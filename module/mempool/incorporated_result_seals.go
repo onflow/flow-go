@@ -18,9 +18,6 @@ type IncorporatedResultSeals interface {
 	// ByID returns an IncorporatedResultSeal by ID
 	ByID(flow.Identifier) (*flow.IncorporatedResultSeal, bool)
 
-	// RegisterEjectionCallbacks adds the provided OnEjection callbacks
-	RegisterEjectionCallbacks(callbacks ...OnEjection)
-
 	// Limit returns the size limit of the mempool
 	Limit() uint
 

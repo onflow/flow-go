@@ -18,37 +18,43 @@ import (
 )
 
 const (
-	BootstrapDir             = "./bootstrap"
-	ProfilerDir              = "./profiler"
-	DataDir                  = "./data"
-	TrieDir                  = "./trie"
-	DockerComposeFile        = "./docker-compose.nodes.yml"
-	DockerComposeFileVersion = "3.7"
-	PrometheusTargetsFile    = "./targets.nodes.json"
-	DefaultCollectionCount   = 3
-	DefaultConsensusCount    = 3
-	DefaultExecutionCount    = 1
-	DefaultVerificationCount = 1
-	DefaultAccessCount       = 1
-	DefaultNClusters         = 1
-	DefaultProfiler          = false
-	DefaultConsensusDelay    = 800 * time.Millisecond
-	DefaultCollectionDelay   = 950 * time.Millisecond
-	AccessAPIPort            = 3569
-	MetricsPort              = 8080
-	RPCPort                  = 9000
+	BootstrapDir               = "./bootstrap"
+	ProfilerDir                = "./profiler"
+	DataDir                    = "./data"
+	TrieDir                    = "./trie"
+	DockerComposeFile          = "./docker-compose.nodes.yml"
+	DockerComposeFileVersion   = "3.7"
+	PrometheusTargetsFile      = "./targets.nodes.json"
+	DefaultCollectionCount     = 3
+	DefaultConsensusCount      = 3
+	DefaultExecutionCount      = 1
+	DefaultVerificationCount   = 1
+	DefaultAccessCount         = 1
+	DefaultUnstakedAccessCount = 0
+	DefaultNClusters           = 1
+	DefaultProfiler            = false
+	DefaultConsensusDelay      = 800 * time.Millisecond
+	DefaultCollectionDelay     = 950 * time.Millisecond
+	AccessAPIPort              = 3569
+	MetricsPort                = 8080
+	RPCPort                    = 9000
+	SecuredRPCPort             = 9001
 )
 
 var (
-	collectionCount   int
-	consensusCount    int
-	executionCount    int
-	verificationCount int
-	accessCount       int
-	nClusters         uint
-	profiler          bool
-	consensusDelay    time.Duration
-	collectionDelay   time.Duration
+	collectionCount        int
+	consensusCount         int
+	executionCount         int
+	verificationCount      int
+	accessCount            int
+	unstakedAccessCount    int
+	nClusters              uint
+	numViewsInStakingPhase uint64
+	numViewsInDKGPhase     uint64
+	numViewsEpoch          uint64
+	profiler               bool
+	consensusDelay         time.Duration
+	collectionDelay        time.Duration
 )
 
 func init() {
@@ -56,8 +62,12 @@ func init() {
 	flag.IntVar(&consensusCount, "consensus", DefaultConsensusCount, "number of consensus nodes")
 	flag.IntVar(&executionCount, "execution", DefaultExecutionCount, "number of execution nodes")
 	flag.IntVar(&verificationCount, "verification", DefaultVerificationCount, "number of verification nodes")
-	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of access nodes")
+	flag.IntVar(&accessCount, "access", DefaultAccessCount, "number of staked access nodes")
+	flag.IntVar(&unstakedAccessCount, "unstaked-access", DefaultUnstakedAccessCount, "number of un-staked access nodes")
 	flag.UintVar(&nClusters, "nclusters", DefaultNClusters, "number of collector clusters")
+	flag.Uint64Var(&numViewsEpoch, "epoch-length", 10000, "number of views in epoch")
+	flag.Uint64Var(&numViewsInStakingPhase, "epoch-staking-phase-length", 2000, "number of views in epoch staking phase")
+	flag.Uint64Var(&numViewsInDKGPhase, "epoch-dkg-phase-length", 2000, "number of views in epoch dkg phase")
 	flag.BoolVar(&profiler, "profiler", DefaultProfiler, "whether to enable the auto-profiler")
 	flag.DurationVar(&consensusDelay, "consensus-delay", DefaultConsensusDelay, "delay on consensus node block proposals")
 	flag.DurationVar(&collectionDelay, "collection-delay", DefaultCollectionDelay, "delay on collection node block proposals")
@@ -73,11 +83,28 @@ func main() {
 	fmt.Printf("- Consensus: %d\n", consensusCount)
 	fmt.Printf("- Execution: %d\n", executionCount)
 	fmt.Printf("- Verification: %d\n", verificationCount)
-	fmt.Printf("- Access: %d\n\n", accessCount)
+	fmt.Printf("- Staked Access: %d\n", accessCount)
+	fmt.Printf("- Unstaked Access: %d\n\n", unstakedAccessCount)
 
 	nodes := prepareNodes()
 
-	conf := testnet.NewNetworkConfig("localnet", nodes, testnet.WithClusters(nClusters))
+	opts := []testnet.NetworkConfigOpt{testnet.WithClusters(nClusters)}
+	if numViewsEpoch != 0 {
+		opts = append(opts, testnet.WithViewsInEpoch(numViewsEpoch))
+	}
+	if numViewsInStakingPhase != 0 {
+		opts = append(opts, testnet.WithViewsInStakingAuction(numViewsInStakingPhase))
+	}
+	if numViewsInDKGPhase != 0 {
+		opts = append(opts, testnet.WithViewsInDKGPhase(numViewsInDKGPhase))
+	}
+	conf := testnet.NewNetworkConfig("localnet", nodes, opts...)
+
+	fmt.Printf("Network config:\n")
+	fmt.Printf("- Clusters: %d\n", conf.NClusters)
+	fmt.Printf("- Epoch Length: %d\n", conf.ViewsInEpoch)
+	fmt.Printf("- Staking Phase Length: %d\n", conf.ViewsInStakingAuction)
+	fmt.Printf("- DKG Phase Length: %d\n", conf.ViewsInDKGPhase)
 
 	err := os.RemoveAll(BootstrapDir)
 	if err != nil && !os.IsNotExist(err) {
@@ -124,7 +151,23 @@ func main() {
 		panic(err)
 	}
 
-	services := prepareServices(containers)
+	fmt.Println("Node bootstrapping data generated...")
+
+	var secureAccessNodeID string
+	for i, c := range containers {
+		fmt.Printf("%d: %s", i+1, c.Identity().String())
+		if c.Unstaked {
+			fmt.Printf(" (unstaked)")
+		}
+
+		if c.Role == flow.RoleAccess && !c.Unstaked {
+			secureAccessNodeID = c.NodeID.String()
+		}
+
+		fmt.Println()
+	}
+
+	services := prepareServices(containers, secureAccessNodeID)
 
 	err = writeDockerComposeConfig(services)
 	if err != nil {
@@ -171,6 +214,12 @@ func prepareNodes() []testnet.NodeConfig {
 		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess))
 	}
 
+	for i := 0; i < unstakedAccessCount; i++ {
+		nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess, func(cfg *testnet.NodeConfig) {
+			cfg.Unstaked = true
+		}))
+	}
+
 	return nodes
 }
 
@@ -202,7 +251,7 @@ type Build struct {
 	Target     string
 }
 
-func prepareServices(containers []testnet.ContainerConfig) Services {
+func prepareServices(containers []testnet.ContainerConfig, secureAccessNodeID string) Services {
 	services := make(Services)
 
 	var (
@@ -216,10 +265,20 @@ func prepareServices(containers []testnet.ContainerConfig) Services {
 	for _, container := range containers {
 		switch container.Role {
 		case flow.RoleConsensus:
-			services[container.ContainerName] = prepareConsensusService(container, numConsensus)
+			services[container.ContainerName] = prepareConsensusService(
+				container,
+				numConsensus,
+				"access_1:9001",
+				secureAccessNodeID,
+			)
 			numConsensus++
 		case flow.RoleCollection:
-			services[container.ContainerName] = prepareCollectionService(container, numCollection)
+			services[container.ContainerName] = prepareCollectionService(
+				container,
+				numCollection,
+				"access_1:9001",
+				secureAccessNodeID,
+			)
 			numCollection++
 		case flow.RoleExecution:
 			services[container.ContainerName] = prepareExecutionService(container, numExecution)
@@ -271,6 +330,12 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 		Environment: []string{
 			"JAEGER_AGENT_HOST=jaeger",
 			"JAEGER_AGENT_PORT=6831",
+			// NOTE: these env vars are not set by default, but can be set [1] to enable binstat logging:
+			// [1] https://docs.docker.com/compose/environment-variables/#pass-environment-variables-to-containers
+			"BINSTAT_ENABLE",
+			"BINSTAT_LEN_WHAT",
+			"BINSTAT_DMP_NAME",
+			"BINSTAT_DMP_PATH",
 		},
 	}
 
@@ -286,6 +351,12 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			},
 			Target: "production",
 		}
+
+		// bring up access node before any other nodes
+		if container.Role == flow.RoleConsensus || container.Role == flow.RoleCollection {
+			service.DependsOn = []string{"access_1"}
+		}
+
 	} else {
 		// remaining services of this role must depend on first service
 		service.DependsOn = []string{
@@ -296,7 +367,7 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 	return service
 }
 
-func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
+func prepareConsensusService(container testnet.ContainerConfig, i int, accessAddress, secureAccessNodeID string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + consensusDelay
@@ -307,6 +378,9 @@ func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--chunk-alpha=1"),
 		fmt.Sprintf("--emergency-sealing-active=false"),
+		fmt.Sprintf("--access-address=%s", accessAddress),
+		fmt.Sprintf("--insecure-access-api=false"),
+		fmt.Sprintf("--secure-access-node-id=%s", secureAccessNodeID),
 	)
 
 	return service
@@ -323,7 +397,7 @@ func prepareVerificationService(container testnet.ContainerConfig, i int) Servic
 	return service
 }
 
-func prepareCollectionService(container testnet.ContainerConfig, i int) Service {
+func prepareCollectionService(container testnet.ContainerConfig, i int, accessAddress, secureAccessNodeID string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + collectionDelay
@@ -333,6 +407,9 @@ func prepareCollectionService(container testnet.ContainerConfig, i int) Service 
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--access-address=%s", accessAddress),
+		fmt.Sprintf("--insecure-access-api=false"),
+		fmt.Sprintf("--secure-access-node-id=%s", secureAccessNodeID),
 	)
 
 	return service
@@ -374,6 +451,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int) Service {
 
 	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
+		fmt.Sprintf("--secure-rpc-addr=%s:%d", container.ContainerName, SecuredRPCPort),
 		fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
@@ -381,7 +459,8 @@ func prepareAccessService(container testnet.ContainerConfig, i int) Service {
 	}...)
 
 	service.Ports = []string{
-		fmt.Sprintf("%d:%d", AccessAPIPort+i, RPCPort),
+		fmt.Sprintf("%d:%d", AccessAPIPort+2*i, RPCPort),
+		fmt.Sprintf("%d:%d", AccessAPIPort+(2*i+1), SecuredRPCPort),
 	}
 
 	return service

@@ -1,14 +1,16 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -16,15 +18,17 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	message2 "github.com/onflow/flow-go/model/libp2p/message"
+	message "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/codec/json"
+	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -34,11 +38,64 @@ var rootBlockID = unittest.IdentifierFixture().String()
 
 const DryRun = true
 
+type PeerTag struct {
+	peer peer.ID
+	tag  string
+}
+
+type TagWatchingConnManager struct {
+	*p2p.ConnManager
+	observers map[observable.Observer]struct{}
+	obsLock   sync.RWMutex
+}
+
+func (cwcm *TagWatchingConnManager) Subscribe(observer observable.Observer) {
+	cwcm.obsLock.Lock()
+	defer cwcm.obsLock.Unlock()
+	var void struct{}
+	cwcm.observers[observer] = void
+}
+
+func (cwcm *TagWatchingConnManager) Unsubscribe(observer observable.Observer) {
+	cwcm.obsLock.Lock()
+	defer cwcm.obsLock.Unlock()
+	delete(cwcm.observers, observer)
+}
+
+func (cwcm *TagWatchingConnManager) Protect(id peer.ID, tag string) {
+	cwcm.obsLock.RLock()
+	defer cwcm.obsLock.RUnlock()
+	cwcm.ConnManager.Protect(id, tag)
+	for obs := range cwcm.observers {
+		go obs.OnNext(PeerTag{peer: id, tag: tag})
+	}
+}
+
+func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
+	cwcm.obsLock.RLock()
+	defer cwcm.obsLock.RUnlock()
+	res := cwcm.ConnManager.Unprotect(id, tag)
+	for obs := range cwcm.observers {
+		go obs.OnNext(PeerTag{peer: id, tag: tag})
+	}
+	return res
+}
+
+func NewTagWatchingConnManager(log zerolog.Logger, metrics module.NetworkMetrics) *TagWatchingConnManager {
+	cm := p2p.NewConnManager(log, metrics)
+	return &TagWatchingConnManager{
+		ConnManager: cm,
+		observers:   make(map[observable.Observer]struct{}),
+		obsLock:     sync.RWMutex{},
+	}
+}
+
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
 // If `dryRunMode` is set to true, it returns an empty slice instead of libp2p nodes, assuming that slice is never going
 // to get used.
-func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Node) {
+func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Node, []observable.Observable) {
 	libP2PNodes := make([]*p2p.Node, n)
+	tagObservables := make([]observable.Observable, n)
 
 	identities := unittest.IdentityListFixture(n, opts...)
 
@@ -50,7 +107,8 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, op
 		port := "0"
 
 		if !dryRunMode {
-			libP2PNodes[i] = generateLibP2PNode(t, logger, *id, key)
+			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key)
+
 			_, port, err = libP2PNodes[i].GetIPPort()
 			require.NoError(t, err)
 		}
@@ -58,7 +116,8 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode bool, op
 		identities[i].Address = fmt.Sprintf("0.0.0.0:%s", port)
 		identities[i].NetworkPubKey = key.PublicKey()
 	}
-	return identities, libP2PNodes
+
+	return identities, libP2PNodes, tagObservables
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
@@ -82,7 +141,9 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			metrics,
 			rootBlockID,
 			p2p.DefaultPeerUpdateInterval,
-			p2p.DefaultUnicastTimeout)
+			p2p.DefaultUnicastTimeout,
+			true,
+			true)
 	}
 	return mws
 }
@@ -124,7 +185,7 @@ func GenerateNetworks(t *testing.T,
 		me.On("Address").Return(ids[i].Address)
 
 		// create the network
-		net, err := p2p.NewNetwork(log, json.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
+		net, err := p2p.NewNetwork(log, cbor.NewCodec(), ids, me, mws[i], csize, tops[i], sms[i], metrics)
 		require.NoError(t, err)
 
 		nets = append(nets, net)
@@ -141,15 +202,15 @@ func GenerateNetworks(t *testing.T,
 	return nets
 }
 
+// returns nodeIDs, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
-	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList,
-	[]*p2p.Middleware) {
+	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []observable.Observable) {
 
-	ids, libP2PNodes := GenerateIDs(t, logger, n, dryRunMode, opts...)
+	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, dryRunMode, opts...)
 	mws := GenerateMiddlewares(t, logger, ids, libP2PNodes)
-	return ids, mws
+	return ids, mws, protectObservables
 }
 
 func GenerateIDsMiddlewaresNetworks(t *testing.T,
@@ -157,11 +218,12 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []network.Topology,
-	dryRun bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network) {
-	ids, mws := GenerateIDsAndMiddlewares(t, n, dryRun, log, opts...)
+	dryRun bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network, []observable.Observable) {
+
+	ids, mws, observables := GenerateIDsAndMiddlewares(t, n, dryRun, log, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
-	return ids, mws, networks
+	return ids, mws, networks, observables
 }
 
 // GenerateEngines generates MeshEngines for the given networks
@@ -179,37 +241,35 @@ func GenerateEngines(t *testing.T, nets []*p2p.Network) []*MeshEngine {
 func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,
 	id flow.Identity,
-	key crypto.PrivateKey) *p2p.Node {
+	key crypto.PrivateKey) (*p2p.Node, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
-
-	// create PubSub options for libp2p to use
-	psOptions := []pubsub.Option{
-		// skip message signing
-		pubsub.WithMessageSigning(false),
-		// skip message signature
-		pubsub.WithStrictSignatureVerification(false),
-		// set max message size limit for 1-k PubSub messaging
-		pubsub.WithMaxMessageSize(p2p.DefaultMaxPubSubMsgSize),
-	}
 
 	pingInfoProvider := new(mocknetwork.PingInfoProvider)
 	pingInfoProvider.On("SoftwareVersion").Return("test")
 	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
 
-	libP2PNode, err := p2p.NewLibP2PNode(logger,
-		id.NodeID,
-		"0.0.0.0:0",
-		p2p.NewConnManager(logger, noopMetrics),
-		key,
-		true,
-		rootBlockID,
-		pingInfoProvider,
-		psOptions...)
+	ctx := context.Background()
+	connGater := p2p.NewConnGater(logger)
+	// Inject some logic to be able to observe connections of this node
+	connManager := NewTagWatchingConnManager(logger, noopMetrics)
 
+	// dns resolver
+	resolver, err := dns.NewResolver(noopMetrics)
 	require.NoError(t, err)
 
-	return libP2PNode
+	libP2PNode, err := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
+		SetRootBlockID(rootBlockID).
+		SetConnectionGater(connGater).
+		SetConnectionManager(connManager).
+		SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
+		SetPingInfoProvider(pingInfoProvider).
+		SetResolver(resolver).
+		SetLogger(logger).
+		Build(ctx)
+	require.NoError(t, err)
+
+	return libP2PNode, connManager
 }
 
 // OptionalSleep introduces a sleep to allow nodes to heartbeat and discover each other (only needed when using PubSub)
@@ -274,12 +334,12 @@ func networkPayloadFixture(t *testing.T, size uint) []byte {
 	// reserves 1000 bytes for the message headers, encoding overhead, and libp2p message overhead.
 	overhead := 1000
 	require.Greater(t, int(size), overhead, "could not generate message below size threshold")
-	emptyEvent := &message2.TestMessage{
+	emptyEvent := &message.TestMessage{
 		Text: "",
 	}
 
 	// encodes the message
-	codec := json.NewCodec()
+	codec := cbor.NewCodec()
 	empty, err := codec.Encode(emptyEvent)
 	require.NoError(t, err)
 

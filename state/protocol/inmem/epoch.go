@@ -17,9 +17,16 @@ type Epoch struct {
 	enc EncodableEpoch
 }
 
-func (e Epoch) Counter() (uint64, error)   { return e.enc.Counter, nil }
-func (e Epoch) FirstView() (uint64, error) { return e.enc.FirstView, nil }
-func (e Epoch) FinalView() (uint64, error) { return e.enc.FinalView, nil }
+func (e Epoch) Encodable() EncodableEpoch {
+	return e.enc
+}
+
+func (e Epoch) Counter() (uint64, error)            { return e.enc.Counter, nil }
+func (e Epoch) FirstView() (uint64, error)          { return e.enc.FirstView, nil }
+func (e Epoch) DKGPhase1FinalView() (uint64, error) { return e.enc.DKGPhase1FinalView, nil }
+func (e Epoch) DKGPhase2FinalView() (uint64, error) { return e.enc.DKGPhase2FinalView, nil }
+func (e Epoch) DKGPhase3FinalView() (uint64, error) { return e.enc.DKGPhase3FinalView, nil }
+func (e Epoch) FinalView() (uint64, error)          { return e.enc.FinalView, nil }
 func (e Epoch) InitialIdentities() (flow.IdentityList, error) {
 	return e.enc.InitialIdentities, nil
 }
@@ -83,6 +90,18 @@ func (es *setupEpoch) Counter() (uint64, error) {
 
 func (es *setupEpoch) FirstView() (uint64, error) {
 	return es.setupEvent.FirstView, nil
+}
+
+func (es *setupEpoch) DKGPhase1FinalView() (uint64, error) {
+	return es.setupEvent.DKGPhase1FinalView, nil
+}
+
+func (es *setupEpoch) DKGPhase2FinalView() (uint64, error) {
+	return es.setupEvent.DKGPhase2FinalView, nil
+}
+
+func (es *setupEpoch) DKGPhase3FinalView() (uint64, error) {
+	return es.setupEvent.DKGPhase3FinalView, nil
 }
 
 func (es *setupEpoch) FinalView() (uint64, error) {

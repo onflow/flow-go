@@ -34,7 +34,7 @@ func (bp *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint
 	setHotstuffFields := func(header *flow.Header) error {
 		header.View = view
 		header.ParentVoterIDs = qc.SignerIDs
-		header.ParentVoterSig = qc.SigData
+		header.ParentVoterSigData = qc.SigData
 		header.ProposerID = bp.committee.Self()
 
 		// turn the header into a block header proposal as known by hotstuff
@@ -53,7 +53,7 @@ func (bp *BlockProducer) MakeBlockProposal(qc *flow.QuorumCertificate, view uint
 			return fmt.Errorf("could not sign block proposal: %w", err)
 		}
 
-		header.ProposerSig = proposal.SigData
+		header.ProposerSigData = proposal.SigData
 		return nil
 	}
 

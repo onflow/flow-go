@@ -42,7 +42,7 @@ func (e UnconvertibleIdentitiesError) Error() string {
 	for id, err := range e.errs {
 		multierr = multierror.Append(multierr, fmt.Errorf("failed to connect to %s: %w", id.String(), err))
 	}
-	return multierr.GoString()
+	return multierr.Error()
 }
 
 // IsUnconvertibleIdentitiesError returns whether the given error is an UnconvertibleIdentitiesError error

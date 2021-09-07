@@ -89,7 +89,7 @@ func (d Delta) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m)
 }
 
-func (d Delta) UnmarshalJSON(data []byte) error {
+func (d *Delta) UnmarshalJSON(data []byte) error {
 
 	var m flow.RegisterEntries
 

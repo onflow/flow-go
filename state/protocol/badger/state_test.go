@@ -35,10 +35,25 @@ func TestBootstrapAndOpen(t *testing.T) {
 	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
 
 		// expect the final view metric to be set to current epoch's final view
-		finalView, err := rootSnapshot.Epochs().Current().FinalView()
+		epoch := rootSnapshot.Epochs().Current()
+		finalView, err := epoch.FinalView()
 		require.NoError(t, err)
+		counter, err := epoch.Counter()
+		require.NoError(t, err)
+		phase, err := rootSnapshot.Phase()
+		require.NoError(t, err)
+
 		complianceMetrics := new(mock.ComplianceMetrics)
 		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
+		complianceMetrics.On("CurrentEpochCounter", counter).Once()
+		complianceMetrics.On("CurrentEpochPhase", phase).Once()
+		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
+
+		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(epoch)
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
@@ -46,7 +61,6 @@ func TestBootstrapAndOpen(t *testing.T) {
 		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
 		require.NoError(t, err)
 
-		// assert update final view was called
 		complianceMetrics.AssertExpectations(t)
 
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
@@ -82,11 +96,32 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 
 	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db *badger.DB, _ *bprotocol.State) {
 
+		complianceMetrics := new(mock.ComplianceMetrics)
+
 		// expect the final view metric to be set to next epoch's final view
 		finalView, err := committedPhaseSnapshot.Epochs().Next().FinalView()
 		require.NoError(t, err)
-		complianceMetrics := new(mock.ComplianceMetrics)
 		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
+
+		// expect counter to be set to current epochs counter
+		counter, err := committedPhaseSnapshot.Epochs().Current().Counter()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentEpochCounter", counter).Once()
+
+		// expect epoch phase to be set to current phase
+		phase, err := committedPhaseSnapshot.Phase()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentEpochPhase", phase).Once()
+
+		currentEpochFinalView, err := committedPhaseSnapshot.Epochs().Current().FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentEpochFinalView", currentEpochFinalView).Once()
+
+		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(committedPhaseSnapshot.Epochs().Current())
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)

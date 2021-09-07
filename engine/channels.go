@@ -106,6 +106,9 @@ const (
 	syncClusterPrefix = network.Channel("sync-cluster") // dynamic channel, use ChannelSyncCluster function
 	SyncExecution     = network.Channel("sync-execution")
 
+	// Channels for dkg communication
+	DKGCommittee = "dkg-committee"
+
 	// Channels for actively pushing entities to subscribers
 	PushTransactions = network.Channel("push-transactions")
 	PushGuarantees   = network.Channel("push-guarantees")
@@ -150,6 +153,9 @@ func initializeChannelRoleMap() {
 	// Channels for protocols actively synchronizing state across nodes
 	channelRoleMap[SyncCommittee] = flow.RoleList{flow.RoleConsensus}
 	channelRoleMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
+
+	// Channels for DKG communication
+	channelRoleMap[DKGCommittee] = flow.RoleList{flow.RoleConsensus}
 
 	// Channels for actively pushing entities to subscribers
 	channelRoleMap[PushTransactions] = flow.RoleList{flow.RoleCollection}

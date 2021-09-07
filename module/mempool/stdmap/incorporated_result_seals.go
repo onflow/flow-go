@@ -1,6 +1,8 @@
 package stdmap
 
 import (
+	"log"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
 )
@@ -24,37 +26,20 @@ func indexByHeight(seal *flow.IncorporatedResultSeal) uint64 {
 func NewIncorporatedResultSeals(limit uint) *IncorporatedResultSeals {
 	byHeight := make(map[uint64]sealSet)
 
-	// assuming all the entities are for unsealed blocks, then we will remove a seal
-	// with the largest height.
-	ejector := func(entities map[flow.Identifier]flow.Entity) (flow.Identifier, flow.Entity) {
-		maxHeight := uint64(0)
-		var sealsAtMaxHeight sealSet
-		for height, seals := range byHeight {
-			if height > maxHeight || (height == 0 && maxHeight == 0) {
-				maxHeight = height
-				sealsAtMaxHeight = seals
-			}
-		}
-
-		for sealID, seal := range sealsAtMaxHeight {
-			return sealID, seal
-		}
-
-		// this can only happen if mempool is empty or if the secondary index was inconsistently updated
-		panic("cannot eject element from empty mempool")
+	// This mempool implementation supports pruning by height, meaning that as soon as sealing advances
+	// seals will be gradually removed from mempool
+	// ejecting a seal from mempool means that we have reached our limit and something is very bad, meaning that sealing
+	// is not actually happening.
+	// By setting high limit ~12 hours we ensure that we have some safety window for sealing to recover and make progress
+	ejector := func(b *Backend) (flow.Identifier, flow.Entity, bool) {
+		log.Fatalf("incorporated result seals reached max capacity %d", limit)
+		panic("incorporated result seals reached max capacity")
 	}
 
 	r := &IncorporatedResultSeals{
 		Backend:  NewBackend(WithLimit(limit), WithEject(ejector)),
 		byHeight: byHeight,
 	}
-
-	// when eject a entity, also update the secondary indx
-	r.RegisterEjectionCallbacks(func(entity flow.Entity) {
-		seal := entity.(*flow.IncorporatedResultSeal)
-		sealID := seal.ID()
-		r.removeFromIndex(sealID, seal.Header.Height)
-	})
 
 	return r
 }
@@ -84,7 +69,7 @@ func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool,
 			return nil
 		}
 
-		added = ir.Backdata.Add(seal)
+		added = ir.Backdata.Add(sealID, seal)
 		if !added {
 			return nil
 		}
@@ -158,11 +143,6 @@ func (ir *IncorporatedResultSeals) Clear() {
 	}
 }
 
-// RegisterEjectionCallbacks adds the provided OnEjection callbacks
-func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
-	ir.Backend.RegisterEjectionCallbacks(callbacks...)
-}
-
 // PruneUpToHeight remove all seals for blocks whose height is strictly
 // smaller that height. Note: seals for blocks at height are retained.
 // After pruning, seals below for blocks below the given height are dropped.
@@ -170,7 +150,7 @@ func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempoo
 // Monotonicity Requirement:
 // The pruned height cannot decrease, as we cannot recover already pruned elements.
 // If `height` is smaller than the previous value, the previous value is kept
-// and the sentinel empool.NewDecreasingPruningHeightError is returned.
+// and the sentinel mempool.DecreasingPruningHeightError is returned.
 func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 	return ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
 		if height < ir.lowestHeight {

@@ -18,10 +18,15 @@ int get_invalid() {
     return INVALID;
 }
 
+void bn_new_wrapper(bn_t a) {
+    bn_new(a);
+}
+
 // global variable of the pre-computed data
 prec_st bls_prec_st;
 prec_st* bls_prec = NULL;
 
+// required constants for the optimized SWU hash to curve
 #if (hashToPoint == OPSWU)
 extern const uint64_t p_3div4_data[Fp_DIGITS];
 extern const uint64_t fp_p_1div2_data[Fp_DIGITS];
@@ -45,8 +50,8 @@ const uint64_t p_1div2_data[Fp_DIGITS] = {
 
 
 // sets the global variable to input
-void precomputed_data_set(prec_st* p) {
-    bls_prec = p;
+void precomputed_data_set(const prec_st* p) {
+    bls_prec = (prec_st*)p;
 }
 
 // Reads a prime field element from a digit vector in big endian format.
@@ -58,9 +63,11 @@ prec_st* init_precomputed_data_BLS12_381() {
     bls_prec = &bls_prec_st;
 
     #if (hashToPoint == OPSWU)
+    // isogenous curve constants used in optimized SWU
     fp_read_raw(bls_prec->a1, a1_data);
     fp_read_raw(bls_prec->b1, b1_data);
     // (p-3)/4
+    bn_new(&bls_prec->p_3div4);
     bn_read_raw(&bls_prec->p_3div4, p_3div4_data, Fp_DIGITS);
     // (p-1)/2
     fp_read_raw(bls_prec->fp_p_1div2, fp_p_1div2_data);
@@ -75,10 +82,13 @@ prec_st* init_precomputed_data_BLS12_381() {
     #endif
 
     #if (MEMBERSHIP_CHECK_G1 == BOWE)
+    bn_new(&bls_prec->beta);
     bn_read_raw(&bls_prec->beta, beta_data, Fp_DIGITS);
+    bn_new(&bls_prec->z2_1_by3);
     bn_read_raw(&bls_prec->z2_1_by3, z2_1_by3_data, 2);
     #endif
 
+    bn_new(&bls_prec->p_1div2);
     bn_read_raw(&bls_prec->p_1div2, p_1div2_data, Fp_DIGITS);
     return bls_prec;
 }
@@ -222,7 +232,7 @@ void bn_map_to_Zr_star(bn_t a, const uint8_t* bin, int len) {
 
 // returns the sign of y.
 // 1 if y > (p - 1)/2 and 0 otherwise.
-static int fp_get_sign(fp_t y) {
+static int fp_get_sign(const fp_t y) {
     bn_t bn_y;
     bn_new(bn_y);
     fp_prime_back(bn_y, y);
@@ -280,12 +290,21 @@ void ep_write_bin_compact(byte *bin, const ep_t a, const int len) {
 // It returns RLC_OK if the inputs are valid and the execution completes, RLC_ERR if any of
 // the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
 int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
+    // check the length
     const int G1_size = (G1_BYTES/(G1_SERIALIZATION+1));
     if (len!=G1_size) {
         return RLC_ERR;
     }
+
+    // check the compression bit
+    int compressed = bin[0] >> 7;
+    if ((compressed == 1) != (G1_SERIALIZATION == COMPRESSED)) {
+        return RLC_ERR;
+    } 
+
     // check if the point is infinity
-    if (bin[0] & 0x40) {
+    int is_infinity = bin[0] & 0x40;
+    if (is_infinity) {
         // check if the remaining bits are cleared
         if (bin[0] & 0x3F) {
             return RLC_ERR;
@@ -299,9 +318,8 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
 		return RLC_OK;
 	} 
 
-    int compressed = bin[0] >> 7;
+    // read the sign bit and check for consistency
     int y_sign = (bin[0] >> 5) & 1;
-
     if (y_sign && (!compressed)) {
         return RLC_ERR;
     } 
@@ -329,6 +347,7 @@ int ep_read_bin_compact(ep_t a, const byte *bin, const int len) {
     }
     return RLC_ERR;
 }
+
 
 // returns the sign of y.
 // sign(y_0) if y_1 = 0, else sign(y_1)
@@ -384,13 +403,21 @@ void ep2_write_bin_compact(byte *bin, const ep2_t a, const int len) {
 // the inputs is invalid, and UNDEFINED if an unexpected execution error happens.
 // The code is a modified version of Relic ep2_read_bin
 int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
+    // check the length
     const int G2size = (G2_BYTES/(G2_SERIALIZATION+1));
     if (len!=G2size) {
         return RLC_ERR;
     }
 
+    // check the compression bit
+    int compressed = bin[0] >> 7;
+    if ((compressed == 1) != (G2_SERIALIZATION == COMPRESSED)) {
+        return RLC_ERR;
+    } 
+
     // check if the point in infinity
-    if (bin[0] & 0x40) {
+    int is_infinity = bin[0] & 0x40;
+    if (is_infinity) {
         // the remaining bits need to be cleared
         if (bin[0] & 0x3F) {
             return RLC_ERR;
@@ -403,11 +430,13 @@ int ep2_read_bin_compact(ep2_t a, const byte *bin, const int len) {
 		ep2_set_infty(a);
 		return RLC_OK;
 	} 
-    byte compressed = bin[0] >> 7;
-    byte y_sign = (bin[0] >> 5) & 1;
+
+    // read the sign bit and check for consistency
+    int y_sign = (bin[0] >> 5) & 1;
     if (y_sign && (!compressed)) {
         return RLC_ERR;
     } 
+    
 	a->coord = BASIC;
 	fp_set_dig(a->z[0], 1);
 	fp_zero(a->z[1]);
@@ -744,4 +773,10 @@ int subgroup_check_G1_bench() {
     res = bowe_subgroup_check_G1(p);
     #endif
     return res;
+}
+
+// This is a testing function.
+// It wraps a call to a Relic macro since cgo can't call macros.
+void xmd_sha256(uint8_t *hash, int len_hash, uint8_t *msg, int len_msg, uint8_t *dst, int len_dst){
+    md_xmd_sh256(hash, len_hash, msg, len_msg, dst, len_dst);
 }

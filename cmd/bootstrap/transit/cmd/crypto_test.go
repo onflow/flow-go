@@ -59,7 +59,7 @@ func TestEndToEnd(t *testing.T) {
 	}
 }
 
-func TestMd5(t *testing.T) {
+func TestSha256(t *testing.T) {
 	tmpFile, err := ioutil.TempFile(os.TempDir(), "prefix-")
 	assert.NoError(t, err)
 	defer os.Remove(tmpFile.Name())
@@ -70,7 +70,7 @@ func TestMd5(t *testing.T) {
 
 	assert.NoError(t, tmpFile.Close())
 
-	md5, err := getFileMD5(tmpFile.Name())
+	hash, err := getFileSHA256(tmpFile.Name())
 	assert.NoError(t, err)
-	assert.Equal(t, "1b8e86521e7e04d647faa9e6192a65f5", md5)
+	assert.Equal(t, "876a3eab5fe740cb864a3d62869b0eefd6fbc34ec331c3064a6ffac0f9485a88", hash)
 }

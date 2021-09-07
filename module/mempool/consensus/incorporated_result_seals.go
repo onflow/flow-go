@@ -35,7 +35,14 @@ func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool,
 
 // All returns all the items in the mempool
 func (ir *IncorporatedResultSeals) All() []*flow.IncorporatedResultSeal {
-	return ir.seals.All()
+	unfiltered := ir.seals.All()
+	seals := make([]*flow.IncorporatedResultSeal, 0, len(unfiltered))
+	for _, s := range unfiltered {
+		if ir.resultHasMultipleReceipts(s.IncorporatedResult) {
+			seals = append(seals, s)
+		}
+	}
+	return seals
 }
 
 // resultHasMultipleReceipts implements an additional _temporary_ safety measure:
@@ -93,11 +100,6 @@ func (ir *IncorporatedResultSeals) Size() uint {
 // Clear removes all entities from the pool.
 func (ir *IncorporatedResultSeals) Clear() {
 	ir.seals.Clear()
-}
-
-// RegisterEjectionCallbacks adds the provided OnEjection callbacks
-func (ir *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
-	ir.seals.RegisterEjectionCallbacks(callbacks...)
 }
 
 // PruneUpToHeight remove all seals for blocks whose height is strictly

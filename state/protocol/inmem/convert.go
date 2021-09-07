@@ -106,7 +106,10 @@ func FromEpoch(from protocol.Epoch) (*Epoch, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get random source: %w", err)
 	}
-
+	epoch.DKGPhase1FinalView, epoch.DKGPhase2FinalView, epoch.DKGPhase3FinalView, err = protocol.DKGPhaseViews(from)
+	if err != nil {
+		return nil, fmt.Errorf("could not get dkg final views")
+	}
 	clustering, err := from.Clustering()
 	if err != nil {
 		return nil, fmt.Errorf("could not get clustering: %w", err)

@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/state/protocol"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the gRPC server.
@@ -151,13 +151,18 @@ func (e *RPC) Done() <-chan struct{} {
 
 // SubmitLocal submits an event originating on the local node.
 func (e *RPC) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), event)
+		if err != nil {
+			e.log.Error().Err(err).Msg("could not process submitted event")
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *RPC) Submit(originID flow.Identifier, event interface{}) {
+func (e *RPC) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -168,12 +173,14 @@ func (e *RPC) Submit(originID flow.Identifier, event interface{}) {
 
 // ProcessLocal processes an event originating on the local node.
 func (e *RPC) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *RPC) Process(originID flow.Identifier, event interface{}) error {
+func (e *RPC) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})

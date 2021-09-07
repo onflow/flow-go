@@ -87,14 +87,16 @@ type CFInvalidEventsCollection struct {
 	computed   flow.Identifier
 	chunkIndex uint64
 	resultID   flow.Identifier
+	eventIDs   flow.IdentifierList
 }
 
-func NewCFInvalidEventsCollection(expected flow.Identifier, computed flow.Identifier, chInx uint64, execResID flow.Identifier) *CFInvalidEventsCollection {
+func NewCFInvalidEventsCollection(expected flow.Identifier, computed flow.Identifier, chInx uint64, execResID flow.Identifier, events flow.EventsList) *CFInvalidEventsCollection {
 	return &CFInvalidEventsCollection{
 		expected:   expected,
 		computed:   computed,
 		chunkIndex: chInx,
 		resultID:   execResID,
+		eventIDs:   flow.GetIDs(events),
 	}
 }
 
@@ -107,7 +109,8 @@ func (c *CFInvalidEventsCollection) ExecutionResultID() flow.Identifier {
 }
 
 func (c *CFInvalidEventsCollection) String() string {
-	return fmt.Sprintf("events collection hash differs, got %x expected %x for chunk %d with result ID %s", c.computed, c.expected, c.chunkIndex, c.resultID)
+	return fmt.Sprintf("events collection hash differs, got %x expected %x for chunk %d with result ID %s, events IDs: %v", c.computed, c.expected,
+		c.chunkIndex, c.resultID, c.eventIDs)
 }
 
 // CFInvalidServiceEventsEmitted is returned when service events are different from the chunk's one

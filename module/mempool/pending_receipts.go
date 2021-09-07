@@ -17,4 +17,14 @@ type PendingReceipts interface {
 	// ByPreviousResultID returns all the pending receipts whose previous result id
 	// matches the given result id
 	ByPreviousResultID(previousReusltID flow.Identifier) []*flow.ExecutionReceipt
+
+	// PruneUpToHeight remove all receipts for blocks whose height is strictly
+	// smaller that height. Note: receipts for blocks at height are retained.
+	// After pruning, receipts below for blocks below the given height are dropped.
+	//
+	// Monotonicity Requirement:
+	// The pruned height cannot decrease, as we cannot recover already pruned elements.
+	// If `height` is smaller than the previous value, the previous value is kept
+	// and the sentinel mempool.DecreasingPruningHeightError is returned.
+	PruneUpToHeight(height uint64) error
 }

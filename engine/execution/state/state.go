@@ -64,7 +64,9 @@ type ExecutionState interface {
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
-	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error
+	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+		chunkDataPacks []*flow.ChunkDataPack,
+		executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error
 }
 
 const (
@@ -213,7 +215,7 @@ type RegisterUpdatesHolder interface {
 	RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
 }
 
-func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, error) {
+func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
 	ids, values := ruh.RegisterUpdates()
 
 	update, err := ledger.NewUpdate(
@@ -223,15 +225,15 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 	)
 
 	if err != nil {
-		return flow.DummyStateCommitment, fmt.Errorf("cannot create ledger update: %w", err)
+		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	commit, err := ldg.Set(update)
+	commit, trieUpdate, err := ldg.Set(update)
 	if err != nil {
-		return flow.DummyStateCommitment, err
+		return flow.DummyStateCommitment, nil, err
 	}
 
-	return flow.StateCommitment(commit), nil
+	return flow.StateCommitment(commit), trieUpdate, nil
 }
 
 //func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
@@ -306,7 +308,12 @@ func (s *state) StateCommitmentByBlockID(ctx context.Context, blockID flow.Ident
 }
 
 func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
-	return s.chunkDataPacks.ByChunkID(chunkID)
+	chunkDataPack, err := s.chunkDataPacks.ByChunkID(chunkID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve stored chunk data pack: %w", err)
+	}
+
+	return chunkDataPack, nil
 }
 
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {
@@ -320,7 +327,9 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
-func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment, chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error {
+func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
+	results []flow.TransactionResult) error {
 
 	spew.Config.DisableMethods = true
 	spew.Config.DisablePointerMethods = true

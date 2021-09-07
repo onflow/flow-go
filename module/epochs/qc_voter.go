@@ -3,6 +3,7 @@ package epochs
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -92,14 +93,15 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 
 		// for all attempts after the first, wait before re-trying
 		if attempts > 1 {
-			time.Sleep(voter.wait)
-		}
+			wait := voter.getWaitInterval(attempts - 2) // -2 so that we wait the base interval in the first Sleep
+			log.Info().Msgf("waiting for %s before retry", wait.String())
 
-		// check that our context is still valid
-		select {
-		case <-ctx.Done():
-			return fmt.Errorf("context cancelled: %w", ctx.Err())
-		default:
+			select {
+			case <-ctx.Done():
+				return fmt.Errorf("context cancelled: %w", ctx.Err())
+			case <-time.After(wait):
+				// proceed and re-submit vote
+			}
 		}
 
 		// check that we're still in the setup phase, if we're not we can't
@@ -133,4 +135,14 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		log.Info().Msg("successfully submitted vote - exiting QC vote process...")
 		return nil
 	}
+}
+
+// getWaitInterval returns an interval to wait after the given number of attempts.
+// The interval includes some jitter to avoid synchronization of requests from
+// all collection nodes.
+func (voter *RootQCVoter) getWaitInterval(attempts int) time.Duration {
+	base := voter.wait << attempts                // base wait period on a geometric backoff
+	jitter := float64(base) * rand.Float64() * .1 // add 10% jitter to avoid synchronization across cluster
+
+	return time.Duration(base) + time.Duration(jitter)
 }

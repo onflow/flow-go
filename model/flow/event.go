@@ -15,8 +15,6 @@ import (
 const (
 	EventAccountCreated EventType = "flow.AccountCreated"
 	EventAccountUpdated EventType = "flow.AccountUpdated"
-	EventEpochSetup     EventType = "flow.EpochSetup"
-	EventEpochCommit    EventType = "flow.EpochCommit"
 )
 
 type EventType string
@@ -44,6 +42,10 @@ func (e Event) String() string {
 // ID returns a canonical identifier that is guaranteed to be unique.
 func (e Event) ID() Identifier {
 	return MakeID(wrapEventID(e))
+}
+
+func (e Event) Checksum() Identifier {
+	return MakeID(e)
 }
 
 // Encode returns the canonical encoding of this event, containing only the fields necessary to uniquely identify it.

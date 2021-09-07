@@ -16,7 +16,7 @@ type Guarantees struct {
 	cache *Cache
 }
 
-func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
+func NewGuarantees(collector module.CacheMetrics, db *badger.DB, cacheSize uint) *Guarantees {
 
 	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		collID := key.(flow.Identifier)
@@ -36,7 +36,7 @@ func NewGuarantees(collector module.CacheMetrics, db *badger.DB) *Guarantees {
 	g := &Guarantees{
 		db: db,
 		cache: newCache(collector, metrics.ResourceGuarantee,
-			withLimit(flow.DefaultTransactionExpiry+100),
+			withLimit(cacheSize),
 			withStore(store),
 			withRetrieve(retrieve)),
 	}

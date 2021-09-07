@@ -3,7 +3,11 @@ CONSENSUS = 3
 EXECUTION = 2
 VERIFICATION = 1
 ACCESS = 1
+UNSTAKED_ACCESS = 0
 NCLUSTERS=1
+EPOCHLEN=10000   # 0 means use default
+STAKINGLEN=2000 # 0 means use default
+DKGLEN=2000     # 0 means use default
 PROFILER=false
 CONSENSUS_DELAY=800ms
 COLLECTION_DELAY=950ms
@@ -22,7 +26,11 @@ init:
 		-execution=$(EXECUTION) \
 		-verification=$(VERIFICATION) \
 		-access=$(ACCESS) \
+		-unstaked-access=$(UNSTAKED_ACCESS) \
 		-nclusters=$(NCLUSTERS) \
+		-epoch-length=$(EPOCHLEN) \
+		-epoch-staking-phase-length=$(STAKINGLEN) \
+		-epoch-dkg-phase-length=$(DKGLEN) \
 		-profiler=$(PROFILER) \
 		-consensus-delay=$(CONSENSUS_DELAY) \
 		-collection-delay=$(COLLECTION_DELAY)
@@ -48,3 +56,4 @@ stop:
 .PHONY: load
 load:
 	go run --tags relic ../loader -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
+

@@ -181,14 +181,17 @@ func (e *Engine) Done() <-chan struct{} {
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	err := e.ProcessLocal(event)
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("internal error processing event")
+	}
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
-	err := e.Process(originID, event)
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
+	err := e.Process(channel, originID, event)
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("internal error processing event")
 	}
@@ -196,12 +199,12 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+	return e.messageHandler.Process(e.me.NodeID(), event)
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(_ network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.messageHandler.Process(originID, event)
 }
 

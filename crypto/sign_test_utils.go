@@ -134,6 +134,16 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
 		distinctPkBytes := distinctSk.PublicKey().Encode()
 		assert.NotEqual(t, pkBytes, distinctPkBytes, "keys should be different")
+
+		// same for the compressed encoding
+		pkComprBytes := pk.EncodeCompressed()
+		pkComprCheck, err := DecodePublicKeyCompressed(salg, pkComprBytes)
+		require.Nil(t, err, "the key decoding has failed")
+		assert.True(t, pk.Equals(pkComprCheck), "key equality check failed")
+		pkCheckComprBytes := pkComprCheck.EncodeCompressed()
+		assert.Equal(t, pkComprBytes, pkCheckComprBytes, "keys should be equal")
+		distinctPkComprBytes := distinctSk.PublicKey().EncodeCompressed()
+		assert.NotEqual(t, pkComprBytes, distinctPkComprBytes, "keys should be different")
 	}
 
 	// test invalid private keys (equal to the curve group order)

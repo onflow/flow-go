@@ -7,6 +7,11 @@ import (
 	"github.com/rs/zerolog"
 )
 
+var (
+	// IncompatibleInputTypeError indicates that the input has an incompatible type
+	IncompatibleInputTypeError = errors.New("incompatible input type")
+)
+
 // InvalidInputError are errors for caused by invalid inputs.
 // It's useful to distinguish these known errors from exceptions.
 // By distinguishing errors from exceptions, we can log them

@@ -46,14 +46,6 @@ func init() {
 	}
 }
 
-// GetDefaultHashes returns the default hashes of the SMT.
-//
-// For each tree level N, there is a default hash equal to the chained
-// hashing of the default value N times.
-func GetDefaultHashes() [defaultHashesNum]hash.Hash {
-	return defaultHashes
-}
-
 // GetDefaultHashForHeight returns the default hashes of the SMT at a specified height.
 //
 // For each tree level N, there is a default hash equal to the chained
@@ -289,7 +281,7 @@ func (p *TrieProof) String() string {
 	interimIndex := 0
 	for j := 0; j < int(p.Steps); j++ {
 		// if bit is set
-		if p.Flags[j/8]&(1<<int(7-j%8)) != 0 {
+		if p.Flags[j/8]&(1<<(7-j%8)) != 0 {
 			proofStr += fmt.Sprintf("\t\t %d: [%x]\n", j, p.Interims[interimIndex])
 			interimIndex++
 		}

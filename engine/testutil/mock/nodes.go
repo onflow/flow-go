@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
@@ -41,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
@@ -112,11 +114,39 @@ func (g *GenericNode) CloseDB() error {
 // CollectionNode implements an in-process collection node for tests.
 type CollectionNode struct {
 	GenericNode
-	Collections     storage.Collections
-	Transactions    storage.Transactions
-	IngestionEngine *collectioningest.Engine
-	PusherEngine    *pusher.Engine
-	ProviderEngine  *provider.Engine
+	Collections        storage.Collections
+	Transactions       storage.Transactions
+	ClusterPayloads    storage.ClusterPayloads
+	TxPools            *epochpool.TransactionPools
+	Voter              module.ClusterRootQCVoter
+	IngestionEngine    *collectioningest.Engine
+	PusherEngine       *pusher.Engine
+	ProviderEngine     *provider.Engine
+	EpochManagerEngine *epochmgr.Engine
+}
+
+func (n CollectionNode) Ready() <-chan struct{} {
+	return lifecycle.AllReady(
+		n.PusherEngine,
+		n.ProviderEngine,
+		n.IngestionEngine,
+		n.EpochManagerEngine,
+	)
+}
+
+func (n CollectionNode) Done() <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		<-lifecycle.AllDone(
+			n.PusherEngine,
+			n.ProviderEngine,
+			n.IngestionEngine,
+			n.EpochManagerEngine,
+		)
+		n.GenericNode.Done()
+		close(done)
+	}()
+	return done
 }
 
 // ConsensusNode implements an in-process consensus node for tests.

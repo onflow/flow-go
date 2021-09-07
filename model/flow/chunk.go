@@ -10,7 +10,7 @@ type ChunkBody struct {
 
 	// Computation consumption info
 	TotalComputationUsed uint64 // total amount of computation used by running all txs in this chunk
-	NumberOfTransactions uint16 // number of transactions inside the collection
+	NumberOfTransactions uint64 // number of transactions inside the collection
 }
 
 type Chunk struct {
@@ -38,10 +38,10 @@ func (ch *Chunk) Checksum() Identifier {
 // Register proofs order must not be correlated to the order of register reads during
 // the chunk execution in order to enforce the SPoCK secret high entropy.
 type ChunkDataPack struct {
-	ChunkID      Identifier
-	StartState   StateCommitment
-	Proof        StorageProof
-	CollectionID Identifier
+	ChunkID    Identifier
+	StartState StateCommitment
+	Proof      StorageProof
+	Collection *Collection
 }
 
 // ID returns the unique identifier for the concrete view, which is the ID of

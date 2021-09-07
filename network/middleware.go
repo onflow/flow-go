@@ -27,15 +27,6 @@ type Middleware interface {
 	// Stop will end the execution of the middleware and wait for it to end.
 	Stop()
 
-	// Send sends the message to the set of target ids
-	// If there is only one target NodeID, then a direct 1-1 connection is used by calling middleware.sendDirect
-	// Otherwise, middleware.Publish is used, which uses the PubSub method of communication.
-	//
-	// Deprecated: Send exists for historical compatibility, and should not be used on new
-	// developments. It is planned to be cleaned up in near future. Proper utilization of Dispatch or
-	// Publish are recommended instead.
-	Send(channel Channel, msg *message.Message, targetIDs ...flow.Identifier) error
-
 	// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
 	// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
 	// as the router.

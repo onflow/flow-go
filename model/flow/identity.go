@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
 
@@ -123,6 +124,18 @@ func (iy Identity) MarshalJSON() ([]byte, error) {
 	return data, nil
 }
 
+func (iy Identity) MarshalCBOR() ([]byte, error) {
+	encodable, err := encodableFromIdentity(iy)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
+	}
+	data, err := cbor.Marshal(encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode cbor: %w", err)
+	}
+	return data, nil
+}
+
 func (iy Identity) MarshalMsgpack() ([]byte, error) {
 	encodable, err := encodableFromIdentity(iy)
 	if err != nil {
@@ -175,6 +188,19 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 	err = identityFromEncodable(encodable, iy)
 	if err != nil {
 		return fmt.Errorf("could not convert from encodable json: %w", err)
+	}
+	return nil
+}
+
+func (iy *Identity) UnmarshalCBOR(b []byte) error {
+	var encodable encodableIdentity
+	err := cbor.Unmarshal(b, &encodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	err = identityFromEncodable(encodable, iy)
+	if err != nil {
+		return fmt.Errorf("could not convert from encodable cbor: %w", err)
 	}
 	return nil
 }
@@ -292,10 +318,10 @@ func (il IdentityList) Selector() IdentityFilter {
 	}
 }
 
-func (il IdentityList) Lookup() map[Identifier]struct{} {
-	lookup := make(map[Identifier]struct{})
+func (il IdentityList) Lookup() map[Identifier]*Identity {
+	lookup := make(map[Identifier]*Identity, len(il))
 	for _, identity := range il {
-		lookup[identity.NodeID] = struct{}{}
+		lookup[identity.NodeID] = identity
 	}
 	return lookup
 }

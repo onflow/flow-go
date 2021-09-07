@@ -4,7 +4,6 @@ package mempool
 
 import (
 	flow "github.com/onflow/flow-go/model/flow"
-	mempool "github.com/onflow/flow-go/module/mempool"
 
 	mock "github.com/stretchr/testify/mock"
 )
@@ -105,17 +104,6 @@ func (_m *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
 	}
 
 	return r0
-}
-
-// RegisterEjectionCallbacks provides a mock function with given fields: callbacks
-func (_m *IncorporatedResultSeals) RegisterEjectionCallbacks(callbacks ...mempool.OnEjection) {
-	_va := make([]interface{}, len(callbacks))
-	for _i := range callbacks {
-		_va[_i] = callbacks[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, _va...)
-	_m.Called(_ca...)
 }
 
 // Rem provides a mock function with given fields: incorporatedResultID

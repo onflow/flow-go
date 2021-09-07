@@ -95,6 +95,15 @@ func RequireCloseBefore(t testing.TB, c <-chan struct{}, duration time.Duration,
 	}
 }
 
+// RequireClosed is a test helper function that fails the test if channel `ch` is not closed.
+func RequireClosed(t *testing.T, ch <-chan struct{}, message string) {
+	select {
+	case <-ch:
+	default:
+		require.Fail(t, "channel is not closed: "+message)
+	}
+}
+
 // RequireConcurrentCallsReturnBefore is a test helper that runs function `f` count-many times concurrently,
 // and requires all invocations to return within duration.
 func RequireConcurrentCallsReturnBefore(t *testing.T, f func(), count int, duration time.Duration, message string) {
@@ -143,6 +152,15 @@ func RequireNeverClosedWithin(t *testing.T, ch <-chan struct{}, duration time.Du
 	case <-time.After(duration):
 	case <-ch:
 		require.Fail(t, "channel closed before timeout: "+message)
+	}
+}
+
+// RequireNotClosed is a test helper function that fails the test if channel `ch` is closed.
+func RequireNotClosed(t *testing.T, ch <-chan struct{}, message string) {
+	select {
+	case <-ch:
+		require.Fail(t, "channel is closed: "+message)
+	default:
 	}
 }
 

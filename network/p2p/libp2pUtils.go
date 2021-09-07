@@ -106,7 +106,7 @@ func networkingInfo(identity flow.Identity) (string, string, crypto.PubKey, erro
 	}
 
 	// convert the Flow key to a LibP2P key
-	lkey, err := publicKey(identity.NetworkPubKey)
+	lkey, err := LibP2PPublicKeyFromFlow(identity.NetworkPubKey)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}

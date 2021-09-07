@@ -48,7 +48,7 @@ type InvalidGasLimitError struct {
 }
 
 func (e InvalidGasLimitError) Error() string {
-	return fmt.Sprintf("transaction gas limit (%d) exceeds the maximum gas limit (%d)", e.Actual, e.Maximum)
+	return fmt.Sprintf("transaction gas limit (%d) is not in the acceptable range (min: 1, max: %d)", e.Actual, e.Maximum)
 }
 
 // InvalidAddressError indicates that a transaction references an invalid flow Address

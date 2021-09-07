@@ -322,31 +322,9 @@ HEIGHT_LOOP:
 			continue
 		}
 
-		// Without the logic below, the sealing engine would produce IncorporatedResults
-		// only from receipts received directly from ENs. sealing Core would not know about
-		// Receipts that are incorporated by other nodes in their blocks blocks (but never
-		// received directly from the EN). Also, Receipt might have been lost from the
-		// mempool during a node crash. Hence we check also if we have the receipts in
-		// storage (which also persists receipts pre-crash or when received from other
-		// nodes as part of a block proposal).
-		// Currently, the index is only added when the block which includes the receipts
-		// get finalized, so the returned receipts must be from finalized blocks.
-		// Therefore, the return receipts must be incorporated receipts, which
-		// are safe to be added to the mempool
-		// ToDo: this logic should eventually be moved in the engine's
-		// OnBlockIncorporated callback planned for phase 3 of the S&V roadmap,
-		// and that the IncorporatedResult's IncorporatedBlockID should be set
-		// correctly.
 		receipts, err := c.receiptsDB.ByBlockID(blockID)
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
-		}
-
-		for _, receipt := range receipts {
-			_, err = c.receipts.AddReceipt(receipt, header)
-			if err != nil {
-				return 0, 0, fmt.Errorf("could not add receipt to receipts mempool %v, %w", receipt.ID(), err)
-			}
 		}
 
 		// We require at least 2 consistent receipts from different ENs to seal a block. If don't need to fetching receipts.
@@ -373,7 +351,7 @@ HEIGHT_LOOP:
 	return len(missingBlocksOrderedByHeight), firstMissingHeight, nil
 }
 
-func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
+func (c *Core) OnBlockFinalization() error {
 	startTime := time.Now()
 	requestReceiptsSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchRequestPendingReceipts)
 	// request execution receipts for unsealed finalized blocks
@@ -394,8 +372,13 @@ func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 			lastSealed.ID(), lastSealed.Height, err)
 	}
 
+	err = c.pendingReceipts.PruneUpToHeight(lastSealed.Height)
+	if err != nil {
+		return fmt.Errorf("failed to prune pending receipts mempool up to latest sealed and finalized block %v, height: %v: %w",
+			lastSealed.ID(), lastSealed.Height, err)
+	}
+
 	c.log.Info().
-		Hex("finalized_block_id", finalizedBlockID[:]).
 		Uint64("first_height_missing_result", firstMissingHeight).
 		Uint("seals_size", c.seals.Size()).
 		Uint("receipts_size", c.receipts.Size()).

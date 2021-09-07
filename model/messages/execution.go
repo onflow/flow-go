@@ -17,7 +17,6 @@ type ChunkDataRequest struct {
 // It contains the chunk data pack of the interest.
 type ChunkDataResponse struct {
 	ChunkDataPack flow.ChunkDataPack
-	Collection    flow.Collection
 	Nonce         uint64 // so that we aren't deduplicated by the network layer
 }
 

@@ -25,9 +25,42 @@ var happyPathRegex = `^will generate networking key` +
 	`wrote file /tmp/%s/private-root-information/private-node-info_\S+/node-info.priv.json` +
 	`wrote file /tmp/%s/public-root-information/node-info.pub.\S+.json`
 
+var happyPathWithMachineAccountRegex = `^will generate networking key` +
+	`generated networking key` +
+	`will generate staking key` +
+	`generated staking key` +
+	`assembling node information` +
+	`encoded public staking and network keys` +
+	`wrote file /tmp/%s/public-root-information/node-id` +
+	`wrote file /tmp/%s/private-root-information/private-node-info_\S+/node-info.priv.json` +
+	`wrote file /tmp/%s/public-root-information/node-info.pub.\S+.json` +
+	`will generate machine account key` +
+	`generated machine account key` +
+	`assembling machine account information` +
+	`encoded machine account public key for entry to Flow Port` +
+	`wrote file /tmp/%s/private-root-information/private-node-info_\S+/node-machine-account-key.priv.json`
+
 func TestHappyPath(t *testing.T) {
 	dirName := strconv.FormatInt(time.Now().UnixNano(), 10)
 	regex := regexp.MustCompile(fmt.Sprintf(happyPathRegex, dirName, dirName, dirName))
+	flagOutdir = "/tmp/" + dirName
+	flagRole = "access"
+	flagAddress = "189.123.123.42:3869"
+	hook := zeroLoggerHook{
+		logs: &strings.Builder{},
+	}
+	log = log.Hook(hook)
+	keyCmdRun(nil, nil)
+
+	require.Regexp(t, regex, hook.logs.String())
+	require.DirExists(t, flagOutdir+"/public-root-information")
+	require.FileExists(t, flagOutdir+"/public-root-information/node-id", "node-id file not created")
+	require.DirExists(t, flagOutdir+"/private-root-information")
+}
+
+func TestHappyPathMachineAccount(t *testing.T) {
+	dirName := strconv.FormatInt(time.Now().UnixNano(), 10)
+	regex := regexp.MustCompile(fmt.Sprintf(happyPathWithMachineAccountRegex, dirName, dirName, dirName, dirName))
 	flagOutdir = "/tmp/" + dirName
 	flagRole = "consensus"
 	flagAddress = "189.123.123.42:3869"
@@ -36,6 +69,7 @@ func TestHappyPath(t *testing.T) {
 	}
 	log = log.Hook(hook)
 	keyCmdRun(nil, nil)
+
 	require.Regexp(t, regex, hook.logs.String())
 	require.DirExists(t, flagOutdir+"/public-root-information")
 	require.FileExists(t, flagOutdir+"/public-root-information/node-id", "node-id file not created")

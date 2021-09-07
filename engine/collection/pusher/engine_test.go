@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -108,7 +109,7 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
 	}
-	err := suite.engine.Process(sender.NodeID, msg)
+	err := suite.engine.Process(engine.PushGuarantees, sender.NodeID, msg)
 	suite.Require().Error(err)
 
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)

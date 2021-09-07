@@ -101,7 +101,13 @@ func (s *Suite) SetupTest() {
 	s.nodeConfigs = append(s.nodeConfigs, ghostConfig)
 
 	// generate the network config
-	netConfig := testnet.NewNetworkConfig("execution_tests", s.nodeConfigs)
+	netConfig := testnet.NewNetworkConfig(
+		"execution_tests",
+		s.nodeConfigs,
+		// set long staking phase to avoid QC/DKG transactions during test run
+		testnet.WithViewsInStakingAuction(10_000),
+		testnet.WithViewsInEpoch(100_000),
+	)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConfig)

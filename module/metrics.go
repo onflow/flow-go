@@ -9,8 +9,25 @@ import (
 
 type EntriesFunc func() uint
 
-// Network Metrics
+// ResolverMetrics encapsulates the metrics collectors for dns resolver module of the networking layer.
+type ResolverMetrics interface {
+	// DNSLookupDuration tracks the time spent to resolve a DNS address.
+	DNSLookupDuration(duration time.Duration)
+
+	// OnDNSCacheMiss tracks the total number of dns requests resolved through looking up the network.
+	OnDNSCacheMiss()
+
+	// DNSCacheResolution tracks the total number of dns requests resolved through the cache without
+	// looking up the network.
+	OnDNSCacheHit()
+
+	// OnDNSCacheInvalidated is called whenever dns cache is invalidated for an entry
+	OnDNSCacheInvalidated()
+}
+
 type NetworkMetrics interface {
+	ResolverMetrics
+
 	// NetworkMessageSent size in bytes and count of the network message sent
 	NetworkMessageSent(sizeBytes int, topic string, messageType string)
 
@@ -53,6 +70,12 @@ type ComplianceMetrics interface {
 	BlockFinalized(*flow.Block)
 	BlockSealed(*flow.Block)
 	BlockProposalDuration(duration time.Duration)
+	CurrentEpochCounter(counter uint64)
+	CurrentEpochPhase(phase flow.EpochPhase)
+	CurrentEpochFinalView(view uint64)
+	CurrentDKGPhase1FinalView(view uint64)
+	CurrentDKGPhase2FinalView(view uint64)
+	CurrentDKGPhase3FinalView(view uint64)
 }
 
 type CleanerMetrics interface {
@@ -342,6 +365,10 @@ type ExecutionMetrics interface {
 
 	// ExecutionSync reports when the state syncing is triggered or stopped.
 	ExecutionSync(syncing bool)
+
+	ExecutionBlockDataUploadStarted()
+
+	ExecutionBlockDataUploadFinished(dur time.Duration)
 }
 
 type TransactionMetrics interface {

@@ -1,6 +1,8 @@
 package fvm
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
@@ -49,6 +51,9 @@ func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 		err := p.Process(vm, ctx, proc, sth, programs)
 		txError, failure := errors.SplitErrorTypes(err)
 		if failure != nil {
+			if errors.IsALedgerFailure(failure) {
+				return fmt.Errorf("cannot execute the script, this error usually happens if the reference block for this script is not set to a recent block: %w", failure)
+			}
 			return failure
 		}
 		if txError != nil {
@@ -73,7 +78,7 @@ func (i ScriptInvocator) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env := newEnvironment(ctx, vm, sth, programs)
+	env := NewScriptEnvironment(ctx, vm, sth, programs)
 	location := common.ScriptLocation(proc.ID[:])
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{
@@ -91,7 +96,7 @@ func (i ScriptInvocator) Process(
 	}
 
 	proc.Value = value
-	proc.Logs = env.getLogs()
+	proc.Logs = env.Logs()
 	proc.Events = env.Events()
 	proc.GasUsed = env.GetComputationUsed()
 	return nil

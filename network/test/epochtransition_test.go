@@ -175,7 +175,7 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 func (suite *MutableIdentityTableSuite) addNodes(count int) {
 
 	// create the ids, middlewares and networks
-	ids, mws, nets := GenerateIDsMiddlewaresNetworks(suite.T(), count, suite.logger, 100, nil, !DryRun)
+	ids, mws, nets, _ := GenerateIDsMiddlewaresNetworks(suite.T(), count, suite.logger, 100, nil, !DryRun)
 
 	// create the engines for the new nodes
 	engines := GenerateEngines(suite.T(), nets)

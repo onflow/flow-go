@@ -45,7 +45,7 @@ func TestEventID(t *testing.T) {
 
 	txID := unittest.IdentifierFixture()
 	evtA := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, txID, 2)
-	evtB := unittest.EventFixture(flow.EventEpochCommit, 0, 37, txID, 22)
+	evtB := unittest.EventFixture(flow.EventAccountCreated, 0, 37, txID, 22)
 
 	evtC := unittest.EventFixture(evtA.Type, evtA.TransactionIndex, evtA.EventIndex+1, txID, 2)
 	evtC.Payload = evtA.Payload
@@ -61,8 +61,8 @@ func TestEventID(t *testing.T) {
 func TestEventsList(t *testing.T) {
 
 	eventA := unittest.EventFixture(flow.EventAccountUpdated, 21, 37, unittest.IdentifierFixture(), 2)
-	eventB := unittest.EventFixture(flow.EventEpochCommit, 0, 37, unittest.IdentifierFixture(), 22)
-	eventC := unittest.EventFixture(flow.EventEpochCommit, 0, 37, unittest.IdentifierFixture(), 22)
+	eventB := unittest.EventFixture(flow.EventAccountCreated, 0, 37, unittest.IdentifierFixture(), 22)
+	eventC := unittest.EventFixture(flow.EventAccountCreated, 0, 37, unittest.IdentifierFixture(), 22)
 
 	listAB := flow.EventsList{
 		eventA,

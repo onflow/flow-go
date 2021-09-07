@@ -53,7 +53,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	provider MockChunkDataProviderFunc) (*enginemock.GenericNode,
 	*mocknetwork.Engine, *sync.WaitGroup) {
 
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, participants, chainID)
+	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
@@ -64,14 +64,19 @@ func SetupChunkDataPackProvider(t *testing.T,
 	wg := &sync.WaitGroup{}
 	wg.Add(len(assignedChunkIDs))
 
-	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
+	mu := &sync.Mutex{} // making testify Run thread-safe
+
+	exeEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			originID, ok := args[0].(flow.Identifier)
+			mu.Lock()
+			defer mu.Unlock()
+
+			originID, ok := args[1].(flow.Identifier)
 			require.True(t, ok)
 			// request should be dispatched by a verification node.
 			require.Contains(t, participants.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs(), originID)
 
-			req, ok := args[1].(*messages.ChunkDataRequest)
+			req, ok := args[2].(*messages.ChunkDataRequest)
 			require.True(t, ok)
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
@@ -162,7 +167,7 @@ func SetupMockConsensusNode(t *testing.T,
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
-	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity, chainID)
+	conNode := testutil.GenericNodeFromParticipants(t, hub, conIdentity, othersIdentity, chainID)
 	conEngine := new(mocknetwork.Engine)
 
 	// map form verIds --> result approval ID
@@ -174,12 +179,17 @@ func SetupMockConsensusNode(t *testing.T,
 	// creates a hasher for spock
 	hasher := crypto.NewBLSKMAC(encoding.SPOCKTag)
 
-	conEngine.On("Process", testifymock.Anything, testifymock.Anything).
+	mu := &sync.Mutex{} // making testify mock thread-safe
+
+	conEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			originID, ok := args[0].(flow.Identifier)
+			mu.Lock()
+			defer mu.Unlock()
+
+			originID, ok := args[1].(flow.Identifier)
 			assert.True(t, ok)
 
-			resultApproval, ok := args[1].(*flow.ResultApproval)
+			resultApproval, ok := args[2].(*flow.ResultApproval)
 			assert.True(t, ok)
 
 			lg.Debug().
@@ -327,7 +337,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 
 			}
 
-			chunkAssigner.On("Assign", &receipt.ExecutionResult, receipt.ExecutionResult.BlockID).Return(a, nil)
+			chunkAssigner.On("Assign", &receipt.ExecutionResult, completeER.ContainerBlock.ID()).Return(a, nil)
 			visited[receipt.ExecutionResult.ID()] = struct{}{}
 		}
 	}
@@ -448,7 +458,6 @@ func withConsumers(t *testing.T,
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	tracer := &trace.NoopTracer{}
-	chainID := flow.Testnet
 
 	// bootstraps system with one node of each role.
 	s, verID, participants := bootstrapSystem(t, tracer, staked)
@@ -463,6 +472,7 @@ func withConsumers(t *testing.T,
 	// hold any guarantees.
 	root, err := s.State.Final().Head()
 	require.NoError(t, err)
+	chainID := root.ChainID
 	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
@@ -580,7 +590,8 @@ func bootstrapSystem(t *testing.T, tracer module.Tracer, staked bool) (*enginemo
 
 	// bootstraps the system
 	collector := &metrics.NoopCollector{}
-	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, identities)
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
 
 	if !staked {
 		// creates a new verification node identity that is unstaked for this epoch

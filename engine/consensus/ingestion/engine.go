@@ -91,27 +91,44 @@ func (e *Engine) Done() <-chan struct{} {
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), event)
+		if err != nil {
+			// receiving an input of incompatible type from a trusted internal component is fatal
+			e.log.Fatal().Err(err).Msg("internal error processing event")
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
-		engine.LogError(e.log, err)
+		lg := e.log.With().
+			Err(err).
+			Str("channel", channel.String()).
+			Str("origin", originID.String()).
+			Logger()
+		if errors.Is(err, engine.IncompatibleInputTypeError) {
+			lg.Error().Msg("received message with incompatible type")
+			return
+		}
+		lg.Fatal().Msg("internal error processing message")
 	})
 }
 
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -124,9 +141,25 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch ev := event.(type) {
 	case *flow.CollectionGuarantee:
 		e.metrics.MessageReceived(metrics.EngineConsensusIngestion, metrics.MessageCollectionGuarantee)
-		return e.onGuarantee(originID, ev)
+		err := e.onGuarantee(originID, ev)
+		if err != nil {
+			if engine.IsInvalidInputError(err) {
+				e.log.Error().Str("origin", originID.String()).Err(err).Msg("received invalid collection guarantee")
+				return nil
+			}
+			if engine.IsOutdatedInputError(err) {
+				e.log.Warn().Str("origin", originID.String()).Err(err).Msg("received outdated collection guarantee")
+				return nil
+			}
+			if engine.IsUnverifiableInputError(err) {
+				e.log.Warn().Str("origin", originID.String()).Err(err).Msg("received unverifiable collection guarantee")
+				return nil
+			}
+			return err
+		}
+		return nil
 	default:
-		return fmt.Errorf("invalid event type (%T)", event)
+		return fmt.Errorf("input with incompatible type %T: %w", event, engine.IncompatibleInputTypeError)
 	}
 }
 
@@ -134,7 +167,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // from nodes that are not consensus nodes (notably collection nodes).
 // Returns expected errors:
 // * InvalidInputError
-// * UnverifiableInput
+// * UnverifiableInputError
 // * OutdatedInputError
 func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
