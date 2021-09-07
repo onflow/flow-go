@@ -753,7 +753,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 		// by the protocol state to fall in the same epoch as its parent.
 		//
 		// CAUTION: this is inconsistent with the FinalView value specified in the epoch.
-		fmt.Println("handleServiceEvents: emergency epoch chain continuation triggered", err.Error())
+		fmt.Println("handleServiceEvents: emergency epoch chain continuation triggered at block %v, height: %v", block.ID(), block.Header.Height, err.Error())
 		parentStatus, err := m.epoch.statuses.ByBlockID(block.Header.ParentID)
 		if err != nil {
 			return nil, fmt.Errorf("internal error constructing EECC from parent's epoch status: %w", err)
