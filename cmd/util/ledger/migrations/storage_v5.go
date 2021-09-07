@@ -34,13 +34,14 @@ type storageFormatV5MigrationResult struct {
 }
 
 type StorageFormatV5Migration struct {
-	Log             zerolog.Logger
-	OutputDir       string
-	accounts        *state.Accounts
-	programs        *programs.Programs
-	brokenTypeIDs   map[common.TypeID]brokenTypeCause
-	reportFile      *os.File
-	brokenContracts map[common.Address]map[string]bool
+	Log                 zerolog.Logger
+	OutputDir           string
+	accounts            *state.Accounts
+	programs            *programs.Programs
+	brokenTypeIDs       map[common.TypeID]brokenTypeCause
+	reportFile          *os.File
+	brokenContractsFile *os.File
+	brokenContracts     map[common.Address]map[string]bool
 }
 
 type brokenTypeCause int
@@ -49,6 +50,8 @@ const (
 	brokenTypeCauseParsingCheckingError brokenTypeCause = iota
 	brokenTypeCauseMissingCompositeType
 )
+
+var keyCodePrefix = fmt.Sprintf("%s.", state.KeyCode)
 
 func (m StorageFormatV5Migration) filename() string {
 	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.csv", int32(time.Now().Unix())))
@@ -71,6 +74,12 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	}()
 
 	m.reportFile = reportFile
+
+	// Create a file to dump removed contracts code
+	err = m.initBrokenContractsDump()
+	if err != nil {
+		return nil, err
+	}
 
 	m.Log.Info().Msg("Loading account contracts ...")
 
@@ -116,6 +125,27 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	}
 
 	return cleanedPayloads, nil
+}
+
+func (m *StorageFormatV5Migration) initBrokenContractsDump() (err error) {
+	filename := path.Join(m.OutputDir, fmt.Sprintf("broken_contracts_%d.csv", int32(time.Now().Unix())))
+
+	m.Log.Info().Msgf("Any removed contracts would be save to %s.", filename)
+
+	brokenContracts, err := os.Create(filename)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		err = brokenContracts.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	m.brokenContractsFile = brokenContracts
+
+	return nil
 }
 
 func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
@@ -277,8 +307,7 @@ func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payl
 
 		// Remove the contract code
 		if bytes.HasPrefix(rawKey, []byte(state.KeyCode)) {
-			prefix := fmt.Sprintf("%s.", state.KeyCode)
-			contractName := strings.TrimPrefix(string(rawKey), prefix)
+			contractName := strings.TrimPrefix(string(rawKey), keyCodePrefix)
 
 			brokenContracts := m.brokenContracts[address]
 			if !brokenContracts[contractName] {
@@ -291,6 +320,14 @@ func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payl
 				address,
 			)
 			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
+
+			m.brokenContractsFile.WriteString(
+				fmt.Sprintf("%x,%s, Contract Code: %s\n",
+					rawOwner,
+					string(rawKey),
+					string(payload.Value),
+				),
+			)
 
 			removedNames[common.AddressLocation{
 				Address: address,
