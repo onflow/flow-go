@@ -81,10 +81,26 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	m.reportFile = reportFile
 
 	// Create a file to dump removed contracts code
-	err = m.initBrokenContractsDump()
+
+	brokenContractsDumpFileName := path.Join(
+		m.OutputDir,
+		fmt.Sprintf("broken_contracts_%d.txt", int32(time.Now().Unix())),
+	)
+
+	m.Log.Info().Msgf("Any removed contracts would be save to %s.", filename)
+
+	brokenContracts, err := os.Create(brokenContractsDumpFileName)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		err = brokenContracts.Close()
+		if err != nil {
+			panic(err)
+		}
+	}()
+
+	m.brokenContractsFile = brokenContracts
 
 	m.Log.Info().Msg("Loading account contracts ...")
 
@@ -330,7 +346,7 @@ func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payl
 			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
 
 			m.brokenContractsFile.WriteString(
-				fmt.Sprintf("Owner: %x\nKey: %s\nContract Code: %s\n\n",
+				fmt.Sprintf("Owner: %x\nKey: %s\nContract Code: \n%s\n\n",
 					rawOwner,
 					string(rawKey),
 					string(payload.Value),
@@ -1579,10 +1595,23 @@ func (m StorageFormatV5Migration) inferArrayStaticType(value *interpreter.ArrayV
 }
 
 func (m StorageFormatV5Migration) getStaticType(value interpreter.Value) (interpreter.StaticType, error) {
-	elementType := value.StaticType()
+	staticType := value.StaticType()
 
-	if elementType != nil {
-		return elementType, nil
+	// If the static types are missing for the element,
+	// recursively infer the static type.
+	switch inspectedValue := value.(type) {
+	case *interpreter.ArrayValue:
+		if m.arrayHasStaticType(inspectedValue) {
+			return staticType, nil
+		}
+	case *interpreter.DictionaryValue:
+		if m.dictionaryHasStaticType(inspectedValue) {
+			return staticType, nil
+		}
+	default:
+		if staticType != nil {
+			return staticType, nil
+		}
 	}
 
 	err := m.inferContainerStaticType(value, nil)
