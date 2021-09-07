@@ -43,7 +43,7 @@ type StorageFormatV5Migration struct {
 	brokenContractsFile *os.File
 	brokenContracts     map[common.Address]map[string]bool
 	view                state.View
-	SafeMode        bool
+	CleanupStorage      bool
 }
 
 type brokenTypeCause int
@@ -144,7 +144,7 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 		}
 	}
 
-	if !m.SafeMode {
+	if m.CleanupStorage {
 		migratedPayloads, err = m.cleanupBrokenContracts(migratedPayloads)
 		if err != nil {
 			return nil, fmt.Errorf("failed to migrate storage: %w", err)

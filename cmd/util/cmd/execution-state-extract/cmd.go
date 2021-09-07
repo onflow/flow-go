@@ -24,7 +24,7 @@ var (
 	flagDatadir           string
 	flagNoMigration       bool
 	flagNoReport          bool
-	flagSafeMode          bool
+	flagCleanupStorage    bool
 )
 
 var Cmd = &cobra.Command{
@@ -57,8 +57,8 @@ func init() {
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
 
-	Cmd.Flags().BoolVar(&flagSafeMode, "safe-mode", false,
-		"migrate in safe mode")
+	Cmd.Flags().BoolVar(&flagCleanupStorage, "cleanup-storage", false,
+		"cleanup storage by removing broken contracts")
 }
 
 func run(*cobra.Command, []string) {
@@ -125,7 +125,7 @@ func run(*cobra.Command, []string) {
 		log.Logger,
 		!flagNoMigration,
 		!flagNoReport,
-		flagSafeMode,
+		flagCleanupStorage,
 	)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
