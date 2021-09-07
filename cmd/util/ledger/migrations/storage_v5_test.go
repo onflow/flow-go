@@ -273,6 +273,7 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 			interpreter.NewIntValueFromInt64(1), innerDictionary,
 		)
 
+		// Reset types to empty dictionary type
 		dictionary.Type = interpreter.DictionaryStaticType{}
 		innerDictionary.Type = interpreter.DictionaryStaticType{}
 
@@ -316,13 +317,23 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		innerDictionary := interpreter.NewDictionaryValueUnownedNonCopying(
 			m.newInterpreter(),
-			interpreter.DictionaryStaticType{},
+			interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeString,
+				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+			},
 		)
 		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
 			m.newInterpreter(),
-			interpreter.DictionaryStaticType{},
+			interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeInt,
+				ValueType: interpreter.PrimitiveStaticTypeAnyResource,
+			},
 			interpreter.NewIntValueFromInt64(1), innerDictionary,
 		)
+
+		// Reset types to empty dictionary type
+		dictionary.Type = interpreter.DictionaryStaticType{}
+		innerDictionary.Type = interpreter.DictionaryStaticType{}
 
 		err := m.inferContainerStaticType(
 			dictionary,
@@ -355,10 +366,16 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		dictionary := interpreter.NewDictionaryValueUnownedNonCopying(
 			m.newInterpreter(),
-			interpreter.DictionaryStaticType{},
+			interpreter.DictionaryStaticType{
+				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				ValueType: interpreter.PrimitiveStaticTypeInt,
+			},
 			interpreter.NewStringValue("one"), interpreter.NewIntValueFromInt64(1),
 			interpreter.NewStringValue("two"), interpreter.NewIntValueFromInt64(2),
 		)
+
+		// Reset types to empty dictionary type
+		dictionary.Type = interpreter.DictionaryStaticType{}
 
 		err := m.inferContainerStaticType(
 			dictionary,
@@ -368,7 +385,7 @@ func TestStorageFormatV5Migration_InferContainerStaticType(t *testing.T) {
 
 		require.Equal(t,
 			interpreter.DictionaryStaticType{
-				KeyType:   interpreter.PrimitiveStaticTypeAnyStruct,
+				KeyType:   interpreter.PrimitiveStaticTypeString,
 				ValueType: interpreter.PrimitiveStaticTypeInt,
 			},
 			dictionary.Type,
