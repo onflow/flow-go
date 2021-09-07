@@ -700,12 +700,8 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 
 	// Block is in the same epoch as its parent, re-use the same epoch status
 	// IMPORTANT: copy the status to avoid modifying the parent status in the cache
-	status, err := flow.NewEpochStatus(
-		parentStatus.PreviousEpoch.SetupID, parentStatus.PreviousEpoch.CommitID,
-		parentStatus.CurrentEpoch.SetupID, parentStatus.CurrentEpoch.CommitID,
-		parentStatus.NextEpoch.SetupID, parentStatus.NextEpoch.CommitID,
-	)
-	return status, err
+	currentStatus := parentStatus.Copy()
+	return currentStatus, err
 }
 
 // handleServiceEvents handles applying state changes which occur as a result
@@ -762,7 +758,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 		if err != nil {
 			return nil, fmt.Errorf("internal error constructing EECC from parent's epoch status: %w", err)
 		}
-		ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), parentStatus))
+		ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), parentStatus.Copy()))
 		return ops, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("could not determine epoch status: %w", err)
