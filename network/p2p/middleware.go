@@ -76,11 +76,10 @@ type Middleware struct {
 	metrics                    module.NetworkMetrics
 	rootBlockID                string
 	validators                 []network.MessageValidator
+	peerManagerFactory         PeerManagerFactoryFunc
 	peerManager                *PeerManager
-	peerUpdateInterval         time.Duration
 	unicastMessageTimeout      time.Duration
 	connectionGating           bool
-	managePeerConnections      bool
 	idTranslator               IDTranslator
 	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
@@ -101,6 +100,12 @@ func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOpt
 	}
 }
 
+func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.peerManagerFactory = peerManagerFunc
+	}
+}
+
 // NewMiddleware creates a new middleware instance
 // libP2PNodeFactory is the factory used to create a LibP2PNode
 // flowID is this node's Flow ID
@@ -116,10 +121,8 @@ func NewMiddleware(
 	flowID flow.Identifier,
 	metrics module.NetworkMetrics,
 	rootBlockID string,
-	peerUpdateInterval time.Duration,
 	unicastMessageTimeout time.Duration,
 	connectionGating bool,
-	managePeerConnections bool,
 	idTranslator IDTranslator,
 	opts ...MiddlewareOption,
 ) *Middleware {
@@ -140,10 +143,9 @@ func NewMiddleware(
 		metrics:               metrics,
 		rootBlockID:           rootBlockID,
 		validators:            DefaultValidators(log, flowID),
-		peerUpdateInterval:    peerUpdateInterval,
 		unicastMessageTimeout: unicastMessageTimeout,
 		connectionGating:      connectionGating,
-		managePeerConnections: managePeerConnections,
+		peerManagerFactory:    nil,
 		idTranslator:          idTranslator,
 	}
 
@@ -250,13 +252,14 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		m.libP2PNode.UpdateAllowList(m.allPeers())
 	}
 
-	if m.managePeerConnections {
-		libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host(), m.log)
+	// create and use a peer manager if a peer manager factory was passed in during initialization
+	if m.peerManagerFactory != nil {
+
+		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, m.topologyPeers, m.log)
 		if err != nil {
-			return fmt.Errorf("failed to create libp2pConnector: %w", err)
+			return fmt.Errorf("failed to create peer manager: %w", err)
 		}
 
-		m.peerManager = NewPeerManager(m.log, m.topologyPeers, libp2pConnector, WithInterval(m.peerUpdateInterval))
 		select {
 		case <-m.peerManager.Ready():
 			m.log.Debug().Msg("peer manager successfully started")
@@ -566,7 +569,7 @@ func (m *Middleware) peerManagerUpdate() {
 
 // peerMgr returns the PeerManager and true if this middleware was started with one, (nil, false) otherwise
 func (m *Middleware) peerMgr() (*PeerManager, bool) {
-	if m.managePeerConnections {
+	if m.peerManager != nil {
 		return m.peerManager, true
 	}
 	return nil, false
