@@ -8,19 +8,22 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/sigvalidator"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 type ConsensusClusterVoteCollector struct {
 	CollectionBase
 
-	validator     *sigvalidator.ConsensusSigValidator
+	block         *model.Block
 	combinedAggr  hotstuff.CombinedSigAggregator
 	reconstructor hotstuff.RandomBeaconReconstructor
 	onQCCreated   hotstuff.OnQCCreated
 	done          atomic.Bool
 }
+
+var _ hotstuff.VerifyingVoteCollector = &ConsensusClusterVoteCollector{}
 
 func NewConsensusClusterVoteCollector(base CollectionBase) *ConsensusClusterVoteCollector {
 	return &ConsensusClusterVoteCollector{
@@ -33,15 +36,41 @@ func (c *ConsensusClusterVoteCollector) CreateVote(block *model.Block) (*model.V
 	panic("implement me")
 }
 
+func (c *ConsensusClusterVoteCollector) validateSignature(signerID flow.Identifier, sigType hotstuff.SigType, sig crypto.Signature) (bool, error) {
+	switch sigType {
+	case hotstuff.SigTypeStaking:
+		return c.combinedAggr.Verify(signerID, sig, hotstuff.SigTypeStaking)
+	case hotstuff.SigTypeRandomBeacon:
+		return c.reconstructor.Verify(signerID, sig)
+	}
+
+	return false, fmt.Errorf("invalid sig type: %d", sigType)
+}
+
 func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 	if c.done.Load() {
 		return nil
 	}
 
-	sigType, err := c.validator.ValidateVote(vote)
+	// perform compliance checks on vote
+	err := VoteComplianceCheck(vote, c.block)
+	if err != nil {
+		return fmt.Errorf("submitted invalid vote (%x) at view %d: %w", vote.ID(), vote.View, err)
+	}
+
+	sigType, sig, err := signature.DecodeSingleSig(vote.SigData)
 	// handle InvalidVoteError
 	if err != nil {
+		return fmt.Errorf("could not parse vote signature type: %w", err)
+	}
+
+	valid, err := c.validateSignature(vote.SignerID, sigType, sig)
+	if err != nil {
 		return fmt.Errorf("could not verify vote signature: %w", err)
+	}
+
+	if !valid {
+		return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
 	}
 
 	if c.done.Load() {
@@ -61,14 +90,16 @@ func (c *ConsensusClusterVoteCollector) AddVote(vote *model.Vote) error {
 	}
 
 	// we haven't collected sufficient weight or shares, we have nothing to do further
-	if !c.hasSufficientStake() {
+	if !c.hasSufficientWeight() {
 		return nil
 	}
 
 	if !c.reconstructor.HasSufficientShares() {
 		return nil
 	}
-
+	if !c.done.CAS(false, true) {
+		return nil
+	}
 	qc, err := c.buildQC()
 	if err != nil {
 		return fmt.Errorf("could not build QC: %w", err)
@@ -106,7 +137,7 @@ func (c *ConsensusClusterVoteCollector) buildQC() (*flow.QuorumCertificate, erro
 	panic("not implemented")
 }
 
-func (c *ConsensusClusterVoteCollector) hasSufficientStake() bool {
+func (c *ConsensusClusterVoteCollector) hasSufficientWeight() bool {
 	panic("not implemented")
 }
 
