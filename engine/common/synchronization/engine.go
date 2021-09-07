@@ -15,14 +15,13 @@ import (
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	identifier "github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -43,11 +42,11 @@ type Engine struct {
 	blocks  storage.Blocks
 	comp    network.Engine // compliance layer engine
 
-	pollInterval    time.Duration
-	scanInterval    time.Duration
-	core            module.SyncCore
-	state           protocol.State
-	finalizedHeader *FinalizedHeaderCache
+	pollInterval         time.Duration
+	scanInterval         time.Duration
+	core                 module.SyncCore
+	participantsProvider identifier.IdentifierProvider
+	finalizedHeader      *FinalizedHeaderCache
 
 	requestHandler *RequestHandlerEngine // component responsible for handling requests
 
@@ -66,7 +65,7 @@ func New(
 	comp network.Engine,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
-	state protocol.State,
+	participantsProvider identifier.IdentifierProvider,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -81,18 +80,18 @@ func New(
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		unit:            engine.NewUnit(),
-		lm:              lifecycle.NewLifecycleManager(),
-		log:             log.With().Str("engine", "synchronization").Logger(),
-		metrics:         metrics,
-		me:              me,
-		blocks:          blocks,
-		comp:            comp,
-		core:            core,
-		pollInterval:    opt.pollInterval,
-		scanInterval:    opt.scanInterval,
-		finalizedHeader: finalizedHeader,
-		state:           state,
+		unit:                 engine.NewUnit(),
+		lm:                   lifecycle.NewLifecycleManager(),
+		log:                  log.With().Str("engine", "synchronization").Logger(),
+		metrics:              metrics,
+		me:                   me,
+		blocks:               blocks,
+		comp:                 comp,
+		core:                 core,
+		pollInterval:         opt.pollInterval,
+		scanInterval:         opt.scanInterval,
+		finalizedHeader:      finalizedHeader,
+		participantsProvider: participantsProvider,
 	}
 
 	err := e.setupResponseMessageHandler()
@@ -107,7 +106,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, finalizedHeader)
+	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, finalizedHeader, true)
 
 	return e, nil
 }
@@ -287,12 +286,14 @@ func (e *Engine) processAvailableResponses() {
 
 // onSyncResponse processes a synchronization response.
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
+	e.log.Debug().Str("origin_id", originID.String()).Msg("received sync response")
 	final := e.finalizedHeader.Get()
 	e.core.HandleHeight(final, res.Height)
 }
 
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
+	e.log.Debug().Str("origin_id", originID.String()).Msg("received block response")
 	// process the blocks one by one
 	for _, block := range res.Blocks {
 		if !e.core.HandleBlock(block.Header) {
@@ -332,7 +333,7 @@ CheckLoop:
 			e.pollHeight()
 		case <-scan.C:
 			head := e.finalizedHeader.Get()
-			participants := e.getParticipants(head.ID())
+			participants := e.participantsProvider.Identifiers()
 			ranges, batches := e.core.ScanPending(head)
 			e.sendRequests(participants, ranges, batches)
 		}
@@ -342,30 +343,21 @@ CheckLoop:
 	scan.Stop()
 }
 
-// getParticipants gets all of the consensus nodes from the state at the given block ID.
-func (e *Engine) getParticipants(blockID flow.Identifier) flow.IdentityList {
-	participants, err := e.state.AtBlockID(blockID).Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
-		filter.Not(filter.HasNodeID(e.me.NodeID())),
-	))
-	if err != nil {
-		e.log.Fatal().Err(err).Msgf("could not get consensus participants at block ID %v", blockID)
-	}
-
-	return participants
-}
-
 // pollHeight will send a synchronization request to three random nodes.
 func (e *Engine) pollHeight() {
 	head := e.finalizedHeader.Get()
-	participants := e.getParticipants(head.ID())
+	participants := e.participantsProvider.Identifiers()
 
 	// send the request for synchronization
 	req := &messages.SyncRequest{
 		Nonce:  rand.Uint64(),
 		Height: head.Height,
 	}
-	err := e.con.Multicast(req, synccore.DefaultPollNodes, participants.NodeIDs()...)
+	e.log.Debug().
+		Uint64("height", req.Height).
+		Uint64("range_nonce", req.Nonce).
+		Msg("sending sync request")
+	err := e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
 	if err != nil {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
 		return
@@ -374,7 +366,7 @@ func (e *Engine) pollHeight() {
 }
 
 // sendRequests sends a request for each range and batch using consensus participants from last finalized snapshot.
-func (e *Engine) sendRequests(participants flow.IdentityList, ranges []flow.Range, batches []flow.Batch) {
+func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Range, batches []flow.Batch) {
 	var errs *multierror.Error
 
 	for _, ran := range ranges {
@@ -383,7 +375,7 @@ func (e *Engine) sendRequests(participants flow.IdentityList, ranges []flow.Rang
 			FromHeight: ran.From,
 			ToHeight:   ran.To,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants.NodeIDs()...)
+		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
@@ -402,11 +394,15 @@ func (e *Engine) sendRequests(participants flow.IdentityList, ranges []flow.Rang
 			Nonce:    rand.Uint64(),
 			BlockIDs: batch.BlockIDs,
 		}
-		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants.NodeIDs()...)
+		err := e.con.Multicast(req, synccore.DefaultBlockRequestNodes, participants...)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue
 		}
+		e.log.Debug().
+			Strs("block_ids", flow.IdentifierList(batch.BlockIDs).Strings()).
+			Uint64("range_nonce", req.Nonce).
+			Msg("batch requested")
 		e.core.BatchRequested(batch)
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 	}

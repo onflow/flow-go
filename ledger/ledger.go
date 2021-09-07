@@ -27,7 +27,7 @@ type Ledger interface {
 	Get(query *Query) (values []Value, err error)
 
 	// Update updates a list of keys with new values at specific state (update) and returns a new state
-	Set(update *Update) (newState State, err error)
+	Set(update *Update) (newState State, trieUpdate *TrieUpdate, err error)
 
 	// Prove returns proofs for the given keys at specific state
 	Prove(query *Query) (proof Proof, err error)

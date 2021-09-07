@@ -169,7 +169,7 @@ func (v *TransactionValidator) checkGasLimit(tx *flow.TransactionBody) error {
 	if tx.Payer == v.serviceAccountAddress {
 		return nil
 	}
-	if tx.GasLimit > v.options.MaxGasLimit {
+	if tx.GasLimit > v.options.MaxGasLimit || tx.GasLimit == 0 {
 		return InvalidGasLimitError{
 			Actual:  tx.GasLimit,
 			Maximum: v.options.MaxGasLimit,

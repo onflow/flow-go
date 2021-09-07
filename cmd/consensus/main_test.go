@@ -1,10 +1,15 @@
 package main
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"testing"
+
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+
+	dkgmodule "github.com/onflow/flow-go/module/dkg"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -15,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -38,87 +42,50 @@ func TestCreateDKGContractClient(t *testing.T) {
 
 	machineAccountFileName := fmt.Sprintf(bootstrap.PathNodeMachineAccountInfoPriv, local.NodeID().String())
 
-	t.Run("should return mock contract client with no NodeMachineAccountInfo file and invalid --access-address flag", func(t *testing.T) {
+	t.Run("should return valid DKG contract client", func(t *testing.T) {
 		unittest.RunWithTempDir(t, func(bootDir string) {
 
-			// empty access address as input
-			accessAddress := ""
-
-			// set BootstrapDir to temporary dir
-			cmd.BaseConfig.BootstrapDir = bootDir
-
-			// make sure NodeMachineAccount file does not exist (sanity-check)
-			require.NoFileExists(t, filepath.Join(bootDir, machineAccountFileName))
-
-			client, err := createDKGContractClient(cmd, accessAddress)
-			require.NoError(t, err)
-
-			// verify that client returned is of type `dkgmodule.MockClient`
-			assert.IsType(t, &dkgmodule.MockClient{}, client)
-		})
-	})
-
-	t.Run("should return mock contract client with no NodeMachineAccountInfo file and valid --access-address flag", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(bootDir string) {
-
-			// valid access address format
 			accessAddress := "17.123.255.123:2353"
+			nk, err := unittest.NetworkingKey()
+			require.NoError(t, err)
+			accessApiNodePubKey := hex.EncodeToString(nk.PublicKey().Encode())
 
+			// set BootstrapDir to temporary dir
+			cmd.BaseConfig.BootstrapDir = bootDir
+
+			// write machine account info
+			infoPath := filepath.Join(bootDir, machineAccountFileName)
+			writeNodeMachineAccountInfo(t, infoPath)
+			require.FileExists(t, infoPath)
+
+			flowClient, err := common.SecureFlowClient(accessAddress, accessApiNodePubKey)
+			require.NoError(t, err)
+
+			client, err := createDKGContractClient(cmd, accessAddress, flowClient)
+			require.NoError(t, err)
+
+			assert.IsType(t, &dkgmodule.Client{}, client)
+
+		})
+	})
+
+	t.Run("should return err if node machine account info is missing", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(bootDir string) {
+
+			accessAddress := "17.123.255.123:2353"
+			nk, err := unittest.NetworkingKey()
+			require.NoError(t, err)
+			accessApiNodePubKey := hex.EncodeToString(nk.PublicKey().Encode())
 			// set BootstrapDir to temporary dir
 			cmd.BaseConfig.BootstrapDir = bootDir
 
 			// make sure NodeMachineAccount file does not exist (sanity-check)
 			require.NoFileExists(t, filepath.Join(bootDir, machineAccountFileName))
-
-			client, err := createDKGContractClient(cmd, accessAddress)
+			flowClient, err := common.SecureFlowClient(accessAddress, accessApiNodePubKey)
 			require.NoError(t, err)
 
-			// verify that client returned is of type `dkgmodule.MockClient`
-			assert.IsType(t, &dkgmodule.MockClient{}, client)
-		})
-	})
-
-	t.Run("should return mock contract client with valid NodeMachineAccountInfo file and invalid --access-address flag", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(bootDir string) {
-
-			// valid access address format
-			accessAddress := ""
-
-			// set BootstrapDir to temporary dir
-			cmd.BaseConfig.BootstrapDir = bootDir
-
-			// write machine account info
-			infoPath := filepath.Join(bootDir, machineAccountFileName)
-			writeNodeMachineAccountInfo(t, infoPath)
-			require.FileExists(t, infoPath)
-
-			client, err := createDKGContractClient(cmd, accessAddress)
-			require.NoError(t, err)
-
-			// verify that client returned is of type `dkgmodule.MockClient`
-			assert.IsType(t, &dkgmodule.MockClient{}, client)
-		})
-	})
-
-	t.Run("should return full contract client with valid NodeMachineAccountInfo file and valid --access-address flag", func(t *testing.T) {
-		unittest.RunWithTempDir(t, func(bootDir string) {
-
-			// valid access address format
-			accessAddress := "13.113.215.113:2353"
-
-			// set BootstrapDir to temporary dir
-			cmd.BaseConfig.BootstrapDir = bootDir
-
-			// write machine account info
-			infoPath := filepath.Join(bootDir, machineAccountFileName)
-			writeNodeMachineAccountInfo(t, infoPath)
-			require.FileExists(t, infoPath)
-
-			client, err := createDKGContractClient(cmd, accessAddress)
-			require.NoError(t, err)
-
-			// verify that client returned is of type `dkgmodule.Client`
-			assert.IsType(t, &dkgmodule.Client{}, client)
+			_, err = createDKGContractClient(cmd, accessAddress, flowClient)
+			require.Error(t, err)
 		})
 	})
 }

@@ -185,7 +185,6 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 
 	t.Run("with failed transaction fee deduction", func(t *testing.T) {
 		accountPrivKey, createAccountTx := testutil.CreateAccountCreationTransaction(t, chain)
-
 		// this should return the address of newly created account
 		accountAddress, err := chain.AddressAtIndex(5)
 		require.NoError(t, err)
@@ -214,6 +213,7 @@ func Test_ExecutionMatchesVerification(t *testing.T) {
 			}`),
 		}
 
+		spamTx.SetGasLimit(800000)
 		err = testutil.SignTransaction(spamTx, accountAddress, accountPrivKey, 0)
 		require.NoError(t, err)
 

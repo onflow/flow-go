@@ -458,7 +458,6 @@ func withConsumers(t *testing.T,
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	tracer := &trace.NoopTracer{}
-	chainID := flow.Testnet
 
 	// bootstraps system with one node of each role.
 	s, verID, participants := bootstrapSystem(t, tracer, staked)
@@ -473,6 +472,7 @@ func withConsumers(t *testing.T,
 	// hold any guarantees.
 	root, err := s.State.Final().Head()
 	require.NoError(t, err)
+	chainID := root.ChainID
 	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
