@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -100,7 +101,7 @@ func (suite *PeerStoreProviderTestSuite) randomPeerInfoWithStubNetwork() peer.Ad
 	privKey, err := utils.GenerateUnstakedNetworkingKey(unittest.SeedFixture(crypto.KeyGenSeedMinLenECDSASecp256k1))
 	require.NoError(suite.T(), err)
 
-	libp2pKey, err := p2p.LibP2PPublicKeyFromFlow(privKey.PublicKey())
+	libp2pKey, err := keyutils.LibP2PPublicKeyFromFlow(privKey.PublicKey())
 	require.NoError(suite.T(), err)
 
 	id, err := peer.IDFromPublicKey(libp2pKey)
