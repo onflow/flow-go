@@ -523,7 +523,7 @@ func (m *FollowerState) Finalize(blockID flow.Identifier) error {
 	// Convention:
 	//                            .. <--- P <----- B
 	//                                    ↑        ↑
-	//             block with service event        first block of new
+	//             block sealing service event        first block of new
 	//           for epoch-phase transition        Epoch phase (e.g.
 	//              (e.g. EpochSetup event)        (EpochSetup phase)
 	// Per convention, service notifications for Epoch-Phase-Changes are emitted, when
