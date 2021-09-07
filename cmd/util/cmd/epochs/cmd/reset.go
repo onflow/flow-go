@@ -153,7 +153,6 @@ func convertResetEpochArgs(epochCounter uint64, randomSource []byte, payout stri
 			log.Fatal().Msg("invalid --payout, eg: 10000.0")
 		}
 
-		var err error
 		cdcPayout, err = cadence.NewUFix64(payout)
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not convert payout to cadence type")

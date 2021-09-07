@@ -139,10 +139,6 @@ func reencodeValueV4(data []byte, owner common.Address, key string, version uint
 	// Determine the appropriate decoder from the decoded version
 
 	decodeFunction := interpreter.DecodeValue
-	// Not available anymore:
-	//if version <= 3 {
-	//	decodeFunction = interpreter.DecodeValueV3
-	//}
 
 	// Decode the value
 

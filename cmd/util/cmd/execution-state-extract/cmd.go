@@ -5,12 +5,12 @@ import (
 	"os"
 	"path"
 
-	"github.com/onflow/flow-go/ledger/common/hash"
-	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"

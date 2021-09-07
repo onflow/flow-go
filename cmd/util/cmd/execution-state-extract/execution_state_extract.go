@@ -65,8 +65,16 @@ func extractExecutionState(
 			OutputDir:      outputDir,
 			CleanupStorage: cleanupStorage,
 		}
+
+		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
+			Log:       log,
+			OutputDir: outputDir,
+		}
+
 		migrations = []ledger.Migration{
+			mgr.PruneMigration,
 			storageFormatV5Migration.Migrate,
+			storageUsedUpdateMigration.Migrate,
 		}
 	}
 	if report {
