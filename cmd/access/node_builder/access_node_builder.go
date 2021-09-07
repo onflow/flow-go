@@ -572,29 +572,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 	})
 }
 
-// initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
-// interval, and validators. The network.Middleware is then passed into the initNetwork function.
-func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
-	networkMetrics module.NetworkMetrics,
-	factoryFunc p2p.LibP2PFactoryFunc,
-	validators ...network.MessageValidator) network.Middleware {
-	builder.Middleware = p2p.NewMiddleware(
-		builder.Logger,
-		factoryFunc,
-		nodeID,
-		networkMetrics,
-		builder.RootBlock.ID().String(),
-		time.Hour, // TODO: this is pretty meaningless since there is no peermanager in play.
-		p2p.DefaultUnicastTimeout,
-		false, // no connection gating for the unstaked network
-		false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
-		builder.IDTranslator,
-		p2p.WithMessageValidators(validators...),
-		// use default identifier provider
-	)
-	return builder.Middleware
-}
-
 // initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
 // participants and topology used to choose peers from the list of participants. The list of participants can later be
 // updated by calling network.SetIDs.
