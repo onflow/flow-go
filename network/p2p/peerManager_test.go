@@ -16,6 +16,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -37,7 +38,7 @@ func (suite *PeerManagerTestSuite) generatePeerIDs(n int) peer.IDSlice {
 	pids := peer.IDSlice{}
 	for i := 0; i < n; i++ {
 		key := generateNetworkingKey(suite.T())
-		pid, err := ExtractPeerID(key.PublicKey())
+		pid, err := keyutils.PeerIDFromFlowPublicKey(key.PublicKey())
 		require.NoError(suite.T(), err)
 		pids = append(pids, pid)
 	}
