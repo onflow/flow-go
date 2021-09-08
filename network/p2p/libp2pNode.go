@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -58,18 +59,25 @@ type LibP2PFactoryFunc func() (*Node, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
-func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID string,
-	maxPubSubMsgSize int, metrics module.NetworkMetrics, pingInfoProvider PingInfoProvider) (LibP2PFactoryFunc, error) {
+func DefaultLibP2PNodeFactory(ctx context.Context,
+	log zerolog.Logger,
+	me flow.Identifier,
+	address string,
+	flowKey fcrypto.PrivateKey,
+	rootBlockID string,
+	maxPubSubMsgSize int,
+	metrics module.NetworkMetrics,
+	pingInfoProvider PingInfoProvider,
+	dnsResolverTTL time.Duration) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
 	connGater := NewConnGater(log)
 
-	// TODO: uncomment following lines to activate dns caching
-	//resolver, err := dns.NewResolver(metrics)
-	//if err != nil {
-	//	return nil, fmt.Errorf("could not create dns resolver: %w", err)
-	//}
+	resolver, err := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
+	if err != nil {
+		return nil, fmt.Errorf("could not create dns resolver: %w", err)
+	}
 
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
@@ -79,7 +87,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.I
 			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
-			// SetResolver(resolver).
+			SetResolver(resolver).
 			Build(ctx)
 	}, nil
 }
