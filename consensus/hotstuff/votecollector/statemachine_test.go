@@ -25,8 +25,8 @@ func TestStateMachine(t *testing.T) {
 
 var factoryError = errors.New("factory error")
 
-// StateMachineTestSuite is a test suite for testing VoteCollector. Stored mocked state for testing behavior and
-// state transitions for VoteCollector.
+// StateMachineTestSuite is a test suite for testing VoteCollector. It stores mocked 
+// VoteProcessors internally for testing behavior and state transitions for VoteCollector.
 type StateMachineTestSuite struct {
 	suite.Suite
 
@@ -125,8 +125,7 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 		secondVote := unittest.VoteFixture(func(vote *model.Vote) {
 			vote.View = firstVote.View
 			vote.SignerID = firstVote.SignerID
-		})
-
+		}) // voted blockID is randomly sampled, i.e. it will be different from firstVote
 		s.notifier.On("OnDoubleVotingDetected", firstVote, secondVote).Return(nil).Once()
 
 		err = s.collector.AddVote(secondVote)
@@ -174,6 +173,13 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 		// in case process returns VoteForIncompatibleBlockError we should silently ignore this error
 		require.NoError(t, err)
 		processor.AssertCalled(t, "Process", vote)
+	})
+	s.T().Run("unexpected-VoteProcessor-errors-are-passed-up", func(t *testing.T) {
+		unexpectedError := errors.New("some unexpected error")
+		vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
+		processor.On("Process", vote).Return(unexpectedError).Once()
+		err := s.collector.AddVote(vote)
+		require.ErrorIs(t, err, unexpectedError)
 	})
 }
 

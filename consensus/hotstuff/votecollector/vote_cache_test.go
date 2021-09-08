@@ -78,6 +78,8 @@ func TestVotesCache_RegisterVoteConsumer(t *testing.T) {
 
 	// registering vote consumer has to fill consumedVotes using callback
 	cache.RegisterVoteConsumer(voteConsumer)
+	// all cached votes should be fed into the consumer right away
+	require.Equal(t, expectedVotes, consumedVotes)
 
 	// produce second batch after registering vote consumer
 	for i := 0; i < votesBatchSize; i++ {
