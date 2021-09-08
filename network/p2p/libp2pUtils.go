@@ -13,11 +13,12 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
-	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
 var directionLookUp = map[network.Direction]string{
@@ -107,7 +108,7 @@ func networkingInfo(identity flow.Identity) (string, string, crypto.PubKey, erro
 	}
 
 	// convert the Flow key to a LibP2P key
-	lkey, err := LibP2PPublicKeyFromFlow(identity.NetworkPubKey)
+	lkey, err := keyutils.LibP2PPublicKeyFromFlow(identity.NetworkPubKey)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}
@@ -233,19 +234,41 @@ func flowStream(conn network.Conn) network.Stream {
 	return nil
 }
 
-// ExtractPeerID extracts the LibP2P peer ID associated with the given Flow public key.
-func ExtractPeerID(networkPubKey fcrypto.PublicKey) (pid peer.ID, err error) {
-	pk, err := LibP2PPublicKeyFromFlow(networkPubKey)
+// messagePubKey extracts the public key of the envelope signer from a libp2p message.
+// The location of that key depends on the type of the key, see:
+// https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md
+// This reproduces the exact logic of the private function doing the same decoding in libp2p:
+// https://github.com/libp2p/go-libp2p-pubsub/blob/ba28f8ecfc551d4d916beb748d3384951bce3ed0/sign.go#L77
+func messageSigningID(m *pubsub.Message) (peer.ID, error) {
+	var pubk crypto.PubKey
+
+	// m.From is the original sender of the message (versus `m.ReceivedFrom` which is the last hop which sent us this message)
+	pid, err := peer.IDFromBytes(m.From)
 	if err != nil {
-		err = fmt.Errorf("failed to convert Flow key to LibP2P key: %w", err)
-		return
+		return "", err
 	}
 
-	pid, err = peer.IDFromPublicKey(pk)
-	if err != nil {
-		err = fmt.Errorf("failed to convert LibP2P key to peer ID: %w", err)
-		return
+	if m.Key == nil {
+		// no attached key, it must be extractable from the source ID
+		pubk, err = pid.ExtractPublicKey()
+		if err != nil {
+			return "", fmt.Errorf("cannot extract signing key: %s", err.Error())
+		}
+		if pubk == nil {
+			return "", fmt.Errorf("cannot extract signing key")
+		}
+	} else {
+		pubk, err = crypto.UnmarshalPublicKey(m.Key)
+		if err != nil {
+			return "", fmt.Errorf("cannot unmarshal signing key: %s", err.Error())
+		}
+
+		// verify that the source ID matches the attached key
+		if !pid.MatchesPublicKey(pubk) {
+			return "", fmt.Errorf("bad signing key; source ID %s doesn't match key", pid)
+		}
 	}
 
-	return
+	// the pid either contains or matches the signing pubKey
+	return pid, nil
 }

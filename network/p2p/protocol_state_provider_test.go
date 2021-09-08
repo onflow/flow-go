@@ -12,6 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -129,7 +130,7 @@ func (suite *ProtocolStateProviderTestSuite) TestIDTranslation() {
 	for _, participant := range suite.participants {
 		pid, err := suite.provider.GetPeerID(participant.NodeID)
 		require.NoError(suite.T(), err)
-		key, err := LibP2PPublicKeyFromFlow(participant.NetworkPubKey)
+		key, err := keyutils.LibP2PPublicKeyFromFlow(participant.NetworkPubKey)
 		require.NoError(suite.T(), err)
 		expectedPid, err := peer.IDFromPublicKey(key)
 		require.NoError(suite.T(), err)

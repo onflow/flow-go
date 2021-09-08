@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
@@ -160,6 +161,10 @@ func (n *Network) unregister(channel network.Channel) error {
 
 func (n *Network) Identities() flow.IdentityList {
 	return n.identityProvider.Identities(NotEjectedFilter)
+}
+
+func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
+	return n.identityProvider.ByPeerID(pid)
 }
 
 // Topology returns the identitiess of a uniform subset of nodes in protocol state using the topology provided earlier.
