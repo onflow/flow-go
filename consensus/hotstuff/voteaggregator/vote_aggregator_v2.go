@@ -30,7 +30,6 @@ type VoteAggregatorV2 struct {
 }
 
 // TODO: Move to tests
-var _ hotstuff.BlockSigner = &VoteAggregatorV2{}
 var _ hotstuff.VoteAggregatorV2 = &VoteAggregatorV2{}
 
 // NewVoteAggregatorV2 creates an instance of vote aggregator
@@ -169,14 +168,6 @@ func (va *VoteAggregatorV2) PruneUpToView(view uint64) {
 			va.log.Fatal().Err(err).Msgf("fatal error when pruning vote collectors by view %d", view)
 		}
 	}
-}
-
-// CreateVote will create a vote for the given block, and return the vote.
-// The created vote will be stored in the vote collector for the block.
-// It get the vote collector for the block or create it if not exists, and let it vote collector
-// to create and store the created vote.
-func (va *VoteAggregatorV2) CreateVote(block *model.Block) (*model.Vote, error) {
-	panic("to be implemented")
 }
 
 func (va *VoteAggregatorV2) isVoteStale(vote *model.Vote) bool {

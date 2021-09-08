@@ -25,7 +25,7 @@ func TestStateMachine(t *testing.T) {
 
 var factoryError = errors.New("factory error")
 
-// StateMachineTestSuite is a test suite for testing VoteCollector. It stores mocked 
+// StateMachineTestSuite is a test suite for testing VoteCollector. It stores mocked
 // VoteProcessors internally for testing behavior and state transitions for VoteCollector.
 type StateMachineTestSuite struct {
 	suite.Suite
@@ -83,13 +83,8 @@ func (s *StateMachineTestSuite) TestStatus_StateTransitions() {
 	// by default, we should create in caching status
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusCaching, s.collector.Status())
 
-	// failing to create collector has to result in error and won't change state
-	err := s.collector.ProcessBlock(helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(s.view)))))
-	require.ErrorIs(s.T(), err, factoryError)
-	require.Equal(s.T(), hotstuff.VoteCollectorStatusCaching, s.collector.Status())
-
 	// after processing block we should get into verifying status
-	err = s.collector.ProcessBlock(proposal)
+	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.collector.Status())
 
@@ -99,6 +94,21 @@ func (s *StateMachineTestSuite) TestStatus_StateTransitions() {
 			helper.MakeBlock(s.T(), helper.WithBlockView(s.view)))))
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusInvalid, s.collector.Status())
+}
+
+// TestStatus_FactoryErrorPropagation verifies that errors from the injected
+// factory are handed through (potentially wrapped), but are not replaced.
+func (s *StateMachineTestSuite) Test_FactoryErrorPropagation() {
+	factoryError := errors.New("factory error")
+	factory := func(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
+		return nil, factoryError
+	}
+	s.collector.createVerifyingProcessor = factory
+
+	// failing to create collector has to result in error and won't change state
+	err := s.collector.ProcessBlock(helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(s.view)))))
+	require.ErrorIs(s.T(), err, factoryError)
+	require.Equal(s.T(), hotstuff.VoteCollectorStatusCaching, s.collector.Status())
 }
 
 // TestAddVote_VerifyingState tests that AddVote correctly process valid and invalid votes as well
@@ -203,4 +213,20 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	time.Sleep(100 * time.Millisecond)
 
 	processor.AssertExpectations(s.T())
+}
+
+// Test_VoteProcessorErrorPropagation verifies that unexpected errors from the `VoteProcessor`
+// are propagated up the call stack (potentially wrapped), but are not replaced.
+func (s *StateMachineTestSuite) Test_VoteProcessorErrorPropagation() {
+	block := helper.MakeBlock(s.T(), helper.WithBlockView(s.view))
+	processor := s.prepareMockedProcessor(block)
+
+	err := s.collector.ProcessBlock(helper.MakeProposal(s.T(), helper.WithBlock(block)))
+	require.NoError(s.T(), err)
+
+	unexpectedError := errors.New("some unexpected error")
+	vote := unittest.VoteForBlockFixture(block, unittest.WithVoteView(s.view))
+	processor.On("Process", vote).Return(unexpectedError).Once()
+	err = s.collector.AddVote(vote)
+	require.ErrorIs(s.T(), err, unexpectedError)
 }

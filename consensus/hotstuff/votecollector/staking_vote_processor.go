@@ -17,8 +17,8 @@ func StakingVoteProcessorFactory(log zerolog.Logger, proposal *model.Proposal) (
 	processor := &StakingVoteProcessor{
 		log:   log,
 		block: proposal.Block,
+		done:  *atomic.NewBool(false),
 	}
-	processor.done.Store(false)
 	err := processor.Process(proposal.ProposerVote())
 	if err != nil {
 		if model.IsInvalidVoteError(err) {

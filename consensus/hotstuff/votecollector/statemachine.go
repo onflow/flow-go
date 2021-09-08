@@ -69,19 +69,6 @@ func NewStateMachine(
 	return sm
 }
 
-// CreateVote implements BlockSigner interface, if underlying collector implements BlockSigner interface then we will
-// delegate function call, otherwise we will return an error indicating wrong collector state.
-// ATTENTION: this might be changed if CreateVote and state transitions will be called in parallel
-// something like compare-and-repeat might need to be implemented.
-func (m *VoteCollector) CreateVote(block *model.Block) (*model.Vote, error) {
-	processor := m.atomicLoadProcessor()
-	blockSigner, ok := processor.(hotstuff.BlockSigner)
-	if ok {
-		return blockSigner.CreateVote(block)
-	}
-	return nil, ErrDifferentCollectorState
-}
-
 func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	// Cache vote
 	err := m.votesCache.AddVote(vote)

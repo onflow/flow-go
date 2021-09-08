@@ -104,9 +104,6 @@ func (vc *VotesCache) AddVote(vote *model.Vote) error {
 // consumer later, when already lots of votes are cached. However, this should
 // be a rare occurrence (we except moderate performance overhead in this case).
 func (vc *VotesCache) RegisterVoteConsumer(consumer VoteConsumer) {
-	if consumer == nil {
-		return
-	}
 	vc.lock.Lock()
 	defer vc.lock.Unlock()
 
