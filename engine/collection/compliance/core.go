@@ -32,7 +32,6 @@ type Core struct {
 	collectionMetrics module.CollectionMetrics
 	cleaner           storage.Cleaner
 	headers           storage.Headers
-	payloads          storage.Payloads
 	state             clusterkv.MutableState
 	pending           module.PendingClusterBlockBuffer // pending block cache
 	sync              module.BlockRequester
@@ -48,7 +47,6 @@ func NewCore(
 	collectionMetrics module.CollectionMetrics,
 	cleaner storage.Cleaner,
 	headers storage.Headers,
-	payloads storage.Payloads,
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,
 	sync module.BlockRequester,
@@ -62,7 +60,6 @@ func NewCore(
 		collectionMetrics: collectionMetrics,
 		cleaner:           cleaner,
 		headers:           headers,
-		payloads:          payloads,
 		state:             state,
 		pending:           pending,
 		sync:              sync,
@@ -287,9 +284,9 @@ func (c *Core) processPendingChildren(header *flow.Header) error {
 	return result.ErrorOrNil()
 }
 
-// onBlockVote handles votes for blocks by passing them to the core consensus
+// OnBlockVote handles votes for blocks by passing them to the core consensus
 // algorithm
-func (c *Core) onBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
+func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlockVote) error {
 
 	c.log.Debug().
 		Hex("origin_id", originID[:]).

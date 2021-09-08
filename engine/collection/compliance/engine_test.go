@@ -1,322 +1,191 @@
-package compliance_test
+package compliance
 
 import (
-	"github.com/onflow/flow-go/engine/collection/compliance"
-	"os"
+	"math/rand"
+	"sync"
 	"testing"
+	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/collection/proposal"
-	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/module/metrics"
-	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/network/mocknetwork"
-	clusterstate "github.com/onflow/flow-go/state/cluster/mock"
-	protocol "github.com/onflow/flow-go/state/protocol/mock"
-	realstorage "github.com/onflow/flow-go/storage"
-	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type Suite struct {
-	suite.Suite
+func TestComplianceEngine(t *testing.T) {
+	suite.Run(t, new(ComplianceSuite))
+}
 
-	// protocol state
-	proto struct {
-		state    *protocol.MutableState
-		snapshot *protocol.Snapshot
-		query    *protocol.EpochQuery
-		epoch    *protocol.Epoch
+type ComplianceSuite struct {
+	ComplianceCoreSuite
+
+	engine *Engine
+}
+
+func (cs *ComplianceSuite) SetupTest() {
+	cs.ComplianceCoreSuite.SetupTest()
+	e, err := NewEngine(unittest.Logger(), cs.net, cs.me, cs.prov, cs.core)
+	require.NoError(cs.T(), err)
+	cs.engine = e
+
+	ready := func() <-chan struct{} {
+		channel := make(chan struct{})
+		close(channel)
+		return channel
+	}()
+
+	cs.hotstuff.On("Ready", mock.Anything).Return(ready)
+	<-cs.engine.Ready()
+}
+
+// TestSendVote tests that single vote can be send and properly processed
+func (cs *ComplianceSuite) TestSendVote() {
+	// create parameters to send a vote
+	blockID := unittest.IdentifierFixture()
+	view := rand.Uint64()
+	sig := unittest.SignatureFixture()
+	recipientID := unittest.IdentifierFixture()
+
+	// submit the vote
+	err := cs.engine.SendVote(blockID, view, sig, recipientID)
+	require.NoError(cs.T(), err, "should pass send vote")
+
+	done := func() <-chan struct{} {
+		channel := make(chan struct{})
+		close(channel)
+		return channel
+	}()
+
+	cs.hotstuff.On("Done", mock.Anything).Return(done)
+
+	// The vote is transmitted asynchronously. We allow 10ms for the vote to be received:
+	<-time.After(10 * time.Millisecond)
+	<-cs.engine.Done()
+
+	// check it was called with right params
+	vote := messages.BlockVote{
+		BlockID: blockID,
+		View:    view,
+		SigData: sig,
 	}
-	// cluster state
-	cluster struct {
-		state    *clusterstate.MutableState
-		snapshot *clusterstate.Snapshot
-		params   *clusterstate.Params
-	}
-
-	me           *module.Local
-	net          *module.Network
-	conduit      *mocknetwork.Conduit
-	transactions *storage.Transactions
-	headers      *storage.Headers
-	payloads     *storage.ClusterPayloads
-	builder      *module.Builder
-	finalizer    *module.Finalizer
-	pending      *module.PendingClusterBlockBuffer
-	sync         *module.BlockRequester
-	hotstuff     *module.HotStuff
-	eng          *compliance.Engine
+	cs.con.AssertCalled(cs.T(), "Unicast", &vote, recipientID)
 }
 
-func TestProposalEngine(t *testing.T) {
-	suite.Run(t, new(Suite))
-}
+// TestBroadcastProposalWithDelay tests broadcasting proposals with different
+// inputs
+func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 
-func (suite *Suite) SetupTest() {
-	log := zerolog.New(os.Stderr)
-	metrics := metrics.NewNoopCollector()
+	// add execution node to participants to make sure we exclude them from broadcast
+	cs.participants = append(cs.participants, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
 
-	me := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
+	// generate a parent with height and chain ID set
+	parent := unittest.BlockHeaderFixture()
+	parent.ChainID = "test"
+	parent.Height = 10
+	cs.headerDB[parent.ID()] = &parent
 
-	// mock out protocol state
-	suite.proto.state = new(protocol.MutableState)
-	suite.proto.snapshot = new(protocol.Snapshot)
-	suite.proto.query = new(protocol.EpochQuery)
-	suite.proto.epoch = new(protocol.Epoch)
-	suite.proto.state.On("Final").Return(suite.proto.snapshot)
-	suite.proto.snapshot.On("Head").Return(&flow.Header{}, nil)
-	suite.proto.snapshot.On("Identities", mock.Anything).Return(unittest.IdentityListFixture(1), nil)
-	suite.proto.snapshot.On("Epochs").Return(suite.proto.query)
-	suite.proto.query.On("Current").Return(suite.proto.epoch)
+	// create a block with the parent and store the payload with correct ID
+	block := unittest.BlockWithParentFixture(&parent)
+	block.Header.ProposerID = cs.myID
+	cs.payloadDB[block.ID()] = block.Payload
 
-	// create a fake cluster
-	clusters := flow.ClusterList{flow.IdentityList{me}}
-	suite.proto.epoch.On("Clustering").Return(clusters, nil)
-	clusterID := flow.ChainID("cluster-id")
+	// keep a duplicate of the correct header to check against leader
+	header := block.Header
 
-	// mock out cluster state
-	suite.cluster.state = new(clusterstate.MutableState)
-	suite.cluster.snapshot = new(clusterstate.Snapshot)
-	suite.cluster.params = new(clusterstate.Params)
-	suite.cluster.state.On("Final").Return(suite.cluster.snapshot)
-	suite.cluster.snapshot.On("Head").Return(&flow.Header{}, nil)
-	suite.cluster.state.On("Params").Return(suite.cluster.params)
-	suite.cluster.params.On("ChainID").Return(clusterID, nil)
+	// unset chain and height to make sure they are correctly reconstructed
+	block.Header.ChainID = ""
+	block.Header.Height = 0
 
-	suite.me = new(module.Local)
-	suite.me.On("NodeID").Return(me.NodeID)
+	cs.hotstuff.On("SubmitProposal", block.Header, parent.View).Return().Once()
 
-	suite.net = new(module.Network)
-	suite.conduit = new(mocknetwork.Conduit)
-	suite.net.On("Register", engine.ChannelConsensusCluster(clusterID), mock.Anything).Return(suite.conduit, nil)
-	suite.conduit.On("Close").Return(nil).Maybe()
+	// submit to broadcast proposal
+	err := cs.engine.BroadcastProposalWithDelay(block.Header, 0)
+	require.NoError(cs.T(), err, "header broadcast should pass")
 
-	suite.transactions = new(storage.Transactions)
-	suite.headers = new(storage.Headers)
-	suite.payloads = new(storage.ClusterPayloads)
-	suite.builder = new(module.Builder)
-	suite.finalizer = new(module.Finalizer)
-	suite.pending = new(module.PendingClusterBlockBuffer)
-	suite.pending.On("Size").Return(uint(0))
-	suite.pending.On("PruneByHeight", mock.Anything).Return()
-	suite.sync = new(module.BlockRequester)
-	suite.hotstuff = new(module.HotStuff)
-
-	eng, err := compliance.New(
-		log,
-		suite.net,
-		suite.me,
-		metrics,
-		metrics,
-		metrics,
-		suite.proto.state,
-		suite.cluster.state,
-		suite.transactions,
-		suite.headers,
-		suite.payloads,
-		suite.pending,
-	)
-	require.NoError(suite.T(), err)
-	suite.eng = eng.WithHotStuff(suite.hotstuff).WithSync(suite.sync)
-}
-
-func (suite *Suite) TestHandleProposal() {
-	originID := unittest.IdentifierFixture()
-	parent := unittest.ClusterBlockFixture()
-	block := unittest.ClusterBlockWithParent(&parent)
-
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
+	// make sure chain ID and height were reconstructed and
+	// we broadcast to correct nodes
+	header.ChainID = "test"
+	header.Height = 11
+	msg := &messages.BlockProposal{
+		Header:  header,
 		Payload: block.Payload,
 	}
 
-	// this is a new block
-	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
-	suite.pending.On("ByID", block.ID()).Return(nil, false)
-	suite.pending.On("ByID", block.Header.ParentID).Return(nil, false)
+	done := func() <-chan struct{} {
+		channel := make(chan struct{})
+		close(channel)
+		return channel
+	}()
 
-	// we have already received and stored the parent
-	suite.headers.On("ByBlockID", parent.ID()).Return(parent.Header, nil)
-	suite.pending.On("ByID", block.Header.ParentID).Return(nil, false)
-	suite.transactions.On("Store", mock.Anything).Return(nil)
-	// should store payload and header
-	suite.payloads.On("Store", mock.Anything, mock.Anything).Return(nil).Once()
-	suite.headers.On("Store", mock.Anything).Return(nil).Once()
-	// should extend state with new block
-	suite.cluster.state.On("Extend", &block).Return(nil).Once()
-	// should submit to consensus algo
-	suite.hotstuff.On("SubmitProposal", proposal.Header, parent.Header.View).Once()
-	// we don't have any cached children
-	suite.pending.On("ByParentID", block.ID()).Return(nil, false)
+	cs.hotstuff.On("Done", mock.Anything).Return(done)
 
-	chainID, err := suite.cluster.params.ChainID()
-	suite.Assert().Nil(err)
-	err = suite.eng.Process(engine.ChannelConsensusCluster(chainID), originID, proposal)
-	suite.Assert().Nil(err)
+	<-time.After(10 * time.Millisecond)
+	<-cs.engine.Done()
+	cs.con.AssertCalled(cs.T(), "Publish", msg, cs.participants[1].NodeID, cs.participants[2].NodeID)
 
-	// assert that the proposal was submitted to consensus algo
-	suite.hotstuff.AssertExpectations(suite.T())
+	// should fail with wrong proposer
+	header.ProposerID = unittest.IdentifierFixture()
+	err = cs.engine.BroadcastProposalWithDelay(header, 0)
+	require.Error(cs.T(), err, "should fail with wrong proposer")
+	header.ProposerID = cs.myID
+
+	// should fail with changed (missing) parent
+	header.ParentID[0]++
+	err = cs.engine.BroadcastProposalWithDelay(header, 0)
+	require.Error(cs.T(), err, "should fail with missing parent")
+	header.ParentID[0]--
+
+	// should fail with wrong block ID (payload unavailable)
+	header.View++
+	err = cs.engine.BroadcastProposalWithDelay(header, 0)
+	require.Error(cs.T(), err, "should fail with missing payload")
+	header.View--
 }
 
-func (suite *Suite) TestHandlePendingProposal() {
+// TestSubmittingMultipleVotes tests that we can send multiple votes and they
+// are queued and processed in expected way
+func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
+	// create a vote
 	originID := unittest.IdentifierFixture()
-	block := unittest.ClusterBlockFixture()
+	voteCount := 15
 
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
-
-	// this is a new block
-	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
-	suite.pending.On("ByID", block.ID()).Return(nil, false)
-
-	// we do not have the parent yet
-	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound)
-	suite.pending.On("ByID", block.Header.ParentID).Return(nil, false)
-	// should request parent block
-	suite.sync.On("RequestBlock", block.Header.ParentID)
-	// should add the proposal to pending buffer
-	suite.pending.On("Add", originID, proposal).Return(true).Once()
-
-	chainID, err := suite.cluster.params.ChainID()
-	suite.Assert().Nil(err)
-	err = suite.eng.Process(engine.ChannelConsensusCluster(chainID), originID, proposal)
-	suite.Assert().Nil(err)
-
-	// proposal should not have been submitted to consensus algo
-	suite.hotstuff.AssertNotCalled(suite.T(), "SubmitProposal")
-	// parent block should be requested
-	suite.sync.AssertExpectations(suite.T())
-}
-
-func (suite *Suite) TestHandlePendingProposalWithPendingParent() {
-	originID := unittest.IdentifierFixture()
-
-	grandparent := unittest.ClusterBlockFixture()           // we are missing this
-	parent := unittest.ClusterBlockWithParent(&grandparent) // we have this in the cache
-	block := unittest.ClusterBlockWithParent(&parent)       // we receive this as a proposal
-
-	suite.T().Logf("block: %x\nparent: %x\ng-parent: %x", block.ID(), parent.ID(), grandparent.ID())
-
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
-
-	// this is a new block
-	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
-	suite.pending.On("ByID", block.ID()).Return(nil, false)
-
-	// we have the parent, it is in pending cache
-	pendingParent := &cluster.PendingBlock{
-		OriginID: originID,
-		Header:   parent.Header,
-		Payload:  parent.Payload,
-	}
-	suite.headers.On("ByBlockID", block.Header.ParentID).Return(nil, realstorage.ErrNotFound)
-
-	// should add block to the cache
-	suite.pending.On("Add", originID, proposal).Return(true).Once()
-	suite.pending.On("ByID", parent.ID()).Return(pendingParent, true).Once()
-	suite.pending.On("ByID", grandparent.ID()).Return(nil, false).Once()
-	// should send a request for the grandparent
-	suite.sync.On("RequestBlock", grandparent.ID())
-
-	chainID, err := suite.cluster.params.ChainID()
-	suite.Assert().Nil(err)
-	err = suite.eng.Process(engine.ChannelConsensusCluster(chainID), originID, proposal)
-	suite.Assert().Nil(err)
-
-	// proposal should not have been submitted to consensus algo
-	suite.hotstuff.AssertNotCalled(suite.T(), "SubmitProposal")
-	// parent block should be requested
-	suite.conduit.AssertExpectations(suite.T())
-}
-
-func (suite *Suite) TestHandleProposalWithPendingChildren() {
-	originID := unittest.IdentifierFixture()
-	parent := unittest.ClusterBlockFixture()
-	block := unittest.ClusterBlockWithParent(&parent)
-	child := unittest.ClusterBlockWithParent(&block)
-
-	proposal := &messages.ClusterBlockProposal{
-		Header:  block.Header,
-		Payload: block.Payload,
-	}
-
-	headersDB := make(map[flow.Identifier]*flow.Header)
-	suite.headers.On("ByBlockID", mock.Anything).Return(
-		func(id flow.Identifier) *flow.Header {
-			return headersDB[id]
-		},
-		func(id flow.Identifier) error {
-			_, exists := headersDB[id]
-			if !exists {
-				return realstorage.ErrNotFound
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		for i := 0; i < voteCount; i++ {
+			vote := messages.BlockVote{
+				BlockID: unittest.IdentifierFixture(),
+				View:    rand.Uint64(),
+				SigData: unittest.SignatureFixture(),
 			}
-			return nil
-		},
-	)
+			cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
+			// execute the vote submission
+			_ = cs.engine.Process(engine.ConsensusCommittee, originID, &vote)
+		}
+		wg.Done()
+	}()
+	wg.Add(1)
+	go func() {
+		// create a proposal that directly descends from the latest finalized header
+		originID := cs.participants[1].NodeID
+		block := unittest.BlockWithParentFixture(cs.head)
+		proposal := unittest.ProposalFromBlock(&block)
 
-	// this is a new block
-	suite.headers.On("ByBlockID", block.ID()).Return(nil, realstorage.ErrNotFound)
-	suite.pending.On("ByID", block.ID()).Return(nil, false)
+		// store the data for retrieval
+		cs.headerDB[block.Header.ParentID] = cs.head
+		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
+		_ = cs.engine.Process(engine.ConsensusCommittee, originID, proposal)
+		wg.Done()
+	}()
 
-	// we have already received and stored the parent
-	headersDB[parent.ID()] = parent.Header
-	suite.pending.On("ByID", parent.ID()).Return(nil, false)
-	// should extend state with new block
-	suite.cluster.state.On("Extend", &block).
-		Run(func(_ mock.Arguments) {
-			// once we add the block to the state, ensure it is retrievable from storage
-			headersDB[block.ID()] = block.Header
-		}).
-		Return(nil).Once()
-	suite.cluster.state.On("Extend", &child).Return(nil).Once()
-	// should submit to consensus algo
-	suite.hotstuff.On("SubmitProposal", mock.Anything, mock.Anything).Twice()
-	// should return the pending child
-	suite.pending.On("ByParentID", block.ID()).Return([]*cluster.PendingBlock{{
-		OriginID: unittest.IdentifierFixture(),
-		Header:   child.Header,
-		Payload:  child.Payload,
-	}}, true)
-	suite.pending.On("DropForParent", block.ID()).Once()
-	suite.pending.On("ByParentID", child.ID()).Return(nil, false)
+	wg.Wait()
 
-	chainID, err := suite.cluster.params.ChainID()
-	suite.Assert().Nil(err)
-	err = suite.eng.Process(engine.ChannelConsensusCluster(chainID), originID, proposal)
-	suite.Assert().Nil(err)
+	time.Sleep(time.Second)
 
-	// assert that the proposal was submitted to consensus algo
-	suite.hotstuff.AssertExpectations(suite.T())
-}
-
-func (suite *Suite) TestReceiveVote() {
-
-	originID := unittest.IdentifierFixture()
-	vote := &messages.ClusterBlockVote{
-		BlockID: unittest.IdentifierFixture(),
-		View:    0,
-		SigData: nil,
-	}
-
-	suite.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Once()
-
-	chainID, err := suite.cluster.params.ChainID()
-	suite.Assert().Nil(err)
-	err = suite.eng.Process(engine.ChannelConsensusCluster(chainID), originID, vote)
-	suite.Assert().Nil(err)
-
-	suite.hotstuff.AssertExpectations(suite.T())
+	// check the submit vote was called with correct parameters
+	cs.hotstuff.AssertExpectations(cs.T())
 }
