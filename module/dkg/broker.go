@@ -116,18 +116,20 @@ func (b *Broker) Broadcast(data []byte) {
 	}
 	maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
 
-	err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
-		err := b.dkgContractClient.Broadcast(bcastMsg)
-		if err != nil {
-			b.log.Error().Err(err).Msg("error broadcasting DKG result, retrying")
-		}
-		return retry.RetryableError(err)
-	})
+	go func() {
+		err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
+			err := b.dkgContractClient.Broadcast(bcastMsg)
+			if err != nil {
+				b.log.Error().Err(err).Msg("error broadcasting DKG result, retrying")
+			}
+			return retry.RetryableError(err)
+		})
 
-	if err != nil {
-		b.log.Fatal().Err(err).Msg("failed to broadcast message")
-	}
-	b.broadcasts++
+		if err != nil {
+			b.log.Fatal().Err(err).Msg("failed to broadcast message")
+		}
+		b.broadcasts++
+	}()
 }
 
 // Disqualify flags that a node is misbehaving and got disqualified
