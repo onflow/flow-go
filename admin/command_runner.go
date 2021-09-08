@@ -214,7 +214,8 @@ func (r *CommandRunner) processLoop(ctx context.Context) {
 					} else if errors.Is(handleErr, context.DeadlineExceeded) {
 						err = status.Error(codes.DeadlineExceeded, "request timed out")
 					} else {
-						err = status.Error(codes.Unknown, handleErr.Error())
+						s, _ := status.FromError(handleErr)
+						err = s.Err()
 					}
 				}
 			} else {
