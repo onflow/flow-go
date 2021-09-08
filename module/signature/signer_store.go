@@ -31,7 +31,7 @@ func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.DKGKe
 // given view. The view determines the epoch, which determines the DKG private
 // key underlying the signer.
 func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.ThresholdSigner, error) {
-	epoch, err := s.epochLookup.EpochForView(view)
+	epoch, err := s.epochLookup.EpochForViewWithFallback(view)
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch by view: %v, %w", view, err)
 	}

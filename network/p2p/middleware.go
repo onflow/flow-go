@@ -13,6 +13,7 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -75,14 +76,14 @@ type Middleware struct {
 	metrics                    module.NetworkMetrics
 	rootBlockID                string
 	validators                 []network.MessageValidator
+	peerManagerFactory         PeerManagerFactoryFunc
 	peerManager                *PeerManager
-	peerUpdateInterval         time.Duration
 	unicastMessageTimeout      time.Duration
 	connectionGating           bool
-	managePeerConnections      bool
 	idTranslator               IDTranslator
 	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
+	stakedTopicValidator       *StakedValidator
 }
 
 type MiddlewareOption func(*Middleware)
@@ -96,6 +97,12 @@ func WithIdentifierProvider(provider id.IdentifierProvider) MiddlewareOption {
 func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.validators = validators
+	}
+}
+
+func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.peerManagerFactory = peerManagerFunc
 	}
 }
 
@@ -114,10 +121,8 @@ func NewMiddleware(
 	flowID flow.Identifier,
 	metrics module.NetworkMetrics,
 	rootBlockID string,
-	peerUpdateInterval time.Duration,
 	unicastMessageTimeout time.Duration,
 	connectionGating bool,
-	managePeerConnections bool,
 	idTranslator IDTranslator,
 	opts ...MiddlewareOption,
 ) *Middleware {
@@ -138,10 +143,9 @@ func NewMiddleware(
 		metrics:               metrics,
 		rootBlockID:           rootBlockID,
 		validators:            DefaultValidators(log, flowID),
-		peerUpdateInterval:    peerUpdateInterval,
 		unicastMessageTimeout: unicastMessageTimeout,
 		connectionGating:      connectionGating,
-		managePeerConnections: managePeerConnections,
+		peerManagerFactory:    nil,
 		idTranslator:          idTranslator,
 	}
 
@@ -242,17 +246,20 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 	m.UpdateNodeAddresses()
 
+	m.stakedTopicValidator = &StakedValidator{m.ov.Identity}
+
 	if m.connectionGating {
 		m.libP2PNode.UpdateAllowList(m.allPeers())
 	}
 
-	if m.managePeerConnections {
-		libp2pConnector, err := newLibp2pConnector(m.libP2PNode.Host(), m.log)
+	// create and use a peer manager if a peer manager factory was passed in during initialization
+	if m.peerManagerFactory != nil {
+
+		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, m.topologyPeers, m.log)
 		if err != nil {
-			return fmt.Errorf("failed to create libp2pConnector: %w", err)
+			return fmt.Errorf("failed to create peer manager: %w", err)
 		}
 
-		m.peerManager = NewPeerManager(m.log, m.topologyPeers, libp2pConnector, WithInterval(m.peerUpdateInterval))
 		select {
 		case <-m.peerManager.Ready():
 			m.log.Debug().Msg("peer manager successfully started")
@@ -383,7 +390,13 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
-	s, err := m.libP2PNode.Subscribe(m.ctx, topic)
+	var validators []pubsub.ValidatorEx
+	if !engine.UnstakedChannels().Contains(channel) {
+		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
+		validators = append(validators, m.stakedTopicValidator.Validate)
+	}
+
+	s, err := m.libP2PNode.Subscribe(m.ctx, topic, validators...)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
 	}
@@ -556,7 +569,7 @@ func (m *Middleware) peerManagerUpdate() {
 
 // peerMgr returns the PeerManager and true if this middleware was started with one, (nil, false) otherwise
 func (m *Middleware) peerMgr() (*PeerManager, bool) {
-	if m.managePeerConnections {
+	if m.peerManager != nil {
 		return m.peerManager, true
 	}
 	return nil, false

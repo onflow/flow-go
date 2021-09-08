@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -235,11 +236,15 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 
 		pingInfoProvider, _, _ := MockPingInfoProvider()
 
+		resolver, err := dns.NewResolver(noopMetrics)
+		require.NoError(suite.T(), err)
+
 		n, err := NewDefaultLibP2PNodeBuilder(flow.Identifier{}, "0.0.0.0:0", key).
 			SetRootBlockID(rootBlockID).
 			SetConnectionManager(connManager).
 			SetDHTOptions(AsServer(dhtServer)).
 			SetPingInfoProvider(pingInfoProvider).
+			SetResolver(resolver).
 			SetLogger(logger).
 			Build(suite.ctx)
 		require.NoError(suite.T(), err)
