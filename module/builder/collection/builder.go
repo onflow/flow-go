@@ -331,7 +331,7 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not build block: %w", err)
 	}
 
-	span, ctx := b.tracer.StartCollectionSpan(context.Background(), proposal.ID(), trace.COLBuildOn, opentracing.StartTime(startTime))
+	span, ctx, _ := b.tracer.StartCollectionSpan(context.Background(), proposal.ID(), trace.COLBuildOn, opentracing.StartTime(startTime))
 	defer span.Finish()
 
 	dbInsertSpan, _ := b.tracer.StartSpanFromContext(ctx, trace.COLBuildOnDBInsert)
