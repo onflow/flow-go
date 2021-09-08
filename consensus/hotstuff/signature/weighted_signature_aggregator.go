@@ -45,7 +45,7 @@ func NewWeightedSignatureAggregator(signerIDs []flow.Identifier,
 	}
 
 	// build a low level aggregator
-	agg, err := signature.NewSignatureAggregatorSameMessage(message, []byte(dsTag), n, publicKeys)
+	agg, err := signature.NewSignatureAggregatorSameMessage(message, dsTag, publicKeys)
 	if err != nil {
 		return nil, fmt.Errorf("new signature aggregator failed: %w", err)
 	}

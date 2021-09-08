@@ -42,20 +42,17 @@ type SignatureAggregatorSameMessage struct {
 //
 // A new SignatureAggregatorSameMessage is needed for each set of public keys. If the key set changes,
 // a new structure needs to be instantiated.
+// The number of public keys fixes the number of partcipantn. Each participant i is defined
+// by public key publicKeys[i]
 // The function errors with ErrInvalidInputs if any input is invalid.
 func NewSignatureAggregatorSameMessage(
 	message []byte, // message to be aggregate signatures for
 	dsTag string, // domain separation tag used for signatures
-	n int, // number of participants
 	publicKeys []crypto.PublicKey, // public keys of participants agreed upon upfront
 ) (*SignatureAggregatorSameMessage, error) {
 
-	// inputs check
-	if n <= 0 {
-		return nil, newErrInvalidInputs("number of participants must larger than 0, got %d", n)
-	}
-	if len(publicKeys) != n {
-		return nil, newErrInvalidInputs("number or keys %d, must be the number of participants %d", len(publicKeys), n)
+	if len(publicKeys) == 0 {
+		return nil, newErrInvalidInputs("number of participants must be larger than 0, got %d", len(publicKeys))
 	}
 	// sanity check for BLS keys
 	for i, key := range publicKeys {
@@ -67,7 +64,7 @@ func NewSignatureAggregatorSameMessage(
 	return &SignatureAggregatorSameMessage{
 		message:          message,
 		hasher:           crypto.NewBLSKMAC(dsTag),
-		n:                n,
+		n:                len(publicKeys),
 		publicKeys:       publicKeys,
 		indexToSignature: make(map[int]string),
 
