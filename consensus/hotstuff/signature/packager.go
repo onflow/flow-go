@@ -28,18 +28,24 @@ type signatureData struct {
 	// bit-vector indicating type of signature for each signer.
 	SigType []hotstuff.SigType
 
-	AggregatedStakingSig      crypto.Signature
-	AggregatedRandomBeaconSig crypto.Signature
+	AggregatedStakingSig      []byte
+	AggregatedRandomBeaconSig []byte
 	RandomBeacon              crypto.Signature
 }
 
 // Pack packs the block signature data into raw bytes
+// a consensus node can be either a random beacon node or a non-random beacon node.
+// a random beacon node can produce either a random beacon sig or a staking sig.
+// a non-random beacon node can only produce a staking sig.
+// To pack the block signature data, we first build a compact data type, and then encode it into bytes.
+// The encoding method is RLP.
 func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
 	consensus, err := p.committees.Identities(blockID, filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
 	}
 
+	// lookup is a map from node identifier to node identity
 	lookup := consensus.Lookup()
 	count := len(sig.StakingSigners) + len(sig.RandomBeaconSigners)
 
@@ -83,7 +89,7 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 
 func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	var data signatureData
-	err := p.encoder.Decode(sigData, &sigData)
+	err := p.encoder.Decode(sigData, &data)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode sig data: %w", err)
 	}
