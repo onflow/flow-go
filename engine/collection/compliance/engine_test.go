@@ -1,6 +1,7 @@
 package compliance_test
 
 import (
+	"github.com/onflow/flow-go/engine/collection/compliance"
 	"os"
 	"testing"
 

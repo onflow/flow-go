@@ -76,7 +76,7 @@ func New(
 	// create the proposal engine
 	e := &Engine{
 		unit:           engine.NewUnit(),
-		log:            log.With().Str("engine", "proposal").Logger(),
+		log:            log.With().Str("col_compliance", "engine").Logger(),
 		colMetrics:     colMetrics,
 		engMetrics:     engMetrics,
 		mempoolMetrics: mempoolMetrics,

@@ -55,7 +55,7 @@ func NewCore(
 ) (*Core, error) {
 
 	c := &Core{
-		log:               log.With().Str("proposal", "core").Logger(),
+		log:               log.With().Str("col_compliance", "core").Logger(),
 		metrics:           collector,
 		tracer:            tracer,
 		mempoolMetrics:    mempool,
