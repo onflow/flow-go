@@ -507,7 +507,6 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	err = rootProtocolJsonWithoutAddresses(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
 
-	fmt.Println(filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	// consensus follower
 	bindPort := testingdock.RandomPort(t)
 	bindAddr := fmt.Sprintf("0.0.0.0:%s", bindPort)
