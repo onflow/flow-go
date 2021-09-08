@@ -42,7 +42,20 @@ func Bootstrap(
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
 	root protocol.Snapshot,
+	skipSnapshotValidation ...bool,
 ) (*State, error) {
+
+	// optionally skip validations involving flow identity
+	var skipValidations bool
+	switch len(skipSnapshotValidation) {
+	case 0:
+		skipValidations = false
+	case 1:
+		skipValidations = skipSnapshotValidation[0]
+	default:
+		return nil, fmt.Errorf("invalid value for skipSnapshotValidation")
+	}
+
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
@@ -52,8 +65,10 @@ func Bootstrap(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
-	if err := isValidRootSnapshot(root); err != nil {
-		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
+	if !skipValidations {
+		if err := isValidRootSnapshot(root); err != nil {
+			return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
+		}
 	}
 
 	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
@@ -97,7 +112,7 @@ func Bootstrap(
 		}
 
 		// 5) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root)(tx)
+		err = state.bootstrapEpoch(root, skipValidations)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
@@ -246,7 +261,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 //
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx) error {
+func (state *State) bootstrapEpoch(root protocol.Snapshot, skipValidation bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		previous := root.Epochs().Previous()
 		current := root.Epochs().Current()
@@ -270,8 +285,10 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 				return fmt.Errorf("could not get previous epoch commit event: %w", err)
 			}
 
-			if err := isValidEpochSetup(setup); err != nil {
-				return fmt.Errorf("invalid setup: %w", err)
+			if !skipValidation {
+				if err := isValidEpochSetup(setup); err != nil {
+					return fmt.Errorf("invalid setup: %w", err)
+				}
 			}
 			if err := isValidEpochCommit(commit, setup); err != nil {
 				return fmt.Errorf("invalid commit")
@@ -295,9 +312,12 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 			return fmt.Errorf("could not get current epoch commit event: %w", err)
 		}
 
-		if err := isValidEpochSetup(setup); err != nil {
-			return fmt.Errorf("invalid setup: %w", err)
+		if !skipValidation {
+			if err := isValidEpochSetup(setup); err != nil {
+				return fmt.Errorf("invalid setup: %w", err)
+			}
 		}
+
 		if err := isValidEpochCommit(commit, setup); err != nil {
 			return fmt.Errorf("invalid commit")
 		}
@@ -315,8 +335,11 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 			if err != nil {
 				return fmt.Errorf("could not get next epoch setup event: %w", err)
 			}
-			if err := isValidEpochSetup(setup); err != nil {
-				return fmt.Errorf("invalid setup: %w", err)
+
+			if !skipValidation {
+				if err := isValidEpochSetup(setup); err != nil {
+					return fmt.Errorf("invalid setup: %w", err)
+				}
 			}
 
 			setups = append(setups, setup)

@@ -504,7 +504,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// strip out the node addresses from root-protocol-state-snapshot.json and copy it to the follower-specific
 	// bootstrap/public-root-information directory
-	err = StripAddressesFromRootProtocolJson(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+	err = rootProtocolJsonWithoutAddresses(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
 
 	fmt.Println(filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))

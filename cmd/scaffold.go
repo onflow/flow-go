@@ -538,6 +538,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Commits,
 			fnb.Storage.Statuses,
 			rootSnapshot,
+			fnb.SkipRootSnapshotValidation,
 		)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 

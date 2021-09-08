@@ -26,6 +26,9 @@ type UnstakedAccessNodeBuilder struct {
 }
 
 func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
+	// the unstaked access node gets a version of the root snapshot file that does not contain any node addresses
+	// hence skip all the root snapshot validations that involved an identity address
+	anb.SkipRootSnapshotValidation = true
 	return &UnstakedAccessNodeBuilder{
 		FlowAccessNodeBuilder: anb,
 	}

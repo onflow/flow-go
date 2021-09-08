@@ -107,13 +107,16 @@ func WriteJSON(path string, data interface{}) error {
 	return err
 }
 
-func StripAddressesFromRootProtocolJson(srcfile string, dstFile string) error {
+// rootProtocolJsonWithoutAddresses strips out all node addresses from the root protocol json file specified as srcFile
+// and creates the dstFile with the modified contents
+func rootProtocolJsonWithoutAddresses(srcfile string, dstFile string) error {
 
 	fileData, err := ioutil.ReadFile(srcfile)
 	if err != nil {
 		return err
 	}
 	fileString := string(fileData)
+	// look for all "Address": "<node addres>" and remove those elements
 	m1 := regexp.MustCompile(`.*"Address".*:.*".*".*\n`)
 	newString := m1.ReplaceAllString(fileString, "")
 	newFileData := []byte(newString)

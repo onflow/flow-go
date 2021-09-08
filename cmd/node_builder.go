@@ -150,11 +150,12 @@ type NodeConfig struct {
 	SyncEngineIdentifierProvider id.IdentifierProvider
 
 	// root state information
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
+	RootBlock                  *flow.Block
+	RootQC                     *flow.QuorumCertificate
+	RootResult                 *flow.ExecutionResult
+	RootSeal                   *flow.Seal
+	RootChainID                flow.ChainID
+	SkipRootSnapshotValidation bool
 }
 
 func DefaultBaseConfig() *BaseConfig {
