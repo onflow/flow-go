@@ -3,8 +3,10 @@
 package mock
 
 import (
-	cadence "github.com/onflow/cadence"
+	atree "github.com/onflow/atree"
 	ast "github.com/onflow/cadence/runtime/ast"
+
+	cadence "github.com/onflow/cadence"
 
 	common "github.com/onflow/cadence/runtime/common"
 
@@ -59,6 +61,29 @@ func (_m *Environment) AddEncodedAccountKey(address common.Address, publicKey []
 	}
 
 	return r0
+}
+
+// AllocateStorageIndex provides a mock function with given fields: owner
+func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	ret := _m.Called(owner)
+
+	var r0 atree.StorageIndex
+	if rf, ok := ret.Get(0).(func([]byte) atree.StorageIndex); ok {
+		r0 = rf(owner)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(atree.StorageIndex)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]byte) error); ok {
+		r1 = rf(owner)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Context provides a mock function with given fields:
@@ -216,29 +241,6 @@ func (_m *Environment) GetAccountContractCode(address common.Address, name strin
 	var r1 error
 	if rf, ok := ret.Get(1).(func(common.Address, string) error); ok {
 		r1 = rf(address, name)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// GetAccountContractNames provides a mock function with given fields: address
-func (_m *Environment) GetAccountContractNames(address common.Address) ([]string, error) {
-	ret := _m.Called(address)
-
-	var r0 []string
-	if rf, ok := ret.Get(0).(func(common.Address) []string); ok {
-		r0 = rf(address)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]string)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(common.Address) error); ok {
-		r1 = rf(address)
 	} else {
 		r1 = ret.Error(1)
 	}
