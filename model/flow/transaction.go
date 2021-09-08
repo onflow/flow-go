@@ -84,8 +84,15 @@ func (tb TransactionBody) ByteSize() uint {
 	return uint(size)
 }
 
+var tb_identifier Identifier
+var hasIdentifier bool = false
+
 func (tb TransactionBody) ID() Identifier {
-	return MakeID(tb)
+	if hasIdentifier == false {
+		tb_identifier = MakeID(tb)
+		hasIdentifier = true
+	}
+	return tb_identifier
 }
 
 func (tb TransactionBody) Checksum() Identifier {
