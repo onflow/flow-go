@@ -99,6 +99,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 			db:      db,
 			headers: storage.NewHeaders(metrics, db),
 			state:   state,
+			tracer:  trace.NewNoopTracer(),
 			cleanup: LogCleanup(&list),
 		}
 		err = fin.MakeFinal(lastID)
