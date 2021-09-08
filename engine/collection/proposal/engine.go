@@ -1,4 +1,4 @@
-package proposal
+package compliance
 
 import (
 	"errors"

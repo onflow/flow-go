@@ -1,4 +1,4 @@
-package proposal_test
+package compliance_test
 
 import (
 	"os"
@@ -52,7 +52,7 @@ type Suite struct {
 	pending      *module.PendingClusterBlockBuffer
 	sync         *module.BlockRequester
 	hotstuff     *module.HotStuff
-	eng          *proposal.Engine
+	eng          *compliance.Engine
 }
 
 func TestProposalEngine(t *testing.T) {
@@ -109,7 +109,7 @@ func (suite *Suite) SetupTest() {
 	suite.sync = new(module.BlockRequester)
 	suite.hotstuff = new(module.HotStuff)
 
-	eng, err := proposal.New(
+	eng, err := compliance.New(
 		log,
 		suite.net,
 		suite.me,
