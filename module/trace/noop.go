@@ -36,10 +36,6 @@ func (t *NoopTracer) Done() <-chan struct{} {
 	return done
 }
 
-func (t *NoopTracer) EntityRootSpan(entityID flow.Identifier, entityType string, opts ...opentracing.StartSpanOption) opentracing.Span {
-	return &NoopSpan{t}
-}
-
 func (t *NoopTracer) StartBlockSpan(
 	ctx context.Context,
 	entityID flow.Identifier,

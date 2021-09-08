@@ -125,6 +125,9 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
+	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
+		"adjusts the level of sampling when tracing is enabled. 0 means capture everything, higher value results in less samples")
+
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {

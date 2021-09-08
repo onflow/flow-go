@@ -19,13 +19,6 @@ var _ Tracer = &trace.NoopTracer{}
 type Tracer interface {
 	ReadyDoneAware
 
-	// EntityRootSpan returns entity root span, a short lived span that is mostly act
-	// as the root span of all spans about an entity.
-	EntityRootSpan(
-		entityID flow.Identifier,
-		entityType string,
-		opts ...opentracing.StartSpanOption) opentracing.Span
-
 	// StartBlockSpan starts an span for a block, built as a child of rootSpan
 	// it also returns the context including this span which can be used for nested calls.
 	StartBlockSpan(

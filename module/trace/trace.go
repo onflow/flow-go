@@ -2,7 +2,6 @@ package trace
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"math/rand"
 	"time"
@@ -31,7 +30,7 @@ type OpenTracer struct {
 	closer      io.Closer
 	log         zerolog.Logger
 	spanCache   *lru.Cache
-	sensitivity int
+	sensitivity uint
 }
 
 type traceLogger struct {
@@ -49,9 +48,8 @@ func (t traceLogger) Infof(msg string, args ...interface{}) {
 
 // NewTracer creates a new tracer.
 //
-// TODO (ramtin):  pass entity cache size as param
 // TODO (ramtin) : we might need to add a mutex lock (not sure if tracer itself is thread-safe)
-func NewTracer(log zerolog.Logger, serviceName string, sensitivity int) (*OpenTracer, error) {
+func NewTracer(log zerolog.Logger, serviceName string, sensitivity uint) (*OpenTracer, error) {
 	cfg, err := config.FromEnv()
 	if err != nil {
 		return nil, err
@@ -59,10 +57,6 @@ func NewTracer(log zerolog.Logger, serviceName string, sensitivity int) (*OpenTr
 
 	if cfg.ServiceName == "" {
 		cfg.ServiceName = serviceName
-	}
-
-	if sensitivity < 0 || sensitivity > 64 {
-		return nil, fmt.Errorf("sensitivity is not in the accaptable range")
 	}
 
 	tracer, closer, err := cfg.NewTracer(config.Logger(traceLogger{log}))
@@ -105,10 +99,10 @@ func (t *OpenTracer) Done() <-chan struct{} {
 	return done
 }
 
-// EntityRootSpan returns the root span for the given entity from the cache
+// entityRootSpan returns the root span for the given entity from the cache
 // and if not exist it would construct it and cache it and return it
 // This should be used mostly for the very first span created for an entity on the service
-func (t *OpenTracer) EntityRootSpan(entityID flow.Identifier, entityType string, opts ...opentracing.StartSpanOption) opentracing.Span {
+func (t *OpenTracer) entityRootSpan(entityID flow.Identifier, entityType string, opts ...opentracing.StartSpanOption) opentracing.Span {
 	if span, ok := t.spanCache.Get(entityID); ok {
 		return span.(opentracing.Span)
 	}
@@ -121,12 +115,11 @@ func (t *OpenTracer) EntityRootSpan(entityID flow.Identifier, entityType string,
 		return sp
 	}
 
-	t.log.Info().Msgf("Tracer Decision for %x, %b", entityID, traceID.High>>uint64(64-t.sensitivity) == 0)
 	ctx := jaeger.NewSpanContext(
 		traceID,
 		jaeger.SpanID(rand.Uint64()),
 		jaeger.SpanID(0),
-		traceID.High>>uint64(64-t.sensitivity) == 0,
+		true,
 		nil,
 	)
 	opts = append(opts, jaeger.SelfRef(ctx))
@@ -141,7 +134,13 @@ func (t *OpenTracer) StartBlockSpan(
 	blockID flow.Identifier,
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
-	rootSpan := t.EntityRootSpan(blockID, EntityTypeBlock)
+
+	// if is not sampled don't move forward
+	if !blockID.IsSampled(t.sensitivity) {
+		return &NoopSpan{&NoopTracer{}}, ctx
+	}
+
+	rootSpan := t.entityRootSpan(blockID, EntityTypeBlock)
 	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
 	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx
 }
@@ -151,7 +150,13 @@ func (t *OpenTracer) StartCollectionSpan(
 	collectionID flow.Identifier,
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
-	rootSpan := t.EntityRootSpan(collectionID, EntityTypeCollection)
+
+	// if is not sampled don't move forward
+	if !collectionID.IsSampled(t.sensitivity) {
+		return &NoopSpan{&NoopTracer{}}, ctx
+	}
+
+	rootSpan := t.entityRootSpan(collectionID, EntityTypeCollection)
 	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
 	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx
 }
@@ -161,7 +166,12 @@ func (t *OpenTracer) StartTransactionSpan(
 	transactionID flow.Identifier,
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
-	rootSpan := t.EntityRootSpan(transactionID, EntityTypeTransaction)
+	// if is not sampled don't move forward
+	if !transactionID.IsSampled(t.sensitivity) {
+		return &NoopSpan{&NoopTracer{}}, ctx
+	}
+
+	rootSpan := t.entityRootSpan(transactionID, EntityTypeTransaction)
 	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
 	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx
 }
