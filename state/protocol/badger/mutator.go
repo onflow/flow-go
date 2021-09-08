@@ -21,11 +21,9 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-
 // errIncompleteEpochConfiguration is a sentinel error returned when there are
 // still epoch service events missing and the new epoch can't be constructed.
 var errIncompleteEpochConfiguration = errors.New("block beyond epoch boundary")
-
 
 // FollowerState implements a lighter version of a mutable protocol state.
 // When extending the state, it performs hardly any checks on the block payload.
@@ -133,7 +131,6 @@ func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error
 
 	return nil
 }
-
 
 // Extend extends the protocol state of a CONSENSUS PARTICIPANT. It checks
 // the validity of the _entire block_ (header and full payload).
@@ -252,7 +249,6 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 
 	return nil
 }
-
 
 // guaranteeExtend verifies the validity of the collection guarantees that are
 // included in the block. Specifically, we check for expired collections and
@@ -469,7 +465,6 @@ func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last 
 
 	return nil
 }
-
 
 // Finalize marks the specified block as finalized. This method only
 // finalizes one block at a time. Hence, the parent of `blockID`

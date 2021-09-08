@@ -10,14 +10,13 @@ import (
 	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/ledger"
-
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
@@ -92,7 +91,7 @@ func (e *blockComputer) ExecuteBlock(
 	program *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
-	span, ctx, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
+	span, _, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
 	if isSampled {
 		span.SetTag("block.collectioncount", len(block.CompleteCollections))
 		span.LogFields(log.String("block.hash", block.ID().String()))
