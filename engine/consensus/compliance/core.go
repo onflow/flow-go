@@ -79,7 +79,7 @@ func NewCore(
 // OnBlockProposal handles incoming block proposals.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
-	span, _ := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONCompOnBlockProposal)
+	span, _, _ := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONCompOnBlockProposal)
 	if span != nil {
 		span.SetTag("block_id", proposal.Header.ID())
 		span.SetTag("view", proposal.Header.View)
@@ -260,8 +260,8 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	startTime := time.Now()
 	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
 
-	span, ctx := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.ConCompProcessBlockProposal)
-	if span != nil {
+	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.ConCompProcessBlockProposal)
+	if isSampled {
 		span.SetTag("block_id", proposal.Header.ID())
 		span.SetTag("view", proposal.Header.View)
 		span.SetTag("proposer", proposal.Header.ProposerID.String())

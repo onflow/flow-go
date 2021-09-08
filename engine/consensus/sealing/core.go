@@ -300,7 +300,7 @@ func (c *Core) processIncorporatedResult(incRes *flow.IncorporatedResult) error 
 // * nil - successfully processed incorporated result
 func (c *Core) ProcessIncorporatedResult(result *flow.IncorporatedResult) error {
 
-	span, _ := c.tracer.StartBlockSpan(context.Background(), result.Result.BlockID, trace.CONSealingProcessIncorporatedResult)
+	span, _, _ := c.tracer.StartBlockSpan(context.Background(), result.Result.BlockID, trace.CONSealingProcessIncorporatedResult)
 	defer span.Finish()
 
 	err := c.processIncorporatedResult(result)
@@ -345,7 +345,7 @@ func (c *Core) checkBlockOutdated(blockID flow.Identifier) error {
 // * nil - successfully processed result approval
 func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
 
-	span, _ := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
+	span, _, _ := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
 	defer span.Finish()
 
 	startTime := time.Now()
@@ -463,7 +463,7 @@ func (c *Core) processPendingApprovals(collector approvals.AssignmentCollectorSt
 // * nil - successfully processed finalized block
 func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
 
-	processFinalizedBlockSpan, _ := c.tracer.StartBlockSpan(context.Background(), finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
+	processFinalizedBlockSpan, _, _ := c.tracer.StartBlockSpan(context.Background(), finalizedBlockID, trace.CONSealingProcessFinalizedBlock)
 	defer processFinalizedBlockSpan.Finish()
 
 	// STEP 0: Collect auxiliary information

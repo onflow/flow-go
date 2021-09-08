@@ -86,15 +86,12 @@ func (e *blockComputer) ExecuteBlock(
 	program *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
-	// call tracer
-	span, ctx := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
-	defer func() {
+	span, ctx, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
+	if isSampled {
 		span.SetTag("block.collectioncount", len(block.CompleteCollections))
-		span.LogFields(
-			log.String("block.hash", block.ID().String()),
-		)
-		span.Finish()
-	}()
+		span.LogFields(log.String("block.hash", block.ID().String()))
+	}
+	defer span.Finish()
 
 	results, err := e.executeBlock(span, block, stateView, program)
 	if err != nil {
@@ -312,8 +309,10 @@ func (e *blockComputer) executeTransaction(
 	txSpan.LogFields(log.String("transaction.ID", txID.String()))
 	defer txSpan.Finish()
 
-	txInternalSpan, _ := e.tracer.StartTransactionSpan(context.Background(), txID, trace.EXERunTransaction)
-	txInternalSpan.LogFields(log.String("transaction.ID", txID.String()))
+	txInternalSpan, _, isSampled := e.tracer.StartTransactionSpan(context.Background(), txID, trace.EXERunTransaction)
+	if isSampled {
+		txInternalSpan.LogFields(log.String("transaction.ID", txID.String()))
+	}
 	defer txInternalSpan.Finish()
 
 	e.log.Debug().

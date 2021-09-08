@@ -315,8 +315,8 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64,
 // verifiableChunkHandler acts as a wrapper around the verify method that captures its performance-related metrics
 func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verification.VerifiableChunkData) error {
 
-	span, ctx := e.tracer.StartBlockSpan(context.Background(), ch.Chunk.BlockID, trace.VERVerVerifyWithMetrics)
-	if span != nil {
+	span, ctx, isSampled := e.tracer.StartBlockSpan(context.Background(), ch.Chunk.BlockID, trace.VERVerVerifyWithMetrics)
+	if isSampled {
 		span.LogKV("result_id", ch.Result.ID())
 		span.LogKV("chunk_index", ch.Chunk.Index)
 	}

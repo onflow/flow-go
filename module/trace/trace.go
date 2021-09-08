@@ -133,47 +133,45 @@ func (t *OpenTracer) StartBlockSpan(
 	ctx context.Context,
 	blockID flow.Identifier,
 	spanName SpanName,
-	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
 
-	// if is not sampled don't move forward
 	if !blockID.IsSampled(t.sensitivity) {
-		return &NoopSpan{&NoopTracer{}}, ctx
+		return &NoopSpan{&NoopTracer{}}, ctx, false
 	}
 
 	rootSpan := t.entityRootSpan(blockID, EntityTypeBlock)
 	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
-	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
 }
 
 func (t *OpenTracer) StartCollectionSpan(
 	ctx context.Context,
 	collectionID flow.Identifier,
 	spanName SpanName,
-	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
 
-	// if is not sampled don't move forward
 	if !collectionID.IsSampled(t.sensitivity) {
-		return &NoopSpan{&NoopTracer{}}, ctx
+		return &NoopSpan{&NoopTracer{}}, ctx, false
 	}
 
 	rootSpan := t.entityRootSpan(collectionID, EntityTypeCollection)
 	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
-	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
 }
 
 func (t *OpenTracer) StartTransactionSpan(
 	ctx context.Context,
 	transactionID flow.Identifier,
 	spanName SpanName,
-	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context) {
-	// if is not sampled don't move forward
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
+
 	if !transactionID.IsSampled(t.sensitivity) {
-		return &NoopSpan{&NoopTracer{}}, ctx
+		return &NoopSpan{&NoopTracer{}}, ctx, false
 	}
 
 	rootSpan := t.entityRootSpan(transactionID, EntityTypeTransaction)
 	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
-	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
 }
 
 func (t *OpenTracer) StartSpanFromContext(

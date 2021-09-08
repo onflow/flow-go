@@ -164,8 +164,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // handleChunkDataPackWithTracing encapsulates the logic of handling a chunk data pack with tracing enabled.
 func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
-	span, _ := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.ID(), trace.VERRequesterHandleChunkDataResponse)
-	span.SetTag("chunk_id", chunkDataPack.ChunkID)
+	span, _, isSampled := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.ID(), trace.VERRequesterHandleChunkDataResponse)
+	if isSampled {
+		span.SetTag("chunk_id", chunkDataPack.ChunkID)
+	}
 	defer span.Finish()
 	e.handleChunkDataPack(originID, chunkDataPack)
 }

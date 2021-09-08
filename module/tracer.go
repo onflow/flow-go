@@ -21,27 +21,30 @@ type Tracer interface {
 
 	// StartBlockSpan starts an span for a block, built as a child of rootSpan
 	// it also returns the context including this span which can be used for nested calls.
+	// and also a boolean reporting if this span is sampled (is used for avoiding unncessary computation for tags)
 	StartBlockSpan(
 		ctx context.Context,
 		blockID flow.Identifier,
 		spanName trace.SpanName,
-		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context)
+		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool)
 
 	// StartCollectionSpan starts an span for a collection, built as a child of rootSpan
 	// it also returns the context including this span which can be used for nested calls.
+	// and also a boolean reporting if this span is sampled (is used for avoiding unncessary computation for tags)
 	StartCollectionSpan(
 		ctx context.Context,
 		collectionID flow.Identifier,
 		spanName trace.SpanName,
-		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context)
+		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool)
 
 	// StartTransactionSpan starts an span for a transaction, built as a child of rootSpan
 	// it also returns the context including this span which can be used for nested calls.
+	// and also a boolean reporting if this span is sampled (is used for avoiding unncessary computation for tags)
 	StartTransactionSpan(
 		ctx context.Context,
 		transactionID flow.Identifier,
 		spanName trace.SpanName,
-		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context)
+		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool)
 
 	StartSpanFromContext(
 		ctx context.Context,

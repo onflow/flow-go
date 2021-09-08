@@ -172,7 +172,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // * OutdatedInputError
 func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
-	span, _ := e.tracer.StartCollectionSpan(context.Background(), guarantee.CollectionID, trace.CONIngOnCollectionGuarantee)
+	span, _, isSampled := e.tracer.StartCollectionSpan(context.Background(), guarantee.CollectionID, trace.CONIngOnCollectionGuarantee)
+	if isSampled {
+		span.LogKV("originID", originID.String())
+	}
 	defer span.Finish()
 
 	guaranteeID := guarantee.ID()

@@ -54,7 +54,7 @@ func NewFinalizer(db *badger.DB,
 // pools and persistent storage.
 func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 
-	span, ctx := f.tracer.StartBlockSpan(context.Background(), blockID, trace.CONFinalizerFinalizeBlock)
+	span, ctx, _ := f.tracer.StartBlockSpan(context.Background(), blockID, trace.CONFinalizerFinalizeBlock)
 	defer span.Finish()
 
 	// STEP ONE: This is an idempotent operation. In case we are trying to

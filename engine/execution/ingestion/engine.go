@@ -432,7 +432,7 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	blockID := block.ID()
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
 
-	span, ctx := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
+	span, ctx, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
 	defer span.Finish()
 
 	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
