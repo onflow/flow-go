@@ -59,7 +59,7 @@ func storageFormatV4MigrationWorker(jobs <-chan ledger.Payload, results chan<- s
 	error
 }) {
 	for payload := range jobs {
-		migratedPayload, err := rencodePayloadV4(payload)
+		migratedPayload, err := reencodePayloadV4(payload)
 		result := struct {
 			key string
 			ledger.Payload
@@ -79,7 +79,7 @@ func storageFormatV4MigrationWorker(jobs <-chan ledger.Payload, results chan<- s
 	}
 }
 
-var decMode = func() cbor.DecMode {
+var storageMigrationV4DecMode = func() cbor.DecMode {
 	decMode, err := cbor.DecOptions{
 		IntDec:           cbor.IntDecConvertNone,
 		MaxArrayElements: math.MaxInt32,
@@ -92,7 +92,7 @@ var decMode = func() cbor.DecMode {
 	return decMode
 }()
 
-func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
+func reencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 
 	keyParts := payload.Key.KeyParts
 
@@ -108,7 +108,7 @@ func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 
 	value, version := interpreter.StripMagic(payload.Value)
 
-	err := decMode.Valid(value)
+	err := storageMigrationV4DecMode.Valid(value)
 	if err != nil {
 		return payload, nil
 	}
@@ -117,7 +117,7 @@ func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 
 	owner := common.BytesToAddress(rawOwner)
 
-	newValue, err := rencodeValueV4(value, owner, string(rawKey), version)
+	newValue, err := reencodeValueV4(value, owner, string(rawKey), version)
 	if err != nil {
 		return ledger.Payload{},
 			fmt.Errorf(
@@ -134,7 +134,7 @@ func rencodePayloadV4(payload ledger.Payload) (ledger.Payload, error) {
 	return payload, nil
 }
 
-func rencodeValueV4(data []byte, owner common.Address, key string, version uint16) ([]byte, error) {
+func reencodeValueV4(data []byte, owner common.Address, key string, version uint16) ([]byte, error) {
 
 	// Determine the appropriate decoder from the decoded version
 
@@ -155,7 +155,7 @@ func rencodeValueV4(data []byte, owner common.Address, key string, version uint1
 
 	// Encode the value using the new encoder
 
-	rewriteTokenForwarderStorageReference(key, value)
+	rewriteTokenForwarderStorageReferenceV4(key, value)
 
 	newData, deferrals, err := interpreter.EncodeValue(value, path, true, nil)
 	if err != nil {
@@ -239,12 +239,13 @@ var tokenForwardingLocationMainnet = common.AddressLocation{
 	Name:    "TokenForwarding",
 }
 
-func isTokenForwardingLocation(location common.Location) bool {
-	return common.LocationsMatch(location, tokenForwardingLocationTestnet) ||
-		common.LocationsMatch(location, tokenForwardingLocationMainnet)
-}
+func rewriteTokenForwarderStorageReferenceV4(key string, value interpreter.Value) {
 
-func rewriteTokenForwarderStorageReference(key string, value interpreter.Value) {
+	isTokenForwardingLocation := func(location common.Location) bool {
+		return common.LocationsMatch(location, tokenForwardingLocationTestnet) ||
+			common.LocationsMatch(location, tokenForwardingLocationMainnet)
+	}
+
 	compositeValue, ok := value.(*interpreter.CompositeValue)
 	if !ok ||
 		key != flowTokenReceiverStorageKey ||
