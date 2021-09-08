@@ -363,7 +363,12 @@ func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payl
 				Address: address,
 				Name:    contractName,
 			}] = true
+
+			return
 		}
+
+		// Add all other payloads (i.e: FVM registers) as-is.
+		addToCleanedPayloads(payload)
 	}
 
 	for _, payload := range payloads {
