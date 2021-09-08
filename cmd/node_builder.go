@@ -109,6 +109,7 @@ type BaseConfig struct {
 	BootstrapDir          string
 	PeerUpdateInterval    time.Duration
 	UnicastMessageTimeout time.Duration
+	DNSCacheTTL           time.Duration
 	profilerEnabled       bool
 	profilerDir           string
 	profilerInterval      time.Duration
