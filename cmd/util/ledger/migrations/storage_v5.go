@@ -114,9 +114,9 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.programs = programs.NewEmptyPrograms()
 
-	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
+	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause)
 
-	m.brokenContracts = make(map[common.Address]map[string]bool, 0)
+	m.brokenContracts = make(map[common.Address]map[string]bool)
 
 	m.view = newView(payloads)
 
@@ -143,7 +143,10 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 			migratedPayloads = append(migratedPayloads, *result.payload)
 		} else {
 			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", rawKey, rawOwner)
-			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
+			_, err := m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 
@@ -155,27 +158,6 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	}
 
 	return migratedPayloads, nil
-}
-
-func (m *StorageFormatV5Migration) initBrokenContractsDump() (err error) {
-	filename := path.Join(m.OutputDir, fmt.Sprintf("broken_contracts_%d.csv", int32(time.Now().Unix())))
-
-	m.Log.Info().Msgf("Any removed contracts would be save to %s.", filename)
-
-	brokenContracts, err := os.Create(filename)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		err = brokenContracts.Close()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	m.brokenContractsFile = brokenContracts
-
-	return nil
 }
 
 func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
@@ -254,8 +236,8 @@ func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payl
 		cleanedPayloads = append(cleanedPayloads, payload)
 	}
 
-	removedNames := make(map[common.AddressLocation]bool, 0)
-	removedContracts := make(map[common.AddressLocation]bool, 0)
+	removedNames := make(map[common.AddressLocation]bool)
+	removedContracts := make(map[common.AddressLocation]bool)
 
 	removeBrokenContracts := func(payload ledger.Payload) {
 		keyParts := payload.Key.KeyParts
@@ -349,15 +331,22 @@ func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payl
 				contractName,
 				address,
 			)
-			m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
 
-			m.brokenContractsFile.WriteString(
+			_, err := m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
+			if err != nil {
+				panic(err)
+			}
+
+			_, err = m.brokenContractsFile.WriteString(
 				fmt.Sprintf("Owner: %x\nKey: %s\nContract Code: \n%s\n\n",
 					rawOwner,
 					string(rawKey),
 					string(payload.Value),
 				),
 			)
+			if err != nil {
+				panic(err)
+			}
 
 			removedNames[common.AddressLocation{
 				Address: address,
@@ -378,7 +367,7 @@ func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payl
 	// Do a sanity check.
 	// Check whether all the broken contract codes and their names are removed from accounts.
 	for address, contracts := range m.brokenContracts {
-		for contractName, _ := range contracts {
+		for contractName := range contracts {
 			contractLoc := common.AddressLocation{
 				Address: address,
 				Name:    contractName,
@@ -536,7 +525,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 	err error,
 ) {
 
-	if bytes.Compare(data, emptyArrayEncoding) == 0 {
+	if bytes.Equal(data, emptyArrayEncoding) {
 		m.Log.Warn().
 			Str("key", key).
 			Str("owner", owner.String()).
@@ -553,7 +542,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 	if err != nil {
 		if tagErr, ok := err.(interpreter.UnsupportedTagDecodingError); ok &&
 			tagErr.Tag == cborTagStorageReference &&
-			bytes.Compare(data[:2], storageReferenceEncodingStart) == 0 {
+			bytes.Equal(data[:2], storageReferenceEncodingStart) {
 
 			m.Log.Warn().
 				Str("key", key).
@@ -577,11 +566,11 @@ func (m StorageFormatV5Migration) reencodeValue(
 		func(inspectedValue interpreter.Value) bool {
 			switch inspectedValue := inspectedValue.(type) {
 			case *interpreter.CompositeValue:
-				_ = inspectedValue.Fields()
+				inspectedValue.Fields()
 			case *interpreter.ArrayValue:
-				_ = inspectedValue.Elements()
+				inspectedValue.Elements()
 			case *interpreter.DictionaryValue:
-				_ = inspectedValue.Entries()
+				inspectedValue.Entries()
 			}
 			return true
 		},
@@ -2019,5 +2008,5 @@ type EmptyContainerTypeInferringError struct {
 }
 
 func (e EmptyContainerTypeInferringError) Error() string {
-	return fmt.Sprint("cannot infer static type from empty container value")
+	return "cannot infer static type from empty container value"
 }
