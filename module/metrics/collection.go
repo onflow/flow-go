@@ -9,16 +9,6 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// Collection spans.
-const (
-
-	// span from a transaction being received to being included in a block
-	spanTransactionToCollection = "transaction_to_collection"
-
-	// span from a collection being proposed to being finalized (eg. guaranteed)
-	spanCollectionToGuarantee = "collection_to_guarantee"
-)
-
 type CollectionCollector struct {
 	tracer               module.Tracer
 	transactionsIngested prometheus.Counter       // tracks the number of ingested transactions
@@ -69,8 +59,6 @@ func NewCollectionCollector(tracer module.Tracer) *CollectionCollector {
 // from being created to being included as part of a collection.
 func (cc *CollectionCollector) TransactionIngested(txID flow.Identifier) {
 	cc.transactionsIngested.Inc()
-	// TODO (Ramtin) - enable this later
-	// cc.tracer.StartSpan(txID, spanTransactionToCollection)
 }
 
 // ClusterBlockProposed tracks the size and number of proposals, as well as
@@ -81,19 +69,6 @@ func (cc *CollectionCollector) ClusterBlockProposed(block *cluster.Block) {
 	cc.proposals.
 		With(prometheus.Labels{LabelChain: block.Header.ChainID.String()}).
 		Observe(float64(collection.Len()))
-
-	// TODO (Ramtin) - enable this later
-	// followsFrom := make([]opentracing.StartSpanOption, 0, len(collection.Transactions))
-	// for _, txID := range collection.Transactions {
-	// 	if txSpan, exists := cc.tracer.GetSpan(txID, spanTransactionToCollection); exists {
-	// 		// link its transactions' spans
-	// 		followsFrom = append(followsFrom, opentracing.FollowsFrom(txSpan.Context()))
-	// 	}
-	// }
-
-	// cc.tracer.StartSpan(collection.ID(), spanCollectionToGuarantee, followsFrom...).
-	// 	SetTag("collection_id", collection.ID().String()).
-	// 	SetTag("collection_txs", collection.Transactions)
 }
 
 // ClusterBlockFinalized updates the guaranteed collection size gauge and
@@ -112,10 +87,4 @@ func (cc *CollectionCollector) ClusterBlockFinalized(block *cluster.Block) {
 			LabelProposer: proposer.String(),
 		}).
 		Observe(float64(collection.Len()))
-
-	// TODO (Ramtin) - enable this later
-	// for _, txID := range collection.Transactions {
-	// 	cc.tracer.FinishSpan(txID, spanTransactionToCollection)
-	// }
-	// cc.tracer.FinishSpan(collection.ID(), spanCollectionToGuarantee)
 }
