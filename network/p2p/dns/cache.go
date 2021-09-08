@@ -6,11 +6,12 @@ import (
 	"time"
 )
 
-// defaultTimeToLive is the default duration a dns result is cached.
+// DefaultTimeToLive is the default duration a dns result is cached.
 const (
-	defaultTimeToLive = 5 * time.Minute
-	cacheEntryExists  = true
-	cacheEntryExpired = true
+	// DefaultTimeToLive is the default duration a dns result is cached.
+	DefaultTimeToLive     = 60 * time.Minute
+	cacheEntryExists      = true
+	cacheEntryInvalidated = true
 )
 
 // cache is a ttl-based cache for dns entries
@@ -23,7 +24,7 @@ type cache struct {
 
 func newCache() *cache {
 	return &cache{
-		ttl:      defaultTimeToLive,
+		ttl:      DefaultTimeToLive,
 		ipCache:  make(map[string]*ipCacheEntry),
 		txtCache: make(map[string]*txtCacheEntry),
 	}

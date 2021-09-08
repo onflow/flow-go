@@ -18,12 +18,15 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	synccore "github.com/onflow/flow-go/module/synchronization"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
+	"github.com/onflow/flow-go/network/p2p"
 	protocolint "github.com/onflow/flow-go/state/protocol"
+	protocolEvents "github.com/onflow/flow-go/state/protocol/events"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
@@ -58,6 +61,12 @@ func (ss *SyncSuite) SetupTest() {
 
 	// generate own ID
 	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
+	keys, err := unittest.NetworkingKeys(len(ss.participants))
+	require.NoError(ss.T(), err)
+
+	for i, p := range ss.participants {
+		p.NetworkPubKey = keys[i].PublicKey()
+	}
 	ss.myID = ss.participants[0].NodeID
 
 	// generate a header for the final state
@@ -161,7 +170,16 @@ func (ss *SyncSuite) SetupTest() {
 	finalizedHeader, err := NewFinalizedHeaderCache(log, ss.state, pubsub.NewFinalizationDistributor())
 	require.NoError(ss.T(), err, "could not create finalized snapshot cache")
 
-	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader, ss.state)
+	idCache, err := p2p.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
+	require.NoError(ss.T(), err, "could not create protocol state identity cache")
+	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader,
+		id.NewFilteredIdentifierProvider(
+			filter.And(
+				filter.HasRole(flow.RoleConsensus),
+				filter.Not(filter.HasNodeID(ss.me.NodeID())),
+			),
+			idCache,
+		))
 	require.NoError(ss.T(), err, "should pass engine initialization")
 
 	ss.e = e
@@ -415,7 +433,7 @@ func (ss *SyncSuite) TestSendRequests() {
 	ss.core.On("BatchRequested", batches[0])
 
 	// exclude my node ID
-	ss.e.sendRequests(ss.participants[1:], ranges, batches)
+	ss.e.sendRequests(ss.participants[1:].NodeIDs(), ranges, batches)
 	ss.con.AssertExpectations(ss.T())
 }
 
@@ -472,6 +490,6 @@ func (ss *SyncSuite) TestOnFinalizedBlock() {
 	err := ss.e.finalizedHeader.updateHeader()
 	require.NoError(ss.T(), err)
 	actualHeader := ss.e.finalizedHeader.Get()
-	require.ElementsMatch(ss.T(), ss.e.getParticipants(actualHeader.ID()), ss.participants[1:])
+	require.ElementsMatch(ss.T(), ss.e.participantsProvider.Identifiers(), ss.participants[1:].NodeIDs())
 	require.Equal(ss.T(), actualHeader, &finalizedBlock)
 }

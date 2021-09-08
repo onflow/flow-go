@@ -2,6 +2,7 @@ package execution
 
 import (
 	"github.com/onflow/flow-go/engine/execution/state/delta"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/entity"
 )
@@ -26,6 +27,7 @@ type ComputationResult struct {
 	TransactionResults []flow.TransactionResult
 	ComputationUsed    uint64
 	StateReads         uint64
+	TrieUpdates        []*ledger.TrieUpdate
 }
 
 func (cr *ComputationResult) AddEvents(chunkIndex int, inp []flow.Event) {

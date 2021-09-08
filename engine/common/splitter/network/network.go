@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p"
 )
 
 // Network is the splitter network. It is a wrapper around the default network implementation
@@ -21,7 +20,7 @@ import (
 // splitter engine. As a result, multiple engines can register with the splitter network on
 // the same channel and will each receive all events on that channel.
 type Network struct {
-	p2p.ReadyDoneAwareNetwork
+	module.ReadyDoneAwareNetwork
 	mu        sync.RWMutex
 	log       zerolog.Logger
 	splitters map[network.Channel]*splitterEngine.Engine // stores splitters for each channel
@@ -31,7 +30,7 @@ type Network struct {
 
 // NewNetwork returns a new splitter network.
 func NewNetwork(
-	net p2p.ReadyDoneAwareNetwork,
+	net module.ReadyDoneAwareNetwork,
 	log zerolog.Logger,
 ) *Network {
 	return &Network{
@@ -76,18 +75,10 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 	}
 
 	// register engine with splitter
-	err := splitter.RegisterEngine(engine)
-
-	if err != nil {
-		// remove the splitter engine if this was the first time the given channel was registered
-		if !channelRegistered {
-			delete(n.splitters, channel)
-		}
-
-		return nil, fmt.Errorf("failed to register engine with splitter: %w", err)
-	}
+	splitter.RegisterEngine(engine)
 
 	if !channelRegistered {
+		var err error
 		conduit, err = n.ReadyDoneAwareNetwork.Register(channel, splitter)
 
 		if err != nil {
