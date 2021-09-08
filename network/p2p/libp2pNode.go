@@ -74,10 +74,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 
 	connGater := NewConnGater(log)
 
-	resolver, err := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
-	if err != nil {
-		return nil, fmt.Errorf("could not create dns resolver: %w", err)
-	}
+	resolver := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
 
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).

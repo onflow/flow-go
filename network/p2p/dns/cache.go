@@ -39,16 +39,16 @@ func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 
 	if !ok {
 		// does not exist
-		return nil, !cacheEntryExists, cacheEntryExpired
+		return nil, !cacheEntryExists, cacheEntryInvalidated
 	}
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
 		// exists but expired
-		return entry.addresses, cacheEntryExists, cacheEntryExpired
+		return entry.addresses, cacheEntryExists, cacheEntryInvalidated
 	}
 
 	// exists and fresh
-	return entry.addresses, cacheEntryExists, !cacheEntryExpired
+	return entry.addresses, cacheEntryExists, !cacheEntryInvalidated
 }
 
 // resolveIPCache resolves the txt through the cache if it is available.
@@ -60,16 +60,16 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 
 	if !ok {
 		// does not exist
-		return nil, !cacheEntryExists, !cacheEntryExpired
+		return nil, !cacheEntryExists, !cacheEntryInvalidated
 	}
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
 		// exists but expired
-		return entry.addresses, cacheEntryExists, cacheEntryExpired
+		return entry.addresses, cacheEntryExists, cacheEntryInvalidated
 	}
 
 	// exists and fresh
-	return entry.addresses, cacheEntryExists, !cacheEntryExpired
+	return entry.addresses, cacheEntryExists, !cacheEntryInvalidated
 }
 
 // updateIPCache updates the cache entry for the domain.
