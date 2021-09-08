@@ -68,12 +68,9 @@ func TestPackUnpack(t *testing.T) {
 	require.Equal(t, blockSigData.AggregatedRandomBeaconSig, unpacked.AggregatedRandomBeaconSig)
 	require.Equal(t, blockSigData.ReconstructedRandomBeaconSig, unpacked.ReconstructedRandomBeaconSig)
 
-	// check that packed signer IDs
-	expectedSignerIDs := []flow.Identifier{
-		committee[0], // A
-		committee[2], // C
-		committee[3], // D
-		committee[5], // F
-	}
+	// check the packed signer IDs
+	expectedSignerIDs := []flow.Identifier{}
+	expectedSignerIDs = append(expectedSignerIDs, blockSigData.StakingSigners...)
+	expectedSignerIDs = append(expectedSignerIDs, blockSigData.RandomBeaconSigners...)
 	require.Equal(t, expectedSignerIDs, signerIDs)
 }
