@@ -65,7 +65,7 @@ func Test_WAL(t *testing.T) {
 			values := utils.RandomValues(numInsPerStep, valueMaxByteSize/2, valueMaxByteSize)
 			update, err := ledger.NewUpdate(state, keys, values)
 			require.NoError(t, err)
-			state, err = led.Set(update)
+			state, _, err = led.Set(update)
 			require.NoError(t, err)
 
 			fmt.Printf("Updated with %x\n", state)

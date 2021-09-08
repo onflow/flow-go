@@ -72,7 +72,7 @@ func (r *ExecutionResults) byBlockID(blockID flow.Identifier) func(*badger.Txn) 
 	}
 }
 
-func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*transaction.Tx) error {
+func (r *ExecutionResults) index(blockID, resultID flow.Identifier, force bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		err := transaction.WithTx(operation.IndexExecutionResult(blockID, resultID))(tx)
 		if err == nil {
@@ -81,6 +81,10 @@ func (r *ExecutionResults) index(blockID, resultID flow.Identifier) func(*transa
 
 		if !errors.Is(err, storage.ErrAlreadyExists) {
 			return err
+		}
+
+		if force {
+			return transaction.WithTx(operation.ReindexExecutionResult(blockID, resultID))(tx)
 		}
 
 		// when trying to index a result for a block, and there is already a result indexed for this block,
@@ -121,7 +125,15 @@ func (r *ExecutionResults) ByID(resultID flow.Identifier) (*flow.ExecutionResult
 }
 
 func (r *ExecutionResults) Index(blockID flow.Identifier, resultID flow.Identifier) error {
-	err := operation.RetryOnConflictTx(r.db, transaction.Update, r.index(blockID, resultID))
+	err := operation.RetryOnConflictTx(r.db, transaction.Update, r.index(blockID, resultID, false))
+	if err != nil {
+		return fmt.Errorf("could not index execution result: %w", err)
+	}
+	return nil
+}
+
+func (r *ExecutionResults) ForceIndex(blockID flow.Identifier, resultID flow.Identifier) error {
+	err := operation.RetryOnConflictTx(r.db, transaction.Update, r.index(blockID, resultID, true))
 	if err != nil {
 		return fmt.Errorf("could not index execution result: %w", err)
 	}

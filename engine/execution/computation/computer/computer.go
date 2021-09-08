@@ -10,6 +10,8 @@ import (
 	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/ledger"
+
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
@@ -23,6 +25,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
+
 // VirtualMachine runs procedures
 type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
@@ -31,7 +35,7 @@ type VirtualMachine interface {
 // ViewCommitter commits views's deltas to the ledger and collects the proofs
 type ViewCommitter interface {
 	// CommitView commits a views' register delta and collects proofs
-	CommitView(state.View, flow.StateCommitment) (flow.StateCommitment, []byte, error)
+	CommitView(state.View, flow.StateCommitment) (flow.StateCommitment, []byte, *ledger.TrieUpdate, error)
 }
 
 // A BlockComputer executes the transactions in a block.
@@ -49,6 +53,17 @@ type blockComputer struct {
 	committer      ViewCommitter
 }
 
+func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
+	return fvm.NewContextFromParent(
+		vmCtx,
+		fvm.WithRestrictedDeployment(false),
+		fvm.WithTransactionFeesEnabled(false),
+		fvm.WithServiceEventCollectionEnabled(),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
+		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
+	)
+}
+
 // NewBlockComputer creates a new block executor.
 func NewBlockComputer(
 	vm VirtualMachine,
@@ -58,22 +73,13 @@ func NewBlockComputer(
 	logger zerolog.Logger,
 	committer ViewCommitter,
 ) (BlockComputer, error) {
-
-	systemChunkCtx := fvm.NewContextFromParent(
-		vmCtx,
-		fvm.WithRestrictedDeployment(false),
-		fvm.WithTransactionFeesEnabled(false),
-		fvm.WithServiceEventCollectionEnabled(),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
-	)
-
 	return &blockComputer{
 		vm:             vm,
 		vmCtx:          vmCtx,
 		metrics:        metrics,
 		tracer:         tracer,
 		log:            logger,
-		systemChunkCtx: systemChunkCtx,
+		systemChunkCtx: SystemChunkContext(vmCtx, logger),
 		committer:      committer,
 	}, nil
 }
@@ -137,6 +143,7 @@ func (e *blockComputer) executeBlock(
 
 	stateCommitments := make([]flow.StateCommitment, 0, len(collections)+1)
 	proofs := make([][]byte, 0, len(collections)+1)
+	trieUpdates := make([]*ledger.TrieUpdate, len(collections)+1)
 
 	bc := blockCommitter{
 		committer: e.committer,
@@ -144,12 +151,13 @@ func (e *blockComputer) executeBlock(
 		tracer:    e.tracer,
 		state:     *block.StartState,
 		views:     make(chan state.View, len(collections)+1),
-		callBack: func(state flow.StateCommitment, proof []byte, err error) {
+		callBack: func(state flow.StateCommitment, proof []byte, trieUpdate *ledger.TrieUpdate, err error) {
 			if err != nil {
 				panic(err)
 			}
 			stateCommitments = append(stateCommitments, state)
 			proofs = append(proofs, proof)
+			trieUpdates = append(trieUpdates, trieUpdate)
 		},
 	}
 
@@ -213,6 +221,7 @@ func (e *blockComputer) executeBlock(
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	res.StateCommitments = stateCommitments
 	res.Proofs = proofs
+	res.TrieUpdates = trieUpdates
 
 	return res, nil
 }
@@ -230,13 +239,31 @@ func (e *blockComputer) executeSystemCollection(
 	colSpan := e.tracer.StartSpanFromParent(blockSpan, trace.EXEComputeSystemCollection)
 	defer colSpan.Finish()
 
-	serviceAddress := e.vmCtx.Chain.ServiceAddress()
-	tx := blueprints.SystemChunkTransaction(serviceAddress)
-	err := e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
+	tx, err := blueprints.SystemChunkTransaction(e.vmCtx.Chain)
+	if err != nil {
+		return txIndex, fmt.Errorf("could not get system chunk transaction: %w", err)
+	}
+
+	err = e.executeTransaction(tx, colSpan, collectionView, programs, systemChunkCtx, collectionIndex, txIndex, res)
 	txIndex++
+
 	if err != nil {
 		return txIndex, err
 	}
+
+	systemChunkTxResult := res.TransactionResults[len(res.TransactionResults)-1]
+	if systemChunkTxResult.ErrorMessage != "" {
+		// This log is used as the data source for an alert on grafana.
+		// The system_chunk_error field must not be changed without adding the corresponding
+		// changes in grafana. https://github.com/dapperlabs/flow-internal/issues/1546
+		e.log.Error().
+			Str("error_message", systemChunkTxResult.ErrorMessage).
+			Hex("block_id", logging.Entity(systemChunkCtx.BlockHeader)).
+			Bool("system_chunk_error", true).
+			Bool("critical_error", true).
+			Msg("error executing system chunk transaction")
+	}
+
 	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
 
 	return txIndex, err
@@ -300,7 +327,6 @@ func (e *blockComputer) executeTransaction(
 	txIndex uint32,
 	res *execution.ComputationResult,
 ) error {
-
 	startedAt := time.Now()
 	txID := txBody.ID()
 
@@ -373,7 +399,7 @@ func (e *blockComputer) executeTransaction(
 type blockCommitter struct {
 	tracer    module.Tracer
 	committer ViewCommitter
-	callBack  func(state flow.StateCommitment, proof []byte, err error)
+	callBack  func(state flow.StateCommitment, proof []byte, update *ledger.TrieUpdate, err error)
 	state     flow.StateCommitment
 	views     chan state.View
 	blockSpan opentracing.Span
@@ -382,8 +408,8 @@ type blockCommitter struct {
 func (bc *blockCommitter) Run() {
 	for view := range bc.views {
 		span := bc.tracer.StartSpanFromParent(bc.blockSpan, trace.EXECommitDelta)
-		stateCommit, proof, err := bc.committer.CommitView(view, bc.state)
-		bc.callBack(stateCommit, proof, err)
+		stateCommit, proof, trieUpdate, err := bc.committer.CommitView(view, bc.state)
+		bc.callBack(stateCommit, proof, trieUpdate, err)
 		bc.state = stateCommit
 		span.Finish()
 	}

@@ -176,6 +176,7 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 	dkgPrivInfo, err := e.keyStorage.RetrieveMyDKGPrivateInfo(currentEpochCounter + 1)
 	if err != nil {
 		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG private info for next epoch")
+		return
 	}
 
 	nextDKGPubKey, err := nextDKG.KeyShare(dkgPrivInfo.NodeID)

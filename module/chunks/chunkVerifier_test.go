@@ -77,9 +77,9 @@ func (s *ChunkVerifierTestSuite) SetupSuite() {
 
 	// system chunk runs predefined system transaction, hence we can't distinguish
 	// based on its content and we need separate VMs
-	s.verifier = chunks.NewChunkVerifier(vm, vmCtx)
-	s.systemOkVerifier = chunks.NewChunkVerifier(systemOkVm, vmCtx)
-	s.systemBadVerifier = chunks.NewChunkVerifier(systemBadVm, vmCtx)
+	s.verifier = chunks.NewChunkVerifier(vm, vmCtx, zerolog.Nop())
+	s.systemOkVerifier = chunks.NewChunkVerifier(systemOkVm, vmCtx, zerolog.Nop())
+	s.systemBadVerifier = chunks.NewChunkVerifier(systemBadVm, vmCtx, zerolog.Nop())
 }
 
 // TestChunkVerifier invokes all the tests in this test suite
@@ -279,7 +279,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 	require.NoError(t, err)
 
-	startState, err := f.Set(update)
+	startState, _, err := f.Set(update)
 	require.NoError(t, err)
 
 	query, err := ledger.NewQuery(startState, keys)
@@ -299,7 +299,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	)
 	require.NoError(t, err)
 
-	endState, err := f.Set(update)
+	endState, _, err := f.Set(update)
 	require.NoError(t, err)
 
 	// events

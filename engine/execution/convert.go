@@ -39,7 +39,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 			collectionGuarantee := result.ExecutableBlock.Block.Payload.Guarantees[i]
 			completeCollection := result.ExecutableBlock.CompleteCollections[collectionGuarantee.ID()]
 			collection := completeCollection.Collection()
-			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint16(len(completeCollection.Transactions)))
+			chunk = GenerateChunk(i, startState, endState, blockID, result.EventsHashes[i], uint64(len(completeCollection.Transactions)))
 			chdps[i] = GenerateChunkDataPack(chunk.ID(), startState, &collection, result.Proofs[i])
 		} else {
 			// system chunk
@@ -95,7 +95,7 @@ func GenerateExecutionResultForBlock(
 // GenerateChunk creates a chunk from the provided computation data.
 func GenerateChunk(colIndex int,
 	startState, endState flow.StateCommitment,
-	blockID, eventsCollection flow.Identifier, txNumber uint16) *flow.Chunk {
+	blockID, eventsCollection flow.Identifier, txNumber uint64) *flow.Chunk {
 	return &flow.Chunk{
 		ChunkBody: flow.ChunkBody{
 			CollectionIndex: uint(colIndex),

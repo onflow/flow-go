@@ -171,7 +171,7 @@ func main() {
 			rt := fvm.NewInterpreterRuntime()
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
-			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
+			chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Logger)
 			approvalStorage := storage.NewResultApprovals(node.Metrics.Cache, node.DB)
 			verifierEng, err = verifier.New(
 				node.Logger,
@@ -276,7 +276,7 @@ func main() {
 		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := storage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
@@ -353,7 +353,7 @@ func main() {
 				followerEng,
 				syncCore,
 				finalizedHeader,
-				node.State,
+				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)

@@ -48,6 +48,13 @@ func TestBootstrapAndOpen(t *testing.T) {
 		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
 		complianceMetrics.On("CurrentEpochCounter", counter).Once()
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
+		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
+
+		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(epoch)
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)
@@ -106,6 +113,16 @@ func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
 		phase, err := committedPhaseSnapshot.Phase()
 		require.NoError(t, err)
 		complianceMetrics.On("CurrentEpochPhase", phase).Once()
+
+		currentEpochFinalView, err := committedPhaseSnapshot.Epochs().Current().FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentEpochFinalView", currentEpochFinalView).Once()
+
+		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(committedPhaseSnapshot.Epochs().Current())
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
 
 		noopMetrics := new(metrics.NoopCollector)
 		all := storagebadger.InitAll(noopMetrics, db)

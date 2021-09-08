@@ -152,54 +152,87 @@ func (i *TransactionInvocator) Process(
 	// 	panic(err)
 	// }
 
+	// try to deduct fees even if there is an error.
+	feesError := i.deductTransactionFees(env, proc)
+	if feesError != nil {
+		txError = feesError
+	}
+
 	// applying contract changes
 	// this writes back the contract contents to accounts
 	// if any error occurs we fail the tx
+	// this needs to happen before checking limits, so that contract changes are committed to the state
 	updatedKeys, err := env.Commit()
 	if err != nil && txError == nil {
 		txError = fmt.Errorf("transaction invocation failed: %w", err)
 	}
 
+	// if there is still no error check if all account storage limits are ok
 	if txError == nil {
 		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
 	}
 
-	if txError == nil {
-		txError = i.deductTransactionFees(env, proc)
-	}
-
-	proc.Logs = append(proc.Logs, env.Logs()...)
-	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
-
+	// it there was any transaction error clear changes and try to deduct fees again
 	if txError != nil {
-		// drop delta
+		// drop delta since transaction failed
 		childState.View().DropDelta()
 		// if tx fails just do clean up
 		programs.Cleanup(nil)
+		// log transaction as failed
 		i.logger.Info().
 			Str("txHash", proc.ID.String()).
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
-		return txError
+
+		// reset env
+		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+
+		// try to deduct fees again, to get the fee deduction events
+		feesError = i.deductTransactionFees(env, proc)
+
+		updatedKeys, err = env.Commit()
+		if err != nil && feesError == nil {
+			feesError = fmt.Errorf("transaction invocation failed: %w", err)
+		}
+
+		// if fee deduction fails just do clean up and exit
+		if feesError != nil {
+			// drop delta
+			childState.View().DropDelta()
+			programs.Cleanup(nil)
+			i.logger.Info().
+				Str("txHash", proc.ID.String()).
+				Uint64("blockHeight", blockHeight).
+				Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
+				Msg("transaction fee deduction executed with error")
+
+			return feesError
+		}
+	} else {
+		// transaction is ok, log as successful
+		i.logger.Info().
+			Str("txHash", proc.ID.String()).
+			Uint64("blockHeight", blockHeight).
+			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
+			Int("retried", proc.Retried).
+			Msg("transaction executed successfully")
 	}
+
+	// if tx failed this will only contain fee deduction logs and computation
+	proc.Logs = append(proc.Logs, env.Logs()...)
+	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
 	// transaction without any deployed contracts
 	programs.Cleanup(updatedKeys)
 
+	// if tx failed this will only contain fee deduction events
 	proc.Events = append(proc.Events, env.Events()...)
 	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
 
-	i.logger.Info().
-		Str("txHash", proc.ID.String()).
-		Uint64("blockHeight", blockHeight).
-		Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
-		Int("retried", proc.Retried).
-		Msg("transaction executed successfully")
-
-	return nil
+	return txError
 }
 
 func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) error {

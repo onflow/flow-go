@@ -2,9 +2,12 @@ package dkg
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/sethvargo/go-retry"
 
 	"github.com/rs/zerolog"
 
@@ -15,12 +18,12 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// RETRY_MAX is the maximum number of times the broker will attempt to broadcast
+// retryMax is the maximum number of times the broker will attempt to broadcast
 // a message or publish a result
-const RETRY_MAX = 5
+const retryMax = 8
 
-// RETRY_MILLISECONDS is the number of milliseconds to wait between retries
-const RETRY_MILLISECONDS = 1000
+// retryMilliseconds is the number of milliseconds to wait between retries
+const retryMilliseconds = 1000 * time.Millisecond
 
 // Broker is an implementation of the DKGBroker interface which is intended to
 // be used in conjuction with the DKG MessagingEngine for private messages, and
@@ -98,24 +101,32 @@ func (b *Broker) Broadcast(data []byte) {
 	if b.broadcasts > 0 {
 		// The Warn log is used by the integration tests to check if this method
 		// is called more than once within one epoch.
-		b.log.Warn().Msgf("DKG broadcast number %d", b.broadcasts+1)
+		b.log.Warn().Msgf("DKG broadcast number %d with header %d", b.broadcasts+1, data[0])
+	} else {
+		b.log.Info().Msgf("DKG message broadcast with header %d", data[0])
 	}
 	bcastMsg, err := b.prepareBroadcastMessage(data)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create broadcast message")
 	}
-	success := b.retry(
-		func() error {
-			return b.dkgContractClient.Broadcast(bcastMsg)
-		},
-		RETRY_MAX,
-		RETRY_MILLISECONDS,
-	)
-	if !success {
-		b.log.Error().Msg("failed to broadcast message")
-		return
+
+	expRetry, err := retry.NewExponential(retryMilliseconds)
+	if err != nil {
+		b.log.Fatal().Err(err).Msg("create retry mechanism")
 	}
-	b.log.Debug().Msg("dkg message broadcast")
+	maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
+
+	err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
+		err := b.dkgContractClient.Broadcast(bcastMsg)
+		if err != nil {
+			b.log.Error().Err(err).Msg("error broadcasting DKG result, retrying")
+		}
+		return retry.RetryableError(err)
+	})
+
+	if err != nil {
+		b.log.Fatal().Err(err).Msg("failed to broadcast message")
+	}
 	b.broadcasts++
 }
 
@@ -175,16 +186,24 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
 func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
-	success := b.retry(
-		func() error {
-			return b.dkgContractClient.SubmitResult(pubKey, groupKeys)
-		},
-		RETRY_MAX,
-		RETRY_MILLISECONDS,
-	)
-	if !success {
-		return fmt.Errorf("failed to submit dkg result")
+	expRetry, err := retry.NewExponential(retryMilliseconds)
+	if err != nil {
+		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
+	maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
+
+	err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
+		err := b.dkgContractClient.SubmitResult(pubKey, groupKeys)
+		if err != nil {
+			b.log.Error().Err(err).Msg("error submitting DKG result, retrying")
+		}
+		return retry.RetryableError(err)
+	})
+
+	if err != nil {
+		b.log.Fatal().Err(err).Msg("failed to submit dkg result")
+	}
+
 	b.log.Debug().Msg("dkg result submitted")
 	return nil
 }
@@ -275,21 +294,4 @@ func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (
 		signData[:],
 		NewDKGMessageHasher(),
 	)
-}
-
-// retry makes maxRetry attempts to executed function f, with retryMilliseconds
-// between each attempt. It returns an error if all attemps failed.
-func (b *Broker) retry(f func() error, maxRetry int, retryMilliseconds int) bool {
-	success := false
-	for attempt := 1; attempt <= maxRetry; attempt++ {
-		err := f()
-		if err != nil {
-			b.log.Warn().Err(err).Msgf("attempt %d/%d failed", attempt, maxRetry)
-			time.Sleep(RETRY_MILLISECONDS * time.Millisecond)
-			continue
-		}
-		success = true
-		break
-	}
-	return success
 }

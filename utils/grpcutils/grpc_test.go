@@ -8,7 +8,7 @@ import (
 	libp2ptls "github.com/libp2p/go-libp2p-tls"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -36,7 +36,7 @@ func TestCertificateGeneration(t *testing.T) {
 	require.NoError(t, err)
 
 	// convert the test key to a libp2p key for easy comparision
-	libp2pKey, err := p2p.PrivKey(key)
+	libp2pKey, err := keyutils.LibP2PPrivKeyFromFlow(key)
 	expectedKey := libp2pKey.GetPublic()
 	require.NoError(t, err)
 

@@ -53,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chunks"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
@@ -64,6 +65,7 @@ import (
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
@@ -362,7 +364,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
 	resultsDB := storage.NewExecutionResults(node.Metrics, node.DB)
-	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.DB, resultsDB)
+	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.DB, resultsDB, storage.DefaultCacheSize)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -483,11 +485,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
 	eventsStorage := storage.NewEvents(node.Metrics, node.DB)
 	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.DB)
-	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, 1000)
+	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, storage.DefaultCacheSize)
 	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
 	chunkDataPackStorage := storage.NewChunkDataPacks(node.Metrics, node.DB, collectionsStorage, 100)
 	results := storage.NewExecutionResults(node.Metrics, node.DB)
-	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results)
+	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results, storage.DefaultCacheSize)
 	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
 	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
@@ -568,6 +570,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.DefaultProgramsCacheSize,
 		committer,
 		computation.DefaultScriptLogThreshold,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -625,6 +628,8 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
 	require.NoError(t, err)
 
+	idCache, err := p2p.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
+	require.NoError(t, err, "could not create finalized snapshot cache")
 	syncEngine, err := synchronization.New(
 		node.Log,
 		node.Metrics,
@@ -634,7 +639,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		followerEng,
 		syncCore,
 		finalizedHeader,
-		node.State,
+		id.NewFilteredIdentifierProvider(
+			filter.And(
+				filter.HasRole(flow.RoleConsensus),
+				filter.Not(filter.HasNodeID(node.Me.NodeID())),
+			),
+			idCache,
+		),
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
@@ -799,7 +810,7 @@ func VerificationNode(t testing.TB,
 	if node.Results == nil {
 		results := storage.NewExecutionResults(node.Metrics, node.DB)
 		node.Results = results
-		node.Receipts = storage.NewExecutionReceipts(node.Metrics, node.DB, results)
+		node.Receipts = storage.NewExecutionReceipts(node.Metrics, node.DB, results, storage.DefaultCacheSize)
 	}
 
 	if node.ProcessedChunkIndex == nil {
@@ -830,7 +841,7 @@ func VerificationNode(t testing.TB,
 			fvm.WithBlocks(blockFinder),
 		)
 
-		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx)
+		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Log)
 
 		approvalStorage := storage.NewResultApprovals(node.Metrics, node.DB)
 

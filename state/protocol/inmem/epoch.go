@@ -201,7 +201,7 @@ func (es *committedEpoch) DKG() (protocol.DKG, error) {
 	return dkg, err
 }
 
-// NewSetupEpoch returns an memory-backed epoch implementation based on an
+// NewSetupEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup event. Epoch information available after the setup phase will
 // not be accessible in the resulting epoch instance.
 func NewSetupEpoch(setupEvent *flow.EpochSetup) (*Epoch, error) {
@@ -211,7 +211,7 @@ func NewSetupEpoch(setupEvent *flow.EpochSetup) (*Epoch, error) {
 	return FromEpoch(convertible)
 }
 
-// NewSetupEpoch returns an memory-backed epoch implementation based on an
+// NewCommittedEpoch returns a memory-backed epoch implementation based on an
 // EpochSetup and EpochCommit event.
 func NewCommittedEpoch(setupEvent *flow.EpochSetup, commitEvent *flow.EpochCommit) (*Epoch, error) {
 	convertible := &committedEpoch{

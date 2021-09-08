@@ -7,6 +7,8 @@ import (
 
 	ggio "github.com/gogo/protobuf/io"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/peer"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
@@ -19,19 +21,23 @@ import (
 type readConnection struct {
 	ctx        context.Context
 	stream     libp2pnetwork.Stream
+	remoteID   peer.ID
 	log        zerolog.Logger
 	metrics    module.NetworkMetrics
 	maxMsgSize int
-	callback   func(msg *message.Message)
+	callback   func(msg *message.Message, peerID peer.ID)
+	isStaked   bool
 }
 
 // newReadConnection creates a new readConnection
 func newReadConnection(ctx context.Context,
 	stream libp2pnetwork.Stream,
-	callback func(msg *message.Message),
+	callback func(msg *message.Message, peerID peer.ID),
 	log zerolog.Logger,
 	metrics module.NetworkMetrics,
-	maxMsgSize int) *readConnection {
+	maxMsgSize int,
+	isStaked bool,
+) *readConnection {
 
 	if maxMsgSize <= 0 {
 		maxMsgSize = DefaultMaxUnicastMsgSize
@@ -40,10 +46,12 @@ func newReadConnection(ctx context.Context,
 	c := readConnection{
 		ctx:        ctx,
 		stream:     stream,
+		remoteID:   stream.Conn().RemotePeer(),
 		callback:   callback,
 		log:        log,
 		metrics:    metrics,
 		maxMsgSize: maxMsgSize,
+		isStaked:   isStaked,
 	}
 	return &c
 }
@@ -97,11 +105,15 @@ func (rc *readConnection) receiveLoop(wg *sync.WaitGroup) {
 			return
 		}
 
+		channel := metrics.ChannelOneToOne
+		if !rc.isStaked {
+			channel = metrics.ChannelOneToOneUnstaked
+		}
 		// log metrics with the channel name as OneToOne
-		rc.metrics.NetworkMessageReceived(msg.Size(), metrics.ChannelOneToOne, msg.Type)
+		rc.metrics.NetworkMessageReceived(msg.Size(), channel, msg.Type)
 
 		// call the callback
-		rc.callback(&msg)
+		rc.callback(&msg, rc.remoteID)
 	}
 }
 

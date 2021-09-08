@@ -73,6 +73,16 @@ int check_membership_G2(const ep2_t p){
     return VALID;
 }
 
+// Computes a BLS signature from a G1 point 
+static void bls_sign_ep(byte* s, const bn_t sk, const ep_t h) {
+    ep_t p;
+    ep_new(p);
+    // s = h^sk
+    ep_mult(p, h, sk);
+    ep_write_bin_compact(s, p, SIGNATURE_LEN);
+    ep_free(p);
+}
+
 // Computes a BLS signature from a hash
 void bls_sign(byte* s, const bn_t sk, const byte* data, const int len) {
     ep_t h;
@@ -82,16 +92,6 @@ void bls_sign(byte* s, const bn_t sk, const byte* data, const int len) {
     // s = h^sk
     bls_sign_ep(s, sk, h);
     ep_free(h);
-}
-
-// Computes a BLS signature from a G1 point 
-void bls_sign_ep(byte* s, const bn_t sk, const ep_t h) {
-    ep_t p;
-    ep_new(p);
-    // s = h^sk
-    ep_mult(p, h, sk);
-    ep_write_bin_compact(s, p, SIGNATURE_LEN);
-    ep_free(p);
 }
 
 // Verifies a BLS signature (G1 point) against a public key (G2 point)

@@ -160,6 +160,7 @@ func (c *Controller) End() error {
 
 	// end and retrieve products of the DKG protocol
 	c.dkgLock.Lock()
+
 	privateShare, groupPublicKey, publicKeys, err := c.dkg.End()
 	c.dkgLock.Unlock()
 	if err != nil {

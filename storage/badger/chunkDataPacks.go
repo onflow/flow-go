@@ -30,9 +30,9 @@ func NewChunkDataPacks(collector module.CacheMetrics, db *badger.DB, collections
 	retrieve := func(key interface{}) func(tx *badger.Txn) (interface{}, error) {
 		chunkID := key.(flow.Identifier)
 
-		var c *badgermodel.StoredChunkDataPack
+		var c badgermodel.StoredChunkDataPack
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := operation.RetrieveChunkDataPack(chunkID, c)(tx)
+			err := operation.RetrieveChunkDataPack(chunkID, &c)(tx)
 			return &c, err
 		}
 	}
@@ -80,12 +80,9 @@ func (ch *ChunkDataPacks) BatchStore(c *flow.ChunkDataPack, batch storage.BatchS
 }
 
 func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPack, error) {
-	tx := ch.db.NewTransaction(false)
-	defer tx.Discard()
-
-	schdp, err := ch.retrieveCHDP(chunkID)(tx)
+	schdp, err := ch.byChunkID(chunkID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrive stored chunk data pack: %w", err)
+		return nil, err
 	}
 
 	chdp := &flow.ChunkDataPack{
@@ -94,8 +91,8 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 		Proof:      schdp.Proof,
 	}
 
-	if schdp.CollectionID != nil {
-		collection, err := ch.collections.ByID(*schdp.CollectionID)
+	if !schdp.SystemChunk {
+		collection, err := ch.collections.ByID(schdp.CollectionID)
 		if err != nil {
 			return nil, fmt.Errorf("could not retrive collection (id: %x) for stored chunk data pack: %w", schdp.CollectionID, err)
 		}
@@ -104,6 +101,18 @@ func (ch *ChunkDataPacks) ByChunkID(chunkID flow.Identifier) (*flow.ChunkDataPac
 	}
 
 	return chdp, nil
+}
+
+func (ch *ChunkDataPacks) byChunkID(chunkID flow.Identifier) (*badgermodel.StoredChunkDataPack, error) {
+	tx := ch.db.NewTransaction(false)
+	defer tx.Discard()
+
+	schdp, err := ch.retrieveCHDP(chunkID)(tx)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrive stored chunk data pack: %w", err)
+	}
+
+	return schdp, nil
 }
 
 func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn) (*badgermodel.StoredChunkDataPack, error) {
@@ -118,15 +127,17 @@ func (ch *ChunkDataPacks) retrieveCHDP(chunkID flow.Identifier) func(*badger.Txn
 
 func toStoredChunkDataPack(c *flow.ChunkDataPack) *badgermodel.StoredChunkDataPack {
 	sc := &badgermodel.StoredChunkDataPack{
-		ChunkID:    c.ChunkID,
-		StartState: c.StartState,
-		Proof:      c.Proof,
+		ChunkID:     c.ChunkID,
+		StartState:  c.StartState,
+		Proof:       c.Proof,
+		SystemChunk: false,
 	}
 
 	if c.Collection != nil {
-		// non-system chunks have a non-nil collection
-		collectionID := c.Collection.ID()
-		sc.CollectionID = &collectionID
+		// non system chunk
+		sc.CollectionID = c.Collection.ID()
+	} else {
+		sc.SystemChunk = true
 	}
 
 	return sc

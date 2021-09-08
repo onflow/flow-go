@@ -653,6 +653,27 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 	}
 }
 
+func WIthServiceEvents(n int) func(result *flow.ExecutionResult) {
+	return func(result *flow.ExecutionResult) {
+		result.ServiceEvents = ServiceEventsFixture(n)
+	}
+}
+
+func ServiceEventsFixture(n int) flow.ServiceEventList {
+	sel := make(flow.ServiceEventList, n)
+
+	for ; n > 0; n-- {
+		switch rand.Intn(2) {
+		case 0:
+			sel[n-1] = EpochCommitFixture().ServiceEvent()
+		case 1:
+			sel[n-1] = EpochSetupFixture().ServiceEvent()
+		}
+	}
+
+	return sel
+}
+
 func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.ExecutionResult {
 	blockID := IdentifierFixture()
 	result := &flow.ExecutionResult{
@@ -1275,6 +1296,15 @@ func ChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*flow.ChunkDataP
 	}
 
 	return cdp
+}
+
+func ChunkDataPacksFixture(count int, opts ...func(*flow.ChunkDataPack)) []*flow.ChunkDataPack {
+	chunkDataPacks := make([]*flow.ChunkDataPack, count)
+	for i := 0; i < count; i++ {
+		chunkDataPacks[i] = ChunkDataPackFixture(IdentifierFixture())
+	}
+
+	return chunkDataPacks
 }
 
 // SeedFixture returns a random []byte with length n

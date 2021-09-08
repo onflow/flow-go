@@ -471,6 +471,14 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		metrics.On("CurrentEpochPhase", initialPhase).Once()
 		metrics.On("CommittedEpochFinalView", finalView).Once()
 
+		metrics.On("CurrentEpochFinalView", finalView).Once()
+
+		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := realprotocol.DKGPhaseViews(initialCurrentEpoch)
+		require.NoError(t, err)
+		metrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
+		metrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
+		metrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
+
 		tracer := trace.NewNoopTracer()
 		headers, _, seals, index, payloads, blocks, setups, commits, statuses, results := storeutil.StorageLayer(t, db)
 		protoState, err := protocol.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
@@ -573,13 +581,11 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		// finalize block 4 so we can finalize subsequent blocks
 		// ensure an epoch phase transition when we finalize block 4
 		consumer.On("EpochSetupPhaseStarted", epoch2Setup.Counter-1, block4.Header).Once()
-		metrics.On("CurrentEpochPhase", flow.EpochPhaseSetup)
-		metrics.On("CurrentEpochCounter", epoch2Setup.Counter-1)
+		metrics.On("CurrentEpochPhase", flow.EpochPhaseSetup).Once()
 		err = state.Finalize(context.Background(), block4.ID())
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochSetupPhaseStarted", epoch2Setup.Counter-1, block4.Header)
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseSetup)
-		metrics.AssertCalled(t, "CurrentEpochCounter", epoch2Setup.Counter-1)
 
 		// now that the setup event has been emitted, we should be in the setup phase
 		phase, err = state.AtBlockID(block4.ID()).Phase()
@@ -643,17 +649,16 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 		require.NoError(t, err)
 
 		// expect epoch phase transition once we finalize block 7
-		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block7.Header)
+		consumer.On("EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block7.Header).Once()
 		// expect committed final view to be updated, since we are committing epoch 2
-		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView)
-		metrics.On("CurrentEpochPhase", flow.EpochPhaseCommitted)
-		metrics.On("CurrentEpochCounter", epoch2Setup.Counter-1)
+		metrics.On("CommittedEpochFinalView", epoch2Setup.FinalView).Once()
+		metrics.On("CurrentEpochPhase", flow.EpochPhaseCommitted).Once()
 		err = state.Finalize(context.Background(), block7.ID())
+
 		require.NoError(t, err)
 		consumer.AssertCalled(t, "EpochCommittedPhaseStarted", epoch2Setup.Counter-1, block7.Header)
 		metrics.AssertCalled(t, "CommittedEpochFinalView", epoch2Setup.FinalView)
 		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseCommitted)
-		metrics.AssertCalled(t, "CurrentEpochCounter", epoch2Setup.Counter-1)
 
 		// we should still be in epoch 1
 		epochCounter, err := state.AtBlockID(block4.ID()).Epochs().Current().Counter()
@@ -695,12 +700,19 @@ func TestExtendEpochTransitionValid(t *testing.T) {
 
 		// expect epoch transition once we finalize block 9
 		consumer.On("EpochTransition", epoch2Setup.Counter, block9.Header).Once()
-		metrics.On("CurrentEpochCounter", epoch2Setup.Counter)
+		metrics.On("CurrentEpochCounter", epoch2Setup.Counter).Once()
+		metrics.On("CurrentEpochPhase", flow.EpochPhaseStaking).Once()
+		metrics.On("CurrentEpochFinalView", epoch1Setup.FinalView)
+		metrics.On("CurrentDKGPhase1FinalView", epoch2Setup.DKGPhase1FinalView)
+		metrics.On("CurrentDKGPhase2FinalView", epoch2Setup.DKGPhase2FinalView)
+		metrics.On("CurrentDKGPhase3FinalView", epoch2Setup.DKGPhase3FinalView)
+
 		err = state.Finalize(context.Background(), block8.ID())
 		require.NoError(t, err)
 		err = state.Finalize(context.Background(), block9.ID())
 		require.NoError(t, err)
 		metrics.AssertCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
+		metrics.AssertCalled(t, "CurrentEpochPhase", flow.EpochPhaseStaking)
 		consumer.AssertCalled(t, "EpochTransition", epoch2Setup.Counter, block9.Header)
 
 		metrics.AssertExpectations(t)
@@ -1121,6 +1133,10 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 //
 // ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
 func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
+
+	// skipping because this case will now result in emergency epoch continuation kicking in
+	t.SkipNow()
+
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
 		head, err := rootSnapshot.Head()
@@ -1172,10 +1188,126 @@ func TestExtendEpochTransitionWithoutCommit(t *testing.T) {
 
 		// block 4 will be the first block for epoch 2
 		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.Header.View = epoch2Setup.FinalView + 1
+		block4.Header.View = epoch1Setup.FinalView + 1
 
 		err = state.Extend(context.Background(), &block4)
 		require.Error(t, err)
+	})
+}
+
+func TestEmergencyEpochChainContinuation(t *testing.T) {
+
+	// if we reach the first block of the next epoch before both setup and commit
+	// service events are finalized, the chain should continue with the previous epoch.
+	//
+	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
+	t.Run("epoch transition without commit event - should continue with fallback epoch", func(t *testing.T) {
+
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+			head, err := rootSnapshot.Head()
+			require.NoError(t, err)
+			result, _, err := rootSnapshot.SealedResult()
+			require.NoError(t, err)
+
+			// add a block for the first seal to reference
+			block1 := unittest.BlockWithParentFixture(head)
+			block1.SetPayload(flow.EmptyPayload())
+			err = state.Extend(&block1)
+			require.NoError(t, err)
+			err = state.Finalize(block1.ID())
+			require.NoError(t, err)
+
+			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+			epoch1FinalView := epoch1Setup.FinalView
+
+			// add a participant for the next epoch
+			epoch2NewParticipant := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+			epoch2Participants := append(participants, epoch2NewParticipant).Sort(order.ByNodeIDAsc)
+
+			// create the epoch setup event for the second epoch
+			epoch2Setup := unittest.EpochSetupFixture(
+				unittest.WithParticipants(epoch2Participants),
+				unittest.SetupWithCounter(epoch1Setup.Counter+1),
+				unittest.WithFinalView(epoch1FinalView+1000),
+				unittest.WithFirstView(epoch1FinalView+1),
+			)
+
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
+
+			// add a block containing a receipt for block 1
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+			err = state.Extend(&block2)
+			require.NoError(t, err)
+			err = state.Finalize(block2.ID())
+			require.NoError(t, err)
+
+			// block 3 seals block 1
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal1},
+			})
+			err = state.Extend(&block3)
+			require.NoError(t, err)
+
+			// block 4 will be the first block for epoch 2
+			block4 := unittest.BlockWithParentFixture(block3.Header)
+			block4.Header.View = epoch1Setup.FinalView + 1
+
+			err = state.Extend(&block4)
+			require.NoError(t, err)
+		})
+	})
+
+	// if we reach the first block of the next epoch before either setup and commit
+	// service events are finalized, the chain should continue with the previous epoch.
+	//
+	// ROOT <- B1 <- B2(R1) <- B3(S1) <- B4
+	t.Run("epoch transition without setup event - should continue with fallback epoch", func(t *testing.T) {
+
+		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+			head, err := rootSnapshot.Head()
+			require.NoError(t, err)
+			result, _, err := rootSnapshot.SealedResult()
+			require.NoError(t, err)
+
+			// add a block for the first seal to reference
+			block1 := unittest.BlockWithParentFixture(head)
+			block1.SetPayload(flow.EmptyPayload())
+			err = state.Extend(&block1)
+			require.NoError(t, err)
+			err = state.Finalize(block1.ID())
+			require.NoError(t, err)
+
+			epoch1Setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+
+			// add a block containing a receipt for block 1
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+			err = state.Extend(&block2)
+			require.NoError(t, err)
+			err = state.Finalize(block2.ID())
+			require.NoError(t, err)
+
+			// block 3 seals block 1
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.SetPayload(flow.Payload{
+				Seals: []*flow.Seal{seal1},
+			})
+			err = state.Extend(&block3)
+			require.NoError(t, err)
+
+			// block 4 will be the first block for epoch 2
+			block4 := unittest.BlockWithParentFixture(block3.Header)
+			block4.Header.View = epoch1Setup.FinalView + 1
+
+			err = state.Extend(&block4)
+			require.NoError(t, err)
+		})
 	})
 }
 
