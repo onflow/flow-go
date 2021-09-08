@@ -12,7 +12,7 @@ import (
 
 type ConsensusSigPackerImpl struct {
 	committees hotstuff.Committee
-	encoder    *rlp.Encoder
+	encoder    *rlp.Encoder // rlp encoder is used in order to ensure deterministic encoding
 }
 
 var _ hotstuff.Packer = &ConsensusSigPackerImpl{}
@@ -25,12 +25,15 @@ func NewConsensusSigPackerImpl(committees hotstuff.Committee) *ConsensusSigPacke
 }
 
 type signatureData struct {
-	SigType                   []byte // bit-vector indicating type of signature
+	// bit-vector indicating type of signature for each signer.
+	SigType []hotstuff.SigType
+
 	AggregatedStakingSig      crypto.Signature
 	AggregatedRandomBeaconSig crypto.Signature
 	RandomBeacon              crypto.Signature
 }
 
+// Pack packs the block signature data into raw bytes
 func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
 	consensus, err := p.committees.Identities(blockID, filter.HasRole(flow.RoleConsensus))
 	if err != nil {
@@ -40,13 +43,13 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	lookup := consensus.Lookup()
 	count := len(sig.StakingSigners) + len(sig.RandomBeaconSigners)
 
-	sigTypes := make([]byte, 0, count)
+	sigTypes := make([]hotstuff.SigType, 0, count)
 	signerIDs := make([]flow.Identifier, 0, count)
 
 	for _, stakingSigner := range sig.StakingSigners {
 		_, ok := lookup[stakingSigner]
 		if ok {
-			sigTypes = append(sigTypes, byte(hotstuff.SigTypeStaking))
+			sigTypes = append(sigTypes, hotstuff.SigTypeStaking)
 			signerIDs = append(signerIDs, stakingSigner)
 		} else {
 			return nil, nil, fmt.Errorf("staking signer ID (%v) not found in the committees at block: %v", stakingSigner, blockID)
@@ -56,7 +59,7 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	for _, beaconSigner := range sig.RandomBeaconSigners {
 		_, ok := lookup[beaconSigner]
 		if ok {
-			sigTypes = append(sigTypes, byte(hotstuff.SigTypeRandomBeacon))
+			sigTypes = append(sigTypes, hotstuff.SigTypeRandomBeacon)
 			signerIDs = append(signerIDs, beaconSigner)
 		} else {
 			return nil, nil, fmt.Errorf("random beacon signer ID (%v) not found in the committees at block: %v", beaconSigner, blockID)
@@ -93,9 +96,9 @@ func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flo
 	}
 
 	for i, sigType := range data.SigType {
-		if sigType == byte(hotstuff.SigTypeStaking) {
+		if sigType == hotstuff.SigTypeStaking {
 			stakingSigners = append(stakingSigners, signerIDs[i])
-		} else if sigType == byte(hotstuff.SigTypeRandomBeacon) {
+		} else if sigType == hotstuff.SigTypeRandomBeacon {
 			randomBeaconSigners = append(randomBeaconSigners, signerIDs[i])
 		} else {
 			return nil, fmt.Errorf("unknown sigType: %v", sigType)
