@@ -397,6 +397,15 @@ type EpochStatus struct {
 	NextEpoch     EventIDs // EpochSetup and EpochCommit events for the next epoch
 }
 
+// Copy returns a copy of the epoch status.
+func (es *EpochStatus) Copy() *EpochStatus {
+	return &EpochStatus{
+		PreviousEpoch: es.PreviousEpoch,
+		CurrentEpoch:  es.CurrentEpoch,
+		NextEpoch:     es.NextEpoch,
+	}
+}
+
 // EventIDs is a container for IDs of epoch service events.
 type EventIDs struct {
 	// SetupID is the ID of the EpochSetup event for the respective Epoch
