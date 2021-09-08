@@ -50,3 +50,26 @@ func WithParentSigners(signerIDs []flow.Identifier) func(*model.Block) {
 		block.QC.SignerIDs = signerIDs
 	}
 }
+
+func MakeProposal(t *testing.T, options ...func(*model.Proposal)) *model.Proposal {
+	proposal := &model.Proposal{
+		Block:   MakeBlock(t),
+		SigData: unittest.SignatureFixture(),
+	}
+	for _, option := range options {
+		option(proposal)
+	}
+	return proposal
+}
+
+func WithBlock(block *model.Block) func(*model.Proposal) {
+	return func(proposal *model.Proposal) {
+		proposal.Block = block
+	}
+}
+
+func WithSigData(sigData []byte) func(*model.Proposal) {
+	return func(proposal *model.Proposal) {
+		proposal.SigData = sigData
+	}
+}

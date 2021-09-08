@@ -30,7 +30,6 @@ type VoteAggregatorV2 struct {
 }
 
 // TODO: Move to tests
-var _ hotstuff.BlockSigner = &VoteAggregatorV2{}
 var _ hotstuff.VoteAggregatorV2 = &VoteAggregatorV2{}
 
 // NewVoteAggregatorV2 creates an instance of vote aggregator
@@ -101,13 +100,19 @@ func (va *VoteAggregatorV2) processQueuedVoteEvents() error {
 
 func (va *VoteAggregatorV2) processQueuedVote(vote *model.Vote) error {
 	// TODO: log created
-	collector, _, err := va.collectors.GetOrCreateCollector(vote.View, vote.BlockID)
+	collector, _, err := va.collectors.GetOrCreateCollector(vote.View)
 	if err != nil {
-		return fmt.Errorf("could not lazy init collector for view %d, blockID %v: %w",
-			vote.View, vote.BlockID, err)
+		return fmt.Errorf("could not get collector for view %d: %w",
+			vote.View, err)
 	}
 	err = collector.AddVote(vote)
 	if err != nil {
+		if model.IsDoubleVoteError(err) {
+			doubleVoteErr := err.(model.DoubleVoteError)
+			va.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
+			return nil
+		}
+
 		return fmt.Errorf("could not process vote for view %d, blockID %v: %w",
 			vote.View, vote.BlockID, err)
 	}
@@ -136,7 +141,7 @@ func (va *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 		return nil
 	}
 
-	collector, _, err := va.collectors.GetOrCreateCollector(block.Block.View, block.Block.BlockID)
+	collector, _, err := va.collectors.GetOrCreateCollector(block.Block.View)
 	if err != nil {
 		return fmt.Errorf("could not get or create collector for block %v: %w", block.Block.BlockID, err)
 	}
@@ -163,14 +168,6 @@ func (va *VoteAggregatorV2) PruneUpToView(view uint64) {
 			va.log.Fatal().Err(err).Msgf("fatal error when pruning vote collectors by view %d", view)
 		}
 	}
-}
-
-// CreateVote will create a vote for the given block, and return the vote.
-// The created vote will be stored in the vote collector for the block.
-// It get the vote collector for the block or create it if not exists, and let it vote collector
-// to create and store the created vote.
-func (va *VoteAggregatorV2) CreateVote(block *model.Block) (*model.Vote, error) {
-	panic("to be implemented")
 }
 
 func (va *VoteAggregatorV2) isVoteStale(vote *model.Vote) bool {
