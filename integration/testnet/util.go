@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"regexp"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/client"
@@ -104,4 +105,24 @@ func WriteJSON(path string, data interface{}) error {
 
 	err = ioutil.WriteFile(path, marshaled, 0644)
 	return err
+}
+
+func StripAddressesFromRootProtocolJson(srcfile string, dstFile string) error {
+
+	fileData, err := ioutil.ReadFile(srcfile)
+	if err != nil {
+		return err
+	}
+	fileString := string(fileData)
+	m1 := regexp.MustCompile(`.*"Address".*:.*".*".*\n`)
+	newString := m1.ReplaceAllString(fileString, "")
+	newFileData := []byte(newString)
+
+	err = ioutil.WriteFile(dstFile, newFileData, 0o600)
+	if err != nil {
+		return err
+	}
+	fmt.Println(newString)
+
+	return nil
 }

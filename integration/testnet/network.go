@@ -473,15 +473,18 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		require.NoError(t, err)
 	}
 
+
+	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
+
 	// add each follower to the network
 	for _, followerConf := range networkConf.ConsensusFollowers {
-		flowNetwork.addConsensusFollower(t, bootstrapDir, followerConf, confs)
+		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
 
 	return flowNetwork
 }
 
-func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
+func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
 	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-consensus-follower")
 	require.NoError(t, err)
 
@@ -495,10 +498,16 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, 
 	err = os.Mkdir(followerBootstrapDir, 0700)
 	require.NoError(t, err)
 
-	// copy bootstrap files to follower-specific bootstrap directory
-	err = io.CopyDirectory(bootstrapDir, followerBootstrapDir)
+	publicRootInformationDir := filepath.Join(followerBootstrapDir, bootstrap.DirnamePublicBootstrap)
+	err = os.Mkdir(publicRootInformationDir, 0700)
 	require.NoError(t, err)
 
+	// strip out the node addresses from root-protocol-state-snapshot.json and copy it to the follower-specific
+	// bootstrap/public-root-information directory
+	err = StripAddressesFromRootProtocolJson(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
+	require.NoError(t, err)
+
+	fmt.Println(filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	// consensus follower
 	bindPort := testingdock.RandomPort(t)
 	bindAddr := fmt.Sprintf("0.0.0.0:%s", bindPort)
