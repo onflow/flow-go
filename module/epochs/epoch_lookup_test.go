@@ -22,6 +22,8 @@ func TestEpochForView(t *testing.T) {
 		epoch.On("FirstView").Return(uint64(firstView), nil)
 		epoch.On("FinalView").Return(uint64(lastView), nil)
 		epoch.On("Counter").Return(uint64(counter), nil)
+		// return nil error to indicate a committed epoch
+		epoch.On("DKG").Return(nil, nil)
 		epochs = append(epochs, epoch)
 	}
 
@@ -56,8 +58,11 @@ func TestEpochForView(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		e, err := lookup.EpochForView(tc.view)
+		epoch, err := lookup.EpochForView(tc.view)
 		require.NoError(t, err)
-		require.Equal(t, tc.epoch, e)
+		require.Equal(t, tc.epoch, epoch)
+		epoch, err = lookup.EpochForViewWithFallback(tc.view)
+		require.NoError(t, err)
+		require.Equal(t, tc.epoch, epoch)
 	}
 }
