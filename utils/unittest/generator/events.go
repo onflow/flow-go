@@ -42,11 +42,7 @@ func (g *Events) New() flow.Event {
 		},
 	}
 
-	fooString, err := cadence.NewString("foo")
-	if err != nil {
-		panic(fmt.Sprintf("unexpected error while creating cadence string: %s", err))
-	}
-
+	fooString := cadence.NewString("foo")
 	testEvent := cadence.NewEvent(
 		[]cadence.Value{
 			cadence.NewInt(int(g.count)),
