@@ -48,7 +48,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 RUN chmod a+x /app/app
 
 ## (3) Add the statically linked binary to a distroless image
-FROM gcr.io/distroless/base-debian10 as production
+FROM ubuntu:latest as production
 
 COPY --from=build-production /app/app /bin/app
 
@@ -66,7 +66,7 @@ RUN --mount=type=ssh \
 
 RUN chmod a+x /app/app
 
-FROM golang:1.15-buster as debug
+FROM ubuntu:latest as debug
 
 RUN go get -u github.com/go-delve/delve/cmd/dlv
 

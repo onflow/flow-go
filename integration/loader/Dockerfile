@@ -49,7 +49,7 @@ RUN mv /app/integration/app /app/app
 RUN chmod a+x /app/app
 
 ## (3) Add the statically linked binary to a distroless image
-FROM gcr.io/distroless/base as production
+FROM ubuntu:laters as production
 
 COPY --from=build-production /app/app /bin/app
 
