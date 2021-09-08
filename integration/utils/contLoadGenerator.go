@@ -153,6 +153,7 @@ func (lg *ContLoadGenerator) SetupFavContract() error {
 	deploymentTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef).
 		SetScript(deployScript).
+		SetGasLimit(9999).
 		SetProposalKey(*acc.address, 0, acc.seqNumber).
 		SetPayer(*acc.address).
 		AddAuthorizer(*acc.address)
@@ -223,6 +224,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	createAccountTx := flowsdk.NewTransaction().
 		SetScript(CreateAccountsScript(*lg.fungibleTokenAddress, *lg.flowTokenAddress)).
 		SetReferenceBlockID(blockRef).
+		SetGasLimit(9999).
 		SetProposalKey(
 			*lg.serviceAccount.address,
 			lg.serviceAccount.accountKey.Index,
@@ -374,6 +376,7 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 		SetScript(addKeysScript).
 		AddAuthorizer(*acc.address).
 		SetReferenceBlockID(blockRef).
+		SetGasLimit(9999).
 		SetProposalKey(
 			*lg.serviceAccount.address,
 			lg.serviceAccount.accountKey.Index,
@@ -434,6 +437,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	transferTx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef).
 		SetScript(transferScript).
+		SetGasLimit(9999).
 		SetProposalKey(*acc.address, 0, acc.seqNumber).
 		SetPayer(*acc.address).
 		AddAuthorizer(*acc.address)
@@ -476,6 +480,7 @@ func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
 	tx := flowsdk.NewTransaction().
 		SetReferenceBlockID(blockRef).
 		SetScript(txScript).
+		SetGasLimit(9999).
 		SetProposalKey(*acc.address, 0, acc.seqNumber).
 		SetPayer(*acc.address).
 		AddAuthorizer(*acc.address)

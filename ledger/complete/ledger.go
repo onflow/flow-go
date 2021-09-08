@@ -235,24 +235,32 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 }
 
 // ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations and returns the new state (after migration) and any errors
-func (l *Ledger) ExportCheckpointAt(state ledger.State,
+func (l *Ledger) ExportCheckpointAt(
+	state ledger.State,
 	migrations []ledger.Migration,
 	reporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
-	outputDir, outputFile string) (ledger.State, error) {
+	outputDir, outputFile string,
+) (ledger.State, error) {
 
-	l.logger.Info().Msgf("Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed", state.String(), len(migrations))
+	l.logger.Info().Msgf(
+		"Ledger is loaded, checkpoint export has started for state %s, and %d migrations have been planed",
+		state.String(),
+		len(migrations),
+	)
 
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("cannot get try at the given state commitment: %w", err)
+		return ledger.State(hash.DummyHash),
+			fmt.Errorf("cannot get try at the given state commitment: %w", err)
 	}
 
 	// clean up tries to release memory
 	err = l.keepOnlyOneTrie(state)
 	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
+		return ledger.State(hash.DummyHash),
+			fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
 	}
 
 	// TODO enable validity check of trie

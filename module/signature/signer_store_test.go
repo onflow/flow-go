@@ -26,7 +26,7 @@ func TestGetThresholdSignerWithNilPrivateKey(t *testing.T) {
 
 	// build epoch lookup mock
 	epochLookup := new(modmocks.EpochLookup)
-	epochLookup.On("EpochForView", mock.Anything).Return(epoch, nil)
+	epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(epoch, nil)
 
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 

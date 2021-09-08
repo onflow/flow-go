@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/verification"
 
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
@@ -36,15 +37,10 @@ type ChunkVerifier struct {
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
 func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context, logger zerolog.Logger) *ChunkVerifier {
 	return &ChunkVerifier{
-		vm:    vm,
-		vmCtx: vmCtx,
-		systemChunkCtx: fvm.NewContextFromParent(vmCtx,
-			fvm.WithRestrictedDeployment(false),
-			fvm.WithTransactionFeesEnabled(false),
-			fvm.WithServiceEventCollectionEnabled(),
-			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
-		),
-		logger: logger.With().Str("component", "chunk_verifier").Logger(),
+		vm:             vm,
+		vmCtx:          vmCtx,
+		systemChunkCtx: computer.SystemChunkContext(vmCtx, vmCtx.Logger),
+		logger:         logger.With().Str("component", "chunk_verifier").Logger(),
 	}
 }
 
