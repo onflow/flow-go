@@ -5,19 +5,17 @@ package compliance
 import (
 	"errors"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
-	"github.com/onflow/flow-go/model/cluster"
-	clusterkv "github.com/onflow/flow-go/state/cluster"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/state"
+	clusterkv "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
+	"github.com/rs/zerolog"
 )
 
 // Core is the consensus engine, responsible for handling communication for
@@ -27,10 +25,8 @@ import (
 type Core struct {
 	log               zerolog.Logger // used to log relevant actions with context
 	metrics           module.EngineMetrics
-	tracer            module.Tracer
 	mempoolMetrics    module.MempoolMetrics
 	collectionMetrics module.CollectionMetrics
-	cleaner           storage.Cleaner
 	headers           storage.Headers
 	state             clusterkv.MutableState
 	pending           module.PendingClusterBlockBuffer // pending block cache
@@ -68,22 +64,21 @@ func NewCore(
 	return c, nil
 }
 
-// OnBlockProposal handles block proposals. Proposals are either processed
-// immediately if possible, or added to the pending cache.
+// OnBlockProposal handles incoming block proposals.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 	header := proposal.Header
-	payload := proposal.Payload
-
 	log := c.log.With().
-		Hex("origin_id", originID[:]).
-		Hex("block_id", logging.Entity(header)).
-		Uint64("block_height", header.Height).
 		Str("chain_id", header.ChainID.String()).
-		Hex("parent_id", logging.ID(header.ParentID)).
-		Int("collection_size", payload.Collection.Len()).
+		Uint64("block_height", header.Height).
+		Uint64("block_view", header.View).
+		Hex("block_id", logging.Entity(header)).
+		Hex("parent_id", header.ParentID[:]).
+		Hex("payload_hash", header.PayloadHash[:]).
+		Time("timestamp", header.Timestamp).
+		Hex("proposer", header.ProposerID[:]).
+		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
-
-	log.Debug().Msg("received proposal")
+	log.Info().Msg("block proposal received")
 
 	c.prunePendingCache()
 
@@ -122,7 +117,6 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 
 		// add the block to the cache
 		_ = c.pending.Add(originID, proposal)
-
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 
 		// go to the first missing ancestor
@@ -153,7 +147,6 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	_, err = c.headers.ByBlockID(header.ParentID)
 	if errors.Is(err, storage.ErrNotFound) {
 
-		// add the block to the cache
 		_ = c.pending.Add(originID, proposal)
 
 		c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
@@ -168,7 +161,14 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 		return fmt.Errorf("could not check parent: %w", err)
 	}
 
-	err = c.processBlockProposal(proposal)
+	// At this point, we should be able to connect the proposal to the finalized
+	// state and should process it to see whether to forward to hotstuff or not.
+	// processBlockAndDescendants is a recursive function. Here we trace the
+	// execution of the entire recursion, which might include processing the
+	// proposal's pending children. There is another span within
+	// processBlockProposal that measures the time spent for a single proposal.
+	err = c.processBlockAndDescendants(proposal)
+	c.mempoolMetrics.MempoolEntries(metrics.ResourceClusterProposal, c.pending.Size())
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
@@ -176,13 +176,61 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Clus
 	return nil
 }
 
-// processBlockProposal processes a block that connects to finalized state.
-// First we ensure the block is a valid extension of chain state, then store
-// the block on disk, then enqueue the block for processing by HotStuff.
+// processBlockAndDescendants is a recursive function that processes a block and
+// its pending proposals for its children. By induction, any children connected
+// to a valid proposal are validly connected to the finalized state and can be
+// processed as well.
+func (c *Core) processBlockAndDescendants(proposal *messages.ClusterBlockProposal) error {
+	blockID := proposal.Header.ID()
+
+	// process block itself
+	err := c.processBlockProposal(proposal)
+	// child is outdated by the time we started processing it
+	// => node was probably behind and is catching up. Log as warning
+	if engine.IsOutdatedInputError(err) {
+		c.log.Info().Msg("dropped processing of abandoned fork; this might be an indicator that the node is slightly behind")
+		return nil
+	}
+	// the block is invalid; log as error as we desire honest participation
+	// ToDo: potential slashing
+	if engine.IsInvalidInputError(err) {
+		c.log.Warn().Err(err).Msg("received invalid block from other node (potential slashing evidence?)")
+		return nil
+	}
+	if err != nil {
+		// unexpected error: potentially corrupted internal state => abort processing and escalate error
+		return fmt.Errorf("failed to process block %x: %w", blockID, err)
+	}
+
+	// process all children
+	// do not break on invalid or outdated blocks as they should not prevent us
+	// from processing other valid children
+	children, has := c.pending.ByParentID(blockID)
+	if !has {
+		return nil
+	}
+	for _, child := range children {
+		childProposal := &messages.ClusterBlockProposal{
+			Header:  child.Header,
+			Payload: child.Payload,
+		}
+		cpr := c.processBlockAndDescendants(childProposal)
+		if cpr != nil {
+			// unexpected error: potentially corrupted internal state => abort processing and escalate error
+			return cpr
+		}
+	}
+
+	// drop all the children that should have been processed now
+	c.pending.DropForParent(blockID)
+
+	return nil
+}
+
+// processBlockProposal processes the given block proposal. The proposal must connect to
+// the finalized state.
 func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) error {
-
 	header := proposal.Header
-
 	log := c.log.With().
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
@@ -194,31 +242,25 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 		Hex("proposer", header.ProposerID[:]).
 		Int("num_signers", len(header.ParentVoterIDs)).
 		Logger()
+	log.Info().Msg("processing block proposal")
 
-	log.Info().Msg("processing cluster block proposal")
-
-	// extend the state with the proposal -- if it is an invalid extension,
-	// we will throw an error here
+	// see if the block is a valid extension of the protocol state
 	block := &cluster.Block{
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
-
 	err := c.state.Extend(block)
-	// if the error is a known invalid extension of the cluster state, then
-	// the input is invalid
+	// if the block proposes an invalid extension of the protocol state, then the block is invalid
 	if state.IsInvalidExtensionError(err) {
-		return engine.NewInvalidInputErrorf("invalid extension of cluster state: %w", err)
+		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
+			header.ID(), header.Height, err)
 	}
-
-	// if the error is an known outdated extension of the cluster state, then
-	// the input is outdated
+	// protocol state aborted processing of block as it is on an abandoned fork: block is outdated
 	if state.IsOutdatedExtensionError(err) {
-		return engine.NewOutdatedInputErrorf("outdated extension of cluster state: %w", err)
+		return engine.NewOutdatedInputErrorf("outdated extension of protocol state: %w", err)
 	}
-
 	if err != nil {
-		return fmt.Errorf("could not extend cluster state: %w", err)
+		return fmt.Errorf("could not extend protocol state (block: %x, height: %d): %w", header.ID(), header.Height, err)
 	}
 
 	// retrieve the parent
@@ -227,57 +269,11 @@ func (c *Core) processBlockProposal(proposal *messages.ClusterBlockProposal) err
 		return fmt.Errorf("could not retrieve proposal parent: %w", err)
 	}
 
-	log.Info().Msg("forwarding cluster block proposal to hotstuff")
-
-	// submit the proposal to hotstuff for processing
+	// submit the model to hotstuff for processing
+	log.Info().Msg("forwarding block proposal to hotstuff")
 	c.hotstuff.SubmitProposal(header, parent.View)
 
-	// report proposed (case that we are not leader)
-	c.collectionMetrics.ClusterBlockProposed(block)
-
-	err = c.processPendingChildren(header)
-	if err != nil {
-		return fmt.Errorf("could not process pending children: %w", err)
-	}
-
 	return nil
-}
-
-// processPendingChildren handles processing pending children after successfully
-// processing their parent. Regardless of whether processing succeeds, each
-// child will be discarded (and re-requested later on if needed).
-func (c *Core) processPendingChildren(header *flow.Header) error {
-	blockID := header.ID()
-
-	// check if there are any children for this parent in the cache
-	children, ok := c.pending.ByParentID(blockID)
-	if !ok {
-		return nil
-	}
-
-	c.log.Debug().
-		Int("children", len(children)).
-		Msg("processing pending children")
-
-	// then try to process children only this once
-	result := new(multierror.Error)
-	for _, child := range children {
-		proposal := &messages.ClusterBlockProposal{
-			Header:  child.Header,
-			Payload: child.Payload,
-		}
-		err := c.processBlockProposal(proposal)
-		if err != nil {
-			result = multierror.Append(result, err)
-		}
-	}
-
-	// remove children from cache
-	c.pending.DropForParent(blockID)
-
-	// flatten out the error tree before returning the error
-	result = multierror.Flatten(result).(*multierror.Error)
-	return result.ErrorOrNil()
 }
 
 // OnBlockVote handles votes for blocks by passing them to the core consensus
