@@ -2,6 +2,7 @@ package factories
 
 import (
 	"fmt"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/collection/compliance"

@@ -28,7 +28,7 @@ const defaultBlockQueueCapacity = 10000
 // defaultVoteQueueCapacity maximum capacity of block votes queue
 const defaultVoteQueueCapacity = 1000
 
-// Engine is a wrapper struct for `Core` which implements consensus algorithm.
+// Engine is a wrapper struct for `Core` which implements cluster consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
 	unit           *engine.Unit
@@ -99,7 +99,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ClusterBlockProposal)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
+					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 				}
 				return ok
 			},
@@ -109,7 +109,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*events.SyncedClusterBlock)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineProposal, metrics.MessageSyncedClusterBlock)
+					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
 				}
 				return ok
 			},
@@ -130,7 +130,7 @@ func NewEngine(
 			Match: func(msg *engine.Message) bool {
 				_, ok := msg.Payload.(*messages.ClusterBlockVote)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineProposal, metrics.MessageClusterBlockVote)
+					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
 				}
 				return ok
 			},
@@ -176,7 +176,7 @@ func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 	return e
 }
 
-// WithSync adds the block requesters to the engine. This must be
+// WithSync adds the block requester to the engine. This must be
 // called before the engine can start.
 func (e *Engine) WithSync(sync module.BlockRequester) *Engine {
 	e.core.sync = sync
@@ -301,7 +301,7 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 			log.Warn().Err(err).Msg("could not send vote")
 			return
 		}
-		e.metrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockVote)
+		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
 		log.Info().Msg("collection vote transmitted")
 	})
 
@@ -376,7 +376,7 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 			Str("recipients", fmt.Sprintf("%v", recipients.NodeIDs())).
 			Msg("broadcast proposal from hotstuff")
 
-		e.metrics.MessageSent(metrics.EngineProposal, metrics.MessageClusterBlockProposal)
+		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 		block := &cluster.Block{
 			Header:  header,
 			Payload: payload,

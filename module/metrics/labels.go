@@ -22,7 +22,7 @@ const (
 
 const (
 	// collection
-	EngineProposal               = "proposal"
+	EngineClusterCompliance      = "proposal"
 	EngineCollectionIngest       = "collection_ingest"
 	EngineCollectionProvider     = "collection_provider"
 	EngineClusterSynchronization = "cluster-sync"

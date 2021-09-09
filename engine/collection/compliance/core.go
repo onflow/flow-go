@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Core is the consensus engine, responsible for handling communication for
+// Core is the cluster consensus engine, responsible for handling communication for
 // the embedded consensus algorithm.
 // NOTE: Core is designed to be non-thread safe and cannot be used in concurrent environment
 // user of this object needs to ensure single thread access.
@@ -69,6 +69,7 @@ func NewCore(
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.ClusterBlockProposal) error {
 	header := proposal.Header
 	log := c.log.With().
+		Hex("origin_id", originID[:]).
 		Str("chain_id", header.ChainID.String()).
 		Uint64("block_height", header.Height).
 		Uint64("block_view", header.View).
