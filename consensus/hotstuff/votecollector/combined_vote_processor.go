@@ -19,7 +19,13 @@ func CombinedVoteProcessorFactory(log zerolog.Logger, proposal *model.Proposal) 
 	processor := &CombinedVoteProcessor{
 		log:   log,
 		block: proposal.Block,
-		done:  *atomic.NewBool(false),
+		// TODO: initialize the following dependencies
+		// stakingSigAggtor
+		// rbSigAggtor
+		// rbRector
+		// onQCCreated
+		// packer
+		done: *atomic.NewBool(false),
 	}
 	err := processor.Process(proposal.ProposerVote())
 	if err != nil {
@@ -30,7 +36,7 @@ func CombinedVoteProcessorFactory(log zerolog.Logger, proposal *model.Proposal) 
 				Err:     err,
 			}
 		}
-		return nil, fmt.Errorf("")
+		return nil, fmt.Errorf("could not process proposer's vote from block %v: %w", proposal.Block.BlockID, err)
 	}
 	return processor, nil
 }
@@ -48,6 +54,7 @@ type CombinedVoteProcessor struct {
 	rbSigAggtor      hotstuff.WeightedSignatureAggregator
 	rbRector         hotstuff.RandomBeaconReconstructor
 	onQCCreated      hotstuff.OnQCCreated
+	packer           hotstuff.Packer
 	minRequiredStake uint64
 	done             atomic.Bool
 }
@@ -63,7 +70,7 @@ func (p *CombinedVoteProcessor) Status() hotstuff.VoteCollectorStatus {
 func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
-		return fmt.Errorf("received incompatible vote: %w", err)
+		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
 	}
 
 	// Vote Processing state machine
@@ -75,7 +82,7 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		if errors.Is(err, msig.ErrInvalidFormat) {
 			return model.InvalidVoteError{VoteID: vote.ID(), View: vote.View, Err: err}
 		}
-		return fmt.Errorf("unexpected error decoding vote: %w", err)
+		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
 	}
 
 	switch sigType {
@@ -83,7 +90,7 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 	case hotstuff.SigTypeStaking:
 		valid, err := p.stakingSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
-			return fmt.Errorf("internal error checking signature validity: %w", err)
+			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
 		}
 		if !valid {
 			return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
@@ -93,13 +100,13 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		}
 		_, err = p.stakingSigAggtor.TrustedAdd(vote.SignerID, sig)
 		if err != nil {
-			return fmt.Errorf("adding the signature to staking aggregator failed: %w", err)
+			return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
 		}
 
 	case hotstuff.SigTypeRandomBeacon:
 		valid, err := p.rbSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
-			return fmt.Errorf("internal error checking signature validity: %w", err)
+			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
 		}
 		if !valid {
 			return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
@@ -109,11 +116,11 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		}
 		_, err = p.rbSigAggtor.TrustedAdd(vote.SignerID, sig)
 		if err != nil {
-			return fmt.Errorf("adding the signature to staking aggregator failed: %w", err)
+			return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
 		}
 		_, err = p.rbRector.TrustedAdd(vote.SignerID, sig)
 		if err != nil {
-			return fmt.Errorf("adding the signature to random beacon reconstructor failed: %w", err)
+			return fmt.Errorf("adding the signature to random beacon reconstructor failed for vote %v: %w", vote.ID(), err)
 		}
 
 	default:
@@ -129,35 +136,52 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 	}
 
 	// At this point, we have enough signatures to build a QC. Another routine
-	// might just be at this point. To avoid uplicate work, only one routine can pass:
+	// might just be at this point. To avoid duplicate work, only one routine can pass:
 	if !p.done.CAS(false, true) {
 		return nil
 	}
-	err = p.buildQC()
+
+	qc, err := p.buildQC()
 	if err != nil {
-		return fmt.Errorf("could not build QC: %w", err)
+		return fmt.Errorf("could not build QC for vote %v: %w", vote.ID(), err)
 	}
+
+	p.onQCCreated(qc)
 
 	return nil
 }
 
-func (p *CombinedVoteProcessor) buildQC() error {
-	_, _, err := p.stakingSigAggtor.Aggregate()
+func (p *CombinedVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
+	stakingSigners, aggregatedStakingSig, err := p.stakingSigAggtor.Aggregate()
 	if err != nil {
-		return fmt.Errorf("could not aggregate staking signature: %w", err)
+		return nil, fmt.Errorf("could not aggregate staking signature: %w", err)
 	}
-	_, _, err = p.rbSigAggtor.Aggregate()
+	beaconSigners, aggregatedRandomBeaconSig, err := p.rbSigAggtor.Aggregate()
 	if err != nil {
-		return fmt.Errorf("could not aggregate random beacon signatures: %w", err)
+		return nil, fmt.Errorf("could not aggregate random beacon signatures: %w", err)
 	}
-	_, err = p.rbRector.Reconstruct()
+	reconstructedBeaconSig, err := p.rbRector.Reconstruct()
 	if err != nil {
-		return fmt.Errorf("could not reconstruct random beacon group signature: %w", err)
+		return nil, fmt.Errorf("could not reconstruct random beacon group signature: %w", err)
 	}
 
-	// TODO: use signatures to build qc
-	var qc *flow.QuorumCertificate
-	p.onQCCreated(qc)
+	blockSigData := &hotstuff.BlockSignatureData{
+		StakingSigners:               stakingSigners,
+		RandomBeaconSigners:          beaconSigners,
+		AggregatedStakingSig:         aggregatedStakingSig,
+		AggregatedRandomBeaconSig:    aggregatedRandomBeaconSig,
+		ReconstructedRandomBeaconSig: reconstructedBeaconSig,
+	}
 
-	panic("not implemented")
+	signerIDs, sigData, err := p.packer.Pack(p.block.BlockID, blockSigData)
+	if err != nil {
+		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
+	}
+
+	return &flow.QuorumCertificate{
+		View:      p.block.View,
+		BlockID:   p.block.BlockID,
+		SignerIDs: signerIDs,
+		SigData:   sigData,
+	}, nil
 }
