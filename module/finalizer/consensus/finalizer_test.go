@@ -6,6 +6,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -66,7 +67,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 	cutoff := total - 3
 	var lastID flow.Identifier
 	for i := 0; i < cutoff; i++ {
-		state.On("Finalize", pending[i].ID()).Return(nil)
+		state.On("Finalize", mock.Anything, pending[i].ID()).Return(nil)
 		lastID = pending[i].ID()
 	}
 

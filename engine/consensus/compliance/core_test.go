@@ -154,7 +154,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 			return cs.snapshot
 		},
 	)
-	cs.state.On("Extend", mock.Anything).Return(nil)
+	cs.state.On("Extend", mock.Anything, mock.Anything).Return(nil)
 
 	// set up protocol snapshot mock
 	cs.snapshot = &protocol.Snapshot{}
@@ -314,7 +314,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 			return cs.snapshot
 		},
 	)
-	cs.state.On("Extend", mock.Anything).Return(errors.New("dummy error"))
+	cs.state.On("Extend", mock.Anything, mock.Anything).Return(errors.New("dummy error"))
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)

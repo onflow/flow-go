@@ -221,8 +221,6 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 // So invocation of this method indicates arrival of a distinct requested chunk.
 func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
 
-	colID := chunkDataPack.Collection.ID()
-
 	lg := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
@@ -231,7 +229,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	if chunkDataPack.Collection != nil {
 		// non-system chunk data packs have non-nil collection
 		lg = lg.With().
-			Hex("collection_id", logging.ID(colID)).
+			Hex("collection_id", logging.ID(chunkDataPack.Collection.ID())).
 			Logger()
 		lg.Info().Msg("chunk data pack arrived")
 	} else {
