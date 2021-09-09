@@ -92,6 +92,38 @@ func TestResolver_Error(t *testing.T) {
 	unittest.RequireCloseBefore(t, resolver.Done(), 10*time.Millisecond, "could not stop dns resolver on time")
 }
 
+func TestResolver_Expired_Invalidated_Error(t *testing.T) {
+	basicResolver := mocknetwork.BasicResolver{}
+	resolver := NewResolver(metrics.NewNoopCollector(),
+		WithBasicResolver(&basicResolver),
+		WithTTL(1*time.Second))
+
+	unittest.RequireCloseBefore(t, resolver.Ready(), 10*time.Millisecond, "could not start dns resolver on time")
+
+	// one test case for txt and one for ip
+	times := 1 // each test case tried once
+	txtTestCases := txtLookupFixture(1)
+	ipTestCase := ipLookupFixture(1)
+
+	// mocks test cases cached in resolver and waits for their expiry
+	mockCacheForDomains(resolver, ipTestCase, txtTestCases)
+	time.Sleep(1 * time.Second)
+
+	// mocks underlying basic resolver invoked once per domain and returns an error on each domain
+	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, times)
+	// queries are answered by cache, so resolver returning an error only invalidates the cache asynchronously for the first time.
+	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
+
+	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Hour, "could not resolve all expected domains")
+	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Hour, "could not perform all queries on time")
+
+	// since resolving invalidated
+	require.Empty(t, resolver.c.ipCache)
+	require.Empty(t, resolver.c.txtCache)
+
+	unittest.RequireCloseBefore(t, resolver.Done(), 10*time.Millisecond, "could not stop dns resolver on time")
+}
+
 type ipLookupTestCase struct {
 	domain string
 	result []net.IPAddr
@@ -158,7 +190,7 @@ func cacheAndQuery(t *testing.T,
 				require.NoError(t, err)
 				require.ElementsMatch(t, addrs, result)
 			} else {
-				require.Error(t, err)
+				require.Error(t, err, domain)
 			}
 
 			if index == 0 {
