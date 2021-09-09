@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
@@ -32,6 +33,7 @@ const defaultVoteQueueCapacity = 1000
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
 	unit           *engine.Unit
+	lm             *lifecycle.LifecycleManager
 	log            zerolog.Logger
 	metrics        module.EngineMetrics
 	me             module.Local
@@ -140,6 +142,7 @@ func NewEngine(
 
 	eng := &Engine{
 		unit:           engine.NewUnit(),
+		lm:             lifecycle.NewLifecycleManager(),
 		log:            engineLog,
 		metrics:        core.metrics,
 		me:             me,
@@ -190,20 +193,24 @@ func (e *Engine) Ready() <-chan struct{} {
 	if e.core.hotstuff == nil {
 		panic("must initialize compliance engine with hotstuff engine")
 	}
-	e.unit.Launch(e.loop)
-	return e.unit.Ready(func() {
+	e.lm.OnStart(func() {
+		e.unit.Launch(e.loop)
+		// wait for request handler to startup
 		<-e.core.hotstuff.Ready()
 	})
+	return e.lm.Started()
 }
 
 // Done returns a done channel that is closed once the engine has fully stopped.
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
-	return e.unit.Done(func() {
+	e.lm.OnStop(func() {
 		e.log.Debug().Msg("shutting down hotstuff eventloop")
 		<-e.core.hotstuff.Done()
 		e.log.Debug().Msg("all components have been shut down")
+		<-e.unit.Done()
 	})
+	return e.lm.Stopped()
 }
 
 // SubmitLocal submits an event originating on the local node.
