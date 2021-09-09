@@ -130,7 +130,7 @@ func (b *Broker) Broadcast(data []byte) {
 		})
 
 		if err != nil {
-			b.log.Fatal().Err(err).Msg("failed to broadcast message")
+			b.log.Error().Err(err).Msg("failed to broadcast message")
 		}
 		b.broadcasts++
 	}
