@@ -101,7 +101,6 @@ func TestResolver_Expired_Invalidated_Error(t *testing.T) {
 	unittest.RequireCloseBefore(t, resolver.Ready(), 10*time.Millisecond, "could not start dns resolver on time")
 
 	// one test case for txt and one for ip
-	times := 1 // each test case tried once
 	txtTestCases := txtLookupFixture(1)
 	ipTestCase := ipLookupFixture(1)
 
@@ -109,15 +108,29 @@ func TestResolver_Expired_Invalidated_Error(t *testing.T) {
 	mockCacheForDomains(resolver, ipTestCase, txtTestCases)
 	time.Sleep(1 * time.Second)
 
+	// first step: query for an expired entry must return the expired entry but also fire an async update on it.
+	// though we mock async update to fail, so the cache should be invalidated literally.
 	// mocks underlying basic resolver invoked once per domain and returns an error on each domain
-	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, times)
+	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, 1)
 	// queries are answered by cache, so resolver returning an error only invalidates the cache asynchronously for the first time.
-	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
+	queryWG := syncThenAsyncQuery(t, 1, resolver, txtTestCases, ipTestCase, happyPath)
 
-	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Hour, "could not resolve all expected domains")
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Hour, "could not perform all queries on time")
+	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Hour, "could not resolve all expected domains")
 
-	// since resolving invalidated
+	// since resolving hits an error, cache is invalidated.
+	require.Empty(t, resolver.c.ipCache)
+	require.Empty(t, resolver.c.txtCache)
+
+	// second step: we query again, and since there is no cache entry for query, it should directly fire a query on
+	// underlying resolver. But since underlying resolver hits an error, the query should return with an error.
+	resolverWG = mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, 1)
+	queryWG = syncThenAsyncQuery(t, 1, resolver, txtTestCases, ipTestCase, !happyPath)
+
+	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Hour, "could not perform all queries on time")
+	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Hour, "could not resolve all expected domains")
+
+	// since resolving hits an error, cache is invalidated.
 	require.Empty(t, resolver.c.ipCache)
 	require.Empty(t, resolver.c.txtCache)
 
