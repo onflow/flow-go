@@ -24,8 +24,10 @@ func NewConsensusSigPackerImpl(committees hotstuff.Committee) *ConsensusSigPacke
 	}
 }
 
+// signatureData is a compact data type for encoding the block signature data
 type signatureData struct {
 	// bit-vector indicating type of signature for each signer.
+	// the order of each sig type matches the order of coresponding signer IDs
 	SigType []hotstuff.SigType
 
 	AggregatedStakingSig      []byte
@@ -34,9 +36,6 @@ type signatureData struct {
 }
 
 // Pack packs the block signature data into raw bytes
-// a consensus node can be either a random beacon node or a non-random beacon node.
-// a random beacon node can produce either a random beacon sig or a staking sig.
-// a non-random beacon node can only produce a staking sig.
 // To pack the block signature data, we first build a compact data type, and then encode it into bytes.
 // The encoding method is RLP.
 func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
@@ -49,14 +48,16 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	lookup := consensus.Lookup()
 	count := len(sig.StakingSigners) + len(sig.RandomBeaconSigners)
 
-	sigTypes := make([]hotstuff.SigType, 0, count)
 	signerIDs := make([]flow.Identifier, 0, count)
+	// the order of sig types matches the signer IDs so that it indicates
+	// which type of signature each signer produces.
+	sigTypes := make([]hotstuff.SigType, 0, count)
 
 	for _, stakingSigner := range sig.StakingSigners {
 		_, ok := lookup[stakingSigner]
 		if ok {
-			sigTypes = append(sigTypes, hotstuff.SigTypeStaking)
 			signerIDs = append(signerIDs, stakingSigner)
+			sigTypes = append(sigTypes, hotstuff.SigTypeStaking)
 		} else {
 			return nil, nil, fmt.Errorf("staking signer ID (%v) not found in the committees at block: %v", stakingSigner, blockID)
 		}
@@ -65,8 +66,8 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	for _, beaconSigner := range sig.RandomBeaconSigners {
 		_, ok := lookup[beaconSigner]
 		if ok {
-			sigTypes = append(sigTypes, hotstuff.SigTypeRandomBeacon)
 			signerIDs = append(signerIDs, beaconSigner)
+			sigTypes = append(sigTypes, hotstuff.SigTypeRandomBeacon)
 		} else {
 			return nil, nil, fmt.Errorf("random beacon signer ID (%v) not found in the committees at block: %v", beaconSigner, blockID)
 		}
