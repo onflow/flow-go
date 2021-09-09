@@ -4,9 +4,10 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine"
 	"sync"
 	"time"
+
+	"github.com/onflow/flow-go/engine"
 
 	"github.com/sethvargo/go-retry"
 
