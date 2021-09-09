@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -127,7 +128,7 @@ func createNode(
 	setupsDB := storage.NewEpochSetups(metrics, db)
 	commitsDB := storage.NewEpochCommits(metrics, db)
 	statusesDB := storage.NewEpochStatuses(metrics, db)
-	consumer := events.NewNoop()
+	consumer := events.NewDistributor()
 
 	state, err := bprotocol.Bootstrap(metrics, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
 	require.NoError(t, err)
@@ -230,8 +231,25 @@ func createNode(
 	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
 	require.NoError(t, err)
 
+	identities, err := state.Final().Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(me.NodeID())),
+	))
+	require.NoError(t, err)
+	idProvider := id.NewFixedIdentifierProvider(identities.NodeIDs())
+
 	// initialize the synchronization engine
-	sync, err := synceng.New(log, metrics, net, me, blocksDB, comp, syncCore, finalizedHeader, state)
+	sync, err := synceng.New(
+		log,
+		metrics,
+		net,
+		me,
+		blocksDB,
+		comp,
+		syncCore,
+		finalizedHeader,
+		idProvider,
+	)
 	require.NoError(t, err)
 
 	pending := []*flow.Header{}

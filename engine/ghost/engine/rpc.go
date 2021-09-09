@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	jsoncodec "github.com/onflow/flow-go/network/codec/json"
 	"github.com/onflow/flow-go/state/protocol"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the gRPC server.

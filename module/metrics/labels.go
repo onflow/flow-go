@@ -16,7 +16,8 @@ const (
 )
 
 const (
-	ChannelOneToOne = "OneToOne"
+	ChannelOneToOne         = "OneToOne"
+	ChannelOneToOneUnstaked = "OneToOneUnstaked"
 )
 
 const (

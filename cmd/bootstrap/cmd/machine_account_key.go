@@ -23,11 +23,16 @@ var machineAccountKeyCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(machineAccountKeyCmd)
 
-	machineAccountKeyCmd.Flags().BytesHexVar(&flagMachineSeed, "seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
+	machineAccountKeyCmd.Flags().BytesHexVar(&flagMachineSeed, "seed", []byte{}, fmt.Sprintf("hex encoded machine account seed (min %d bytes)", minSeedBytes))
 }
 
 // machineAccountKeyRun generate a machine account key and writes it to a default file path.
 func machineAccountKeyRun(_ *cobra.Command, _ []string) {
+
+	// generate seed if not specified via flag
+	if len(flagMachineSeed) == 0 {
+		flagMachineSeed = GenerateRandomSeed()
+	}
 
 	// read nodeID written to boostrap dir by `bootstrap key`
 	nodeID, err := readNodeID()
