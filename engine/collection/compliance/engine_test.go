@@ -1,6 +1,13 @@
 package compliance
 
 import (
+	"github.com/onflow/flow-go/model/cluster"
+	module "github.com/onflow/flow-go/module/mock"
+	netint "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
+	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	storerr "github.com/onflow/flow-go/storage"
+	storage "github.com/onflow/flow-go/storage/mock"
 	"math/rand"
 	"sync"
 	"testing"
@@ -23,12 +30,102 @@ func TestComplianceEngine(t *testing.T) {
 type ComplianceSuite struct {
 	ComplianceCoreSuite
 
+	myID       flow.Identifier
+	cluster    flow.IdentityList
+	me         *module.Local
+	net        *module.Network
+	payloads   *storage.ClusterPayloads
+	protoState *protocol.MutableState
+	con        *mocknetwork.Conduit
+
+	payloadDB map[flow.Identifier]*cluster.Payload
+
 	engine *Engine
 }
 
 func (cs *ComplianceSuite) SetupTest() {
 	cs.ComplianceCoreSuite.SetupTest()
-	e, err := NewEngine(unittest.Logger(), cs.net, cs.me, cs.prov, cs.core)
+
+	// initialize the paramaters
+	cs.cluster = unittest.IdentityListFixture(3,
+		unittest.WithRole(flow.RoleCollection),
+		unittest.WithStake(1000),
+	)
+	cs.myID = cs.cluster[0].NodeID
+
+	protoEpoch := &protocol.Epoch{}
+	clusters := flow.ClusterList{cs.cluster}
+	protoEpoch.On("Clustering").Return(clusters, nil)
+
+	protoQuery := &protocol.EpochQuery{}
+	protoQuery.On("Current").Return(protoEpoch)
+
+	protoSnapshot := &protocol.Snapshot{}
+	protoSnapshot.On("Epochs").Return(protoQuery)
+	protoSnapshot.On("Identities", mock.Anything).Return(
+		func(selector flow.IdentityFilter) flow.IdentityList {
+			return cs.cluster.Filter(selector)
+		},
+		nil,
+	)
+
+	cs.protoState = &protocol.MutableState{}
+	cs.protoState.On("Final").Return(protoSnapshot)
+
+	clusterID := flow.ChainID("cluster-id")
+	clusterParams := &protocol.Params{}
+	clusterParams.On("ChainID").Return(clusterID, nil)
+
+	cs.state.On("Params").Return(clusterParams)
+
+	// set up local module mock
+	cs.me = &module.Local{}
+	cs.me.On("NodeID").Return(
+		func() flow.Identifier {
+			return cs.myID
+		},
+	)
+
+	cs.payloadDB = make(map[flow.Identifier]*cluster.Payload)
+
+	// set up payload storage mock
+	cs.payloads = &storage.ClusterPayloads{}
+	cs.payloads.On("Store", mock.Anything, mock.Anything).Return(
+		func(blockID flow.Identifier, payload *cluster.Payload) error {
+			cs.payloadDB[blockID] = payload
+			return nil
+		},
+	)
+	cs.payloads.On("ByBlockID", mock.Anything).Return(
+		func(blockID flow.Identifier) *cluster.Payload {
+			return cs.payloadDB[blockID]
+		},
+		func(blockID flow.Identifier) error {
+			_, exists := cs.payloadDB[blockID]
+			if !exists {
+				return storerr.ErrNotFound
+			}
+			return nil
+		},
+	)
+
+	// set up network conduit mock
+	cs.con = &mocknetwork.Conduit{}
+	cs.con.On("Publish", mock.Anything, mock.Anything).Return(nil)
+	cs.con.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	cs.con.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+	cs.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
+
+	// set up network module mock
+	cs.net = &module.Network{}
+	cs.net.On("Register", mock.Anything, mock.Anything).Return(
+		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
+			return cs.con
+		},
+		nil,
+	)
+
+	e, err := NewEngine(unittest.Logger(), cs.net, cs.me, cs.protoState, cs.payloads, cs.core)
 	require.NoError(cs.T(), err)
 	cs.engine = e
 
@@ -67,7 +164,7 @@ func (cs *ComplianceSuite) TestSendVote() {
 	<-cs.engine.Done()
 
 	// check it was called with right params
-	vote := messages.BlockVote{
+	vote := messages.ClusterBlockVote{
 		BlockID: blockID,
 		View:    view,
 		SigData: sig,
@@ -79,17 +176,14 @@ func (cs *ComplianceSuite) TestSendVote() {
 // inputs
 func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 
-	// add execution node to participants to make sure we exclude them from broadcast
-	cs.participants = append(cs.participants, unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution)))
-
 	// generate a parent with height and chain ID set
-	parent := unittest.BlockHeaderFixture()
-	parent.ChainID = "test"
-	parent.Height = 10
+	parent := unittest.ClusterBlockFixture()
+	parent.Header.ChainID = "test"
+	parent.Header.Height = 10
 	cs.headerDB[parent.ID()] = &parent
 
 	// create a block with the parent and store the payload with correct ID
-	block := unittest.BlockWithParentFixture(&parent)
+	block := unittest.ClusterBlockWithParent(&parent)
 	block.Header.ProposerID = cs.myID
 	cs.payloadDB[block.ID()] = block.Payload
 
@@ -100,7 +194,7 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	block.Header.ChainID = ""
 	block.Header.Height = 0
 
-	cs.hotstuff.On("SubmitProposal", block.Header, parent.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return().Once()
 
 	// submit to broadcast proposal
 	err := cs.engine.BroadcastProposalWithDelay(block.Header, 0)
@@ -110,7 +204,7 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 	// we broadcast to correct nodes
 	header.ChainID = "test"
 	header.Height = 11
-	msg := &messages.BlockProposal{
+	msg := &messages.ClusterBlockProposal{
 		Header:  header,
 		Payload: block.Payload,
 	}
@@ -125,7 +219,7 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 
 	<-time.After(10 * time.Millisecond)
 	<-cs.engine.Done()
-	cs.con.AssertCalled(cs.T(), "Publish", msg, cs.participants[1].NodeID, cs.participants[2].NodeID)
+	cs.con.AssertCalled(cs.T(), "Publish", msg, cs.cluster[1].NodeID, cs.cluster[2].NodeID)
 
 	// should fail with wrong proposer
 	header.ProposerID = unittest.IdentifierFixture()
@@ -171,13 +265,16 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 	wg.Add(1)
 	go func() {
 		// create a proposal that directly descends from the latest finalized header
-		originID := cs.participants[1].NodeID
-		block := unittest.BlockWithParentFixture(cs.head)
-		proposal := unittest.ProposalFromBlock(&block)
+		originID := cs.cluster[1].NodeID
+		block := unittest.ClusterBlockWithParent(cs.head)
+		proposal := &messages.ClusterBlockProposal{
+			Header:  block.Header,
+			Payload: block.Payload,
+		}
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
-		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
+		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.Header.View).Return()
 		_ = cs.engine.Process(engine.ConsensusCommittee, originID, proposal)
 		wg.Done()
 	}()

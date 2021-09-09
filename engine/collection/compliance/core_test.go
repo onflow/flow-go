@@ -35,7 +35,6 @@ type ComplianceCoreSuite struct {
 	// storage data
 	headerDB map[flow.Identifier]*cluster.Block
 
-	payloadDB  map[flow.Identifier]*cluster.Payload
 	pendingDB  map[flow.Identifier]*cluster.PendingBlock
 	childrenDB map[flow.Identifier][]*cluster.PendingBlock
 
@@ -44,7 +43,6 @@ type ComplianceCoreSuite struct {
 	snapshot *clusterstate.Snapshot
 	metrics  *metrics.NoopCollector
 	headers  *storage.Headers
-	payloads *storage.ClusterPayloads
 	pending  *module.PendingClusterBlockBuffer
 	hotstuff *module.HotStuff
 	sync     *module.BlockRequester
@@ -62,13 +60,11 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 
 	// initialize the storage data
 	cs.headerDB = make(map[flow.Identifier]*cluster.Block)
-	cs.payloadDB = make(map[flow.Identifier]*cluster.Payload)
 	cs.pendingDB = make(map[flow.Identifier]*cluster.PendingBlock)
 	cs.childrenDB = make(map[flow.Identifier][]*cluster.PendingBlock)
 
 	// store the head header and payload
 	cs.headerDB[block.ID()] = cs.head
-	cs.payloadDB[block.ID()] = cs.head.Payload
 
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
@@ -81,27 +77,6 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 		},
 		func(blockID flow.Identifier) error {
 			_, exists := cs.headerDB[blockID]
-			if !exists {
-				return storerr.ErrNotFound
-			}
-			return nil
-		},
-	)
-
-	// set up payload storage mock
-	cs.payloads = &storage.ClusterPayloads{}
-	cs.payloads.On("Store", mock.Anything, mock.Anything).Return(
-		func(blockID flow.Identifier, payload *cluster.Payload) error {
-			cs.payloadDB[blockID] = payload
-			return nil
-		},
-	)
-	cs.payloads.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) *cluster.Payload {
-			return cs.payloadDB[blockID]
-		},
-		func(blockID flow.Identifier) error {
-			_, exists := cs.payloadDB[blockID]
 			if !exists {
 				return storerr.ErrNotFound
 			}
