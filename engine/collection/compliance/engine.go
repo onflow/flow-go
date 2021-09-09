@@ -3,13 +3,13 @@ package compliance
 import (
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/model/cluster"
 	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -54,7 +54,7 @@ func NewEngine(
 	payloads storage.ClusterPayloads,
 	core *Core) (*Engine, error) {
 
-	engineLog := log.With().Str("col_compliance", "engine").Logger()
+	engineLog := log.With().Str("cluster_compliance", "engine").Logger()
 
 	// find my cluster for the current epoch
 	// TODO this should flow from cluster state as source of truth
@@ -173,6 +173,13 @@ func NewEngine(
 // called before the engine can start.
 func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 	e.core.hotstuff = hot
+	return e
+}
+
+// WithSync adds the block requesters to the engine. This must be
+// called before the engine can start.
+func (e *Engine) WithSync(sync module.BlockRequester) *Engine {
+	e.core.sync = sync
 	return e
 }
 

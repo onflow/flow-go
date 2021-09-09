@@ -2,7 +2,6 @@ package compliance
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/model/cluster"
 	"math/rand"
 	"testing"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	realbuffer "github.com/onflow/flow-go/module/buffer"
@@ -150,12 +150,13 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.metrics = metrics.NewNoopCollector()
 
 	// initialize the engine
-	e, err := NewCore(unittest.Logger(), cs.metrics, cs.metrics, cs.metrics, cs.headers, cs.state, cs.pending, cs.sync)
+	e, err := NewCore(unittest.Logger(), cs.metrics, cs.metrics, cs.metrics, cs.headers, cs.state, cs.pending)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	cs.core = e
 	// assign engine with consensus & synchronization
 	cs.core.hotstuff = cs.hotstuff
+	cs.core.sync = cs.sync
 }
 
 func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {

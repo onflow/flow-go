@@ -5,6 +5,9 @@ package compliance
 import (
 	"errors"
 	"fmt"
+
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -15,7 +18,6 @@ import (
 	clusterkv "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/logging"
-	"github.com/rs/zerolog"
 )
 
 // Core is the consensus engine, responsible for handling communication for
@@ -43,18 +45,17 @@ func NewCore(
 	headers storage.Headers,
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,
-	sync module.BlockRequester,
 ) (*Core, error) {
 
 	c := &Core{
-		log:               log.With().Str("col_compliance", "core").Logger(),
+		log:               log.With().Str("cluster_compliance", "core").Logger(),
 		metrics:           collector,
 		mempoolMetrics:    mempool,
 		collectionMetrics: collectionMetrics,
 		headers:           headers,
 		state:             state,
 		pending:           pending,
-		sync:              sync,
+		sync:              nil, // use `WithSync`
 		hotstuff:          nil, // use `WithConsensus`
 	}
 

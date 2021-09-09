@@ -30,6 +30,7 @@ func TestComplianceEngine(t *testing.T) {
 type ComplianceSuite struct {
 	ComplianceCoreSuite
 
+	clusterID  flow.ChainID
 	myID       flow.Identifier
 	cluster    flow.IdentityList
 	me         *module.Local
@@ -72,9 +73,9 @@ func (cs *ComplianceSuite) SetupTest() {
 	cs.protoState = &protocol.MutableState{}
 	cs.protoState.On("Final").Return(protoSnapshot)
 
-	clusterID := flow.ChainID("cluster-id")
+	cs.clusterID = "cluster-id"
 	clusterParams := &protocol.Params{}
-	clusterParams.On("ChainID").Return(clusterID, nil)
+	clusterParams.On("ChainID").Return(cs.clusterID, nil)
 
 	cs.state.On("Params").Return(clusterParams)
 
@@ -247,18 +248,20 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
 
+	channel := engine.ChannelConsensusCluster(cs.clusterID)
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		for i := 0; i < voteCount; i++ {
-			vote := messages.BlockVote{
+			vote := messages.ClusterBlockVote{
 				BlockID: unittest.IdentifierFixture(),
 				View:    rand.Uint64(),
 				SigData: unittest.SignatureFixture(),
 			}
 			cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
 			// execute the vote submission
-			_ = cs.engine.Process(engine.ConsensusCommittee, originID, &vote)
+			_ = cs.engine.Process(channel, originID, &vote)
 		}
 		wg.Done()
 	}()
@@ -275,7 +278,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
 		cs.hotstuff.On("SubmitProposal", block.Header, cs.head.Header.View).Return()
-		_ = cs.engine.Process(engine.ConsensusCommittee, originID, proposal)
+		_ = cs.engine.Process(channel, originID, proposal)
 		wg.Done()
 	}()
 
@@ -283,6 +286,6 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 
 	time.Sleep(time.Second)
 
-	// check the submit vote was called with correct parameters
+	// check that submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
 }
