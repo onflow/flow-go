@@ -295,6 +295,20 @@ func mockBasicResolverForDomains(t *testing.T,
 	return wg
 }
 
+// mockCacheForDomains updates cache of resolver with the test cases.
+func mockCacheForDomains(resolver *Resolver,
+	ipLookupTestCases map[string]*ipLookupTestCase,
+	txtLookupTestCases map[string]*txtLookupTestCase) {
+
+	for _, iptc := range ipLookupTestCases {
+		resolver.c.updateIPCache(iptc.domain, iptc.result)
+	}
+
+	for _, txttc := range txtLookupTestCases {
+		resolver.c.updateTXTCache(txttc.domain, txttc.result)
+	}
+}
+
 func ipLookupFixture(count int) map[string]*ipLookupTestCase {
 	tt := make(map[string]*ipLookupTestCase)
 	for i := 0; i < count; i++ {
