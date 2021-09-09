@@ -259,6 +259,7 @@ func TestBroadcastMessage(t *testing.T) {
 	sender.dkgContractClient = contractClient
 
 	sender.Broadcast(msgb)
+	<-sender.unit.Done()
 	contractClient.AssertExpectations(t)
 }
 
