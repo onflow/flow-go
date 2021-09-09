@@ -42,10 +42,8 @@ type Core struct {
 func NewCore(
 	log zerolog.Logger,
 	collector module.EngineMetrics,
-	tracer module.Tracer,
 	mempool module.MempoolMetrics,
 	collectionMetrics module.CollectionMetrics,
-	cleaner storage.Cleaner,
 	headers storage.Headers,
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,
@@ -55,10 +53,8 @@ func NewCore(
 	c := &Core{
 		log:               log.With().Str("col_compliance", "core").Logger(),
 		metrics:           collector,
-		tracer:            tracer,
 		mempoolMetrics:    mempool,
 		collectionMetrics: collectionMetrics,
-		cleaner:           cleaner,
 		headers:           headers,
 		state:             state,
 		pending:           pending,

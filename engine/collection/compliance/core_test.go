@@ -2,6 +2,7 @@ package compliance
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/model/cluster"
 	"math/rand"
 	"testing"
 	"time"
@@ -13,15 +14,11 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
-	realModule "github.com/onflow/flow-go/module"
-	real "github.com/onflow/flow-go/module/buffer"
+	realbuffer "github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/trace"
-	netint "github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/mocknetwork"
-	protint "github.com/onflow/flow-go/state/protocol"
-	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	clusterint "github.com/onflow/flow-go/state/cluster"
+	clusterstate "github.com/onflow/flow-go/state/cluster/mock"
 	storerr "github.com/onflow/flow-go/storage"
 	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -34,30 +31,21 @@ func TestComplianceCore(t *testing.T) {
 type ComplianceCoreSuite struct {
 	suite.Suite
 
-	// engine parameters
-	participants flow.IdentityList
-	myID         flow.Identifier
-	head         *flow.Header
-
+	head *cluster.Block
 	// storage data
-	headerDB   map[flow.Identifier]*flow.Header
-	payloadDB  map[flow.Identifier]*flow.Payload
-	pendingDB  map[flow.Identifier]*flow.PendingBlock
-	childrenDB map[flow.Identifier][]*flow.PendingBlock
+	headerDB map[flow.Identifier]*cluster.Block
+
+	payloadDB  map[flow.Identifier]*cluster.Payload
+	pendingDB  map[flow.Identifier]*cluster.PendingBlock
+	childrenDB map[flow.Identifier][]*cluster.PendingBlock
 
 	// mocked dependencies
-	me       *module.Local
+	state    *clusterstate.MutableState
+	snapshot *clusterstate.Snapshot
 	metrics  *metrics.NoopCollector
-	tracer   realModule.Tracer
-	cleaner  *storage.Cleaner
 	headers  *storage.Headers
-	payloads *storage.Payloads
-	state    *protocol.MutableState
-	snapshot *protocol.Snapshot
-	con      *mocknetwork.Conduit
-	net      *module.Network
-	prov     *mocknetwork.Engine
-	pending  *module.PendingBlockBuffer
+	payloads *storage.ClusterPayloads
+	pending  *module.PendingClusterBlockBuffer
 	hotstuff *module.HotStuff
 	sync     *module.BlockRequester
 
@@ -69,48 +57,27 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// seed the RNG
 	rand.Seed(time.Now().UnixNano())
 
-	// initialize the paramaters
-	cs.participants = unittest.IdentityListFixture(3,
-		unittest.WithRole(flow.RoleConsensus),
-		unittest.WithStake(1000),
-	)
-	cs.myID = cs.participants[0].NodeID
-	block := unittest.BlockFixture()
-	cs.head = block.Header
+	block := unittest.ClusterBlockFixture()
+	cs.head = &block
 
 	// initialize the storage data
-	cs.headerDB = make(map[flow.Identifier]*flow.Header)
-	cs.payloadDB = make(map[flow.Identifier]*flow.Payload)
-	cs.pendingDB = make(map[flow.Identifier]*flow.PendingBlock)
-	cs.childrenDB = make(map[flow.Identifier][]*flow.PendingBlock)
+	cs.headerDB = make(map[flow.Identifier]*cluster.Block)
+	cs.payloadDB = make(map[flow.Identifier]*cluster.Payload)
+	cs.pendingDB = make(map[flow.Identifier]*cluster.PendingBlock)
+	cs.childrenDB = make(map[flow.Identifier][]*cluster.PendingBlock)
 
 	// store the head header and payload
-	cs.headerDB[block.ID()] = block.Header
-	cs.payloadDB[block.ID()] = block.Payload
-
-	// set up local module mock
-	cs.me = &module.Local{}
-	cs.me.On("NodeID").Return(
-		func() flow.Identifier {
-			return cs.myID
-		},
-	)
-
-	// set up storage cleaner
-	cs.cleaner = &storage.Cleaner{}
-	cs.cleaner.On("RunGC").Return()
+	cs.headerDB[block.ID()] = cs.head
+	cs.payloadDB[block.ID()] = cs.head.Payload
 
 	// set up header storage mock
 	cs.headers = &storage.Headers{}
-	cs.headers.On("Store", mock.Anything).Return(
-		func(header *flow.Header) error {
-			cs.headerDB[header.ID()] = header
-			return nil
-		},
-	)
 	cs.headers.On("ByBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) *flow.Header {
-			return cs.headerDB[blockID]
+			if header := cs.headerDB[blockID]; header != nil {
+				return cs.headerDB[blockID].Header
+			}
+			return nil
 		},
 		func(blockID flow.Identifier) error {
 			_, exists := cs.headerDB[blockID]
@@ -122,15 +89,15 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 
 	// set up payload storage mock
-	cs.payloads = &storage.Payloads{}
+	cs.payloads = &storage.ClusterPayloads{}
 	cs.payloads.On("Store", mock.Anything, mock.Anything).Return(
-		func(header *flow.Header, payload *flow.Payload) error {
-			cs.payloadDB[header.ID()] = payload
+		func(blockID flow.Identifier, payload *cluster.Payload) error {
+			cs.payloadDB[blockID] = payload
 			return nil
 		},
 	)
 	cs.payloads.On("ByBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.Payload {
+		func(blockID flow.Identifier) *cluster.Payload {
 			return cs.payloadDB[blockID]
 		},
 		func(blockID flow.Identifier) error {
@@ -143,59 +110,33 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	)
 
 	// set up protocol state mock
-	cs.state = &protocol.MutableState{}
+	cs.state = &clusterstate.MutableState{}
 	cs.state.On("Final").Return(
-		func() protint.Snapshot {
+		func() clusterint.Snapshot {
 			return cs.snapshot
 		},
 	)
 	cs.state.On("AtBlockID", mock.Anything).Return(
-		func(blockID flow.Identifier) protint.Snapshot {
+		func(blockID flow.Identifier) clusterint.Snapshot {
 			return cs.snapshot
 		},
 	)
 	cs.state.On("Extend", mock.Anything).Return(nil)
 
 	// set up protocol snapshot mock
-	cs.snapshot = &protocol.Snapshot{}
-	cs.snapshot.On("Identities", mock.Anything).Return(
-		func(filter flow.IdentityFilter) flow.IdentityList {
-			return cs.participants.Filter(filter)
-		},
-		nil,
-	)
+	cs.snapshot = &clusterstate.Snapshot{}
 	cs.snapshot.On("Head").Return(
 		func() *flow.Header {
-			return cs.head
+			return cs.head.Header
 		},
 		nil,
 	)
-
-	// set up network conduit mock
-	cs.con = &mocknetwork.Conduit{}
-	cs.con.On("Publish", mock.Anything, mock.Anything).Return(nil)
-	cs.con.On("Publish", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	cs.con.On("Publish", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	cs.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
-
-	// set up network module mock
-	cs.net = &module.Network{}
-	cs.net.On("Register", mock.Anything, mock.Anything).Return(
-		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
-			return cs.con
-		},
-		nil,
-	)
-
-	// set up the provider engine
-	cs.prov = &mocknetwork.Engine{}
-	cs.prov.On("SubmitLocal", mock.Anything).Return()
 
 	// set up pending module mock
-	cs.pending = &module.PendingBlockBuffer{}
+	cs.pending = &module.PendingClusterBlockBuffer{}
 	cs.pending.On("Add", mock.Anything, mock.Anything).Return(true)
 	cs.pending.On("ByID", mock.Anything).Return(
-		func(blockID flow.Identifier) *flow.PendingBlock {
+		func(blockID flow.Identifier) *cluster.PendingBlock {
 			return cs.pendingDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -204,7 +145,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 		},
 	)
 	cs.pending.On("ByParentID", mock.Anything).Return(
-		func(blockID flow.Identifier) []*flow.PendingBlock {
+		func(blockID flow.Identifier) []*cluster.PendingBlock {
 			return cs.childrenDB[blockID]
 		},
 		func(blockID flow.Identifier) bool {
@@ -233,11 +174,8 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// set up no-op metrics mock
 	cs.metrics = metrics.NewNoopCollector()
 
-	// set up no-op tracer
-	cs.tracer = trace.NewNoopTracer()
-
 	// initialize the engine
-	e, err := NewCore(unittest.Logger(), cs.metrics, cs.tracer, cs.metrics, cs.metrics, cs.cleaner, cs.headers, cs.payloads, cs.state, cs.pending, cs.sync)
+	e, err := NewCore(unittest.Logger(), cs.metrics, cs.metrics, cs.metrics, cs.headers, cs.state, cs.pending, cs.sync)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	cs.core = e
@@ -248,21 +186,22 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 
 	// create a proposal that directly descends from the latest finalized header
-	originID := cs.participants[1].NodeID
-	block := unittest.BlockWithParentFixture(cs.head)
-	proposal := unittest.ProposalFromBlock(&block)
+	originID := unittest.IdentifierFixture()
+	block := unittest.ClusterBlockWithParent(cs.head)
+
+	proposal := &messages.ClusterBlockProposal{
+		Header:  block.Header,
+		Payload: block.Payload,
+	}
 
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
 
-	cs.hotstuff.On("SubmitProposal", block.Header, cs.head.View).Return()
+	cs.hotstuff.On("SubmitProposal", proposal.Header, cs.head.Header.View).Return()
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
 	require.NoError(cs.T(), err, "valid block proposal should pass")
-
-	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", &block)
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
@@ -271,15 +210,18 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 
 	// create a proposal that has two ancestors in the cache
-	originID := cs.participants[1].NodeID
-	ancestor := unittest.BlockWithParentFixture(cs.head)
-	parent := unittest.BlockWithParentFixture(ancestor.Header)
-	block := unittest.BlockWithParentFixture(parent.Header)
-	proposal := unittest.ProposalFromBlock(&block)
+	originID := unittest.IdentifierFixture()
+	ancestor := unittest.ClusterBlockWithParent(cs.head)
+	parent := unittest.ClusterBlockWithParent(&ancestor)
+	block := unittest.ClusterBlockWithParent(&parent)
+	proposal := &messages.ClusterBlockProposal{
+		Header:  block.Header,
+		Payload: block.Payload,
+	}
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parent.Header
-	cs.headerDB[ancestor.ID()] = ancestor.Header
+	cs.headerDB[parent.ID()] = &parent
+	cs.headerDB[ancestor.ID()] = &ancestor
 
 	cs.hotstuff.On("SubmitProposal", block.Header, parent.Header.View).Return()
 
@@ -297,20 +239,23 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 
 	// create a proposal that has two ancestors in the cache
-	originID := cs.participants[1].NodeID
-	ancestor := unittest.BlockWithParentFixture(cs.head)
-	parent := unittest.BlockWithParentFixture(ancestor.Header)
-	block := unittest.BlockWithParentFixture(parent.Header)
-	proposal := unittest.ProposalFromBlock(&block)
+	originID := unittest.IdentifierFixture()
+	ancestor := unittest.ClusterBlockWithParent(cs.head)
+	parent := unittest.ClusterBlockWithParent(&ancestor)
+	block := unittest.ClusterBlockWithParent(&parent)
+	proposal := &messages.ClusterBlockProposal{
+		Header:  block.Header,
+		Payload: block.Payload,
+	}
 
 	// store the data for retrieval
-	cs.headerDB[parent.ID()] = parent.Header
-	cs.headerDB[ancestor.ID()] = ancestor.Header
+	cs.headerDB[parent.ID()] = &parent
+	cs.headerDB[ancestor.ID()] = &ancestor
 
 	// make sure we fail to extend the state
-	*cs.state = protocol.MutableState{}
+	*cs.state = clusterstate.MutableState{}
 	cs.state.On("Final").Return(
-		func() protint.Snapshot {
+		func() clusterint.Snapshot {
 			return cs.snapshot
 		},
 	)
@@ -330,33 +275,44 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
-	parent := unittest.BlockWithParentFixture(cs.head)
-	proposal := unittest.ProposalFromBlock(&parent)
-	block1 := unittest.BlockWithParentFixture(parent.Header)
-	block2 := unittest.BlockWithParentFixture(parent.Header)
-	block3 := unittest.BlockWithParentFixture(parent.Header)
+	parent := unittest.ClusterBlockWithParent(cs.head)
+	proposal := &messages.ClusterBlockProposal{
+		Header:  parent.Header,
+		Payload: parent.Payload,
+	}
+	block1 := unittest.ClusterBlockWithParent(&parent)
+	block2 := unittest.ClusterBlockWithParent(&parent)
+	block3 := unittest.ClusterBlockWithParent(&parent)
+
+	pendingFromBlock := func(block *cluster.Block) *cluster.PendingBlock {
+		return &cluster.PendingBlock{
+			OriginID: block.Header.ProposerID,
+			Header:   block.Header,
+			Payload:  block.Payload,
+		}
+	}
 
 	// create the pending blocks
-	pending1 := unittest.PendingFromBlock(&block1)
-	pending2 := unittest.PendingFromBlock(&block2)
-	pending3 := unittest.PendingFromBlock(&block3)
+	pending1 := pendingFromBlock(&block1)
+	pending2 := pendingFromBlock(&block2)
+	pending3 := pendingFromBlock(&block3)
 
 	// store the parent on disk
 	parentID := parent.ID()
-	cs.headerDB[parentID] = parent.Header
+	cs.headerDB[parentID] = &parent
 
 	// store the pending children in the cache
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending1)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending2)
 	cs.childrenDB[parentID] = append(cs.childrenDB[parentID], pending3)
 
-	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.View).Return().Once()
+	cs.hotstuff.On("SubmitProposal", parent.Header, cs.head.Header.View).Return().Once()
 	cs.hotstuff.On("SubmitProposal", block1.Header, parent.Header.View).Return().Once()
 	cs.hotstuff.On("SubmitProposal", block2.Header, parent.Header.View).Return().Once()
 	cs.hotstuff.On("SubmitProposal", block3.Header, parent.Header.View).Return().Once()
 
 	// execute the connected children handling
-	err := cs.core.processBlockAndDescendants(proposal)
+	err := cs.core.processBlockProposal(proposal)
 	require.NoError(cs.T(), err, "should pass handling children")
 
 	// check that we submitted each child to hotstuff
@@ -370,7 +326,7 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 
 	// create a vote
 	originID := unittest.IdentifierFixture()
-	vote := messages.BlockVote{
+	vote := messages.ClusterBlockVote{
 		BlockID: unittest.IdentifierFixture(),
 		View:    rand.Uint64(),
 		SigData: unittest.SignatureFixture(),
@@ -389,25 +345,26 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 
 	// create a proposal that we will not submit until the end
-	originID := cs.participants[1].NodeID
-	block := unittest.BlockWithParentFixture(cs.head)
-	missing := unittest.ProposalFromBlock(&block)
+	originID := unittest.IdentifierFixture()
+	block := unittest.ClusterBlockWithParent(cs.head)
+	missing := &block
 
 	// create a chain of descendants
-	var proposals []*messages.BlockProposal
+	var proposals []*cluster.Block
+	proposalsLookup := make(map[flow.Identifier]*cluster.Block)
 	parent := missing
 	for i := 0; i < 3; i++ {
-		descendant := unittest.BlockWithParentFixture(parent.Header)
-		proposal := unittest.ProposalFromBlock(&descendant)
-		proposals = append(proposals, proposal)
-		parent = proposal
+		proposal := unittest.ClusterBlockWithParent(parent)
+		proposals = append(proposals, &proposal)
+		proposalsLookup[proposal.ID()] = &proposal
+		parent = &proposal
 	}
 
 	// replace the engine buffer with the real one
-	cs.core.pending = real.NewPendingBlocks()
+	cs.core.pending = realbuffer.NewPendingClusterBlocks()
 
 	// process all of the descendants
-	for _, proposal := range proposals {
+	for _, block := range proposals {
 
 		// check that we request the ancestor block each time
 		cs.sync.On("RequestBlock", mock.Anything).Once().Run(
@@ -416,6 +373,11 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 				assert.Equal(cs.T(), missing.Header.ID(), ancestorID, "should always request root block")
 			},
 		)
+
+		proposal := &messages.ClusterBlockProposal{
+			Header:  block.Header,
+			Payload: block.Payload,
+		}
 
 		// process and make sure no error occurs (as they are unverifiable)
 		err := cs.core.OnBlockProposal(originID, proposal)
@@ -439,12 +401,19 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 			header := args.Get(0).(*flow.Header)
 			assert.Equal(cs.T(), order[index], header.ID(), "should submit correct header to hotstuff")
 			index++
-			cs.headerDB[header.ID()] = header
+			cs.headerDB[header.ID()] = proposalsLookup[header.ID()]
 		},
 	)
 
+	missingProposal := &messages.ClusterBlockProposal{
+		Header:  missing.Header,
+		Payload: missing.Payload,
+	}
+
+	proposalsLookup[missing.ID()] = missing
+
 	// process the root proposal
-	err := cs.core.OnBlockProposal(originID, missing)
+	err := cs.core.OnBlockProposal(originID, missingProposal)
 	require.NoError(cs.T(), err, "root proposal should pass")
 
 	// make sure we submitted all four proposals
