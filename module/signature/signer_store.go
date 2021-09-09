@@ -1,6 +1,7 @@
 package signature
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/encoding"
@@ -30,7 +31,7 @@ func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.DKGKe
 // given view. The view determines the epoch, which determines the DKG private
 // key underlying the signer.
 func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.ThresholdSigner, error) {
-	epoch, err := s.epochLookup.EpochForView(view)
+	epoch, err := s.epochLookup.EpochForViewWithFallback(view)
 	if err != nil {
 		return nil, fmt.Errorf("could not get epoch by view: %v, %w", view, err)
 	}
@@ -38,12 +39,17 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 	if ok {
 		return signer, nil
 	}
+
 	privDKGData, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
-	if err != nil {
+	if errors.Is(err, storage.ErrNotFound) {
+		signer = NewThresholdProvider(encoding.RandomBeaconTag, nil)
+	} else if err != nil {
 		return nil, fmt.Errorf("could not retrieve DKG private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
+	} else {
+		signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData.RandomBeaconPrivKey)
 	}
-	signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData.RandomBeaconPrivKey)
 	s.signers[epoch] = signer
+
 	return signer, nil
 }
 

@@ -21,7 +21,7 @@ import (
 
 	"github.com/onflow/cadence/runtime/common"
 	newInter "github.com/onflow/cadence/runtime/interpreter"
-	oldInter "github.com/onflow/cadence/v18/runtime/interpreter"
+	oldInter "github.com/onflow/cadence/v19/runtime/interpreter"
 )
 
 const cborTagStorageReference = 202
@@ -671,8 +671,9 @@ func (c *ValueConverter) VisitArrayValue(inter *oldInter.Interpreter, value *old
 	arrayStaticType := ConvertStaticType(value.StaticType()).(newInter.ArrayStaticType)
 
 	c.result = newInter.NewArrayValueWithAddress(
+		nil,
 		arrayStaticType,
-		c.storage,
+		//c.storage,
 		*value.Owner,
 		newElements...,
 	)
@@ -798,8 +799,9 @@ func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value
 	}
 
 	c.result = newInter.NewDictionaryValueWithAddress(
+		nil,
 		staticType,
-		c.storage,
+		//c.storage,
 		*value.Owner,
 		keysAndValues...,
 	)
@@ -888,11 +890,11 @@ func (c *ValueConverter) VisitLinkValue(inter *oldInter.Interpreter, value oldIn
 	}
 }
 
-func (c *ValueConverter) VisitInterpretedFunctionValue(_ *oldInter.Interpreter, _ oldInter.InterpretedFunctionValue) {
+func (c *ValueConverter) VisitInterpretedFunctionValue(_ *oldInter.Interpreter, _ *oldInter.InterpretedFunctionValue) {
 	panic("value not storable")
 }
 
-func (c *ValueConverter) VisitHostFunctionValue(_ *oldInter.Interpreter, _ oldInter.HostFunctionValue) {
+func (c *ValueConverter) VisitHostFunctionValue(_ *oldInter.Interpreter, _ *oldInter.HostFunctionValue) {
 	panic("value not storable")
 }
 

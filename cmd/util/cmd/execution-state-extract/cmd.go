@@ -24,6 +24,7 @@ var (
 	flagDatadir           string
 	flagNoMigration       bool
 	flagNoReport          bool
+	flagCleanupStorage    bool
 )
 
 var Cmd = &cobra.Command{
@@ -55,6 +56,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
+
+	Cmd.Flags().BoolVar(&flagCleanupStorage, "cleanup-storage", false,
+		"cleanup storage by removing broken contracts")
 }
 
 func run(*cobra.Command, []string) {
@@ -93,7 +97,7 @@ func run(*cobra.Command, []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("invalid state commitment length")
 		}
-	} else {
+	} else if !flagNoMigration {
 		// read state commitment from root checkpoint
 
 		f, err := os.Open(path.Join(flagExecutionStateDir, bootstrap.FilenameWALRootCheckpoint))
@@ -121,8 +125,8 @@ func run(*cobra.Command, []string) {
 		log.Logger,
 		!flagNoMigration,
 		!flagNoReport,
+		flagCleanupStorage,
 	)
-
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}

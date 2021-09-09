@@ -1,4 +1,4 @@
-// +build relic
+// +build relic, blst
 
 package crypto
 
@@ -78,8 +78,9 @@ func validSignatureBytesBLST(t *rapid.T) []byte {
 func testEncodeDecodePrivateKeyCrossBLST(t *rapid.T) {
 	randomSlice := rapid.SliceOfN(rapid.Byte(), prKeyLengthBLSBLS12381, prKeyLengthBLSBLS12381)
 	validSliceFlow := rapid.Custom(validPrivateKeyBytesFlow)
+	validSliceBLST := rapid.Custom(validPrivateKeyBytesBLST)
 	// skBytes are bytes of either a valid or a random private key
-	skBytes := rapid.OneOf(randomSlice, validSliceFlow).Example().([]byte)
+	skBytes := rapid.OneOf(randomSlice, validSliceFlow, validSliceBLST).Example().([]byte)
 
 	// check decoding results are consistent
 	skFlow, err := DecodePrivateKey(BLSBLS12381, skBytes)
@@ -104,8 +105,9 @@ func testEncodeDecodePrivateKeyCrossBLST(t *rapid.T) {
 func testEncodeDecodePublicKeyCrossBLST(t *rapid.T) {
 	randomSlice := rapid.SliceOfN(rapid.Byte(), PubKeyLenBLSBLS12381, PubKeyLenBLSBLS12381)
 	validSliceFlow := rapid.Custom(validPublicKeyBytesFlow)
+	validSliceBLST := rapid.Custom(validPublicKeyBytesBLST)
 	// pkBytes are bytes of either a valid or a random public key
-	pkBytes := rapid.OneOf(randomSlice, validSliceFlow).Example().([]byte)
+	pkBytes := rapid.OneOf(randomSlice, validSliceFlow, validSliceBLST).Example().([]byte)
 
 	// check decoding results are consistent
 	pkFlow, err := DecodePublicKey(BLSBLS12381, pkBytes)
@@ -131,8 +133,9 @@ func testEncodeDecodePublicKeyCrossBLST(t *rapid.T) {
 func testEncodeDecodeSignatureCrossBLST(t *rapid.T) {
 	randomSlice := rapid.SliceOfN(rapid.Byte(), SignatureLenBLSBLS12381, SignatureLenBLSBLS12381)
 	validSignatureFlow := rapid.Custom(validSignatureBytesFlow)
+	validSignatureBLST := rapid.Custom(validSignatureBytesBLST)
 	// sigBytes are bytes of either a valid or a random signature
-	sigBytes := rapid.OneOf(randomSlice, validSignatureFlow).Example().([]byte)
+	sigBytes := rapid.OneOf(randomSlice, validSignatureFlow, validSignatureBLST).Example().([]byte)
 
 	// check decoding results are consistent
 	var pointFlow pointG1

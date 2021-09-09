@@ -134,14 +134,12 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	ctx := context.Background()
 	switch v := event.(type) {
 	case *messages.ChunkDataRequest:
-		err := e.onChunkDataRequest(ctx, originID, v)
-		if err != nil {
-			return fmt.Errorf("could not answer chunk data request: %w", err)
-		}
-		return err
+		e.onChunkDataRequest(ctx, originID, v)
 	default:
 		return fmt.Errorf("invalid event type (%T)", event)
 	}
+
+	return nil
 }
 
 // onChunkDataRequest receives a request for the chunk data pack associated with chunkID from the
@@ -151,7 +149,7 @@ func (e *Engine) onChunkDataRequest(
 	ctx context.Context,
 	originID flow.Identifier,
 	req *messages.ChunkDataRequest,
-) error {
+) {
 
 	processStart := time.Now()
 
@@ -163,7 +161,7 @@ func (e *Engine) onChunkDataRequest(
 		Hex("chunk_id", logging.ID(chunkID)).
 		Logger()
 
-	lg.Debug().Msg("received chunk data pack request")
+	lg.Info().Msg("received chunk data pack request")
 
 	// increases collector metric
 	e.metrics.ChunkDataPackRequested()
@@ -172,17 +170,24 @@ func (e *Engine) onChunkDataRequest(
 	// we might be behind when we don't have the requested chunk.
 	// if this happen, log it and return nil
 	if errors.Is(err, storage.ErrNotFound) {
-		lg.Warn().Msg("chunk data pack not found")
-		return nil
+		lg.Warn().
+			Err(err).
+			Msg("chunk data pack not found, execution node may be behind")
+		return
+	}
+	if err != nil {
+		lg.Error().
+			Err(err).
+			Msg("could not retrieve chunk ID from storage")
+		return
 	}
 
+	_, err = e.ensureStaked(chunkDataPack.ChunkID, originID)
 	if err != nil {
-		return fmt.Errorf("could not retrieve chunk ID (%s): %w", originID, err)
-	}
-
-	origin, err := e.ensureStaked(chunkDataPack.ChunkID, originID)
-	if err != nil {
-		return err
+		lg.Error().
+			Err(err).
+			Msg("could not verify staked identity of chunk data pack request, dropping it")
+		return
 	}
 
 	response := &messages.ChunkDataResponse{
@@ -191,12 +196,13 @@ func (e *Engine) onChunkDataRequest(
 	}
 
 	sinceProcess := time.Since(processStart)
-
 	lg = lg.With().Dur("sinceProcess", sinceProcess).Logger()
 
 	if sinceProcess > e.chdpQueryTimeout {
 		lg.Warn().Msgf("chunk data pack query takes longer than %v secs", e.chdpQueryTimeout.Seconds())
 	}
+
+	lg.Debug().Msg("chunk data pack response lunched to dispatch")
 
 	// sends requested chunk data pack to the requester
 	e.unit.Launch(func() {
@@ -212,7 +218,9 @@ func (e *Engine) onChunkDataRequest(
 		}
 
 		if err != nil {
-			lg.Error().Err(err).Str("origin", origin.String()).Msg("could not send requested chunk data pack to")
+			lg.Warn().
+				Err(err).
+				Msg("could not send requested chunk data pack to origin ID")
 			return
 		}
 
@@ -224,10 +232,8 @@ func (e *Engine) onChunkDataRequest(
 				Logger()
 		}
 
-		lg.Debug().Msg("chunk data pack request successfully replied")
+		lg.Info().Msg("chunk data pack request successfully replied")
 	})
-
-	return nil
 }
 
 func (e *Engine) ensureStaked(chunkID flow.Identifier, originID flow.Identifier) (*flow.Identity, error) {

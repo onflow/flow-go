@@ -1298,6 +1298,15 @@ func ChunkDataPackFixture(chunkID flow.Identifier, opts ...func(*flow.ChunkDataP
 	return cdp
 }
 
+func ChunkDataPacksFixture(count int, opts ...func(*flow.ChunkDataPack)) []*flow.ChunkDataPack {
+	chunkDataPacks := make([]*flow.ChunkDataPack, count)
+	for i := 0; i < count; i++ {
+		chunkDataPacks[i] = ChunkDataPackFixture(IdentifierFixture())
+	}
+
+	return chunkDataPacks
+}
+
 // SeedFixture returns a random []byte with length n
 func SeedFixture(n int) []byte {
 	var seed = make([]byte, n)

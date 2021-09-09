@@ -12,8 +12,8 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	newInter "github.com/onflow/cadence/runtime/interpreter"
 
-	oldInter "github.com/onflow/cadence/v18/runtime/interpreter"
-	"github.com/onflow/cadence/v18/runtime/tests/utils"
+	oldInter "github.com/onflow/cadence/v19/runtime/interpreter"
+	"github.com/onflow/cadence/v19/runtime/tests/utils"
 )
 
 func TestValueConversion(t *testing.T) {

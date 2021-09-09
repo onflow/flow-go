@@ -24,7 +24,7 @@ var (
 //
 // Comment on concurrency safety for state-specific business logic:
 //  * AssignmentCollectorStateMachine processes state updates concurrently with
-//    state-specific business logic. Hence, it can happen that that we update a stale
+//    state-specific business logic. Hence, it can happen that we update a stale
 //    state.
 //  * To guarantee that we hand inputs to the latest state, we employ a
 //    "Compare And Repeat Pattern": we atomically read the state before and after the
@@ -182,7 +182,7 @@ func (asm *AssignmentCollectorStateMachine) ChangeProcessingStatus(expectedCurre
 		//
 		// Generally, we would like to process the cached data concurrently here, because
 		// sequential processing is too slow. However, we should only allocate limited resources
-		// to avoid other components being starved. Therefore, we use a workerPool to queue
+		// to avoid other components being starved. Therefore, we use a WorkerPool to queue
 		// the processing tasks and work through a limited number of them concurrently.
 		for _, ir := range cachingCollector.GetIncorporatedResults() {
 			task := asm.reIngestIncorporatedResultTask(ir)

@@ -31,6 +31,7 @@ ExecStart=docker run --rm \
 	--bootstrapdir /bootstrap \
 	--datadir /data/protocol \
 	--rpc-addr 0.0.0.0:9000 \
+	--secure-rpc-addr 0.0.0.0:9001 \
 	--http-addr 0.0.0.0:8000 \
 	--collection-ingress-port 9000 \
 	--bind 0.0.0.0:3569 \

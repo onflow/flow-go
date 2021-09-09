@@ -38,12 +38,13 @@ func init() {
 // ContainerConfig represents configuration for a node container in the network.
 type ContainerConfig struct {
 	bootstrap.NodeInfo
-	ContainerName   string
-	LogLevel        zerolog.Level
-	Ghost           bool
-	AdditionalFlags []string
-	Debug           bool
-	Unstaked        bool
+	ContainerName         string
+	LogLevel              zerolog.Level
+	Ghost                 bool
+	AdditionalFlags       []string
+	Debug                 bool
+	Unstaked              bool
+	SupportsUnstakedNodes bool
 }
 
 // ImageName returns the Docker image name for the given config.
@@ -254,8 +255,8 @@ func (c *Container) OpenState() (*state.State, error) {
 	headers := storage.NewHeaders(metrics, db)
 	seals := storage.NewSeals(metrics, db)
 	results := storage.NewExecutionResults(metrics, db)
-	receipts := storage.NewExecutionReceipts(metrics, db, results)
-	guarantees := storage.NewGuarantees(metrics, db)
+	receipts := storage.NewExecutionReceipts(metrics, db, results, storage.DefaultCacheSize)
+	guarantees := storage.NewGuarantees(metrics, db, storage.DefaultCacheSize)
 	payloads := storage.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := storage.NewBlocks(db, headers, payloads)
 	setups := storage.NewEpochSetups(metrics, db)

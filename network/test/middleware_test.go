@@ -8,8 +8,10 @@ import (
 	"time"
 
 	"github.com/ipfs/go-log"
+	swarm "github.com/libp2p/go-libp2p-swarm"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	mockery "github.com/stretchr/testify/mock"
 
 	"github.com/stretchr/testify/require"
@@ -28,6 +30,11 @@ import (
 
 const testChannel = "test-channel"
 
+// libp2p emits a call to `Protect` with a topic-specific tag upon establishing each peering connection in a GossipSUb mesh, see:
+// https://github.com/libp2p/go-libp2p-pubsub/blob/master/tag_tracer.go
+// One way to make sure such a mesh has formed, asynchronously, in unit tests, is to wait for libp2p.GossipSubD such calls,
+// and that's what we do with tagsObserver.
+//
 type tagsObserver struct {
 	tags chan string
 	log  zerolog.Logger
@@ -51,16 +58,20 @@ func (co *tagsObserver) OnComplete() {
 
 type MiddlewareTestSuite struct {
 	suite.Suite
-	size    int               // used to determine number of middlewares under test
-	mws     []*p2p.Middleware // used to keep track of middlewares under test
-	ov      []*mocknetwork.Overlay
-	obs     chan string // used to keep track of Protect events tagged by pubsub messages
-	ids     []*flow.Identity
-	metrics *metrics.NoopCollector // no-op performance monitoring simulation
+	sync.RWMutex
+	size      int               // used to determine number of middlewares under test
+	mws       []*p2p.Middleware // used to keep track of middlewares under test
+	ov        []*mocknetwork.Overlay
+	obs       chan string // used to keep track of Protect events tagged by pubsub messages
+	ids       []*flow.Identity
+	metrics   *metrics.NoopCollector // no-op performance monitoring simulation
+	logger    zerolog.Logger
+	providers []*UpdatableIDProvider
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
-func TestMiddlewareTestSuit(t *testing.T) {
+func TestMiddlewareTestSuite(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(MiddlewareTestSuite))
 }
 
@@ -68,6 +79,7 @@ func TestMiddlewareTestSuit(t *testing.T) {
 func (m *MiddlewareTestSuite) SetupTest() {
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
+	m.logger = logger
 
 	m.size = 2 // operates on two middlewares
 	m.metrics = metrics.NewNoopCollector()
@@ -80,7 +92,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	m.ids, m.mws, obs = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
+	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -93,21 +105,75 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	// create the mock overlays
 	for i := 0; i < m.size; i++ {
-		overlay := &mocknetwork.Overlay{}
-		m.ov = append(m.ov, overlay)
-
-		identifierToID := make(map[flow.Identifier]flow.Identity)
-		for _, id := range m.ids {
-			identifierToID[id.NodeID] = *id
-		}
-		overlay.On("Identity").Maybe().Return(identifierToID, nil)
-		overlay.On("Topology").Maybe().Return(flow.IdentityList(m.ids), nil)
+		m.ov = append(m.ov, m.createOverlay())
 	}
 	for i, mw := range m.mws {
 		assert.NoError(m.T(), mw.Start(m.ov[i]))
-		err := mw.UpdateAllowList()
-		require.NoError(m.T(), err)
+		mw.UpdateAllowList()
 	}
+}
+
+// TestUpdateNodeAddresses tests that the UpdateNodeAddresses method correctly updates
+// the addresses of the staked network participants.
+func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
+	// create a new staked identity
+	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1, false, false)
+	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, false)
+	require.Len(m.T(), ids, 1)
+	require.Len(m.T(), providers, 1)
+	require.Len(m.T(), mws, 1)
+	newId := ids[0]
+	newMw := mws[0]
+	// newProvider := providers[0]
+	defer newMw.Stop()
+
+	overlay := m.createOverlay()
+	overlay.On("Receive",
+		m.ids[0].NodeID,
+		mock.AnythingOfType("*message.Message"),
+	).Return(nil)
+	assert.NoError(m.T(), newMw.Start(overlay))
+
+	idList := flow.IdentityList(append(m.ids, newId))
+
+	// needed to enable ID translation
+	m.providers[0].SetIdentities(idList)
+	m.mws[0].UpdateAllowList()
+
+	msg := createMessage(m.ids[0].NodeID, newId.NodeID, "hello")
+
+	// message should fail to send because no address is known yet
+	// for the new identity
+	err := m.mws[0].SendDirect(msg, newId.NodeID)
+	require.ErrorIs(m.T(), err, swarm.ErrNoAddresses)
+
+	// update the addresses
+	m.Lock()
+	m.ids = idList
+	m.Unlock()
+	// newProvider.SetIdentities(idList)
+	// newMw.UpdateAllowList()
+	m.mws[0].UpdateNodeAddresses()
+
+	// now the message should send successfully
+	err = m.mws[0].SendDirect(msg, newId.NodeID)
+	require.NoError(m.T(), err)
+}
+
+func (m *MiddlewareTestSuite) createOverlay() *mocknetwork.Overlay {
+	overlay := &mocknetwork.Overlay{}
+	overlay.On("Identities").Maybe().Return(m.getIds, nil)
+	overlay.On("Topology").Maybe().Return(m.getIds, nil)
+	// this test is not testing the topic validator, especially in spoofing,
+	// so we always return a valid identity
+	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(), true)
+	return overlay
+}
+
+func (m *MiddlewareTestSuite) getIds() flow.IdentityList {
+	m.RLock()
+	defer m.RUnlock()
+	return flow.IdentityList(m.ids)
 }
 
 func (m *MiddlewareTestSuite) TearDownTest() {
@@ -161,7 +227,6 @@ func (m *MiddlewareTestSuite) TestMultiPing() {
 // expectID and expectPayload are what we expect the receiver side to evaluate the
 // incoming ping against, it can be mocked or typed data
 func (m *MiddlewareTestSuite) Ping(expectID, expectPayload interface{}) {
-
 	ch := make(chan struct{})
 	// extracts sender id based on the mock option
 	var err error
@@ -266,6 +331,92 @@ func (m *MiddlewareTestSuite) TestEcho() {
 	for i := 1; i < m.size; i++ {
 		m.ov[i].AssertExpectations(m.T())
 	}
+}
+
+// TestSpoofedPubSubHello evaluates checking the originID of the message w.r.t. its libp2p network ID on PubSub
+// we check a pubsub message with a spoofed OriginID does not get delivered
+// This would be doubled with cryptographic verification of the libp2p network ID in production (see message signing options in pubSub initialization)
+func (m *MiddlewareTestSuite) TestSpoofedPubSubHello() {
+	first := 0
+	last := m.size - 1
+	lastNode := m.ids[last].NodeID
+
+	// initially subscribe the nodes to the channel
+	for _, mw := range m.mws {
+		err := mw.Subscribe(testChannel)
+		require.NoError(m.Suite.T(), err)
+	}
+
+	// set up waiting for m.size pubsub tags indicating a mesh has formed
+	for i := 0; i < m.size; i++ {
+		select {
+		case <-m.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(m.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
+
+	spoofedID := unittest.IdentifierFixture()
+
+	message1 := createMessage(spoofedID, lastNode, "hello1")
+
+	err := m.mws[first].Publish(message1, testChannel)
+	assert.NoError(m.T(), err)
+
+	// assert that the spoofed message is not received by the target node
+	assert.Never(m.T(), func() bool {
+		return !m.ov[last].AssertNumberOfCalls(m.T(), "Receive", 0)
+	}, 2*time.Second, 100*time.Millisecond)
+
+	// invalid message sent by firstNode claims to be from lastNode
+	message2 := createMessage(lastNode, lastNode, "hello1")
+
+	err = m.mws[first].Publish(message2, testChannel)
+	assert.NoError(m.T(), err)
+
+	// assert that the invalid message is not received by the target node
+	assert.Never(m.T(), func() bool {
+		return !m.ov[last].AssertNumberOfCalls(m.T(), "Receive", 0)
+	}, 2*time.Second, 100*time.Millisecond)
+
+}
+
+// TestSpoofedDirect sends a message from the first middleware of the test suit to the last one
+// we check a pubsub message with a spoofed OriginID does not get delivered
+func (m *MiddlewareTestSuite) TestSpoofedDirect() {
+
+	// extracts sender id based on the mock option
+	var err error
+	// mocks Overlay.Receive for middleware.Overlay.Receive(*nodeID, payload)
+	firstNode := 0
+	lastNode := m.size - 1
+
+	spoofedID := unittest.IdentifierFixture()
+
+	spoofedMsg := createMessage(spoofedID, m.ids[lastNode].NodeID, "hello")
+
+	// sends a direct spoofed message from first node to the last node
+	err = m.mws[firstNode].SendDirect(spoofedMsg, m.ids[lastNode].NodeID)
+	require.NoError(m.Suite.T(), err)
+
+	// assert that the spoofed message is not received by the target node
+	assert.Never(m.T(), func() bool {
+		return !m.ov[lastNode].AssertNumberOfCalls(m.T(), "Receive", 0)
+	}, 2*time.Second, 100*time.Millisecond)
+
+	invalidID := m.ids[lastNode].NodeID
+
+	invalidMsg := createMessage(invalidID, m.ids[lastNode].NodeID, "hello")
+
+	// sends a direct spoofed message from first node to the last node
+	err = m.mws[firstNode].SendDirect(invalidMsg, m.ids[lastNode].NodeID)
+	require.NoError(m.Suite.T(), err)
+
+	// assert that the spoofed message is not received by the target node
+	assert.Never(m.T(), func() bool {
+		return !m.ov[lastNode].AssertNumberOfCalls(m.T(), "Receive", 0)
+	}, 2*time.Second, 100*time.Millisecond)
+
 }
 
 // TestMaxMessageSize_SendDirect evaluates that invoking SendDirect method of the middleware on a message
@@ -400,17 +551,20 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 		}
 	}
 
+	msgRcvd := make(chan struct{}, 2)
+	msgRcvdFun := func() {
+		<-msgRcvd
+	}
 	message1 := createMessage(firstNode, lastNode, "hello1")
-
-	m.ov[last].On("Receive", firstNode, mockery.Anything).Return(nil).Once()
+	m.ov[last].On("Receive", firstNode, mockery.Anything).Return(nil).Run(func(_ mockery.Arguments) {
+		msgRcvd <- struct{}{}
+	})
 
 	// first test that when both nodes are subscribed to the channel, the target node receives the message
 	err := m.mws[first].Publish(message1, testChannel)
 	assert.NoError(m.T(), err)
 
-	assert.Eventually(m.T(), func() bool {
-		return m.ov[last].AssertCalled(m.T(), "Receive", firstNode, mockery.Anything)
-	}, 2*time.Second, time.Millisecond)
+	unittest.RequireReturnsBefore(m.T(), msgRcvdFun, 2*time.Second, "message not received")
 
 	// now unsubscribe the target node from the channel
 	err = m.mws[last].Unsubscribe(testChannel)
@@ -422,9 +576,7 @@ func (m *MiddlewareTestSuite) TestUnsubscribe() {
 	assert.NoError(m.T(), err)
 
 	// assert that the new message is not received by the target node
-	assert.Never(m.T(), func() bool {
-		return !m.ov[last].AssertNumberOfCalls(m.T(), "Receive", 1)
-	}, 2*time.Second, time.Millisecond)
+	unittest.RequireNeverReturnBefore(m.T(), msgRcvdFun, 2*time.Second, "message received unexpectedly")
 }
 
 func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...string) *message.Message {

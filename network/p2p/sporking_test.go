@@ -6,6 +6,8 @@ import (
 	"time"
 
 	golog "github.com/ipfs/go-log"
+	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/peerstore"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -13,7 +15,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -50,9 +51,11 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(suite.T())
 	node2, id2 := NodeFixture(suite.T(), suite.logger, node2key, rootBlockID, nil, false, defaultAddress)
+	peerInfo2, err := PeerAddressInfo(id2)
+	require.NoError(suite.T(), err)
 
 	// create stream from node 1 to node 2
-	testOneToOneMessagingSucceeds(suite.T(), node1, id2)
+	testOneToOneMessagingSucceeds(suite.T(), node1, peerInfo2)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
@@ -71,7 +74,7 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// attempt to create a stream from node 1 (old chain) to node 2 (new chain)
 	// this time it should fail since node 2 is using a different public key
 	// (and therefore has a different libp2p node id)
-	testOneToOneMessagingFails(suite.T(), node1, id2)
+	testOneToOneMessagingFails(suite.T(), node1, peerInfo2)
 }
 
 // TestOneToOneCrosstalkPrevention tests that a node from the old chain cannot talk directly to a node in the new chain
@@ -85,13 +88,15 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	node1key := generateNetworkingKey(suite.T())
 	node1, id1 := NodeFixture(suite.T(), suite.logger, node1key, rootID1, nil, false, defaultAddress)
 	defer StopNode(suite.T(), node1)
+	peerInfo1, err := PeerAddressInfo(id1)
+	require.NoError(suite.T(), err)
 
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(suite.T())
 	node2, id2 := NodeFixture(suite.T(), suite.logger, node2key, rootID1, nil, false, defaultAddress)
 
 	// create stream from node 2 to node 1
-	testOneToOneMessagingSucceeds(suite.T(), node2, id1)
+	testOneToOneMessagingSucceeds(suite.T(), node2, peerInfo1)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
 
@@ -110,7 +115,7 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 
 	// attempt to create a stream from node 2 (new chain) to node 1 (old chain)
 	// this time it should fail since node 2 is listening on a different protocol
-	testOneToOneMessagingFails(suite.T(), node2, id1)
+	testOneToOneMessagingFails(suite.T(), node2, peerInfo1)
 }
 
 // TestOneToKCrosstalkPrevention tests that a node from the old chain cannot talk to a node in the new chain via PubSub
@@ -128,7 +133,9 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2key := generateNetworkingKey(suite.T())
 	node2, id2 := NodeFixture(suite.T(), suite.logger, node2key, rootIDBeforeSpork, nil, false, defaultAddress)
+	pInfo2, err := PeerAddressInfo(id2)
 	defer StopNode(suite.T(), node2)
+	require.NoError(suite.T(), err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -137,13 +144,13 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	topicBeforeSpork := engine.TopicFromChannel(engine.TestNetwork, rootIDBeforeSpork)
 
 	// both nodes are initially on the same spork and subscribed to the same topic
-	_, err := node1.Subscribe(ctx, topicBeforeSpork)
+	_, err = node1.Subscribe(ctx, topicBeforeSpork)
 	require.NoError(suite.T(), err)
 	sub2, err := node2.Subscribe(ctx, topicBeforeSpork)
 	require.NoError(suite.T(), err)
 
 	// add node 2 as a peer of node 1
-	err = node1.AddPeer(ctx, id2)
+	err = node1.AddPeer(ctx, pInfo2)
 	require.NoError(suite.T(), err)
 
 	// let the two nodes form the mesh
@@ -170,17 +177,19 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	testOneToKMessagingFails(ctx, suite.T(), node1, sub2, topicAfterSpork)
 }
 
-func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *Node, targetId flow.Identity) {
+func testOneToOneMessagingSucceeds(t *testing.T, sourceNode *Node, peerInfo peer.AddrInfo) {
 	// create stream from node 1 to node 2
-	s, err := sourceNode.CreateStream(context.Background(), targetId)
+	sourceNode.host.Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
+	s, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
 	// assert that stream creation succeeded
 	require.NoError(t, err)
 	assert.NotNil(t, s)
 }
 
-func testOneToOneMessagingFails(t *testing.T, sourceNode *Node, targetId flow.Identity) {
+func testOneToOneMessagingFails(t *testing.T, sourceNode *Node, peerInfo peer.AddrInfo) {
 	// create stream from source node to destination address
-	_, err := sourceNode.CreateStream(context.Background(), targetId)
+	sourceNode.host.Peerstore().AddAddrs(peerInfo.ID, peerInfo.Addrs, peerstore.AddressTTL)
+	_, err := sourceNode.CreateStream(context.Background(), peerInfo.ID)
 	// assert that stream creation failed
 	assert.Error(t, err)
 	// assert that it failed with the expected error

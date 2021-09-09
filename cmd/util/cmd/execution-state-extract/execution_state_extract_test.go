@@ -59,7 +59,15 @@ func TestExtractExecutionState(t *testing.T) {
 
 	t.Run("empty WAL doesn't find anything", func(t *testing.T) {
 		withDirs(t, func(datadir, execdir, outdir string) {
-			err := extractExecutionState(execdir, unittest.StateCommitmentFixture(), outdir, zerolog.Nop(), false, false)
+			err := extractExecutionState(
+				execdir,
+				unittest.StateCommitmentFixture(),
+				outdir,
+				zerolog.Nop(),
+				false,
+				false,
+				false,
+			)
 			require.Error(t, err)
 		})
 	})
@@ -92,7 +100,7 @@ func TestExtractExecutionState(t *testing.T) {
 				update, err := ledger.NewUpdate(stateCommitment, keys, values)
 				require.NoError(t, err)
 
-				stateCommitment, err = f.Set(update)
+				stateCommitment, _, err = f.Set(update)
 				//stateCommitment, err = f.UpdateRegisters(keys, values, stateCommitment)
 				require.NoError(t, err)
 

@@ -75,6 +75,11 @@ func NewThresholdProvider(tag string, priv crypto.PrivateKey) *ThresholdProvider
 // Sign will use the internal private key share to generate a threshold signature
 // share.
 func (tp *ThresholdProvider) Sign(msg []byte) (crypto.Signature, error) {
+
+	// return invalid signature if the private key is nil
+	if tp.priv == nil {
+		return crypto.BLSInvalidSignature(), nil
+	}
 	return tp.priv.Sign(msg, tp.hasher)
 }
 

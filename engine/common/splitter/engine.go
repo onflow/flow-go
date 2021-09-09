@@ -1,7 +1,6 @@
 package splitter
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -40,17 +39,11 @@ func New(
 // RegisterEngine registers a new engine with the splitter. Events
 // that are received by the splitter after the engine has registered
 // will be passed down to it.
-func (e *Engine) RegisterEngine(engine module.Engine) error {
+func (e *Engine) RegisterEngine(engine module.Engine) {
 	e.enginesMu.Lock()
 	defer e.enginesMu.Unlock()
 
-	if _, ok := e.engines[engine]; ok {
-		return errors.New("engine already registered with splitter")
-	}
-
 	e.engines[engine] = struct{}{}
-
-	return nil
 }
 
 // UnregisterEngine unregisters an engine with the splitter. After

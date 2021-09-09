@@ -18,7 +18,7 @@ func TestChunkDataPack(t *testing.T) {
 			ChunkID:      unittest.IdentifierFixture(),
 			StartState:   unittest.StateCommitmentFixture(),
 			Proof:        []byte{'p'},
-			CollectionID: &collectionID,
+			CollectionID: collectionID,
 		}
 
 		t.Run("Retrieve non-existent", func(t *testing.T) {

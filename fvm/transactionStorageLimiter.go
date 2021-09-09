@@ -23,6 +23,7 @@ func (d *TransactionStorageLimiter) CheckLimits(
 		return nil
 	}
 
+	// iterating through a map in a non-deterministic order! Do not exit the loop early.
 	for _, address := range addresses {
 		commonAddress := common.BytesToAddress(address.Bytes())
 
@@ -40,5 +41,6 @@ func (d *TransactionStorageLimiter) CheckLimits(
 			return errors.NewStorageCapacityExceededError(address, usage, capacity)
 		}
 	}
+
 	return nil
 }
