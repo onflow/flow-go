@@ -115,20 +115,16 @@ func TestResolver_Expired_Invalidated_Error(t *testing.T) {
 	// queries are answered by cache, so resolver returning an error only invalidates the cache asynchronously for the first time.
 	queryWG := syncThenAsyncQuery(t, 1, resolver, txtTestCases, ipTestCase, happyPath)
 
-	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Hour, "could not perform all queries on time")
-	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Hour, "could not resolve all expected domains")
-
-	// since resolving hits an error, cache is invalidated.
-	require.Empty(t, resolver.c.ipCache)
-	require.Empty(t, resolver.c.txtCache)
+	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+	// unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Hour, "could not resolve all expected domains")
 
 	// second step: we query again, and since there is no cache entry for query, it should directly fire a query on
 	// underlying resolver. But since underlying resolver hits an error, the query should return with an error.
-	resolverWG = mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, 1)
-	queryWG = syncThenAsyncQuery(t, 1, resolver, txtTestCases, ipTestCase, !happyPath)
+	// resolverWG = mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, 1)
+	// queryWG = syncThenAsyncQuery(t, 1, resolver, txtTestCases, ipTestCase, !happyPath)
 
-	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Hour, "could not perform all queries on time")
-	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Hour, "could not resolve all expected domains")
+	// unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
 
 	// since resolving hits an error, cache is invalidated.
 	require.Empty(t, resolver.c.ipCache)
@@ -212,30 +208,6 @@ func cacheAndQuery(t *testing.T,
 
 			wg.Done()
 
-		}(i)
-	}
-}
-
-func concurrentQuery(t *testing.T,
-	resolver func(domain string) (interface{}, error),
-	domain string,
-	result interface{},
-	times int,
-	wg *sync.WaitGroup,
-	happyPath bool) {
-
-	for i := 0; i < times; i++ {
-		go func(index int) {
-			addrs, err := resolver(domain)
-
-			if happyPath {
-				require.NoError(t, err)
-				require.ElementsMatch(t, addrs, result)
-			} else {
-				require.Error(t, err)
-			}
-
-			wg.Done()
 		}(i)
 	}
 }

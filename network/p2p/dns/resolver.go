@@ -220,7 +220,3 @@ func (r *Resolver) shouldResolveTXT(txt string) bool {
 
 	return false
 }
-
-func (r *Resolver) BasicResolver() madns.BasicResolver {
-	return r.res
-}
