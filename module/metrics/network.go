@@ -186,14 +186,6 @@ func (nc *NetworkCollector) InboundConnections(connectionCount uint) {
 	nc.inboundConnectionCount.Set(float64(connectionCount))
 }
 
-func (nc *NetworkCollector) UnstakedOutboundConnections(connectionCount uint) {
-	nc.unstakedOutboundConnectionCount.Set(float64(connectionCount))
-}
-
-func (nc *NetworkCollector) UnstakedInboundConnections(connectionCount uint) {
-	nc.unstakedInboundConnectionCount.Set(float64(connectionCount))
-}
-
 // DNSLookupDuration tracks the time spent to resolve a DNS address.
 func (nc *NetworkCollector) DNSLookupDuration(duration time.Duration) {
 	nc.dnsLookupDuration.Observe(float64(duration.Milliseconds()))
