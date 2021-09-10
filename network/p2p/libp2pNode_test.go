@@ -711,7 +711,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		SetRootBlockID(rootID).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
-		SetResolver(dns.NewResolver(metrics.NewNoopCollector())).
+		SetResolver(resolver).
 		SetLogger(log)
 
 	if allowList {
