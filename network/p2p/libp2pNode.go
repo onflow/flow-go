@@ -217,10 +217,11 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 
 		select {
 		case <-builder.resolver.Ready():
-			opts = append(opts, libp2p.MultiaddrResolver(libp2pResolver))
 		case <-time.After(30 * time.Second):
 			return nil, fmt.Errorf("could not start resolver on time")
 		}
+
+		opts = append(opts, libp2p.MultiaddrResolver(libp2pResolver))
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
