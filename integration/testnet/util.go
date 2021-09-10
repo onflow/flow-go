@@ -10,12 +10,14 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"regexp"
+	"reflect"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 // healthcheckAccessGRPC returns a Docker healthcheck function that pings the Access node GRPC
@@ -111,21 +113,45 @@ func WriteJSON(path string, data interface{}) error {
 // and creates the dstFile with the modified contents
 func rootProtocolJsonWithoutAddresses(srcfile string, dstFile string) error {
 
-	fileData, err := ioutil.ReadFile(srcfile)
+	data, err := io.ReadFile(filepath.Join(srcfile))
 	if err != nil {
 		return err
 	}
-	fileString := string(fileData)
-	// look for all "Address": "<node addres>" and remove those elements
-	m1 := regexp.MustCompile(`.*"Address".*:.*".*".*\n`)
-	newString := m1.ReplaceAllString(fileString, "")
-	newFileData := []byte(newString)
 
-	err = ioutil.WriteFile(dstFile, newFileData, 0o600)
+	var rootSnapshot inmem.EncodableSnapshot
+	err = json.Unmarshal(data, &rootSnapshot)
 	if err != nil {
 		return err
 	}
-	fmt.Println(newString)
 
-	return nil
+	removeAddress := func(ids flow.IdentityList) {
+
+		for _, identity := range ids {
+			identity.Address = ""
+			//TODO: following doesn't work and Address is still retained
+			idType := reflect.TypeOf(*identity)
+			if addressField, found := idType.FieldByName("Address"); found {
+				addressField.Tag = `json:"-"` // suppress json
+			}
+		}
+	}
+	removeAddress(rootSnapshot.Identities)
+	if rootSnapshot.Epochs.Previous != nil {
+		removeAddress(rootSnapshot.Epochs.Previous.InitialIdentities)
+	}
+
+	removeAddress(rootSnapshot.Epochs.Current.InitialIdentities)
+
+	if rootSnapshot.Epochs.Next != nil {
+		removeAddress(rootSnapshot.Epochs.Next.InitialIdentities)
+	}
+
+	for _, event := range rootSnapshot.LatestResult.ServiceEvents {
+		switch event.Type {
+		case flow.ServiceEventSetup:
+			removeAddress(event.Event.(*flow.EpochSetup).Participants)
+		}
+	}
+
+	return WriteJSON(dstFile, rootSnapshot)
 }

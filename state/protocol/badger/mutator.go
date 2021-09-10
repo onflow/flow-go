@@ -814,7 +814,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 				}
 
 				// Finally, the epoch setup event must contain all necessary information.
-				err = isValidEpochSetup(ev)
+				err = isValidEpochSetup(ev, false)
 				if err != nil {
 					return nil, state.NewInvalidExtensionErrorf("invalid epoch setup: %s", err)
 				}

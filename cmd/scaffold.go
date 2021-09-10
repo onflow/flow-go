@@ -509,6 +509,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Setups,
 			fnb.Storage.Commits,
 			fnb.Storage.Statuses,
+			false,
 		)
 		fnb.MustNot(err).Msg("could not open flow state")
 		fnb.State = state
@@ -541,7 +542,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Commits,
 			fnb.Storage.Statuses,
 			rootSnapshot,
-			fnb.SkipRootSnapshotValidation,
+			fnb.SkipNwAddressBasedValidations,
 		)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 

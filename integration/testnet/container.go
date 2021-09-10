@@ -273,6 +273,7 @@ func (c *Container) OpenState() (*state.State, error) {
 		setups,
 		commits,
 		statuses,
+		false,
 	)
 }
 
