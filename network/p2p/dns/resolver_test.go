@@ -41,7 +41,7 @@ func TestResolver_HappyPath(t *testing.T) {
 	unittest.RequireCloseBefore(t, resolver.Done(), 10*time.Millisecond, "could not stop dns resolver on time")
 }
 
-// TestResolver_CacheExpiry evaluates that cached dns entries get expired after their time-to-live is passed.
+// TestResolver_CacheExpiry evaluates that cached dns entries get expired and underlying resolver gets called after their time-to-live is passed.
 func TestResolver_CacheExpiry(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
 	resolver := NewResolver(
@@ -51,11 +51,12 @@ func TestResolver_CacheExpiry(t *testing.T) {
 
 	unittest.RequireCloseBefore(t, resolver.Ready(), 10*time.Millisecond, "could not start dns resolver on time")
 
-	size := 1  // we have 10 txt and 10 ip lookup test cases
+	size := 10 // we have 10 txt and 10 ip lookup test cases
 	times := 5 // each domain is queried for resolution 5 times
 	txtTestCases := txtLookupFixture(size)
 	ipTestCase := ipLookupFixture(size)
 
+	// each domain gets resolved through underlying resolver twice: once initially, and once after expiry.
 	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, happyPath, 2)
 
 	queryWG := syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
@@ -64,6 +65,7 @@ func TestResolver_CacheExpiry(t *testing.T) {
 	time.Sleep(2 * time.Second) // waits enough for cache to get invalidated
 
 	queryWG = syncThenAsyncQuery(t, times, resolver, txtTestCases, ipTestCase, happyPath)
+
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Hour, "could not resolve all expected domains")
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Hour, "could not perform all queries on time")
 	unittest.RequireCloseBefore(t, resolver.Done(), 10*time.Hour, "could not stop dns resolver on time")
@@ -89,14 +91,21 @@ func TestResolver_Error(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
+
+	// since resolving hits an error, cache is invalidated.
+	require.Empty(t, resolver.c.ipCache)
+	require.Empty(t, resolver.c.txtCache)
+
 	unittest.RequireCloseBefore(t, resolver.Done(), 10*time.Millisecond, "could not stop dns resolver on time")
 }
 
-func TestResolver_Expired_Invalidated_Error(t *testing.T) {
+// TestResolver_Expired_Invalidated evaluates that when resolver is queried for an expired entry, it returns the expired one, but queries async on the
+// network to refresh the cache. However, when the query hits an error, it invalidates the cache.
+func TestResolver_Expired_Invalidated(t *testing.T) {
 	basicResolver := mocknetwork.BasicResolver{}
 	resolver := NewResolver(metrics.NewNoopCollector(),
 		WithBasicResolver(&basicResolver),
-		WithTTL(1*time.Second))
+		WithTTL(1*time.Second)) // 1 second TTL for test
 
 	unittest.RequireCloseBefore(t, resolver.Ready(), 10*time.Millisecond, "could not start dns resolver on time")
 
@@ -108,7 +117,7 @@ func TestResolver_Expired_Invalidated_Error(t *testing.T) {
 	mockCacheForDomains(resolver, ipTestCase, txtTestCases)
 	time.Sleep(1 * time.Second)
 
-	// first step: query for an expired entry must return the expired entry but also fire an async update on it.
+	// queries for an expired entry must return the expired entry but also fire an async update on it.
 	// though we mock async update to fail, so the cache should be invalidated literally.
 	// mocks underlying basic resolver invoked once per domain and returns an error on each domain
 	resolverWG := mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, 1)
