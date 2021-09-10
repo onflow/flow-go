@@ -673,7 +673,6 @@ func (c *ValueConverter) VisitArrayValue(inter *oldInter.Interpreter, value *old
 	c.result = newInter.NewArrayValueWithAddress(
 		nil,
 		arrayStaticType,
-		//c.storage,
 		*value.Owner,
 		newElements...,
 	)
@@ -801,7 +800,6 @@ func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value
 	c.result = newInter.NewDictionaryValueWithAddress(
 		nil,
 		staticType,
-		//c.storage,
 		*value.Owner,
 		keysAndValues...,
 	)
