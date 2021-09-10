@@ -142,7 +142,7 @@ func (e *blockComputer) executeBlock(
 
 	stateCommitments := make([]flow.StateCommitment, 0, len(collections)+1)
 	proofs := make([][]byte, 0, len(collections)+1)
-	trieUpdates := make([]*ledger.TrieUpdate, len(collections)+1)
+	trieUpdates := make([]*ledger.TrieUpdate, 0, len(collections)+1)
 
 	bc := blockCommitter{
 		committer: e.committer,
