@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/encoding/rlp"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module/signature"
 )
 
 type ConsensusSigPackerImpl struct {
@@ -92,14 +93,14 @@ func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flo
 	var data signatureData
 	err := p.encoder.Decode(sigData, &data)
 	if err != nil {
-		return nil, fmt.Errorf("could not decode sig data: %w", err)
+		return nil, fmt.Errorf("could not decode sig data %s: %w", err, signature.ErrInvalidFormat)
 	}
 
 	stakingSigners := make([]flow.Identifier, 0)
 	randomBeaconSigners := make([]flow.Identifier, 0)
 
 	if len(data.SigType) != len(signerIDs) {
-		return nil, fmt.Errorf("unmatched number of signerIDs, %v != %v", len(data.SigType), len(signerIDs))
+		return nil, fmt.Errorf("unmatched number of signerIDs, %v != %v: %w", len(data.SigType), len(signerIDs), signature.ErrInvalidFormat)
 	}
 
 	for i, sigType := range data.SigType {
@@ -108,7 +109,7 @@ func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flo
 		} else if sigType == hotstuff.SigTypeRandomBeacon {
 			randomBeaconSigners = append(randomBeaconSigners, signerIDs[i])
 		} else {
-			return nil, fmt.Errorf("unknown sigType: %v", sigType)
+			return nil, fmt.Errorf("unknown sigType %v, %w", sigType, signature.ErrInvalidFormat)
 		}
 	}
 

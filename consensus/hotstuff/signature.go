@@ -96,5 +96,8 @@ type Packer interface {
 
 	// blockID is the block that the aggregated sig is signed for
 	// sig is the aggregated signature data
+	// It returns:
+	//  - (sigData, nil) if successfully unpacked the signature data
+	//  - (nil, signature.ErrInvalidFormat) if failed to unpack the signature data
 	Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
 }
