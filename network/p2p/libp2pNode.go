@@ -31,6 +31,7 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/dns"
@@ -64,7 +65,9 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 	me flow.Identifier,
 	address string,
 	flowKey fcrypto.PrivateKey,
-	rootBlockID string,
+	rootBlockID flow.Identifier,
+	chainID flow.ChainID,
+	idProvider id.IdentityProvider,
 	maxPubSubMsgSize int,
 	metrics module.NetworkMetrics,
 	pingInfoProvider PingInfoProvider,
@@ -79,12 +82,19 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 		return nil, fmt.Errorf("could not create dns resolver: %w", err)
 	}
 
+	psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
+	psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
+		return pubsub.WithSubscriptionFilter(NewSubscriptionFilter(
+			h.ID(), rootBlockID, chainID, idProvider,
+		)), nil
+	})
+
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
 			SetRootBlockID(rootBlockID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
-			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
+			SetPubsubOptions(psOpts...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			SetResolver(resolver).
@@ -93,7 +103,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 }
 
 type NodeBuilder interface {
-	SetRootBlockID(string) NodeBuilder
+	SetRootBlockID(flow.Identifier) NodeBuilder
 	SetConnectionManager(TagLessConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
 	SetPubsubOptions(...PubsubOption) NodeBuilder
@@ -106,7 +116,7 @@ type NodeBuilder interface {
 
 type DefaultLibP2PNodeBuilder struct {
 	id               flow.Identifier
-	rootBlockID      string
+	rootBlockID      flow.Identifier
 	logger           zerolog.Logger
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
@@ -135,7 +145,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetDHTOptions(opts ...dht.Option) NodeB
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId string) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId flow.Identifier) NodeBuilder {
 	builder.rootBlockID = rootBlockId
 	return builder
 }
@@ -186,7 +196,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, errors.New("unable to create libp2p pubsub: factory function not provided")
 	}
 
-	if builder.rootBlockID == "" {
+	if builder.rootBlockID == flow.ZeroID {
 		return nil, errors.New("root block ID must be provided")
 	}
 	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
@@ -202,11 +212,6 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		opts = append(opts, libp2p.ConnectionManager(builder.connMngr))
 		node.connMgr = builder.connMngr
 	}
-
-	if builder.rootBlockID == "" {
-		return nil, errors.New("root block ID must be provided")
-	}
-	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
 
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
@@ -718,7 +723,6 @@ func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 		pubSubOptionFunc(pubsub.WithStrictSignatureVerification(true)),
 		// set max message size limit for 1-k PubSub messaging
 		pubSubOptionFunc(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
-		// no discovery
 	}
 }
 

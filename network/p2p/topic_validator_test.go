@@ -20,10 +20,10 @@ import (
 func TestTopicValidator(t *testing.T) {
 
 	// create two staked nodes - node1 and node2
-	identity1, privateKey1 := createID(t)
+	identity1, privateKey1 := createID(t, unittest.WithRole(flow.RoleAccess))
 	node1 := createNode(t, identity1.NodeID, privateKey1)
 
-	identity2, privateKey2 := createID(t)
+	identity2, privateKey2 := createID(t, unittest.WithRole(flow.RoleAccess))
 	node2 := createNode(t, identity2.NodeID, privateKey2)
 
 	badTopic := engine.TopicFromChannel(engine.SyncCommittee, rootBlockID)
@@ -127,13 +127,11 @@ func TestTopicValidator(t *testing.T) {
 	wg.Wait()
 }
 
-func createID(t *testing.T) (*flow.Identity, crypto.PrivateKey) {
+func createID(t *testing.T, opts ...func(*flow.Identity)) (*flow.Identity, crypto.PrivateKey) {
 	networkKey, err := unittest.NetworkingKey()
 	require.NoError(t, err)
-	id := unittest.IdentityFixture(
-		unittest.WithRole(flow.RoleAccess),
-		unittest.WithNetworkingKey(networkKey.PublicKey()),
-	)
+	opts = append(opts, unittest.WithNetworkingKey(networkKey.PublicKey()))
+	id := unittest.IdentityFixture(opts...)
 	return id, networkKey
 }
 
@@ -141,10 +139,14 @@ func createNode(
 	t *testing.T,
 	nodeID flow.Identifier,
 	networkKey crypto.PrivateKey,
+	psOpts ...PubsubOption,
 ) *Node {
+	if len(psOpts) == 0 {
+		psOpts = DefaultPubsubOptions(DefaultMaxPubSubMsgSize)
+	}
 	libp2pNode, err := NewDefaultLibP2PNodeBuilder(nodeID, "0.0.0.0:0", networkKey).
 		SetRootBlockID(rootBlockID).
-		SetPubsubOptions(DefaultPubsubOptions(DefaultMaxPubSubMsgSize)...).
+		SetPubsubOptions(psOpts...).
 		Build(context.TODO())
 	require.NoError(t, err)
 

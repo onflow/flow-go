@@ -157,7 +157,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	return func() (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
-			SetRootBlockID(builder.RootBlock.ID().String()).
+			SetRootBlockID(builder.RootBlock.ID()).
 			SetConnectionManager(connManager).
 			// unlike the staked side of the network where currently all the node addresses are known upfront,
 			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
@@ -275,7 +275,7 @@ func (anb *UnstakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
-		anb.RootBlock.ID().String(),
+		anb.RootBlock.ID(),
 		p2p.DefaultUnicastTimeout,
 		false, // no connection gating for the unstaked nodes
 		anb.IDTranslator,

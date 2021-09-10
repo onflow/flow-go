@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/libp2p/go-libp2p-core/host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
@@ -210,13 +212,19 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 	}
 
 	return func() (*p2p.Node, error) {
+		psOpts := p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)
+		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
+			return pubsub.WithSubscriptionFilter(p2p.NewSubscriptionFilter(
+				h.ID(), builder.RootBlock.ID(), builder.RootChainID, builder.IdentityProvider,
+			)), nil
+		})
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
-			SetRootBlockID(builder.RootBlock.ID().String()).
+			SetRootBlockID(builder.RootBlock.ID()).
 			// no connection gater
 			SetConnectionManager(connManager).
 			// act as a DHT server
 			SetDHTOptions(dhtOptions...).
-			SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
+			SetPubsubOptions(psOpts...).
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
 			Build(ctx)
@@ -243,7 +251,7 @@ func (builder *StakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
-		builder.RootBlock.ID().String(),
+		builder.RootBlock.ID(),
 		p2p.DefaultUnicastTimeout,
 		false, // no connection gating to allow unstaked nodes to connect
 		builder.IDTranslator,
