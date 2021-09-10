@@ -147,7 +147,7 @@ func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessage
 		err = retry.Do(e.unit.Ctx(), maxedExpRetry, func(ctx context.Context) error {
 			err := e.conduit.Unicast(&message.DKGMessage, message.DestID)
 			if err != nil {
-				e.log.Error().Err(err).Msg("error sending dkg message retrying")
+				e.log.Warn().Err(err).Msg("error sending dkg message retrying")
 			}
 			return retry.RetryableError(err)
 		})
