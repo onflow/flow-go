@@ -9,7 +9,7 @@ import (
 // DefaultTimeToLive is the default duration a dns result is cached.
 const (
 	// DefaultTimeToLive is the default duration a dns result is cached.
-	DefaultTimeToLive = 60 * time.Minute
+	DefaultTimeToLive = 5 * time.Minute
 	cacheEntryExists  = true
 	cacheEntryExpired = true
 )
