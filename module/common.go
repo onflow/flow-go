@@ -30,3 +30,9 @@ func (n *NoopReadDoneAware) Done() <-chan struct{} {
 	defer close(done)
 	return done
 }
+
+// ErrorAware provides an interface to be notified of errors encountered during
+// a component's lifecycle.
+type ErrorAware interface {
+	Errors() <-chan error
+}
