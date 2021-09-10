@@ -30,7 +30,7 @@ func TestFunctionalityWithCompleteTrie(t *testing.T) {
 	update, err := ledger.NewUpdate(state, keys[0:2], values[0:2])
 	require.NoError(t, err)
 
-	newState, err := l.Set(update)
+	newState, _, err := l.Set(update)
 	require.NoError(t, err)
 
 	query, err := ledger.NewQuery(newState, keys[0:2])
@@ -58,7 +58,7 @@ func TestFunctionalityWithCompleteTrie(t *testing.T) {
 	update, err = ledger.NewUpdate(state, keys[1:3], values[1:3])
 	require.NoError(t, err)
 
-	_, err = pled.Set(update)
+	_, _, err = pled.Set(update)
 	require.Error(t, err)
 
 	e, ok = err.(*ledger.ErrMissingKeys)

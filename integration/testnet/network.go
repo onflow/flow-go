@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
@@ -223,10 +224,11 @@ type ConsensusFollowerConfig struct {
 	NodeID            flow.Identifier
 	NetworkingPrivKey crypto.PrivateKey
 	StakedNodeID      flow.Identifier
+	Opts              []consensus_follower.Option
 }
 
-func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier) ConsensusFollowerConfig {
-	pid, err := p2p.ExtractPeerID(networkingPrivKey.PublicKey())
+func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier, opts ...consensus_follower.Option) ConsensusFollowerConfig {
+	pid, err := keyutils.PeerIDFromFlowPublicKey(networkingPrivKey.PublicKey())
 	assert.NoError(t, err)
 	nodeID, err := p2p.NewUnstakedNetworkIDTranslator().GetFlowID(pid)
 	assert.NoError(t, err)
@@ -234,6 +236,7 @@ func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKe
 		NetworkingPrivKey: networkingPrivKey,
 		StakedNodeID:      stakedNodeID,
 		NodeID:            nodeID,
+		Opts:              opts,
 	}
 }
 
@@ -499,10 +502,11 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, 
 	// consensus follower
 	bindPort := testingdock.RandomPort(t)
 	bindAddr := fmt.Sprintf("0.0.0.0:%s", bindPort)
-	opts := []consensus_follower.Option{
+	opts := append(
+		followerConf.Opts,
 		consensus_follower.WithDataDir(dataDir),
 		consensus_follower.WithBootstrapDir(followerBootstrapDir),
-	}
+	)
 
 	var stakedANContainer *ContainerConfig
 	// find the upstream Access node container for this follower engine
@@ -525,12 +529,10 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, 
 		NetworkPublicKey: stakedANContainer.NetworkPubKey(),
 	}
 
-	// TODO: update consensus follower to just accept a networking key instead of a node ID
 	// it should be able to figure out the rest on its own.
 	follower, err := consensus_follower.NewConsensusFollower(followerConf.NetworkingPrivKey, bindAddr,
 		[]consensus_follower.BootstrapNodeInfo{bootstrapNodeInfo}, opts...)
 
-	// TODO: convert key to node ID? or just store with the network key as map key
 	net.ConsensusFollowers[followerConf.NodeID] = follower
 }
 
@@ -654,7 +656,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			hostHTTPProxyPort := testingdock.RandomPort(t)
 			containerGRPCPort := "9000/tcp"
 			containerHTTPProxyPort := "8000/tcp"
-
 			nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
 			nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
 
@@ -701,7 +702,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// in the public network, because connection gating is enabled by default and
 			// therefore the ghost node will deny incoming connections from all consensus
 			// followers. A flag for the ghost node will need to be created to enable
-			// overriding the default behavior.
+			// overriding the default behavior (see: https://github.com/dapperlabs/flow-go/issues/5696).
 			return fmt.Errorf("currently ghost node for an access node which supports unstaked node is not implemented")
 		}
 	}
@@ -734,6 +735,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 
 	// TODO: currently just stashing a dummy key as staking key to prevent the nodeinfo.Type() function from
 	// returning an error. Eventually, a new key type NodeInfoTypePrivateUnstaked needs to be defined
+	// (see issue: https://github.com/onflow/flow-go/issues/1214)
 	dummyStakingKey, err := unittest.StakingKey()
 	if err != nil {
 		return nil, err
@@ -781,6 +783,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	allNodeInfos := append(toNodeInfos(stakedConfs), followerInfos...)
+
 	// IMPORTANT: we must use this ordering when writing the DKG keys as
 	//            this ordering defines the DKG participant's indices
 	stakedNodeInfos := bootstrap.Sort(toNodeInfos(stakedConfs), order.Canonical)

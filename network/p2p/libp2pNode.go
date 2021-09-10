@@ -31,9 +31,10 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/id"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -58,39 +59,41 @@ type LibP2PFactoryFunc func() (*Node, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
-func DefaultLibP2PNodeFactory(ctx context.Context, log zerolog.Logger, me flow.Identifier, address string, flowKey fcrypto.PrivateKey, rootBlockID flow.Identifier,
-	maxPubSubMsgSize int, metrics module.NetworkMetrics, pingInfoProvider PingInfoProvider, idProvider id.IdentityProvider, idTranslator IDTranslator) (LibP2PFactoryFunc, error) {
+func DefaultLibP2PNodeFactory(ctx context.Context,
+	log zerolog.Logger,
+	me flow.Identifier,
+	address string,
+	flowKey fcrypto.PrivateKey,
+	rootBlockID string,
+	maxPubSubMsgSize int,
+	metrics module.NetworkMetrics,
+	pingInfoProvider PingInfoProvider,
+	dnsResolverTTL time.Duration) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
 	connGater := NewConnGater(log)
 
-	// TODO: uncomment following lines to activate dns caching
-	// resolver, err := dns.NewResolver(metrics)
-	// if err != nil {
-	// 	return nil, fmt.Errorf("could not create dns resolver: %w", err)
-	// }
-
-	psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
-	psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
-		return pubsub.WithSubscriptionFilter(NewSubscriptionFilter(h.ID(), rootBlockID, idProvider, idTranslator)), nil
-	})
+	resolver, err := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
+	if err != nil {
+		return nil, fmt.Errorf("could not create dns resolver: %w", err)
+	}
 
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
 			SetRootBlockID(rootBlockID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
-			SetPubsubOptions(psOpts...).
+			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
-			// SetResolver(resolver).
+			SetResolver(resolver).
 			Build(ctx)
 	}, nil
 }
 
 type NodeBuilder interface {
-	SetRootBlockID(flow.Identifier) NodeBuilder
+	SetRootBlockID(string) NodeBuilder
 	SetConnectionManager(TagLessConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
 	SetPubsubOptions(...PubsubOption) NodeBuilder
@@ -103,7 +106,7 @@ type NodeBuilder interface {
 
 type DefaultLibP2PNodeBuilder struct {
 	id               flow.Identifier
-	rootBlockID      flow.Identifier
+	rootBlockID      string
 	logger           zerolog.Logger
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
@@ -132,7 +135,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetDHTOptions(opts ...dht.Option) NodeB
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId flow.Identifier) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId string) NodeBuilder {
 	builder.rootBlockID = rootBlockId
 	return builder
 }
@@ -183,7 +186,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, errors.New("unable to create libp2p pubsub: factory function not provided")
 	}
 
-	if builder.rootBlockID == flow.ZeroID {
+	if builder.rootBlockID == "" {
 		return nil, errors.New("root block ID must be provided")
 	}
 	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
@@ -199,6 +202,11 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		opts = append(opts, libp2p.ConnectionManager(builder.connMngr))
 		node.connMgr = builder.connMngr
 	}
+
+	if builder.rootBlockID == "" {
+		return nil, errors.New("root block ID must be provided")
+	}
+	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
 
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
@@ -408,6 +416,8 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		// the desired behaviour for pub-sub (1-k style of communication) for 1-1 style we want to retry the connection
 		// immediately without backing off and fail-fast.
 		// Hence, explicitly cancel the dial back off (if any) and try connecting again
+
+		// cancel the dial back off (if any), since we want to connect immediately
 		network := n.host.Network()
 		if swm, ok := network.(*swarm.Swarm); ok {
 			swm.Backoff().Clear(peerID)
@@ -464,19 +474,38 @@ func (n *Node) GetIPPort() (string, string, error) {
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ...pubsub.ValidatorEx) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
+
+	if len(validators) > 1 {
+		return nil, errors.New("only one topic validator is allowed")
+	}
 
 	// Check if the topic has been already created and is in the cache
 	n.pubSub.GetTopics()
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
+		if len(validators) > 0 {
+			if err := n.pubSub.RegisterTopicValidator(
+				topic.String(), validators[0], pubsub.WithValidatorInline(true),
+			); err != nil {
+				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
+				return nil, fmt.Errorf("failed to register topic validator: %w", err)
+			}
+		}
+
 		tp, err = n.pubSub.Join(topic.String())
 		if err != nil {
+			if len(validators) > 0 {
+				if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
+					n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
+				}
+			}
 			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
 		}
+
 		n.topics[topic] = tp
 	}
 
@@ -511,6 +540,10 @@ func (n *Node) UnSubscribe(topic flownet.Topic) error {
 	if !found {
 		err := fmt.Errorf("could not find topic (%s)", topic)
 		return err
+	}
+
+	if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
+		n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
 	}
 
 	// attempt to close the topic
@@ -623,7 +656,7 @@ func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateK
 // DefaultLibP2POptions creates and returns the standard LibP2P host options that are used for the Flow Libp2p network
 func DefaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Option, error) {
 
-	libp2pKey, err := LibP2PPrivKeyFromFlow(key)
+	libp2pKey, err := keyutils.LibP2PPrivKeyFromFlow(key)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate libp2p key: %w", err)
 	}

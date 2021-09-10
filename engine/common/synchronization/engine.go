@@ -88,8 +88,8 @@ func New(
 		blocks:               blocks,
 		comp:                 comp,
 		core:                 core,
-		pollInterval:         opt.pollInterval,
-		scanInterval:         opt.scanInterval,
+		pollInterval:         opt.PollInterval,
+		scanInterval:         opt.ScanInterval,
 		finalizedHeader:      finalizedHeader,
 		participantsProvider: participantsProvider,
 	}
@@ -286,12 +286,14 @@ func (e *Engine) processAvailableResponses() {
 
 // onSyncResponse processes a synchronization response.
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
+	e.log.Debug().Str("origin_id", originID.String()).Msg("received sync response")
 	final := e.finalizedHeader.Get()
 	e.core.HandleHeight(final, res.Height)
 }
 
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
+	e.log.Debug().Str("origin_id", originID.String()).Msg("received block response")
 	// process the blocks one by one
 	for _, block := range res.Blocks {
 		if !e.core.HandleBlock(block.Header) {
@@ -351,6 +353,10 @@ func (e *Engine) pollHeight() {
 		Nonce:  rand.Uint64(),
 		Height: head.Height,
 	}
+	e.log.Debug().
+		Uint64("height", req.Height).
+		Uint64("range_nonce", req.Nonce).
+		Msg("sending sync request")
 	err := e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
 	if err != nil {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")
@@ -393,6 +399,10 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Ra
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue
 		}
+		e.log.Debug().
+			Strs("block_ids", flow.IdentifierList(batch.BlockIDs).Strings()).
+			Uint64("range_nonce", req.Nonce).
+			Msg("batch requested")
 		e.core.BatchRequested(batch)
 		e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchRequest)
 	}

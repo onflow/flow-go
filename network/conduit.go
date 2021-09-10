@@ -46,6 +46,7 @@ func (cl ChannelList) ID() flow.Identifier {
 	return flow.MakeID(cl)
 }
 
+// Contains retuns true if the ChannelList contains the given channel.
 func (cl ChannelList) Contains(channel Channel) bool {
 	for _, c := range cl {
 		if c == channel {

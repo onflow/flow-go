@@ -89,6 +89,10 @@ type NodeBuilder interface {
 
 	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics()
+
+	// ValidateFlags is an extra method called after parsing flags, intended for extra check of flag validity
+	// for example where certain combinations aren't allowed
+	ValidateFlags(func() error) NodeBuilder
 }
 
 // BaseConfig is the general config for the NodeBuilder and the command line params
@@ -103,8 +107,9 @@ type BaseConfig struct {
 	level                 string
 	metricsPort           uint
 	BootstrapDir          string
-	peerUpdateInterval    time.Duration
+	PeerUpdateInterval    time.Duration
 	UnicastMessageTimeout time.Duration
+	DNSCacheTTL           time.Duration
 	profilerEnabled       bool
 	profilerDir           string
 	profilerInterval      time.Duration
@@ -113,6 +118,7 @@ type BaseConfig struct {
 	metricsEnabled        bool
 	guaranteesCacheSize   uint
 	receiptsCacheSize     uint
+	db                    *badger.DB
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -162,7 +168,7 @@ func DefaultBaseConfig() *BaseConfig {
 		timeout:               1 * time.Minute,
 		datadir:               datadir,
 		level:                 "info",
-		peerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
+		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
 		metricsPort:           8080,
 		profilerEnabled:       false,

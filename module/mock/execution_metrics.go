@@ -24,6 +24,16 @@ func (_m *ExecutionMetrics) DiskSize(_a0 uint64) {
 	_m.Called(_a0)
 }
 
+// ExecutionBlockDataUploadFinished provides a mock function with given fields: dur
+func (_m *ExecutionMetrics) ExecutionBlockDataUploadFinished(dur time.Duration) {
+	_m.Called(dur)
+}
+
+// ExecutionBlockDataUploadStarted provides a mock function with given fields:
+func (_m *ExecutionMetrics) ExecutionBlockDataUploadStarted() {
+	_m.Called()
+}
+
 // ExecutionBlockExecuted provides a mock function with given fields: dur, compUsed, txCounts, colCounts
 func (_m *ExecutionMetrics) ExecutionBlockExecuted(dur time.Duration, compUsed uint64, txCounts int, colCounts int) {
 	_m.Called(dur, compUsed, txCounts, colCounts)

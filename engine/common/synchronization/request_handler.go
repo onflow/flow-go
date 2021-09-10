@@ -178,6 +178,11 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 // we have a lower height, we add the difference to our own download queue.
 func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
 	final := r.finalizedHeader.Get()
+	r.log.Debug().
+		Str("origin_id", originID.String()).
+		Uint64("origin_height", req.Height).
+		Uint64("local_height", final.Height).
+		Msg("received new sync request")
 
 	if r.queueMissingHeights {
 		// queue any missing heights as needed
@@ -207,6 +212,7 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *mess
 
 // onRangeRequest processes a request for a range of blocks by height.
 func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
+	r.log.Debug().Str("origin_id", originID.String()).Msg("received new range request")
 	// get the latest final state to know if we can fulfill the request
 	head := r.finalizedHeader.Get()
 
@@ -252,6 +258,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 
 // onBatchRequest processes a request for a specific block by block ID.
 func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
+	r.log.Debug().Str("origin_id", originID.String()).Msg("received new batch request")
 	// we should bail and send nothing on empty request
 	if len(req.BlockIDs) == 0 {
 		return nil

@@ -78,7 +78,8 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 	splitter.RegisterEngine(engine)
 
 	if !channelRegistered {
-		conduit, err := n.ReadyDoneAwareNetwork.Register(channel, splitter)
+		var err error
+		conduit, err = n.ReadyDoneAwareNetwork.Register(channel, splitter)
 
 		if err != nil {
 			// undo previous steps

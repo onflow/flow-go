@@ -41,7 +41,7 @@ const tickForAssertEventually = 100 * time.Millisecond
 // "0.0.0.0:<selected-port-by-os>
 const defaultAddress = "0.0.0.0:0"
 
-var rootBlockID = unittest.IdentifierFixture()
+var rootBlockID = unittest.IdentifierFixture().String()
 
 type LibP2PNodeTestSuite struct {
 	suite.Suite
@@ -245,12 +245,36 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 	nodes[0].host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
 	maxTimeToWait := maxConnectAttempt * maxConnectAttemptSleepDuration * time.Millisecond
 
-	unittest.RequireReturnsBefore(suite.T(), func() {
-		_, err = node1.CreateStream(context.Background(), pInfo.ID)
-	}, maxTimeToWait, fmt.Sprintf("create stream did not error within %d ms", maxTimeToWait))
+	// need to add some buffer time so that RequireReturnsBefore waits slightly longer than maxTimeToWait to avoid
+	// a race condition
+	someGraceTime := 100 * time.Millisecond
+	totalWaitTime := maxTimeToWait + someGraceTime
 
-	require.Error(suite.T(), err)
-	require.NotContainsf(suite.T(), err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
+	//each CreateStream() call may try to connect up to maxConnectAttempt (3) times.
+
+	//there are 2 scenarios that we need to account for:
+	//
+	//1. machines where a timeout occurs on the first connection attempt - this can be due to local firewall rules or other processes running on the machine.
+	//   In this case, we need to create a scenario where a backoff would have normally occured. This is why we initiate a second connection attempt.
+	//   Libp2p remembers the peer we are trying to connect to between CreateStream() calls and would have initiated a backoff if backoff wasn't turned off.
+	//   The second CreateStream() call will make a second connection attempt maxConnectAttempt times and that should never result in a backoff error.
+	//
+	//2. machines where a timeout does NOT occur on the first connection attempt - this is on CI machines and some local dev machines without a firewall / too many other processes.
+	//   In this case, there will be maxConnectAttempt (3) connection attempts on the first CreateStream() call and maxConnectAttempt (3) attempts on the second CreateStream() call.
+
+	// make two separate stream creation attempt and assert that no connection back off happened
+	for i := 0; i < 2; i++ {
+
+		// limit the maximum amount of time to wait for a connection to be established by using a context that times out
+		ctx, cancel := context.WithTimeout(context.Background(), maxTimeToWait)
+
+		unittest.RequireReturnsBefore(suite.T(), func() {
+			_, err = node1.CreateStream(ctx, pInfo.ID)
+		}, totalWaitTime, fmt.Sprintf("create stream did not error within %s", totalWaitTime.String()))
+		require.Error(suite.T(), err)
+		require.NotContainsf(suite.T(), err.Error(), swarm.ErrDialBackoff.Error(), "swarm dialer unexpectedly did a back off for a one-to-one connection")
+		cancel()
+	}
 }
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
@@ -661,7 +685,7 @@ func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testin
 
 // NodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
-func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID flow.Identifier, handler func(t *testing.T) network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
+func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID string, handler func(t *testing.T) network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
 
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(address))
 
@@ -680,8 +704,12 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	resolver, err := dns.NewResolver(metrics.NewNoopCollector())
 	require.NoError(t, err)
 
+	noopMetrics := metrics.NewNoopCollector()
+	connManager := NewConnManager(log, noopMetrics)
+
 	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
 		SetRootBlockID(rootID).
+		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
 		SetLogger(log)

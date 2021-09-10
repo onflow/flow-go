@@ -21,7 +21,6 @@ import (
 	message "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
-	idModule "github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
@@ -36,7 +35,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var rootBlockID = unittest.IdentifierFixture()
+var rootBlockID = unittest.IdentifierFixture().String()
 
 const DryRun = true
 
@@ -83,7 +82,7 @@ func (cwcm *TagWatchingConnManager) Unprotect(id peer.ID, tag string) bool {
 	return res
 }
 
-func NewTagWatchingConnManager(log zerolog.Logger, idProvider idModule.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
+func NewTagWatchingConnManager(log zerolog.Logger, idProvider id.IdentityProvider, metrics module.NetworkMetrics) *TagWatchingConnManager {
 	cm := p2p.NewConnManager(log, metrics)
 	return &TagWatchingConnManager{
 		ConnManager: cm,
@@ -111,7 +110,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode, connGat
 		port := "0"
 
 		if !dryRunMode {
-			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, idProvider, connGating)
+			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, connGating, idProvider)
 
 			_, port, err = libP2PNodes[i].GetIPPort()
 			require.NoError(t, err)
@@ -141,20 +140,21 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
+		peerManagerFactory := p2p.PeerManagerFactory(nil)
+
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
 			factory,
 			id.NodeID,
 			metrics,
 			rootBlockID,
-			p2p.DefaultPeerUpdateInterval,
 			p2p.DefaultUnicastTimeout,
-			enablePeerManagementAndConnectionGating,
 			enablePeerManagementAndConnectionGating,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
 			p2p.WithIdentifierProvider(
 				idProviders[i],
 			),
+			p2p.WithPeerManager(peerManagerFactory),
 		)
 	}
 	return mws, idProviders
@@ -206,7 +206,7 @@ func GenerateNetworks(t *testing.T,
 			tops[i],
 			sms[i],
 			metrics,
-			idModule.NewFixedIdentityProvider(ids),
+			id.NewFixedIdentityProvider(ids),
 		)
 		require.NoError(t, err)
 
@@ -262,8 +262,8 @@ func generateLibP2PNode(t *testing.T,
 	logger zerolog.Logger,
 	id flow.Identity,
 	key crypto.PrivateKey,
-	idProvider idModule.IdentityProvider,
 	connGating bool,
+	idProvider id.IdentityProvider,
 ) (*p2p.Node, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()

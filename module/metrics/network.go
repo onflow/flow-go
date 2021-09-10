@@ -214,3 +214,11 @@ func (nc *NetworkCollector) OnDNSCacheInvalidated() {
 func (nc *NetworkCollector) OnDNSCacheHit() {
 	nc.dnsCacheHitCount.Inc()
 }
+
+func (nc *NetworkCollector) UnstakedOutboundConnections(connectionCount uint) {
+	nc.unstakedOutboundConnectionCount.Set(float64(connectionCount))
+}
+
+func (nc *NetworkCollector) UnstakedInboundConnections(connectionCount uint) {
+	nc.unstakedInboundConnectionCount.Set(float64(connectionCount))
+}

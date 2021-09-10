@@ -34,7 +34,7 @@ func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
 // to channelRoleMap as a constant channel type manually.
 func Exists(channel network.Channel) bool {
 	_, exists := RolesByChannel(channel)
-	return exists
+	return exists || UnstakedChannels().Contains(channel)
 }
 
 // ChannelsByRole returns a list of all channels the role subscribes to.
@@ -90,10 +90,10 @@ func Channels() network.ChannelList {
 	return channels
 }
 
+// UnstakedChannels returns all channels that unstaked nodes can send messages on.
 func UnstakedChannels() network.ChannelList {
 	return network.ChannelList{
 		UnstakedSyncCommittee,
-		ReceiveBlocks,
 	}
 }
 
@@ -161,7 +161,7 @@ func initializeChannelRoleMap() {
 	channelRoleMap[ConsensusCommittee] = flow.RoleList{flow.RoleConsensus}
 
 	// Channels for protocols actively synchronizing state across nodes
-	channelRoleMap[SyncCommittee] = flow.Roles()
+	channelRoleMap[SyncCommittee] = flow.RoleList{flow.RoleConsensus}
 	channelRoleMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
 
 	// Channels for DKG communication
@@ -197,8 +197,6 @@ func initializeChannelRoleMap() {
 
 	channelRoleMap[syncClusterPrefix] = flow.RoleList{flow.RoleCollection}
 	channelRoleMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
-
-	channelRoleMap[UnstakedSyncCommittee] = flow.RoleList{flow.RoleAccess}
 }
 
 // ClusterChannel returns true if channel is cluster-based.
@@ -219,13 +217,13 @@ func ClusterChannel(channel network.Channel) (network.Channel, bool) {
 // TopicFromChannel returns the unique LibP2P topic form the channel.
 // The channel is made up of name string suffixed with root block id.
 // The root block id is used to prevent cross talks between nodes on different sporks.
-func TopicFromChannel(channel network.Channel, rootBlockID flow.Identifier) network.Topic {
+func TopicFromChannel(channel network.Channel, rootBlockID string) network.Topic {
 	// skip root block suffix, if this is a cluster specific channel. A cluster specific channel is inherently
 	// unique for each epoch
 	if strings.HasPrefix(channel.String(), syncClusterPrefix.String()) || strings.HasPrefix(string(channel), consensusClusterPrefix.String()) {
 		return network.Topic(channel)
 	}
-	return network.Topic(fmt.Sprintf("%s/%s", string(channel), rootBlockID.String()))
+	return network.Topic(fmt.Sprintf("%s/%s", string(channel), rootBlockID))
 }
 
 // ChannelConsensusCluster returns a dynamic cluster consensus channel based on

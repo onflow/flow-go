@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/dgraph-io/badger/v2"
+
 	"github.com/onflow/flow-go/cmd"
 	access "github.com/onflow/flow-go/cmd/access/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
@@ -27,21 +29,42 @@ type Config struct {
 	networkPrivKey crypto.PrivateKey   // the network private key of this node
 	bootstrapNodes []BootstrapNodeInfo // the bootstrap nodes to use
 	bindAddr       string              // address to bind on
-	dataDir        string              // directory to store the protocol state
+	db             *badger.DB          // the badger DB storage to use for the protocol state
+	dataDir        string              // directory to store the protocol state (if the badger storage is not provided)
 	bootstrapDir   string              // path to the bootstrap directory
+	logLevel       string              // log level
 }
 
 type Option func(c *Config)
 
+// WithDataDir sets the underlying directory to be used to store the database
+// If a database is supplied, then data directory will be set to empty string
 func WithDataDir(dataDir string) Option {
 	return func(cf *Config) {
-		cf.dataDir = dataDir
+		if cf.db == nil {
+			cf.dataDir = dataDir
+		}
 	}
 }
 
 func WithBootstrapDir(bootstrapDir string) Option {
 	return func(cf *Config) {
 		cf.bootstrapDir = bootstrapDir
+	}
+}
+
+func WithLogLevel(level string) Option {
+	return func(cf *Config) {
+		cf.logLevel = level
+	}
+}
+
+// WithDB sets the underlying database that will be used to store the chain state
+// WithDB takes precedence over WithDataDir and datadir will be set to empty if DB is set using this option
+func WithDB(db *badger.DB) Option {
+	return func(cf *Config) {
+		cf.db = db
+		cf.dataDir = ""
 	}
 }
 
@@ -87,6 +110,12 @@ func getBaseOptions(config *Config) []cmd.Option {
 	if config.bindAddr != "" {
 		options = append(options, cmd.WithBindAddress(config.bindAddr))
 	}
+	if config.logLevel != "" {
+		options = append(options, cmd.WithLogLevel(config.logLevel))
+	}
+	if config.db != nil {
+		options = append(options, cmd.WithDB(config.db))
+	}
 
 	return options
 }
@@ -96,7 +125,7 @@ func buildAccessNode(accessNodeOptions []access.Option) *access.UnstakedAccessNo
 	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
 
 	nodeBuilder.Initialize()
-	nodeBuilder.Build()
+	nodeBuilder.BuildConsensusFollower()
 
 	return nodeBuilder
 }
@@ -118,6 +147,7 @@ func NewConsensusFollower(
 		networkPrivKey: networkPrivKey,
 		bootstrapNodes: bootstapIdentities,
 		bindAddr:       bindAddr,
+		logLevel:       "info",
 	}
 
 	for _, opt := range opts {
@@ -128,6 +158,7 @@ func NewConsensusFollower(
 
 	anb := buildAccessNode(accessNodeOptions)
 	consensusFollower := &ConsensusFollowerImpl{NodeBuilder: anb}
+	anb.BaseConfig.NodeRole = "consensus_follower"
 
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
 

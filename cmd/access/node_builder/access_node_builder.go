@@ -1,13 +1,11 @@
 package node_builder
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
 
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
@@ -50,7 +48,7 @@ import (
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	storage "github.com/onflow/flow-go/storage/badger"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // AccessNodeBuilder extends cmd.NodeBuilder and declares additional functions needed to bootstrap an Access node
@@ -75,10 +73,6 @@ type AccessNodeBuilder interface {
 	// IsStaked returns True is this is a staked Access Node, False otherwise
 	IsStaked() bool
 
-	// SupportsUnstakedNode returns True if this is a staked Access node which also supports
-	// unstaked access nodes/unstaked consensus follower engines, False otherwise.
-	SupportsUnstakedNode() bool
-
 	// Build defines all of the Access node's components and modules.
 	Build() AccessNodeBuilder
 }
@@ -92,7 +86,7 @@ type AccessNodeConfig struct {
 	bootstrapNodePublicKeys      []string
 	bootstrapIdentities          flow.IdentityList // the identity list of bootstrap peers the node uses to discover other nodes
 	NetworkKey                   crypto.PrivateKey // the networking key passed in by the caller when being used as a library
-	supportsUnstakedFollower     bool
+	supportsUnstakedFollower     bool              // True if this is a staked Access node which also supports unstaked access nodes/unstaked consensus follower engines
 	collectionGRPCPort           uint
 	executionGRPCPort            uint
 	pingEnabled                  bool
@@ -116,9 +110,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
-			UnsecureGRPCListenAddr:    "localhost:9000",
-			SecureGRPCListenAddr:      "localhost:9001",
-			HTTPListenAddr:            "localhost:8000",
+			UnsecureGRPCListenAddr:    "0.0.0.0:9000",
+			SecureGRPCListenAddr:      "0.0.0.0:9001",
+			HTTPListenAddr:            "0.0.0.0:8000",
 			CollectionAddr:            "",
 			HistoricalAccessAddrs:     "",
 			CollectionClientTimeout:   3 * time.Second,
@@ -272,7 +266,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
 	builder.Component("follower engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize cleaner for DB
-		cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 		conCache := buffer.NewPendingBlocks()
 
 		followerEng, err := follower.New(
@@ -535,16 +529,6 @@ func (builder *FlowAccessNodeBuilder) IsStaked() bool {
 	return builder.staked
 }
 
-func (builder *FlowAccessNodeBuilder) SupportsUnstakedNode() bool {
-	// unstaked access nodes can't be upstream of other unstaked access nodes for now
-	if !builder.IsStaked() {
-		return false
-	}
-
-	// a staked access node may or may not support unstaked follower
-	return builder.supportsUnstakedFollower
-}
-
 func (builder *FlowAccessNodeBuilder) ParseFlags() {
 
 	builder.BaseFlags()
@@ -553,7 +537,6 @@ func (builder *FlowAccessNodeBuilder) ParseFlags() {
 
 	builder.ParseAndPrintFlags()
 
-	builder.deriveBootstrapPeerIdentities()
 }
 
 func (builder *FlowAccessNodeBuilder) extraFlags() {
@@ -587,75 +570,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
 	})
-}
-
-// deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
-// These are the identities of the staked and unstaked ANs also acting as the DHT bootstrap server
-func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() {
-	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
-	builder.MustNot(err)
-	builder.bootstrapIdentities = ids
-}
-
-// initLibP2PFactory creates the LibP2P factory function for the given node ID and network key.
-// The factory function is later passed into the initMiddleware function to eventually instantiate the p2p.LibP2PNode instance
-func (builder *FlowAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
-	nodeID flow.Identifier,
-	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
-
-	// The staked nodes act as the DHT servers
-	dhtOptions := []dht.Option{p2p.AsServer(builder.IsStaked())}
-
-	// if this is an unstaked access node, then seed the DHT with the boostrap identities
-	if !builder.IsStaked() {
-		bootstrapPeersOpt, err := p2p.WithBootstrapPeers(builder.bootstrapIdentities)
-		builder.MustNot(err)
-		dhtOptions = append(dhtOptions, bootstrapPeersOpt)
-	}
-
-	myAddr := builder.NodeConfig.Me.Address()
-	if builder.BaseConfig.BindAddr != cmd.NotSet {
-		myAddr = builder.BaseConfig.BindAddr
-	}
-
-	return func() (*p2p.Node, error) {
-		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
-			SetRootBlockID(builder.RootBlock.ID()).
-			// unlike the staked side of the network where currently all the node addresses are known upfront,
-			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
-			SetDHTOptions(dhtOptions...).
-			// TODO: set pubsub options with subscription filter
-			SetLogger(builder.Logger).
-			Build(ctx)
-		if err != nil {
-			return nil, err
-		}
-		builder.LibP2PNode = libp2pNode
-		return builder.LibP2PNode, nil
-	}, nil
-}
-
-// initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
-// interval, and validators. The network.Middleware is then passed into the initNetwork function.
-func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
-	networkMetrics module.NetworkMetrics,
-	factoryFunc p2p.LibP2PFactoryFunc,
-	validators ...network.MessageValidator) network.Middleware {
-	builder.Middleware = p2p.NewMiddleware(
-		builder.Logger,
-		factoryFunc,
-		nodeID,
-		networkMetrics,
-		builder.RootBlock.ID(),
-		time.Hour, // TODO: this is pretty meaningless since there is no peermanager in play.
-		p2p.DefaultUnicastTimeout,
-		false, // no connection gating for the unstaked network
-		false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
-		builder.IDTranslator,
-		p2p.WithMessageValidators(validators...),
-		// use default identifier provider
-	)
-	return builder.Middleware
 }
 
 // initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network
@@ -693,9 +607,11 @@ func unstakedNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProv
 		// filter out messages sent by this node itself
 		validator.ValidateNotSender(selfID),
 		validator.NewAnyValidator(
+			// message should be either from a valid staked node
 			validator.NewOriginValidator(
 				id.NewFilteredIdentifierProvider(filter.IsValidCurrentEpochParticipant, idProvider),
 			),
+			// or the message should be specifically targeted for this node
 			validator.ValidateTarget(log, selfID),
 		),
 	}

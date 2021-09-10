@@ -71,62 +71,98 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 type BaseAssignmentCollectorTestSuite struct {
 	BaseApprovalsTestSuite
 
-	workerPool      *workerpool.WorkerPool
-	blocks          map[flow.Identifier]*flow.Header
-	state           *protocol.State
-	headers         *storage.Headers
-	assigner        *module.ChunkAssigner
-	sealsPL         *mempool.IncorporatedResultSeals
-	sigVerifier     *module.Verifier
-	conduit         *mocknetwork.Conduit
-	identitiesCache map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
-	requestTracker  *RequestTracker
+	WorkerPool        *workerpool.WorkerPool
+	Blocks            map[flow.Identifier]*flow.Header
+	State             *protocol.State
+	Headers           *storage.Headers
+	Assigner          *module.ChunkAssigner
+	SealsPL           *mempool.IncorporatedResultSeals
+	SigVerifier       *module.Verifier
+	Conduit           *mocknetwork.Conduit
+	FinalizedAtHeight map[uint64]*flow.Header
+	IdentitiesCache   map[flow.Identifier]map[flow.Identifier]*flow.Identity // helper map to store identities for given block
+	RequestTracker    *RequestTracker
 }
 
 func (s *BaseAssignmentCollectorTestSuite) SetupTest() {
 	s.BaseApprovalsTestSuite.SetupTest()
 
-	s.workerPool = workerpool.New(4)
-	s.sealsPL = &mempool.IncorporatedResultSeals{}
-	s.state = &protocol.State{}
-	s.assigner = &module.ChunkAssigner{}
-	s.sigVerifier = &module.Verifier{}
-	s.conduit = &mocknetwork.Conduit{}
-	s.headers = &storage.Headers{}
+	s.WorkerPool = workerpool.New(4)
+	s.SealsPL = &mempool.IncorporatedResultSeals{}
+	s.State = &protocol.State{}
+	s.Assigner = &module.ChunkAssigner{}
+	s.SigVerifier = &module.Verifier{}
+	s.Conduit = &mocknetwork.Conduit{}
+	s.Headers = &storage.Headers{}
 
-	s.requestTracker = NewRequestTracker(s.headers, 1, 3)
+	s.RequestTracker = NewRequestTracker(s.Headers, 1, 3)
+
+	s.FinalizedAtHeight = make(map[uint64]*flow.Header)
+	s.FinalizedAtHeight[s.ParentBlock.Height] = &s.ParentBlock
+	s.FinalizedAtHeight[s.Block.Height] = &s.Block
 
 	// setup blocks cache for protocol state
-	s.blocks = make(map[flow.Identifier]*flow.Header)
-	s.blocks[s.Block.ID()] = &s.Block
-	s.blocks[s.IncorporatedBlock.ID()] = &s.IncorporatedBlock
+	s.Blocks = make(map[flow.Identifier]*flow.Header)
+	s.Blocks[s.ParentBlock.ID()] = &s.ParentBlock
+	s.Blocks[s.Block.ID()] = &s.Block
+	s.Blocks[s.IncorporatedBlock.ID()] = &s.IncorporatedBlock
 
 	// setup identities for each block
-	s.identitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
-	s.identitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiers
+	s.IdentitiesCache = make(map[flow.Identifier]map[flow.Identifier]*flow.Identity)
+	s.IdentitiesCache[s.IncorporatedResult.Result.BlockID] = s.AuthorizedVerifiers
 
-	s.assigner.On("Assign", mock.Anything, mock.Anything).Return(func(result *flow.ExecutionResult, blockID flow.Identifier) *chunks.Assignment {
+	s.Assigner.On("Assign", mock.Anything, mock.Anything).Return(func(result *flow.ExecutionResult, blockID flow.Identifier) *chunks.Assignment {
 		return s.ChunksAssignment
 	}, func(result *flow.ExecutionResult, blockID flow.Identifier) error { return nil })
 
-	s.headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) *flow.Header {
-		return s.blocks[blockID]
+	s.Headers.On("ByBlockID", mock.Anything).Return(func(blockID flow.Identifier) *flow.Header {
+		return s.Blocks[blockID]
 	}, func(blockID flow.Identifier) error {
-		_, found := s.blocks[blockID]
+		_, found := s.Blocks[blockID]
 		if found {
 			return nil
 		} else {
 			return realstorage.ErrNotFound
 		}
 	})
+	s.Headers.On("ByHeight", mock.Anything).Return(
+		func(height uint64) *flow.Header {
+			if block, found := s.FinalizedAtHeight[height]; found {
+				return block
+			} else {
+				return nil
+			}
+		},
+		func(height uint64) error {
+			_, found := s.FinalizedAtHeight[height]
+			if !found {
+				return realstorage.ErrNotFound
+			}
+			return nil
+		},
+	)
 
-	s.state.On("AtBlockID", mock.Anything).Return(
+	s.State.On("AtBlockID", mock.Anything).Return(
 		func(blockID flow.Identifier) realproto.Snapshot {
-			if block, found := s.blocks[blockID]; found {
-				return unittest.StateSnapshotForKnownBlock(block, s.identitiesCache[blockID])
+			if block, found := s.Blocks[blockID]; found {
+				return unittest.StateSnapshotForKnownBlock(block, s.IdentitiesCache[blockID])
 			} else {
 				return unittest.StateSnapshotForUnknownBlock()
 			}
 		},
 	)
+
+	s.SealsPL.On("Size").Return(uint(0)).Maybe()                       // for metrics
+	s.SealsPL.On("PruneUpToHeight", mock.Anything).Return(nil).Maybe() // noop on pruning
+}
+
+func (s *BaseAssignmentCollectorTestSuite) MarkFinalized(block *flow.Header) {
+	s.FinalizedAtHeight[block.Height] = block
+}
+
+func (s *BaseAssignmentCollectorTestSuite) TearDownTest() {
+	// Without this line we are risking running into weird situations where one test has finished but there are active workers
+	// that are executing some work on the shared pool. Need to ensure that all pending work has been executed before
+	// starting next test.
+	s.WorkerPool.StopWait()
 }

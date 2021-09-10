@@ -215,7 +215,7 @@ type RegisterUpdatesHolder interface {
 	RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue)
 }
 
-func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, error) {
+func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.StateCommitment) (flow.StateCommitment, *ledger.TrieUpdate, error) {
 	ids, values := ruh.RegisterUpdates()
 
 	update, err := ledger.NewUpdate(
@@ -225,15 +225,15 @@ func CommitDelta(ldg ledger.Ledger, ruh RegisterUpdatesHolder, baseState flow.St
 	)
 
 	if err != nil {
-		return flow.DummyStateCommitment, fmt.Errorf("cannot create ledger update: %w", err)
+		return flow.DummyStateCommitment, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	commit, err := ldg.Set(update)
+	commit, trieUpdate, err := ldg.Set(update)
 	if err != nil {
-		return flow.DummyStateCommitment, err
+		return flow.DummyStateCommitment, nil, err
 	}
 
-	return flow.StateCommitment(commit), nil
+	return flow.StateCommitment(commit), trieUpdate, nil
 }
 
 //func (s *state) CommitDelta(ctx context.Context, delta delta.Delta, baseState flow.StateCommitment) (flow.StateCommitment, error) {
