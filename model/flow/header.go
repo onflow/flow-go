@@ -72,6 +72,9 @@ func (h Header) Fingerprint() []byte {
 	return fingerprint.Fingerprint(h.Body())
 }
 
+var previd_hdr Identifier
+var prev_hdr Header
+
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
 func (h Header) ID() Identifier {
@@ -80,7 +83,22 @@ func (h Header) ID() Identifier {
 	if h.Timestamp.Location() != time.UTC {
 		h.Timestamp = h.Timestamp.UTC()
 	}
-	return MakeID(h)
+
+	if h.ChainID == prev_hdr.ChainID &&
+		h.Timestamp == prev_hdr.Timestamp &&
+		h.ParentID == prev_hdr.ParentID &&
+		h.View == prev_hdr.View &&
+		h.Height == prev_hdr.Height &&
+		h.PayloadHash == prev_hdr.PayloadHash &&
+		h.ProposerID == prev_hdr.ProposerID {
+
+		return previd_hdr
+	}
+
+	previd_hdr = MakeID(h)
+	prev_hdr = h
+
+	return previd_hdr
 }
 
 // Checksum returns the checksum of the header.
