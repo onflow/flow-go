@@ -189,6 +189,7 @@ func (r *Resolver) lookupResolverForTXTAddr(ctx context.Context, txt string) ([]
 	return addr, nil
 }
 
+// shouldResolveIP returns true if there is no other concurrent attempt ongoing for resolving the domain.
 func (r *Resolver) shouldResolveIP(domain string) bool {
 	r.Lock()
 	defer r.Unlock()
@@ -201,6 +202,7 @@ func (r *Resolver) shouldResolveIP(domain string) bool {
 	return false
 }
 
+// doneResolvingIP cleans up tracking an ongoing concurrent attempt for resolving domain.
 func (r *Resolver) doneResolvingIP(domain string) {
 	r.Lock()
 	defer r.Unlock()
@@ -208,6 +210,7 @@ func (r *Resolver) doneResolvingIP(domain string) {
 	delete(r.processingIPs, domain)
 }
 
+// doneResolvingIP cleans up tracking an ongoing concurrent attempt for resolving txt.
 func (r *Resolver) doneResolvingTXT(txt string) {
 	r.Lock()
 	defer r.Unlock()
@@ -215,6 +218,7 @@ func (r *Resolver) doneResolvingTXT(txt string) {
 	delete(r.processingTXTs, txt)
 }
 
+// shouldResolveIP returns true if there is no other concurrent attempt ongoing for resolving the txt.
 func (r *Resolver) shouldResolveTXT(txt string) bool {
 	r.Lock()
 	defer r.Unlock()
