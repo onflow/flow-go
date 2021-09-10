@@ -1,5 +1,7 @@
 package module
 
+import "runtime"
+
 // ReadyDoneAware provides an easy interface to wait for module startup and shutdown.
 // Modules that implement this interface only support a single start-stop cycle, and
 // will not restart if Ready() is called again after shutdown has already commenced.
@@ -35,4 +37,23 @@ func (n *NoopReadDoneAware) Done() <-chan struct{} {
 // a component's lifecycle.
 type ErrorAware interface {
 	Errors() <-chan error
+}
+
+// ErrorBase implements the ErrorAware interface, and provides a way for components
+// to signal an irrecoverable error.
+type ErrorBase struct {
+	errors chan error
+}
+
+func NewErrorBase() *ErrorBase {
+	return &ErrorBase{make(chan error)}
+}
+
+func (e *ErrorBase) Errors() <-chan error {
+	return e.errors
+}
+
+func (e *ErrorBase) ThrowError(err error) {
+	e.errors <- err
+	runtime.Goexit()
 }
