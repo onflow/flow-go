@@ -31,13 +31,6 @@ func newUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p
 }
 func (connector *upstreamConnector) Ready() <-chan struct{} {
 	connector.lm.OnStart(func() {
-		select {
-		case <-connector.unstakedNode.Start():
-			connector.logger.Debug().Msg("libp2p node starts successfully")
-		case <-time.After(30 * time.Second):
-			connector.logger.Fatal().Msg("could not start libp2p node within timeout")
-		}
-
 		// eventually, context will be passed in to Start method: https://github.com/dapperlabs/flow-go/issues/5730
 		ctx, cancel := context.WithCancel(context.TODO())
 		connector.cancel = cancel
