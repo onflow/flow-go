@@ -18,6 +18,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type AdminClient interface {
+	// RunCommand sends a command to the admin server.
 	RunCommand(ctx context.Context, in *RunCommandRequest, opts ...grpc.CallOption) (*RunCommandResponse, error)
 }
 
@@ -42,6 +43,7 @@ func (c *adminClient) RunCommand(ctx context.Context, in *RunCommandRequest, opt
 // All implementations must embed UnimplementedAdminServer
 // for forward compatibility
 type AdminServer interface {
+	// RunCommand sends a command to the admin server.
 	RunCommand(context.Context, *RunCommandRequest) (*RunCommandResponse, error)
 	mustEmbedUnimplementedAdminServer()
 }
@@ -97,5 +99,5 @@ var Admin_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
-	Metadata: "admin/admin/admin.proto",
+	Metadata: "admin/admin.proto",
 }

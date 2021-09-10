@@ -5,8 +5,11 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"sync"
+	"time"
 
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -16,16 +19,20 @@ import (
 )
 
 const (
-	CommandRunnerMaxQueueLength = 128
-	CommandRunnerNumWorkers     = 1
+	CommandRunnerMaxQueueLength  = 128
+	CommandRunnerNumWorkers      = 1
+	CommandRunnerShutdownTimeout = 5 * time.Second
 )
 
 type CommandRunner struct {
-	handlers   map[string]CommandHandler
-	validators map[string]CommandValidator
-	commandQ   chan *CommandRequest
-	address    string
-	logger     zerolog.Logger
+	handlers    map[string]CommandHandler
+	validators  map[string]CommandValidator
+	commandQ    chan *CommandRequest
+	grpcAddress string
+	httpAddress string
+	logger      zerolog.Logger
+
+	errors chan error
 
 	// mutex to guard against concurrent access to handlers and validators
 	mu sync.RWMutex
@@ -42,16 +49,30 @@ type CommandRunner struct {
 
 type CommandHandler func(ctx context.Context, data map[string]interface{}) error
 type CommandValidator func(data map[string]interface{}) error
+type CommandRunnerOption func(*CommandRunner)
 
-func NewCommandRunner(logger zerolog.Logger, address string) *CommandRunner {
-	return &CommandRunner{
+func WithHTTPServer(httpAddress string) CommandRunnerOption {
+	return func(r *CommandRunner) {
+		r.httpAddress = httpAddress
+	}
+}
+
+func NewCommandRunner(logger zerolog.Logger, grpcAddress string, opts ...CommandRunnerOption) *CommandRunner {
+	r := &CommandRunner{
 		handlers:         make(map[string]CommandHandler),
 		validators:       make(map[string]CommandValidator),
 		commandQ:         make(chan *CommandRequest, CommandRunnerMaxQueueLength),
-		address:          address,
+		grpcAddress:      grpcAddress,
 		logger:           logger.With().Str("admin", "command_runner").Logger(),
 		startupCompleted: make(chan struct{}),
+		errors:           make(chan error),
 	}
+
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 func (r *CommandRunner) RegisterHandler(command string, handler CommandHandler) bool {
@@ -138,6 +159,10 @@ func (r *CommandRunner) Done() <-chan struct{} {
 	return done
 }
 
+func (r *CommandRunner) Errors() <-chan error {
+	return r.errors
+}
+
 func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
@@ -147,7 +172,7 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 
 	r.logger.Info().Msg("admin server starting up")
 
-	listener, err := net.Listen("tcp", r.address)
+	listener, err := net.Listen("tcp", r.grpcAddress)
 	if err != nil {
 		return fmt.Errorf("failed to listen on admin server address: %w", err)
 	}
@@ -155,16 +180,47 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 	grpcServer := grpc.NewServer()
 	pb.RegisterAdminServer(grpcServer, NewAdminServer(r.commandQ))
 
-	r.workersStarted.Add(2)
-	r.workersFinished.Add(2)
+	r.workersStarted.Add(1)
+	r.workersFinished.Add(1)
 	go func() {
 		defer r.workersFinished.Done()
 		r.workersStarted.Done()
 
 		if err := grpcServer.Serve(listener); err != nil {
 			r.logger.Err(err).Msg("gRPC server encountered fatal error")
+			r.errors <- err
 		}
 	}()
+
+	var httpServer *http.Server
+
+	if r.httpAddress != "" {
+		// Register gRPC server endpoint
+		mux := runtime.NewServeMux()
+		opts := []grpc.DialOption{grpc.WithInsecure()}
+		err = pb.RegisterAdminHandlerFromEndpoint(ctx, mux, r.grpcAddress, opts)
+		if err != nil {
+			return fmt.Errorf("failed to register http handlers for admin service: %w", err)
+		}
+
+		httpServer = &http.Server{Addr: r.httpAddress, Handler: mux}
+
+		r.workersStarted.Add(1)
+		r.workersFinished.Add(1)
+		go func() {
+			defer r.workersFinished.Done()
+			r.workersStarted.Done()
+
+			// Start HTTP server (and proxy calls to gRPC server endpoint)
+			if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				r.logger.Err(err).Msg("HTTP server encountered error")
+				r.errors <- err
+			}
+		}()
+	}
+
+	r.workersStarted.Add(1)
+	r.workersFinished.Add(1)
 	go func() {
 		defer r.workersFinished.Done()
 		r.workersStarted.Done()
@@ -173,6 +229,17 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 		r.logger.Info().Msg("admin server shutting down")
 
 		grpcServer.Stop()
+
+		if httpServer != nil {
+			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), CommandRunnerShutdownTimeout)
+			defer shutdownCancel()
+
+			if err := httpServer.Shutdown(shutdownCtx); err != nil {
+				r.logger.Err(err).Msg("failed to shutdown http server")
+				r.errors <- err
+			}
+		}
+
 		close(r.commandQ)
 	}()
 

@@ -1,9 +1,11 @@
 package admin
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"sync"
 	"testing"
 	"time"
@@ -22,8 +24,9 @@ import (
 type CommandRunnerSuite struct {
 	suite.Suite
 
-	runner  *CommandRunner
-	address string
+	runner      *CommandRunner
+	grpcAddress string
+	httpAddress string
 
 	client pb.AdminClient
 	conn   *grpc.ClientConn
@@ -40,13 +43,22 @@ func (suite *CommandRunnerSuite) SetupTest() {
 	suite.cancel = cancel
 
 	logger := zerolog.New(zerolog.NewConsoleWriter())
-	suite.address = fmt.Sprintf("localhost:%s", testingdock.RandomPort(suite.T()))
-	suite.runner = NewCommandRunner(logger, suite.address)
+	suite.grpcAddress = fmt.Sprintf("localhost:%s", testingdock.RandomPort(suite.T()))
+	suite.httpAddress = fmt.Sprintf("localhost:%s", "49626" /*testingdock.RandomPort(suite.T())*/)
+	suite.runner = NewCommandRunner(logger, suite.grpcAddress, WithHTTPServer(suite.httpAddress))
 	err := suite.runner.Start(ctx)
 	suite.Assert().NoError(err)
 	<-suite.runner.Ready()
+	go func() {
+		select {
+		case <-ctx.Done():
+			return
+		case err := <-suite.runner.Errors():
+			suite.Fail("encountered unexpected error", err)
+		}
+	}()
 
-	conn, err := grpc.Dial(suite.address, grpc.WithInsecure())
+	conn, err := grpc.Dial(suite.grpcAddress, grpc.WithInsecure())
 	suite.Assert().NoError(err)
 	suite.conn = conn
 	suite.client = pb.NewAdminClient(conn)
@@ -208,6 +220,32 @@ func (suite *CommandRunnerSuite) TestTimeout() {
 
 	_, err = suite.client.RunCommand(ctx, request)
 	suite.Assert().Equal(codes.DeadlineExceeded, status.Code(err))
+}
+
+func (suite *CommandRunnerSuite) TestHTTPServer() {
+	called := false
+
+	suite.runner.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		suite.Assert().EqualValues(data["key"], "value")
+		called = true
+
+		return nil
+	})
+
+	url := fmt.Sprintf("http://%s/admin/run_command", suite.httpAddress)
+	reqBody := bytes.NewBuffer([]byte(`{"commandName": "foo", "data": {"key": "value"}}`))
+	resp, err := http.Post(url, "application/json", reqBody)
+	suite.Assert().NoError(err)
+	defer resp.Body.Close()
+
+	suite.Assert().True(called)
+	suite.Assert().Equal("200 OK", resp.Status)
 }
 
 func (suite *CommandRunnerSuite) TestCleanup() {
