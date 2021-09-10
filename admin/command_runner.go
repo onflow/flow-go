@@ -229,6 +229,7 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 		r.logger.Info().Msg("admin server shutting down")
 
 		grpcServer.Stop()
+		close(r.commandQ)
 
 		if httpServer != nil {
 			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), CommandRunnerShutdownTimeout)
@@ -239,8 +240,6 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 				r.errors <- err
 			}
 		}
-
-		close(r.commandQ)
 	}()
 
 	return nil
