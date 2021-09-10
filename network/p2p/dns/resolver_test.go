@@ -116,14 +116,6 @@ func TestResolver_Expired_Invalidated_Error(t *testing.T) {
 	queryWG := syncThenAsyncQuery(t, 1, resolver, txtTestCases, ipTestCase, happyPath)
 
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
-	// unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Hour, "could not resolve all expected domains")
-
-	// second step: we query again, and since there is no cache entry for query, it should directly fire a query on
-	// underlying resolver. But since underlying resolver hits an error, the query should return with an error.
-	// resolverWG = mockBasicResolverForDomains(t, &basicResolver, ipTestCase, txtTestCases, !happyPath, 1)
-	// queryWG = syncThenAsyncQuery(t, 1, resolver, txtTestCases, ipTestCase, !happyPath)
-
-	// unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
 
 	// since resolving hits an error, cache is invalidated.
