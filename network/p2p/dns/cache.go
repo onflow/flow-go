@@ -32,7 +32,7 @@ func newCache() *cache {
 
 // resolveIPCache resolves the domain through the cache if it is available.
 // First boolean variable determines whether the domain exists in the cache.
-// Second boolean variable determines whether the domain cache entry expired.
+// Second boolean variable determines whether the domain cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 	c.RLock()
 	defer c.RUnlock()
@@ -55,7 +55,7 @@ func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 
 // resolveIPCache resolves the txt through the cache if it is available.
 // First boolean variable determines whether the txt exists in the cache.
-// Second boolean variable determines whether the txt cache entry expired.
+// Second boolean variable determines whether the txt cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 	c.RLock()
 	defer c.RUnlock()
