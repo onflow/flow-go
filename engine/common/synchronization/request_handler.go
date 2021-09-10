@@ -222,9 +222,10 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		return nil
 	}
 
-	maxHeight := req.FromHeight + uint64(r.core.(*synchronization.Core).Config.MaxSize)
-	if maxHeight < req.FromHeight {
-		req.FromHeight = maxHeight
+	// enforce client-side max request size
+	maxHeight := req.FromHeight + uint64(synchronization.DefaultConfig().MaxSize)
+	if maxHeight < req.ToHeight {
+		req.ToHeight = maxHeight
 	}
 
 	// get all of the blocks, one by one
@@ -272,11 +273,13 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 
 	// deduplicate the block IDs in the batch request
 	blockIDs := make(map[flow.Identifier]struct{})
-	for i, blockID := range req.BlockIDs {
-		if i == int(r.core.(*synchronization.Core).Config.MaxSize) {
+	for _, blockID := range req.BlockIDs {
+		blockIDs[blockID] = struct{}{}
+
+		// enforce client-side max request size
+		if len(blockIDs) == int(synchronization.DefaultConfig().MaxSize) {
 			break
 		}
-		blockIDs[blockID] = struct{}{}
 	}
 
 	// try to get all the blocks by ID
