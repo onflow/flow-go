@@ -94,14 +94,14 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 
 // lookupIPAddr encapsulates the logic of resolving an ip address through cache.
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	addr, exists, expired := r.c.resolveIPCache(domain)
+	addr, exists, fresh := r.c.resolveIPCache(domain)
 
 	if !exists {
 		r.collector.OnDNSCacheMiss()
 		return r.lookupResolverForIPAddr(ctx, domain)
 	}
 
-	if expired && r.shouldResolveIP(domain) {
+	if !fresh && r.shouldResolveIP(domain) {
 		r.unit.Launch(func() {
 			_, err := r.lookupResolverForIPAddr(ctx, domain)
 			if err != nil {
@@ -145,14 +145,14 @@ func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) 
 
 // lookupIPAddr encapsulates the logic of resolving a txt through cache.
 func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) {
-	addr, exists, expired := r.c.resolveTXTCache(txt)
+	addr, exists, fresh := r.c.resolveTXTCache(txt)
 
 	if !exists {
 		r.collector.OnDNSCacheMiss()
 		return r.lookupResolverForTXTAddr(ctx, txt)
 	}
 
-	if expired && r.shouldResolveTXT(txt) {
+	if !fresh && r.shouldResolveTXT(txt) {
 		r.unit.Launch(func() {
 			defer r.doneResolvingTXT(txt)
 			_, err := r.lookupResolverForTXTAddr(ctx, txt)
