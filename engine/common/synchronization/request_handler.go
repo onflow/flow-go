@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/storage"
 )
@@ -221,6 +222,11 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		return nil
 	}
 
+	maxHeight := req.FromHeight + uint64(r.core.(*synchronization.Core).Config.MaxSize)
+	if maxHeight < req.FromHeight {
+		req.FromHeight = maxHeight
+	}
+
 	// get all of the blocks, one by one
 	blocks := make([]*flow.Block, 0, req.ToHeight-req.FromHeight+1)
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
@@ -266,7 +272,10 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 
 	// deduplicate the block IDs in the batch request
 	blockIDs := make(map[flow.Identifier]struct{})
-	for _, blockID := range req.BlockIDs {
+	for i, blockID := range req.BlockIDs {
+		if i == int(r.core.(*synchronization.Core).Config.MaxSize) {
+			break
+		}
 		blockIDs[blockID] = struct{}{}
 	}
 
