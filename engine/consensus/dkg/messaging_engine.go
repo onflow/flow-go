@@ -104,6 +104,9 @@ func (e *MessagingEngine) Process(_ network.Channel, originID flow.Identifier, e
 func (e *MessagingEngine) process(originID flow.Identifier, event interface{}) error {
 	switch v := event.(type) {
 	case *msg.DKGMessage:
+		// messages are forwarded async rather than sync, because otherwise the message queue
+		// might get full when it's slow to process DKG messages synchronously and impact 
+		// block rate.
 		e.forwardInboundMessageAsync(originID, v)
 		return nil
 	default:
