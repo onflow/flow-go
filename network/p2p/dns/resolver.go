@@ -93,6 +93,9 @@ func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 }
 
 // lookupIPAddr encapsulates the logic of resolving an ip address through cache.
+// If domain exists on cache it is resolved through the cache.
+// An expired domain on cache is still addressed through the cache, however, a request is fired up asynchronously
+// through the underlying basic resolver to resolve it from the network.
 func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
 	addr, exists, fresh := r.c.resolveIPCache(domain)
 
@@ -132,6 +135,9 @@ func (r *Resolver) lookupResolverForIPAddr(ctx context.Context, domain string) (
 }
 
 // LookupTXT implements BasicResolver interface for libp2p.
+// If txt exists on cache it is resolved through the cache.
+// An expired txt on cache is still addressed through the cache, however, a request is fired up asynchronously
+// through the underlying basic resolver to resolve it from the network.
 func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) {
 
 	started := runtimeNano()
