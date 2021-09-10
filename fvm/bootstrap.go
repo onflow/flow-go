@@ -209,7 +209,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.deployQC(service)
 
-	b.deployIDTableStaking(service, fungibleToken, flowToken)
+	b.deployIDTableStaking(service, fungibleToken, flowToken, feeContract)
 
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
@@ -366,13 +366,12 @@ func (b *BootstrapProcedure) deployQC(service flow.Address) {
 	panicOnMetaInvokeErrf("failed to deploy QC contract: %s", txError, err)
 }
 
-func (b *BootstrapProcedure) deployIDTableStaking(
-	service, fungibleToken,
-	flowToken flow.Address) {
+func (b *BootstrapProcedure) deployIDTableStaking(service, fungibleToken, flowToken, flowFees flow.Address) {
 
 	contract := contracts.FlowIDTableStaking(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
+		flowFees.HexWithPrefix(),
 		true)
 
 	txError, err := b.vm.invokeMetaTransaction(
