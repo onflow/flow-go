@@ -215,7 +215,12 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 			return nil, fmt.Errorf("could not create libp2p resolver: %w", err)
 		}
 
-		opts = append(opts, libp2p.MultiaddrResolver(libp2pResolver))
+		select {
+		case <-builder.resolver.Ready():
+			opts = append(opts, libp2p.MultiaddrResolver(libp2pResolver))
+		case <-time.After(30 * time.Second):
+			return nil, fmt.Errorf("could not start resolver on time")
+		}
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -283,23 +288,6 @@ type Node struct {
 	pingService          *PingService
 	connMgr              TagLessConnManager
 	dht                  *dht.IpfsDHT
-}
-
-// Start starts the libp2p node
-func (n *Node) Start() chan struct{} {
-	done := make(chan struct{})
-
-	go func(done chan struct{}) {
-		defer close(done)
-
-		if n.resolver != nil {
-			// non-nil resolver means a non-default one, so it must be started up.
-			n.resolver.Ready()
-		}
-
-	}(done)
-
-	return done
 }
 
 // Stop terminates the libp2p node.

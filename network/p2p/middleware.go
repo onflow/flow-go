@@ -244,13 +244,6 @@ func (m *Middleware) Start(ov network.Overlay) error {
 
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
-	select {
-	case <-m.libP2PNode.Start():
-		m.log.Debug().Msg("libp2p node starts successfully")
-	case <-time.After(30 * time.Second):
-		return fmt.Errorf("could not start libp2p node")
-	}
-
 	m.UpdateNodeAddresses()
 
 	m.stakedTopicValidator = &StakedValidator{m.ov.Identity}
