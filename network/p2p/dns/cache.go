@@ -9,9 +9,9 @@ import (
 // DefaultTimeToLive is the default duration a dns result is cached.
 const (
 	// DefaultTimeToLive is the default duration a dns result is cached.
-	DefaultTimeToLive     = 60 * time.Minute
-	cacheEntryExists      = true
-	cacheEntryInvalidated = true
+	DefaultTimeToLive = 60 * time.Minute
+	cacheEntryExists  = true
+	cacheEntryExpired = true
 )
 
 // cache is a ttl-based cache for dns entries
@@ -39,16 +39,16 @@ func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 
 	if !ok {
 		// does not exist
-		return nil, !cacheEntryExists, cacheEntryInvalidated
+		return nil, !cacheEntryExists, cacheEntryExpired
 	}
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
 		// exists but expired
-		return entry.addresses, cacheEntryExists, cacheEntryInvalidated
+		return entry.addresses, cacheEntryExists, cacheEntryExpired
 	}
 
 	// exists and fresh
-	return entry.addresses, cacheEntryExists, !cacheEntryInvalidated
+	return entry.addresses, cacheEntryExists, !cacheEntryExpired
 }
 
 // resolveIPCache resolves the txt through the cache if it is available.
@@ -60,16 +60,16 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 
 	if !ok {
 		// does not exist
-		return nil, !cacheEntryExists, !cacheEntryInvalidated
+		return nil, !cacheEntryExists, !cacheEntryExpired
 	}
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
 		// exists but expired
-		return entry.addresses, cacheEntryExists, cacheEntryInvalidated
+		return entry.addresses, cacheEntryExists, cacheEntryExpired
 	}
 
 	// exists and fresh
-	return entry.addresses, cacheEntryExists, !cacheEntryInvalidated
+	return entry.addresses, cacheEntryExists, !cacheEntryExpired
 }
 
 // updateIPCache updates the cache entry for the domain.
