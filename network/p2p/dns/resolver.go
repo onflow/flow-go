@@ -32,8 +32,8 @@ type Resolver struct {
 	res            madns.BasicResolver // underlying resolver
 	collector      module.ResolverMetrics
 	unit           *engine.Unit
-	processingIPs  map[string]struct{}
-	processingTXTs map[string]struct{}
+	processingIPs  map[string]struct{} // ongoing ip lookups through underlying resolver
+	processingTXTs map[string]struct{} // ongoing txt lookups through underlying resolver
 }
 
 // optFunc is the option function for Resolver.
