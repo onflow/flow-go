@@ -134,8 +134,7 @@ func (c *CombinedVerifier) VerifyConsensusQC(signers flow.IdentityList, sigData 
 
 	aggregatedSigData, err := c.packer.Unpack(block.BlockID, signers, sigData)
 	if err != nil {
-		// TODO: Use sentinal error
-		return fmt.Error("could not unpack sig data for block (%v): %w", block.BlockID, sigData)
+		return fmt.Errorf("could not unpack sig data for block (%v): %w", block.BlockID, sigData)
 	}
 
 	msg := MakeVoteMessage(block.View, block.BlockID)
@@ -147,8 +146,7 @@ func (c *CombinedVerifier) VerifyConsensusQC(signers flow.IdentityList, sigData 
 		return fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
 	if !beaconValid {
-		// TODO: Use sential error
-		return fmt.Error("invalid beacon error: %w", err)
+		return fmt.Errorf("invalid random beacon signature: %w", signature.ErrInvalidFormat)
 	}
 	// verify the aggregated staking signature next (more costly)
 	// TODO: eventually VerifyMany will be a method of a stateful struct. The struct would
@@ -161,27 +159,28 @@ func (c *CombinedVerifier) VerifyConsensusQC(signers flow.IdentityList, sigData 
 	if err != nil {
 		return fmt.Errorf("could not compute aggregated key: %w", err)
 	}
+
 	aggregatedStakingValid, err := c.staking.Verify(msg, aggregatedSigData.AggregatedStakingSig, aggregatedKey)
 	if err != nil {
 		return fmt.Errorf("internal error while verifying aggregated staking signature: %w", err)
 	}
 
-	if aggregatedStakingValid == false {
-		// TODO: use sentinal error
-		return fmt.Errorf("invalid aggregated staking sig error: %w", err)
+	if !aggregatedStakingValid {
+		return fmt.Errorf("invalid aggregated staking sig: %w", signature.ErrInvalidFormat)
 	}
 
 	aggregatedBeaconKey, err := c.keysAggregator.aggregatedStakingKey(aggregatedSigData.RandomBeaconSigners)
 	if err != nil {
 		return fmt.Errorf("could not compute aggregated key: %w", err)
 	}
+
 	aggregatedBeaconValid, err := c.staking.Verify(msg, aggregatedSigData.AggregatedRandomBeaconSig, aggregatedBeaconKey)
 	if err != nil {
 		return fmt.Errorf("internal error while verifying aggregated random beacon signature: %w", err)
 	}
-	if aggregatedBeaconValid == false {
-		// TODO: use sentinal error
-		return fmt.Errorf("invalid aggregated random beacon sig error: %w", err)
+
+	if !aggregatedBeaconValid {
+		return fmt.Errorf("invalid aggregated random beacon sig error: %w", signature.ErrInvalidFormat)
 	}
 
 	return nil
