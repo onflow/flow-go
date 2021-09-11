@@ -146,7 +146,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 	// seed the DHT with the boostrap identities
 	bootstrapPeersOpt, err := p2p.WithBootstrapPeers(builder.bootstrapIdentities)
 	if err != nil {
-		return nil, fmt.Errorf("could not configure bootstrap peers opts: %w", err)
+		return nil, err
 	}
 	dhtOptions = append(dhtOptions, bootstrapPeersOpt)
 
