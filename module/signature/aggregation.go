@@ -33,12 +33,12 @@ type SignatureAggregatorSameMessage struct {
 // NewSignatureAggregatorSameMessage returns a new SignatureAggregatorSameMessage structure.
 //
 // A new SignatureAggregatorSameMessage is needed for each set of public keys. If the key set changes,
-// a new structure needs to be instantiated.
+// a new structure needs to be instantiated. Participants are defined by their public keys, and are
+// indexed from 0 to n-1 where n is the length of the public key slice.
 // The function errors with ErrInvalidInputs if any input is invalid.
 func NewSignatureAggregatorSameMessage(
 	message []byte, // message to be aggregate signatures for
 	dsTag []byte, // domain separation tag used for signatures
-	n int, // number of participants
 	publicKeys []crypto.PublicKey, // public keys of participants agreed upon upfront
 ) (*SignatureAggregatorSameMessage, error) {
 	panic("implement me")
@@ -99,14 +99,14 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 	panic("implement me")
 }
 
-// VerifyAggregation verifies an aggregated signature against the stored message and the stored
+// VerifyAggregate verifies an aggregated signature against the stored message and the stored
 // keys corresponding to the input signers.
 // Aggregating the keys of the signers internally is optimized to only look at the keys delta
 // compared to the latest execution of the function. The function is therefore not thread-safe.
 // The function errors:
 //  - ErrInvalidInputs if the indices are invalid
 //  - random error if the execution failed
-func (s *SignatureAggregatorSameMessage) VerifyAggregation(sig crypto.Signature, signers []int) (bool, error) {
+func (s *SignatureAggregatorSameMessage) VerifyAggregate(sig crypto.Signature, signers []int) (bool, error) {
 	panic("implement me")
 }
 
