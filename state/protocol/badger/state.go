@@ -49,10 +49,6 @@ func SkipNetworkAddressValidation(conf *BootstrapConfig) {
 	conf.SkipNetworkAddressValidation = true
 }
 
-// NetworkAddressError are validation errors that are expected to occur during the bootstrap of an unstaked access node
-// They occur because the node identity addresses in the root snapshot file used to bootstrap the node are absent
-var NetworkAddressError = errors.New("network address error")
-
 func Bootstrap(
 	metrics module.ComplianceMetrics,
 	db *badger.DB,
@@ -82,12 +78,8 @@ func Bootstrap(
 
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
-	if err := isValidRootSnapshot(root); err != nil {
-		// if SkipNetworkAddressValidation is false or if this is any error other than one caused by missing network
-		// addresses throw an error
-		if !config.SkipNetworkAddressValidation || !errors.Is(err, NetworkAddressError) {
-			return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
-		}
+	if err := isValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
+		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
 
 	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
@@ -131,11 +123,9 @@ func Bootstrap(
 		}
 
 		// 5) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root)(tx)
+		err = state.bootstrapEpoch(root, !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
-			if !config.SkipNetworkAddressValidation || !errors.Is(err, NetworkAddressError) {
-				return fmt.Errorf("could not bootstrap epoch values: %w", err)
-			}
+			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
 
 		// 6) set metric values
@@ -282,7 +272,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 //
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx) error {
+func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		previous := root.Epochs().Previous()
 		current := root.Epochs().Current()
@@ -306,7 +296,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 				return fmt.Errorf("could not get previous epoch commit event: %w", err)
 			}
 
-			if err := isValidEpochSetup(setup); err != nil {
+			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
 
@@ -332,7 +322,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 			return fmt.Errorf("could not get current epoch commit event: %w", err)
 		}
 
-		if err := isValidEpochSetup(setup); err != nil {
+		if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 			return fmt.Errorf("invalid setup: %w", err)
 		}
 
@@ -354,7 +344,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 				return fmt.Errorf("could not get next epoch setup event: %w", err)
 			}
 
-			if err := isValidEpochSetup(setup); err != nil {
+			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
 

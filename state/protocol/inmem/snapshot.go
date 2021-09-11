@@ -97,12 +97,12 @@ func StrippedInmemSnapshot(snapshot EncodableSnapshot) EncodableSnapshot {
 			return
 		}
 		removeAddress(epoch.InitialIdentities)
-		for _, cluster := range epoch.Clustering {
-			removeAddress(cluster)
-		}
-		for _, c := range epoch.Clusters {
-			removeAddress(c.Members)
-		}
+		//for _, cluster := range epoch.Clustering {
+		//	removeAddress(cluster)
+		//}
+		//for _, c := range epoch.Clusters {
+		//	removeAddress(c.Members)
+		//}
 	}
 
 	removeAddress(snapshot.Identities)
