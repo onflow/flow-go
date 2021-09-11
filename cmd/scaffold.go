@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -125,6 +126,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
+	fnb.flags.StringVar(&fnb.BaseConfig.adminAddr, "admin-addr", defaultConfig.adminAddr, "address to bind on for admin gRPC service")
+	fnb.flags.StringVar(&fnb.BaseConfig.adminHttpAddr, "admin-http-addr", defaultConfig.adminHttpAddr, "address to bind on for admin gRPC service")
 
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
@@ -218,6 +221,24 @@ func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 	fnb.Component("metrics server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
 		return server, nil
+	})
+}
+
+func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
+	fnb.Component("admin server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+		var opts []admin.CommandRunnerOption
+		if fnb.adminHttpAddr != NotSet {
+			opts = append(opts, admin.WithHTTPServer(fnb.adminHttpAddr))
+		}
+
+		command_runner := admin.NewCommandRunner(fnb.Logger, fnb.adminAddr, opts...)
+		if err := command_runner.Start(ctx); err != nil {
+			return nil, err
+		}
+
+		node.CommandRunner = command_runner
+
+		return command_runner, nil
 	})
 }
 
@@ -720,6 +741,10 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()
 		fnb.RegisterBadgerMetrics()
+	}
+
+	if fnb.adminAddr != NotSet {
+		fnb.EnqueueAdminServerInit(ctx)
 	}
 
 	fnb.EnqueueTracer()

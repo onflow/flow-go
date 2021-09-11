@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
@@ -92,6 +93,8 @@ type NodeBuilder interface {
 type BaseConfig struct {
 	nodeIDHex             string
 	bindAddr              string
+	adminAddr             string
+	adminHttpAddr         string
 	NodeRole              string
 	timeout               time.Duration
 	datadir               string
@@ -132,6 +135,7 @@ type NodeConfig struct {
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey
 	NetworkKey        crypto.PrivateKey
+	CommandRunner     *admin.CommandRunner
 
 	// root state information
 	RootBlock   *flow.Block
@@ -147,6 +151,8 @@ func DefaultBaseConfig() *BaseConfig {
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
 		bindAddr:              NotSet,
+		adminAddr:             NotSet,
+		adminHttpAddr:         NotSet,
 		BootstrapDir:          "bootstrap",
 		timeout:               1 * time.Minute,
 		datadir:               datadir,
