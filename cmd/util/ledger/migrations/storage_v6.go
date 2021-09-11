@@ -2,14 +2,13 @@ package migrations
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"math"
 	"os"
 	"path"
 	"strings"
 	"time"
-
-	"encoding/hex"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/rs/zerolog"
@@ -61,21 +60,23 @@ type storageFormatV6MigrationResult struct {
 	err     error
 }
 
-var _ atree.BaseStorage = &EncodingStorage{}
-
-type EncodingStorage struct {
+// Base storage to be used by the persistent slab storage.
+//
+type encodingBaseStorage struct {
 	*atree.InMemBaseStorage
-	Payloads []ledger.Payload
+	ReencodedPayloads []*ledger.Payload
 }
 
-func NewEncodingStorage() *EncodingStorage {
-	return &EncodingStorage{
-		InMemBaseStorage: atree.NewInMemBaseStorage(),
-		Payloads:         make([]ledger.Payload, 0),
+var _ atree.BaseStorage = &encodingBaseStorage{}
+
+func newEncodingBaseStorage() *encodingBaseStorage {
+	return &encodingBaseStorage{
+		InMemBaseStorage:  atree.NewInMemBaseStorage(),
+		ReencodedPayloads: make([]*ledger.Payload, 0),
 	}
 }
 
-func (e *EncodingStorage) Store(id atree.StorageID, value []byte) error {
+func (e *encodingBaseStorage) Store(id atree.StorageID, value []byte) error {
 	err := e.InMemBaseStorage.Store(id, value)
 	if err != nil {
 		return err
@@ -93,9 +94,32 @@ func (e *EncodingStorage) Store(id atree.StorageID, value []byte) error {
 		),
 	}
 
-	e.Payloads = append(e.Payloads, payload)
+	e.ReencodedPayloads = append(e.ReencodedPayloads, &payload)
 
 	return nil
+}
+
+// delegationStorage is the storage implementation to be used by the
+// new interpreter during value conversions. This is a delegation
+// object and does not define any operations.
+//
+type delegationStorage struct {
+	// Overrides the InMemoryStorage's storage operations (i.e: BasicSlabStorage)
+	// using a PersistentSlabStorage.
+	*atree.PersistentSlabStorage
+
+	*newInter.InMemoryStorage
+}
+
+var _ newInter.Storage = &delegationStorage{}
+var _ atree.SlabStorage = &delegationStorage{}
+
+func newDelegationStorage(persistentSlabStorage *atree.PersistentSlabStorage) delegationStorage {
+	inMemStorage := newInter.NewInMemoryStorage()
+	return delegationStorage{
+		PersistentSlabStorage: persistentSlabStorage,
+		InMemoryStorage:       &inMemStorage,
+	}
 }
 
 func ledgerKeyFromStorageID(id atree.StorageID) ledger.Key {
@@ -113,21 +137,15 @@ type storagePath struct {
 	key   string
 }
 
-type decodedPayload struct {
-	key   storagePath
-	value oldInter.Value
-}
-
 type StorageFormatV6Migration struct {
-	Log           zerolog.Logger
-	OutputDir     string
-	accounts      *state.Accounts
-	programs      *programs.Programs
-	brokenTypeIDs map[common.TypeID]brokenTypeCause
-	reportFile    *os.File
-	storage       *atree.PersistentSlabStorage
-	baseStorage   *EncodingStorage
-	interpreter   *oldInter.Interpreter
+	Log        zerolog.Logger
+	OutputDir  string
+	accounts   *state.Accounts
+	programs   *programs.Programs
+	reportFile *os.File
+	storage    *atree.PersistentSlabStorage
+	oldInter   *oldInter.Interpreter
+	newInter   *newInter.Interpreter
 
 	migratedPayloadPaths map[storagePath]bool
 	deferredValuePaths   map[storagePath]bool
@@ -163,17 +181,17 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.programs = programs.NewEmptyPrograms()
 
-	m.brokenTypeIDs = make(map[common.TypeID]brokenTypeCause, 0)
-
 	m.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
-	m.initStorage()
+	baseStorage := newEncodingBaseStorage()
+	storage := newPersistentSlabStorage(baseStorage)
+
+	m.initNewInterpreter(storage)
+	m.initOldInterpreter(payloads)
 
 	m.deferredValuePaths = m.getDeferredKeys(payloads)
 
-	m.interpreter = m.newInterpreter(payloads)
-
-	// Convert payloads payloads.
+	// Convert payloads.
 	//   - Cadence values are decoded and converted to new values.
 	//   - Non-cadence values are added to the migrated payloads.
 
@@ -201,7 +219,7 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 			migratedPayloads = append(migratedPayloads, *result.payload)
 		} else {
 			// Both nil means, value is decoded and converted.
-			// Do the encoding once at the end.
+			// Do the encoding at once at the end.
 		}
 	}
 	m.Log.Info().Msg("Converting payloads complete")
@@ -216,15 +234,15 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 
 	// Add the encoded new values to the payloads
 
-	for _, payload := range m.baseStorage.Payloads {
-		migratedPayloads = append(migratedPayloads, payload)
+	for _, payload := range baseStorage.ReencodedPayloads {
+		migratedPayloads = append(migratedPayloads, *payload)
 	}
 	m.Log.Info().Msg("Re-encoding converted values complete")
 
 	return migratedPayloads, nil
 }
 
-func (m *StorageFormatV6Migration) initStorage() {
+func newPersistentSlabStorage(encodingStorage *encodingBaseStorage) *atree.PersistentSlabStorage {
 	encMode, err := cbor.EncOptions{}.EncMode()
 	if err != nil {
 		panic(err)
@@ -235,10 +253,8 @@ func (m *StorageFormatV6Migration) initStorage() {
 		panic(err)
 	}
 
-	m.baseStorage = NewEncodingStorage()
-
-	m.storage = atree.NewPersistentSlabStorage(
-		m.baseStorage,
+	return atree.NewPersistentSlabStorage(
+		encodingStorage,
 		encMode,
 		decMode,
 	)
@@ -444,13 +460,12 @@ func (m *StorageFormatV6Migration) decodeAndConvert(
 	version uint16,
 ) (err error) {
 
-	// If its a deferred value, then skip
-
 	path := storagePath{
 		owner: string(owner.Bytes()),
 		key:   key,
 	}
 
+	// If it's a deferred value, then skip.
 	if m.deferredValuePaths[path] {
 		return nil
 	}
@@ -466,16 +481,34 @@ func (m *StorageFormatV6Migration) decodeAndConvert(
 		return err
 	}
 
-	converter := NewValueConverter(m.storage)
-	_ = converter.Convert(m.interpreter, rootValue)
+	converter := NewValueConverter(m.newInter, m.oldInter, m.storage)
+	_ = converter.Convert(rootValue)
 
-	// Mark the payload as 'migrated'
+	// Mark the payload as 'migrated'.
 	m.migratedPayloadPaths[path] = true
 
 	return nil
 }
 
-func (m *StorageFormatV6Migration) newInterpreter(payloads []ledger.Payload) *oldInter.Interpreter {
+func (m *StorageFormatV6Migration) initNewInterpreter(storage *atree.PersistentSlabStorage) {
+	inter, err := newInter.NewInterpreter(
+		nil,
+		nil,
+	)
+
+	if err != nil {
+		panic(fmt.Errorf(
+			"failed to create interpreter: %w",
+			err,
+		))
+	}
+
+	inter.Storage = newDelegationStorage(storage)
+
+	m.newInter = inter
+}
+
+func (m *StorageFormatV6Migration) initOldInterpreter(payloads []ledger.Payload) {
 	// Convert old value to new value
 
 	storageView := newView(payloads)
@@ -556,13 +589,19 @@ func (m *StorageFormatV6Migration) newInterpreter(payloads []ledger.Payload) *ol
 		))
 	}
 
-	return inter
+	m.oldInter = inter
 }
 
-func (m *StorageFormatV6Migration) decode(data []byte, owner common.Address, key string, version uint16) (oldInter.Value, error, bool) {
-	storagePath := []string{key}
+func (m *StorageFormatV6Migration) decode(
+	data []byte,
+	owner common.Address,
+	key string,
+	version uint16,
+) (oldInter.Value, error, bool) {
 
-	rootValue, err := oldInter.DecodeValue(data, &owner, storagePath, version, nil)
+	path := []string{key}
+
+	rootValue, err := oldInter.DecodeValue(data, &owner, path, version, nil)
 	if err != nil {
 		if tagErr, ok := err.(oldInter.UnsupportedTagDecodingError); ok &&
 			tagErr.Tag == cborTagStorageReference &&
@@ -606,22 +645,31 @@ func cborMeLink(value []byte) string {
 	return fmt.Sprintf("http://cbor.me/?bytes=%x", value)
 }
 
-// Value Converter
+// ValueConverter converts old cadence interpreter values
+// to new cadence interpreter values.
 //
 type ValueConverter struct {
-	result  newInter.Value
-	storage atree.SlabStorage
+	result   newInter.Value
+	storage  atree.SlabStorage
+	newInter *newInter.Interpreter
+	oldInter *oldInter.Interpreter
 }
 
 var _ oldInter.Visitor = &ValueConverter{}
 
-func NewValueConverter(storage atree.SlabStorage) *ValueConverter {
+func NewValueConverter(
+	newInter *newInter.Interpreter,
+	oldInter *oldInter.Interpreter,
+	storage atree.SlabStorage,
+) *ValueConverter {
 	return &ValueConverter{
-		storage: storage,
+		storage:  storage,
+		newInter: newInter,
+		oldInter: oldInter,
 	}
 }
 
-func (c *ValueConverter) Convert(inter *oldInter.Interpreter, value oldInter.Value) newInter.Value {
+func (c *ValueConverter) Convert(value oldInter.Value) newInter.Value {
 	prevResult := c.result
 	c.result = nil
 
@@ -630,7 +678,7 @@ func (c *ValueConverter) Convert(inter *oldInter.Interpreter, value oldInter.Val
 	}()
 
 	// Interpreter is never used. So safe to pass nil here.
-	value.Accept(inter, c)
+	value.Accept(c.oldInter, c)
 
 	if c.result == nil {
 		panic("returned nil")
@@ -665,13 +713,13 @@ func (c *ValueConverter) VisitArrayValue(inter *oldInter.Interpreter, value *old
 	newElements := make([]newInter.Value, value.Count())
 
 	for index, element := range value.Elements() {
-		newElements[index] = c.Convert(inter, element)
+		newElements[index] = c.Convert(element)
 	}
 
 	arrayStaticType := ConvertStaticType(value.StaticType()).(newInter.ArrayStaticType)
 
 	c.result = newInter.NewArrayValueWithAddress(
-		nil,
+		c.newInter,
 		arrayStaticType,
 		*value.Owner,
 		newElements...,
@@ -765,7 +813,7 @@ func (c *ValueConverter) VisitCompositeValue(inter *oldInter.Interpreter, value 
 	fields := newInter.NewStringValueOrderedMap()
 
 	value.Fields().Foreach(func(key string, fieldVal oldInter.Value) {
-		fields.Set(key, c.Convert(inter, fieldVal))
+		fields.Set(key, c.Convert(fieldVal))
 	})
 
 	// TODO: Convert location and kind to new package?
@@ -793,12 +841,12 @@ func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value
 			continue
 		}
 
-		keysAndValues = append(keysAndValues, c.Convert(inter, key))
-		keysAndValues = append(keysAndValues, c.Convert(inter, entryValue))
+		keysAndValues = append(keysAndValues, c.Convert(key))
+		keysAndValues = append(keysAndValues, c.Convert(entryValue))
 	}
 
 	c.result = newInter.NewDictionaryValueWithAddress(
-		nil,
+		c.newInter,
 		staticType,
 		*value.Owner,
 		keysAndValues...,
@@ -838,7 +886,7 @@ func (c *ValueConverter) VisitNilValue(_ *oldInter.Interpreter, _ oldInter.NilVa
 }
 
 func (c *ValueConverter) VisitSomeValue(inter *oldInter.Interpreter, value *oldInter.SomeValue) bool {
-	innerValue := c.Convert(inter, value.Value)
+	innerValue := c.Convert(value.Value)
 	c.result = newInter.NewSomeValueNonCopying(innerValue)
 
 	// Do not descent
@@ -865,8 +913,8 @@ func (c *ValueConverter) VisitPathValue(_ *oldInter.Interpreter, value oldInter.
 }
 
 func (c *ValueConverter) VisitCapabilityValue(inter *oldInter.Interpreter, value oldInter.CapabilityValue) {
-	address := c.Convert(inter, value.Address).(newInter.AddressValue)
-	pathValue := c.Convert(inter, value.Path).(newInter.PathValue)
+	address := c.Convert(value.Address).(newInter.AddressValue)
+	pathValue := c.Convert(value.Path).(newInter.PathValue)
 
 	var burrowType newInter.StaticType
 	if value.BorrowType != nil {
@@ -881,7 +929,7 @@ func (c *ValueConverter) VisitCapabilityValue(inter *oldInter.Interpreter, value
 }
 
 func (c *ValueConverter) VisitLinkValue(inter *oldInter.Interpreter, value oldInter.LinkValue) {
-	targetPath := c.Convert(inter, value.TargetPath).(newInter.PathValue)
+	targetPath := c.Convert(value.TargetPath).(newInter.PathValue)
 	c.result = newInter.LinkValue{
 		TargetPath: targetPath,
 		Type:       ConvertStaticType(value.Type),
