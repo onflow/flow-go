@@ -57,5 +57,9 @@ func WithBootstrapPeers(bootstrapNodes flow.IdentityList) (dht.Option, error) {
 func defaultDHTOptions() []dht.Option {
 	return []dht.Option{
 		dht.ProtocolPrefix(FlowLibP2PProtocolCommonPrefix),
+		dht.RoutingTableFilter(func(dht interface{}, p peer.ID) bool {
+			// return true if p is the peer ID of a staked node
+			return true
+		}),
 	}
 }
