@@ -29,8 +29,29 @@ type State struct {
 		commits  storage.EpochCommits
 		statuses storage.EpochStatuses
 	}
-	skipNwAddressBasedValidations bool
 }
+
+type BootstrapConfig struct {
+	// SkipNetworkAddressValidation flags allows skipping all the network address related validations not needed for
+	// an unstaked node
+	SkipNetworkAddressValidation bool
+}
+
+func defaultBootstrapConfig() *BootstrapConfig {
+	return &BootstrapConfig{
+		SkipNetworkAddressValidation: false,
+	}
+}
+
+type BootstrapConfigOptions func(conf *BootstrapConfig)
+
+func SkipNetworkAddressValidation(conf *BootstrapConfig) {
+	conf.SkipNetworkAddressValidation = true
+}
+
+// NetworkAddressError are validation errors that are expected to occur during the bootstrap of an unstaked access node
+// They occur because the node identity addresses in the root snapshot file used to bootstrap the node are absent
+var NetworkAddressError = errors.New("network address error")
 
 func Bootstrap(
 	metrics module.ComplianceMetrics,
@@ -43,8 +64,13 @@ func Bootstrap(
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
 	root protocol.Snapshot,
-	skipNwAddressBasedValidations bool,
+	options ...BootstrapConfigOptions,
 ) (*State, error) {
+
+	config := defaultBootstrapConfig()
+	for _, opt := range options {
+		opt(config)
+	}
 
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
@@ -53,10 +79,15 @@ func Bootstrap(
 	if isBootstrapped {
 		return nil, fmt.Errorf("expected empty database")
 	}
-	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses, skipNwAddressBasedValidations)
 
-	if err := isValidRootSnapshot(root, skipNwAddressBasedValidations); err != nil {
-		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
+	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
+
+	if err := isValidRootSnapshot(root); err != nil {
+		// if SkipNetworkAddressValidation is false or if this is any error other than one caused by missing network
+		// addresses throw an error
+		if !config.SkipNetworkAddressValidation || !errors.Is(err, NetworkAddressError) {
+			return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
+		}
 	}
 
 	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
@@ -102,7 +133,9 @@ func Bootstrap(
 		// 5) initialize values related to the epoch logic
 		err = state.bootstrapEpoch(root)(tx)
 		if err != nil {
-			return fmt.Errorf("could not bootstrap epoch values: %w", err)
+			if !config.SkipNetworkAddressValidation || !errors.Is(err, NetworkAddressError) {
+				return fmt.Errorf("could not bootstrap epoch values: %w", err)
+			}
 		}
 
 		// 6) set metric values
@@ -273,7 +306,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 				return fmt.Errorf("could not get previous epoch commit event: %w", err)
 			}
 
-			if err := isValidEpochSetup(setup, state.skipNwAddressBasedValidations); err != nil {
+			if err := isValidEpochSetup(setup); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
 
@@ -299,7 +332,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 			return fmt.Errorf("could not get current epoch commit event: %w", err)
 		}
 
-		if err := isValidEpochSetup(setup, state.skipNwAddressBasedValidations); err != nil {
+		if err := isValidEpochSetup(setup); err != nil {
 			return fmt.Errorf("invalid setup: %w", err)
 		}
 
@@ -321,7 +354,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 				return fmt.Errorf("could not get next epoch setup event: %w", err)
 			}
 
-			if err := isValidEpochSetup(setup, state.skipNwAddressBasedValidations); err != nil {
+			if err := isValidEpochSetup(setup); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
 
@@ -390,7 +423,6 @@ func OpenState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
-	skipValidations bool,
 ) (*State, error) {
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
@@ -399,7 +431,7 @@ func OpenState(
 	if !isBootstrapped {
 		return nil, fmt.Errorf("expected database to contain bootstrapped state")
 	}
-	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses, skipValidations)
+	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
 	finalSnapshot := state.Final()
 
@@ -464,7 +496,6 @@ func newState(
 	setups storage.EpochSetups,
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
-	skipValidations bool,
 ) *State {
 	return &State{
 		metrics: metrics,
@@ -482,7 +513,6 @@ func newState(
 			commits:  commits,
 			statuses: statuses,
 		},
-		skipNwAddressBasedValidations: skipValidations,
 	}
 }
 

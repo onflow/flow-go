@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
-	"reflect"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/client"
@@ -124,34 +123,7 @@ func rootProtocolJsonWithoutAddresses(srcfile string, dstFile string) error {
 		return err
 	}
 
-	removeAddress := func(ids flow.IdentityList) {
+	strippedSnapshot := inmem.StrippedInmemSnapshot(rootSnapshot)
 
-		for _, identity := range ids {
-			identity.Address = ""
-			//TODO: following doesn't work and Address is still retained
-			idType := reflect.TypeOf(*identity)
-			if addressField, found := idType.FieldByName("Address"); found {
-				addressField.Tag = `json:"-"` // suppress json
-			}
-		}
-	}
-	removeAddress(rootSnapshot.Identities)
-	if rootSnapshot.Epochs.Previous != nil {
-		removeAddress(rootSnapshot.Epochs.Previous.InitialIdentities)
-	}
-
-	removeAddress(rootSnapshot.Epochs.Current.InitialIdentities)
-
-	if rootSnapshot.Epochs.Next != nil {
-		removeAddress(rootSnapshot.Epochs.Next.InitialIdentities)
-	}
-
-	for _, event := range rootSnapshot.LatestResult.ServiceEvents {
-		switch event.Type {
-		case flow.ServiceEventSetup:
-			removeAddress(event.Event.(*flow.EpochSetup).Participants)
-		}
-	}
-
-	return WriteJSON(dstFile, rootSnapshot)
+	return WriteJSON(dstFile, strippedSnapshot)
 }

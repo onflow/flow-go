@@ -509,7 +509,6 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Setups,
 			fnb.Storage.Commits,
 			fnb.Storage.Statuses,
-			false,
 		)
 		fnb.MustNot(err).Msg("could not open flow state")
 		fnb.State = state
@@ -530,7 +529,10 @@ func (fnb *FlowNodeBuilder) initState() {
 	} else {
 		// Bootstrap!
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
-
+		var options []badgerState.BootstrapConfigOptions
+		if fnb.SkipNwAddressBasedValidations {
+			options = append(options, badgerState.SkipNetworkAddressValidation)
+		}
 		fnb.State, err = badgerState.Bootstrap(
 			fnb.Metrics.Compliance,
 			fnb.DB,
@@ -542,7 +544,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Commits,
 			fnb.Storage.Statuses,
 			rootSnapshot,
-			fnb.SkipNwAddressBasedValidations,
+			options...,
 		)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 

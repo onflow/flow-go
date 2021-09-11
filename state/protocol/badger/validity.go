@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
-func isValidEpochSetup(setup *flow.EpochSetup, skipNetworkAddressValidations bool) error {
+func isValidEpochSetup(setup *flow.EpochSetup) error {
 	// STEP 1: general sanity checks
 	// the seed needs to be at least minimum length
 	if len(setup.RandomSource) != flow.EpochSetupRandomSourceLength {
@@ -27,16 +27,17 @@ func isValidEpochSetup(setup *flow.EpochSetup, skipNetworkAddressValidations boo
 		identLookup[participant.NodeID] = struct{}{}
 	}
 
-	if !skipNetworkAddressValidations {
-		// there should be no duplicate node addresses
-		addrLookup := make(map[string]struct{})
-		for _, participant := range setup.Participants {
-			_, ok := addrLookup[participant.Address]
-			if ok {
-				return fmt.Errorf("duplicate node address (%x)", participant.Address)
-			}
-			addrLookup[participant.Address] = struct{}{}
+	// there should be no duplicate node addresses
+	addrLookup := make(map[string]struct{})
+	for _, participant := range setup.Participants {
+		if participant.Address == "" {
+			return NetworkAddressError
 		}
+		_, ok := addrLookup[participant.Address]
+		if ok {
+			return fmt.Errorf("duplicate node address (%x)", participant.Address)
+		}
+		addrLookup[participant.Address] = struct{}{}
 	}
 
 	// there should be no nodes with zero stake
@@ -119,7 +120,7 @@ func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error 
 }
 
 // isValidRootSnapshot checks internal consistency of root state snapshot
-func isValidRootSnapshot(snap protocol.Snapshot, skipNwAddressBasedValidations bool) error {
+func isValidRootSnapshot(snap protocol.Snapshot) error {
 
 	segment, err := snap.SealingSegment()
 	if err != nil {
@@ -147,14 +148,6 @@ func isValidRootSnapshot(snap protocol.Snapshot, skipNwAddressBasedValidations b
 		return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, tail.ID())
 	}
 
-	if !skipNwAddressBasedValidations {
-		// result.ID changes if addresses are stripped off from the ServiceEvents, hence skip this check
-		// for the unstaked access node since it's root snapshot doesn't has the network addresses
-		if seal.ResultID != result.ID() {
-			return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
-		}
-	}
-
 	// identities must be canonically ordered
 	identities, err := snap.Identities(filter.Any)
 	if err != nil {
@@ -162,6 +155,17 @@ func isValidRootSnapshot(snap protocol.Snapshot, skipNwAddressBasedValidations b
 	}
 	if !identities.Sorted(order.Canonical) {
 		return fmt.Errorf("identities are not canonically ordered")
+	}
+
+	if seal.ResultID != result.ID() {
+		// result.ID changes if addresses are stripped off from the ServiceEvents, hence for the unstaked access
+		// node since this validation will always fail
+		if id, found := identities.ByIndex(0); found {
+			if id.Address == "" {
+				return NetworkAddressError
+			}
+		}
+		return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
 	}
 
 	// root qc must be for reference block of snapshot
