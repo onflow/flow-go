@@ -31,13 +31,16 @@ func TestValueConversion(t *testing.T) {
 		address := &common.Address{1, 2}
 		oldArray.SetOwner(address)
 
-		storage := newInter.NewInMemoryStorage()
-		converter := NewValueConverter(storage)
+		migration := &StorageFormatV6Migration{}
+		baseStorage := newEncodingBaseStorage()
+		storage := newPersistentSlabStorage(baseStorage)
+		migration.initNewInterpreter(storage)
 
-		inter, err := oldInter.NewInterpreter(nil, nil)
+		oldInterpreter, err := oldInter.NewInterpreter(nil, nil)
 		assert.NoError(t, err)
 
-		newValue := converter.Convert(inter, oldArray)
+		converter := NewValueConverter(migration.newInter, oldInterpreter, storage)
+		newValue := converter.Convert(oldArray)
 
 		assert.IsType(t, &newInter.ArrayValue{}, newValue)
 		array := newValue.(*newInter.ArrayValue)
@@ -67,7 +70,10 @@ func TestEncoding(t *testing.T) {
 			Log: zerolog.Logger{},
 		}
 
-		migration.initStorage()
+		baseStorage := newEncodingBaseStorage()
+		storage := newPersistentSlabStorage(baseStorage)
+		migration.initNewInterpreter(storage)
+
 		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
 		address := common.Address{1, 2}
@@ -77,7 +83,7 @@ func TestEncoding(t *testing.T) {
 
 		migration.storage.Commit()
 
-		encodedValues := migration.baseStorage.Payloads
+		encodedValues := baseStorage.ReencodedPayloads
 		require.Len(t, encodedValues, 1)
 
 		storageId := atree.NewStorageID(
@@ -132,7 +138,9 @@ func TestEncoding(t *testing.T) {
 			Log: zerolog.Logger{},
 		}
 
-		migration.initStorage()
+		baseStorage := newEncodingBaseStorage()
+		storage := newPersistentSlabStorage(baseStorage)
+		migration.initNewInterpreter(storage)
 		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
 		address := common.Address{1, 2}
@@ -142,7 +150,7 @@ func TestEncoding(t *testing.T) {
 
 		migration.storage.Commit()
 
-		encodedValues := migration.baseStorage.Payloads
+		encodedValues := baseStorage.ReencodedPayloads
 		require.Len(t, encodedValues, 2)
 
 		storageId := atree.NewStorageID(
@@ -168,4 +176,54 @@ func TestEncoding(t *testing.T) {
 		require.True(t, ok)
 		assert.Equal(t, newInter.BoolValue(true), value)
 	})
+}
+
+// Tests for the 'Store' method implementation of delegationStorage.
+func TestDelegation(t *testing.T) {
+	t.Parallel()
+
+	var s storageInterface = &delegator{}
+
+	// s.name() must invoke the respective method from the
+	// overridden implementation. i.e: 'overrider.name()'
+	assert.Equal(t, "overrider", s.name())
+}
+
+type storageInterface interface {
+	name() string
+}
+
+var _ storageInterface = &overrider{}
+var _ storageInterface = &storageImpl{}
+var _ storageInterface = &innerStorageImpl{}
+var _ storageInterface = &delegator{}
+
+// delegator does not define method 'name'.
+// Instead, delegates to overrider and storageImpl,
+// where both have the same method.
+type delegator struct {
+	*overrider // overrides the inner implementation
+	*storageImpl
+}
+
+// overrider defines method 'name'
+type overrider struct {
+}
+
+func (*overrider) name() string {
+	return "overrider"
+}
+
+// storageImpl does not define method 'name',
+// but delegates to innerStorageImpl.
+type storageImpl struct {
+	*innerStorageImpl
+}
+
+// innerStorageImpl defines method 'name'
+type innerStorageImpl struct {
+}
+
+func (*innerStorageImpl) name() string {
+	return "inner implementation"
 }
