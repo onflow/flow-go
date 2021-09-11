@@ -159,7 +159,9 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 		libP2PFactory, err := builder.initLibP2PFactory(ctx,
 			builder.NodeID,
 			builder.NodeConfig.NetworkKey)
-		builder.MustNot(err)
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize libp2p factory: %w", err)
+		}
 
 		msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, builder.NodeID)
 
@@ -169,7 +171,9 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 		top := topology.EmptyListTopology{}
 
 		network, err := builder.initNetwork(builder.Me, node.Metrics.Network, middleware, top)
-		builder.MustNot(err)
+		if err != nil {
+			return nil, fmt.Errorf("could not initialize network: %w", err)
+		}
 
 		builder.Network = network
 		builder.Middleware = middleware
