@@ -54,8 +54,8 @@ func NewEngine(
 	me module.Local,
 	state protocol.State,
 	payloads storage.ClusterPayloads,
-	core *Core) (*Engine, error) {
-
+	core *Core,
+) (*Engine, error) {
 	engineLog := log.With().Str("cluster_compliance", "engine").Logger()
 
 	// find my cluster for the current epoch

@@ -20,8 +20,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-// Core is the cluster consensus engine, responsible for handling communication for
-// the embedded consensus algorithm.
+// Core contains the central business logic for the collector clusters' compliance engine.
+// It is responsible for handling communication for the embedded consensus algorithm.
 // NOTE: Core is designed to be non-thread safe and cannot be used in concurrent environment
 // user of this object needs to ensure single thread access.
 type Core struct {
@@ -36,7 +36,7 @@ type Core struct {
 	hotstuff          module.HotStuff
 }
 
-// NewCore creates a new consensus propagation engine.
+// NewCore instantiates the business logic for the collector clusters' compliance engine.
 func NewCore(
 	log zerolog.Logger,
 	collector module.EngineMetrics,
