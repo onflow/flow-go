@@ -11,6 +11,12 @@ cross-blst-test:
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic,blst -run BLST -v ./...
 
+NUM_RUNS := 10
+
+.PHONY: flakiness-run
+flakiness-run:
+	GO111MODULE=on go test -json -count $(NUM_RUNS) --tags relic ./... | jq 'select(.Test != null and (.Action == "pass" or .Action == "fail"))' >> flakiness_results
+
 .PHONY: docker-build
 docker-build:
 	docker build --ssh default -t gcr.io/dl-flow/golang-cmake:latest -t gcr.io/dl-flow/golang-cmake:$(IMAGE_TAG) .
