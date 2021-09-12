@@ -96,25 +96,22 @@ func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 
 	// atomically update the signatures pool and the total weight
 	s.lock.Lock()
-	collectedWeight = s.totalWeight
+	defer s.lock.Unlock()
 
 	// This is a sanity check because the upper layer should have already checked for double-voters.
 	_, ok = s.collectedIDs[signerID]
 	if ok {
-		s.lock.Unlock()
 		return collectedWeight, fmt.Errorf("SigneID %s was already added", signerID)
 	}
 
 	err := s.SignatureAggregatorSameMessage.TrustedAdd(index, sig)
 	if err != nil {
-		s.lock.Unlock()
 		return collectedWeight, fmt.Errorf("Trusted add has failed: %w", err)
 	}
 
 	s.collectedIDs[signerID] = struct{}{}
 	collectedWeight += weight
 	s.totalWeight = collectedWeight
-	s.lock.Unlock()
 	return collectedWeight, nil
 }
 
