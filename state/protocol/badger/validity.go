@@ -152,6 +152,12 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, tail.ID())
 	}
 
+	if verifyResultID {
+		if seal.ResultID != result.ID() {
+			return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
+		}
+	}
+
 	// identities must be canonically ordered
 	identities, err := snap.Identities(filter.Any)
 	if err != nil {
@@ -159,19 +165,6 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	}
 	if !identities.Sorted(order.Canonical) {
 		return fmt.Errorf("identities are not canonically ordered")
-	}
-
-	if verifyResultID {
-		if seal.ResultID != result.ID() {
-			// result.ID changes if addresses are stripped off from the ServiceEvents, hence for the unstaked access
-			// node since this validation will always fail
-			// skip throwing an error if the address of the identity is empty
-			if id, found := identities.ByIndex(0); found {
-				if id.Address != "" {
-					return fmt.Errorf("root block seal for wrong execution result (%x != %x)", seal.ResultID, result.ID())
-				}
-			}
-		}
 	}
 
 	// root qc must be for reference block of snapshot
