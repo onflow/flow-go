@@ -484,23 +484,20 @@ func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ..
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		if len(validators) > 0 {
-			topic_validator := validator.NewTopicValidator(validators...)
-			if err := n.pubSub.RegisterTopicValidator(
-				topic.String(), topic_validator, pubsub.WithValidatorInline(true),
-			); err != nil {
-				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
-				return nil, fmt.Errorf("failed to register topic validator: %w", err)
-			}
+		topic_validator := validator.TopicValidator(validators...)
+		if err := n.pubSub.RegisterTopicValidator(
+			topic.String(), topic_validator, pubsub.WithValidatorInline(true),
+		); err != nil {
+			n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
+			return nil, fmt.Errorf("failed to register topic validator: %w", err)
 		}
 
 		tp, err = n.pubSub.Join(topic.String())
 		if err != nil {
-			if len(validators) > 0 {
-				if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
-					n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
-				}
+			if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
+				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
 			}
+
 			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
 		}
 

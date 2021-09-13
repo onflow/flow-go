@@ -53,43 +53,37 @@ type ValidatorData struct {
 	From    peer.ID
 }
 
-type TopicValidator struct {
-	validators []MessageValidator
-}
-
-func NewTopicValidator(validators ...MessageValidator) *TopicValidator {
-	return &TopicValidator{validators}
-}
-
-func (v *TopicValidator) Validate(ctx context.Context, receivedFrom peer.ID, rawMsg *pubsub.Message) pubsub.ValidationResult {
-	var msg message.Message
-	// convert the incoming raw message payload to Message type
-	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire>1protobuf2message", int64(len(rawMsg.Data)))
-	err := msg.Unmarshal(rawMsg.Data)
-	//binstat.Leave(bs)
-	if err != nil {
-		return pubsub.ValidationReject
-	}
-
-	from, err := messageSigningID(rawMsg)
-	if err != nil {
-		return pubsub.ValidationReject
-	}
-
-	rawMsg.ValidatorData = ValidatorData{
-		Message: &msg,
-		From:    from,
-	}
-
-	result := pubsub.ValidationAccept
-	for _, validator := range v.validators {
-		switch res := validator(ctx, from, &msg); res {
-		case pubsub.ValidationReject:
-			return res
-		case pubsub.ValidationIgnore:
-			result = res
+func TopicValidator(validators ...MessageValidator) pubsub.ValidatorEx {
+	return func(ctx context.Context, receivedFrom peer.ID, rawMsg *pubsub.Message) pubsub.ValidationResult {
+		var msg message.Message
+		// convert the incoming raw message payload to Message type
+		//bs := binstat.EnterTimeVal(binstat.BinNet+":wire>1protobuf2message", int64(len(rawMsg.Data)))
+		err := msg.Unmarshal(rawMsg.Data)
+		//binstat.Leave(bs)
+		if err != nil {
+			return pubsub.ValidationReject
 		}
-	}
 
-	return result
+		from, err := messageSigningID(rawMsg)
+		if err != nil {
+			return pubsub.ValidationReject
+		}
+
+		rawMsg.ValidatorData = ValidatorData{
+			Message: &msg,
+			From:    from,
+		}
+
+		result := pubsub.ValidationAccept
+		for _, validator := range v.validators {
+			switch res := validator(ctx, from, &msg); res {
+			case pubsub.ValidationReject:
+				return res
+			case pubsub.ValidationIgnore:
+				result = res
+			}
+		}
+
+		return result
+	}
 }
