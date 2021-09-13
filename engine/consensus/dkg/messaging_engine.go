@@ -76,7 +76,12 @@ func (e *MessagingEngine) Done() <-chan struct{} {
 
 // SubmitLocal implements the network Engine interface
 func (e *MessagingEngine) SubmitLocal(event interface{}) {
-	e.Submit(engine.DKGCommittee, e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.Process(engine.DKGCommittee, e.me.NodeID(), event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Submit implements the network Engine interface
@@ -91,7 +96,9 @@ func (e *MessagingEngine) Submit(_ network.Channel, originID flow.Identifier, ev
 
 // ProcessLocal implements the network Engine interface
 func (e *MessagingEngine) ProcessLocal(event interface{}) error {
-	return e.Process(engine.DKGCommittee, e.me.NodeID(), event)
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Process implements the network Engine interface
@@ -105,7 +112,7 @@ func (e *MessagingEngine) process(originID flow.Identifier, event interface{}) e
 	switch v := event.(type) {
 	case *msg.DKGMessage:
 		// messages are forwarded async rather than sync, because otherwise the message queue
-		// might get full when it's slow to process DKG messages synchronously and impact 
+		// might get full when it's slow to process DKG messages synchronously and impact
 		// block rate.
 		e.forwardInboundMessageAsync(originID, v)
 		return nil
