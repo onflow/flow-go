@@ -182,6 +182,8 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 		unittest.WithDisagrees(disagrees))
 	vertestutils.MockLastSealedHeight(s.state, 10)
 	s.pendingRequests.On("All").Return(requests)
+	// check data pack request is never tried since its block has been sealed.
+	s.metrics.On("SetMaxChunkDataPackAttemptsAtRequester", uint64(0)).Return().Once()
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
