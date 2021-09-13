@@ -329,9 +329,9 @@ func (vc *VerificationCollector) OnBlockConsumerJobDone(processedIndex uint64) {
 	vc.lastProcessedBlockJobIndexBlockConsumer.Set(float64(processedIndex))
 }
 
-// SetMaxChunkDataPackAttempts is invoked when a cycle of requesting chunk data packs is done by requester engine.
+// SetMaxChunkDataPackAttemptsAtRequester is invoked when a cycle of requesting chunk data packs is done by requester engine.
 // It updates the maximum number of attempts made by requester engine for requesting a chunk data pack. The maximum is taken over
 // the history of all chunk data packs requested during that cycle.
-func (vc *VerificationCollector) SetMaxChunkDataPackAttempts(attempts uint64) {
+func (vc *VerificationCollector) SetMaxChunkDataPackAttemptsAtRequester(attempts uint64) {
 	vc.maxChunkDataPackRequestAttempt.Set(float64(attempts))
 }
