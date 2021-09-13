@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/engine"
 )
 
 // NewCollectorFactoryMethod is a factory method to generate a VoteCollector for concrete view
@@ -29,7 +30,11 @@ func NewVoteCollectors(lowestLevel uint64, factoryMethod NewCollectorFactoryMeth
 
 // GetOrCreateCollector performs lazy initialization of collectors based on their view
 func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollector, bool, error) {
-	cachedCollector := v.getCollector(view)
+	cachedCollector, err := v.getCollector(view)
+	if err != nil {
+		return nil, false, err
+	}
+
 	if cachedCollector != nil {
 		return cachedCollector, false, nil
 	}
@@ -44,6 +49,7 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 	// goroutine already added the needed collector. Hence, check again after acquiring the lock:
 	v.lock.Lock()
 	defer v.lock.Unlock()
+
 	clr, found := v.collectors[view]
 	if found {
 		return clr, false, nil
@@ -53,10 +59,17 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 	return collector, true, nil
 }
 
-func (v *VoteCollectors) getCollector(view uint64) hotstuff.VoteCollector {
+func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, error) {
 	v.lock.RLock()
 	defer v.lock.RUnlock()
-	return v.collectors[view]
+
+	// leveled forest doesn't treat this case as error, we shouldn't create collectors
+	// for vertices lower that forest.LowestLevel
+	if view < v.lowestLevel {
+		return nil, engine.NewOutdatedInputErrorf("cannot add collector because its height %d is smaller than the lowest height %d", view, v.lowestLevel)
+	}
+
+	return v.collectors[view], nil
 }
 
 // PruneUpToView prunes all collectors below view, sets the lowest level to that value
@@ -75,6 +88,8 @@ func (v *VoteCollectors) PruneUpToView(view uint64) error {
 	for l := v.lowestLevel; l < view; l++ {
 		delete(v.collectors, l)
 	}
+
+	v.lowestLevel = view
 
 	return nil
 }
