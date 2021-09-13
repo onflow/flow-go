@@ -104,3 +104,31 @@ type ByzantineThresholdExceededError struct {
 func (e ByzantineThresholdExceededError) Error() string {
 	return e.Evidence
 }
+
+type DoubleVoteError struct {
+	FirstVote       *Vote
+	ConflictingVote *Vote
+	err             error
+}
+
+func (e DoubleVoteError) Error() string {
+	return e.err.Error()
+}
+
+// IsDoubleVoteError returns whether an error is DoubleVoteError
+func IsDoubleVoteError(err error) bool {
+	var e DoubleVoteError
+	return errors.As(err, &e)
+}
+
+func (e DoubleVoteError) Unwrap() error {
+	return e.err
+}
+
+func NewDoubleVoteErrorf(firstVote, conflictingVote *Vote, msg string, args ...interface{}) error {
+	return DoubleVoteError{
+		FirstVote:       firstVote,
+		ConflictingVote: conflictingVote,
+		err:             fmt.Errorf(msg, args...),
+	}
+}

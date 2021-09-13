@@ -67,8 +67,8 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 	s.BaseAssignmentCollectorTestSuite.SetupTest()
 
 	var err error
-	s.collector, err = newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, s.state, s.headers,
-		s.assigner, s.sealsPL, s.sigVerifier, s.conduit, s.requestTracker, uint(len(s.AuthorizedVerifiers)))
+	s.collector, err = newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, s.State, s.Headers,
+		s.Assigner, s.SealsPL, s.SigVerifier, s.Conduit, s.RequestTracker, uint(len(s.AuthorizedVerifiers)))
 	require.NoError(s.T(), err)
 }
 
@@ -79,14 +79,14 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_ApprovalsAfterResult(
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
-	s.sealsPL.On("Add", mock.Anything).Run(
+	s.SealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			seal := args.Get(0).(*flow.IncorporatedResultSeal)
 			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
 			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
 		},
 	).Return(true, nil).Once()
-	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	blockID := s.Block.ID()
 	resultID := s.IncorporatedResult.Result.ID()
@@ -101,7 +101,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_ApprovalsAfterResult(
 		}
 	}
 
-	s.sealsPL.AssertExpectations(s.T())
+	s.SealsPL.AssertExpectations(s.T())
 }
 
 // TestProcessIncorporatedResult_ReusingCachedApprovals tests a scenario where we successfully processed approvals for one incorporated result
@@ -110,8 +110,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 	err := s.collector.ProcessIncorporatedResult(s.IncorporatedResult)
 	require.NoError(s.T(), err)
 
-	s.sealsPL.On("Add", mock.Anything).Return(true, nil).Twice()
-	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.SealsPL.On("Add", mock.Anything).Return(true, nil).Twice()
+	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	blockID := s.Block.ID()
 	resultID := s.IncorporatedResult.Result.ID()
@@ -127,7 +127,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 	}
 
 	incorporatedBlock := unittest.BlockHeaderWithParentFixture(&s.Block)
-	s.blocks[incorporatedBlock.ID()] = &incorporatedBlock
+	s.Blocks[incorporatedBlock.ID()] = &incorporatedBlock
 
 	// at this point we have proposed a seal, let's construct new incorporated result with same assignment
 	// but different incorporated block ID resulting in new seal.
@@ -138,7 +138,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_ReusingCach
 
 	err = s.collector.ProcessIncorporatedResult(incorporatedResult)
 	require.NoError(s.T(), err)
-	s.sealsPL.AssertExpectations(s.T())
+	s.SealsPL.AssertExpectations(s.T())
 
 }
 
@@ -153,9 +153,9 @@ func (s *AssignmentCollectorTestSuite) TestProcessApproval_InvalidSignature() {
 		unittest.WithExecutionResultID(s.IncorporatedResult.Result.ID()))
 
 	// attestation signature is valid
-	s.sigVerifier.On("Verify", mock.Anything, approval.Body.AttestationSignature, mock.Anything).Return(true, nil).Once()
+	s.SigVerifier.On("Verify", mock.Anything, approval.Body.AttestationSignature, mock.Anything).Return(true, nil).Once()
 	// approval signature is invalid
-	s.sigVerifier.On("Verify", mock.Anything, approval.VerifierSignature, mock.Anything).Return(false, nil).Once()
+	s.SigVerifier.On("Verify", mock.Anything, approval.VerifierSignature, mock.Anything).Return(false, nil).Once()
 
 	err = s.collector.ProcessApproval(approval)
 	require.Error(s.T(), err)
@@ -205,8 +205,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		assigner := &module.ChunkAssigner{}
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, s.state, s.headers,
-			assigner, s.sealsPL, s.sigVerifier, s.conduit, s.requestTracker, 1)
+		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, s.State, s.Headers,
+			assigner, s.SealsPL, s.SigVerifier, s.Conduit, s.RequestTracker, 1)
 		require.NoError(s.T(), err)
 
 		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
@@ -215,9 +215,9 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 
 	s.Run("invalid-verifier-identities", func() {
 		// delete identities for Result.BlockID
-		delete(s.identitiesCache, s.IncorporatedResult.Result.BlockID)
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, s.state, s.headers,
-			s.assigner, s.sealsPL, s.sigVerifier, s.conduit, s.requestTracker, 1)
+		delete(s.IdentitiesCache, s.IncorporatedResult.Result.BlockID)
+		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, s.State, s.Headers,
+			s.Assigner, s.SealsPL, s.SigVerifier, s.Conduit, s.RequestTracker, 1)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
 	})
@@ -241,8 +241,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, 1)
+		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, state, s.Headers, s.Assigner, s.SealsPL,
+			s.SigVerifier, s.Conduit, s.RequestTracker, 1)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
 	})
@@ -261,8 +261,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, 1)
+		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, state, s.Headers, s.Assigner, s.SealsPL,
+			s.SigVerifier, s.Conduit, s.RequestTracker, 1)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
 	})
@@ -280,8 +280,8 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 			},
 		)
 
-		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.workerPool, s.IncorporatedResult.Result, state, s.headers, s.assigner, s.sealsPL,
-			s.sigVerifier, s.conduit, s.requestTracker, 1)
+		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, state, s.Headers, s.Assigner, s.SealsPL,
+			s.SigVerifier, s.Conduit, s.RequestTracker, 1)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
 	})
@@ -321,7 +321,7 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 		incorporatedBlock.Height = lastHeight
 		lastHeight++
 
-		s.blocks[incorporatedBlock.ID()] = &incorporatedBlock
+		s.Blocks[incorporatedBlock.ID()] = &incorporatedBlock
 		incorporatedBlocks = append(incorporatedBlocks, &incorporatedBlock)
 	}
 
@@ -338,7 +338,7 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 
 	requests := make([]*messages.ApprovalRequest, 0)
 	// mock the Publish method when requests are sent to 2 verifiers
-	s.conduit.On("Publish", mock.Anything, mock.Anything, mock.Anything).
+	s.Conduit.On("Publish", mock.Anything, mock.Anything, mock.Anything).
 		Return(nil).
 		Run(func(args mock.Arguments) {
 			// collect the request
@@ -373,7 +373,7 @@ func (s *AssignmentCollectorTestSuite) TestRequestMissingApprovals() {
 	result := s.IncorporatedResult.Result
 	for _, chunk := range s.Chunks {
 		for _, incorporatedResult := range incorporatedResults {
-			requestItem, _, err := s.requestTracker.TryUpdate(result, incorporatedResult.IncorporatedBlockID, chunk.Index)
+			requestItem, _, err := s.RequestTracker.TryUpdate(result, incorporatedResult.IncorporatedBlockID, chunk.Index)
 			require.NoError(s.T(), err)
 			require.Equal(s.T(), uint(1), requestItem.Requests)
 		}
@@ -391,7 +391,7 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
-	s.sealsPL.On("Add", mock.Anything).Run(
+	s.SealsPL.On("Add", mock.Anything).Run(
 		func(args mock.Arguments) {
 			seal := args.Get(0).(*flow.IncorporatedResultSeal)
 			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
@@ -402,5 +402,5 @@ func (s *AssignmentCollectorTestSuite) TestCheckEmergencySealing() {
 	err = s.collector.CheckEmergencySealing(&tracker.NoopSealingTracker{}, DefaultEmergencySealingThreshold+s.IncorporatedBlock.Height)
 	require.NoError(s.T(), err)
 
-	s.sealsPL.AssertExpectations(s.T())
+	s.SealsPL.AssertExpectations(s.T())
 }

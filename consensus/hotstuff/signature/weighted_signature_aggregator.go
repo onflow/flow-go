@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
@@ -28,7 +27,7 @@ func NewWeightedSignatureAggregator(
 	signers []flow.Identity, // list of all possible signers
 	message []byte, // message to get an aggregated signature for
 	dsTag string, // domain separation tag used by the signature
-) (hotstuff.WeightedSignatureAggregator, error) {
+) (*WeightedSignatureAggregator, error) {
 
 	// build a low level crypto aggregator
 	publicKeys := make([]crypto.PublicKey, 0, len(signers))

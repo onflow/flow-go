@@ -78,6 +78,9 @@ func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.
 	sth := state.NewStateHolder(st)
 	account, err := getAccount(vm, ctx, sth, programs, address)
 	if err != nil {
+		if errors.IsALedgerFailure(err) {
+			return nil, fmt.Errorf("cannot get account, this error usually happens if the reference block for this query is not set to a recent block: %w", err)
+		}
 		return nil, fmt.Errorf("cannot get account: %w", err)
 	}
 	return account, nil
