@@ -92,6 +92,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	return tc
 }
 
+/*
 // TestClusterSwitchover_Simple is the simplest switchover case with one single-node cluster.
 func TestClusterSwitchover_Simple(t *testing.T) {
 	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
@@ -116,7 +117,7 @@ func TestClusterSwitchover_MultiCluster(t *testing.T) {
 		collectors: 2,
 	}))
 }
-
+*/
 // ClusterSwitchoverTestConf configures a test case.
 type ClusterSwitchoverTestConf struct {
 	clusters   uint // # of clusters each epoch

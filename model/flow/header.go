@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"bytes"
 	"encoding/json"
 	"time"
 
@@ -75,6 +76,17 @@ func (h Header) Fingerprint() []byte {
 var previd_hdr Identifier
 var prev_hdr Header
 
+// this does a binary byte-by-byte comparison of identifiers
+// an Identifier is just a 32-byte array
+func compareIdentifiers(a Identifier, b Identifier) int {
+	for i := 0; i < 32; i++ {
+		if a[i] != b[i] {
+			return -1
+		}
+	}
+	return 0
+}
+
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
 func (h Header) ID() Identifier {
@@ -84,18 +96,48 @@ func (h Header) ID() Identifier {
 		h.Timestamp = h.Timestamp.UTC()
 	}
 
-	if h.ChainID == prev_hdr.ChainID &&
-		h.Timestamp == prev_hdr.Timestamp &&
-		h.ParentID == prev_hdr.ParentID &&
-		h.View == prev_hdr.View &&
-		h.Height == prev_hdr.Height &&
-		h.PayloadHash == prev_hdr.PayloadHash &&
-		h.ProposerID == prev_hdr.ProposerID {
+	for {
+		// compare these elements individually
+		if prev_hdr.ParentVoterIDs == nil ||
+			prev_hdr.ParentVoterSigData == nil ||
+			prev_hdr.ProposerSigData == nil ||
+			len(h.ParentVoterIDs) != len(prev_hdr.ParentVoterIDs) ||
+			len(h.ParentVoterSigData) != len(prev_hdr.ParentVoterSigData) ||
+			len(h.ProposerSigData) != len(prev_hdr.ProposerSigData) {
+			break
+		}
+		bNotEqual := false
+		if len(h.ParentVoterIDs) > 0 {
+			for i, v := range h.ParentVoterIDs {
+				if len(prev_hdr.ParentVoterIDs) >= i &&
+					compareIdentifiers(v, prev_hdr.ParentVoterIDs[i]) != 0 {
+					bNotEqual = true
+					break
+				}
+			}
+		}
 
-		return previd_hdr
+		if bNotEqual == false &&
+			h.ChainID == prev_hdr.ChainID &&
+			h.Timestamp == prev_hdr.Timestamp &&
+			h.Height == prev_hdr.Height &&
+			h.ParentID == prev_hdr.ParentID &&
+			h.View == prev_hdr.View &&
+			h.PayloadHash == prev_hdr.PayloadHash &&
+			bytes.Compare(h.ProposerSigData, prev_hdr.ProposerSigData) == 0 &&
+			bytes.Compare(h.ParentVoterSigData, prev_hdr.ParentVoterSigData) == 0 &&
+			h.ProposerID == prev_hdr.ProposerID {
+
+			// cache hit, return the previous identifier
+			return previd_hdr
+		}
+		// exit the for loop
+		break
 	}
 
 	previd_hdr = MakeID(h)
+
+	// store a reference to the Header entity data
 	prev_hdr = h
 
 	return previd_hdr
