@@ -328,6 +328,12 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, attempts)
 
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(count * attempts)
+	s.metrics.On("SetMaxChunkDataPackAttemptsAtRequester", testifymock.Anything).Run(func(args testifymock.Arguments) {
+		actualAttempts, ok := args[0].(uint64)
+		require.True(t, ok)
+
+		require.LessOrEqual(t, actualAttempts, uint64(attempts))
+	}).Return().Times(attempts)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
