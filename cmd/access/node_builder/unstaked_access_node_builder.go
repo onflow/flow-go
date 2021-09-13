@@ -37,11 +37,11 @@ func (anb *UnstakedAccessNodeBuilder) initNodeInfo() {
 	// use the networking key that has been passed in the config
 	networkingKey := anb.AccessNodeConfig.NetworkKey
 	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkingKey.PublicKey())
-	anb.MustNot(err).Msg("could not load networking public key")
+	anb.ThrowOnError(err, "could not load networking public key")
 	peerID, err := peer.IDFromPublicKey(pubKey)
-	anb.MustNot(err).Msg("could not get peer ID from public key")
+	anb.ThrowOnError(err, "could not get peer ID from public key")
 	anb.NodeID, err = p2p.NewUnstakedNetworkIDTranslator().GetFlowID(peerID)
-	anb.MustNot(err).Msg("could not get flow node ID")
+	anb.ThrowOnError(err, "could not get flow node ID")
 	anb.NodeConfig.NetworkKey = networkingKey // copy the key to NodeConfig
 	anb.NodeConfig.StakingKey = nil           // no staking key for the unstaked node
 }
@@ -63,7 +63,7 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 			// use the middleware that should have now been initialized
 			middleware, ok := anb.Middleware.(*p2p.Middleware)
 			if !ok {
-				anb.Logger.Fatal().Msg("middleware was of unexpected type")
+				anb.ThrowError(nil, "middleware was of unexpected type")
 			}
 			return middleware.IdentifierProvider()
 		}
@@ -105,25 +105,26 @@ func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() {
 		return
 	}
 	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
-	builder.MustNot(err).Msg("failed to derive bootstrap peer identities")
+	builder.ThrowOnError(err, "failed to derive bootstrap peer identities")
+
 	builder.bootstrapIdentities = ids
 }
 
 func (anb *UnstakedAccessNodeBuilder) validateParams() {
 	if anb.BaseConfig.BindAddr == cmd.NotSet || anb.BaseConfig.BindAddr == "" {
-		anb.Logger.Fatal().Msg("bind address not specified")
+		anb.ThrowError(nil, "bind address not specified")
 	}
 	if anb.AccessNodeConfig.NetworkKey == nil {
-		anb.Logger.Fatal().Msg("networking key not provided")
+		anb.ThrowError(nil, "networking key not provided")
 	}
 	if len(anb.bootstrapIdentities) > 0 {
 		return
 	}
 	if len(anb.bootstrapNodeAddresses) == 0 {
-		anb.Logger.Fatal().Msg("no bootstrap node address provided")
+		anb.ThrowError(nil, "no bootstrap node address provided")
 	}
 	if len(anb.bootstrapNodeAddresses) != len(anb.bootstrapNodePublicKeys) {
-		anb.Logger.Fatal().Msg("number of bootstrap node addresses and public keys should match")
+		anb.ThrowError(nil, "number of bootstrap node addresses and public keys should match")
 	}
 }
 
@@ -190,7 +191,7 @@ func (anb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.NodeB
 		}
 
 		me, err := local.New(self, nil)
-		anb.MustNot(err).Msg("could not initialize local")
+		anb.ThrowOnError(err, "could not initialize local")
 		node.Me = me
 	}
 }

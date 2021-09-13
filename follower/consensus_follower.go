@@ -103,6 +103,7 @@ func getAccessNodeOptions(config *Config) []access.Option {
 func getBaseOptions(config *Config) []cmd.Option {
 	options := []cmd.Option{
 		cmd.WithMetricsEnabled(false),
+		cmd.WithErrorManager(),
 	}
 	if config.bootstrapDir != "" {
 		options = append(options, cmd.WithBootstrapDir(config.bootstrapDir))
@@ -146,7 +147,15 @@ func NewConsensusFollower(
 	bindAddr string,
 	bootstapIdentities []BootstrapNodeInfo,
 	opts ...Option,
-) (*ConsensusFollowerImpl, error) {
+) (consensusFollower *ConsensusFollowerImpl, err error) {
+	// catch any unrecoverable errors encountered during initialization
+	defer func() {
+		if e := recover(); e != nil {
+			consensusFollower = nil
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+
 	config := &Config{
 		networkPrivKey: networkPrivKey,
 		bootstrapNodes: bootstapIdentities,
@@ -161,7 +170,7 @@ func NewConsensusFollower(
 	accessNodeOptions := getAccessNodeOptions(config)
 
 	anb := buildAccessNode(accessNodeOptions)
-	consensusFollower := &ConsensusFollowerImpl{
+	consensusFollower = &ConsensusFollowerImpl{
 		NodeBuilder:  anb,
 		errorManager: module.NewErrorManager(),
 	}
@@ -192,14 +201,14 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 
 // Run starts the consensus follower.
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
-	runAccessNode(ctx, cf.NodeBuilder)
+	cf.runAccessNode(ctx, cf.NodeBuilder)
 }
 
 func (cf *ConsensusFollowerImpl) Errors() <-chan error {
 	return cf.errorManager.Errors()
 }
 
-func runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {
+func (cf *ConsensusFollowerImpl) runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {
 	select {
 	case <-ctx.Done():
 		return
@@ -211,10 +220,17 @@ func runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {
 		anb.Logger.Info().Msg("Access node startup complete")
 	case <-ctx.Done():
 		anb.Logger.Info().Msg("Access node startup aborted")
+	case err := <-anb.Errors():
+		cf.errorManager.ThrowError(err)
 	}
 
-	<-ctx.Done()
-	anb.Logger.Info().Msg("Access node shutting down")
+	select {
+	case <-ctx.Done():
+		anb.Logger.Info().Msg("Access node shutting down")
+	case err := <-anb.Errors():
+		cf.errorManager.ThrowError(err)
+	}
+
 	<-anb.Done()
 	anb.Logger.Info().Msg("Access node shutdown complete")
 }

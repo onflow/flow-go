@@ -131,3 +131,7 @@ func (lm *LifecycleManager) Started() <-chan struct{} {
 func (lm *LifecycleManager) Stopped() <-chan struct{} {
 	return lm.stopped
 }
+
+func (lm *LifecycleManager) StartupCommenced() bool {
+	return lm.startupCommenced
+}

@@ -68,10 +68,18 @@ type NodeBuilder interface {
 	// `Done`.
 	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
 
-	// MustNot asserts that the given error must not occur.
-	// If the error is nil, returns a nil log event (which acts as a no-op).
-	// If the error is not nil, returns a fatal log event containing the error.
-	MustNot(err error) *zerolog.Event
+	// Errors returns a channel that receives any unrecoverable errors encountered by the builder
+	Errors() <-chan error
+
+	// ThrowError handles unrecoverable errors
+	// If errorManger is enabled for the builder, the errorManager's ThrowError is called propagate the error
+	// If errorManger is not enabled, the error is handled as a panic
+	ThrowError(err error, msg string)
+
+	// ThrowOnError asserts that the given error must not occur.
+	// If the error is nil, do nothing
+	// If the error is not nil, call ThrowError to initiate fatal error handler
+	ThrowOnError(err error, msg string)
 
 	// Run initiates all common components (logger, database, protocol state etc.)
 	// then starts each component. It also sets up a channel to gracefully shut
@@ -119,6 +127,7 @@ type BaseConfig struct {
 	guaranteesCacheSize   uint
 	receiptsCacheSize     uint
 	db                    *badger.DB
+	errorManager          *module.ErrorManager
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
