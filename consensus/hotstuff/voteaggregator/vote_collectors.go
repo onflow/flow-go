@@ -11,6 +11,9 @@ import (
 // NewCollectorFactoryMethod is a factory method to generate a VoteCollector for concrete view
 type NewCollectorFactoryMethod = func(view uint64) (hotstuff.VoteCollector, error)
 
+// VoteCollectors implements management of multiple vote collectors indexed by view.
+// Implements lazy initialization of vote collectors.
+// This structure is concurrently safe.
 type VoteCollectors struct {
 	lock            sync.RWMutex
 	lowestLevel     uint64                            // lowest view that we have pruned up to
