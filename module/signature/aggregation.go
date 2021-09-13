@@ -7,13 +7,14 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	//"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
 )
 
 // SignatureAggregatorSameMessage aggregates BLS signatures of the same message from different signers.
 // The public keys and message are aggreed upon upfront.
 //
-// The module does not support signatures with multiplicity higher than 1. Each signer is allowed
+// Currently, the module does not support signatures with multiplicity higher than 1. Each signer is allowed
 // to sign at most once.
 //
 // Aggregation uses BLS scheme. Mitigation against rogue attacks is done using Proof Of Possession (PoP)
@@ -35,10 +36,10 @@ type SignatureAggregatorSameMessage struct {
 // A new SignatureAggregatorSameMessage is needed for each set of public keys. If the key set changes,
 // a new structure needs to be instantiated. Participants are defined by their public keys, and are
 // indexed from 0 to n-1 where n is the length of the public key slice.
-// The function errors with ErrInvalidInputs if any input is invalid.
+// The function errors with engine.InvalidInputError if any input is invalid.
 func NewSignatureAggregatorSameMessage(
 	message []byte, // message to be aggregate signatures for
-	dsTag []byte, // domain separation tag used for signatures
+	dsTag string, // domain separation tag used for signatures
 	publicKeys []crypto.PublicKey, // public keys of participants agreed upon upfront
 ) (*SignatureAggregatorSameMessage, error) {
 	panic("implement me")
@@ -50,7 +51,7 @@ func NewSignatureAggregatorSameMessage(
 //
 // This function does not update the internal state.
 // The function errors:
-//  - ErrInvalidInputs if the index input is invalid
+//  - engine.InvalidInputErrorf if the index input is invalid
 //  - random error if the execution failed
 // The function does not return an error for any invalid signature.
 // The function is not thread-safe.
@@ -62,7 +63,7 @@ func (s *SignatureAggregatorSameMessage) Verify(signer int, sig crypto.Signature
 // key at the input index. If the verification passes, the signature is added to the internal
 // signature state.
 // The function errors:
-//  - ErrInvalidInputs if the index input is invalid
+//  - engine.InvalidInputErrorf if the index input is invalid
 //  - ErrDuplicatedSigner if the signer has been already added
 //  - random error if the execution failed
 // The function does not return an error for any invalid signature.
@@ -78,7 +79,7 @@ func (s *SignatureAggregatorSameMessage) VerifyAndAdd(signer int, sig crypto.Sig
 // outputs valid signatures. This would detect if TrustedAdd has added any invalid
 // signature.
 // The function errors:
-//  - ErrInvalidInputs if the index input is invalid
+//  - engine.InvalidInputErrorf if the index input is invalid
 //  - ErrDuplicatedSigner if the signer has been already added
 //  - random error if the execution failed
 // The function is not thread-safe.
@@ -89,10 +90,12 @@ func (s *SignatureAggregatorSameMessage) TrustedAdd(signer int, sig crypto.Signa
 // HasSignature checks if a signer has already provided a valid signature.
 //
 // The function errors:
-//  - ErrInvalidInputs if the index input is invalid
+//  - engine.InvalidInputError if the index input is invalid
 //  - random error if the execution failed
 // The function is not thread-safe.
-func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error)
+func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) {
+	panic("implement me")
+}
 
 // Aggregate aggregates the stored BLS signatures and returns the aggregated signature.
 //
@@ -113,17 +116,9 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 // Aggregating the keys of the signers internally is optimized to only look at the keys delta
 // compared to the latest execution of the function. The function is therefore not thread-safe.
 // The function errors:
-//  - ErrInvalidInputs if the indices are invalid
+//  - engine.InvalidInputErrorf if the indices are invalid
 //  - random error if the execution failed
 func (s *SignatureAggregatorSameMessage) VerifyAggregate(sig crypto.Signature, signers []int) (bool, error) {
-	panic("implement me")
-}
-
-// SetMessage sets a new message in the structure.
-// This allows re-using the same structure with the same keys for different messages.
-// Once called, the fuction empties all internally stored signatures.
-// The function is not thread-safe.
-func (s *SignatureAggregatorSameMessage) SetMessage(message []byte) { // we could also update the DST here
 	panic("implement me")
 }
 
