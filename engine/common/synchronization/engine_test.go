@@ -336,7 +336,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 		},
 	)
 	err = ss.e.requestHandler.onRangeRequest(originID, req)
-	require.NoError(ss.T(), err, "valid range request should pass")
+	require.NoError(ss.T(), err, "valid range request exceeding max size should still pass")
 }
 
 func (ss *SyncSuite) TestOnBatchRequest() {
@@ -394,7 +394,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 		},
 	)
 	err = ss.e.requestHandler.onBatchRequest(originID, req)
-	require.NoError(ss.T(), err, "should pass request with valid blocks")
+	require.NoError(ss.T(), err, "valid batch request exceeding max size should still pass")
 }
 
 func (ss *SyncSuite) TestOnBlockResponse() {
