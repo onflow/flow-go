@@ -6,8 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/atree"
 	"github.com/onflow/cadence/runtime/common"
 	newInter "github.com/onflow/cadence/runtime/interpreter"
@@ -33,20 +31,28 @@ func TestValueConversion(t *testing.T) {
 
 		migration := &StorageFormatV6Migration{}
 		baseStorage := newEncodingBaseStorage()
-		storage := newPersistentSlabStorage(baseStorage)
-		migration.initNewInterpreter(storage)
+
+		migration.initPersistentSlabStorage(baseStorage)
+		migration.initNewInterpreter()
 
 		oldInterpreter, err := oldInter.NewInterpreter(nil, nil)
 		assert.NoError(t, err)
 
-		converter := NewValueConverter(migration.newInter, oldInterpreter, storage)
+		converter := NewValueConverter(migration.newInter, oldInterpreter, migration.storage)
 		newValue := converter.Convert(oldArray)
 
 		assert.IsType(t, &newInter.ArrayValue{}, newValue)
 		array := newValue.(*newInter.ArrayValue)
 
-		assert.Equal(t, newInter.NewStringValue("foo"), array.GetIndex(nil, 0))
-		assert.Equal(t, newInter.NewStringValue("bar"), array.GetIndex(nil, 1))
+		assert.Equal(
+			t,
+			newInter.NewStringValue("foo"),
+			array.GetIndex(migration.newInter, nil, 0),
+		)
+		assert.Equal(t,
+			newInter.NewStringValue("bar"),
+			array.GetIndex(migration.newInter, nil, 1),
+		)
 	})
 }
 
@@ -66,14 +72,11 @@ func TestEncoding(t *testing.T) {
 		encoded, _, err := oldInter.EncodeValue(oldArray, nil, false, nil)
 		require.NoError(t, err)
 
-		migration := &StorageFormatV6Migration{
-			Log: zerolog.Logger{},
-		}
-
+		migration := &StorageFormatV6Migration{}
 		baseStorage := newEncodingBaseStorage()
-		storage := newPersistentSlabStorage(baseStorage)
-		migration.initNewInterpreter(storage)
 
+		migration.initPersistentSlabStorage(baseStorage)
+		migration.initNewInterpreter()
 		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
 		address := common.Address{1, 2}
@@ -95,21 +98,20 @@ func TestEncoding(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, ok)
 
-		newValue, err := newInter.StoredValue(slab, migration.storage)
-		require.NoError(t, err)
+		newValue := newInter.StoredValue(slab, migration.storage)
 
 		assert.IsType(t, &newInter.ArrayValue{}, newValue)
 		array := newValue.(*newInter.ArrayValue)
 
-		value := array.GetIndex(nil, 0)
+		value := array.GetIndex(migration.newInter, nil, 0)
 		require.NoError(t, err)
 		assert.Equal(t, newInter.NewStringValue("foo"), value)
 
-		value = array.GetIndex(nil, 1)
+		value = array.GetIndex(migration.newInter, nil, 1)
 		require.NoError(t, err)
 		assert.Equal(t, newInter.NewStringValue("bar"), value)
 
-		value = array.GetIndex(nil, 2)
+		value = array.GetIndex(migration.newInter, nil, 2)
 		require.NoError(t, err)
 		assert.Equal(t, newInter.BoolValue(true), value)
 	})
@@ -134,13 +136,11 @@ func TestEncoding(t *testing.T) {
 		encoded, _, err := oldInter.EncodeValue(oldArray, nil, false, nil)
 		require.NoError(t, err)
 
-		migration := &StorageFormatV6Migration{
-			Log: zerolog.Logger{},
-		}
-
+		migration := &StorageFormatV6Migration{}
 		baseStorage := newEncodingBaseStorage()
-		storage := newPersistentSlabStorage(baseStorage)
-		migration.initNewInterpreter(storage)
+
+		migration.initPersistentSlabStorage(baseStorage)
+		migration.initNewInterpreter()
 		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
 		address := common.Address{1, 2}
@@ -162,8 +162,7 @@ func TestEncoding(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, ok)
 
-		newValue, err := newInter.StoredValue(slab, migration.storage)
-		require.NoError(t, err)
+		newValue := newInter.StoredValue(slab, migration.storage)
 
 		assert.IsType(t, &newInter.DictionaryValue{}, newValue)
 		dictionary := newValue.(*newInter.DictionaryValue)

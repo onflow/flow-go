@@ -184,9 +184,9 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	m.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
 	baseStorage := newEncodingBaseStorage()
-	storage := newPersistentSlabStorage(baseStorage)
+	m.initPersistentSlabStorage(baseStorage)
 
-	m.initNewInterpreter(storage)
+	m.initNewInterpreter()
 	m.initOldInterpreter(payloads)
 
 	m.deferredValuePaths = m.getDeferredKeys(payloads)
@@ -242,7 +242,7 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	return migratedPayloads, nil
 }
 
-func newPersistentSlabStorage(encodingStorage *encodingBaseStorage) *atree.PersistentSlabStorage {
+func (m *StorageFormatV6Migration) initPersistentSlabStorage(encodingStorage *encodingBaseStorage) {
 	encMode, err := cbor.EncOptions{}.EncMode()
 	if err != nil {
 		panic(err)
@@ -253,7 +253,7 @@ func newPersistentSlabStorage(encodingStorage *encodingBaseStorage) *atree.Persi
 		panic(err)
 	}
 
-	return atree.NewPersistentSlabStorage(
+	m.storage = atree.NewPersistentSlabStorage(
 		encodingStorage,
 		encMode,
 		decMode,
@@ -490,7 +490,7 @@ func (m *StorageFormatV6Migration) decodeAndConvert(
 	return nil
 }
 
-func (m *StorageFormatV6Migration) initNewInterpreter(storage *atree.PersistentSlabStorage) {
+func (m *StorageFormatV6Migration) initNewInterpreter() {
 	inter, err := newInter.NewInterpreter(
 		nil,
 		nil,
@@ -503,7 +503,7 @@ func (m *StorageFormatV6Migration) initNewInterpreter(storage *atree.PersistentS
 		))
 	}
 
-	inter.Storage = newDelegationStorage(storage)
+	inter.Storage = newDelegationStorage(m.storage)
 
 	m.newInter = inter
 }
