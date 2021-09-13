@@ -494,7 +494,8 @@ func createQCContractClient(node *cmd.NodeConfig, accessAddress string, flowClie
 
 	// if not valid return a mock qc contract client
 	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
-		return nil, fmt.Errorf("could not validate node machine account config")
+		//return nil, fmt.Errorf("could not validate node machine account config")
+		return epochs.NewMockQCContractClient(node.Logger), nil
 	}
 
 	// attempt to read NodeMachineAccountInfo

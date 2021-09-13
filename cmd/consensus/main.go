@@ -756,7 +756,8 @@ func createDKGContractClient(node *cmd.NodeConfig, accessAddress string, flowCli
 
 	// if not valid return a mock dkg contract client
 	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
-		return nil, fmt.Errorf("could not validate node machine account config")
+		//return nil, fmt.Errorf("could not validate node machine account config")
+		return dkgmodule.NewMockClient(node.Logger), nil
 	}
 
 	// attempt to read NodeMachineAccountInfo
