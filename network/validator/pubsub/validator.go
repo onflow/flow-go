@@ -9,6 +9,7 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/network/message"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // TODO: break circular dependency and remove duplicate function
@@ -75,7 +76,7 @@ func TopicValidator(validators ...MessageValidator) pubsub.ValidatorEx {
 		}
 
 		result := pubsub.ValidationAccept
-		for _, validator := range v.validators {
+		for _, validator := range validators {
 			switch res := validator(ctx, from, &msg); res {
 			case pubsub.ValidationReject:
 				return res
