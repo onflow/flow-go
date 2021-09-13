@@ -12,7 +12,11 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-// TODO: break circular dependency and remove duplicate function
+// messagePubKey extracts the public key of the envelope signer from a libp2p message.
+// The location of that key depends on the type of the key, see:
+// https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md
+// This reproduces the exact logic of the private function doing the same decoding in libp2p:
+// https://github.com/libp2p/go-libp2p-pubsub/blob/ba28f8ecfc551d4d916beb748d3384951bce3ed0/sign.go#L77
 func messageSigningID(m *pubsub.Message) (peer.ID, error) {
 	var pubk crypto.PubKey
 
