@@ -32,6 +32,8 @@ type VoteCollector struct {
 	votesProcessor atomic.Value
 }
 
+var _ hotstuff.VoteCollector = &VoteCollector{}
+
 func (m *VoteCollector) atomicLoadProcessor() hotstuff.VoteProcessor {
 	return m.votesProcessor.Load().(*atomicValueWrapper).processor
 }
@@ -48,7 +50,7 @@ func NewStateMachine(
 	log zerolog.Logger,
 	workerPool *workerpool.WorkerPool,
 	notifier hotstuff.Consumer,
-	verifyingCollectorFactory VerifyingVoteProcessorFactory,
+	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) *VoteCollector {
 	log = log.With().
 		Str("hotstuff", "VoteCollector").
@@ -58,7 +60,7 @@ func NewStateMachine(
 		log:                      log,
 		workerPool:               workerPool,
 		notifier:                 notifier,
-		createVerifyingProcessor: verifyingCollectorFactory,
+		createVerifyingProcessor: verifyingVoteProcessorFactory,
 		votesCache:               *NewVotesCache(view),
 	}
 
@@ -116,6 +118,10 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 
 func (m *VoteCollector) Status() hotstuff.VoteCollectorStatus {
 	return m.atomicLoadProcessor().Status()
+}
+
+func (m *VoteCollector) View() uint64 {
+	return m.votesCache.View()
 }
 
 // ProcessBlock performs validation of block signature and processes block with respected collector.
