@@ -226,6 +226,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Times(len(requests))
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(requests))
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(requests))
+	s.metrics.On("SetMaxChunkDataPackAttemptsAtRequester", uint64(1)).Return().Times(1)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
