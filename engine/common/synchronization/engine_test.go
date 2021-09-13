@@ -322,6 +322,21 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	)
 	err = ss.e.requestHandler.onRangeRequest(originID, req)
 	require.NoError(ss.T(), err, "valid range request should pass")
+
+	// a request for a range larger than MaxSize should be clamped
+	req.FromHeight = ref - uint64(synccore.DefaultConfig().MaxSize) - 1
+	req.ToHeight = ref
+	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*messages.BlockResponse)
+			assert.Len(ss.T(), res.Blocks, int(synccore.DefaultConfig().MaxSize))
+			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			recipientID := args.Get(1).(flow.Identifier)
+			assert.Equal(ss.T(), originID, recipientID, "should send response to original requester")
+		},
+	)
+	err = ss.e.requestHandler.onRangeRequest(originID, req)
+	require.NoError(ss.T(), err, "valid range request exceeding max size should still pass")
 }
 
 func (ss *SyncSuite) TestOnBatchRequest() {
@@ -358,9 +373,28 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 			recipientID := args.Get(1).(flow.Identifier)
 			assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
 		},
-	)
+	).Once()
 	err = ss.e.requestHandler.onBatchRequest(originID, req)
 	require.NoError(ss.T(), err, "should pass request with valid block")
+
+	// a request for too many blocks should be clamped
+	for i := 0; i < int(synccore.DefaultConfig().MaxSize); i++ {
+		block := unittest.BlockFixture()
+		block.Header.Height = ss.head.Height - 2 - uint64(i)
+		req.BlockIDs = append(req.BlockIDs, block.ID())
+		ss.blockIDs[block.ID()] = &block
+	}
+	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*messages.BlockResponse)
+			assert.Len(ss.T(), res.Blocks, int(synccore.DefaultConfig().MaxSize))
+			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
+			recipientID := args.Get(1).(flow.Identifier)
+			assert.Equal(ss.T(), originID, recipientID, "response should be send to original requester")
+		},
+	)
+	err = ss.e.requestHandler.onBatchRequest(originID, req)
+	require.NoError(ss.T(), err, "valid batch request exceeding max size should still pass")
 }
 
 func (ss *SyncSuite) TestOnBlockResponse() {
