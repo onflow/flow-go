@@ -105,6 +105,7 @@ func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() {
 		return
 	}
 	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
+
 	builder.ThrowOnError(err, "failed to derive bootstrap peer identities")
 
 	builder.bootstrapIdentities = ids
