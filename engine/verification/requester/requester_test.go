@@ -391,6 +391,9 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	// mocks only instantly qualified requests are dispatched in the network.
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*messages.ChunkDataRequest) {})
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(instantQualifiedRequests) * attempts)
+	// each instantly qualified one is requested only once, hence the maximum is updated only once from 0 -> 1, and
+	// is kept at 1 during all cycles of this test.
+	s.metrics.On("SetMaxChunkDataPackAttemptsAtRequester", uint64(1)).Return()
 
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
 		"could not check chunk requests qualification on time")
