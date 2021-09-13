@@ -1747,13 +1747,11 @@ func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
 	}
 }
 
-func MachineAccountFixture() (bootstrap.NodeMachineAccountInfo, *sdk.Account) {
+func MachineAccountFixture(t *testing.T) (bootstrap.NodeMachineAccountInfo, *sdk.Account) {
 	info := NodeMachineAccountInfoFixture()
 
 	bal, err := cadence.NewUFix64("0.1")
-	if err != nil {
-		panic(err)
-	}
+	require.NoError(t, err)
 
 	acct := &sdk.Account{
 		Address: sdk.HexToAddress(info.Address),
