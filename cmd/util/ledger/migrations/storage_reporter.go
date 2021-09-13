@@ -213,5 +213,5 @@ func decode(storedData []byte, version uint16, commonAddress common.Address) (in
 		return nil, err
 	}
 
-	return interpreter.StoredValue(decoded, storage)
+	return interpreter.StoredValue(decoded, storage), nil
 }
