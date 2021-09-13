@@ -21,8 +21,11 @@ func TestVoteCollectors(t *testing.T) {
 	suite.Run(t, new(VoteCollectorsTestSuite))
 }
 
+// VoteCollectorsTestSuite is a test suite for isolated testing of VoteCollectors.
+// Contains helper methods and mocked state which is used to verify correct behavior of VoteCollectors.
 type VoteCollectorsTestSuite struct {
 	suite.Suite
+
 	mockedCollectors map[uint64]*mocks.VoteCollector
 	factoryMethod    NewCollectorFactoryMethod
 	collectors       *VoteCollectors
@@ -50,6 +53,8 @@ func (s *VoteCollectorsTestSuite) prepareMockedCollector(view uint64) *mocks.Vot
 	return collector
 }
 
+// TestGetOrCreatorCollector_ViewLowerThanLowest tests a scenario where caller tries to create a collector with view
+// lower than already pruned one. This should result in sentinel error.
 func (s *VoteCollectorsTestSuite) TestGetOrCreatorCollector_ViewLowerThanLowest() {
 	collector, created, err := s.collectors.GetOrCreateCollector(s.lowestLevel - 10)
 	require.Nil(s.T(), collector)
@@ -58,6 +63,7 @@ func (s *VoteCollectorsTestSuite) TestGetOrCreatorCollector_ViewLowerThanLowest(
 	require.True(s.T(), engine.IsOutdatedInputError(err))
 }
 
+// TestGetOrCreateCollector_ValidCollector tests a happy path scenario where we try first to create and then retrieve cached collector.
 func (s *VoteCollectorsTestSuite) TestGetOrCreateCollector_ValidCollector() {
 	view := s.lowestLevel + 10
 	s.prepareMockedCollector(view)
@@ -72,6 +78,7 @@ func (s *VoteCollectorsTestSuite) TestGetOrCreateCollector_ValidCollector() {
 	require.Equal(s.T(), collector, cached)
 }
 
+// TestGetOrCreateCollector_FactoryError tests that error from factory method is propagated to caller.
 func (s *VoteCollectorsTestSuite) TestGetOrCreateCollector_FactoryError() {
 	// creating collector without calling prepareMockedCollector will yield factoryError.
 	collector, created, err := s.collectors.GetOrCreateCollector(s.lowestLevel + 10)
@@ -80,6 +87,8 @@ func (s *VoteCollectorsTestSuite) TestGetOrCreateCollector_FactoryError() {
 	require.ErrorIs(s.T(), err, factoryError)
 }
 
+// TestGetOrCreateCollectors_ConcurrentAccess tests that concurrently accessing of GetOrCreateCollector creates
+// only one collector and all other instances are retrieved from cache.
 func (s *VoteCollectorsTestSuite) TestGetOrCreateCollectors_ConcurrentAccess() {
 	createdTimes := atomic.NewUint64(0)
 	view := s.lowestLevel + 10
@@ -101,6 +110,7 @@ func (s *VoteCollectorsTestSuite) TestGetOrCreateCollectors_ConcurrentAccess() {
 	require.Equal(s.T(), uint64(1), createdTimes.Load())
 }
 
+// TestPruneUpToView tests pruning removes item below pruning height and leaves unmodified other items.
 func (s *VoteCollectorsTestSuite) TestPruneUpToView() {
 	numberOfCollectors := uint64(10)
 	prunedViews := make([]uint64, 0)
