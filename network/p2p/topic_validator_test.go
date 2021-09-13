@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/message"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -68,7 +69,11 @@ func TestTopicValidator(t *testing.T) {
 			len(unstakedNode.pubSub.ListPeers(badTopic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
-	data := []byte("hello")
+	m := message.Message{
+		Payload: []byte("hello"),
+	}
+	data, err := m.Marshal()
+	require.NoError(t, err)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
