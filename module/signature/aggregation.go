@@ -25,18 +25,11 @@ import (
 // Implementation of SignatureAggregator is not thread-safe, the caller should
 // make sure the calls are concurrent safe.
 type SignatureAggregatorSameMessage struct {
-	// TODO: initial incomplete fields that will evolve
 	message          []byte
 	hasher           hash.Hasher
 	n                int                // number of participants indexed from 0 to n-1
 	publicKeys       []crypto.PublicKey // keys indexed from 0 to n-1, signer i is assigned to public key i
 	indexToSignature map[int]string     // signatures indexed by the signer index
-
-	// the below items are related to public keys aggregation and the greedy aggrgetion algorithm
-	lastSigners       map[int]struct{} // maps the signers in the latest call to aggregate keys
-	lastAggregatedKey crypto.PublicKey // the latest aggregated public key
-	sync.RWMutex                       // the above "latest" data only make sense in a concurrent safe model, the lock maintains the thread-safety.
-	// since the caller should not be aware of the internal non thread-safe algorithm.
 }
 
 // NewSignatureAggregatorSameMessage returns a new SignatureAggregatorSameMessage structure.
@@ -67,10 +60,6 @@ func NewSignatureAggregatorSameMessage(
 		n:                len(publicKeys),
 		publicKeys:       publicKeys,
 		indexToSignature: make(map[int]string),
-
-		lastSigners:       make(map[int]struct{}),
-		lastAggregatedKey: crypto.NeutralBLSPublicKey(),
-		RWMutex:           sync.RWMutex{},
 	}, nil
 }
 
@@ -146,7 +135,11 @@ func (s *SignatureAggregatorSameMessage) TrustedAdd(signer int, sig crypto.Signa
 //  - random error if the execution failed
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) {
-	panic("implement me")
+	if signer >= s.n || signer < 0 {
+		return false, engine.NewInvalidInputErrorf("input index %d is invalid", signer)
+	}
+	_, ok := s.indexToSignature[signer]
+	return ok, nil
 }
 
 // Aggregate aggregates the stored BLS signatures and returns the aggregated signature.
@@ -190,11 +183,54 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 //  - engine.InvalidInputErrorf if the indices are invalid
 //  - random error if the execution failed
 func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig crypto.Signature) (bool, error) {
-	panic("implement me")
+	sharesNum := len(signers)
+	keys := make([]crypto.PublicKey, 0, sharesNum)
+	for _, signer := range signers {
+		if signer >= s.n || signer < 0 {
+			return false, engine.NewInvalidInputErrorf("input index %d is invalid", signer)
+		}
+		keys = append(keys, s.publicKeys[signer])
+	}
+	aggregatedKey, err := crypto.AggregateBLSPublicKeys(keys)
+	if err != nil {
+		return false, fmt.Errorf("aggregating public keys failed: %w", err)
+	}
+	ok, err := aggregatedKey.Verify(sig, s.message, s.hasher)
+	if err != nil {
+		return false, fmt.Errorf("signature verification failed: %w", err)
+	}
+	return ok, nil
+}
+
+// publicKeyAggregator aggregates BLS public keys in an optimized manner.
+// It uses a greedy algorithm to compute the aggregated key based on the latest
+// computed key and the delta of keys.
+// A caller can use a classic stateless aggrgetaion if the optimization is not needed.
+//
+// The structure is thread safe.
+type publicKeyAggregator struct {
+	n                 int                // number of participants indexed from 0 to n-1
+	publicKeys        []crypto.PublicKey // keys indexed from 0 to n-1, signer i is assigned to public key i
+	lastSigners       map[int]struct{}   // maps the signers in the latest call to aggregate keys
+	lastAggregatedKey crypto.PublicKey   // the latest aggregated public key
+	sync.RWMutex                         // the above "latest" data only make sense in a concurrent safe model, the lock maintains the thread-safety
+	// since the caller should not be aware of the internal non thread-safe algorithm.
+}
+
+// creates a new public key aggregator from all possible public keys
+func newPublicKeyAggregator(publicKeys []crypto.PublicKey) *publicKeyAggregator {
+	aggregator := &publicKeyAggregator{
+		n:                 len(publicKeys),
+		publicKeys:        publicKeys,
+		lastSigners:       make(map[int]struct{}),
+		lastAggregatedKey: crypto.NeutralBLSPublicKey(),
+		RWMutex:           sync.RWMutex{},
+	}
+	return aggregator
 }
 
 // aggregatedKey returns the aggregated public key of the input signers.
-func (s *SignatureAggregatorSameMessage) aggregatedKey(signers []int) (crypto.PublicKey, error) {
+func (p *publicKeyAggregator) aggregatedKey(signers []int) (crypto.PublicKey, error) {
 
 	// this greedy algorithm assumes the signers set does not vary much from one call
 	// to aggregatedKey to another. It computes the delta of signers compared to the
@@ -202,11 +238,11 @@ func (s *SignatureAggregatorSameMessage) aggregatedKey(signers []int) (crypto.Pu
 	// than aggregating the public keys from scratch at each call.
 
 	// read lock to read consistent last key and last signers
-	s.RLock()
+	p.RLock()
 	// get the signers delta and update the last list for the next comparison
-	newSignerKeys, missingSignerKeys, updatedSignerSet := s.deltaKeys(signers)
-	lastKey := s.lastAggregatedKey
-	s.RUnlock()
+	newSignerKeys, missingSignerKeys, updatedSignerSet := p.deltaKeys(signers)
+	lastKey := p.lastAggregatedKey
+	p.RUnlock()
 
 	// add the new keys
 	var err error
@@ -221,17 +257,17 @@ func (s *SignatureAggregatorSameMessage) aggregatedKey(signers []int) (crypto.Pu
 	}
 
 	// update the latest list and public key.
-	s.Lock()
-	s.lastSigners = updatedSignerSet
-	s.lastAggregatedKey = updatedKey
-	s.Unlock()
+	p.Lock()
+	p.lastSigners = updatedSignerSet
+	p.lastAggregatedKey = updatedKey
+	p.Unlock()
 	return updatedKey, nil
 }
 
 // keysDelta computes the delta between the reference s.lastSigners
 // and the input identity list.
 // It returns a list of the new signer keys, a list of the missing signer keys and the new map of signers.
-func (s *SignatureAggregatorSameMessage) deltaKeys(signers []int) (
+func (p *publicKeyAggregator) deltaKeys(signers []int) (
 	[]crypto.PublicKey, []crypto.PublicKey, map[int]struct{}) {
 
 	var newSignerKeys, missingSignerKeys []crypto.PublicKey
@@ -241,17 +277,17 @@ func (s *SignatureAggregatorSameMessage) deltaKeys(signers []int) (
 	signersMap := make(map[int]struct{})
 	for _, signer := range signers {
 		signersMap[signer] = struct{}{}
-		_, ok := s.lastSigners[signer]
+		_, ok := p.lastSigners[signer]
 		if !ok {
-			newSignerKeys = append(newSignerKeys, s.publicKeys[signer])
+			newSignerKeys = append(newSignerKeys, p.publicKeys[signer])
 		}
 	}
 
 	// look for missing signers
-	for signer, _ := range s.lastSigners {
+	for signer, _ := range p.lastSigners {
 		_, ok := signersMap[signer]
 		if !ok {
-			missingSignerKeys = append(missingSignerKeys, s.publicKeys[signer])
+			missingSignerKeys = append(missingSignerKeys, p.publicKeys[signer])
 		}
 	}
 	return newSignerKeys, missingSignerKeys, signersMap
