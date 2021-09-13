@@ -977,6 +977,8 @@ github.com/onflow/atree v0.0.0-20210818123121-cde91fb1ae69 h1:LhoBmpC0OwsaRO5YD4
 github.com/onflow/atree v0.0.0-20210818123121-cde91fb1ae69/go.mod h1:11u70r11k2JczLH2u4YeXG9wo/sj0soVRfbU0d5612s=
 github.com/onflow/atree v0.0.0-20210824174451-e987f6cbed8a h1:HUXAlq9rsSYqtVZ+m+axfZNJZjObGbhhtLjuIvcuX7M=
 github.com/onflow/atree v0.0.0-20210824174451-e987f6cbed8a/go.mod h1:11u70r11k2JczLH2u4YeXG9wo/sj0soVRfbU0d5612s=
+github.com/onflow/atree v0.0.0-20210903151759-94b860d1f7fc h1:PI4rhnl8L9r/G4HS1jXT4TXZlzQ0u231lkv0YOO9Rms=
+github.com/onflow/atree v0.0.0-20210903151759-94b860d1f7fc/go.mod h1:4GP4dQ2RCWtqHj2FE1LhNNNgLJiJht2Hv97dSDXbtVc=
 github.com/onflow/cadence v0.15.0/go.mod h1:KMzDF6cIv6nb5PJW9aITaqazbmJX8MMeibFcpPP385M=
 github.com/onflow/cadence v0.17.0/go.mod h1:iR/tZpP+1YhM8iRnOBPiBIs7on5dE3hk2ZfunCRQswE=
 github.com/onflow/cadence v0.18.0/go.mod h1:iR/tZpP+1YhM8iRnOBPiBIs7on5dE3hk2ZfunCRQswE=
@@ -984,6 +986,8 @@ github.com/onflow/cadence v0.18.1-0.20210730161646-b891a21c51fd h1:+J8msFNYPhdjg
 github.com/onflow/cadence v0.18.1-0.20210730161646-b891a21c51fd/go.mod h1:ZXcJOh7LZkgqoArtvKx8UYcYQ0cC71zNffP6R1HGGB8=
 github.com/onflow/cadence v0.18.1-0.20210824210747-3a3a85dd8a35 h1:zJuyXCNsehh1eJ2Njn5sOs2TCjbjOWMAfTzJtX72nKg=
 github.com/onflow/cadence v0.18.1-0.20210824210747-3a3a85dd8a35/go.mod h1:XENob3VnJVUAFUn1/xtB23Miw10a27NVCvJ3DYBlqEw=
+github.com/onflow/cadence v0.19.1-0.20210913143503-5ac2185dd167 h1:rLWtwSRZyyF6FXT+UtBYS1T+tAi6BnvHkPk+t/PKvw4=
+github.com/onflow/cadence v0.19.1-0.20210913143503-5ac2185dd167/go.mod h1:8VSDMMjtJ2vyzu9wQr/hxPnIqZBbqJQ6hHcxHEwrdjc=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.3-0.20210527134022-58c25247091a/go.mod h1:IZ2e7UyLCYmpQ8Kd7k0A32uXqdqfiV1r2sKs5/riblo=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.7 h1:5GTxbA0oTBwysgIyFFVEdkbBvtSOQYHQ/frKLGTnjYM=
 github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.7/go.mod h1:MSNt2rodpRXm1n0iGQWL6ltDoJCtXEzlPw9nhE/zQmk=
@@ -1258,6 +1262,8 @@ github.com/zeebo/assert v1.1.0/go.mod h1:Pq9JiuJQpG8JLJdtkwrJESF0Foym2/D9XMU5ciN
 github.com/zeebo/blake3 v0.2.0 h1:1SGx3IvKWFUU/xl+/7kjdcjjMcvVSm+3dMo/N42afC8=
 github.com/zeebo/blake3 v0.2.0/go.mod h1:G9pM4qQwjRzF1/v7+vabMj/c5mWpGZ2Wzo3Eb4z0pb4=
 github.com/zeebo/pcg v1.0.0/go.mod h1:09F0S9iiKrwn9rlI5yjLkmrug154/YRW6KnnXVDM/l4=
+github.com/zeebo/xxh3 v0.12.0 h1:AGJ7bBsKfpYmaoTEx714qGOTjUxRo3nj5NYqUUQBrTA=
+github.com/zeebo/xxh3 v0.12.0/go.mod h1:AQY73TOrhF3jNsdiM9zZOb8MThrYbZONHj7ryDBaLpg=
 go.etcd.io/bbolt v1.3.2/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/bbolt v1.3.3/go.mod h1:IbVyRI1SCnLcuJnV2u8VeU0CEYM7e686BmAb1XKL+uU=
 go.etcd.io/etcd v0.0.0-20191023171146-3cf2f69b5738/go.mod h1:dnLIgRNXwCJa5e+c6mIZCrds/GIG4ncV9HhK5PX7jPg=
@@ -1513,6 +1519,7 @@ golang.org/x/sys v0.0.0-20200523222454-059865788121/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20200602225109-6fdc65e7d980/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200615200032-f1bc736245b1/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200625212154-ddb9806d33ae/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20200727154430-2d971f7391a4/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200803210538-64077c9b5642/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200828194041-157a740278f4/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200905004654-be1d3432aa8f/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=

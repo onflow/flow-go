@@ -866,10 +866,22 @@ func registerNodeTransaction(
 		panic(err)
 	}
 
-	cdcNodeID := cadence.NewString(id.NodeID.String())
-	cdcAddress := cadence.NewString(id.Address)
-	cdcNetworkPubKey := cadence.NewString(id.NetworkPubKey.String()[2:])
-	cdcStakingPubKey := cadence.NewString(id.StakingPubKey.String()[2:])
+	cdcNodeID, err := cadence.NewString(id.NodeID.String())
+	if err != nil {
+		panic(err)
+	}
+	cdcAddress, err := cadence.NewString(id.Address)
+	if err != nil {
+		panic(err)
+	}
+	cdcNetworkPubKey, err := cadence.NewString(id.NetworkPubKey.String()[2:])
+	if err != nil {
+		panic(err)
+	}
+	cdcStakingPubKey, err := cadence.NewString(id.StakingPubKey.String()[2:])
+	if err != nil {
+		panic(err)
+	}
 
 	// register node
 	return Transaction(

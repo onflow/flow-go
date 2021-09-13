@@ -601,7 +601,8 @@ func TestBlockContext_ExecuteTransaction_WithArguments(t *testing.T) {
 	)
 
 	arg1, _ := jsoncdc.Encode(cadence.NewInt(42))
-	fooString := cadence.NewString("foo")
+	fooString, err := cadence.NewString("foo")
+	require.NoError(t, err)
 	arg2, _ := jsoncdc.Encode(fooString)
 
 	var tests = []struct {

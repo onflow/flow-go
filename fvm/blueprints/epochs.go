@@ -15,7 +15,10 @@ func SetStakingAllowlistTransaction(idTableStakingAddr flow.Address, allowedNode
 
 	cdcNodeIDs := make([]cadence.Value, 0, len(allowedNodeIDs))
 	for _, id := range allowedNodeIDs {
-		cdcNodeID := cadence.NewString(id.String())
+		cdcNodeID, err := cadence.NewString(id.String())
+		if err != nil {
+			panic(err)
+		}
 		cdcNodeIDs = append(cdcNodeIDs, cdcNodeID)
 	}
 
