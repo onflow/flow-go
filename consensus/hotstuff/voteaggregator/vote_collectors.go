@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // NewCollectorFactoryMethod is a factory method to generate a VoteCollector for concrete view
@@ -66,7 +66,7 @@ func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, erro
 	// leveled forest doesn't treat this case as error, we shouldn't create collectors
 	// for vertices lower that forest.LowestLevel
 	if view < v.lowestLevel {
-		return nil, engine.NewOutdatedInputErrorf("cannot add collector because its height %d is smaller than the lowest height %d", view, v.lowestLevel)
+		return nil, mempool.NewDecreasingPruningHeightErrorf("cannot add collector because its height %d is smaller than the lowest height %d", view, v.lowestLevel)
 	}
 
 	return v.collectors[view], nil
