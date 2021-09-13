@@ -35,6 +35,8 @@ type VerificationCollector struct {
 	receivedChunkDataResponseMessageTotalRequester prometheus.Counter
 	// total number of chunk data pack sent by requester to fetcher engine.
 	sentChunkDataPackByRequesterTotal prometheus.Counter
+	// maximum number of attempts made for requesting a chunk data pack.
+	maxChunkDataPackRequestAttempt prometheus.Gauge
 
 	// Verifier Engine
 	receivedVerifiableChunkTotalVerifier prometheus.Counter // total verifiable chunks received by verifier engine
@@ -145,6 +147,13 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		Help:      "total number of chunk data packs requested by fetcher engine",
 	})
 
+	maxChunkDataPackRequestAttempt := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name:      "max_chunk_data_pack_request_attempt_times",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemRequesterEngine,
+		Help:      "the maximum number of times a chunk data pack requested on requester engine",
+	})
+
 	// Verifier Engine
 	receivedVerifiableChunksTotalVerifier := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_received_total",
@@ -183,6 +192,7 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		sentChunkDataRequestMessagesTotalRequester,
 		receivedChunkDataResponseMessagesTotalRequester,
 		sentChunkDataPackByRequesterTotal,
+		maxChunkDataPackRequestAttempt,
 
 		// verifier engine
 		receivedVerifiableChunksTotalVerifier,
@@ -216,6 +226,7 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		sentChunkDataRequestMessagesTotalRequester:     sentChunkDataRequestMessagesTotalRequester,
 		receivedChunkDataResponseMessageTotalRequester: receivedChunkDataResponseMessagesTotalRequester,
 		sentChunkDataPackByRequesterTotal:              sentChunkDataPackByRequesterTotal,
+		maxChunkDataPackRequestAttempt:                 maxChunkDataPackRequestAttempt,
 	}
 
 	return vc
@@ -316,4 +327,11 @@ func (vc *VerificationCollector) OnChunkConsumerJobDone(processedIndex uint64) {
 // sets the last processed block job index.
 func (vc *VerificationCollector) OnBlockConsumerJobDone(processedIndex uint64) {
 	vc.lastProcessedBlockJobIndexBlockConsumer.Set(float64(processedIndex))
+}
+
+// SetMaxChunkDataPackAttempts is invoked when a cycle of requesting chunk data packs is done by requester engine.
+// It updates the maximum number of attempts made by requester engine for requesting a chunk data pack. The maximum is taken over
+// the history of all chunk data packs requested during that cycle.
+func (vc *VerificationCollector) SetMaxChunkDataPackAttempts(attempts uint64) {
+	vc.maxChunkDataPackRequestAttempt.Set(float64(attempts))
 }
