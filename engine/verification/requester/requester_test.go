@@ -275,6 +275,8 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests, flow.GetIDs(unsealedRequests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(unsealedRequests))
+	// each unsealed height is requested only once, hence the maximum is updated only once from 0 -> 1
+	s.metrics.On("SetMaxChunkDataPackAttemptsAtRequester", testifymock.Anything).Return().Once()
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
