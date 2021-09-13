@@ -9,8 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+
 	"github.com/spf13/pflag"
-	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
@@ -89,7 +90,11 @@ func main() {
 		requiredApprovalsForSealVerification   uint
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
-		accessAddress                          string
+
+		// DKG contract client
+		accessAddress      string
+		secureAccessNodeID string
+		insecureAccessAPI  bool
 
 		err                     error
 		mutableState            protocol.MutableState
@@ -136,6 +141,8 @@ func main() {
 			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
 			flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
+			flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
+			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
 		}).
 		Initialize().
 		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -450,7 +457,7 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
@@ -617,7 +624,7 @@ func main() {
 				comp,
 				syncCore,
 				finalizedHeader,
-				node.State,
+				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)
@@ -650,7 +657,6 @@ func main() {
 			return messagingEngine, nil
 		}).
 		Component("DKG reactor engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
 			// the viewsObserver is used by the reactor engine to subscribe to
 			// new views being finalized
 			viewsObserver := gadgets.NewViews()
@@ -660,8 +666,40 @@ func main() {
 			// participation in the DKG run
 			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
 
+			// create flow client with correct GRPC configuration for QC contract client
+			var flowClient *client.Client
+			if insecureAccessAPI {
+				flowClient, err = common.InsecureFlowClient(accessAddress)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				if secureAccessNodeID == "" {
+					return nil, fmt.Errorf("invalid flag --secure-access-node-id required")
+				}
+
+				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
+				if err != nil {
+					return nil, fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
+				}
+
+				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))
+				if err != nil {
+					return nil, fmt.Errorf("could not get identity of secure access node: %s", secureAccessNodeID)
+				}
+
+				if len(identities) < 1 {
+					return nil, fmt.Errorf("could not find identity of secure access node: %s", secureAccessNodeID)
+				}
+
+				flowClient, err = common.SecureFlowClient(accessAddress, identities[0].NetworkPubKey.String()[2:])
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			// construct DKG contract client
-			dkgContractClient, err := createDKGContractClient(node, accessAddress)
+			dkgContractClient, err := createDKGContractClient(node, accessAddress, flowClient)
 			if err != nil {
 				return nil, fmt.Errorf("could not create dkg contract client %w", err)
 			}
@@ -705,11 +743,8 @@ func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPr
 	return &priv, nil
 }
 
-// TEMPORARY: The functionality to allow starting up a node without a properly
-// configured machine account is very much intended to be temporary.
-// Implemented by: https://github.com/dapperlabs/flow-go/issues/5585
-// Will be reverted by: https://github.com/dapperlabs/flow-go/issues/5619
-func createDKGContractClient(node *cmd.NodeConfig, accessAddress string) (module.DKGContractClient, error) {
+// createDKGContractClient creates a DKG contract client
+func createDKGContractClient(node *cmd.NodeConfig, accessAddress string, flowClient *client.Client) (module.DKGContractClient, error) {
 
 	var dkgClient module.DKGContractClient
 
@@ -721,7 +756,7 @@ func createDKGContractClient(node *cmd.NodeConfig, accessAddress string) (module
 
 	// if not valid return a mock dkg contract client
 	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
-		return dkgmodule.NewMockClient(node.Logger), nil
+		return nil, fmt.Errorf("could not validate node machine account config")
 	}
 
 	// attempt to read NodeMachineAccountInfo
@@ -736,12 +771,6 @@ func createDKGContractClient(node *cmd.NodeConfig, accessAddress string) (module
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
 	txSigner := crypto.NewInMemorySigner(sk, info.HashAlgorithm)
-
-	// create flow client
-	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
 
 	// create actual dkg contract client, all flags and machine account info file found
 	dkgClient = dkgmodule.NewClient(

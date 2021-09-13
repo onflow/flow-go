@@ -34,14 +34,19 @@ type RandomBeaconReconstructor interface {
 }
 
 // SigType is the aggregable signature type.
-type SigType int
+type SigType uint8
 
 // SigType specifies the role of the signature in the protocol. SigTypeRandomBeacon type is for random beacon signatures. SigTypeStaking is for Hotstuff sigantures. Both types are aggregatable cryptographic signatures.
 const (
 	SigTypeStaking SigType = iota
 	SigTypeRandomBeacon
-	SigTypeInvalid
 )
+
+// Valid returns true if the signature is either SigTypeStaking or SigTypeRandomBeacon
+// else return false
+func (t SigType) Valid() bool {
+	return t == SigTypeStaking || t == SigTypeRandomBeacon
+}
 
 // WeightedSignatureAggregator aggregates signatures of the same signature scheme and the same message from different signers.
 // The public keys and message are aggreed upon upfront.
@@ -70,35 +75,6 @@ type WeightedSignatureAggregator interface {
 	// required for the function safety since "TrustedAdd" allows adding invalid signatures.
 	// If called concurrently, only one thread will be running the aggregation.
 	Aggregate() ([]flow.Identifier, []byte, error)
-}
-
-// CombinedSigAggregator aggregates the staking signatures and random beacon signatures,
-// and keep track of the total weights represented by each signature share. And report whether
-// sufficient weights for representing the majority of stakes have been collected. If yes, then aggregate
-// the signatures.
-type CombinedSigAggregator interface {
-	// Verify verifies the signature under the stored public key corresponding to the signerID and the stored message.
-	// `sigType` specifies the type of the input signature (random beacon or hotstuff), which helps the module pick the right stored public key and message.
-	Verify(signerID flow.Identifier, sig crypto.Signature, sigType SigType) (bool, error)
-
-	// TrustedAdd adds the signature to staking signatures store or random beacon signature store
-	// based on the given sig type.
-	// It returns:
-	//  - (false, nil) if the sig share is added, but the total stake weight represented by the collected
-	//    signatures can not represent the majority.
-	//  - (true, nil) if the sig share is added, and sufficient stake weight has been collected to represent
-	//    the majority.
-	//  - (false, exception) if there is any exception adding the signature.
-	TrustedAdd(signerID flow.Identifier, sig crypto.Signature, sigType SigType) (hasSufficientWeight bool, exception error)
-
-	// HasSufficientWeight returns whether enough signatures have been collected to represent
-	// stake majority.
-	HasSufficientWeight() bool
-
-	// Aggregate assumes enough shares have been collected, and aggregates the signatures.
-	// Note we don't mix the staking sig and random beacon sig when aggregating them,
-	// Instead, they are aggregated separately and returned separately.
-	Aggregate() (aggregatedStakingSig []byte, aggregatedRandomBeaconSig []byte, exception error)
 }
 
 // BlockSignatureData is an intermediate struct for Packer to pack the
