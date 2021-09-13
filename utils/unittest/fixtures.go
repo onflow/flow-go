@@ -1750,7 +1750,7 @@ func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
 func MachineAccountFixture(t *testing.T) (bootstrap.NodeMachineAccountInfo, *sdk.Account) {
 	info := NodeMachineAccountInfoFixture()
 
-	bal, err := cadence.NewUFix64("0.1")
+	bal, err := cadence.NewUFix64("0.5")
 	require.NoError(t, err)
 
 	acct := &sdk.Account{
