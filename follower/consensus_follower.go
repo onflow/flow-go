@@ -134,10 +134,10 @@ func buildAccessNode(accessNodeOptions []access.Option) *access.UnstakedAccessNo
 }
 
 type ConsensusFollowerImpl struct {
-	NodeBuilder *access.UnstakedAccessNodeBuilder
-	consumersMu sync.RWMutex
-	consumers   []pubsub.OnBlockFinalizedConsumer
-	errorBase   *module.ErrorBase
+	NodeBuilder  *access.UnstakedAccessNodeBuilder
+	consumersMu  sync.RWMutex
+	consumers    []pubsub.OnBlockFinalizedConsumer
+	errorManager *module.ErrorManager
 }
 
 // NewConsensusFollower creates a new consensus follower.
@@ -162,8 +162,8 @@ func NewConsensusFollower(
 
 	anb := buildAccessNode(accessNodeOptions)
 	consensusFollower := &ConsensusFollowerImpl{
-		NodeBuilder: anb,
-		errorBase:   module.NewErrorBase(),
+		NodeBuilder:  anb,
+		errorManager: module.NewErrorManager(),
 	}
 	anb.BaseConfig.NodeRole = "consensus_follower"
 
@@ -196,7 +196,7 @@ func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 }
 
 func (cf *ConsensusFollowerImpl) Errors() <-chan error {
-	return cf.errorBase.Errors()
+	return cf.errorManager.Errors()
 }
 
 func runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {

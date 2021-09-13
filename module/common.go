@@ -39,21 +39,21 @@ type ErrorAware interface {
 	Errors() <-chan error
 }
 
-// ErrorBase implements the ErrorAware interface, and provides a way for components
+// ErrorManager implements the ErrorAware interface, and provides a way for components
 // to signal an irrecoverable error.
-type ErrorBase struct {
+type ErrorManager struct {
 	errors chan error
 }
 
-func NewErrorBase() *ErrorBase {
-	return &ErrorBase{make(chan error)}
+func NewErrorManager() *ErrorManager {
+	return &ErrorManager{make(chan error)}
 }
 
-func (e *ErrorBase) Errors() <-chan error {
+func (e *ErrorManager) Errors() <-chan error {
 	return e.errors
 }
 
-func (e *ErrorBase) ThrowError(err error) {
+func (e *ErrorManager) ThrowError(err error) {
 	e.errors <- err
 	runtime.Goexit()
 }
