@@ -236,6 +236,9 @@ func (e *Engine) Request(request *verification.ChunkDataPackRequest) {
 func (e *Engine) onTimer() {
 	pendingReqs := e.pendingRequests.All()
 
+	// keeps maximum attempts made on a chunk data pack for telemetry
+	maxAttempts := uint64(0)
+
 	e.log.Debug().
 		Int("total", len(pendingReqs)).
 		Msg("start processing all pending chunk data requests")
@@ -248,12 +251,18 @@ func (e *Engine) onTimer() {
 	}
 
 	for _, request := range pendingReqs {
-		e.handleChunkDataPackRequestWithTracing(request, lastSealed.Height)
+		attempts := e.handleChunkDataPackRequestWithTracing(request, lastSealed.Height)
+		if attempts > maxAttempts {
+			maxAttempts = attempts
+		}
 	}
+
+	e.metrics.SetMaxChunkDataPackAttemptsAtRequester(maxAttempts)
 }
 
 // handleChunkDataPackRequestWithTracing encapsulates the logic of dispatching chunk data request in network with tracing enabled.
-func (e *Engine) handleChunkDataPackRequestWithTracing(request *verification.ChunkDataPackRequest, lastSealedHeight uint64) {
+// The return value determines number of times this request has been dispatched.
+func (e *Engine) handleChunkDataPackRequestWithTracing(request *verification.ChunkDataPackRequest, lastSealedHeight uint64) uint64 {
 	span, ok := e.tracer.GetSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
 	if !ok {
 		span = e.tracer.StartSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
@@ -262,13 +271,17 @@ func (e *Engine) handleChunkDataPackRequestWithTracing(request *verification.Chu
 	}
 
 	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
+	attempts := uint64(0)
 	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataRequest, func() {
-		e.handleChunkDataPackRequest(ctx, request, lastSealedHeight)
+		attempts = e.handleChunkDataPackRequest(ctx, request, lastSealedHeight)
 	})
+
+	return attempts
 }
 
 // handleChunkDataPackRequest encapsulates the logic of dispatching the chunk data pack request to the network.
-func (e *Engine) handleChunkDataPackRequest(ctx context.Context, request *verification.ChunkDataPackRequest, lastSealedHeight uint64) {
+// The return value determines number of times this request has been dispatched.
+func (e *Engine) handleChunkDataPackRequest(ctx context.Context, request *verification.ChunkDataPackRequest, lastSealedHeight uint64) uint64 {
 	lg := e.log.With().
 		Hex("chunk_id", logging.ID(request.ID())).
 		Uint64("block_height", request.Height).
@@ -281,19 +294,19 @@ func (e *Engine) handleChunkDataPackRequest(ctx context.Context, request *verifi
 		lg.Info().
 			Bool("removed", removed).
 			Msg("drops requesting chunk of a sealed block")
-		return
+		return 0
 	}
 
 	qualified := e.canDispatchRequest(request.ChunkID)
 	if !qualified {
 		lg.Debug().Msg("chunk data pack request is not qualified for dispatching at this round")
-		return
+		return 0
 	}
 
 	err := e.requestChunkDataPackWithTracing(ctx, request)
 	if err != nil {
 		lg.Error().Err(err).Msg("could not request chunk data pack")
-		return
+		return 0
 	}
 
 	attempts, lastAttempt, retryAfter, updated := e.onRequestDispatched(request.ChunkID)
@@ -303,6 +316,8 @@ func (e *Engine) handleChunkDataPackRequest(ctx context.Context, request *verifi
 		Time("last_attempt", lastAttempt).
 		Dur("retry_after", retryAfter).
 		Msg("chunk data pack requested")
+
+	return attempts
 }
 
 // requestChunkDataPack dispatches request for the chunk data pack to the execution nodes.
