@@ -42,4 +42,7 @@ type EpochLookup interface {
 
 	// EpochForView returns the counter of the epoch that the view belongs to.
 	EpochForView(view uint64) (epochCounter uint64, err error)
+
+	// EpochForViewWithFallback returns the counter of the epoch that the view belongs to.
+	EpochForViewWithFallback(view uint64) (epochCounter uint64, err error)
 }

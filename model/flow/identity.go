@@ -392,6 +392,16 @@ func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 	return nil, false
 }
 
+// ByNetworkingKey gets a node from the list by network public key.
+func (il IdentityList) ByNetworkingKey(key crypto.PublicKey) (*Identity, bool) {
+	for _, identity := range il {
+		if identity.NetworkPubKey.Equals(key) {
+			return identity, true
+		}
+	}
+	return nil, false
+}
+
 // Sample returns simple random sample from the `IdentityList`
 func (il IdentityList) Sample(size uint) IdentityList {
 	n := uint(len(il))

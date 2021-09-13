@@ -38,6 +38,8 @@ func Test_ComputationResultToBlockDataConversion(t *testing.T) {
 	}
 
 	assert.Equal(t, cr.TrieUpdates, blockData.TrieUpdates)
+
+	assert.Equal(t, cr.StateCommitments[len(cr.StateCommitments)-1], blockData.FinalStateCommitment)
 }
 
 func generateComputationResult(t *testing.T) *execution.ComputationResult {
@@ -104,9 +106,14 @@ func generateComputationResult(t *testing.T) *execution.ComputationResult {
 			{unittest.IdentifierFixture()},
 			{unittest.IdentifierFixture()},
 		}),
-		StateSnapshots:   nil,
-		StateCommitments: nil,
-		Proofs:           nil,
+		StateSnapshots: nil,
+		StateCommitments: []flow.StateCommitment{
+			unittest.StateCommitmentFixture(),
+			unittest.StateCommitmentFixture(),
+			unittest.StateCommitmentFixture(),
+			unittest.StateCommitmentFixture(),
+		},
+		Proofs: nil,
 		Events: []flow.EventsList{
 			{
 				unittest.EventFixture("what", 0, 0, unittest.IdentifierFixture(), 2),
