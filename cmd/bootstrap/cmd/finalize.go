@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
@@ -76,10 +77,10 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
 
-	_ = finalizeCmd.MarkFlagRequired("config")
-	_ = finalizeCmd.MarkFlagRequired("internal-priv-dir")
-	_ = finalizeCmd.MarkFlagRequired("partner-dir")
-	_ = finalizeCmd.MarkFlagRequired("partner-stakes")
+	cmd.MarkFlagRequired(finalizeCmd, "config")
+	cmd.MarkFlagRequired(finalizeCmd, "internal-priv-dir")
+	cmd.MarkFlagRequired(finalizeCmd, "partner-dir")
+	cmd.MarkFlagRequired(finalizeCmd, "partner-stakes")
 
 	// required parameters for generation of root block, root execution result and root block seal
 	finalizeCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'canary', 'bench', or 'local'")
@@ -92,14 +93,14 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
 
-	_ = finalizeCmd.MarkFlagRequired("root-chain")
-	_ = finalizeCmd.MarkFlagRequired("root-parent")
-	_ = finalizeCmd.MarkFlagRequired("root-height")
-	_ = finalizeCmd.MarkFlagRequired("root-commit")
-	_ = finalizeCmd.MarkFlagRequired("epoch-counter")
-	_ = finalizeCmd.MarkFlagRequired("epoch-length")
-	_ = finalizeCmd.MarkFlagRequired("epoch-staking-phase-length")
-	_ = finalizeCmd.MarkFlagRequired("epoch-dkg-phase-length")
+	cmd.MarkFlagRequired(finalizeCmd, "root-chain")
+	cmd.MarkFlagRequired(finalizeCmd, "root-parent")
+	cmd.MarkFlagRequired(finalizeCmd, "root-height")
+	cmd.MarkFlagRequired(finalizeCmd, "root-commit")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-counter")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-length")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-staking-phase-length")
+	cmd.MarkFlagRequired(finalizeCmd, "epoch-dkg-phase-length")
 
 	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(), "The seed used to for DKG, Clustering and Cluster QC generation")
 

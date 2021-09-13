@@ -5,6 +5,7 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 
 	"github.com/multiformats/go-multiaddr"
@@ -38,9 +39,9 @@ func init() {
 
 	// required flags
 	keyCmd.Flags().StringVar(&flagRole, "role", "", "node role (can be \"collection\", \"consensus\", \"execution\", \"verification\" or \"access\")")
-	_ = keyCmd.MarkFlagRequired("role")
+	cmd.MarkFlagRequired(keyCmd, "role")
 	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
-	_ = keyCmd.MarkFlagRequired("address")
+	cmd.MarkFlagRequired(keyCmd, "address")
 
 	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", []byte{}, fmt.Sprintf("hex encoded networking seed (min %d bytes)", minSeedBytes))
 	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", []byte{}, fmt.Sprintf("hex encoded staking seed (min %d bytes)", minSeedBytes))
