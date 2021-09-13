@@ -1,6 +1,7 @@
 package compliance
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -364,6 +365,9 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 
 		// broadcast the proposal to consensus nodes
 		err = e.con.Publish(proposal, recipients.NodeIDs()...)
+		if errors.Is(err, network.EmptyTargetList) {
+			return
+		}
 		if err != nil {
 			log.Error().Err(err).Msg("could not send proposal message")
 		}
