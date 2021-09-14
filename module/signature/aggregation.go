@@ -71,6 +71,8 @@ func NewSignatureAggregatorSameMessage(
 //  - engine.InvalidInputErrorf if the index input is invalid
 //  - random error if the execution failed
 // The function does not return an error for any invalid signature.
+// If any error is returned, the returned bool is false.
+// If no error is returned, the bool represents the validity of the signature.
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) Verify(signer int, sig crypto.Signature) (bool, error) {
 	if signer >= s.n || signer < 0 {
@@ -87,6 +89,7 @@ func (s *SignatureAggregatorSameMessage) Verify(signer int, sig crypto.Signature
 //  - ErrDuplicatedSigner if the signer has been already added
 //  - random error if the execution failed
 // The function does not return an error for any invalid signature.
+// If any error is returned, the returned bool is false.
 // If no error is returned, the bool represents the validity of the signature.
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) VerifyAndAdd(signer int, sig crypto.Signature) (bool, error) {
@@ -163,11 +166,11 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 
 	aggregatedSignature, err := crypto.AggregateBLSSignatures(signatures)
 	if err != nil {
-		return nil, nil, errors.New("BLS signature aggregtion failed")
+		return nil, nil, fmt.Errorf("BLS signature aggregtion failed %w", err)
 	}
 	ok, err := s.VerifyAggregate(indices, aggregatedSignature)
 	if err != nil {
-		return nil, nil, errors.New("BLS signature verification failed")
+		return nil, nil, fmt.Errorf("BLS signature aggregtion failed %w", err)
 	}
 	if !ok {
 		return nil, nil, errors.New("resulting BLS aggregated signatutre is invalid")
@@ -208,7 +211,7 @@ func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig cryp
 // PublicKeyAggregator aggregates BLS public keys in an optimized manner.
 // It uses a greedy algorithm to compute the aggregated key based on the latest
 // computed key and the delta of keys.
-// A caller can use a classic stateless aggrgetaion if the optimization is not needed.
+// A caller can use a classic stateless aggregation if the optimization is not needed.
 //
 // The structure is thread safe.
 type PublicKeyAggregator struct {

@@ -5,22 +5,22 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type SigDataPacker struct {
+type ConsensusSigDataPacker struct {
 	committees hotstuff.Committee
 }
 
-var _ hotstuff.Packer = &SigDataPacker{}
+var _ hotstuff.Packer = &ConsensusSigDataPacker{}
 
-func NewSigDataPacker(committees hotstuff.Committee) *SigDataPacker {
-	return &SigDataPacker{
+func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataPacker {
+	return &ConsensusSigDataPacker{
 		committees: committees,
 	}
 }
 
-func (p *SigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
+func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
 	panic("to be implemented")
 }
 
-func (p *SigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	panic("to be implemented")
 }
