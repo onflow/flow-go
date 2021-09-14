@@ -12,11 +12,12 @@ import (
 type NewCollectorFactoryMethod = func(view uint64) (hotstuff.VoteCollector, error)
 
 // VoteCollectors implements management of multiple vote collectors indexed by view.
-// Implements lazy initialization of vote collectors.
+// Implements hotstuff.VoteCollectors interface. Creating a VoteCollector for a
+// particular view is lazy (instances are created on demand).
 // This structure is concurrently safe.
 type VoteCollectors struct {
 	lock            sync.RWMutex
-	lowestLevel     uint64                            // lowest view that we have pruned up to
+	lowestView     uint64                            // lowest view that we have pruned up to
 	collectors      map[uint64]hotstuff.VoteCollector // view -> VoteCollector
 	createCollector NewCollectorFactoryMethod         // factory method for creating collectors
 }
@@ -65,11 +66,8 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, error) {
 	v.lock.RLock()
 	defer v.lock.RUnlock()
-
-	// leveled forest doesn't treat this case as error, we shouldn't create collectors
-	// for vertices lower that forest.LowestLevel
 	if view < v.lowestLevel {
-		return nil, mempool.NewDecreasingPruningHeightErrorf("cannot add collector because its height %d is smaller than the lowest height %d", view, v.lowestLevel)
+		return nil, mempool.NewDecreasingPruningHeightErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, v.lowestLevel)
 	}
 
 	return v.collectors[view], nil
@@ -82,16 +80,26 @@ func (v *VoteCollectors) PruneUpToView(view uint64) error {
 	if v.lowestLevel >= view {
 		return nil
 	}
-
 	if len(v.collectors) == 0 {
-		v.lowestLevel = 0
+		v.lowestView = view
 		return nil
 	}
 
-	for l := v.lowestLevel; l < view; l++ {
-		delete(v.collectors, l)
+	// to optimize the pruning of large view-ranges, we compare:
+	//  * the number of views for which we have collectors: len(v.collectors)
+	//  * the number of views that need to be pruned: view-v.lowestView
+	// We iterate over the dimension which is smaller.
+	if uint64(len(v.collectors)) < view-v.lowestView {
+		for w, _ := range v.collectors {
+			if w < view {
+				delete(v.collectors, w)
+			}
+		}
+	} else {
+		for w := v.lowestView; w < view; w++ {
+			delete(v.collectors, w)
+		}
 	}
-
 	v.lowestLevel = view
 
 	return nil

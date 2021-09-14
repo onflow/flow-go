@@ -37,8 +37,8 @@ type VoteAggregatorV2 struct {
 var _ hotstuff.VoteAggregatorV2 = &VoteAggregatorV2{}
 
 // NewVoteAggregatorV2 creates an instance of vote aggregator
-// NOTE: verifyingProcessorFactory has to be passed outside to abstract out knowledge about Consensus vs Collection
-// cluster running vote aggregation.
+// Note: verifyingProcessorFactory is injected. Thereby, the code is agnostic to the
+// different voting formats of main Consensus vs Collector consensus.   
 func NewVoteAggregatorV2(log zerolog.Logger, notifier hotstuff.Consumer, highestPrunedView uint64, committee hotstuff.Committee, voteValidator hotstuff.Validator, signer hotstuff.SignerVerifier,
 	verifyingProcessorFactory votecollector.VerifyingVoteProcessorFactory) *VoteAggregatorV2 {
 

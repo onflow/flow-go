@@ -54,7 +54,7 @@ func (s *VoteCollectorsTestSuite) prepareMockedCollector(view uint64) *mocks.Vot
 }
 
 // TestGetOrCreatorCollector_ViewLowerThanLowest tests a scenario where caller tries to create a collector with view
-// lower than already pruned one. This should result in sentinel error.
+// lower than already pruned one. This should result in sentinel error `DecreasingPruningHeightError`
 func (s *VoteCollectorsTestSuite) TestGetOrCreatorCollector_ViewLowerThanLowest() {
 	collector, created, err := s.collectors.GetOrCreateCollector(s.lowestLevel - 10)
 	require.Nil(s.T(), collector)
