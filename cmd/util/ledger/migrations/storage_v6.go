@@ -11,9 +11,10 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/atree"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/atree"
+	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -123,9 +124,9 @@ func newDelegationStorage(persistentSlabStorage *atree.PersistentSlabStorage) de
 
 func ledgerKeyFromStorageID(id atree.StorageID) ledger.Key {
 	return ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(0, id.Address[:]),
-		ledger.NewKeyPart(1, []byte{}),
-		ledger.NewKeyPart(2, id.Index[:]),
+		ledger.NewKeyPart(execState.KeyPartOwner, id.Address[:]),
+		ledger.NewKeyPart(execState.KeyPartController, []byte{}),
+		ledger.NewKeyPart(execState.KeyPartKey, id.Index[:]),
 	})
 }
 
@@ -170,6 +171,10 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.reportFile = reportFile
 
+	return m.migrate(payloads)
+}
+
+func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.Payload, error) {
 	m.Log.Info().Msg("Loading account contracts ...")
 
 	m.accounts = m.getContractsOnlyAccounts(payloads)
@@ -202,7 +207,7 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 		rawOwner := keyParts[0].Value
 		rawKey := keyParts[2].Value
 
-		result := m.migrate(payload)
+		result := m.migratePayload(payload)
 
 		if result.err != nil {
 
@@ -224,7 +229,8 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	// Encode the new values by calling `storage.Commit()`
 
 	m.Log.Info().Msg("Re-encoding converted values...")
-	err = m.storage.Commit()
+
+	err := m.storage.Commit()
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate payloads: %w", err)
 	}
@@ -360,7 +366,7 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 	return deferredValuePaths
 }
 
-func (m *StorageFormatV6Migration) migrate(payload ledger.Payload) storageFormatV6MigrationResult {
+func (m *StorageFormatV6Migration) migratePayload(payload ledger.Payload) storageFormatV6MigrationResult {
 
 	migratedPayload, err := m.reencodePayload(payload)
 

@@ -3,13 +3,17 @@ package migrations
 import (
 	"testing"
 
+	"github.com/rs/zerolog"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/atree"
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/ledger"
+
 	"github.com/onflow/cadence/runtime/common"
 	newInter "github.com/onflow/cadence/runtime/interpreter"
-
 	oldInter "github.com/onflow/cadence/v19/runtime/interpreter"
 	"github.com/onflow/cadence/v19/runtime/tests/utils"
 )
@@ -239,7 +243,7 @@ func TestRoundTrip(t *testing.T) {
 		require.NoError(t, err)
 
 		// Get the bytes in old format
-		oldArray := oldInter.NewDictionaryValueUnownedNonCopying(
+		oldDictionary := oldInter.NewDictionaryValueUnownedNonCopying(
 			inter,
 			oldInter.DictionaryStaticType{
 				KeyType:   oldInter.PrimitiveStaticTypeString,
@@ -251,7 +255,7 @@ func TestRoundTrip(t *testing.T) {
 			oldInter.BoolValue(true),
 		)
 
-		encoded, _, err := oldInter.EncodeValue(oldArray, nil, false, nil)
+		encoded, _, err := oldInter.EncodeValue(oldDictionary, nil, false, nil)
 		require.NoError(t, err)
 
 		migration := &StorageFormatV6Migration{}
@@ -294,7 +298,79 @@ func TestRoundTrip(t *testing.T) {
 	})
 }
 
-// Tests for the 'Store' method implementation of delegationStorage.
+func TestPayloadsMigration(t *testing.T) {
+	inter, err := oldInter.NewInterpreter(nil, utils.TestLocation)
+	require.NoError(t, err)
+
+	owner := &common.Address{1, 2}
+
+	oldDictionary := oldInter.NewDictionaryValueUnownedNonCopying(
+		inter,
+		oldInter.DictionaryStaticType{
+			KeyType:   oldInter.PrimitiveStaticTypeString,
+			ValueType: oldInter.PrimitiveStaticTypeAnyStruct,
+		},
+		oldInter.NewStringValue("key1"),
+		oldInter.NewStringValue("value1"),
+		oldInter.NewStringValue("key2"),
+		oldInter.BoolValue(true),
+	)
+
+	fields := oldInter.NewStringValueOrderedMap()
+	fields.Set("foo", oldDictionary)
+
+	composite := oldInter.NewCompositeValue(
+		utils.TestLocation,
+		"Test",
+		common.CompositeKindContract,
+		fields,
+		owner,
+	)
+
+	encoded, _, err := oldInter.EncodeValue(composite, nil, false, nil)
+	require.NoError(t, err)
+
+	encoded = oldInter.PrependMagic(encoded, oldInter.CurrentEncodingVersion)
+
+	keyParts := []ledger.KeyPart{
+		ledger.NewKeyPart(state.KeyPartOwner, owner.Bytes()),
+		ledger.NewKeyPart(state.KeyPartController, []byte{}),
+		ledger.NewKeyPart(state.KeyPartKey, []byte("Test")),
+	}
+
+	payloads := []ledger.Payload{
+		{
+			Key:   ledger.NewKey(keyParts),
+			Value: ledger.Value(encoded),
+		},
+	}
+
+	checkLedger := func(payloads []ledger.Payload) {
+		ledgerView := newView(payloads)
+		value, err := ledgerView.Get(string(owner.Bytes()), "", "Test")
+		require.NoError(t, err)
+		assert.NotNil(t, value)
+
+	}
+
+	// Check whether the query works with old ledger
+	checkLedger(payloads)
+
+	storageFormatV6Migration := StorageFormatV6Migration{
+		Log:       zerolog.Nop(),
+		OutputDir: "none",
+	}
+
+	migratedPayloads, err := storageFormatV6Migration.migrate(payloads)
+	require.NoError(t, err)
+
+	// Check whether the query works with new ledger
+	checkLedger(migratedPayloads)
+}
+
+// Test for the 'Store' method implementation of delegationStorage.
+// This ensures the 'Store' method of the overridden custom
+// base storage gets invoked.
 func TestDelegation(t *testing.T) {
 	t.Parallel()
 
@@ -318,7 +394,7 @@ var _ storageInterface = &delegator{}
 // Instead, delegates to overrider and storageImpl,
 // where both have the same method.
 type delegator struct {
-	*overrider // overrides the inner implementation
+	*overrider // overrides the inner implementation of storageImpl
 	*storageImpl
 }
 
