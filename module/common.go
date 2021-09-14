@@ -119,6 +119,7 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, errorH
 		case <-ctx.Done():
 			return ctx.Err()
 		case <-restartChan:
+			// shutdown the component
 			cancel()
 		}
 
