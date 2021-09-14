@@ -209,10 +209,10 @@ func Test_Compactor(t *testing.T) {
 			}
 
 			// check for
-			forestTries, _ := f.GetTries()
+			forestTries, err := f.GetTries()
 			require.NoError(t, err)
 
-			forestTries2, _ := f2.GetTries()
+			forestTries2, err := f2.GetTries()
 			require.NoError(t, err)
 
 			// order might be different
