@@ -54,10 +54,17 @@ func NewWeightedSignatureAggregator(
 }
 
 // Verify verifies the signature under the stored public and message.
+//
+// The function errors:
+//  - engine.InvalidInputError if signerID is invalid
+//  - random error if the execution failed
+// If any error is returned, the returned bool is false.
+// If no error is returned, the bool represents the validity of the signature.
+// The function is not thread-safe.
 func (s *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
 	index, ok := s.idToIndex[signerID]
 	if !ok {
-		return false, fmt.Errorf("couldn't find signerID %s in the index map", signerID)
+		return false, engine.InvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
 	}
 	return s.SignatureAggregatorSameMessage.Verify(index, sig)
 }
@@ -66,8 +73,11 @@ func (s *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 //
 // It adds the signer's weight to the total collected weight and returns the total weight regardless
 // of the returned error.
-// The function errors if a signature from the signerID was already collected.
-// The function is thread-safe
+// The function errors
+//  - engine.InvalidInputError if signerID is invalid
+//  - engine.InvalidInputError if the signer has been already added (to be confirmed)
+//  - random error if the execution failed
+// The function is thread-safe.
 func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
 	// get the total weight safely
 	collectedWeight := s.TotalWeight()
@@ -75,12 +85,12 @@ func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 	// get the index
 	index, ok := s.idToIndex[signerID]
 	if !ok {
-		return collectedWeight, fmt.Errorf("couldn't find signerID %s in the index map", signerID)
+		return collectedWeight, engine.InvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
 	}
 	// get the weight
 	weight, ok := s.idToWeights[signerID]
 	if !ok {
-		return collectedWeight, fmt.Errorf("couldn't find signerID %s in the weight map", signerID)
+		return collectedWeight, engine.InvalidInputErrorf("couldn't find signerID %s in the weight map", signerID)
 	}
 
 	// atomically update the signatures pool and the total weight
@@ -90,7 +100,7 @@ func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 	// This is a sanity check because the upper layer should have already checked for double-voters.
 	_, ok = s.collectedIDs[signerID]
 	if ok {
-		return collectedWeight, fmt.Errorf("SigneID %s was already added", signerID)
+		return collectedWeight, engine.InvalidInputErrorf("SigneID %s was already added", signerID)
 	}
 
 	err := s.SignatureAggregatorSameMessage.TrustedAdd(index, sig)
@@ -109,8 +119,8 @@ func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 // The function is thread-safe
 func (s *WeightedSignatureAggregator) TotalWeight() uint64 {
 	s.lock.RLock()
+	defer s.lock.RUnlock()
 	collectedWeight := s.totalWeight
-	s.lock.RUnlock()
 	return collectedWeight
 }
 

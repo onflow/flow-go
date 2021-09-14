@@ -54,6 +54,8 @@ func NewSignatureAggregatorSameMessage(
 //  - engine.InvalidInputErrorf if the index input is invalid
 //  - random error if the execution failed
 // The function does not return an error for any invalid signature.
+// If any error is returned, the returned bool is false.
+// If no error is returned, the bool represents the validity of the signature.
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) Verify(signer int, sig crypto.Signature) (bool, error) {
 	panic("implement me")
@@ -67,6 +69,7 @@ func (s *SignatureAggregatorSameMessage) Verify(signer int, sig crypto.Signature
 //  - ErrDuplicatedSigner if the signer has been already added
 //  - random error if the execution failed
 // The function does not return an error for any invalid signature.
+// If any error is returned, the returned bool is false.
 // If no error is returned, the bool represents the validity of the signature.
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) VerifyAndAdd(signer int, sig crypto.Signature) (bool, error) {
