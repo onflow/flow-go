@@ -4,8 +4,10 @@ package signature
 
 import (
 	"crypto/rand"
+	mrand "math/rand"
 	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -51,13 +53,15 @@ func TestAggregatorSameMessage(t *testing.T) {
 		// empty keys
 		_, err := NewSignatureAggregatorSameMessage(msg, tag, []crypto.PublicKey{})
 		assert.Error(t, err)
-		// wrong key type
+		// wrong key types
 		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
 		_, err = rand.Read(seed)
 		require.NoError(t, err)
 		sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 		require.NoError(t, err)
 		_, err = NewSignatureAggregatorSameMessage(msg, tag, []crypto.PublicKey{sk.PublicKey()})
+		assert.Error(t, err)
+		_, err = NewSignatureAggregatorSameMessage(msg, tag, []crypto.PublicKey{nil})
 		assert.Error(t, err)
 	})
 
@@ -200,5 +204,64 @@ func TestAggregatorSameMessage(t *testing.T) {
 		assert.Nil(t, signers)
 		// fix sigs[0]
 		sigs[0][4] ^= 1
+	})
+}
+
+func TestKeyAggregator(t *testing.T) {
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
+
+	signersNum := 20
+	// create keys
+	indices := make([]int, 0, signersNum)
+	keys := make([]crypto.PublicKey, 0, signersNum)
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	for i := 0; i < signersNum; i++ {
+		indices = append(indices, i)
+		_, err := rand.Read(seed)
+		require.NoError(t, err)
+		sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+		require.NoError(t, err)
+		keys = append(keys, sk.PublicKey())
+	}
+	aggregator, err := NewPublicKeyAggregator(keys)
+	require.NoError(t, err)
+
+	// constrcutor edge cases
+	t.Run("constructor", func(t *testing.T) {
+		// wrong key types
+		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+		_, err = rand.Read(seed)
+		require.NoError(t, err)
+		sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
+		require.NoError(t, err)
+		_, err = NewPublicKeyAggregator([]crypto.PublicKey{sk.PublicKey()})
+		assert.Error(t, err)
+		_, err = NewPublicKeyAggregator([]crypto.PublicKey{nil})
+		assert.Error(t, err)
+	})
+
+	t.Run("greedy algorithm", func(t *testing.T) {
+		// iterate over different random cases to make sure
+		// the delta algorithm works
+		rounds := 30
+		for i := 0; i < rounds; i++ {
+			go func() { // test module concurrency
+				low := mrand.Intn(signersNum)
+				high := low + mrand.Intn(signersNum-low)
+				var key, expectedKey crypto.PublicKey
+				var err error
+				key, err = aggregator.KeyAggregate(indices[low:high])
+				require.NoError(t, err)
+				if low == high {
+					expectedKey = crypto.NeutralBLSPublicKey()
+				} else {
+					expectedKey, err = crypto.AggregateBLSPublicKeys(keys[low:high])
+					require.NoError(t, err)
+				}
+				assert.True(t, key.Equals(expectedKey))
+			}()
+		}
 	})
 }

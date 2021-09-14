@@ -194,24 +194,24 @@ func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig cryp
 		}
 		keys = append(keys, s.publicKeys[signer])
 	}
-	aggregatedKey, err := crypto.AggregateBLSPublicKeys(keys)
+	KeyAggregate, err := crypto.AggregateBLSPublicKeys(keys)
 	if err != nil {
 		return false, fmt.Errorf("aggregating public keys failed: %w", err)
 	}
-	ok, err := aggregatedKey.Verify(sig, s.message, s.hasher)
+	ok, err := KeyAggregate.Verify(sig, s.message, s.hasher)
 	if err != nil {
 		return false, fmt.Errorf("signature verification failed: %w", err)
 	}
 	return ok, nil
 }
 
-// publicKeyAggregator aggregates BLS public keys in an optimized manner.
+// PublicKeyAggregator aggregates BLS public keys in an optimized manner.
 // It uses a greedy algorithm to compute the aggregated key based on the latest
 // computed key and the delta of keys.
 // A caller can use a classic stateless aggrgetaion if the optimization is not needed.
 //
 // The structure is thread safe.
-type publicKeyAggregator struct {
+type PublicKeyAggregator struct {
 	n                 int                // number of participants indexed from 0 to n-1
 	publicKeys        []crypto.PublicKey // keys indexed from 0 to n-1, signer i is assigned to public key i
 	lastSigners       map[int]struct{}   // maps the signers in the latest call to aggregate keys
@@ -221,22 +221,28 @@ type publicKeyAggregator struct {
 }
 
 // creates a new public key aggregator from all possible public keys
-func newPublicKeyAggregator(publicKeys []crypto.PublicKey) *publicKeyAggregator {
-	aggregator := &publicKeyAggregator{
+func NewPublicKeyAggregator(publicKeys []crypto.PublicKey) (*PublicKeyAggregator, error) {
+	// check for BLS keys
+	for i, key := range publicKeys {
+		if key == nil || key.Algorithm() != crypto.BLSBLS12381 {
+			return nil, engine.NewInvalidInputErrorf("key at index %d is not a BLS key", i)
+		}
+	}
+	aggregator := &PublicKeyAggregator{
 		n:                 len(publicKeys),
 		publicKeys:        publicKeys,
 		lastSigners:       make(map[int]struct{}),
 		lastAggregatedKey: crypto.NeutralBLSPublicKey(),
 		RWMutex:           sync.RWMutex{},
 	}
-	return aggregator
+	return aggregator, nil
 }
 
-// aggregatedKey returns the aggregated public key of the input signers.
-func (p *publicKeyAggregator) aggregatedKey(signers []int) (crypto.PublicKey, error) {
+// KeyAggregate returns the aggregated public key of the input signers.
+func (p *PublicKeyAggregator) KeyAggregate(signers []int) (crypto.PublicKey, error) {
 
 	// this greedy algorithm assumes the signers set does not vary much from one call
-	// to aggregatedKey to another. It computes the delta of signers compared to the
+	// to KeyAggregate to another. It computes the delta of signers compared to the
 	// latest list of signers and adjust the latest aggregated public key. This is faster
 	// than aggregating the public keys from scratch at each call.
 
@@ -270,7 +276,7 @@ func (p *publicKeyAggregator) aggregatedKey(signers []int) (crypto.PublicKey, er
 // keysDelta computes the delta between the reference s.lastSigners
 // and the input identity list.
 // It returns a list of the new signer keys, a list of the missing signer keys and the new map of signers.
-func (p *publicKeyAggregator) deltaKeys(signers []int) (
+func (p *PublicKeyAggregator) deltaKeys(signers []int) (
 	[]crypto.PublicKey, []crypto.PublicKey, map[int]struct{}) {
 
 	var newSignerKeys, missingSignerKeys []crypto.PublicKey
