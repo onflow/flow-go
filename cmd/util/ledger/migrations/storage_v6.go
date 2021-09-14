@@ -13,6 +13,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
 	"github.com/rs/zerolog"
+	"github.com/schollz/progressbar/v3"
 
 	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -147,6 +148,7 @@ type StorageFormatV6Migration struct {
 
 	migratedPayloadPaths map[storagePath]bool
 	deferredValuePaths   map[storagePath]bool
+	progress             *progressbar.ProgressBar
 }
 
 func (m *StorageFormatV6Migration) filename() string {
@@ -191,6 +193,9 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	m.initNewInterpreter()
 	m.initOldInterpreter(payloads)
 
+	total := int64(len(payloads) * 3)
+	m.progress = progressbar.Default(total, "Migrating:")
+
 	m.deferredValuePaths = m.getDeferredKeys(payloads)
 
 	// Convert payloads.
@@ -202,7 +207,6 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
 
 	for _, payload := range payloads {
-
 		keyParts := payload.Key.KeyParts
 		rawOwner := keyParts[0].Value
 		rawKey := keyParts[2].Value
@@ -223,7 +227,10 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 			// Both nil means, value is decoded and converted.
 			// Do the encoding at once at the end.
 		}
+
+		m.progress.Add(1)
 	}
+	m.progress.Clear()
 	m.Log.Info().Msg("Converting payloads complete")
 
 	// Encode the new values by calling `storage.Commit()`
@@ -237,9 +244,17 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 
 	// Add the encoded new values to the payloads
 
+	currentProgress := m.progress.GetMax()
+	m.progress.Clear()
+	m.progress.Reset()
+	m.progress.ChangeMax(len(payloads)*2 + len(baseStorage.ReencodedPayloads))
+	m.progress.Set(currentProgress)
+
 	for _, payload := range baseStorage.ReencodedPayloads {
 		migratedPayloads = append(migratedPayloads, *payload)
 	}
+	m.progress.Finish()
+
 	m.Log.Info().Msg("Re-encoding converted values complete")
 
 	return migratedPayloads, nil
@@ -285,10 +300,10 @@ func (m *StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Pa
 
 func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) map[storagePath]bool {
 
+	m.progress.Clear()
 	m.Log.Info().Msgf("Collecting deferred keys...")
 
 	deferredValuePaths := make(map[storagePath]bool, 0)
-
 	for _, payload := range payloads {
 		keyParts := payload.Key.KeyParts
 		rawOwner := keyParts[0].Value
@@ -359,8 +374,11 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 				return true
 			},
 		)
+
+		m.progress.Add(1)
 	}
 
+	m.progress.Clear()
 	m.Log.Info().Msgf("Deferred keys collected: %d", len(deferredValuePaths))
 
 	return deferredValuePaths
