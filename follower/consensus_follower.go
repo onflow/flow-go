@@ -155,7 +155,7 @@ func NewConsensusFollower(
 	bindAddr string,
 	bootstapIdentities []BootstrapNodeInfo,
 	opts ...Option,
-) (consensusFollower *ConsensusFollowerImpl, err error) {
+) (*ConsensusFollowerImpl, error) {
 
 	config := &Config{
 		networkPrivKey: networkPrivKey,
@@ -174,7 +174,7 @@ func NewConsensusFollower(
 	if err != nil {
 		return nil, err
 	}
-	consensusFollower = &ConsensusFollowerImpl{
+	consensusFollower := &ConsensusFollowerImpl{
 		NodeBuilder:  anb,
 		errorManager: module.NewErrorManager(),
 	}
