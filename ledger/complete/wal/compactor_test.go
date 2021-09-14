@@ -138,7 +138,7 @@ func Test_Compactor(t *testing.T) {
 			require.NoError(t, err)
 		})
 
-		time.Sleep(2 * time.Second)
+		time.Sleep(1 * time.Second)
 
 		t.Run("remove unnecessary files", func(t *testing.T) {
 			// Remove all files apart from target checkpoint and WAL segments ahead of it
@@ -161,7 +161,7 @@ func Test_Compactor(t *testing.T) {
 		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
 
-		time.Sleep(2 * time.Second)
+		time.Sleep(1 * time.Second)
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
 			wal2, err := NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
@@ -184,8 +184,6 @@ func Test_Compactor(t *testing.T) {
 			<-wal2.Done()
 
 		})
-
-		time.Sleep(2 * time.Second)
 
 		t.Run("make sure forests are equal", func(t *testing.T) {
 
