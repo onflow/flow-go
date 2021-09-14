@@ -146,7 +146,7 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 //
 // Aggregate attempts to aggregate the internal signatures and returns the resulting signature.
 // The function performs a final verification and errors if any signature fails the desrialization
-// or if the aggregated signature is not valid.
+// or if the aggregated signature is not valid. It also errors if no signatures were added.
 // required for the function safety since "TrustedAdd" allows adding invalid signatures.
 // The function is not thread-safe.
 //
@@ -180,11 +180,14 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 // Aggregating the keys of the signers internally is optimized to only look at the keys delta
 // compared to the latest execution of the function. The function is therefore not thread-safe.
 // The function errors:
-//  - engine.InvalidInputErrorf if the indices are invalid
+//  - engine.InvalidInputErrorf if the indices are invalid or the signers list is empty.
 //  - random error if the execution failed
 func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig crypto.Signature) (bool, error) {
 	sharesNum := len(signers)
 	keys := make([]crypto.PublicKey, 0, sharesNum)
+	if sharesNum == 0 {
+		return false, engine.NewInvalidInputErrorf("signers list is empty")
+	}
 	for _, signer := range signers {
 		if signer >= s.n || signer < 0 {
 			return false, engine.NewInvalidInputErrorf("input index %d is invalid", signer)
