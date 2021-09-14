@@ -29,6 +29,7 @@ const NotSet = "not set"
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
 	module.ReadyDoneAware
+	module.ErrorAware
 
 	// BaseFlags reads the command line arguments common to all nodes
 	BaseFlags()
@@ -67,19 +68,6 @@ type NodeBuilder interface {
 	// node is stopped, we will wait for the component to exit gracefully with
 	// `Done`.
 	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
-
-	// Errors returns a channel that receives any unrecoverable errors encountered by the builder
-	Errors() <-chan error
-
-	// ThrowError handles unrecoverable errors
-	// If errorManger is enabled for the builder, the errorManager's ThrowError is called propagate the error
-	// If errorManger is not enabled, the error is handled as a panic
-	ThrowError(err error, msg string)
-
-	// ThrowOnError asserts that the given error must not occur.
-	// If the error is nil, do nothing
-	// If the error is not nil, call ThrowError to initiate fatal error handler
-	ThrowOnError(err error, msg string)
 
 	// Run initiates all common components (logger, database, protocol state etc.)
 	// then starts each component. It also sets up a channel to gracefully shut

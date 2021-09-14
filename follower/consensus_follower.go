@@ -124,14 +124,22 @@ func getBaseOptions(config *Config) []cmd.Option {
 	return options
 }
 
-func buildAccessNode(accessNodeOptions []access.Option) *access.UnstakedAccessNodeBuilder {
+func buildAccessNode(accessNodeOptions []access.Option) (nodeBuilder *access.UnstakedAccessNodeBuilder, err error) {
+	// catch any unrecoverable errors encountered during initialization
+	defer func() {
+		if e := recover(); e != nil {
+			nodeBuilder = nil
+			err = fmt.Errorf("%v", e)
+		}
+	}()
+
 	anb := access.FlowAccessNode(accessNodeOptions...)
-	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
+	nodeBuilder = access.NewUnstakedAccessNodeBuilder(anb)
 
 	nodeBuilder.Initialize()
 	nodeBuilder.BuildConsensusFollower()
 
-	return nodeBuilder
+	return nodeBuilder, nil
 }
 
 type ConsensusFollowerImpl struct {
@@ -148,13 +156,6 @@ func NewConsensusFollower(
 	bootstapIdentities []BootstrapNodeInfo,
 	opts ...Option,
 ) (consensusFollower *ConsensusFollowerImpl, err error) {
-	// catch any unrecoverable errors encountered during initialization
-	defer func() {
-		if e := recover(); e != nil {
-			consensusFollower = nil
-			err = fmt.Errorf("%v", e)
-		}
-	}()
 
 	config := &Config{
 		networkPrivKey: networkPrivKey,
@@ -169,7 +170,10 @@ func NewConsensusFollower(
 
 	accessNodeOptions := getAccessNodeOptions(config)
 
-	anb := buildAccessNode(accessNodeOptions)
+	anb, err := buildAccessNode(accessNodeOptions)
+	if err != nil {
+		return nil, err
+	}
 	consensusFollower = &ConsensusFollowerImpl{
 		NodeBuilder:  anb,
 		errorManager: module.NewErrorManager(),
@@ -231,6 +235,10 @@ func (cf *ConsensusFollowerImpl) runAccessNode(ctx context.Context, anb *access.
 		cf.errorManager.ThrowError(err)
 	}
 
-	<-anb.Done()
-	anb.Logger.Info().Msg("Access node shutdown complete")
+	select {
+	case <-anb.Done():
+		anb.Logger.Info().Msg("Access node shutdown complete")
+	case err := <-anb.Errors():
+		cf.errorManager.ThrowError(err)
+	}
 }
