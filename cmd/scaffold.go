@@ -280,17 +280,17 @@ func (fnb *FlowNodeBuilder) PrintBuildVersionDetails() {
 
 func (fnb *FlowNodeBuilder) initNodeInfo() {
 	if fnb.BaseConfig.nodeIDHex == NotSet {
-		fnb.ThrowError(nil, "cannot start without node ID")
+		fnb.ThrowError(errors.New("cannot start without node ID"))
 	}
 
 	nodeID, err := flow.HexStringToIdentifier(fnb.BaseConfig.nodeIDHex)
 	if err != nil {
-		fnb.ThrowError(err, fmt.Sprintf("could not parse node ID from string: %v", fnb.BaseConfig.nodeIDHex))
+		fnb.ThrowError(fmt.Errorf("could not parse node ID from string: %v: %w", fnb.BaseConfig.nodeIDHex, err))
 	}
 
 	info, err := loadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
 	if err != nil {
-		fnb.ThrowError(err, "failed to load private node info")
+		fnb.ThrowError(fmt.Errorf("failed to load private node info: %w", err))
 	}
 
 	fnb.NodeID = nodeID
@@ -312,7 +312,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	// parse config log level and apply to logger
 	lvl, err := zerolog.ParseLevel(strings.ToLower(fnb.BaseConfig.level))
 	if err != nil {
-		fnb.ThrowError(err, "invalid log level")
+		fnb.ThrowError(fmt.Errorf("invalid log level: %w", err))
 	}
 	log = log.Level(lvl)
 
@@ -522,7 +522,7 @@ func (fnb *FlowNodeBuilder) initState() {
 		rootBlockFromState, err := state.Params().Root()
 		fnb.ThrowOnError(err, "could not load root block from protocol state")
 		if fnb.RootBlock.ID() != rootBlockFromState.ID() {
-			fnb.ThrowError(nil, fmt.Sprintf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
+			fnb.ThrowError(fmt.Errorf("mismatching root block ID, protocol state block ID: %v, bootstrap root block ID: %v",
 				rootBlockFromState.ID(),
 				fnb.RootBlock.ID(),
 			))
@@ -584,7 +584,7 @@ func (fnb *FlowNodeBuilder) initLocal() {
 		rootBlockHeader, err := fnb.State.Params().Root()
 		fnb.ThrowOnError(err, "could not get root block from protocol state")
 		if rootBlockHeader.ChainID == flow.Mainnet {
-			fnb.ThrowError(nil, fmt.Sprintf("running as incorrect role, expected: %v, actual: %v, exiting",
+			fnb.ThrowError(fmt.Errorf("running as incorrect role, expected: %v, actual: %v, exiting",
 				self.Role.String(),
 				fnb.BaseConfig.NodeRole,
 			))
@@ -597,10 +597,10 @@ func (fnb *FlowNodeBuilder) initLocal() {
 
 	// ensure that the configured staking/network keys are consistent with the protocol state
 	if !self.NetworkPubKey.Equals(fnb.NetworkKey.PublicKey()) {
-		fnb.ThrowError(nil, "configured networking key does not match protocol state")
+		fnb.ThrowError(errors.New("configured networking key does not match protocol state"))
 	}
 	if !self.StakingPubKey.Equals(fnb.StakingKey.PublicKey()) {
-		fnb.ThrowError(nil, "configured staking key does not match protocol state")
+		fnb.ThrowError(errors.New("configured staking key does not match protocol state"))
 	}
 
 	fnb.Me, err = local.New(self, fnb.StakingKey)
@@ -626,7 +626,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
 	err := v.fn(fnb, fnb.NodeConfig)
 	if err != nil {
-		fnb.ThrowError(err, fmt.Sprintf("module %s initialization failed", v.name))
+		fnb.ThrowError(fmt.Errorf("module %s initialization failed: %w", v.name, err))
 	} else {
 		fnb.Logger.Info().Str("module", v.name).Msg("module initialization complete")
 	}
@@ -638,7 +638,7 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
 
 	readyAware, err := v.fn(fnb, fnb.NodeConfig)
 	if err != nil {
-		fnb.ThrowError(err, fmt.Sprintf("component %s initialization failed", v.name))
+		fnb.ThrowError(fmt.Errorf("component %s initialization failed: %w", v.name, err))
 	} else {
 		log.Info().Msg("component initialization complete")
 	}
@@ -690,25 +690,20 @@ func (fnb *FlowNodeBuilder) Errors() <-chan error {
 }
 
 // handle an unrecoverable error. if an error manager is configured, pass error to the manager, otherwise log a panic
-func (fnb *FlowNodeBuilder) ThrowError(err error, msg string) {
+func (fnb *FlowNodeBuilder) ThrowError(err error) {
 	if fnb.errorManager == nil || !fnb.lm.StartupCommenced() {
 		// node has not started yet, so we must trigger a panic to make the error recoverable by calling libraries
-		fnb.Logger.Panic().Err(err).Msg(msg)
+		fnb.Logger.Panic().Err(err).Send()
 	}
 
 	// if the node has already started, we can use the error channel
-	if err == nil {
-		err = errors.New(msg)
-	} else {
-		err = fmt.Errorf("%s: %w", msg, err)
-	}
 	fnb.errorManager.ThrowError(err)
 }
 
 // handle unrecoverable error if one was found
 func (fnb *FlowNodeBuilder) ThrowOnError(err error, msg string) {
 	if err != nil {
-		fnb.ThrowError(err, msg)
+		fnb.ThrowError(fmt.Errorf("%s: %w", msg, err))
 	}
 }
 
@@ -845,7 +840,7 @@ func (fnb *FlowNodeBuilder) Run() {
 	case <-fnb.Ready():
 		fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.NodeRole)
 	case <-time.After(fnb.BaseConfig.timeout):
-		fnb.ThrowError(nil, "node startup timed out")
+		fnb.ThrowError(errors.New("node startup timed out"))
 	case <-fnb.sig:
 		fnb.Logger.Warn().Msg("node startup aborted")
 		os.Exit(1)
@@ -860,7 +855,7 @@ func (fnb *FlowNodeBuilder) Run() {
 	case <-fnb.Done():
 		fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.NodeRole)
 	case <-time.After(fnb.BaseConfig.timeout):
-		fnb.ThrowError(nil, "node shutdown timed out")
+		fnb.ThrowError(errors.New("node shutdown timed out"))
 	case <-fnb.sig:
 		fnb.Logger.Warn().Msg("node shutdown aborted")
 		os.Exit(1)
@@ -955,7 +950,7 @@ func (fnb *FlowNodeBuilder) extraFlagsValidation() {
 	if fnb.extraFlagCheck != nil {
 		err := fnb.extraFlagCheck()
 		if err != nil {
-			fnb.ThrowError(err, "invalid flags")
+			fnb.ThrowError(fmt.Errorf("invalid flags: %w", err))
 		}
 	}
 }

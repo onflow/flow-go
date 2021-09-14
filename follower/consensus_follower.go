@@ -125,7 +125,6 @@ func getBaseOptions(config *Config) []cmd.Option {
 }
 
 func buildAccessNode(accessNodeOptions []access.Option) (nodeBuilder *access.UnstakedAccessNodeBuilder, err error) {
-	// catch any unrecoverable errors encountered during initialization
 	defer func() {
 		if e := recover(); e != nil {
 			nodeBuilder = nil

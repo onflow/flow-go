@@ -2,6 +2,7 @@ package node_builder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -63,7 +64,7 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 			// use the middleware that should have now been initialized
 			middleware, ok := anb.Middleware.(*p2p.Middleware)
 			if !ok {
-				anb.ThrowError(nil, "middleware was of unexpected type")
+				anb.ThrowError(errors.New("middleware was of unexpected type"))
 			}
 			return middleware.IdentifierProvider()
 		}
@@ -111,19 +112,19 @@ func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() {
 
 func (anb *UnstakedAccessNodeBuilder) validateParams() {
 	if anb.BaseConfig.BindAddr == cmd.NotSet || anb.BaseConfig.BindAddr == "" {
-		anb.ThrowError(nil, "bind address not specified")
+		anb.ThrowError(errors.New("bind address not specified"))
 	}
 	if anb.AccessNodeConfig.NetworkKey == nil {
-		anb.ThrowError(nil, "networking key not provided")
+		anb.ThrowError(errors.New("networking key not provided"))
 	}
 	if len(anb.bootstrapIdentities) > 0 {
 		return
 	}
 	if len(anb.bootstrapNodeAddresses) == 0 {
-		anb.ThrowError(nil, "no bootstrap node address provided")
+		anb.ThrowError(errors.New("no bootstrap node address provided"))
 	}
 	if len(anb.bootstrapNodeAddresses) != len(anb.bootstrapNodePublicKeys) {
-		anb.ThrowError(nil, "number of bootstrap node addresses and public keys should match")
+		anb.ThrowError(errors.New("number of bootstrap node addresses and public keys should match"))
 	}
 }
 
