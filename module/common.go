@@ -1,6 +1,9 @@
 package module
 
-import "runtime"
+import (
+	"context"
+	"runtime"
+)
 
 // ReadyDoneAware provides an easy interface to wait for module startup and shutdown.
 // Modules that implement this interface only support a single start-stop cycle, and
@@ -33,6 +36,12 @@ func (n *NoopReadDoneAware) Done() <-chan struct{} {
 	return done
 }
 
+// Startable provides an interface to start a component. Once started, the component
+// can be stopped by cancelling the given context.
+type Startable interface {
+	Start(context.Context) error
+}
+
 // ErrorAware provides an interface to be notified of errors encountered during
 // a component's lifecycle.
 type ErrorAware interface {
@@ -56,4 +65,67 @@ func (e *ErrorManager) Errors() <-chan error {
 func (e *ErrorManager) ThrowError(err error) {
 	e.errors <- err
 	runtime.Goexit()
+}
+
+type ErrorHandler func(ctx context.Context, errors <-chan error, restart func())
+
+type Component interface {
+	Startable
+	ReadyDoneAware
+	ErrorAware
+}
+
+type ComponentFactory func() (Component, error)
+
+func RunComponent(ctx context.Context, componentFactory ComponentFactory, errorHandler ErrorHandler) error {
+	restartChan := make(chan struct{})
+
+	start := func() (context.CancelFunc, <-chan struct{}, error) {
+		component, err := componentFactory()
+		if err != nil {
+			// failed to create component
+			return nil, nil, err
+		}
+
+		// context used to restart the component
+		runCtx, cancel := context.WithCancel(ctx)
+		if err := component.Start(runCtx); err != nil {
+			// failed to start component
+			cancel()
+			return nil, nil, err
+		}
+
+		select {
+		case <-ctx.Done():
+			runtime.Goexit()
+		case <-component.Ready():
+		}
+
+		go errorHandler(runCtx, component.Errors(), func() {
+			restartChan <- struct{}{}
+			runtime.Goexit()
+		})
+
+		return cancel, component.Done(), nil
+	}
+
+	for {
+		cancel, done, err := start()
+		if err != nil {
+			return err
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-restartChan:
+			cancel()
+		}
+
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-done:
+		}
+	}
 }
