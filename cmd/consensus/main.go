@@ -503,7 +503,7 @@ func main() {
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
 			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 
 			// initialize the pending blocks cache
 			proposals := buffer.NewPendingBlocks()
@@ -670,7 +670,7 @@ func main() {
 				comp,
 				syncCore,
 				finalizedHeader,
-				node.State,
+				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)

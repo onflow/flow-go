@@ -18,3 +18,8 @@ type Network interface {
 	// On a single node, only one engine can be subscribed to a channel at any given time.
 	Register(channel network.Channel, engine network.Engine) (network.Conduit, error)
 }
+
+type ReadyDoneAwareNetwork interface {
+	Network
+	ReadyDoneAware
+}

@@ -11,6 +11,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/client"
+	"github.com/onflow/flow-go/cmd"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -29,7 +30,7 @@ func init() {
 	rootCmd.AddCommand(checkMachineAccountCmd)
 
 	checkMachineAccountCmd.Flags().StringVar(&flagAccessAPIAddress, "access-address", "", "network address of an Access Node")
-	_ = machineAccountCmd.MarkFlagRequired("address")
+	cmd.MarkFlagRequired(checkMachineAccountCmd, "access-address")
 }
 
 func checkMachineAccountRun(_ *cobra.Command, _ []string) {
