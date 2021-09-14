@@ -152,6 +152,11 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 	return tx
 }
 
+//transaction ID (hash) is used to route a transaction to a cluster.
+//The envelope signature is included in that hash, so this function:
+//1) signs the envelope
+//2) then computes the hash
+//3) then checks whether it routes to the target cluster
 func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
 	acct := suite.acct
 
@@ -161,8 +166,10 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
+		// ensure we always exit this loop with exactly 1 envelope signature - otherwise we would get a "duplicate signature for key" error
+		tx.EnvelopeSignatures = nil
 		tx.SetScript(append(tx.Script, '/', '/'))
-		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Testnet), acct.key.Index, acct.signer)
+		err := tx.SignEnvelope(acct.addr, acct.key.Index, acct.signer)
 		require.Nil(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
