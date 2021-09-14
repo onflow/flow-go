@@ -96,3 +96,5 @@ func (s *Suite) TearDownTest() {
 		s.cancel()
 	}
 }
+
+//@TODO add util func to stake a node
