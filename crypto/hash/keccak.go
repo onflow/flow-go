@@ -21,8 +21,6 @@ void callKeccakF1600(ulong* state) {
 	KeccakP1600_Permute_24rounds(state);
 }
 
-#cgo LDFLAGS: -L./lib -lXKCP  -Wl,-rpath=./lib
-
 */
 import "C"
 
