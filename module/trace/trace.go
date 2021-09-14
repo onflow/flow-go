@@ -179,7 +179,17 @@ func (t *OpenTracer) StartSpanFromContext(
 	operationName SpanName,
 	opts ...opentracing.StartSpanOption,
 ) (opentracing.Span, context.Context) {
-	return opentracing.StartSpanFromContextWithTracer(ctx, t.Tracer, string(operationName), opts...)
+	parentSpan := opentracing.SpanFromContext(ctx)
+	if parentSpan == nil {
+		return &NoopSpan{&NoopTracer{}}, ctx
+	}
+	if _, ok := parentSpan.(*NoopSpan); ok {
+		return &NoopSpan{&NoopTracer{}}, ctx
+	}
+
+	opts = append(opts, opentracing.ChildOf(parentSpan.Context()))
+	span := t.Tracer.StartSpan(string(operationName), opts...)
+	return span, opentracing.ContextWithSpan(ctx, span)
 }
 
 func (t *OpenTracer) StartSpanFromParent(
@@ -187,6 +197,9 @@ func (t *OpenTracer) StartSpanFromParent(
 	operationName SpanName,
 	opts ...opentracing.StartSpanOption,
 ) opentracing.Span {
+	if _, ok := span.(*NoopSpan); ok {
+		return &NoopSpan{&NoopTracer{}}
+	}
 	opts = append(opts, opentracing.FollowsFrom(span.Context()))
 	return t.Tracer.StartSpan(string(operationName), opts...)
 }
@@ -198,6 +211,9 @@ func (t *OpenTracer) RecordSpanFromParent(
 	logs []opentracing.LogRecord,
 	opts ...opentracing.StartSpanOption,
 ) {
+	if _, ok := span.(*NoopSpan); ok {
+		return
+	}
 	end := time.Now()
 	start := end.Add(-duration)
 	opts = append(opts, opentracing.FollowsFrom(span.Context()))
