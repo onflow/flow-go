@@ -44,16 +44,6 @@ var storageMigrationV6DecMode = func() cbor.DecMode {
 	return decMode
 }()
 
-var CBOREncMode = func() cbor.EncMode {
-	options := cbor.CanonicalEncOptions()
-	options.BigIntConvert = cbor.BigIntConvertNone
-	encMode, err := options.EncMode()
-	if err != nil {
-		panic(err)
-	}
-	return encMode
-}()
-
 type storageFormatV6MigrationResult struct {
 	key     ledger.Key
 	payload *ledger.Payload
@@ -81,6 +71,15 @@ func (e *encodingBaseStorage) Store(id atree.StorageID, value []byte) error {
 	if err != nil {
 		return err
 	}
+
+	//// Sanity check: decode and see whether the values are decodable.
+	//
+	//decoder := newInter.CBORDecMode.NewByteStreamDecoder(value)
+	//
+	//_, err = newInter.DecodeStorable(decoder, id)
+	//if err != nil {
+	//	panic(err)
+	//}
 
 	// Add the encoded content to the payloads
 
@@ -129,8 +128,6 @@ func ledgerKeyFromStorageID(id atree.StorageID) ledger.Key {
 		ledger.NewKeyPart(2, id.Index[:]),
 	})
 }
-
-type brokenTypeCause int
 
 type storagePath struct {
 	owner string
@@ -677,7 +674,6 @@ func (c *ValueConverter) Convert(value oldInter.Value) newInter.Value {
 		c.result = prevResult
 	}()
 
-	// Interpreter is never used. So safe to pass nil here.
 	value.Accept(c.oldInter, c)
 
 	if c.result == nil {
@@ -688,7 +684,7 @@ func (c *ValueConverter) Convert(value oldInter.Value) newInter.Value {
 }
 
 func (c *ValueConverter) VisitValue(_ *oldInter.Interpreter, _ oldInter.Value) {
-	panic("implement me")
+	panic("unreachable")
 }
 
 func (c *ValueConverter) VisitTypeValue(_ *oldInter.Interpreter, value oldInter.TypeValue) {
@@ -709,7 +705,7 @@ func (c *ValueConverter) VisitStringValue(_ *oldInter.Interpreter, value *oldInt
 	c.result = newInter.NewStringValue(value.Str)
 }
 
-func (c *ValueConverter) VisitArrayValue(inter *oldInter.Interpreter, value *oldInter.ArrayValue) bool {
+func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInter.ArrayValue) bool {
 	newElements := make([]newInter.Value, value.Count())
 
 	for index, element := range value.Elements() {
@@ -810,14 +806,13 @@ func (c *ValueConverter) VisitUFix64Value(_ *oldInter.Interpreter, value oldInte
 	c.result = newInter.NewUFix64ValueWithInteger(uint64(value.ToInt()))
 }
 
-func (c *ValueConverter) VisitCompositeValue(inter *oldInter.Interpreter, value *oldInter.CompositeValue) bool {
+func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *oldInter.CompositeValue) bool {
 	fields := newInter.NewStringValueOrderedMap()
 
 	value.Fields().Foreach(func(key string, fieldVal oldInter.Value) {
 		fields.Set(key, c.Convert(fieldVal))
 	})
 
-	// TODO: Convert location and kind to new package?
 	c.result = newInter.NewCompositeValue(
 		c.storage,
 		value.Location(),
@@ -887,7 +882,7 @@ func (c *ValueConverter) VisitNilValue(_ *oldInter.Interpreter, _ oldInter.NilVa
 	c.result = newInter.NilValue{}
 }
 
-func (c *ValueConverter) VisitSomeValue(inter *oldInter.Interpreter, value *oldInter.SomeValue) bool {
+func (c *ValueConverter) VisitSomeValue(_ *oldInter.Interpreter, value *oldInter.SomeValue) bool {
 	innerValue := c.Convert(value.Value)
 	c.result = newInter.NewSomeValueNonCopying(innerValue)
 
@@ -914,7 +909,7 @@ func (c *ValueConverter) VisitPathValue(_ *oldInter.Interpreter, value oldInter.
 	}
 }
 
-func (c *ValueConverter) VisitCapabilityValue(inter *oldInter.Interpreter, value oldInter.CapabilityValue) {
+func (c *ValueConverter) VisitCapabilityValue(_ *oldInter.Interpreter, value oldInter.CapabilityValue) {
 	address := c.Convert(value.Address).(newInter.AddressValue)
 	pathValue := c.Convert(value.Path).(newInter.PathValue)
 
@@ -930,7 +925,7 @@ func (c *ValueConverter) VisitCapabilityValue(inter *oldInter.Interpreter, value
 	}
 }
 
-func (c *ValueConverter) VisitLinkValue(inter *oldInter.Interpreter, value oldInter.LinkValue) {
+func (c *ValueConverter) VisitLinkValue(_ *oldInter.Interpreter, value oldInter.LinkValue) {
 	targetPath := c.Convert(value.TargetPath).(newInter.PathValue)
 	c.result = newInter.LinkValue{
 		TargetPath: targetPath,
