@@ -148,7 +148,7 @@ func (factory *EpochComponentsFactory) Create(
 
 	// attach dependencies to the proposal engine
 	proposal = proposalEng.
-		WithHotStuff(hotstuff).
+		WithConsensus(hotstuff).
 		WithSync(syncCore)
 
 	return
