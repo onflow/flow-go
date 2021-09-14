@@ -3,6 +3,7 @@ package flow
 import (
 	"bytes"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
@@ -73,19 +74,9 @@ func (h Header) Fingerprint() []byte {
 	return fingerprint.Fingerprint(h.Body())
 }
 
+var mutex_hdr sync.Mutex
 var previd_hdr Identifier
 var prev_hdr Header
-
-// this does a binary byte-by-byte comparison of identifiers
-// an Identifier is just a 32-byte array
-func compareIdentifiers(a Identifier, b Identifier) int {
-	for i := 0; i < 32; i++ {
-		if a[i] != b[i] {
-			return -1
-		}
-	}
-	return 0
-}
 
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
@@ -95,6 +86,11 @@ func (h Header) ID() Identifier {
 	if h.Timestamp.Location() != time.UTC {
 		h.Timestamp = h.Timestamp.UTC()
 	}
+
+	mutex_hdr.Lock()
+
+	// unlock at the return
+	defer mutex_hdr.Unlock()
 
 	for {
 		// compare these elements individually
@@ -109,23 +105,23 @@ func (h Header) ID() Identifier {
 		bNotEqual := false
 		if len(h.ParentVoterIDs) > 0 {
 			for i, v := range h.ParentVoterIDs {
-				if len(prev_hdr.ParentVoterIDs) >= i &&
-					compareIdentifiers(v, prev_hdr.ParentVoterIDs[i]) != 0 {
-					bNotEqual = true
-					break
+				if v == prev_hdr.ParentVoterIDs[i] {
+					continue
 				}
+				bNotEqual = true
+				break
 			}
 		}
 
-		if bNotEqual == false &&
+		if !bNotEqual &&
 			h.ChainID == prev_hdr.ChainID &&
 			h.Timestamp == prev_hdr.Timestamp &&
 			h.Height == prev_hdr.Height &&
 			h.ParentID == prev_hdr.ParentID &&
 			h.View == prev_hdr.View &&
 			h.PayloadHash == prev_hdr.PayloadHash &&
-			bytes.Compare(h.ProposerSigData, prev_hdr.ProposerSigData) == 0 &&
-			bytes.Compare(h.ParentVoterSigData, prev_hdr.ParentVoterSigData) == 0 &&
+			bytes.Equal(h.ProposerSigData, prev_hdr.ProposerSigData) &&
+			bytes.Equal(h.ParentVoterSigData, prev_hdr.ParentVoterSigData) &&
 			h.ProposerID == prev_hdr.ProposerID {
 
 			// cache hit, return the previous identifier
