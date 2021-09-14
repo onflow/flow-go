@@ -17,16 +17,16 @@ type NewCollectorFactoryMethod = func(view uint64) (hotstuff.VoteCollector, erro
 // This structure is concurrently safe.
 type VoteCollectors struct {
 	lock            sync.RWMutex
-	lowestView     uint64                            // lowest view that we have pruned up to
+	lowestView      uint64                            // lowest view that we have pruned up to
 	collectors      map[uint64]hotstuff.VoteCollector // view -> VoteCollector
 	createCollector NewCollectorFactoryMethod         // factory method for creating collectors
 }
 
 var _ hotstuff.VoteCollectors = &VoteCollectors{}
 
-func NewVoteCollectors(lowestLevel uint64, factoryMethod NewCollectorFactoryMethod) *VoteCollectors {
+func NewVoteCollectors(lowestView uint64, factoryMethod NewCollectorFactoryMethod) *VoteCollectors {
 	return &VoteCollectors{
-		lowestLevel:     lowestLevel,
+		lowestView:      lowestView,
 		collectors:      make(map[uint64]hotstuff.VoteCollector),
 		createCollector: factoryMethod,
 	}
@@ -66,8 +66,8 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, error) {
 	v.lock.RLock()
 	defer v.lock.RUnlock()
-	if view < v.lowestLevel {
-		return nil, mempool.NewDecreasingPruningHeightErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, v.lowestLevel)
+	if view < v.lowestView {
+		return nil, mempool.NewDecreasingPruningHeightErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, v.lowestView)
 	}
 
 	return v.collectors[view], nil
@@ -77,7 +77,7 @@ func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, erro
 func (v *VoteCollectors) PruneUpToView(view uint64) error {
 	v.lock.Lock()
 	defer v.lock.Unlock()
-	if v.lowestLevel >= view {
+	if v.lowestView >= view {
 		return nil
 	}
 	if len(v.collectors) == 0 {
@@ -100,7 +100,7 @@ func (v *VoteCollectors) PruneUpToView(view uint64) error {
 			delete(v.collectors, w)
 		}
 	}
-	v.lowestLevel = view
+	v.lowestView = view
 
 	return nil
 }
