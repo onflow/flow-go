@@ -135,8 +135,7 @@ func (s *VoteCollectorsTestSuite) TestPruneUpToView() {
 
 	// after this operation collectors below pruning height should be pruned and everything higher
 	// should be left unmodified
-	err := s.collectors.PruneUpToView(pruningHeight)
-	require.NoError(s.T(), err)
+	s.collectors.PruneUpToView(pruningHeight)
 
 	for _, prunedView := range prunedViews {
 		_, _, err := s.collectors.GetOrCreateCollector(prunedView)

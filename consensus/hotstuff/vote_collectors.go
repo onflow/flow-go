@@ -20,5 +20,5 @@ type VoteCollectors interface {
 	// PruneUpToView prunes the vote collectors whose view is below the given view.
 	// If `view` is smaller than the previous value, the previous value is kept
 	// and no operations will be made.
-	PruneUpToView(view uint64) error
+	PruneUpToView(view uint64)
 }

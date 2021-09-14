@@ -38,9 +38,16 @@ var _ hotstuff.VoteAggregatorV2 = &VoteAggregatorV2{}
 
 // NewVoteAggregatorV2 creates an instance of vote aggregator
 // Note: verifyingProcessorFactory is injected. Thereby, the code is agnostic to the
-// different voting formats of main Consensus vs Collector consensus.   
-func NewVoteAggregatorV2(log zerolog.Logger, notifier hotstuff.Consumer, highestPrunedView uint64, committee hotstuff.Committee, voteValidator hotstuff.Validator, signer hotstuff.SignerVerifier,
-	verifyingProcessorFactory votecollector.VerifyingVoteProcessorFactory) *VoteAggregatorV2 {
+// different voting formats of main Consensus vs Collector consensus.
+func NewVoteAggregatorV2(
+	log zerolog.Logger,
+	notifier hotstuff.Consumer,
+	highestPrunedView uint64,
+	committee hotstuff.Committee,
+	voteValidator hotstuff.Validator,
+	signer hotstuff.SignerVerifier,
+	verifyingProcessorFactory votecollector.VerifyingVoteProcessorFactory,
+) *VoteAggregatorV2 {
 
 	aggregator := &VoteAggregatorV2{
 		log:               log,
@@ -187,9 +194,6 @@ func (va *VoteAggregatorV2) PruneUpToView(view uint64) {
 	// if someone else has updated view in parallel don't bother doing extra work for cleaning, whoever
 	// is able to advance counter will perform the cleanup
 	if va.highestPrunedView.Set(view) {
-		err := va.collectors.PruneUpToView(view)
-		if err != nil {
-			va.log.Fatal().Err(err).Msgf("fatal error when pruning vote collectors by view %d", view)
-		}
+		va.collectors.PruneUpToView(view)
 	}
 }

@@ -32,7 +32,13 @@ func NewVoteCollectors(lowestView uint64, factoryMethod NewCollectorFactoryMetho
 	}
 }
 
-// GetOrCreateCollector performs lazy initialization of collectors based on their view
+// GetOrCreateCollector retrieves the hotstuff.VoteCollector for the specified
+// view or creates one if none exists.
+//  -  (collector, true, nil) if no collector can be found by the block ID, and a new collector was created.
+//  -  (collector, false, nil) if the collector can be found by the block ID
+//  -  (nil, false, error) if running into any exception creating the vote collector state machine
+// Expected error returns during normal operations:
+//  * mempool.DecreasingPruningHeightError - in case view is lower than lowestView
 func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollector, bool, error) {
 	cachedCollector, err := v.getCollector(view)
 	if err != nil {
@@ -63,6 +69,10 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 	return collector, true, nil
 }
 
+// getCollector retrieves hotstuff.VoteCollector from local cache in concurrent safe way.
+// Performs check for lowestView.
+// Expected error returns during normal operations:
+//  * mempool.DecreasingPruningHeightError - in case view is lower than lowestView
 func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, error) {
 	v.lock.RLock()
 	defer v.lock.RUnlock()
@@ -74,15 +84,15 @@ func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, erro
 }
 
 // PruneUpToView prunes all collectors below view, sets the lowest level to that value
-func (v *VoteCollectors) PruneUpToView(view uint64) error {
+func (v *VoteCollectors) PruneUpToView(view uint64) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 	if v.lowestView >= view {
-		return nil
+		return
 	}
 	if len(v.collectors) == 0 {
 		v.lowestView = view
-		return nil
+		return
 	}
 
 	// to optimize the pruning of large view-ranges, we compare:
@@ -90,7 +100,7 @@ func (v *VoteCollectors) PruneUpToView(view uint64) error {
 	//  * the number of views that need to be pruned: view-v.lowestView
 	// We iterate over the dimension which is smaller.
 	if uint64(len(v.collectors)) < view-v.lowestView {
-		for w, _ := range v.collectors {
+		for w := range v.collectors {
 			if w < view {
 				delete(v.collectors, w)
 			}
@@ -101,6 +111,4 @@ func (v *VoteCollectors) PruneUpToView(view uint64) error {
 		}
 	}
 	v.lowestView = view
-
-	return nil
 }

@@ -71,6 +71,9 @@ func NewStateMachine(
 	return sm
 }
 
+// AddVote adds a vote to current vote collector
+// All expected errors are handled via callbacks to notifier.
+// Under normal execution only exceptions are propagated to caller.
 func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	// Cache vote
 	err := m.votesCache.AddVote(vote)
@@ -96,6 +99,7 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	return nil
 }
 
+// processVote uses compare-and-repeat pattern to process vote with underlying vote processor
 func (m *VoteCollector) processVote(vote *model.Vote) error {
 	for {
 		processor := m.atomicLoadProcessor()
@@ -116,10 +120,12 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 	}
 }
 
+// Status returns the status of underlying vote processor
 func (m *VoteCollector) Status() hotstuff.VoteCollectorStatus {
 	return m.atomicLoadProcessor().Status()
 }
 
+// View returns view associated with this collector
 func (m *VoteCollector) View() uint64 {
 	return m.votesCache.View()
 }
