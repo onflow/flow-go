@@ -2,6 +2,7 @@ package node_builder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -33,17 +34,28 @@ func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNod
 	}
 }
 
-func (anb *UnstakedAccessNodeBuilder) initNodeInfo() {
+func (anb *UnstakedAccessNodeBuilder) initNodeInfo() error {
 	// use the networking key that has been passed in the config
 	networkingKey := anb.AccessNodeConfig.NetworkKey
 	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkingKey.PublicKey())
-	anb.MustNot(err).Msg("could not load networking public key")
+	if err != nil {
+		return fmt.Errorf("could not load networking public key: %w", err)
+	}
+
 	peerID, err := peer.IDFromPublicKey(pubKey)
-	anb.MustNot(err).Msg("could not get peer ID from public key")
+	if err != nil {
+		return fmt.Errorf("could not get peer ID from public key: %w", err)
+	}
+
 	anb.NodeID, err = p2p.NewUnstakedNetworkIDTranslator().GetFlowID(peerID)
-	anb.MustNot(err).Msg("could not get flow node ID")
+	if err != nil {
+		return fmt.Errorf("could not get flow node ID: %w", err)
+	}
+
 	anb.NodeConfig.NetworkKey = networkingKey // copy the key to NodeConfig
 	anb.NodeConfig.StakingKey = nil           // no staking key for the unstaked node
+
+	return nil
 }
 
 func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
@@ -72,16 +84,25 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 	})
 }
 
-func (anb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
+func (anb *UnstakedAccessNodeBuilder) Initialize() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	anb.Cancel = cancel
 
-	anb.deriveBootstrapPeerIdentities()
+	err := anb.deriveBootstrapPeerIdentities()
+	if err != nil {
+		return err
+	}
 
-	anb.validateParams()
+	err = anb.validateParams()
+	if err != nil {
+		return err
+	}
 
-	anb.initNodeInfo()
+	err = anb.initNodeInfo()
+	if err != nil {
+		return err
+	}
 
 	anb.InitIDProviders()
 
@@ -93,38 +114,43 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	anb.PreInit(anb.initUnstakedLocal())
 
-	return anb
+	return nil
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
 // These are the identities of the staked and unstaked ANs also acting as the DHT bootstrap server
-func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() {
+func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() error {
 	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
 	// line params)
 	if builder.bootstrapIdentities != nil {
-		return
+		return nil
 	}
 	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
-	builder.MustNot(err).Msg("failed to derive bootstrap peer identities")
+	if err != nil {
+		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
+	}
 	builder.bootstrapIdentities = ids
+
+	return nil
 }
 
-func (anb *UnstakedAccessNodeBuilder) validateParams() {
+func (anb *UnstakedAccessNodeBuilder) validateParams() error {
 	if anb.BaseConfig.BindAddr == cmd.NotSet || anb.BaseConfig.BindAddr == "" {
-		anb.Logger.Fatal().Msg("bind address not specified")
+		return errors.New("bind address not specified")
 	}
 	if anb.AccessNodeConfig.NetworkKey == nil {
-		anb.Logger.Fatal().Msg("networking key not provided")
+		return errors.New("networking key not provided")
 	}
 	if len(anb.bootstrapIdentities) > 0 {
-		return
+		return nil
 	}
 	if len(anb.bootstrapNodeAddresses) == 0 {
-		anb.Logger.Fatal().Msg("no bootstrap node address provided")
+		return errors.New("no bootstrap node address provided")
 	}
 	if len(anb.bootstrapNodeAddresses) != len(anb.bootstrapNodePublicKeys) {
-		anb.Logger.Fatal().Msg("number of bootstrap node addresses and public keys should match")
+		return errors.New("number of bootstrap node addresses and public keys should match")
 	}
+	return nil
 }
 
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the unstaked node.

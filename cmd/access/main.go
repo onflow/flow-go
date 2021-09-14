@@ -20,6 +20,10 @@ func main() {
 		nodeBuilder = nodebuilder.NewUnstakedAccessNodeBuilder(anb)
 	}
 
-	nodeBuilder.Initialize()
+	err := nodeBuilder.Initialize()
+	if err != nil {
+		anb.Logger.Fatal().Err(err).Send()
+	}
+
 	nodeBuilder.Build().Run()
 }
