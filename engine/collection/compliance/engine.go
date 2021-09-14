@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/events"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -28,38 +29,52 @@ const defaultBlockQueueCapacity = 10000
 // defaultVoteQueueCapacity maximum capacity of block votes queue
 const defaultVoteQueueCapacity = 1000
 
-// Engine is a wrapper struct for `Core` which implements consensus algorithm.
+// Engine is a wrapper struct for `Core` which implements cluster consensus algorithm.
 // Engine is responsible for handling incoming messages, queueing for processing, broadcasting proposals.
 type Engine struct {
 	unit           *engine.Unit
 	lm             *lifecycle.LifecycleManager
 	log            zerolog.Logger
-	mempool        module.MempoolMetrics
 	metrics        module.EngineMetrics
 	me             module.Local
 	headers        storage.Headers
-	payloads       storage.Payloads
-	tracer         module.Tracer
+	payloads       storage.ClusterPayloads
 	state          protocol.State
-	prov           network.Engine
 	core           *Core
 	pendingBlocks  engine.MessageStore
 	pendingVotes   engine.MessageStore
 	messageHandler *engine.MessageHandler
 	con            network.Conduit
+	cluster        flow.IdentityList // consensus participants in our cluster
 }
 
 func NewEngine(
 	log zerolog.Logger,
 	net module.Network,
 	me module.Local,
-	prov network.Engine,
-	core *Core) (*Engine, error) {
+	state protocol.State,
+	payloads storage.ClusterPayloads,
+	core *Core,
+) (*Engine, error) {
+	engineLog := log.With().Str("cluster_compliance", "engine").Logger()
+
+	// find my cluster for the current epoch
+	// TODO this should flow from cluster state as source of truth
+	clusters, err := state.Final().Epochs().Current().Clustering()
+	if err != nil {
+		return nil, fmt.Errorf("could not get clusters: %w", err)
+	}
+	currentCluster, _, found := clusters.ByNodeID(me.NodeID())
+	if !found {
+		return nil, fmt.Errorf("could not find cluster for self")
+	}
 
 	// FIFO queue for block proposals
 	blocksQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultBlockQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockProposalQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) {
+			core.mempoolMetrics.MempoolEntries(metrics.ResourceClusterBlockProposalQueue, uint(len))
+		}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound receipts: %w", err)
@@ -71,7 +86,7 @@ func NewEngine(
 	// FIFO queue for block votes
 	votesQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultVoteQueueCapacity),
-		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceBlockVoteQueue, uint(len)) }),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempoolMetrics.MempoolEntries(metrics.ResourceClusterBlockVoteQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create queue for inbound approvals: %w", err)
@@ -80,13 +95,13 @@ func NewEngine(
 
 	// define message queueing behaviour
 	handler := engine.NewMessageHandler(
-		log.With().Str("compliance", "engine").Logger(),
+		engineLog,
 		engine.NewNotifier(),
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.BlockProposal)
+				_, ok := msg.Payload.(*messages.ClusterBlockProposal)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
+					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
 				}
 				return ok
 			},
@@ -94,19 +109,19 @@ func NewEngine(
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*events.SyncedBlock)
+				_, ok := msg.Payload.(*events.SyncedClusterBlock)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageSyncedBlock)
+					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageSyncedClusterBlock)
 				}
 				return ok
 			},
 			Map: func(msg *engine.Message) (*engine.Message, bool) {
-				syncedBlock := msg.Payload.(*events.SyncedBlock)
+				syncedBlock := msg.Payload.(*events.SyncedClusterBlock)
 				msg = &engine.Message{
 					OriginID: msg.OriginID,
-					Payload: &messages.BlockProposal{
-						Payload: syncedBlock.Block.Payload,
+					Payload: &messages.ClusterBlockProposal{
 						Header:  syncedBlock.Block.Header,
+						Payload: syncedBlock.Block.Payload,
 					},
 				}
 				return msg, true
@@ -115,9 +130,9 @@ func NewEngine(
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.BlockVote)
+				_, ok := msg.Payload.(*messages.ClusterBlockVote)
 				if ok {
-					core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockVote)
+					core.metrics.MessageReceived(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
 				}
 				return ok
 			},
@@ -128,26 +143,31 @@ func NewEngine(
 	eng := &Engine{
 		unit:           engine.NewUnit(),
 		lm:             lifecycle.NewLifecycleManager(),
-		log:            log.With().Str("compliance", "engine").Logger(),
-		me:             me,
-		mempool:        core.mempool,
+		log:            engineLog,
 		metrics:        core.metrics,
+		me:             me,
 		headers:        core.headers,
-		payloads:       core.payloads,
+		payloads:       payloads,
+		state:          state,
+		core:           core,
 		pendingBlocks:  pendingBlocks,
 		pendingVotes:   pendingVotes,
-		state:          core.state,
-		tracer:         core.tracer,
-		prov:           prov,
-		core:           core,
 		messageHandler: handler,
+		con:            nil,
+		cluster:        currentCluster,
 	}
 
-	// register the core with the network layer and store the conduit
-	eng.con, err = net.Register(engine.ConsensusCommittee, eng)
+	chainID, err := core.state.Params().ChainID()
 	if err != nil {
-		return nil, fmt.Errorf("could not register core: %w", err)
+		return nil, fmt.Errorf("could not get chain ID: %w", err)
 	}
+
+	// register network conduit
+	conduit, err := net.Register(engine.ChannelConsensusCluster(chainID), eng)
+	if err != nil {
+		return nil, fmt.Errorf("could not register engine: %w", err)
+	}
+	eng.con = conduit
 
 	return eng, nil
 }
@@ -156,6 +176,13 @@ func NewEngine(
 // called before the engine can start.
 func (e *Engine) WithConsensus(hot module.HotStuff) *Engine {
 	e.core.hotstuff = hot
+	return e
+}
+
+// WithSync adds the block requester to the engine. This must be
+// called before the engine can start.
+func (e *Engine) WithSync(sync module.BlockRequester) *Engine {
+	e.core.sync = sync
 	return e
 }
 
@@ -232,11 +259,9 @@ func (e *Engine) loop() {
 func (e *Engine) processAvailableMessages() error {
 
 	for {
-		// TODO prioritization
-		// eg: msg := engine.SelectNextMessage()
 		msg, ok := e.pendingBlocks.Get()
 		if ok {
-			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.BlockProposal))
+			err := e.core.OnBlockProposal(msg.OriginID, msg.Payload.(*messages.ClusterBlockProposal))
 			if err != nil {
 				return fmt.Errorf("could not handle block proposal: %w", err)
 			}
@@ -245,7 +270,7 @@ func (e *Engine) processAvailableMessages() error {
 
 		msg, ok = e.pendingVotes.Get()
 		if ok {
-			err := e.core.OnBlockVote(msg.OriginID, msg.Payload.(*messages.BlockVote))
+			err := e.core.OnBlockVote(msg.OriginID, msg.Payload.(*messages.ClusterBlockVote))
 			if err != nil {
 				return fmt.Errorf("could not handle block vote: %w", err)
 			}
@@ -262,15 +287,14 @@ func (e *Engine) processAvailableMessages() error {
 func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, recipientID flow.Identifier) error {
 
 	log := e.log.With().
-		Hex("block_id", blockID[:]).
-		Uint64("block_view", view).
+		Hex("collection_id", blockID[:]).
+		Uint64("collection_view", view).
 		Hex("recipient_id", recipientID[:]).
 		Logger()
-
 	log.Info().Msg("processing vote transmission request from hotstuff")
 
 	// build the vote message
-	vote := &messages.BlockVote{
+	vote := &messages.ClusterBlockVote{
 		BlockID: blockID,
 		View:    view,
 		SigData: sigData,
@@ -284,15 +308,15 @@ func (e *Engine) SendVote(blockID flow.Identifier, view uint64, sigData []byte, 
 			log.Warn().Err(err).Msg("could not send vote")
 			return
 		}
-		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockVote)
-		log.Info().Msg("block vote transmitted")
+		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockVote)
+		log.Info().Msg("collection vote transmitted")
 	})
 
 	return nil
 }
 
-// BroadcastProposalWithDelay will propagate a block proposal to all non-local consensus nodes.
-// Note the header has incomplete fields, because it was converted from a hotstuff.
+// BroadcastProposalWithDelay submits a cluster block proposal (effectively a proposal
+// for the next collection) to all the collection nodes in our cluster.
 func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Duration) error {
 
 	// first, check that we are the proposer of the block
@@ -307,70 +331,64 @@ func (e *Engine) BroadcastProposalWithDelay(header *flow.Header, delay time.Dura
 	}
 
 	// fill in the fields that can't be populated by HotStuff
+	//TODO clean this up - currently we set these fields in builder, then lose
+	// them in HotStuff, then need to set them again here
 	header.ChainID = parent.ChainID
 	header.Height = parent.Height + 1
+
+	log := e.log.With().
+		Hex("block_id", logging.ID(header.ID())).
+		Uint64("block_height", header.Height).
+		Logger()
+
+	log.Debug().Msg("preparing to broadcast proposal from hotstuff")
 
 	// retrieve the payload for the block
 	payload, err := e.payloads.ByBlockID(header.ID())
 	if err != nil {
-		return fmt.Errorf("could not retrieve payload for proposal: %w", err)
+		return fmt.Errorf("could not get payload for block: %w", err)
 	}
 
-	log := e.log.With().
-		Str("chain_id", header.ChainID.String()).
-		Uint64("block_height", header.Height).
-		Uint64("block_view", header.View).
-		Hex("block_id", logging.Entity(header)).
-		Hex("parent_id", header.ParentID[:]).
-		Hex("payload_hash", header.PayloadHash[:]).
-		Int("gaurantees_count", len(payload.Guarantees)).
-		Int("seals_count", len(payload.Seals)).
-		Int("receipts_count", len(payload.Receipts)).
-		Time("timestamp", header.Timestamp).
-		Hex("proposer", header.ProposerID[:]).
-		Int("num_signers", len(header.ParentVoterIDs)).
-		Dur("delay", delay).
-		Logger()
+	log = log.With().Int("collection_size", payload.Collection.Len()).Logger()
 
-	log.Debug().Msg("processing proposal broadcast request from hotstuff")
-
-	// retrieve all consensus nodes without our ID
-	recipients, err := e.state.AtBlockID(header.ParentID).Identities(filter.And(
-		filter.HasRole(flow.RoleConsensus),
+	// retrieve all collection nodes in our cluster
+	recipients, err := e.state.Final().Identities(filter.And(
+		filter.In(e.cluster),
 		filter.Not(filter.HasNodeID(e.me.NodeID())),
 	))
 	if err != nil {
-		return fmt.Errorf("could not get consensus recipients: %w", err)
+		return fmt.Errorf("could not get cluster members: %w", err)
 	}
 
 	e.unit.LaunchAfter(delay, func() {
 
 		go e.core.hotstuff.SubmitProposal(header, parent.View)
 
-		// NOTE: some fields are not needed for the message
-		// - proposer ID is conveyed over the network message
-		// - the payload hash is deduced from the payload
-		proposal := &messages.BlockProposal{
+		// create the proposal message for the collection
+		msg := &messages.ClusterBlockProposal{
 			Header:  header,
 			Payload: payload,
 		}
 
-		// broadcast the proposal to consensus nodes
-		err = e.con.Publish(proposal, recipients.NodeIDs()...)
+		err := e.con.Publish(msg, recipients.NodeIDs()...)
 		if errors.Is(err, network.EmptyTargetList) {
 			return
 		}
 		if err != nil {
-			log.Error().Err(err).Msg("could not send proposal message")
+			log.Error().Err(err).Msg("could not broadcast proposal")
+			return
 		}
 
-		e.metrics.MessageSent(metrics.EngineCompliance, metrics.MessageBlockProposal)
+		log.Debug().
+			Str("recipients", fmt.Sprintf("%v", recipients.NodeIDs())).
+			Msg("broadcast proposal from hotstuff")
 
-		log.Info().Msg("block proposal broadcasted")
-
-		// submit the proposal to the provider engine to forward it to other
-		// node roles
-		e.prov.SubmitLocal(proposal)
+		e.metrics.MessageSent(metrics.EngineClusterCompliance, metrics.MessageClusterBlockProposal)
+		block := &cluster.Block{
+			Header:  header,
+			Payload: payload,
+		}
+		e.core.collectionMetrics.ClusterBlockProposed(block)
 	})
 
 	return nil
