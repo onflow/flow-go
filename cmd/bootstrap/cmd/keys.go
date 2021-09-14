@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow/order"
@@ -90,9 +89,9 @@ func assembleNodeMachineAccountInfo(machineKey crypto.PrivateKey, accountAddress
 		Msg("encoded public machine account key")
 	machineNodeInfo := model.NodeMachineAccountInfo{
 		EncodedPrivateKey: machineKey.Encode(),
-		KeyIndex:          0,
-		SigningAlgorithm:  sdkcrypto.ECDSA_P256,
-		HashAlgorithm:     sdkcrypto.SHA3_256,
+		KeyIndex:          model.DefaultMachineAccountKeyIndex,
+		SigningAlgorithm:  model.DefaultMachineAccountSignAlgo,
+		HashAlgorithm:     model.DefaultMachineAccountHashAlgo,
 		Address:           accountAddress,
 	}
 	return machineNodeInfo
