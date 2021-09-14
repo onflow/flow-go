@@ -15,7 +15,7 @@ NUM_RUNS := 10
 
 .PHONY: flakiness-run
 flakiness-run:
-	GO111MODULE=on go test -json -count $(NUM_RUNS) --tags relic ./... | jq 'select(.Test != null and (.Action == "pass" or .Action == "fail"))' >> flakiness_results
+	GO111MODULE=on go test -json -count $(NUM_RUNS) --tags relic ./... | jq -c 'select(.Test != null and (.Action == "pass" or .Action == "fail"))' >> flakiness_results
 
 .PHONY: docker-build
 docker-build:

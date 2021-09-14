@@ -10,11 +10,11 @@ NUM_RUNS := 10
 
 .PHONY: flakiness-run
 flakiness-run:
-	GO111MODULE=on go test -json -count $(NUM_RUNS) --tags relic ./... | jq 'select(.Test != null and (.Action == "pass" or .Action == "fail"))' >> flakiness_results
+	GO111MODULE=on go test -json -count $(NUM_RUNS) --tags relic ./... | jq -c 'select(.Test != null and (.Action == "pass" or .Action == "fail"))' >> flakiness_results
 
 .PHONY: flakiness-run-integration
 flakiness-run-integration:
-	GO111MODULE=on go test -json -count $(NUM_RUNS) --tags relic ./tests/access ./tests/collection ./tests/consensus ./tests/epochs ./tests/common ./tests/execution ./tests/verification | jq 'select(.Test != null and (.Action == "pass" or .Action == "fail"))' >> flakiness_results
+	GO111MODULE=on go test -json -count $(NUM_RUNS) --tags relic ./tests/access ./tests/collection ./tests/consensus ./tests/epochs ./tests/common ./tests/execution ./tests/verification | jq -c 'select(.Test != null and (.Action == "pass" or .Action == "fail"))' >> flakiness_results_integration
 
 # Run the integration test suite
 .PHONY: integration-test

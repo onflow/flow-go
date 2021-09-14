@@ -93,5 +93,5 @@ jobs:
       uses: google-github-actions/upload-cloud-storage@main
       with:
         credentials: ${{ secrets.gcp_credentials }}
-        path: ./integration/flakiness_results
+        path: ./integration/flakiness_results_integration
         destination: flakiness-detection/${{ env.FLAKINESS_RUN_FILENAME }}
