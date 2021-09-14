@@ -97,4 +97,4 @@ func (s *Suite) TearDownTest() {
 	}
 }
 
-//@TODO add util func to stake a node during integration test
+//@TODO add util func to stake a node during integration testing
