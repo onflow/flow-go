@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// WeightedSignatureAggregator implements consensus/hotstuff.WeightedSignatureAggregator
+// WeightedSignatureAggregator implements hotstuff.WeightedSignatureAggregator
 type WeightedSignatureAggregator struct {
 	*signature.SignatureAggregatorSameMessage                              // low level crypto aggregator, agnostic of weights and flow IDs
 	signers                                   []flow.Identity              // all possible signers, defining a canonical order
@@ -55,11 +55,12 @@ func NewWeightedSignatureAggregator(
 
 // Verify verifies the signature under the stored public and message.
 func (s *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
-	index, ok := s.idToIndex[signerID]
+	/*index, ok := s.idToIndex[signerID]
 	if !ok {
 		return false, fmt.Errorf("couldn't find signerID %s in the index map", signerID)
 	}
-	return s.SignatureAggregatorSameMessage.Verify(index, sig)
+	return s.SignatureAggregatorSameMessage.Verify(index, sig)*/
+	panic("implement me")
 }
 
 // TrustedAdd adds a signature to the internal set of signatures.
@@ -70,7 +71,7 @@ func (s *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 // The function is thread-safe
 func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
 	// get the total weight safely
-	collectedWeight := s.TotalWeight()
+	/*collectedWeight := s.TotalWeight()
 
 	// get the index
 	index, ok := s.idToIndex[signerID]
@@ -101,17 +102,19 @@ func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 	s.collectedIDs[signerID] = struct{}{}
 	collectedWeight += weight
 	s.totalWeight = collectedWeight
-	return collectedWeight, nil
+	return collectedWeight, nil*/
+	panic("implement me")
 }
 
 // TotalWeight returns the total weight presented by the collected signatures.
 //
 // The function is thread-safe
 func (s *WeightedSignatureAggregator) TotalWeight() uint64 {
-	s.lock.RLock()
+	/*s.lock.RLock()
 	collectedWeight := s.totalWeight
 	s.lock.RUnlock()
-	return collectedWeight
+	return collectedWeight*/
+	panic("implement me")
 }
 
 // Aggregate aggregates the signatures and returns the aggregated signature.
@@ -124,7 +127,7 @@ func (s *WeightedSignatureAggregator) TotalWeight() uint64 {
 // TODO : When compacting the list of signers, update the return from []flow.Identifier
 // to a compact bit vector.
 func (s *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
-	s.lock.Lock()
+	/*s.lock.Lock()
 	defer s.lock.Unlock()
 
 	// Aggregate includes the safety check of the aggregated signature
@@ -137,5 +140,6 @@ func (s *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, er
 		signerIDs = append(signerIDs, s.signers[i].NodeID)
 	}
 
-	return signerIDs, aggSignature, nil
+	return signerIDs, aggSignature, nil*/
+	panic("implement me")
 }
