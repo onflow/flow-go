@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 
 	"github.com/spf13/cobra"
@@ -87,7 +88,7 @@ func init() {
 
 	// required parameters
 	keygenCmd.Flags().StringVar(&flagConfig, "config", "node-config.json", "path to a JSON file containing multiple node configurations (Role, Address, Stake)")
-	_ = keygenCmd.MarkFlagRequired("config")
+	cmd.MarkFlagRequired(keygenCmd, "config")
 
 	// optional parameters, used for generating machine account files
 	keygenCmd.Flags().BoolVar(&flagDefaultMachineAccount, "machine-account", false, "whether or not to generate a default (same as networking key) machine account key file")
