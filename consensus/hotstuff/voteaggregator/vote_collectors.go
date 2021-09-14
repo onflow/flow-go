@@ -40,12 +40,12 @@ func NewVoteCollectors(lowestView uint64, factoryMethod NewCollectorFactoryMetho
 // Expected error returns during normal operations:
 //  * mempool.DecreasingPruningHeightError - in case view is lower than lowestView
 func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollector, bool, error) {
-	cachedCollector, err := v.getCollector(view)
+	cachedCollector, hasCachedCollector, err := v.getCollector(view)
 	if err != nil {
 		return nil, false, err
 	}
 
-	if cachedCollector != nil {
+	if hasCachedCollector {
 		return cachedCollector, false, nil
 	}
 
@@ -73,14 +73,16 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 // Performs check for lowestView.
 // Expected error returns during normal operations:
 //  * mempool.DecreasingPruningHeightError - in case view is lower than lowestView
-func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, error) {
+func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, bool, error) {
 	v.lock.RLock()
 	defer v.lock.RUnlock()
 	if view < v.lowestView {
-		return nil, mempool.NewDecreasingPruningHeightErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, v.lowestView)
+		return nil, false, mempool.NewDecreasingPruningHeightErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, v.lowestView)
 	}
 
-	return v.collectors[view], nil
+	clr, found := v.collectors[view]
+
+	return clr, found, nil
 }
 
 // PruneUpToView prunes all collectors below view, sets the lowest level to that value
