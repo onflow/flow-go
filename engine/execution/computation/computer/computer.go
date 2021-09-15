@@ -345,7 +345,9 @@ func (e *blockComputer) executeTransaction(
 		Msg("executing transaction")
 
 	tx := fvm.Transaction(txBody, txIndex)
-	tx.SetTraceSpan(txInternalSpan)
+	if isSampled {
+		tx.SetTraceSpan(txInternalSpan)
+	}
 
 	txView := collectionView.NewChild()
 	err := e.vm.Run(ctx, tx, txView, programs)
