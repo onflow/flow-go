@@ -101,9 +101,10 @@ func (c *cache) updateTXTCache(txt string, addr []string) {
 // invalidateIPCacheEntry atomically invalidates ip cache entry. Boolean variable determines whether invalidation
 // is successful.
 func (c *cache) invalidateIPCacheEntry(domain string) bool {
-	c.RLock()
+	c.Lock()
+	defer c.Unlock()
+
 	_, exists := c.ipCache[domain]
-	c.RUnlock()
 
 	if !exists {
 		return false
@@ -119,9 +120,10 @@ func (c *cache) invalidateIPCacheEntry(domain string) bool {
 // invalidateTXTCacheEntry atomically invalidates txt cache entry. Boolean variable determines whether invalidation
 // is successful.
 func (c *cache) invalidateTXTCacheEntry(txt string) bool {
-	c.RLock()
+	c.Lock()
+	defer c.Unlock()
+
 	_, exists := c.txtCache[txt]
-	c.RUnlock()
 
 	if !exists {
 		return false
