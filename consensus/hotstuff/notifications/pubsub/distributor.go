@@ -16,6 +16,8 @@ type Distributor struct {
 	lock        sync.RWMutex
 }
 
+var _ hotstuff.Consumer = &Distributor{}
+
 func (p *Distributor) OnEventProcessed() {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
@@ -160,5 +162,13 @@ func (p *Distributor) OnInvalidVoteDetected(vote *model.Vote) {
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
 		subscriber.OnInvalidVoteDetected(vote)
+	}
+}
+
+func (p *Distributor) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, subscriber := range p.subscribers {
+		subscriber.OnVoteForInvalidBlockDetected(vote, invalidProposal)
 	}
 }

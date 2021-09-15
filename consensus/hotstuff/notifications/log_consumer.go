@@ -3,6 +3,7 @@ package notifications
 import (
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/logging"
@@ -13,6 +14,8 @@ import (
 type LogConsumer struct {
 	log zerolog.Logger
 }
+
+var _ hotstuff.Consumer = &LogConsumer{}
 
 func NewLogConsumer(log zerolog.Logger) *LogConsumer {
 	lc := &LogConsumer{
@@ -139,6 +142,15 @@ func (lc *LogConsumer) OnInvalidVoteDetected(vote *model.Vote) {
 		Hex("vote_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
 		Msg("invalid vote detected")
+}
+
+func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {
+	lc.log.Warn().
+		Uint64("vote_view", vote.View).
+		Hex("vote_id", vote.BlockID[:]).
+		Hex("voter_id", vote.SignerID[:]).
+		Hex("proposer_id", proposal.Block.ProposerID[:]).
+		Msg("invalid vote for proposal detected")
 }
 
 func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *model.Block) *zerolog.Event {

@@ -1,6 +1,7 @@
 package notifications
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -8,6 +9,8 @@ import (
 // NoopConsumer is an implementation of the notifications consumer that
 // doesn't do anything.
 type NoopConsumer struct{}
+
+var _ hotstuff.Consumer = &NoopConsumer{}
 
 func NewNoopConsumer() *NoopConsumer {
 	nc := &NoopConsumer{}
@@ -47,3 +50,5 @@ func (*NoopConsumer) OnForkChoiceGenerated(uint64, *flow.QuorumCertificate) {}
 func (*NoopConsumer) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 
 func (*NoopConsumer) OnInvalidVoteDetected(*model.Vote) {}
+
+func (*NoopConsumer) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}

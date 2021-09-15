@@ -43,15 +43,6 @@ func (_m *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollec
 }
 
 // PruneUpToView provides a mock function with given fields: view
-func (_m *VoteCollectors) PruneUpToView(view uint64) error {
-	ret := _m.Called(view)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(uint64) error); ok {
-		r0 = rf(view)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *VoteCollectors) PruneUpToView(view uint64) {
+	_m.Called(view)
 }
