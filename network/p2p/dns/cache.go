@@ -101,7 +101,15 @@ func (c *cache) updateTXTCache(txt string, addr []string) {
 // invalidateIPCacheEntry atomically invalidates ip cache entry. Boolean variable determines whether invalidation
 // is successful.
 func (c *cache) invalidateIPCacheEntry(domain string) bool {
-	c.Lock()
+	c.RLock()
+	_, exists := c.ipCache[domain]
+	c.RUnlock()
+	
+	if !exists {
+	    return false
+	}
+	delete(c.ipCache, domain) // delete is idempotent and once in a while it is ok to report as exist even when it may have been deleted to avoid the cost of a write lock
+	return true
 	defer c.Unlock()
 
 	_, exists := c.ipCache[domain]
