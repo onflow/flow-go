@@ -83,10 +83,20 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 		return b.grpcTxSend(ctx, b.staticCollectionRPC, tx)
 	}
 
+	var collAddrs = make([]string, collectionNodesToTry)
+
+	// get a mutable value
+	size := uint(collectionNodesToTry)
+
 	// otherwise choose a random set of collections nodes to try
-	collAddrs, err := b.chooseCollectionNodes(tx, collectionNodesToTry)
+	err := b.chooseCollectionNodes(tx, &size, &collAddrs)
 	if err != nil {
 		return fmt.Errorf("failed to determine collection node for tx %x: %w", tx, err)
+	}
+
+	// resize the collection if necessary
+	if len(collAddrs) > int(size) {
+		collAddrs = collAddrs[:size]
 	}
 
 	var sendErrors *multierror.Error
@@ -112,30 +122,24 @@ func (b *backendTransactions) trySendTransaction(ctx context.Context, tx *flow.T
 
 // chooseCollectionNodes finds a random subset of size sampleSize of collection node addresses from the
 // collection node cluster responsible for the given tx
-func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sampleSize uint) ([]string, error) {
+func (b *backendTransactions) chooseCollectionNodes(tx *flow.TransactionBody, sampleSize *uint, targetAddrs *[]string) error {
 
 	// retrieve the set of collector clusters
 	clusters, err := b.state.Final().Epochs().Current().Clustering()
 	if err != nil {
-		return nil, fmt.Errorf("could not cluster collection nodes: %w", err)
+		*sampleSize = uint(0)
+		return fmt.Errorf("could not cluster collection nodes: %w", err)
 	}
 
 	// get the cluster responsible for the transaction
 	txCluster, ok := clusters.ByTxID(tx.ID())
 	if !ok {
-		return nil, fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
+		*sampleSize = uint(0)
+		return fmt.Errorf("could not get local cluster by txID: %x", tx.ID())
 	}
 
 	// select a random subset of collection nodes from the cluster to be tried in order
-	targetNodes := txCluster.Sample(sampleSize)
-
-	// collect the addresses of all the chosen collection nodes
-	var targetAddrs = make([]string, len(targetNodes))
-	for i, id := range targetNodes {
-		targetAddrs[i] = id.Address
-	}
-
-	return targetAddrs, nil
+	return txCluster.SampleAddresses(sampleSize, targetAddrs)
 }
 
 // sendTransactionToCollection sends the transaction to the given collection node via grpc

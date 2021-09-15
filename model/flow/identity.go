@@ -421,6 +421,26 @@ func (il IdentityList) ByNetworkingKey(key crypto.PublicKey) (*Identity, bool) {
 	return nil, false
 }
 
+// This returns a randomized list of addresses from the IdentityList
+func (il IdentityList) SampleAddresses(size *uint, addrs *[]string) error {
+	// get the max size of the slice with addresses
+	n := uint(len(il))
+	if *size > n {
+		*size = n
+	}
+
+	// fill in the slice with addresses, and then randomize
+	for i, id := range il {
+		(*addrs)[i] = id.Address
+	}
+
+	for k := uint(0); k < *size; k++ {
+		j := uint(rand.Intn(int(n - k)))
+		(*addrs)[k], (*addrs)[j+k] = (*addrs)[j+k], (*addrs)[k]
+	}
+	return nil
+}
+
 // Sample returns simple random sample from the `IdentityList`
 func (il IdentityList) Sample(size uint) IdentityList {
 	n := uint(len(il))
