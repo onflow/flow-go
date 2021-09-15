@@ -3,6 +3,7 @@ package epochs
 import (
 	"context"
 	"fmt"
+	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/integration/utils"
 
 	"github.com/rs/zerolog"
@@ -99,7 +100,32 @@ func (s *Suite) TearDownTest() {
 }
 
 //@TODO add util func to stake a node during integration test
-func (s *Suite) CreateLockedTokenAccount()  {
-	service, _ := utils.LocalnetService()
-	fmt.Println(service.PrivateKey.PublicKey())
+func (s *Suite) StakeNode(role flow.Role) (sdk.Address, error) {
+	ctx := context.Background()
+	tokenAmount, err := s.client.TokenAmountByRole(role.String())
+	require.NoError(s.T(), err)
+	fmt.Println(tokenAmount)
+
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	makeLeaseAcctTx := utils.MakeCreateLocalnetLeaseAccountWithKey(
+		s.client.Accountkey(),
+		s.client.Account(),
+		0,
+		sdk.Identifier(latestBlockID),
+	)
+
+	err = s.client.SignAndSendTransaction(ctx, makeLeaseAcctTx)
+	require.NoError(s.T(), err)
+
+	result, err := s.client.WaitForSealed(ctx, makeLeaseAcctTx.ID())
+	require.NoError(s.T(), err)
+
+	stakingAccount, found := s.client.UserAddress(result)
+	if !found {
+		return sdk.Address{}, fmt.Errorf("failed to stake node, could not create locked token account")
+	}
+
+	fmt.Println(stakingAccount)
+
+	return stakingAccount, nil
 }

@@ -2,6 +2,8 @@ package epochs
 
 import (
 	"context"
+	"fmt"
+	"github.com/stretchr/testify/suite"
 	"testing"
 
 	"github.com/onflow/flow-go/integration/testnet"
@@ -12,9 +14,7 @@ import (
 )
 
 func TestEpochs(t *testing.T) {
-	s := new(Suite)
-	s.CreateLockedTokenAccount()
-	//suite.Run(t, new(Suite))
+	suite.Run(t, new(Suite))
 }
 
 // TestViewsProgress asserts epoch state transitions over two full epochs
@@ -73,6 +73,9 @@ func (s *Suite) TestViewsProgress() {
 		phaseChecks = append(phaseChecks, epochViews...)
 	}
 
+	addr , err := s.StakeNode(flow.RoleConsensus)
+	require.NoError(s.T(), err)
+
 	s.net.StopContainers()
 
 	consensusContainers := []*testnet.Container{}
@@ -123,4 +126,6 @@ func (s *Suite) TestViewsProgress() {
 			assert.Equal(s.T(), v.phase, item.phase, "wrong phase at view %d", v.finalView)
 		}
 	}
+
+	fmt.Println("NEW-STAKING-ACCOUNT", addr)
 }

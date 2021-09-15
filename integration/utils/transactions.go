@@ -9,12 +9,11 @@ import (
 )
 
 func MakeCreateLocalnetLeaseAccountWithKey(
-	network string,
 	fullAccountKey *sdk.AccountKey,
 	creatorAccount *sdk.Account,
 	creatorAccountKeyIndex int,
-	latestBlock *sdk.Block,
-) sdk.Transaction {
+	latestBlockID sdk.Identifier,
+) *sdk.Transaction {
 	creatorKey := creatorAccount.Keys[creatorAccountKeyIndex]
 
 	adminPublicKey, err := crypto.DecodePublicKeyHex(
@@ -34,11 +33,11 @@ func MakeCreateLocalnetLeaseAccountWithKey(
 		AddAuthorizer(creatorAccount.Address).
 		AddRawArgument(jsoncdc.MustEncode(bytesToCadenceArray(fullAdminAccountKey.Encode()))).
 		AddRawArgument(jsoncdc.MustEncode(bytesToCadenceArray(fullAccountKey.Encode()))).
-		SetReferenceBlockID(latestBlock.ID).
+		SetReferenceBlockID(latestBlockID).
 		SetGasLimit(1000).
 		SetProposalKey(creatorAccount.Address, creatorAccountKeyIndex, creatorKey.SequenceNumber).
 		SetPayer(creatorAccount.Address)
-	return *tx
+	return tx
 }
 
 func MakeTransferLeaseToken(network string, receiver sdk.Address, sender *sdk.Account, senderKeyID int, tokenAmount string, latestBlock *sdk.Block) (sdk.Transaction, error) {
