@@ -152,16 +152,14 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, dataChan chan balanceD
 
 	value, version := interpreter.StripMagic(p.Value)
 
-	err = decMode.Valid(value)
+	err = storageMigrationV5DecMode.Valid(value)
 	if err != nil {
 		return nil
 	}
 
-	// Determine the appropriate decoder from the decoded version
-
 	decodeFunction := interpreter.DecodeValue
-	if version <= 3 {
-		decodeFunction = interpreter.DecodeValueV3
+	if version <= 4 {
+		decodeFunction = interpreter.DecodeValueV4
 	}
 
 	// Decode the value

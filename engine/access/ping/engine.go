@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -22,7 +22,7 @@ type Engine struct {
 
 	pingEnabled  bool
 	pingInterval time.Duration
-	middleware   *p2p.Middleware
+	middleware   network.Middleware
 	nodeInfo     map[flow.Identifier]string // additional details about a node such as operator name
 }
 
@@ -32,7 +32,7 @@ func New(
 	me module.Local,
 	metrics module.PingMetrics,
 	pingEnabled bool,
-	mw *p2p.Middleware,
+	mw network.Middleware,
 	nodeInfoFile string,
 ) (*Engine, error) {
 
