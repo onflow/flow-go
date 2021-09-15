@@ -155,7 +155,7 @@ func TestInvalidSigType(t *testing.T) {
 	err = packer.encoder.Decode(sig, &data)
 	require.NoError(t, err)
 
-	data.SigType[0] = hotstuff.SigTypeRandomBeacon + 3 // invalid type
+	data.SigType = []byte{1}
 
 	encoded, err := packer.encoder.Encode(data)
 	require.NoError(t, err)
@@ -164,3 +164,11 @@ func TestInvalidSigType(t *testing.T) {
 
 	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
 }
+
+// func TestSeralizeAndDeseralizeSigTypes(t *testing.T) {
+// 	t.Run("valid sig types can be seralized and deseralized", func(t *testing.T) {
+// 	})
+// 	t.Run("invalid sig type can not be seralized", func(t *testing.T) {
+// 	})
+//
+// }

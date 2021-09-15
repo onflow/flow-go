@@ -31,7 +31,7 @@ func NewConsensusSigPackerImpl(committees hotstuff.Committee) *ConsensusSigPacke
 type signatureData struct {
 	// bit-vector indicating type of signature for each signer.
 	// the order of each sig type matches the order of corresponding signer IDs
-	SigType []hotstuff.SigType
+	SigType []byte
 
 	AggregatedStakingSig      []byte
 	AggregatedRandomBeaconSig []byte
@@ -77,8 +77,13 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 		}
 	}
 
+	seralized, err := seralizeToBytes(sigTypes)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not seralize sig types to bytes at block: %v, %w", blockID, err)
+	}
+
 	data := signatureData{
-		SigType:                   sigTypes,
+		SigType:                   seralized,
 		AggregatedStakingSig:      sig.AggregatedStakingSig,
 		AggregatedRandomBeaconSig: sig.AggregatedRandomBeaconSig,
 		RandomBeacon:              sig.ReconstructedRandomBeaconSig,
@@ -108,11 +113,12 @@ func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flo
 	stakingSigners := make([]flow.Identifier, 0)
 	randomBeaconSigners := make([]flow.Identifier, 0)
 
-	if len(data.SigType) != len(signerIDs) {
-		return nil, fmt.Errorf("unmatched number of signerIDs, %v != %v: %w", len(data.SigType), len(signerIDs), signature.ErrInvalidFormat)
+	sigTypes, err := deseralizeFromBytes(data.SigType, len(signerIDs))
+	if err != nil {
+		return nil, fmt.Errorf("failed to deseralize sig types from bytes: %w", err)
 	}
 
-	for i, sigType := range data.SigType {
+	for i, sigType := range sigTypes {
 		if sigType == hotstuff.SigTypeStaking {
 			stakingSigners = append(stakingSigners, signerIDs[i])
 		} else if sigType == hotstuff.SigTypeRandomBeacon {
@@ -129,4 +135,83 @@ func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flo
 		AggregatedRandomBeaconSig:    data.AggregatedRandomBeaconSig,
 		ReconstructedRandomBeaconSig: data.RandomBeacon,
 	}, nil
+}
+
+// given that a SigType can either be a Staking Sig or a Random Beacon Sig
+// a SigType can be converted into a bool.
+// it returns:
+// - (false, nil) for SigTypeStakingSig
+// - (true, nil) for SigTypeRandomBeaconSig
+// - (false, signature.ErrInvalidFormat) for invalid sig type
+func sigTypeToBool(t hotstuff.SigType) (bool, error) {
+	if t == hotstuff.SigTypeStaking {
+		return false, nil
+	}
+	if t == hotstuff.SigTypeRandomBeacon {
+		return true, nil
+	}
+	return false, signature.ErrInvalidFormat
+}
+
+// seralize the sig types into a compact format
+func seralizeToBytes(sigTypes []hotstuff.SigType) ([]byte, error) {
+	bytes := make([]byte, 0)
+	for byt := 0; byt < len(sigTypes); byt += 8 {
+		b := byte(0)
+		offset := 7
+		for pos := byt; pos < 8 && pos < len(sigTypes); pos++ {
+			sigType := sigTypes[pos]
+
+			if !sigType.Valid() {
+				return nil, fmt.Errorf("invalid sig type: %v at pos %v", sigType, pos)
+			}
+
+			b = b ^ (byte(sigType) << offset)
+		}
+		bytes = append(bytes, b)
+		offset--
+	}
+	return bytes, nil
+}
+
+// deseralize the sig types from bytes
+func deseralizeFromBytes(seralized []byte, count int) ([]hotstuff.SigType, error) {
+	types := make([]hotstuff.SigType, 0, count)
+
+	// validate the length of seralized
+	// it must have enough bytes to fit the `count` number of bits
+	totalBytes := count / 8
+	if count%8 > 0 {
+		totalBytes++
+	}
+
+	if len(seralized) != totalBytes {
+		return nil, fmt.Errorf("mismatching bytes for seralized sig types, total signers: %v"+
+			", expect bytes: %v, actual bytes: %v, %w", count, totalBytes, len(seralized), signature.ErrInvalidFormat)
+	}
+
+	// parse each bit in the bit-vector, bit 0 is SigTypeStaking, bit 1 is SigTypeRandomBeacon
+	for i := 0; i < count; i++ {
+		byt := seralized[i/8]
+		posMask := byte((1 << 7) >> (i % 8))
+		if byt&posMask == 0 {
+			types = append(types, hotstuff.SigTypeStaking)
+		} else {
+			types = append(types, hotstuff.SigTypeRandomBeacon)
+		}
+	}
+
+	// if there are remaining bits, they must be all `0`s
+	if count%8 > 0 {
+		// since we've validated the length of seralized, then the last byte
+		// must contains the remaining bits
+		last := seralized[len(seralized)-1]
+		remainings := last << (count % 8) // shift away the last used bits
+		if remainings != byte(0) {
+			return nil, fmt.Errorf("the remaining bits are expect to be all 0s, but actually are: %v: %w",
+				remainings, signature.ErrInvalidFormat)
+		}
+	}
+
+	return types, nil
 }
