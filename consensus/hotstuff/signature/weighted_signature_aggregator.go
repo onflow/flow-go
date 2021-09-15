@@ -57,27 +57,33 @@ func NewWeightedSignatureAggregator(
 // Verify verifies the signature under the stored public and message.
 //
 // The function errors:
-//  - engine.InvalidInputError if signerID is invalid
+//  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
+//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 //  - random error if the execution failed
-// If any error is returned, the returned bool is false.
-// If no error is returned, the bool represents the validity of the signature.
 // The function is not thread-safe.
-func (s *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
+func (s *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	index, ok := s.idToIndex[signerID]
 	if !ok {
-		return false, engine.NewInvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
+		return engine.NewInvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
 	}
-	return s.SignatureAggregatorSameMessage.Verify(index, sig)
+	ok, err := s.SignatureAggregatorSameMessage.Verify(index, sig)
+	if err != nil {
+		return fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
+	}
+	if !ok {
+		return signature.ErrInvalidFormat
+	}
+	return nil
 }
 
-// TrustedAdd adds a signature to the internal set of signatures.
+// TrustedAdd adds a signature to the internal set of signatures and adds the signer's
+// weight to the total collected weight, iff the signature is _not_ a duplicate.
 //
-// It adds the signer's weight to the total collected weight and returns the total weight regardless
-// of the returned error.
+// The total weight of all collected signatures (excluding duplicates) is returned regardless
+// of any returned error.
 // The function errors
-//  - engine.InvalidInputError if signerID is invalid
-//  - engine.InvalidInputError if the signer has been already added (to be confirmed)
-//  - random error if the execution failed
+//  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
+//  - engine.DuplicatedEntryError if the signer has been already added
 // The function is thread-safe.
 func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
 	// get the total weight safely
@@ -98,10 +104,10 @@ func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// This is a sanity check because the upper layer should have already checked for double-voters.
+	// check for double-voters.
 	_, ok = s.collectedIDs[signerID]
 	if ok {
-		return collectedWeight, engine.NewInvalidInputErrorf("SigneID %s was already added", signerID)
+		return collectedWeight, engine.NewDuplicatedEntryErrorf("SigneID %s was already added", signerID)
 	}
 
 	err := s.SignatureAggregatorSameMessage.TrustedAdd(index, sig)
