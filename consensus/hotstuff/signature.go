@@ -90,10 +90,14 @@ type BlockSignatureData struct {
 
 // Packer packs aggregated signature data into raw bytes to be used in block header.
 type Packer interface {
+	// Pack serializes the block signature data into raw bytes, suitable to creat a QC.
 	// blockID is the block that the aggregated sig is for
 	// sig is the aggregated signature data
+	// Expected error returns during normal operations:
+	//  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
 	Pack(blockID flow.Identifier, sig *BlockSignatureData) ([]flow.Identifier, []byte, error)
 
+	// Unpack de-serializes the provided signature data.
 	// blockID is the block that the aggregated sig is signed for
 	// sig is the aggregated signature data
 	// It returns:

@@ -11,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
+// ConsensusSigPackerImpl implements the hotstuff.Packer interface.
+// The encoding method is RLP.
 type ConsensusSigPackerImpl struct {
 	committees hotstuff.Committee
 	encoder    *rlp.Encoder // rlp encoder is used in order to ensure deterministic encoding
@@ -36,9 +38,10 @@ type signatureData struct {
 	RandomBeacon              crypto.Signature
 }
 
-// Pack packs the block signature data into raw bytes
+// Pack serializes the block signature data into raw bytes, suitable to creat a QC.
 // To pack the block signature data, we first build a compact data type, and then encode it into bytes.
-// The encoding method is RLP.
+// Expected error returns during normal operations:
+//  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
 func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
 	consensus, err := p.committees.Identities(blockID, filter.HasRole(flow.RoleConsensus))
 	if err != nil {
@@ -89,6 +92,12 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	return signerIDs, encoded, nil
 }
 
+// Unpack de-serializes the provided signature data.
+// blockID is the block that the aggregated sig is signed for
+// sig is the aggregated signature data
+// It returns:
+//  - (sigData, nil) if successfully unpacked the signature data
+//  - (nil, signature.ErrInvalidFormat) if failed to unpack the signature data
 func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	var data signatureData
 	err := p.encoder.Decode(sigData, &data)
