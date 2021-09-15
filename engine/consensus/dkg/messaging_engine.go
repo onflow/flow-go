@@ -166,6 +166,10 @@ func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessage
 			attempts++
 			return retry.RetryableError(err)
 		})
+
+		// Various network can conditions can result in errors while forwarding outbound messages,
+		// because failure to send an individual DKG message doesn't necessarily result in local or global DKG failure
+		// it is acceptable to log the error and move on.
 		if err != nil {
 			e.log.Error().Err(err).Msg("error sending dkg message")
 		}
