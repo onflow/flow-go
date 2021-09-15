@@ -120,24 +120,29 @@ func (b *Broker) Broadcast(data []byte) {
 	}
 	maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
 
-	f := func() {
+	b.unit.Launch(func() {
+		attempts := 1
 		err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
 			err := b.dkgContractClient.Broadcast(bcastMsg)
 			if err != nil {
-				b.log.Error().Err(err).Msg("error broadcasting, retrying")
+				b.log.Error().Err(err).Msgf("error broadcasting, retrying (%x)", attempts)
 			}
+
+			attempts++
 			return retry.RetryableError(err)
 		})
 
+		// Various network can conditions can result in errors while broadcasting DKG messages,
+		// because failure to send an individual DKG message doesn't necessarily result in local or global DKG failure
+		// it is acceptable to log the error and move on.
 		if err != nil {
 			b.log.Error().Err(err).Msg("failed to broadcast message")
 		}
+
 		b.unit.Lock()
 		b.broadcasts++
 		b.unit.Unlock()
-	}
-
-	b.unit.Launch(f)
+	})
 }
 
 // Disqualify flags that a node is misbehaving and got disqualified

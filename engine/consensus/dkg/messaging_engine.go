@@ -77,9 +77,9 @@ func (e *MessagingEngine) Done() <-chan struct{} {
 // SubmitLocal implements the network Engine interface
 func (e *MessagingEngine) SubmitLocal(event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(engine.DKGCommittee, e.me.NodeID(), event)
-		if err != nil {
-			engine.LogError(e.log, err)
+		err := e.process(e.me.NodeID(), event)
+		if engine.IsInvalidInputError(err) {
+			e.log.Fatal().Err(err).Str("origin", e.me.NodeID().String()).Msg("failed to submit local message")
 		}
 	})
 }
@@ -87,9 +87,9 @@ func (e *MessagingEngine) SubmitLocal(event interface{}) {
 // Submit implements the network Engine interface
 func (e *MessagingEngine) Submit(_ network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(engine.DKGCommittee, originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
+		err := e.process(originID, event)
+		if engine.IsInvalidInputError(err) {
+			e.log.Error().Err(err).Str("origin", originID.String()).Msg("failed to submit dropping invalid input message")
 		}
 	})
 }
@@ -97,7 +97,12 @@ func (e *MessagingEngine) Submit(_ network.Channel, originID flow.Identifier, ev
 // ProcessLocal implements the network Engine interface
 func (e *MessagingEngine) ProcessLocal(event interface{}) error {
 	return e.unit.Do(func() error {
-		return e.process(e.me.NodeID(), event)
+		err := e.process(e.me.NodeID(), event)
+		if engine.IsInvalidInputError(err) {
+			e.log.Fatal().Err(err).Str("origin", e.me.NodeID().String()).Msg("failed to process local message")
+		}
+
+		return nil
 	})
 }
 
@@ -117,7 +122,7 @@ func (e *MessagingEngine) process(originID flow.Identifier, event interface{}) e
 		e.forwardInboundMessageAsync(originID, v)
 		return nil
 	default:
-		return fmt.Errorf("invalid event type (%T)", event)
+		return engine.NewInvalidInputErrorf("expecting input with type msg.DKGMessage, but got %T", event)
 	}
 }
 
@@ -144,24 +149,25 @@ func (e *MessagingEngine) forwardOutgoingMessages() {
 }
 
 func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessageOut) {
-	f := func() {
+	e.unit.Launch(func() {
 		expRetry, err := retry.NewExponential(retryMilliseconds)
 		if err != nil {
 			e.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 		}
 
 		maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
+		attempts := 1
 		err = retry.Do(e.unit.Ctx(), maxedExpRetry, func(ctx context.Context) error {
 			err := e.conduit.Unicast(&message.DKGMessage, message.DestID)
 			if err != nil {
-				e.log.Warn().Err(err).Msg("error sending dkg message retrying")
+				e.log.Warn().Err(err).Msgf("error sending dkg message retrying (%x)", attempts)
 			}
+
+			attempts++
 			return retry.RetryableError(err)
 		})
 		if err != nil {
 			e.log.Error().Err(err).Msg("error sending dkg message")
 		}
-	}
-
-	e.unit.Launch(f)
+	})
 }

@@ -259,7 +259,7 @@ func TestBroadcastMessage(t *testing.T) {
 	sender.dkgContractClient = contractClient
 
 	sender.Broadcast(msgb)
-	<-sender.unit.Done()
+	unittest.AssertClosesBefore(t, sender.unit.Done(), time.Second)
 	contractClient.AssertExpectations(t)
 }
 
