@@ -4,17 +4,17 @@ import (
 	"context"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEpochs(t *testing.T) {
-	suite.Run(t, new(Suite))
+	s := new(Suite)
+	s.CreateLockedTokenAccount()
+	//suite.Run(t, new(Suite))
 }
 
 // TestViewsProgress asserts epoch state transitions over two full epochs

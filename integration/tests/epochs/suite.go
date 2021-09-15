@@ -3,6 +3,7 @@ package epochs
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/integration/utils"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -98,3 +99,7 @@ func (s *Suite) TearDownTest() {
 }
 
 //@TODO add util func to stake a node during integration test
+func (s *Suite) CreateLockedTokenAccount()  {
+	service, _ := utils.LocalnetService()
+	fmt.Println(service.PrivateKey.PublicKey())
+}
