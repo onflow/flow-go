@@ -122,13 +122,6 @@ transaction(){
 	b.Run("reference tx", func(b *testing.B) {
 		benchTransaction(b, templateTx(""))
 	})
-	b.Run("log empty string", func(b *testing.B) {
-		benchTransaction(b, templateTx(`log("")`))
-	})
-	b.Run("log long string", func(b *testing.B) {
-		benchTransaction(b, templateTx(fmt.Sprintf(`log(%s)`, longString)))
-		// 100 character string
-	})
 	b.Run("convert int to string", func(b *testing.B) {
 		benchTransaction(b, templateTx(`i.toString()`))
 	})
@@ -418,11 +411,13 @@ func prepareExecutionEnv(tb testing.TB, chain flow.Chain) func(txs [][]*flow.Tra
 
 	view := delta.NewView(exeState.LedgerGetRegister(ledger, initialCommit))
 
+	blockPrograms := programs.NewEmptyPrograms()
+
 	return func(txs [][]*flow.TransactionBody) *execution.ComputationResult {
 		executableBlock := unittest.ExecutableBlockFromTransactions(txs)
 		executableBlock.StartState = &initialCommit
 
-		computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, programs.NewEmptyPrograms())
+		computationResult, err := blockComputer.ExecuteBlock(context.Background(), executableBlock, view, blockPrograms)
 		require.NoError(tb, err)
 
 		prevResultId := unittest.IdentifierFixture()
