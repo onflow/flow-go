@@ -21,7 +21,7 @@ import (
 // Test sending various invalid transactions to a single-cluster configuration.
 // The transactions should be rejected by the collection node and not included
 // in any collection.
-func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
+func (suite *Suite) TestTransactionIngress_InvalidTransaction() {
 	t := suite.T()
 
 	suite.SetupTest("col_txingress_invalid", 3, 1)
@@ -85,7 +85,7 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 
 // Test sending a single valid transaction to a single cluster.
 // The transaction should be included in a collection.
-func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
+func (suite *Suite) TestTxIngress_SingleCluster() {
 	t := suite.T()
 
 	suite.SetupTest("col_txingress_singlecluster", 3, 1)
@@ -125,7 +125,7 @@ func (suite *CollectorSuite) TestTxIngress_SingleCluster() {
 //
 // The transaction should not be routed and should be included in exactly one
 // collection in only the responsible cluster.
-func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
+func (suite *Suite) TestTxIngressMultiCluster_CorrectCluster() {
 	t := suite.T()
 
 	// NOTE: we use 3-node clusters so that proposal messages are sent 1-K
@@ -197,7 +197,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 //
 // The transaction should be routed to the responsible cluster and should be
 // included in a collection in only the responsible cluster's state.
-func (suite *CollectorSuite) TestTxIngressMultiCluster_OtherCluster() {
+func (suite *Suite) TestTxIngressMultiCluster_OtherCluster() {
 	t := suite.T()
 
 	// NOTE: we use 3-node clusters so that proposal messages are sent 1-K

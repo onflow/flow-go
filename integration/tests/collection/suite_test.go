@@ -29,9 +29,10 @@ const (
 	defaultTimeout = 30 * time.Second
 )
 
-// CollectorSuite represents a test suite for collector nodes.
-type CollectorSuite struct {
+// Suite represents a test suite for collector nodes.
+type Suite struct {
 	suite.Suite
+	common.TestnetStateTracker
 
 	// root context for the current test
 	ctx    context.Context
@@ -53,7 +54,7 @@ type CollectorSuite struct {
 }
 
 func TestCollectorSuite(t *testing.T) {
-	suite.Run(t, new(CollectorSuite))
+	suite.Run(t, new(Suite))
 }
 
 // SetupTest generates a test network with the given number of collector nodes
@@ -61,7 +62,7 @@ func TestCollectorSuite(t *testing.T) {
 //
 // NOTE: This must be called explicitly by each test, since nodes/clusters vary
 //       between test cases.
-func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
+func (s *Suite) SetupTest(name string, nNodes, nClusters uint) {
 
 	// default set of non-collector nodes
 	var (
@@ -71,37 +72,27 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	)
 	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection, testnet.WithAdditionalFlag("--block-rate-delay=1ms"))
 
-	suite.nClusters = nClusters
+	s.nClusters = nClusters
 
 	// set one of the non-collector nodes to be the ghost
-	suite.ghostID = conNode.Identifier
+	s.ghostID = conNode.Identifier
 
 	// instantiate the network
 	nodes := append(colNodes, conNode, exeNode, verNode)
 	conf := testnet.NewNetworkConfig(name, nodes, testnet.WithClusters(nClusters))
-	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
+	s.net = testnet.PrepareFlowNetwork(s.T(), conf)
 
 	// start the network
-	suite.ctx, suite.cancel = context.WithCancel(context.Background())
-	suite.net.Start(suite.ctx)
+	s.ctx, s.cancel = context.WithCancel(context.Background())
+	s.net.Start(s.ctx)
 
 	// create an account to use for sending transactions
-	suite.acct.addr, suite.acct.key, suite.acct.signer = common.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	s.acct.addr, s.acct.key, s.acct.signer = common.GetAccount(s.net.Root().Header.ChainID.Chain())
 
-	// subscribe to the ghost
-	for attempts := 0; ; attempts++ {
-		reader, err := suite.Ghost().Subscribe(suite.ctx)
-		if err == nil {
-			suite.reader = reader
-			break
-		}
-		if attempts >= 10 {
-			require.NoError(suite.T(), err, "could not subscribe to ghost (%d attempts)", attempts)
-		}
-	}
+	s.Track(s.T(), s.ctx, s.Ghost())
 }
 
-func (suite *CollectorSuite) TearDownTest() {
+func (suite *Suite) TearDownTest() {
 	// avoid nil pointer errors for skipped tests
 	if suite.cancel != nil {
 		defer suite.cancel()
@@ -112,14 +103,14 @@ func (suite *CollectorSuite) TearDownTest() {
 }
 
 // Ghost returns a client for the ghost node.
-func (suite *CollectorSuite) Ghost() *ghostclient.GhostClient {
+func (suite *Suite) Ghost() *ghostclient.GhostClient {
 	ghost := suite.net.ContainerByID(suite.ghostID)
 	client, err := common.GetGhostClient(ghost)
 	require.NoError(suite.T(), err, "could not get ghost client")
 	return client
 }
 
-func (suite *CollectorSuite) Clusters() flow.ClusterList {
+func (suite *Suite) Clusters() flow.ClusterList {
 	result := suite.net.Result()
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	suite.Require().True(ok)
@@ -130,7 +121,7 @@ func (suite *CollectorSuite) Clusters() flow.ClusterList {
 	return clusters
 }
 
-func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sdk.Transaction {
+func (suite *Suite) NextTransaction(opts ...func(*sdk.Transaction)) *sdk.Transaction {
 	acct := suite.acct
 
 	tx := sdk.NewTransaction().
@@ -157,7 +148,7 @@ func (suite *CollectorSuite) NextTransaction(opts ...func(*sdk.Transaction)) *sd
 //1) signs the envelope
 //2) then computes the hash
 //3) then checks whether it routes to the target cluster
-func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
+func (suite *Suite) TxForCluster(target flow.IdentityList) *sdk.Transaction {
 	acct := suite.acct
 
 	tx := suite.NextTransaction()
@@ -183,7 +174,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 
 // AwaitProposals waits to observe the given number of cluster block proposals
 // and returns them.
-func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
+func (suite *Suite) AwaitProposals(n uint) []cluster.Block {
 
 	blocks := make([]cluster.Block, 0, n)
 	suite.T().Logf("awaiting %d cluster blocks", n)
@@ -214,7 +205,7 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 	return nil
 }
 
-func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier) {
+func (suite *Suite) AwaitTransactionsIncluded(txIDs ...flow.Identifier) {
 
 	var (
 		// for quickly looking up tx IDs
@@ -294,7 +285,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 // Collector returns the collector node with the given index in the
 // given cluster.
-func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Container {
+func (suite *Suite) Collector(clusterIdx, nodeIdx uint) *testnet.Container {
 
 	clusters := suite.Clusters()
 	require.True(suite.T(), clusterIdx < uint(len(clusters)), "invalid cluster index")
@@ -309,7 +300,7 @@ func (suite *CollectorSuite) Collector(clusterIdx, nodeIdx uint) *testnet.Contai
 
 // ClusterStateFor returns a cluster state instance for the collector node
 // with the given ID.
-func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateimpl.State {
+func (suite *Suite) ClusterStateFor(id flow.Identifier) *clusterstateimpl.State {
 
 	myCluster, _, ok := suite.Clusters().ByNodeID(id)
 	require.True(suite.T(), ok, "could not get node %s in clusters", id)
