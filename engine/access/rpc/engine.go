@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the access node server

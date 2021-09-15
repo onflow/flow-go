@@ -5,12 +5,19 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sethvargo/go-retry"
+
 	"github.com/rs/zerolog"
 
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/module"
+)
+
+const (
+	waitForSealedRetryInterval = 3 * time.Second
+	waitForSealedMaxDuration   = 5 * time.Minute
 )
 
 // BaseClient represents the core fields and methods needed to create
@@ -27,12 +34,15 @@ type BaseClient struct {
 }
 
 // NewBaseClient creates a instance of BaseClient
-func NewBaseClient(log zerolog.Logger,
+func NewBaseClient(
+	log zerolog.Logger,
 	flowClient module.SDKClientWrapper,
 	accountAddress string,
 	accountKeyIndex uint,
 	signer sdkcrypto.Signer,
-	contractAddress string) *BaseClient {
+	contractAddress string,
+) *BaseClient {
+
 	return &BaseClient{
 		Log:             log,
 		ContractAddress: contractAddress,
@@ -79,25 +89,28 @@ func (c *BaseClient) SendTransaction(ctx context.Context, tx *sdk.Transaction) (
 // WaitForSealed waits for a transaction to be sealed
 func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, started time.Time) error {
 
-	attempts := 1
-	for {
-		log := c.Log.With().Int("attempt", attempts).Float64("time_elapsed_s", time.Since(started).Seconds()).Logger()
+	constRetry, err := retry.NewConstant(waitForSealedRetryInterval)
+	if err != nil {
+		c.Log.Fatal().Err(err).Msg("failed to create retry mechanism")
+	}
+	maxedConstRetry := retry.WithMaxDuration(waitForSealedMaxDuration, constRetry)
 
-		// check for a cancelled/expired context
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
+	attempts := 0
+	err = retry.Do(ctx, maxedConstRetry, func(ctx context.Context) error {
+		attempts++
+		log := c.Log.With().Int("attempt", attempts).Float64("time_elapsed_s", time.Since(started).Seconds()).Logger()
 
 		result, err := c.FlowClient.GetTransactionResult(ctx, txID)
 		if err != nil {
-			log.Error().Err(err).Msg("could not get transaction result")
-			continue
+			msg := "could not get transaction result, retrying"
+			log.Error().Err(err).Msg(msg)
+			return retry.RetryableError(fmt.Errorf(msg))
 		}
+
 		if result.Error != nil {
 			return fmt.Errorf("error executing transaction: %w", result.Error)
 		}
+
 		log.Info().Str("status", result.Status.String()).Msg("got transaction result")
 
 		// if the transaction has expired we skip waiting for seal
@@ -109,13 +122,11 @@ func (c *BaseClient) WaitForSealed(ctx context.Context, txID sdk.Identifier, sta
 			return nil
 		}
 
-		attempts++
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(TransactionStatusRetryTimeout):
-			// re-enter the top of the for loop
-		}
+		return retry.RetryableError(fmt.Errorf("waiting for transaction to be sealed retrying"))
+	})
+	if err != nil {
+		return err
 	}
+
+	return nil
 }

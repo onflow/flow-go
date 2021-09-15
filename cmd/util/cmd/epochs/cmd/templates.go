@@ -1,3 +1,9 @@
+package cmd
+
+// deployEpochTransactionTemplate is the transaction text for deploying the FLowEpoch
+// contract. The contract code (including correct imports for the given chain
+// is encoded into the transaction text (via fmt.Sprintf).
+var deployEpochTransactionTemplate = `
 // The Epoch smart contract is deployed after a spork.
 // When we deploy the Epoch smart contract for the first time, we need to ensure 
 // the epoch length and staking auction length are consistent with the protocol state.
@@ -5,7 +11,6 @@
 // value based on the current block when epochs is deployed
 
 transaction(name: String, 
-            code: [UInt8],
             currentEpochCounter: UInt64,
             // this value should be the number of views in the epoch, as computed from the 
             // first and final views of the epoch info from the protocol state
@@ -19,6 +24,8 @@ transaction(name: String,
   prepare(signer: AuthAccount) {
 
     let currentBlock = getCurrentBlock()
+
+	let code: [UInt8] = %s
 
     // The smart contract computes the final view of the epoch like currentBlock.view+numViewsInEpoch. 
     // Since the Epoch contract is deployed after the spork while the network is running, 
@@ -46,4 +53,4 @@ transaction(name: String,
             clusterQCs: [],
             dkgPubKeys: [])
   }
-}
+}`

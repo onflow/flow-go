@@ -1,7 +1,12 @@
 package utils
 
 import (
+	"crypto/sha256"
 	"fmt"
+	gohash "hash"
+	"io"
+
+	"golang.org/x/crypto/hkdf"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
@@ -10,12 +15,75 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// these constants are defined in X9.62 section 4.2 and 4.3
+// see https://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.202.2977&rep=rep1&type=pdf
+// they indicate if the conversion to/from a public key (point) in compressed form must involve an inversion of the ordinate coordinate
+const X962_NO_INVERSION = uint8(0x02)
+const X962_INVERSION = uint8(0x03)
+
 func GenerateMachineAccountKey(seed []byte) (crypto.PrivateKey, error) {
 	keys, err := GenerateKeys(crypto.ECDSAP256, 1, [][]byte{seed})
 	if err != nil {
 		return nil, err
 	}
 	return keys[0], nil
+}
+
+// The unstaked nodes have special networking keys, in two aspects:
+// - they use crypto.ECDSASecp256k1 keys, not crypto.ECDSAP256 keys,
+// - they use only positive keys (in the sense that the elliptic curve point of their public key is positive)
+//
+// Thanks to various properties of the cryptographic algorithm and libp2p,
+// this affords us to not have to maintain a table of flow.NodeID -> NetworkPublicKey
+// for those numerous and ephemeral nodes.
+// It incurs a one-bit security reduction, which is deemed acceptable.
+
+// drawUnstakedKey draws a single positive ECDSASecp256k1 key, and returns an error otherwise.
+func drawUnstakedKey(seed []byte) (crypto.PrivateKey, error) {
+	key, err := crypto.GeneratePrivateKey(crypto.ECDSASecp256k1, seed)
+	if err != nil {
+		// this should not happen
+		return nil, err
+	} else if key.PublicKey().EncodeCompressed()[0] == X962_INVERSION {
+		// negative key -> unsuitable
+		return nil, fmt.Errorf("Unsuitable negative key")
+	}
+	return key, nil
+}
+
+// GenerateUnstakedNetworkingKey draws ECDSASecp256k1 keys until finding a suitable one.
+// though this will return fast, this is not constant-time and will leak ~1 bit of information through its runtime
+func GenerateUnstakedNetworkingKey(seed []byte) (key crypto.PrivateKey, err error) {
+	hkdf := hkdf.New(func() gohash.Hash { return sha256.New() }, seed, nil, []byte("unstaked network"))
+	round_seed := make([]byte, len(seed))
+	max_iterations := 20 // 1/(2^20) failure chance
+	for i := 0; i < max_iterations; i++ {
+		if _, err = io.ReadFull(hkdf, round_seed); err != nil {
+			// the hkdf Reader should not fail
+			panic(err)
+		}
+		if key, err = drawUnstakedKey(round_seed); err == nil {
+			return
+		}
+	}
+	return
+}
+
+func GenerateUnstakedNetworkingKeys(n int, seeds [][]byte) ([]crypto.PrivateKey, error) {
+	if n != len(seeds) {
+		return nil, fmt.Errorf("n needs to match the number of seeds (%v != %v)", n, len(seeds))
+	}
+
+	keys := make([]crypto.PrivateKey, n)
+
+	var err error
+	for i, seed := range seeds {
+		if keys[i], err = GenerateUnstakedNetworkingKey(seed); err != nil {
+			return nil, err
+		}
+	}
+
+	return keys, nil
 }
 
 func GenerateNetworkingKey(seed []byte) (crypto.PrivateKey, error) {

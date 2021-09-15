@@ -10,11 +10,11 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -209,9 +209,10 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.deployQC(service)
 
-	b.deployIDTableStaking(service,
-		fungibleToken,
-		flowToken)
+	b.deployIDTableStaking(service, fungibleToken, flowToken)
+
+	// set the list of nodes which are allowed to stake in this network
+	b.setStakingAllowlist(service, b.identities.NodeIDs())
 
 	b.deployEpoch(service, fungibleToken, flowToken)
 
@@ -493,6 +494,22 @@ func (b *BootstrapProcedure) setupStorageForServiceAccounts(
 		b.programs,
 	)
 	panicOnMetaInvokeErrf("failed to setup storage for service accounts: %s", txError, err)
+}
+
+func (b *BootstrapProcedure) setStakingAllowlist(service flow.Address, allowedIDs []flow.Identifier) {
+
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.SetStakingAllowlistTransaction(
+				service,
+				allowedIDs,
+			),
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to set staking allow-list: %s", txError, err)
 }
 
 func (b *BootstrapProcedure) registerNodes(service, fungibleToken, flowToken flow.Address) {
@@ -829,7 +846,7 @@ func registerNodeTransaction(
 	accountKey := flow.AccountPublicKey{
 		PublicKey: id.NetworkPubKey,
 		SignAlgo:  id.NetworkPubKey.Algorithm(),
-		HashAlgo:  hash.SHA3_256,
+		HashAlgo:  bootstrap.DefaultMachineAccountHashAlgo,
 		Weight:    1000,
 	}
 

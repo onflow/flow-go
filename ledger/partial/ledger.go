@@ -99,16 +99,16 @@ func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
 
 // Set updates the ledger given an update
 // it returns the state after update and errors (if any)
-func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
+func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, trieUpdate *ledger.TrieUpdate, err error) {
 	// TODO: add test case
 	if update.Size() == 0 {
 		// return current state root unchanged
-		return update.State(), nil
+		return update.State(), nil, nil
 	}
 
-	trieUpdate, err := pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
+	trieUpdate, err = pathfinder.UpdateToTrieUpdate(update, l.pathFinderVersion)
 	if err != nil {
-		return ledger.DummyState, err
+		return ledger.DummyState, nil, err
 	}
 
 	newRootHash, err := l.ptrie.Update(trieUpdate.Paths, trieUpdate.Payloads)
@@ -117,7 +117,7 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 
 			paths, err := pathfinder.KeysToPaths(update.Keys(), l.pathFinderVersion)
 			if err != nil {
-				return ledger.DummyState, err
+				return ledger.DummyState, nil, err
 			}
 
 			//store mappings and restore keys from missing paths
@@ -132,13 +132,13 @@ func (l *Ledger) Set(update *ledger.Update) (newState ledger.State, err error) {
 			for _, path := range pErr.Paths {
 				keys = append(keys, pathToKey[path])
 			}
-			return ledger.DummyState, &ledger.ErrMissingKeys{Keys: keys}
+			return ledger.DummyState, nil, &ledger.ErrMissingKeys{Keys: keys}
 		}
-		return ledger.DummyState, err
+		return ledger.DummyState, nil, err
 	}
 
 	// TODO log info state
-	return ledger.State(newRootHash), nil
+	return ledger.State(newRootHash), trieUpdate, nil
 }
 
 // Prove provides proofs for a ledger query and errors (if any)

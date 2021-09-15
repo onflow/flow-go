@@ -3,7 +3,7 @@ module github.com/onflow/flow-go
 go 1.15
 
 require (
-	cloud.google.com/go/storage v1.10.0
+	cloud.google.com/go/storage v1.16.0
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/davecgh/go-spew v1.1.1
@@ -15,7 +15,7 @@ require (
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/go-cmp v0.5.5
+	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2 v2.0.0-rc.2
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-20200501113911-9a95f0fdbfea
@@ -39,9 +39,10 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.3
-	github.com/onflow/cadence v0.18.1-0.20210730161646-b891a21c51fd
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.6
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.6
+	github.com/multiformats/go-multiaddr-dns v0.3.1
+	github.com/onflow/cadence v0.19.0
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.7
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.7
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.18.0
@@ -51,6 +52,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/rs/zerolog v1.19.0
+	github.com/sethvargo/go-retry v0.1.0
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.7.0
@@ -63,8 +65,8 @@ require (
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/api v0.31.0
-	google.golang.org/grpc v1.36.1
+	google.golang.org/api v0.49.0
+	google.golang.org/grpc v1.38.0
 	google.golang.org/protobuf v1.27.1
 	gotest.tools v2.2.0+incompatible
 	pgregory.net/rapid v0.4.7

@@ -31,6 +31,24 @@ type State struct {
 	}
 }
 
+type BootstrapConfig struct {
+	// SkipNetworkAddressValidation flags allows skipping all the network address related validations not needed for
+	// an unstaked node
+	SkipNetworkAddressValidation bool
+}
+
+func defaultBootstrapConfig() *BootstrapConfig {
+	return &BootstrapConfig{
+		SkipNetworkAddressValidation: false,
+	}
+}
+
+type BootstrapConfigOptions func(conf *BootstrapConfig)
+
+func SkipNetworkAddressValidation(conf *BootstrapConfig) {
+	conf.SkipNetworkAddressValidation = true
+}
+
 func Bootstrap(
 	metrics module.ComplianceMetrics,
 	db *badger.DB,
@@ -42,7 +60,14 @@ func Bootstrap(
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
 	root protocol.Snapshot,
+	options ...BootstrapConfigOptions,
 ) (*State, error) {
+
+	config := defaultBootstrapConfig()
+	for _, opt := range options {
+		opt(config)
+	}
+
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
@@ -50,9 +75,10 @@ func Bootstrap(
 	if isBootstrapped {
 		return nil, fmt.Errorf("expected empty database")
 	}
+
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
-	if err := isValidRootSnapshot(root); err != nil {
+	if err := isValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
 
@@ -97,7 +123,7 @@ func Bootstrap(
 		}
 
 		// 5) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root)(tx)
+		err = state.bootstrapEpoch(root, !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
@@ -246,7 +272,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 //
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx) error {
+func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		previous := root.Epochs().Previous()
 		current := root.Epochs().Current()
@@ -270,9 +296,10 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 				return fmt.Errorf("could not get previous epoch commit event: %w", err)
 			}
 
-			if err := isValidEpochSetup(setup); err != nil {
+			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
+
 			if err := isValidEpochCommit(commit, setup); err != nil {
 				return fmt.Errorf("invalid commit")
 			}
@@ -295,9 +322,10 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 			return fmt.Errorf("could not get current epoch commit event: %w", err)
 		}
 
-		if err := isValidEpochSetup(setup); err != nil {
+		if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 			return fmt.Errorf("invalid setup: %w", err)
 		}
+
 		if err := isValidEpochCommit(commit, setup); err != nil {
 			return fmt.Errorf("invalid commit")
 		}
@@ -315,7 +343,8 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 			if err != nil {
 				return fmt.Errorf("could not get next epoch setup event: %w", err)
 			}
-			if err := isValidEpochSetup(setup); err != nil {
+
+			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
 
@@ -513,6 +542,21 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 	if err != nil {
 		return fmt.Errorf("could not update committed epoch final view")
 	}
+
+	currentEpochFinalView, err := snap.Epochs().Current().FinalView()
+	if err != nil {
+		return fmt.Errorf("could not update current epoch final view: %w", err)
+	}
+	state.metrics.CurrentEpochFinalView(currentEpochFinalView)
+
+	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(snap.Epochs().Current())
+	if err != nil {
+		return fmt.Errorf("could not get dkg phase final view: %w", err)
+	}
+
+	state.metrics.CurrentDKGPhase1FinalView(dkgPhase1FinalView)
+	state.metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
+	state.metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
 
 	return nil
 }

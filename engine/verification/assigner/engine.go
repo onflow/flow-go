@@ -104,6 +104,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 
 	// TODO: de-escalate to debug level on stable version.
 	log.Info().
+		Int("total_chunks", len(result.Chunks)).
 		Int("total_assigned_chunks", len(chunkList)).
 		Msg("chunk assignment done")
 
