@@ -151,7 +151,10 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		Name:      "max_chunk_data_pack_request_attempt_times",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemRequesterEngine,
-		Help:      "the maximum number of times a chunk data pack requested on requester engine",
+		// an indicator for when execution nodes is unresponsive to chunk data pack requests, 
+		// in which case verification node will keep requesting the chunk data pack, and this 
+		// metrics number will go up.
+		Help:      "among all the pending chunk data packs requested by the requester engine, the maximum number of times a certain chunk data pack was requested",
 	})
 
 	// Verifier Engine
