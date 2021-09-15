@@ -42,7 +42,8 @@ if [[ "$ARCH" =~ ^(arm64|armv7|armv7s)$ && "${CC_VERSION_STR[0]}" =~ (clang)  ]]
     #  the "-march=native" option is not supported with clang on ARM
     MARCH=""
 else
-    MARCH="-march=native"
+    # Target standard x86-64 CPU. Avoids AVX512 SIGILL: illegal instruction
+    MARCH="-march=x86-64"
 fi
 
 # Set RELIC config for Flow
