@@ -24,6 +24,14 @@ void callKeccakF1600(ulong* state) {
 */
 import "C"
 
+func AVXKeccakF1600(a *[25]uint64) {
+	if cpu.X86.HasAVX512 {
+		C.callKeccakF1600((*C.ulong)(&a[0]))
+	} else {
+		keccak.KeccakF1600(a)
+	}
+}
+
 func keccakF1600(a *[25]uint64) {
 	if cpu.X86.HasAVX512 {
 		C.callKeccakF1600((*C.ulong)(&a[0]))
