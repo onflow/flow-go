@@ -80,24 +80,33 @@ type ComponentFactory func() (Component, error)
 func RunComponent(ctx context.Context, componentFactory ComponentFactory, errorHandler ErrorHandler) error {
 	restartChan := make(chan struct{})
 
-	start := func() (context.CancelFunc, <-chan struct{}, error) {
-		component, err := componentFactory()
+	start := func() (cancel context.CancelFunc, done <-chan struct{}, err error) {
+		var component Component
+		component, err = componentFactory()
 		if err != nil {
 			// failed to create component
-			return nil, nil, err
+			return
 		}
 
 		// context used to restart the component
-		runCtx, cancel := context.WithCancel(ctx)
-		if err := component.Start(runCtx); err != nil {
+		var runCtx context.Context
+		runCtx, cancel = context.WithCancel(ctx)
+		defer func() {
+			if err != nil {
+				cancel()
+				cancel = nil
+			}
+		}()
+
+		if err = component.Start(runCtx); err != nil {
 			// failed to start component
-			cancel()
-			return nil, nil, err
+			return
 		}
 
 		select {
 		case <-ctx.Done():
-			runtime.Goexit()
+			err = ctx.Err()
+			return
 		case <-component.Ready():
 		}
 
@@ -106,7 +115,9 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, errorH
 			runtime.Goexit()
 		})
 
-		return cancel, component.Done(), nil
+		done = component.Done()
+
+		return
 	}
 
 	for {
