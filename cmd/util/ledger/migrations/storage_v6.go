@@ -156,6 +156,7 @@ type StorageFormatV6Migration struct {
 	migratedPayloadPaths map[storagePath]bool
 	deferredValuePaths   map[storagePath]bool
 	progress             *progressbar.ProgressBar
+	emptyDeferredValues  int
 }
 
 func (m *StorageFormatV6Migration) filename() string {
@@ -243,6 +244,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	// Encode the new values by calling `storage.Commit()`
 
 	m.Log.Info().Msg("Re-encoding converted values...")
+	m.progress.Add(1)
 
 	err := m.storage.Commit()
 	if err != nil {
@@ -258,11 +260,17 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	m.progress.Set(currentProgress)
 
 	for _, payload := range baseStorage.ReencodedPayloads {
+		m.progress.Add(1)
 		migratedPayloads = append(migratedPayloads, *payload)
 	}
 	m.progress.Finish()
 
 	m.Log.Info().Msg("Re-encoding converted values complete")
+
+	if m.emptyDeferredValues > 0 {
+		m.progress.Clear()
+		m.Log.Warn().Msgf("empty deferred values found: %d", m.emptyDeferredValues)
+	}
 
 	return migratedPayloads, nil
 }
@@ -510,6 +518,13 @@ func (m *StorageFormatV6Migration) decodeAndConvert(
 	}
 
 	converter := NewValueConverter(m.newInter, m.oldInter, m.storage)
+
+	defer func() {
+		if r := recover(); r != nil {
+			m.Log.Debug().Msgf("failed to convert value: %s", r.(error).Error())
+		}
+	}()
+
 	_ = converter.Convert(rootValue)
 
 	// Mark the payload as 'migrated'.
@@ -585,8 +600,7 @@ func (m *StorageFormatV6Migration) initOldInterpreter(payloads []ledger.Payload)
 				}
 
 				if len(registerValue) == 0 {
-					m.progress.Clear()
-					m.Log.Warn().Msgf("empty value for owner: %s, key: %s", owner, key)
+					m.emptyDeferredValues += 1
 					panic(&ValueNotFoundError{
 						key: key,
 					})
