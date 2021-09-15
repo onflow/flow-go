@@ -19,10 +19,14 @@ import (
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
 
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	newInter "github.com/onflow/cadence/runtime/interpreter"
-	oldInter "github.com/onflow/cadence/v18/runtime/interpreter"
+
+	oldInter "github.com/onflow/cadence/v19/runtime/interpreter"
 )
 
 const cborTagStorageReference = 202
@@ -127,6 +131,9 @@ func ledgerKeyFromStorageID(id atree.StorageID) ledger.Key {
 	return ledger.NewKey([]ledger.KeyPart{
 		ledger.NewKeyPart(execState.KeyPartOwner, id.Address[:]),
 		ledger.NewKeyPart(execState.KeyPartController, []byte{}),
+
+		// TODO: Ude prefixed key. i.e:
+		//  prefixedKey := []byte(LedgerBaseStorageSlabPrefix + string(id.Index[:]))
 		ledger.NewKeyPart(execState.KeyPartKey, id.Index[:]),
 	})
 }
@@ -305,6 +312,8 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 
 	deferredValuePaths := make(map[storagePath]bool, 0)
 	for _, payload := range payloads {
+		m.progress.Add(1)
+
 		keyParts := payload.Key.KeyParts
 		rawOwner := keyParts[0].Value
 		rawController := keyParts[1].Value
@@ -374,8 +383,6 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 				return true
 			},
 		)
-
-		m.progress.Add(1)
 	}
 
 	m.progress.Clear()
@@ -515,6 +522,23 @@ func (m *StorageFormatV6Migration) initNewInterpreter() {
 	inter, err := newInter.NewInterpreter(
 		nil,
 		nil,
+		newInter.WithImportLocationHandler(
+			func(inter *newInter.Interpreter, location common.Location) newInter.Import {
+				program, err := m.loadProgram(location)
+				if err != nil {
+					panic(err)
+				}
+
+				subInter, err := inter.NewSubInterpreter(program, location)
+				if err != nil {
+					panic(err)
+				}
+
+				return newInter.InterpreterImport{
+					Interpreter: subInter,
+				}
+			},
+		),
 	)
 
 	if err != nil {
@@ -561,6 +585,7 @@ func (m *StorageFormatV6Migration) initOldInterpreter(payloads []ledger.Payload)
 				}
 
 				if len(registerValue) == 0 {
+					m.progress.Clear()
 					m.Log.Warn().Msgf("empty value for owner: %s, key: %s", owner, key)
 					panic(&ValueNotFoundError{
 						key: key,
@@ -660,6 +685,292 @@ func (m *StorageFormatV6Migration) decode(
 		},
 	)
 	return rootValue, nil, false
+}
+
+func (m *StorageFormatV6Migration) loadProgram(
+	location common.Location,
+) (
+	*newInter.Program,
+	error,
+) {
+	program, _, ok := m.programs.Get(location)
+	if ok {
+		return program, nil
+	}
+
+	addressLocation, ok := location.(common.AddressLocation)
+	if !ok {
+		return nil, fmt.Errorf(
+			"cannot load program for unsupported non-address location: %s",
+			addressLocation,
+		)
+	}
+
+	contractCode, err := m.accounts.GetContract(
+		addressLocation.Name,
+		flow.Address(addressLocation.Address),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rt := runtime.NewInterpreterRuntime()
+	program, err = rt.ParseAndCheckProgram(
+		contractCode,
+		runtime.Context{
+			Interface: migrationRuntimeInterface{
+				m.accounts,
+				m.programs,
+			},
+			Location: location,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	m.programs.Set(location, program, nil)
+
+	return program, nil
+}
+
+// migrationRuntimeInterface
+
+type migrationRuntimeInterface struct {
+	accounts *state.Accounts
+	programs *programs.Programs
+}
+
+func (m migrationRuntimeInterface) ResolveLocation(
+	identifiers []runtime.Identifier,
+	location runtime.Location,
+) ([]runtime.ResolvedLocation, error) {
+
+	addressLocation, isAddress := location.(common.AddressLocation)
+
+	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
+	// then return a single resolved location which declares all identifiers.
+	if !isAddress {
+		return []runtime.ResolvedLocation{
+			{
+				Location:    location,
+				Identifiers: identifiers,
+			},
+		}, nil
+	}
+
+	// if the location is an address,
+	// and no specific identifiers where requested in the import statement,
+	// then fetch all identifiers at this address
+	if len(identifiers) == 0 {
+		address := flow.Address(addressLocation.Address)
+
+		contractNames, err := m.accounts.GetContractNames(address)
+		if err != nil {
+			return nil, fmt.Errorf("ResolveLocation failed: %w", err)
+		}
+
+		// if there are no contractNames deployed,
+		// then return no resolved locations
+		if len(contractNames) == 0 {
+			return nil, nil
+		}
+
+		identifiers = make([]runtime.Identifier, len(contractNames))
+
+		for i := range identifiers {
+			identifiers[i] = runtime.Identifier{
+				Identifier: contractNames[i],
+			}
+		}
+	}
+
+	// return one resolved location per identifier.
+	// each resolved location is an address contract location
+	resolvedLocations := make([]runtime.ResolvedLocation, len(identifiers))
+	for i := range resolvedLocations {
+		identifier := identifiers[i]
+		resolvedLocations[i] = runtime.ResolvedLocation{
+			Location: common.AddressLocation{
+				Address: addressLocation.Address,
+				Name:    identifier.Identifier,
+			},
+			Identifiers: []runtime.Identifier{identifier},
+		}
+	}
+
+	return resolvedLocations, nil
+}
+
+func (m migrationRuntimeInterface) GetCode(location runtime.Location) ([]byte, error) {
+	contractLocation, ok := location.(common.AddressLocation)
+	if !ok {
+		return nil, fmt.Errorf("GetCode failed: expected AddressLocation")
+	}
+
+	add, err := m.accounts.GetContract(contractLocation.Name, flow.Address(contractLocation.Address))
+	if err != nil {
+		return nil, fmt.Errorf("GetCode failed: %w", err)
+	}
+
+	return add, nil
+}
+
+func (m migrationRuntimeInterface) GetProgram(location runtime.Location) (*newInter.Program, error) {
+	program, _, ok := m.programs.Get(location)
+	if ok {
+		return program, nil
+	}
+
+	return nil, nil
+}
+
+func (m migrationRuntimeInterface) SetProgram(location runtime.Location, program *newInter.Program) error {
+	m.programs.Set(location, program, nil)
+	return nil
+}
+
+func (m migrationRuntimeInterface) GetValue(_, _ []byte) (value []byte, err error) {
+	panic("unexpected GetValue call")
+}
+
+func (m migrationRuntimeInterface) SetValue(_, _, _ []byte) (err error) {
+	panic("unexpected SetValue call")
+}
+
+func (m migrationRuntimeInterface) CreateAccount(_ runtime.Address) (address runtime.Address, err error) {
+	panic("unexpected CreateAccount call")
+}
+
+func (m migrationRuntimeInterface) AddEncodedAccountKey(_ runtime.Address, _ []byte) error {
+	panic("unexpected AddEncodedAccountKey call")
+}
+
+func (m migrationRuntimeInterface) RevokeEncodedAccountKey(_ runtime.Address, _ int) (publicKey []byte, err error) {
+	panic("unexpected RevokeEncodedAccountKey call")
+}
+
+func (m migrationRuntimeInterface) AddAccountKey(
+	_ runtime.Address,
+	_ *runtime.PublicKey,
+	_ runtime.HashAlgorithm,
+	_ int,
+) (*runtime.AccountKey, error) {
+	panic("unexpected AddAccountKey call")
+}
+
+func (m migrationRuntimeInterface) GetAccountKey(_ runtime.Address, _ int) (*runtime.AccountKey, error) {
+	panic("unexpected GetAccountKey call")
+}
+
+func (m migrationRuntimeInterface) RevokeAccountKey(_ runtime.Address, _ int) (*runtime.AccountKey, error) {
+	panic("unexpected RevokeAccountKey call")
+}
+
+func (m migrationRuntimeInterface) UpdateAccountContractCode(_ runtime.Address, _ string, _ []byte) (err error) {
+	panic("unexpected UpdateAccountContractCode call")
+}
+
+func (m migrationRuntimeInterface) GetAccountContractCode(
+	address runtime.Address,
+	name string,
+) (code []byte, err error) {
+	return m.accounts.GetContract(name, flow.Address(address))
+}
+
+func (m migrationRuntimeInterface) RemoveAccountContractCode(_ runtime.Address, _ string) (err error) {
+	panic("unexpected RemoveAccountContractCode call")
+}
+
+func (m migrationRuntimeInterface) GetSigningAccounts() ([]runtime.Address, error) {
+	panic("unexpected GetSigningAccounts call")
+}
+
+func (m migrationRuntimeInterface) ProgramLog(_ string) error {
+	panic("unexpected ProgramLog call")
+}
+
+func (m migrationRuntimeInterface) EmitEvent(_ cadence.Event) error {
+	panic("unexpected EmitEvent call")
+}
+
+func (m migrationRuntimeInterface) ValueExists(_, _ []byte) (exists bool, err error) {
+	panic("unexpected ValueExists call")
+}
+
+func (m migrationRuntimeInterface) GenerateUUID() (uint64, error) {
+	panic("unexpected GenerateUUID call")
+}
+
+func (m migrationRuntimeInterface) GetComputationLimit() uint64 {
+	panic("unexpected GetComputationLimit call")
+}
+
+func (m migrationRuntimeInterface) SetComputationUsed(_ uint64) error {
+	panic("unexpected SetComputationUsed call")
+}
+
+func (m migrationRuntimeInterface) DecodeArgument(_ []byte, _ cadence.Type) (cadence.Value, error) {
+	panic("unexpected DecodeArgument call")
+}
+
+func (m migrationRuntimeInterface) GetCurrentBlockHeight() (uint64, error) {
+	panic("unexpected GetCurrentBlockHeight call")
+}
+
+func (m migrationRuntimeInterface) GetBlockAtHeight(_ uint64) (block runtime.Block, exists bool, err error) {
+	panic("unexpected GetBlockAtHeight call")
+}
+
+func (m migrationRuntimeInterface) UnsafeRandom() (uint64, error) {
+	panic("unexpected UnsafeRandom call")
+}
+
+func (m migrationRuntimeInterface) VerifySignature(
+	_ []byte,
+	_ string,
+	_ []byte,
+	_ []byte,
+	_ runtime.SignatureAlgorithm,
+	_ runtime.HashAlgorithm,
+) (bool, error) {
+	panic("unexpected VerifySignature call")
+}
+
+func (m migrationRuntimeInterface) Hash(_ []byte, _ string, _ runtime.HashAlgorithm) ([]byte, error) {
+	panic("unexpected Hash call")
+}
+
+func (m migrationRuntimeInterface) GetAccountBalance(_ common.Address) (value uint64, err error) {
+	panic("unexpected GetAccountBalance call")
+}
+
+func (m migrationRuntimeInterface) GetAccountAvailableBalance(_ common.Address) (value uint64, err error) {
+	panic("unexpected GetAccountAvailableBalance call")
+}
+
+func (m migrationRuntimeInterface) GetStorageUsed(_ runtime.Address) (value uint64, err error) {
+	panic("unexpected GetStorageUsed call")
+}
+
+func (m migrationRuntimeInterface) GetStorageCapacity(_ runtime.Address) (value uint64, err error) {
+	panic("unexpected GetStorageCapacity call")
+}
+
+func (m migrationRuntimeInterface) ImplementationDebugLog(_ string) error {
+	panic("unexpected ImplementationDebugLog call")
+}
+
+func (m migrationRuntimeInterface) ValidatePublicKey(_ *runtime.PublicKey) (bool, error) {
+	panic("unexpected ValidatePublicKey call")
+}
+
+func (m migrationRuntimeInterface) GetAccountContractNames(_ runtime.Address) ([]string, error) {
+	panic("unexpected GetAccountContractNames call")
+}
+
+func (m migrationRuntimeInterface) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
+	panic("unexpected AllocateStorageIndex call")
 }
 
 func cborMeLink(value []byte) string {

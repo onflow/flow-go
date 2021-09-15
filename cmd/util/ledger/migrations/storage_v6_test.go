@@ -302,7 +302,7 @@ func TestPayloadsMigration(t *testing.T) {
 	inter, err := oldInter.NewInterpreter(nil, utils.TestLocation)
 	require.NoError(t, err)
 
-	owner := &common.Address{1, 2}
+	owner := common.Address{1, 2}
 
 	oldDictionary := oldInter.NewDictionaryValueUnownedNonCopying(
 		inter,
@@ -324,7 +324,7 @@ func TestPayloadsMigration(t *testing.T) {
 		"Test",
 		common.CompositeKindContract,
 		fields,
-		owner,
+		&owner,
 	)
 
 	encoded, _, err := oldInter.EncodeValue(composite, nil, false, nil)
@@ -345,16 +345,11 @@ func TestPayloadsMigration(t *testing.T) {
 		},
 	}
 
-	checkLedger := func(payloads []ledger.Payload) {
-		ledgerView := newView(payloads)
-		value, err := ledgerView.Get(string(owner.Bytes()), "", "Test")
-		require.NoError(t, err)
-		assert.NotNil(t, value)
-
-	}
-
 	// Check whether the query works with old ledger
-	checkLedger(payloads)
+	ledgerView := newView(payloads)
+	value, err := ledgerView.Get(string(owner.Bytes()), "", "Test")
+	require.NoError(t, err)
+	assert.NotNil(t, value)
 
 	storageFormatV6Migration := StorageFormatV6Migration{
 		Log:       zerolog.Nop(),
@@ -365,7 +360,13 @@ func TestPayloadsMigration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Check whether the query works with new ledger
-	checkLedger(migratedPayloads)
+
+	migratedLedgerView := newView(migratedPayloads)
+	key := []byte{0, 0, 0, 0, 0, 0, 0, 3}
+
+	migratedValue, err := migratedLedgerView.Get(string(owner.Bytes()), "", string(key))
+	require.NoError(t, err)
+	require.NotNil(t, migratedValue)
 }
 
 // Test for the 'Store' method implementation of delegationStorage.
