@@ -185,8 +185,25 @@ func (va *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 	return nil
 }
 
-func (va *VoteAggregatorV2) InvalidBlock(block *model.Proposal) error {
-	panic("implement me")
+// InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it can process votes for the invalid
+// block and slash the voters.
+func (va *VoteAggregatorV2) InvalidBlock(proposal *model.Proposal) error {
+	slashingVoteConsumer := func(vote *model.Vote) {
+		if proposal.Block.BlockID == vote.BlockID {
+			va.notifier.OnVoteForInvalidBlockDetected(vote, proposal)
+		}
+	}
+
+	block := proposal.Block
+	collector, _, err := va.collectors.GetOrCreateCollector(block.View)
+	if err != nil {
+		return fmt.Errorf("could not retrieve collector for invalid proposal (%x) at view %d: %w",
+			block.BlockID, block.View, err)
+	}
+	// registering vote consumer will deliver all previously cached votes in strict order
+	// and will keep delivering votes if more are collected
+	collector.RegisterVoteConsumer(slashingVoteConsumer)
+	return nil
 }
 
 // PruneUpToView will delete all votes equal or below to the given view, as well as related indexes.

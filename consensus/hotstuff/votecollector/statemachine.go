@@ -143,7 +143,7 @@ func (m *VoteCollector) View() uint64 {
 //         VerifyingVotes -> Invalid
 func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 
-	if proposal.Block.View != m.votesCache.View() {
+	if proposal.Block.View != m.View() {
 		return fmt.Errorf("this VoteCollector accepts proposals only for view %d but received %d", m.votesCache.View(), proposal.Block.View)
 	}
 
@@ -188,6 +188,11 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 
 		return nil
 	}
+}
+
+// RegisterVoteConsumer effectively delegates call to votes cache
+func (m *VoteCollector) RegisterVoteConsumer(consumer hotstuff.VoteConsumer) {
+	m.votesCache.RegisterVoteConsumer(consumer)
 }
 
 // caching2Verifying ensures that the VoteProcessor is currently in state `VoteCollectorStatusCaching`
