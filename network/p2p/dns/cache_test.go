@@ -12,7 +12,7 @@ func BenchmarkCache(b *testing.B) {
 	b.StopTimer()
 
 	c := newCache()
-	testCases := ipLookupFixture(100_000)
+	testCases := ipLookupFixture(1000_000)
 	wg := &sync.WaitGroup{}
 
 	wg.Add(3 * len(testCases))

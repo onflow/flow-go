@@ -16,17 +16,14 @@ const (
 
 // cache is a ttl-based cache for dns entries
 type cache struct {
-	sync.RWMutex
 	ttl      time.Duration // time-to-live for cache entry
-	ipCache  map[string]*ipCacheEntry
-	txtCache map[string]*txtCacheEntry
+	ipCache  sync.Map
+	txtCache sync.Map
 }
 
 func newCache() *cache {
 	return &cache{
-		ttl:      DefaultTimeToLive,
-		ipCache:  make(map[string]*ipCacheEntry),
-		txtCache: make(map[string]*txtCacheEntry),
+		ttl: DefaultTimeToLive,
 	}
 }
 
@@ -34,15 +31,13 @@ func newCache() *cache {
 // First boolean variable determines whether the domain exists in the cache.
 // Second boolean variable determines whether the domain cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
-	c.RLock()
-	defer c.RUnlock()
-
-	entry, ok := c.ipCache[domain]
-
+	entity, ok := c.ipCache.Load(domain)
 	if !ok {
 		// does not exist
 		return nil, !cacheEntryExists, !cacheEntryFresh
 	}
+
+	entry := entity.(*ipCacheEntry)
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
 		// exists but expired
@@ -57,15 +52,14 @@ func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 // First boolean variable determines whether the txt exists in the cache.
 // Second boolean variable determines whether the txt cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
-	c.RLock()
-	defer c.RUnlock()
-
-	entry, ok := c.txtCache[txt]
+	entity, ok := c.txtCache.Load(txt)
 
 	if !ok {
 		// does not exist
 		return nil, !cacheEntryExists, !cacheEntryFresh
 	}
+
+	entry := entity.(*txtCacheEntry)
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
 		// exists but expired
@@ -78,33 +72,24 @@ func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 
 // updateIPCache updates the cache entry for the domain.
 func (c *cache) updateIPCache(domain string, addr []net.IPAddr) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.ipCache[domain] = &ipCacheEntry{
+	c.ipCache.Store(domain, &ipCacheEntry{
 		addresses: addr,
 		timestamp: runtimeNano(),
-	}
+	})
 }
 
 // updateTXTCache updates the cache entry for the txt.
 func (c *cache) updateTXTCache(txt string, addr []string) {
-	c.Lock()
-	defer c.Unlock()
-
-	c.txtCache[txt] = &txtCacheEntry{
+	c.txtCache.Store(txt, &txtCacheEntry{
 		addresses: addr,
 		timestamp: runtimeNano(),
-	}
+	})
 }
 
 // invalidateIPCacheEntry atomically invalidates ip cache entry. Boolean variable determines whether invalidation
 // is successful.
 func (c *cache) invalidateIPCacheEntry(domain string) bool {
-	c.Lock()
-	defer c.Unlock()
-
-	_, exists := c.ipCache[domain]
+	_, exists := c.ipCache.Load(domain)
 
 	if !exists {
 		return false
@@ -112,7 +97,7 @@ func (c *cache) invalidateIPCacheEntry(domain string) bool {
 
 	// delete is idempotent and once in a while it is ok to report as exist even
 	// when it may have been deleted to avoid the cost of write lock
-	delete(c.ipCache, domain)
+	c.ipCache.Delete(domain)
 
 	return true
 }
@@ -120,10 +105,7 @@ func (c *cache) invalidateIPCacheEntry(domain string) bool {
 // invalidateTXTCacheEntry atomically invalidates txt cache entry. Boolean variable determines whether invalidation
 // is successful.
 func (c *cache) invalidateTXTCacheEntry(txt string) bool {
-	c.Lock()
-	defer c.Unlock()
-
-	_, exists := c.txtCache[txt]
+	_, exists := c.txtCache.Load(txt)
 
 	if !exists {
 		return false
@@ -131,7 +113,7 @@ func (c *cache) invalidateTXTCacheEntry(txt string) bool {
 
 	// delete is idempotent and once in a while it is ok to report as exist even
 	// when it may have been deleted to avoid the cost of write lock
-	delete(c.txtCache, txt)
+	c.txtCache.Delete(txt)
 
 	return exists
 }
