@@ -148,13 +148,14 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 	})
 
 	maxChunkDataPackRequestAttempt := prometheus.NewGauge(prometheus.GaugeOpts{
-		Name:      "max_chunk_data_pack_request_attempt_times",
+		Name:      "next_unsealed_height_max_chunk_data_pack_request_attempt_times",
 		Namespace: namespaceVerification,
 		Subsystem: subsystemRequesterEngine,
-		// an indicator for when execution nodes is unresponsive to chunk data pack requests, 
-		// in which case verification node will keep requesting the chunk data pack, and this 
+		// an indicator for when execution nodes is unresponsive to chunk data pack requests,
+		// in which case verification node will keep requesting the chunk data pack, and this
 		// metrics number will go up.
-		Help:      "among all the pending chunk data packs requested by the requester engine, the maximum number of times a certain chunk data pack was requested",
+		Help: "among all the pending chunk data packs requested by the requester engine for the next unsealed height the maximum number of times a" +
+			" certain chunk data pack was requested",
 	})
 
 	// Verifier Engine
