@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 )
@@ -155,8 +156,12 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 
 	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-		libP2PFactory, err := builder.initLibP2PFactory(ctx, builder.NodeID, builder.NodeConfig.NetworkKey)
-		builder.MustNot(err)
+		libP2PFactory, err := builder.initLibP2PFactory(ctx,
+			builder.NodeID,
+			builder.NodeConfig.NetworkKey)
+		if err != nil {
+			return nil, err
+		}
 
 		msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, builder.NodeID)
 
@@ -166,7 +171,9 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 		top := topology.EmptyListTopology{}
 
 		network, err := builder.initNetwork(builder.Me, node.Metrics.Network, middleware, top)
-		builder.MustNot(err)
+		if err != nil {
+			return nil, err
+		}
 
 		builder.Network = network
 		builder.Middleware = middleware
@@ -201,6 +208,11 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
 
+	resolver, err := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
+	if err != nil {
+		return nil, fmt.Errorf("could not create dns resolver: %w", err)
+	}
+
 	return func() (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
 			SetRootBlockID(builder.RootBlock.ID().String()).
@@ -210,6 +222,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 			SetDHTOptions(dhtOptions...).
 			SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
 			SetLogger(builder.Logger).
+			SetResolver(resolver).
 			Build(ctx)
 		if err != nil {
 			return nil, err

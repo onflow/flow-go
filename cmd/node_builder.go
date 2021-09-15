@@ -109,6 +109,7 @@ type BaseConfig struct {
 	BootstrapDir          string
 	PeerUpdateInterval    time.Duration
 	UnicastMessageTimeout time.Duration
+	DNSCacheTTL           time.Duration
 	profilerEnabled       bool
 	profilerDir           string
 	profilerInterval      time.Duration
@@ -150,11 +151,12 @@ type NodeConfig struct {
 	SyncEngineIdentifierProvider id.IdentifierProvider
 
 	// root state information
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
+	RootBlock                     *flow.Block
+	RootQC                        *flow.QuorumCertificate
+	RootResult                    *flow.ExecutionResult
+	RootSeal                      *flow.Seal
+	RootChainID                   flow.ChainID
+	SkipNwAddressBasedValidations bool
 }
 
 func DefaultBaseConfig() *BaseConfig {

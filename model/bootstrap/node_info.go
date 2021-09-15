@@ -4,6 +4,7 @@ package bootstrap
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 
@@ -21,11 +22,17 @@ const (
 	NodeInfoTypePrivate
 )
 
+const (
+	DefaultMachineAccountSignAlgo      = sdkcrypto.ECDSA_P256
+	DefaultMachineAccountHashAlgo      = sdkcrypto.SHA3_256
+	DefaultMachineAccountKeyIndex uint = 0
+)
+
 // ErrMissingPrivateInfo is returned when a method is called on NodeInfo
 // that is only valid on instances containing private info.
 var ErrMissingPrivateInfo = fmt.Errorf("can not access private information for a public node type")
 
-// NodeMachineAccountPriv contains the private configration need to construct a
+// NodeMachineAccountKey contains the private configration need to construct a
 // NodeMachineAccountInfo object. This is used as an intemediary by the bootstrap scripts
 // for storing the private key before generating a NodeMachineAccountInfo.
 type NodeMachineAccountKey struct {
@@ -54,6 +61,31 @@ type NodeMachineAccountInfo struct {
 
 	// HashAlgorithm is the algorithm used for hashing
 	HashAlgorithm sdkcrypto.HashAlgorithm
+}
+
+func (info NodeMachineAccountInfo) FlowAddress() flow.Address {
+	// trim 0x-prefix if present
+	addr := info.Address
+	if strings.ToLower(addr[:2]) == "0x" {
+		addr = addr[2:]
+	}
+	return flow.HexToAddress(addr)
+}
+
+func (info NodeMachineAccountInfo) PrivateKey() (crypto.PrivateKey, error) {
+	sk, err := crypto.DecodePrivateKey(info.SigningAlgorithm, info.EncodedPrivateKey)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode machine account private key: %w", err)
+	}
+	return sk, nil
+}
+
+func (info NodeMachineAccountInfo) MustPrivateKey() crypto.PrivateKey {
+	sk, err := info.PrivateKey()
+	if err != nil {
+		panic(err)
+	}
+	return sk
 }
 
 // NodeConfig contains configuration information used as input to the
