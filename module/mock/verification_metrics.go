@@ -90,6 +90,6 @@ func (_m *VerificationMetrics) OnVerifiableChunkSentToVerifier() {
 }
 
 // SetMaxChunkDataPackAttemptsAtRequester provides a mock function with given fields: attempts
-func (_m *VerificationMetrics) SetMaxChunkDataPackAttemptsAtRequester(attempts uint64) {
+func (_m *VerificationMetrics) SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester(attempts uint64) {
 	_m.Called(attempts)
 }

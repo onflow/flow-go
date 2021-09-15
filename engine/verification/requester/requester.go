@@ -236,7 +236,7 @@ func (e *Engine) Request(request *verification.ChunkDataPackRequest) {
 func (e *Engine) onTimer() {
 	pendingReqs := e.pendingRequests.All()
 
-	// keeps maximum attempts made on a chunk data pack for telemetry
+	// keeps maximum attempts made on chunk data packs of the next unsealed height for telemetry
 	maxAttempts := uint64(0)
 
 	e.log.Debug().
@@ -252,12 +252,12 @@ func (e *Engine) onTimer() {
 
 	for _, request := range pendingReqs {
 		attempts := e.handleChunkDataPackRequestWithTracing(request, lastSealed.Height)
-		if attempts > maxAttempts {
+		if attempts > maxAttempts && request.Height == lastSealed.Height+uint64(1) {
 			maxAttempts = attempts
 		}
 	}
 
-	e.metrics.SetMaxChunkDataPackAttemptsAtRequester(maxAttempts)
+	e.metrics.SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester(maxAttempts)
 }
 
 // handleChunkDataPackRequestWithTracing encapsulates the logic of dispatching chunk data request in network with tracing enabled.

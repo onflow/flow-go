@@ -167,7 +167,7 @@ func demo() {
 			tryRandomCall(vc.OnChunkDataPackResponseReceivedFromNetworkByRequester)
 			tryRandomCall(vc.OnChunkDataPackSentToFetcher)
 			tryRandomCall(func() {
-				vc.SetMaxChunkDataPackAttemptsAtRequester(uint64(i))
+				vc.SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester(uint64(i))
 			})
 
 			// verifier

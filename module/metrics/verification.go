@@ -288,13 +288,13 @@ func (vc *VerificationCollector) OnChunkDataPackRequestReceivedByRequester() {
 	vc.receivedChunkDataPackRequestsTotalRequester.Inc()
 }
 
-// OnChunkDataPackRequestDispatchedInNetwork increments a counter that keeps track of number of chunk data pack requests that the
+// OnChunkDataPackRequestDispatchedInNetworkByRequester increments a counter that keeps track of number of chunk data pack requests that the
 // requester engine dispatches in the network (to the execution nodes).
 func (vc *VerificationCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester() {
 	vc.sentChunkDataRequestMessagesTotalRequester.Inc()
 }
 
-// OnChunkDataPackResponseReceivedFromNetwork increments a counter that keeps track of number of chunk data pack responses that the
+// OnChunkDataPackResponseReceivedFromNetworkByRequester increments a counter that keeps track of number of chunk data pack responses that the
 // requester engine receives from execution nodes (through network).
 func (vc *VerificationCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester() {
 	vc.receivedChunkDataResponseMessageTotalRequester.Inc()
@@ -329,9 +329,9 @@ func (vc *VerificationCollector) OnBlockConsumerJobDone(processedIndex uint64) {
 	vc.lastProcessedBlockJobIndexBlockConsumer.Set(float64(processedIndex))
 }
 
-// SetMaxChunkDataPackAttemptsAtRequester is invoked when a cycle of requesting chunk data packs is done by requester engine.
-// It updates the maximum number of attempts made by requester engine for requesting a chunk data pack. The maximum is taken over
-// the history of all chunk data packs requested during that cycle.
-func (vc *VerificationCollector) SetMaxChunkDataPackAttemptsAtRequester(attempts uint64) {
+// SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester is invoked when a cycle of requesting chunk data packs is done by requester engine.
+// It updates the maximum number of attempts made by requester engine for requesting the chunk data packs of the next unsealed height.
+// The maximum is taken over the history of all chunk data packs requested during that cycle that belong to the next unsealed height.
+func (vc *VerificationCollector) SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester(attempts uint64) {
 	vc.maxChunkDataPackRequestAttempt.Set(float64(attempts))
 }
