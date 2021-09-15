@@ -30,7 +30,7 @@ func NewConsensusSigPackerImpl(committees hotstuff.Committee) *ConsensusSigPacke
 // signatureData is a compact data type for encoding the block signature data
 type signatureData struct {
 	// bit-vector indicating type of signature for each signer.
-	// the order of each sig type matches the order of coresponding signer IDs
+	// the order of each sig type matches the order of corresponding signer IDs
 	SigType []hotstuff.SigType
 
 	AggregatedStakingSig      []byte
