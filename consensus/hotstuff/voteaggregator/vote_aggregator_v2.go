@@ -3,13 +3,16 @@ package voteaggregator
 import (
 	"fmt"
 
+	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // defaultVoteAggregatorWorkers number of workers to dispatch events for vote aggregators
@@ -19,6 +22,7 @@ const defaultVoteAggregatorWorkers = 8
 type VoteAggregatorV2 struct {
 	unit                *engine.Unit
 	log                 zerolog.Logger
+	workerPool          *workerpool.WorkerPool
 	notifier            hotstuff.Consumer
 	committee           hotstuff.Committee
 	voteValidator       hotstuff.Validator
@@ -33,8 +37,20 @@ type VoteAggregatorV2 struct {
 var _ hotstuff.VoteAggregatorV2 = &VoteAggregatorV2{}
 
 // NewVoteAggregatorV2 creates an instance of vote aggregator
-func NewVoteAggregatorV2(notifier hotstuff.Consumer, highestPrunedView uint64, committee hotstuff.Committee, voteValidator hotstuff.Validator, signer hotstuff.SignerVerifier) *VoteAggregatorV2 {
-	return &VoteAggregatorV2{
+// Note: verifyingProcessorFactory is injected. Thereby, the code is agnostic to the
+// different voting formats of main Consensus vs Collector consensus.
+func NewVoteAggregatorV2(
+	log zerolog.Logger,
+	notifier hotstuff.Consumer,
+	highestPrunedView uint64,
+	committee hotstuff.Committee,
+	voteValidator hotstuff.Validator,
+	signer hotstuff.SignerVerifier,
+	verifyingProcessorFactory votecollector.VerifyingVoteProcessorFactory,
+) *VoteAggregatorV2 {
+
+	aggregator := &VoteAggregatorV2{
+		log:               log,
 		notifier:          notifier,
 		highestPrunedView: counters.NewMonotonousCounter(highestPrunedView),
 		committee:         committee,
@@ -42,6 +58,13 @@ func NewVoteAggregatorV2(notifier hotstuff.Consumer, highestPrunedView uint64, c
 		signer:            signer,
 		unit:              engine.NewUnit(),
 	}
+
+	newCollectorFactoryMethod := func(view uint64) (hotstuff.VoteCollector, error) {
+		return votecollector.NewStateMachine(view, log, aggregator.workerPool, notifier, verifyingProcessorFactory), nil
+	}
+
+	aggregator.collectors = NewVoteCollectors(highestPrunedView, newCollectorFactoryMethod)
+	return aggregator
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
@@ -102,6 +125,10 @@ func (va *VoteAggregatorV2) processQueuedVote(vote *model.Vote) error {
 	// TODO: log created
 	collector, _, err := va.collectors.GetOrCreateCollector(vote.View)
 	if err != nil {
+		// ignore if our routine is outdated and some other one has pruned collectors
+		if mempool.IsDecreasingPruningHeightError(err) {
+			return nil
+		}
 		return fmt.Errorf("could not get collector for view %d: %w",
 			vote.View, err)
 	}
@@ -122,7 +149,7 @@ func (va *VoteAggregatorV2) processQueuedVote(vote *model.Vote) error {
 
 func (va *VoteAggregatorV2) AddVote(vote *model.Vote) error {
 	// drop stale votes
-	if va.isVoteStale(vote) {
+	if vote.View <= va.highestPrunedView.Value() {
 		return nil
 	}
 
@@ -137,12 +164,16 @@ func (va *VoteAggregatorV2) AddVote(vote *model.Vote) error {
 
 func (va *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
-	if va.isBlockStale(block.Block) {
+	if block.Block.View <= va.highestPrunedView.Value() {
 		return nil
 	}
 
 	collector, _, err := va.collectors.GetOrCreateCollector(block.Block.View)
 	if err != nil {
+		// ignore if our routine is outdated and some other one has pruned collectors
+		if mempool.IsDecreasingPruningHeightError(err) {
+			return nil
+		}
 		return fmt.Errorf("could not get or create collector for block %v: %w", block.Block.BlockID, err)
 	}
 
@@ -163,17 +194,6 @@ func (va *VoteAggregatorV2) PruneUpToView(view uint64) {
 	// if someone else has updated view in parallel don't bother doing extra work for cleaning, whoever
 	// is able to advance counter will perform the cleanup
 	if va.highestPrunedView.Set(view) {
-		err := va.collectors.PruneUpToView(view)
-		if err != nil {
-			va.log.Fatal().Err(err).Msgf("fatal error when pruning vote collectors by view %d", view)
-		}
+		va.collectors.PruneUpToView(view)
 	}
-}
-
-func (va *VoteAggregatorV2) isVoteStale(vote *model.Vote) bool {
-	return vote.View <= va.highestPrunedView.Value()
-}
-
-func (va *VoteAggregatorV2) isBlockStale(block *model.Block) bool {
-	return block.View <= va.highestPrunedView.Value()
 }
