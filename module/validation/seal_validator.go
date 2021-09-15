@@ -250,9 +250,15 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 			len(seal.AggregatedApprovalSigs))
 	}
 
+	// sanity check
+	if incorporatedResult.IncorporatedBlockID != seal.BlockID {
+		return fmt.Errorf("incorporatedResult's block ID (%v) does not match with the seal's block ID (%v)",
+			incorporatedResult.IncorporatedBlockID, seal.BlockID)
+	}
+
 	assignments, err := s.assigner.Assign(executionResult, incorporatedResult.IncorporatedBlockID)
 	if err != nil {
-		return fmt.Errorf("could not retreive assignments for block: %v, %w", seal.BlockID, err)
+		return fmt.Errorf("could not retreive assignments for block: %v, %v, %w", seal.BlockID, incorporatedResult.IncorporatedBlockID, err)
 	}
 
 	// Check that each AggregatedSignature has enough valid signatures from
