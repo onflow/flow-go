@@ -3,6 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -27,15 +28,15 @@ func init() {
 func addFinalListFlags() {
 	// partner node info flag
 	finalListCmd.Flags().StringVar(&flagPartnerNodeInfoDir, "partner-infos", "", "path to a directory containing all parnter nodes details")
-	_ = finalListCmd.MarkFlagRequired("partner-infos")
+	cmd.MarkFlagRequired(finalListCmd, "partner-infos")
 
 	// internal/flow node info flag
 	finalListCmd.Flags().StringVar(&flagInternalNodePrivInfoDir, "flow-infos", "", "path to a directory containing all internal/flow nodes details")
-	_ = finalListCmd.MarkFlagRequired("flow-infos")
+	cmd.MarkFlagRequired(finalListCmd, "flow-infos")
 
 	// staking nodes dir containing staking nodes json
 	finalListCmd.Flags().StringVar(&flagStakingNodesPath, "staking-nodes", "", "path to a JSON file of all staking nodes")
-	_ = finalListCmd.MarkFlagRequired("staking-nodes")
+	cmd.MarkFlagRequired(finalListCmd, "staking-nodes")
 
 	finalListCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2,
 		"number of collection clusters")

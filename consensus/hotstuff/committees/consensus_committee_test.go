@@ -139,10 +139,18 @@ func TestConsensus_LeaderForView(t *testing.T) {
 		})
 
 		t.Run("after current epoch", func(t *testing.T) {
+			t.SkipNow()
 			// get leader for view in next epoch when it is not set up yet
 			_, err := committee.LeaderForView(250)
 			assert.Error(t, err)
 			assert.True(t, errors.Is(err, protocol.ErrNextEpochNotSetup))
+		})
+
+		t.Run("after current epoch - with emergency epoch chain continuation", func(t *testing.T) {
+			// get leader for view in next epoch when it is not set up yet
+			_, err := committee.LeaderForView(250)
+			// emergency epoch chain continuation should kick in and return a valid leader
+			assert.NoError(t, err)
 		})
 	})
 
@@ -260,6 +268,8 @@ func newMockEpoch(
 	epoch.On("InitialIdentities").Return(identities, nil)
 	epoch.On("FirstView").Return(firstView, nil)
 	epoch.On("FinalView").Return(finalView, nil)
+	// return nil error to indicate the epoch is committed
+	epoch.On("DKG").Return(nil, nil)
 
 	var params []interface{}
 	for _, ind := range indices.ProtocolConsensusLeaderSelection {
