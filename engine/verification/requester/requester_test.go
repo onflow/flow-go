@@ -182,6 +182,8 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 		unittest.WithDisagrees(disagrees))
 	vertestutils.MockLastSealedHeight(s.state, 10)
 	s.pendingRequests.On("All").Return(requests)
+	// check data pack request is never tried since its block has been sealed.
+	s.metrics.On("SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester", uint64(0)).Return().Once()
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -226,6 +228,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Times(len(requests))
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(requests))
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(requests))
+	s.metrics.On("SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester", uint64(1)).Return().Once()
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -272,6 +275,8 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests, flow.GetIDs(unsealedRequests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(unsealedRequests))
+	// each unsealed height is requested only once, hence the maximum is updated only once from 0 -> 1
+	s.metrics.On("SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester", testifymock.Anything).Return().Once()
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -323,6 +328,12 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, attempts)
 
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(count * attempts)
+	s.metrics.On("SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester", testifymock.Anything).Run(func(args testifymock.Arguments) {
+		actualAttempts, ok := args[0].(uint64)
+		require.True(t, ok)
+
+		require.LessOrEqual(t, actualAttempts, uint64(attempts))
+	}).Return().Times(attempts)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
@@ -386,6 +397,9 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	// mocks only instantly qualified requests are dispatched in the network.
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, instantQualifiedRequests, attempts, func(*messages.ChunkDataRequest) {})
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(instantQualifiedRequests) * attempts)
+	// each instantly qualified one is requested only once, hence the maximum is updated only once from 0 -> 1, and
+	// is kept at 1 during all cycles of this test.
+	s.metrics.On("SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester", uint64(1)).Return()
 
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
 		"could not check chunk requests qualification on time")
