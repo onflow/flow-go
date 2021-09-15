@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
 )
@@ -64,7 +65,7 @@ func NewWeightedSignatureAggregator(
 func (s *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
 	index, ok := s.idToIndex[signerID]
 	if !ok {
-		return false, engine.InvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
+		return false, engine.NewInvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
 	}
 	return s.SignatureAggregatorSameMessage.Verify(index, sig)
 }
@@ -85,12 +86,12 @@ func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 	// get the index
 	index, ok := s.idToIndex[signerID]
 	if !ok {
-		return collectedWeight, engine.InvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
+		return collectedWeight, engine.NewInvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
 	}
 	// get the weight
 	weight, ok := s.idToWeights[signerID]
 	if !ok {
-		return collectedWeight, engine.InvalidInputErrorf("couldn't find signerID %s in the weight map", signerID)
+		return collectedWeight, engine.NewInvalidInputErrorf("couldn't find signerID %s in the weight map", signerID)
 	}
 
 	// atomically update the signatures pool and the total weight
@@ -100,7 +101,7 @@ func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 	// This is a sanity check because the upper layer should have already checked for double-voters.
 	_, ok = s.collectedIDs[signerID]
 	if ok {
-		return collectedWeight, engine.InvalidInputErrorf("SigneID %s was already added", signerID)
+		return collectedWeight, engine.NewInvalidInputErrorf("SigneID %s was already added", signerID)
 	}
 
 	err := s.SignatureAggregatorSameMessage.TrustedAdd(index, sig)
