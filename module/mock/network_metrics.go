@@ -77,3 +77,13 @@ func (_m *NetworkMetrics) OutboundConnections(connectionCount uint) {
 func (_m *NetworkMetrics) QueueDuration(duration time.Duration, priority int) {
 	_m.Called(duration, priority)
 }
+
+// UnstakedInboundConnections provides a mock function with given fields: connectionCount
+func (_m *NetworkMetrics) UnstakedInboundConnections(connectionCount uint) {
+	_m.Called(connectionCount)
+}
+
+// UnstakedOutboundConnections provides a mock function with given fields: connectionCount
+func (_m *NetworkMetrics) UnstakedOutboundConnections(connectionCount uint) {
+	_m.Called(connectionCount)
+}

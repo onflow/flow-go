@@ -5,6 +5,8 @@ package network
 import (
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/message"
 )
@@ -51,7 +53,11 @@ type Middleware interface {
 
 	// UpdateAllowList fetches the most recent identity of the nodes from overlay
 	// and updates the underlying libp2p node.
-	UpdateAllowList() error
+	UpdateAllowList()
+
+	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
+	// in the Flow protocol.
+	UpdateNodeAddresses()
 }
 
 // Overlay represents the interface that middleware uses to interact with the
@@ -59,8 +65,13 @@ type Middleware interface {
 type Overlay interface {
 	// Topology returns an identity list of nodes which this node should be directly connected to as peers
 	Topology() (flow.IdentityList, error)
-	// Identity returns a map of all identifier to flow identity
-	Identity() (map[flow.Identifier]flow.Identity, error)
+
+	// Identities returns a list of all Flow identities on the network
+	Identities() flow.IdentityList
+
+	// GetIdentity returns the Identity associated with the given peer ID, if it exists
+	Identity(peer.ID) (*flow.Identity, bool)
+
 	Receive(nodeID flow.Identifier, msg *message.Message) error
 }
 
