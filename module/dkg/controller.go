@@ -14,12 +14,24 @@ import (
 )
 
 const (
+
 	// DefaultBaseStartDelay is the default base delay to use when introducing
 	// random delay to the DKG start process. See preStartDelay for details.
 	DefaultBaseStartDelay = 500 * time.Microsecond
+
 	// DefaultBaseHandleBroadcastDelay is the default base to use when
-	// introducing random delay to processing a DKG broadcast message. See
+	// introducing random delay to processing EACH DKG broadcast message. See
 	// preHandleBroadcastDelay for details.
+	//
+	// For a 150-node DKG, we observe a cost of ~2.5s per message to process
+	// broadcast messages during phase 1, for a total of ~6m of total CPU time.
+	// We would like to target spreading this cost over a 20 minute period in the
+	// average case.
+	//
+	// 500µs results in per-broadcast delays of max=11.25s, ave=5.625s.
+	// This results in total delays of max=~28m, ave=~14m, and total time to
+	// process all phase 1 broadcast messages of max=~34m, ave=~20m.
+	//
 	DefaultBaseHandleBroadcastDelay = 500 * time.Microsecond
 )
 
