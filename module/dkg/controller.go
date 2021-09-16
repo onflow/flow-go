@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"fmt"
+	"math"
 	"math/rand"
 	"sync"
 	"time"
@@ -396,7 +397,7 @@ func (c *Controller) phase3() error {
 // * b is a configurable base delay
 // * n is the size of the DKG committee
 func (c *Controller) preStartDelay() time.Duration {
-	maxDelay := time.Duration(c.dkg.Size()^2) * c.config.BaseStartDelay
+	maxDelay := time.Duration(math.Pow(float64(c.dkg.Size()), 2)) * c.config.BaseStartDelay
 	delay := time.Duration(rand.Int63n(maxDelay.Nanoseconds()))
 	return delay
 }
@@ -410,7 +411,7 @@ func (c *Controller) preStartDelay() time.Duration {
 // * b is a configurable base delay
 // * n is the size of the DKG committee
 func (c *Controller) preHandleBroadcastDelay() time.Duration {
-	maxDelay := time.Duration(c.dkg.Size()^2) * c.config.BaseHandleBroadcastDelay
+	maxDelay := time.Duration(math.Pow(float64(c.dkg.Size()), 2)) * c.config.BaseStartDelay
 	delay := time.Duration(rand.Int63n(maxDelay.Nanoseconds()))
 	return delay
 }
