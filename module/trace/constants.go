@@ -200,11 +200,7 @@ const (
 	FVMEnvRemoveAccountContractCode SpanName = "fvm.env.removeAccountContractCode"
 	FVMEnvGetSigningAccounts        SpanName = "fvm.env.getSigningAccounts"
 
-	FVMCadenceParseProgram     SpanName = "fvm.cadence.parseProgram"
-	FVMCadenceCheckProgram     SpanName = "fvm.cadence.checkProgram"
-	FVMCadenceInterpretProgram SpanName = "fvm.cadence.interpretProgram"
-	FVMCadenceEncodeValue      SpanName = "fvm.cadence.encodeValue"
-	FVMCadenceDecodeValue      SpanName = "fvm.cadence.decodeValue"
+	FVMCadenceTrace SpanName = "fvm.cadence.trace"
 )
 
 // Tag names
