@@ -6,6 +6,9 @@ FROM golang:1.15-buster AS build-setup
 RUN apt-get update
 RUN apt-get -y install cmake zip sudo
 
+RUN export GOPRIVATE=github.com/onflow/atree
+
+RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
 RUN git config --global 'url.ssh://git@github.com/.insteadof' https://github.com/
 
 ## (1) Build Relic first to maximize caching
