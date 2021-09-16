@@ -100,16 +100,14 @@ func (h Header) ID() Identifier {
 		len(h.ParentVoterSigData) == len(prevHeader.ParentVoterSigData) &&
 		len(h.ProposerSigData) == len(prevHeader.ProposerSigData) {
 		bNotEqual := false
-		if len(h.ParentVoterIDs) > 0 {
-			for i, v := range h.ParentVoterIDs {
-				if v == prevHeader.ParentVoterIDs[i] {
-					continue
-				}
-				bNotEqual = true
-				break
+		
+		for i, v := range h.ParentVoterIDs {
+			if v == prevHeader.ParentVoterIDs[i] {
+				continue
 			}
+			bNotEqual = true
+			break
 		}
-
 		if !bNotEqual &&
 			h.ChainID == prevHeader.ChainID &&
 			h.Timestamp == prevHeader.Timestamp &&
