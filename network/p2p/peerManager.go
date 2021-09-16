@@ -3,6 +3,7 @@ package p2p
 import (
 	"context"
 	"fmt"
+	mrand "math/rand"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
@@ -83,12 +84,15 @@ func PeerManagerFactory(peerManagerOptions []Option, connectorOptions ...Connect
 
 // Ready kicks off the ambient periodic connection updates.
 func (pm *PeerManager) Ready() <-chan struct{} {
-	// makes sure that peer update request is invoked
-	// once before returning
+	// makes sure that peer update request is invoked once before returning
 	pm.RequestPeerUpdate()
 
 	// also starts running it periodically
-	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, pm.peerUpdateInterval, time.Duration(0))
+	//
+	// add a random delay to initial launch to avoid synchronizing this
+	// potentially expensive operation across the network
+	delay := time.Duration(mrand.Int63n(pm.peerUpdateInterval.Nanoseconds()))
+	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, pm.peerUpdateInterval, delay)
 
 	pm.unit.Launch(pm.updateLoop)
 
