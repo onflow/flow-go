@@ -661,18 +661,19 @@ func (e *ScriptEnv) ImplementationDebugLog(message string) error {
 }
 
 func (e *ScriptEnv) RecordTrace(operation string, location common.Location, duration time.Duration, logs []opentracing.LogRecord) {
-	if e.isTraceable() {
-		if location != nil {
-			if logs == nil {
-				logs = make([]opentracing.LogRecord, 0)
-			}
-			logs = append(logs, opentracing.LogRecord{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", location.String())},
-			})
-		}
-		spanName := trace.FVMCadenceTrace.Child(operation)
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, spanName, duration, logs)
+	if !e.isTraceable() {
+		return
 	}
+	if location != nil {
+		if logs == nil {
+			logs = make([]opentracing.LogRecord, 0)
+		}
+		logs = append(logs, opentracing.LogRecord{Timestamp: time.Now(),
+			Fields: []traceLog.Field{traceLog.String("location", location.String())},
+		})
+	}
+	spanName := trace.FVMCadenceTrace.Child(operation)
+	e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, spanName, duration, logs)
 }
 
 func (e *ScriptEnv) ProgramParsed(location common.Location, duration time.Duration) {
