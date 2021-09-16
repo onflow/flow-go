@@ -43,19 +43,21 @@ type signatureData struct {
 // Expected error returns during normal operations:
 //  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
 func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
+	// breaking staking and random beacon signers into signerIDs and sig type for compaction
+	// each signer must have its signerID and sig type stored at the same index in the two slices
+	count := len(sig.StakingSigners) + len(sig.RandomBeaconSigners)
+	signerIDs := make([]flow.Identifier, 0, count)
+	sigTypes := make([]hotstuff.SigType, 0, count)
+
+	// read all the possible signer IDs at the given block
 	consensus, err := p.committees.Identities(blockID, filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
 	}
 
 	// lookup is a map from node identifier to node identity
+	// it is used to check the given signers are all valid signers at the given block
 	lookup := consensus.Lookup()
-	count := len(sig.StakingSigners) + len(sig.RandomBeaconSigners)
-
-	signerIDs := make([]flow.Identifier, 0, count)
-	// the order of sig types matches the signer IDs so that it indicates
-	// which type of signature each signer produces.
-	sigTypes := make([]hotstuff.SigType, 0, count)
 
 	for _, stakingSigner := range sig.StakingSigners {
 		_, ok := lookup[stakingSigner]
@@ -77,6 +79,7 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 		}
 	}
 
+	// seralize the sig type for compaction
 	seralized, err := seralizeToBytes(sigTypes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not seralize sig types to bytes at block: %v, %w", blockID, err)
@@ -89,6 +92,7 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 		RandomBeacon:              sig.ReconstructedRandomBeaconSig,
 	}
 
+	// encode the structured data into raw bytes
 	encoded, err := p.encoder.Encode(data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not encode data %v, %w", data, err)
@@ -104,25 +108,46 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 //  - (sigData, nil) if successfully unpacked the signature data
 //  - (nil, signature.ErrInvalidFormat) if failed to unpack the signature data
 func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+	// decode into typed data
 	var data signatureData
 	err := p.encoder.Decode(sigData, &data)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode sig data %s: %w", err, signature.ErrInvalidFormat)
 	}
 
-	stakingSigners := make([]flow.Identifier, 0)
-	randomBeaconSigners := make([]flow.Identifier, 0)
-
+	// deseralize the compact sig types
 	sigTypes, err := deseralizeFromBytes(data.SigType, len(signerIDs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to deseralize sig types from bytes: %w", err)
 	}
 
+	// read all the possible signer IDs at the given block
+	consensus, err := p.committees.Identities(blockID, filter.HasRole(flow.RoleConsensus))
+	if err != nil {
+		return nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
+	}
+
+	// lookup is a map from node identifier to node identity
+	// it is used to check the given signerIDs are all valid signers at the given block
+	lookup := consensus.Lookup()
+
+	// read each signer's signerID and sig type from two different slices
+	// group signers by its sig type
+	stakingSigners := make([]flow.Identifier, 0)
+	randomBeaconSigners := make([]flow.Identifier, 0)
+
 	for i, sigType := range sigTypes {
+		signerID := signerIDs[i]
+		_, ok := lookup[signerID]
+		if !ok {
+			return nil, fmt.Errorf("unknown signer ID (%v) at the given block (%v): %w",
+				signerID, blockID, signature.ErrInvalidFormat)
+		}
+
 		if sigType == hotstuff.SigTypeStaking {
-			stakingSigners = append(stakingSigners, signerIDs[i])
+			stakingSigners = append(stakingSigners, signerID)
 		} else if sigType == hotstuff.SigTypeRandomBeacon {
-			randomBeaconSigners = append(randomBeaconSigners, signerIDs[i])
+			randomBeaconSigners = append(randomBeaconSigners, signerID)
 		} else {
 			return nil, fmt.Errorf("unknown sigType %v, %w", sigType, signature.ErrInvalidFormat)
 		}
@@ -156,25 +181,36 @@ func sigTypeToBool(t hotstuff.SigType) (bool, error) {
 // seralize the sig types into a compact format
 func seralizeToBytes(sigTypes []hotstuff.SigType) ([]byte, error) {
 	bytes := make([]byte, 0)
+	// a sig type can be converted into one bit.
+	// so every 8 sig types will fit into one byte.
+	// iterate through every 8 sig types, for each sig type in each
+	// group, convert into each bit, and fill the bit into the byte.
+	// the remaining unfilled bits in the last byte will be 0
 	for byt := 0; byt < len(sigTypes); byt += 8 {
 		b := byte(0)
 		offset := 7
-		for pos := byt; pos < 8 && pos < len(sigTypes); pos++ {
+		for pos := byt; pos < byt+8 && pos < len(sigTypes); pos++ {
 			sigType := sigTypes[pos]
 
 			if !sigType.Valid() {
 				return nil, fmt.Errorf("invalid sig type: %v at pos %v", sigType, pos)
 			}
 
-			b = b ^ (byte(sigType) << offset)
+			b ^= (byte(sigType) << offset)
+			offset--
 		}
 		bytes = append(bytes, b)
-		offset--
 	}
 	return bytes, nil
 }
 
 // deseralize the sig types from bytes
+// - seralized: seralized bytes
+// - count: the total number of sig types to be deseralized from the given bytes
+// It returns:
+// - (sigTypes, nil) if successfully deseralized sig types
+// - (nil, signature.ErrInvalidFormat) if the number of seralized bytes doesn't match the given number of sig types
+// - (nil, signature.ErrInvalidFormat) if the remaining bits in the last byte are not all 0s
 func deseralizeFromBytes(seralized []byte, count int) ([]hotstuff.SigType, error) {
 	types := make([]hotstuff.SigType, 0, count)
 

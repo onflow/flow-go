@@ -2,6 +2,7 @@ package signature
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -82,6 +83,50 @@ func TestPackUnpack(t *testing.T) {
 	require.Equal(t, expectedSignerIDs, signerIDs)
 }
 
+// if signed by 60 staking nodes, and 50 random beacon nodes among a 200 nodes committee,
+// it's able to pack and unpack
+func TestPackUnpackManyNodes(t *testing.T) {
+	identities := unittest.IdentityListFixture(200, unittest.WithRole(flow.RoleConsensus))
+	committee := identities.NodeIDs()
+
+	// prepare data for testing
+	blockID := unittest.IdentifierFixture()
+	blockSigData := makeBlockSigData(committee)
+	stakingSigners := make([]flow.Identifier, 0)
+	for i := 0; i < 60; i++ {
+		stakingSigners = append(stakingSigners, committee[i])
+	}
+	randomBeaconSigners := make([]flow.Identifier, 0)
+	for i := 100; i < 100+50; i++ {
+		randomBeaconSigners = append(randomBeaconSigners, committee[i])
+	}
+	blockSigData.StakingSigners = stakingSigners
+	blockSigData.RandomBeaconSigners = randomBeaconSigners
+
+	// create packer with the committee
+	packer := newPacker(identities)
+
+	// pack & unpack
+	signerIDs, sig, err := packer.Pack(blockID, blockSigData)
+	require.NoError(t, err)
+
+	unpacked, err := packer.Unpack(blockID, signerIDs, sig)
+	require.NoError(t, err)
+
+	// check that the unpack data match with the original data
+	require.Equal(t, blockSigData.StakingSigners, unpacked.StakingSigners)
+	require.Equal(t, blockSigData.RandomBeaconSigners, unpacked.RandomBeaconSigners)
+	require.Equal(t, blockSigData.AggregatedStakingSig, unpacked.AggregatedStakingSig)
+	require.Equal(t, blockSigData.AggregatedRandomBeaconSig, unpacked.AggregatedRandomBeaconSig)
+	require.Equal(t, blockSigData.ReconstructedRandomBeaconSig, unpacked.ReconstructedRandomBeaconSig)
+
+	// check the packed signer IDs
+	expectedSignerIDs := []flow.Identifier{}
+	expectedSignerIDs = append(expectedSignerIDs, blockSigData.StakingSigners...)
+	expectedSignerIDs = append(expectedSignerIDs, blockSigData.RandomBeaconSigners...)
+	require.Equal(t, expectedSignerIDs, signerIDs)
+}
+
 // if the sig data can not be decoded, return ErrInvalidFormat
 func TestFailToDecode(t *testing.T) {
 	identities := unittest.IdentityListFixture(6, unittest.WithRole(flow.RoleConsensus))
@@ -102,6 +147,7 @@ func TestFailToDecode(t *testing.T) {
 
 	_, err = packer.Unpack(blockID, signerIDs, invalidSigData)
 
+	require.Error(t, err)
 	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
 }
 
@@ -126,13 +172,15 @@ func TestMismatchSignerIDs(t *testing.T) {
 
 	_, err = packer.Unpack(blockID, invalidSignerIDs, sig)
 
+	require.Error(t, err)
 	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
 
 	// prepare invalid signerIDs by modifying the valid signerIDs
 	// adding one more signer
-	invalidSignerIDs = append(signerIDs, signerIDs[0])
-	_, err = packer.Unpack(blockID, invalidSignerIDs, sig)
+	invalidSignerIDs = append(signerIDs, unittest.IdentifierFixture())
+	misPacked, err := packer.Unpack(blockID, invalidSignerIDs, sig)
 
+	require.Error(t, err, fmt.Sprintf("packed signers: %v", misPacked))
 	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
 }
 
@@ -165,10 +213,209 @@ func TestInvalidSigType(t *testing.T) {
 	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
 }
 
-// func TestSeralizeAndDeseralizeSigTypes(t *testing.T) {
-// 	t.Run("valid sig types can be seralized and deseralized", func(t *testing.T) {
-// 	})
-// 	t.Run("invalid sig type can not be seralized", func(t *testing.T) {
-// 	})
-//
-// }
+func TestSeralizeAndDeseralizeSigTypes(t *testing.T) {
+	t.Run("nothing", func(t *testing.T) {
+		expected := []hotstuff.SigType{}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		require.Equal(t, []byte{}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+
+	t.Run("1 SigTypeStaking", func(t *testing.T) {
+		expected := []hotstuff.SigType{hotstuff.SigTypeStaking}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		require.Equal(t, []byte{0}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+
+	t.Run("1 SigTypeRandomBeacon", func(t *testing.T) {
+		expected := []hotstuff.SigType{hotstuff.SigTypeRandomBeacon}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		require.Equal(t, []byte{1 << 7}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+
+	t.Run("2 SigTypeRandomBeacon", func(t *testing.T) {
+		expected := []hotstuff.SigType{
+			hotstuff.SigTypeRandomBeacon,
+			hotstuff.SigTypeRandomBeacon,
+		}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		require.Equal(t, []byte{1<<7 + 1<<6}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+
+	t.Run("8 SigTypeRandomBeacon", func(t *testing.T) {
+		count := 8
+		expected := make([]hotstuff.SigType, 0)
+		for i := 0; i < count; i++ {
+			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+		}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		require.Equal(t, []byte{255}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+
+	t.Run("8 SigTypeStaking", func(t *testing.T) {
+		count := 8
+		expected := make([]hotstuff.SigType, 0)
+		for i := 0; i < count; i++ {
+			expected = append(expected, hotstuff.SigTypeStaking)
+		}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		require.Equal(t, []byte{0}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+
+	t.Run("9 SigTypeRandomBeacon", func(t *testing.T) {
+		count := 9
+		expected := make([]hotstuff.SigType, 0)
+		for i := 0; i < count; i++ {
+			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+		}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		require.Equal(t, []byte{255, 1 << 7}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+
+	t.Run("9 SigTypeStaking", func(t *testing.T) {
+		count := 9
+		expected := make([]hotstuff.SigType, 0)
+		for i := 0; i < count; i++ {
+			expected = append(expected, hotstuff.SigTypeStaking)
+		}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		require.Equal(t, []byte{0, 0}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+
+	t.Run("16 SigTypeRandomBeacon, 2 groups", func(t *testing.T) {
+		count := 16
+		expected := make([]hotstuff.SigType, 0)
+		for i := 0; i < count; i++ {
+			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+		}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		require.Equal(t, []byte{255, 255}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+
+	t.Run("3 SigTypeRandomBeacon, 4 SigTypeStaking", func(t *testing.T) {
+		random, staking := 3, 4
+		expected := make([]hotstuff.SigType, 0)
+		for i := 0; i < random; i++ {
+			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+		}
+		for i := 0; i < staking; i++ {
+			expected = append(expected, hotstuff.SigTypeStaking)
+		}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		require.Equal(t, []byte{1<<7 + 1<<6 + 1<<5}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+
+	t.Run("3 SigTypeStaking, 4 SigTypeRandomBeacon", func(t *testing.T) {
+		staking, random := 3, 4
+		expected := make([]hotstuff.SigType, 0)
+		for i := 0; i < staking; i++ {
+			expected = append(expected, hotstuff.SigTypeStaking)
+		}
+		for i := 0; i < random; i++ {
+			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+		}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		// 00011110
+		require.Equal(t, []byte{1<<4 + 1<<3 + 1<<2 + 1<<1}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+
+	t.Run("3 SigTypeStaking, 6 SigTypeRandomBeacon", func(t *testing.T) {
+		staking, random := 3, 6
+		expected := make([]hotstuff.SigType, 0)
+		for i := 0; i < staking; i++ {
+			expected = append(expected, hotstuff.SigTypeStaking)
+		}
+		for i := 0; i < random; i++ {
+			expected = append(expected, hotstuff.SigTypeRandomBeacon)
+		}
+		bytes, err := seralizeToBytes(expected)
+		require.NoError(t, err)
+		// 00011110, 10000000
+		require.Equal(t, []byte{1<<4 + 1<<3 + 1<<2 + 1<<1 + 1, 1 << 7}, bytes)
+
+		types, err := deseralizeFromBytes(bytes, len(expected))
+		require.NoError(t, err)
+		require.Equal(t, expected, types)
+	})
+}
+
+func TestDeseralizeMismatchingBytes(t *testing.T) {
+	count := 9
+	expected := make([]hotstuff.SigType, 0)
+	for i := 0; i < count; i++ {
+		expected = append(expected, hotstuff.SigTypeStaking)
+	}
+	bytes, err := seralizeToBytes(expected)
+	require.NoError(t, err)
+
+	for invalidCount := 0; invalidCount < 100; invalidCount++ {
+		if invalidCount >= count && invalidCount <= 16 {
+			// skip correct count
+			continue
+		}
+		_, err := deseralizeFromBytes(bytes, invalidCount)
+		require.Error(t, err, fmt.Sprintf("invalid count: %v", invalidCount))
+		require.True(t, errors.Is(err, signature.ErrInvalidFormat), fmt.Sprintf("invalid count: %v", invalidCount))
+	}
+}
+
+func TestDeseralizeInvalidTailingBits(t *testing.T) {
+	_, err := deseralizeFromBytes([]byte{255, 1<<7 + 1<<1}, 9)
+	require.Error(t, err)
+	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
+	require.Contains(t, fmt.Sprintf("%v", err), "remaining bits")
+}
