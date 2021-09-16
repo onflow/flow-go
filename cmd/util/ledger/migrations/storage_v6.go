@@ -157,6 +157,7 @@ type StorageFormatV6Migration struct {
 	deferredValuePaths   map[storagePath]bool
 	progress             *progressbar.ProgressBar
 	emptyDeferredValues  int
+	missingTypeValues    int
 }
 
 func (m *StorageFormatV6Migration) filename() string {
@@ -264,6 +265,11 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	if m.emptyDeferredValues > 0 {
 		m.clearProgress()
 		m.Log.Warn().Msgf("empty deferred values found: %d", m.emptyDeferredValues)
+	}
+
+	if m.missingTypeValues > 0 {
+		m.clearProgress()
+		m.Log.Warn().Msgf("values not migrated due to missing types: %d", m.missingTypeValues)
 	}
 
 	return migratedPayloads, nil
@@ -563,6 +569,7 @@ func (m *StorageFormatV6Migration) decodeAndConvert(
 
 	defer func() {
 		if r := recover(); r != nil {
+			m.missingTypeValues += 1
 			m.Log.Debug().Msgf("failed to convert value: %s", r.(error).Error())
 		}
 	}()
@@ -642,6 +649,11 @@ func (m *StorageFormatV6Migration) initOldInterpreter(payloads []ledger.Payload)
 				}
 
 				if len(registerValue) == 0 {
+					m.Log.Debug().Msgf("empty deferred value: owner: %s, key: %s",
+						ownerStr,
+						key,
+					)
+
 					m.emptyDeferredValues += 1
 					panic(&ValueNotFoundError{
 						key: key,
