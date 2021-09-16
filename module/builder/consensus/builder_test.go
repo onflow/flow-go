@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -110,10 +111,9 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 		block = unittest.BlockWithParentFixture(parentBlock.Header)
 	}
 
-	// if parentBlock is not nil, create a receipt for a result of the parentBlock
-	// block, and add it to the payload. The corresponding IncorporatedResult
-	// will be use to seal the parentBlock block, and to create an
-	// IncorporatedResultSeal for the seal mempool.
+	// If parentBlock is not nil, create a receipt for a result of the parentBlock block,
+	// and add it to the payload. The corresponding IncorporatedResult will be used to
+	// seal the parentBlock, and to create an IncorporatedResultSeal for the seal mempool.
 	var incorporatedResultForPrevBlock *flow.IncorporatedResult
 	if parentBlock != nil {
 		previousResult, found := bs.resultForBlock[parentBlock.ID()]
@@ -133,6 +133,9 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 			unittest.WithBlock(&block),
 			unittest.WithPreviousResult(*previousResult),
 		)
+
+		fmt.Println("produced block: ", block.ID().String())
+		fmt.Println("adding receipt for block: ", result.BlockID.String())
 
 		bs.resultForBlock[result.BlockID] = result
 		bs.resultByID[result.ID()] = result
@@ -566,6 +569,78 @@ func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 	bs.Assert().ElementsMatch(bs.chain[len(bs.chain)-8:], bs.assembled.Seals[4:], "should have included only valid chain of seals")
 
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
+}
+
+// TestPayloadSeals_EnforceGap checks that builder leaves a 1-block gap between block incorporating the result
+// and the block sealing the result. Without this gap, some nodes might not be able to compute the Verifier
+// assignment for the seal and therefore reject the block. This edge case only occurs in a very specific situation:
+//
+//                                                                        ┌---- [A5] (orphaned fork)
+//                                                                        v
+// ...<- [B0] <- [B1] <- [B2] <- [B3] <- [B4{incorporates result R for B1}] <- ░newBlock░
+//
+// SCENARIO:
+// * block B0 is sealed
+// Proposer for ░newBlock░:
+//  * Knows block A5. Hence, it knows a QC for block B4, which contains the Source Of Randomness (SOR) for B4.
+//    Therefore, the proposer can construct the verifier assignment for [B4{incorporates result R for B1}]
+//  * Assume that verification was fast enough, so the proposer has sufficient approvals for result R.
+//    Therefore, the proposer has a candidate seal, sealing result R for block B4, in its mempool.
+// Replica trying to verify ░newBlock░:
+//  * Assume that the replica does _not_ know A5. Therefore, it _cannot_ compute the verifier assignment for B4.
+//
+// Problem:  If the proposer included the seal for B1, the replica could not check it.
+// Solution: There must be a gap between the block incorporating the result (here B4) and
+//           the block sealing the result. A gap of one block is sufficient.
+//                                                                        ┌---- [A5] (orphaned fork)
+//                                                                        v
+// ...<- [B0] <- [B1] <- [B2] <- [B3] <- [B4{incorporates result R for B1}] <- [B5] <- [B6{seals B1}]
+//                                                                            ~~~~~~
+//                                                                             gap
+// We test the two distinct cases:
+//   (i) Builder does _not_ include seal for B1 when constructing block B5
+//  (ii) Builder _includes_ seal for B1 when constructing block B6
+func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
+	fmt.Println("")
+	fmt.Println("")
+
+	// we use bs.parentID as block B0
+	b0result := bs.resultForBlock[bs.parentID]
+	b0seal := unittest.Seal.Fixture(
+		unittest.Seal.WithResult(b0result),
+	)
+	b1 := bs.createAndRecordBlock(bs.blocks[bs.parentID])
+	bchain := unittest.ChainFixtureFrom(3, b1.Header) // creates blocks b2, b3, b4
+	b4 := bchain[2]
+
+	// Incorporate result for block B1 into payload of block B4
+	fmt.Println("looking for result for block: ", b1.ID().String())
+	resultB1 := bs.resultForBlock[b1.ID()]
+
+	receiptB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB1))
+	b4.SetPayload(
+		flow.Payload{
+			Results:  []*flow.ExecutionResult{&receiptB1.ExecutionResult},
+			Receipts: []*flow.ExecutionReceiptMeta{receiptB1.Meta()},
+		})
+	bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+	storeSealForIncorporatedResult(resultB1, b4.ID(), bs.pendingSeals)
+
+	a5 := unittest.BlockWithParentFixture(b4.Header)
+	for _, b := range append(bchain, &a5) {
+		bs.storeBlock(b)
+	}
+
+	bs.sealDB = &storage.Seals{}
+	bs.sealDB.On("ByBlockID", b4.ID()).Return(b0seal, nil)
+	bs.build.seals = bs.sealDB
+
+	_, err := bs.build.BuildOn(b4.ID(), bs.setter)
+	//bs.Assert().Empty(bs.assembled.Seals, "should have no guarantees in payload with empty mempool")
+
+	fmt.Println("included seals: ", len(bs.assembled.Seals))
+	bs.Require().NoError(err)
+	bs.recPool.AssertExpectations(bs.T())
 }
 
 // TestPayloadSeals_Duplicates verifies that the builder does not duplicate seals for already sealed blocks:
