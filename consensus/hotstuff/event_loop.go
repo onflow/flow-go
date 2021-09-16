@@ -20,13 +20,14 @@ type EventLoop struct {
 	metrics      module.HotstuffMetrics
 	proposals    chan *model.Proposal
 	votes        chan *model.Vote
+	startTime    time.Time
 
 	lm   *lifecycle.LifecycleManager
 	unit *engine.Unit // lock for preventing concurrent state transitions
 }
 
 // NewEventLoop creates an instance of EventLoop.
-func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler EventHandler) (*EventLoop, error) {
+func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler EventHandler, startTime time.Time) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
 	votes := make(chan *model.Vote)
 
@@ -38,6 +39,7 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 		proposals:    proposals,
 		votes:        votes,
 		unit:         engine.NewUnit(),
+		startTime:    startTime,
 	}
 
 	return el, nil
@@ -199,7 +201,7 @@ func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifie
 // once.
 func (el *EventLoop) Ready() <-chan struct{} {
 	el.lm.OnStart(func() {
-		el.unit.Launch(el.loop)
+		el.unit.LaunchAfter(el.startTime.Sub(time.Now().UTC()), el.loop)
 	})
 	return el.lm.Started()
 }

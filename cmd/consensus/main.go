@@ -90,6 +90,8 @@ func main() {
 		requiredApprovalsForSealVerification   uint
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
+		startupTimeString                      string
+		startupTime                            time.Time
 
 		// DKG contract client
 		accessAddress      string
@@ -143,8 +145,19 @@ func main() {
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
 			flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
 			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
+			flags.StringVar(&startupTimeString, "startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) when the consensus participant enters the first view")
 		}).
 		Initialize().
+		ValidateFlags(func() error {
+			if startupTimeString != cmd.NotSet {
+				t, err := time.Parse(time.RFC3339, startupTimeString)
+				if err != nil {
+					return fmt.Errorf("invalid start-time value: %w", err)
+				}
+				startupTime = t
+			}
+			return nil
+		}).
 		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
@@ -576,6 +589,19 @@ func main() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}
 
+			opts := []consensus.Option{
+				consensus.WithInitialTimeout(hotstuffTimeout),
+				consensus.WithMinTimeout(hotstuffMinTimeout),
+				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
+				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+				consensus.WithBlockRateDelay(blockRateDelay),
+			}
+
+			if !startupTime.IsZero() {
+				opts = append(opts, consensus.WithStartupTime(startupTime))
+			}
+
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
@@ -592,12 +618,7 @@ func main() {
 				node.RootQC,
 				finalized,
 				pending,
-				consensus.WithInitialTimeout(hotstuffTimeout),
-				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
-				consensus.WithBlockRateDelay(blockRateDelay),
+				opts...,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)

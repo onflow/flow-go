@@ -24,7 +24,7 @@ func TestReadyDone(t *testing.T) {
 
 	log := zerolog.New(ioutil.Discard)
 
-	eventLoop, err := hotstuff.NewEventLoop(log, metrics, eh)
+	eventLoop, err := hotstuff.NewEventLoop(log, metrics, eh, time.Time{})
 	require.NoError(t, err)
 
 	<-eventLoop.Ready()
