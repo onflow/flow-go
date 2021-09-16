@@ -162,22 +162,6 @@ func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flo
 	}, nil
 }
 
-// given that a SigType can either be a Staking Sig or a Random Beacon Sig
-// a SigType can be converted into a bool.
-// it returns:
-// - (false, nil) for SigTypeStakingSig
-// - (true, nil) for SigTypeRandomBeaconSig
-// - (false, signature.ErrInvalidFormat) for invalid sig type
-func sigTypeToBool(t hotstuff.SigType) (bool, error) {
-	if t == hotstuff.SigTypeStaking {
-		return false, nil
-	}
-	if t == hotstuff.SigTypeRandomBeacon {
-		return true, nil
-	}
-	return false, signature.ErrInvalidFormat
-}
-
 // seralize the sig types into a compact format
 func seralizeToBytes(sigTypes []hotstuff.SigType) ([]byte, error) {
 	bytes := make([]byte, 0)
