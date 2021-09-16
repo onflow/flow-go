@@ -181,6 +181,9 @@ func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.reportFile = reportFile
 
+	total := int64(len(payloads) * 3)
+	m.progress = progressbar.Default(total, "Migrating:")
+
 	return m.migrate(payloads)
 }
 
@@ -200,9 +203,6 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.initNewInterpreter()
 	m.initOldInterpreter(payloads)
-
-	total := int64(len(payloads) * 3)
-	m.progress = progressbar.Default(total, "Migrating:")
 
 	m.deferredValuePaths = m.getDeferredKeys(payloads)
 
@@ -270,6 +270,10 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 }
 
 func (m *StorageFormatV6Migration) incrementProgress() {
+	if m.progress == nil {
+		return
+	}
+
 	err := m.progress.Add(1)
 	if err != nil {
 		panic(err)
@@ -277,6 +281,10 @@ func (m *StorageFormatV6Migration) incrementProgress() {
 }
 
 func (m *StorageFormatV6Migration) clearProgress() {
+	if m.progress == nil {
+		return
+	}
+
 	err := m.progress.Clear()
 	if err != nil {
 		panic(err)
@@ -284,6 +292,10 @@ func (m *StorageFormatV6Migration) clearProgress() {
 }
 
 func (m *StorageFormatV6Migration) completeProgress(err error) {
+	if m.progress == nil {
+		return
+	}
+
 	if m.progress.IsFinished() {
 		return
 	}
@@ -294,8 +306,15 @@ func (m *StorageFormatV6Migration) completeProgress(err error) {
 	}
 }
 
-func (m *StorageFormatV6Migration) addProgress(progress int) error {
-	return m.progress.Add(progress)
+func (m *StorageFormatV6Migration) addProgress(progress int) {
+	if m.progress == nil {
+		return
+	}
+
+	err := m.progress.Add(progress)
+	if err != nil {
+		panic(err)
+	}
 }
 
 func (m *StorageFormatV6Migration) initPersistentSlabStorage(encodingStorage *encodingBaseStorage) {
