@@ -113,7 +113,7 @@ func Test_Compactor(t *testing.T) {
 			select {
 			case <-co.done:
 				// continue
-			case <-time.After(70 * time.Second):
+			case <-time.After(60 * time.Second):
 				assert.FailNow(t, "timed out")
 			}
 
