@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/rs/zerolog"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -216,26 +215,6 @@ func TestRoundTrip(t *testing.T) {
 
 		encodedValues := baseStorage.ReencodedPayloads
 		require.Len(t, encodedValues, 1)
-
-		storageID := atree.NewStorageID(
-			atree.Address(address),
-			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 1},
-		)
-
-		storedData, version := newInter.StripMagic(encodedValues[0].Value)
-		require.Equal(t, newInter.CurrentEncodingVersion, version)
-
-		storage := newInter.NewInMemoryStorage()
-
-		decoder := newInter.CBORDecMode.NewByteStreamDecoder(storedData)
-
-		decoded, err := newInter.DecodeStorable(decoder, storageID)
-		require.NoError(t, err)
-
-		value := newInter.StoredValue(decoded, storage)
-		assert.NotNil(t, value)
-
-		// TODO:
 	})
 
 	t.Run("Dictionary", func(t *testing.T) {
@@ -276,26 +255,40 @@ func TestRoundTrip(t *testing.T) {
 		encodedValues := baseStorage.ReencodedPayloads
 		require.Len(t, encodedValues, 2)
 
+		slabData, version := newInter.StripMagic(encodedValues[0].Value)
+		require.Equal(t, newInter.CurrentEncodingVersion, version)
+
+		storedData := stripSlabPrefix(slabData)
+
 		storageID := atree.NewStorageID(
 			atree.Address(address),
 			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 1},
 		)
 
-		storedData, version := newInter.StripMagic(encodedValues[0].Value)
-		require.Equal(t, newInter.CurrentEncodingVersion, version)
-
-		storage := newInter.NewInMemoryStorage()
-
 		decoder := newInter.CBORDecMode.NewByteStreamDecoder(storedData)
-
 		decoded, err := newInter.DecodeStorable(decoder, storageID)
-		require.NoError(t, err)
+		assert.NoError(t, err)
 
-		value := newInter.StoredValue(decoded, storage)
-		assert.NotNil(t, value)
+		value := newInter.StoredValue(decoded, migration.storage)
+		require.NotNil(t, value)
 
-		// TODO:
+		require.IsType(t, &newInter.DictionaryValue{}, value)
+		dictionary := value.(*newInter.DictionaryValue)
+
+		entryValue := dictionary.Get(nil, nil, newInter.NewStringValue("key1"))
+		require.IsType(t, &newInter.SomeValue{}, entryValue)
+		someValue := entryValue.(*newInter.SomeValue)
+		assert.Equal(t, newInter.NewStringValue("foo"), someValue.Value)
+
+		entryValue = dictionary.Get(nil, nil, newInter.NewStringValue("key2"))
+		require.IsType(t, &newInter.SomeValue{}, entryValue)
+		someValue = entryValue.(*newInter.SomeValue)
+		assert.Equal(t, newInter.BoolValue(true), someValue.Value)
 	})
+}
+
+func stripSlabPrefix(slabData []byte) []byte {
+	return slabData[2:]
 }
 
 func TestPayloadsMigration(t *testing.T) {
@@ -366,7 +359,7 @@ func TestPayloadsMigration(t *testing.T) {
 
 	migratedValue, err := migratedLedgerView.Get(string(owner.Bytes()), "", string(key))
 	require.NoError(t, err)
-	require.NotNil(t, migratedValue)
+	require.NotEmpty(t, migratedValue)
 }
 
 // Test for the 'Store' method implementation of delegationStorage.
