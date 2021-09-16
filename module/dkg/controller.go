@@ -282,6 +282,7 @@ func (c *Controller) doBackgroundWork() {
 			state := c.GetState()
 			if state == Phase1 {
 				delay := c.preHandleBroadcastDelay()
+				c.log.Debug().Msgf("sleeping for %s before processing phase 1 broadcast message", delay)
 				time.Sleep(delay)
 			}
 
@@ -301,12 +302,14 @@ func (c *Controller) doBackgroundWork() {
 func (c *Controller) start() error {
 	state := c.GetState()
 	if state != Init {
-		return fmt.Errorf("Cannot execute start routine in state %s", state)
+		return fmt.Errorf("cannot execute start routine in state %s", state)
 	}
 
 	// before starting the DKG, sleep for a random delay to avoid synchronizing
 	// this expensive operation across all consensus nodes
-	time.Sleep(c.preStartDelay())
+	delay := c.preStartDelay()
+	c.log.Debug().Msgf("sleeping for %s before processing phase 1 broadcast message", delay)
+	time.Sleep(delay)
 
 	c.dkgLock.Lock()
 	err := c.dkg.Start(c.seed)
