@@ -64,7 +64,6 @@ require (
 	go.uber.org/atomic v1.7.0
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
-	golang.org/x/sys v0.0.0-20210902050250-f475640dd07b
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.49.0
 	google.golang.org/grpc v1.38.0
