@@ -426,7 +426,7 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
-// In particular, it populates the `OriginID` field of the message with a Flow ID.
+// In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
 // The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
 // this requirement is fulfilled by e.g. the output of readConnection and readSubscription
 func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID) {
