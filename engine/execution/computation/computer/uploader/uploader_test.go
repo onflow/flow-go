@@ -95,6 +95,8 @@ func Test_AsyncUploader(t *testing.T) {
 		require.Equal(t, 3, callCount)
 	})
 
+	time.Sleep(1 * time.Second)
+
 	t.Run("stopping component stops retrying", func(t *testing.T) {
 
 		callCount := 0
