@@ -236,15 +236,15 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 			// Do the encoding at once at the end.
 		}
 
-		m.progress.Add(1)
+		m.incrementProgress()
 	}
-	m.progress.Clear()
+	m.clearProgress()
 	m.Log.Info().Msg("Converting payloads complete")
 
 	// Encode the new values by calling `storage.Commit()`
 
 	m.Log.Info().Msg("Re-encoding converted values...")
-	m.progress.Add(1)
+	m.incrementProgress()
 
 	err := m.storage.Commit()
 	if err != nil {
@@ -253,26 +253,49 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 
 	// Add the encoded new values to the payloads
 
-	currentProgress := m.progress.GetMax()
-	m.progress.Clear()
-	m.progress.Reset()
-	m.progress.ChangeMax(len(payloads)*2 + len(baseStorage.ReencodedPayloads))
-	m.progress.Set(currentProgress)
-
 	for _, payload := range baseStorage.ReencodedPayloads {
-		m.progress.Add(1)
 		migratedPayloads = append(migratedPayloads, *payload)
 	}
-	m.progress.Finish()
+
+	m.completeProgress(err)
 
 	m.Log.Info().Msg("Re-encoding converted values complete")
 
 	if m.emptyDeferredValues > 0 {
-		m.progress.Clear()
+		m.clearProgress()
 		m.Log.Warn().Msgf("empty deferred values found: %d", m.emptyDeferredValues)
 	}
 
 	return migratedPayloads, nil
+}
+
+func (m *StorageFormatV6Migration) incrementProgress() {
+	err := m.progress.Add(1)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (m *StorageFormatV6Migration) clearProgress() {
+	err := m.progress.Clear()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (m *StorageFormatV6Migration) completeProgress(err error) {
+	if m.progress.IsFinished() {
+		return
+	}
+
+	err = m.progress.Finish()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func (m *StorageFormatV6Migration) addProgress(progress int) error {
+	return m.progress.Add(progress)
 }
 
 func (m *StorageFormatV6Migration) initPersistentSlabStorage(encodingStorage *encodingBaseStorage) {
@@ -315,12 +338,12 @@ func (m *StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Pa
 
 func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) map[storagePath]bool {
 
-	m.progress.Clear()
+	m.clearProgress()
 	m.Log.Info().Msgf("Collecting deferred keys...")
 
 	deferredValuePaths := make(map[storagePath]bool, 0)
 	for _, payload := range payloads {
-		m.progress.Add(1)
+		m.incrementProgress()
 
 		keyParts := payload.Key.KeyParts
 		rawOwner := keyParts[0].Value
@@ -393,7 +416,7 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 		)
 	}
 
-	m.progress.Clear()
+	m.clearProgress()
 	m.Log.Info().Msgf("Deferred keys collected: %d", len(deferredValuePaths))
 
 	return deferredValuePaths
