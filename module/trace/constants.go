@@ -189,12 +189,3 @@ const (
 	FVMCadenceEncodeValue      SpanName = "fvm.cadence.encodeValue"
 	FVMCadenceDecodeValue      SpanName = "fvm.cadence.decodeValue"
 )
-
-// Tag names
-const (
-	EXEParseDurationTag         = "runtime.parseTransactionDuration"
-	EXECheckDurationTag         = "runtime.checkTransactionDuration"
-	EXEInterpretDurationTag     = "runtime.interpretTransactionDuration"
-	EXEValueEncodingDurationTag = "runtime.encodingValueDuration"
-	EXEValueDecodingDurationTag = "runtime.decodingValueDuration"
-)
