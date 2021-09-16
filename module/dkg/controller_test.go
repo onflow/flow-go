@@ -246,12 +246,20 @@ func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Durati
 		dkg, err := crypto.NewJointFeldman(n, signature.RandomBeaconThreshold(n), i, broker)
 		require.NoError(t, err)
 
+		// create a config with no delays for tests
+		config := ControllerConfig{
+			BaseStartDelay:           0,
+			BaseHandleBroadcastDelay: 0,
+		}
+
 		controller := NewController(
 			logger,
 			"dkg_test",
 			dkg,
 			seed,
-			broker)
+			broker,
+			config,
+		)
 		require.NoError(t, err)
 
 		node := newNode(i, controller, phase1Duration, phase2Duration, phase3Duration)

@@ -42,14 +42,6 @@ type ControllerConfig struct {
 	BaseHandleBroadcastDelay time.Duration
 }
 
-// DefaultControllerConfig returns a config struct with defaults set.
-func DefaultControllerConfig() ControllerConfig {
-	return ControllerConfig{
-		BaseStartDelay:           DefaultBaseStartDelay,
-		BaseHandleBroadcastDelay: DefaultBaseHandleBroadcastDelay,
-	}
-}
-
 // Controller implements the DKGController interface. It controls the execution
 // of a Joint Feldman DKG instance. A new Controller must be instantiated for
 // every epoch.
