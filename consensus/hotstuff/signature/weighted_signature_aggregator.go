@@ -60,13 +60,16 @@ func NewWeightedSignatureAggregator(
 //  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
 //  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 //  - random error if the execution failed
-// The function is not thread-safe.
-func (s *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
-	index, ok := s.idToIndex[signerID]
+// The function is thread-safe.
+func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
+	w.lock.RLock()
+	index, ok := w.idToIndex[signerID]
 	if !ok {
 		return engine.NewInvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
 	}
-	ok, err := s.SignatureAggregatorSameMessage.Verify(index, sig)
+	w.lock.RUnlock()
+
+	ok, err := w.SignatureAggregatorSameMessage.Verify(index, sig)
 	if err != nil {
 		return fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
 	}
@@ -85,50 +88,53 @@ func (s *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 //  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
 //  - engine.DuplicatedEntryError if the signer has been already added
 // The function is thread-safe.
-func (s *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
+func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
+
+	// read data
+	w.lock.RLock()
+
 	// get the total weight safely
-	collectedWeight := s.TotalWeight()
+	collectedWeight := w.totalWeight
 
-	// get the index
-	index, ok := s.idToIndex[signerID]
-	if !ok {
-		return collectedWeight, engine.NewInvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
-	}
-	// get the weight
-	weight, ok := s.idToWeights[signerID]
-	if !ok {
-		return collectedWeight, engine.NewInvalidInputErrorf("couldn't find signerID %s in the weight map", signerID)
-	}
+	// get index and weight
+	index, idOk := w.idToIndex[signerID]
+	weight, weightOk := w.idToWeights[signerID]
+	newCollectedWeight := collectedWeight + weight
 
-	// atomically update the signatures pool and the total weight
-	s.lock.Lock()
-	defer s.lock.Unlock()
+	if !(idOk && weightOk) {
+		w.lock.RUnlock()
+		return collectedWeight, engine.NewInvalidInputErrorf("couldn't find signerID %s in the map", signerID)
+	}
 
 	// check for double-voters.
-	_, ok = s.collectedIDs[signerID]
+	_, ok := w.collectedIDs[signerID]
 	if ok {
+		w.lock.RUnlock()
 		return collectedWeight, engine.NewDuplicatedEntryErrorf("SigneID %s was already added", signerID)
 	}
+	w.lock.RUnlock()
 
-	err := s.SignatureAggregatorSameMessage.TrustedAdd(index, sig)
+	// atomically update the signatures pool and the total weight
+	w.lock.Lock()
+	defer w.lock.Unlock()
+
+	err := w.SignatureAggregatorSameMessage.TrustedAdd(index, sig)
 	if err != nil {
 		return collectedWeight, fmt.Errorf("Trusted add has failed: %w", err)
 	}
 
-	s.collectedIDs[signerID] = struct{}{}
-	collectedWeight += weight
-	s.totalWeight = collectedWeight
-	return collectedWeight, nil
+	w.collectedIDs[signerID] = struct{}{}
+	w.totalWeight = newCollectedWeight
+	return w.totalWeight, nil
 }
 
 // TotalWeight returns the total weight presented by the collected signatures.
 //
 // The function is thread-safe
-func (s *WeightedSignatureAggregator) TotalWeight() uint64 {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-	collectedWeight := s.totalWeight
-	return collectedWeight
+func (w *WeightedSignatureAggregator) TotalWeight() uint64 {
+	w.lock.RLock()
+	defer w.lock.RUnlock()
+	return w.totalWeight
 }
 
 // Aggregate aggregates the signatures and returns the aggregated signature.
@@ -140,18 +146,18 @@ func (s *WeightedSignatureAggregator) TotalWeight() uint64 {
 //
 // TODO : When compacting the list of signers, update the return from []flow.Identifier
 // to a compact bit vector.
-func (s *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
+func (w *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, error) {
+	w.lock.Lock()
+	defer w.lock.Unlock()
 
 	// Aggregate includes the safety check of the aggregated signature
-	indices, aggSignature, err := s.SignatureAggregatorSameMessage.Aggregate()
+	indices, aggSignature, err := w.SignatureAggregatorSameMessage.Aggregate()
 	if err != nil {
 		return nil, nil, fmt.Errorf("Aggregate has failed: %w", err)
 	}
 	signerIDs := make([]flow.Identifier, 0, len(indices))
-	for _, i := range indices {
-		signerIDs = append(signerIDs, s.signers[i].NodeID)
+	for _, index := range indices {
+		signerIDs = append(signerIDs, w.signers[index].NodeID)
 	}
 
 	return signerIDs, aggSignature, nil
