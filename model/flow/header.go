@@ -91,7 +91,7 @@ func (h Header) ID() Identifier {
 
 	// unlock at the return
 	defer mutexHeader.Unlock()
-	
+
 	// compare these elements individually
 	if prevHeader.ParentVoterIDs != nil &&
 		prevHeader.ParentVoterSigData != nil &&
@@ -100,7 +100,7 @@ func (h Header) ID() Identifier {
 		len(h.ParentVoterSigData) == len(prevHeader.ParentVoterSigData) &&
 		len(h.ProposerSigData) == len(prevHeader.ProposerSigData) {
 		bNotEqual := false
-		
+
 		for i, v := range h.ParentVoterIDs {
 			if v == prevHeader.ParentVoterIDs[i] {
 				continue
