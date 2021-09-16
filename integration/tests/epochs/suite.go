@@ -6,6 +6,7 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/integration/utils"
 
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -100,15 +101,54 @@ func (s *Suite) TearDownTest() {
 }
 
 //@TODO add util func to stake a node during integration test
-func (s *Suite) StakeNode(role flow.Role) (sdk.Address, error) {
-	ctx := context.Background()
-	tokenAmount, err := s.client.TokenAmountByRole(role.String())
+func (s *Suite) StakeNode(role flow.Role) {
+	networkingKey, _ := s.generateAccountKeys()
+
+	fullAccountKey := sdk.NewAccountKey().
+		SetPublicKey(networkingKey.PublicKey()).
+		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	stakingAccountAddress, err := s.createNewLeaseAccount(fullAccountKey)
 	require.NoError(s.T(), err)
-	fmt.Println(tokenAmount)
+
+	result, err := s.transferLeaseTokens(role, stakingAccountAddress)
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), result.Error)
+
+	stakingAccount, err := s.client.GetAccount(stakingAccountAddress)
+	require.NoError(s.T(), err)
+
+	_, err = s.createStakingCollection(networkingKey, stakingAccount)
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), result.Error)
+}
+
+func (s *Suite) generateAccountKeys() (sdkcrypto.PrivateKey, sdkcrypto.PrivateKey) {
+	//@TODO generate staking account key
+	stakingAccountKey, err := unittest.NetworkingKey()
+
+	//@TODO generate key for machine account
+	stakingAccountKey, err := unittest.StakingKey()
+
+	networkingKey, err := unittest.NetworkingKey()
+	require.NoError(s.T(), err)
+
+	stakingKey, err := unittest.StakingKey()
+	require.NoError(s.T(), err)
+
+	return networkingKey, stakingKey
+}
+
+// creates a new lease account, can be used to test staking
+func (s *Suite) createNewLeaseAccount(fullAccountKey *sdk.AccountKey) (sdk.Address, error) {
+	ctx := context.Background()
 
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
+
 	makeLeaseAcctTx := utils.MakeCreateLocalnetLeaseAccountWithKey(
-		s.client.Accountkey(),
+		fullAccountKey,
 		s.client.Account(),
 		0,
 		sdk.Identifier(latestBlockID),
@@ -120,12 +160,66 @@ func (s *Suite) StakeNode(role flow.Role) (sdk.Address, error) {
 	result, err := s.client.WaitForSealed(ctx, makeLeaseAcctTx.ID())
 	require.NoError(s.T(), err)
 
-	stakingAccount, found := s.client.UserAddress(result)
+	stakingAccountAddress, found := s.client.UserAddress(result)
 	if !found {
 		return sdk.Address{}, fmt.Errorf("failed to stake node, could not create locked token account")
 	}
 
-	fmt.Println(stakingAccount)
+	return stakingAccountAddress, nil
+}
 
-	return stakingAccount, nil
+// transfers tokens to a lease account from the localnet service account
+func (s *Suite) transferLeaseTokens(role flow.Role, to sdk.Address) (*sdk.TransactionResult, error) {
+	ctx := context.Background()
+	tokenAmount, err := s.client.TokenAmountByRole(role.String())
+	require.NoError(s.T(), err)
+	fmt.Println(tokenAmount)
+
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
+
+	transferLeaseTokenTx, err := utils.MakeTransferLeaseToken(
+		to,
+		s.client.Account(),
+		0,
+		tokenAmount,
+		sdk.Identifier(latestBlockID),
+	)
+
+	err = s.client.SignAndSendTransaction(ctx, transferLeaseTokenTx)
+	require.NoError(s.T(), err)
+
+	result, err := s.client.WaitForSealed(ctx, transferLeaseTokenTx.ID())
+	require.NoError(s.T(), err)
+
+	return result, nil
+}
+
+// creates a staking collection for the given node
+func (s *Suite) createStakingCollection(accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account) (*sdk.TransactionResult, error) {
+	ctx := context.Background()
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
+
+	env := utils.EnvFromNetwork("localnet")
+
+	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+	require.NoError(s.T(), err)
+
+	createStakingCollectionTx, err := utils.MakeCreateStakingCollectionTx(
+		env,
+		stakingAccount,
+		0,
+		signer,
+		s.client.SDKServiceAddress(),
+		sdk.Identifier(latestBlockID),
+	)
+
+	err = s.client.SignAndSendTransaction(ctx, createStakingCollectionTx)
+	require.NoError(s.T(), err)
+
+	result, err := s.client.WaitForSealed(ctx, createStakingCollectionTx.ID())
+	require.NoError(s.T(), err)
+
+	return result, nil
 }

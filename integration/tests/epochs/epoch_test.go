@@ -2,7 +2,6 @@ package epochs
 
 import (
 	"context"
-	"fmt"
 	"github.com/stretchr/testify/suite"
 	"testing"
 
@@ -73,8 +72,7 @@ func (s *Suite) TestViewsProgress() {
 		phaseChecks = append(phaseChecks, epochViews...)
 	}
 
-	addr , err := s.StakeNode(flow.RoleConsensus)
-	require.NoError(s.T(), err)
+	s.StakeNode(flow.RoleConsensus)
 
 	s.net.StopContainers()
 
@@ -126,6 +124,4 @@ func (s *Suite) TestViewsProgress() {
 			assert.Equal(s.T(), v.phase, item.phase, "wrong phase at view %d", v.finalView)
 		}
 	}
-
-	fmt.Println("NEW-STAKING-ACCOUNT", addr)
 }

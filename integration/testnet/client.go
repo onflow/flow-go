@@ -268,3 +268,13 @@ func (c *Client) TokenAmountByRole(role string) (string, error) {
 
 	return "", fmt.Errorf("could not get token amount by role: %v", role)
 }
+
+func (c *Client) GetAccount(accountAddress sdk.Address) (*sdk.Account, error) {
+	ctx := context.Background()
+	account, err := c.client.GetAccount(ctx, accountAddress)
+	if err != nil {
+		return nil, fmt.Errorf("could not get service account: %w", err)
+	}
+
+	return account, nil
+}
