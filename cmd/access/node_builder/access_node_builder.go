@@ -110,9 +110,9 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 		collectionGRPCPort: 9000,
 		executionGRPCPort:  9000,
 		rpcConf: rpc.Config{
-			UnsecureGRPCListenAddr:    "localhost:9000",
-			SecureGRPCListenAddr:      "localhost:9001",
-			HTTPListenAddr:            "localhost:8000",
+			UnsecureGRPCListenAddr:    "0.0.0.0:9000",
+			SecureGRPCListenAddr:      "0.0.0.0:9001",
+			HTTPListenAddr:            "0.0.0.0:8000",
 			CollectionAddr:            "",
 			HistoricalAccessAddrs:     "",
 			CollectionClientTimeout:   3 * time.Second,
@@ -472,10 +472,13 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 
 			anb.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Results, node.Storage.Receipts, anb.TransactionMetrics,
 				anb.CollectionsToMarkFinalized, anb.CollectionsToMarkExecuted, anb.BlocksToMarkExecuted, anb.RpcEng)
+			if err != nil {
+				return nil, err
+			}
 			anb.RequestEng.WithHandle(anb.IngestEng.OnCollection)
 			anb.FinalizationDistributor.AddConsumer(anb.IngestEng)
 
-			return anb.IngestEng, err
+			return anb.IngestEng, nil
 		}).
 		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
@@ -570,29 +573,6 @@ func (builder *FlowAccessNodeBuilder) extraFlags() {
 		flags.StringSliceVar(&builder.bootstrapNodePublicKeys, "bootstrap-node-public-keys", defaultConfig.bootstrapNodePublicKeys, "the networking public key of the bootstrap access node if this is an unstaked access node (in the same order as the bootstrap node addresses) e.g. \"d57a5e9c5.....\",\"44ded42d....\"")
 		flags.BoolVar(&builder.supportsUnstakedFollower, "supports-unstaked-node", defaultConfig.supportsUnstakedFollower, "true if this staked access node supports unstaked node")
 	})
-}
-
-// initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update
-// interval, and validators. The network.Middleware is then passed into the initNetwork function.
-func (builder *FlowAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
-	networkMetrics module.NetworkMetrics,
-	factoryFunc p2p.LibP2PFactoryFunc,
-	validators ...network.MessageValidator) network.Middleware {
-	builder.Middleware = p2p.NewMiddleware(
-		builder.Logger,
-		factoryFunc,
-		nodeID,
-		networkMetrics,
-		builder.RootBlock.ID().String(),
-		time.Hour, // TODO: this is pretty meaningless since there is no peermanager in play.
-		p2p.DefaultUnicastTimeout,
-		false, // no connection gating for the unstaked network
-		false, // no peer management for the unstaked network (peer discovery will be done via LibP2P discovery mechanism)
-		builder.IDTranslator,
-		p2p.WithMessageValidators(validators...),
-		// use default identifier provider
-	)
-	return builder.Middleware
 }
 
 // initNetwork creates the network.Network implementation with the given metrics, middleware, initial list of network

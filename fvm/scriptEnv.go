@@ -661,70 +661,44 @@ func (e *ScriptEnv) ImplementationDebugLog(message string) error {
 	return nil
 }
 
-func (e *ScriptEnv) ProgramParsed(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceParseProgram, duration,
-			[]opentracing.LogRecord{
-				{Timestamp: time.Now(),
-					Fields: []traceLog.Field{traceLog.String("location", locStr)},
-				},
-			},
-		)
+func (e *ScriptEnv) RecordTrace(operation string, location common.Location, duration time.Duration, logs []opentracing.LogRecord) {
+	if !e.isTraceable() {
+		return
 	}
+	if location != nil {
+		if logs == nil {
+			logs = make([]opentracing.LogRecord, 0)
+		}
+		logs = append(logs, opentracing.LogRecord{Timestamp: time.Now(),
+			Fields: []traceLog.Field{traceLog.String("location", location.String())},
+		})
+	}
+	spanName := trace.FVMCadenceTrace.Child(operation)
+	e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, spanName, duration, logs)
+}
+
+func (e *ScriptEnv) ProgramParsed(location common.Location, duration time.Duration) {
+	e.RecordTrace("parseProgram", location, duration, nil)
 	e.metrics.ProgramParsed(location, duration)
 }
 
 func (e *ScriptEnv) ProgramChecked(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceCheckProgram, duration,
-			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", locStr)},
-			},
-			},
-		)
-	}
+	e.RecordTrace("checkProgram", location, duration, nil)
 	e.metrics.ProgramChecked(location, duration)
 }
 
 func (e *ScriptEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceInterpretProgram, duration,
-			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", locStr)},
-			},
-			},
-		)
-	}
+	e.RecordTrace("interpretProgram", location, duration, nil)
 	e.metrics.ProgramInterpreted(location, duration)
 }
 
 func (e *ScriptEnv) ValueEncoded(duration time.Duration) {
-	if e.isTraceable() {
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceEncodeValue, duration,
-			[]opentracing.LogRecord{},
-		)
-	}
+	e.RecordTrace("encodeValue", nil, duration, nil)
 	e.metrics.ValueEncoded(duration)
 }
 
 func (e *ScriptEnv) ValueDecoded(duration time.Duration) {
-	if e.isTraceable() {
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceDecodeValue, duration,
-			[]opentracing.LogRecord{},
-		)
-	}
+	e.RecordTrace("decodeValue", nil, duration, nil)
 	e.metrics.ValueDecoded(duration)
 }
 
