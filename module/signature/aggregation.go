@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	//"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -24,11 +23,11 @@ import (
 // make sure the calls are concurrent safe.
 type SignatureAggregatorSameMessage struct {
 	// TODO: initial incomplete fields that will evolve
-	message       []byte
+	/*message       []byte
 	hasher        hash.Hasher
 	n             int                      // number of participants indexed from 0 to n-1
 	publicKeys    []crypto.PublicKey       // keys indexed from 0 to n-1, signer i is assigned to public key i
-	idToSignature map[int]crypto.Signature // signatures indexed by the signer index
+	idToSignature map[int]crypto.Signature // signatures indexed by the signer index*/
 }
 
 // NewSignatureAggregatorSameMessage returns a new SignatureAggregatorSameMessage structure.
@@ -43,7 +42,6 @@ func NewSignatureAggregatorSameMessage(
 	publicKeys []crypto.PublicKey, // public keys of participants agreed upon upfront
 ) (*SignatureAggregatorSameMessage, error) {
 	panic("implement me")
-	return &SignatureAggregatorSameMessage{}, nil
 }
 
 // Verify verifies the input signature under the stored message and stored
