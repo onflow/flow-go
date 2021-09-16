@@ -74,9 +74,9 @@ func (h Header) Fingerprint() []byte {
 	return fingerprint.Fingerprint(h.Body())
 }
 
-var mutex_hdr sync.Mutex
-var previd_hdr Identifier
-var prev_hdr Header
+var mutexHeader sync.Mutex
+var previdHeader Identifier
+var prevHeader Header
 
 // ID returns a unique ID to singularly identify the header and its block
 // within the flow system.
@@ -87,25 +87,22 @@ func (h Header) ID() Identifier {
 		h.Timestamp = h.Timestamp.UTC()
 	}
 
-	mutex_hdr.Lock()
+	mutexHeader.Lock()
 
 	// unlock at the return
-	defer mutex_hdr.Unlock()
-
-	for {
-		// compare these elements individually
-		if prev_hdr.ParentVoterIDs == nil ||
-			prev_hdr.ParentVoterSigData == nil ||
-			prev_hdr.ProposerSigData == nil ||
-			len(h.ParentVoterIDs) != len(prev_hdr.ParentVoterIDs) ||
-			len(h.ParentVoterSigData) != len(prev_hdr.ParentVoterSigData) ||
-			len(h.ProposerSigData) != len(prev_hdr.ProposerSigData) {
-			break
-		}
+	defer mutexHeader.Unlock()
+	
+	// compare these elements individually
+	if prevHeader.ParentVoterIDs != nil &&
+		prevHeader.ParentVoterSigData != nil &&
+		prevHeader.ProposerSigData != nil &&
+		len(h.ParentVoterIDs) == len(prevHeader.ParentVoterIDs) &&
+		len(h.ParentVoterSigData) == len(prevHeader.ParentVoterSigData) &&
+		len(h.ProposerSigData) == len(prevHeader.ProposerSigData) {
 		bNotEqual := false
 		if len(h.ParentVoterIDs) > 0 {
 			for i, v := range h.ParentVoterIDs {
-				if v == prev_hdr.ParentVoterIDs[i] {
+				if v == prevHeader.ParentVoterIDs[i] {
 					continue
 				}
 				bNotEqual = true
@@ -114,29 +111,27 @@ func (h Header) ID() Identifier {
 		}
 
 		if !bNotEqual &&
-			h.ChainID == prev_hdr.ChainID &&
-			h.Timestamp == prev_hdr.Timestamp &&
-			h.Height == prev_hdr.Height &&
-			h.ParentID == prev_hdr.ParentID &&
-			h.View == prev_hdr.View &&
-			h.PayloadHash == prev_hdr.PayloadHash &&
-			bytes.Equal(h.ProposerSigData, prev_hdr.ProposerSigData) &&
-			bytes.Equal(h.ParentVoterSigData, prev_hdr.ParentVoterSigData) &&
-			h.ProposerID == prev_hdr.ProposerID {
+			h.ChainID == prevHeader.ChainID &&
+			h.Timestamp == prevHeader.Timestamp &&
+			h.Height == prevHeader.Height &&
+			h.ParentID == prevHeader.ParentID &&
+			h.View == prevHeader.View &&
+			h.PayloadHash == prevHeader.PayloadHash &&
+			bytes.Equal(h.ProposerSigData, prevHeader.ProposerSigData) &&
+			bytes.Equal(h.ParentVoterSigData, prevHeader.ParentVoterSigData) &&
+			h.ProposerID == prevHeader.ProposerID {
 
 			// cache hit, return the previous identifier
-			return previd_hdr
+			return previdHeader
 		}
-		// exit the for loop
-		break
 	}
 
-	previd_hdr = MakeID(h)
+	previdHeader = MakeID(h)
 
 	// store a reference to the Header entity data
-	prev_hdr = h
+	prevHeader = h
 
-	return previd_hdr
+	return previdHeader
 }
 
 // Checksum returns the checksum of the header.
