@@ -140,23 +140,28 @@ func (m *MutableState) Extend(candidate *flow.Block) error {
 	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtend)
 	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtend)
 
+	fmt.Println("before header extend, payload hash: ", candidate.Header.PayloadHash)
+
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("header does not compliance the chain state: %w", err)
 	}
+	fmt.Println("after header extend for block", candidate.Header.Height, "payload hash: ", candidate.Header.PayloadHash)
 
 	// check if the guarantees in the payload is a valid extension of the finalized state
 	err = m.guaranteeExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("guarantee does not compliance the chain state: %w", err)
 	}
+	fmt.Println("after guarantee extend for block", candidate.Header.Height, "payload hash: ", candidate.Header.PayloadHash)
 
 	// check if the receipts in the payload are valid
 	err = m.receiptExtend(candidate)
 	if err != nil {
 		return fmt.Errorf("payload receipts not compliant with chain state: %w", err)
 	}
+	fmt.Println("after receipt extend for block", candidate.Header.Height, "payload hash: ", candidate.Header.PayloadHash)
 
 	// check if the seals in the payload is a valid extension of the finalized
 	// state
@@ -164,12 +169,14 @@ func (m *MutableState) Extend(candidate *flow.Block) error {
 	if err != nil {
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
+	fmt.Println("after seal extend for block", candidate.Header.Height, "payload hash: ", candidate.Header.PayloadHash)
 
 	// insert the block and index the last seal for the block
 	err = m.insert(candidate, lastSeal)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
 	}
+	fmt.Println("after insert for block", candidate.Header.Height, "payload hash: ", candidate.Header.PayloadHash)
 
 	return nil
 }
