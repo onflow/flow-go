@@ -92,11 +92,11 @@ func TestResolver_Error(t *testing.T) {
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 
+	unittest.RequireCloseBefore(t, resolver.Done(), 10*time.Millisecond, "could not stop dns resolver on time")
+
 	// since resolving hits an error, cache is invalidated.
 	require.Empty(t, resolver.c.ipCache)
 	require.Empty(t, resolver.c.txtCache)
-
-	unittest.RequireCloseBefore(t, resolver.Done(), 10*time.Millisecond, "could not stop dns resolver on time")
 }
 
 // TestResolver_Expired_Invalidated evaluates that when resolver is queried for an expired entry, it returns the expired one, but queries async on the
@@ -127,11 +127,11 @@ func TestResolver_Expired_Invalidated(t *testing.T) {
 	unittest.RequireReturnsBefore(t, queryWG.Wait, 1*time.Second, "could not perform all queries on time")
 	unittest.RequireReturnsBefore(t, resolverWG.Wait, 1*time.Second, "could not resolve all expected domains")
 
+	unittest.RequireCloseBefore(t, resolver.Done(), 10*time.Millisecond, "could not stop dns resolver on time")
+
 	// since resolving hits an error, cache is invalidated.
 	require.Empty(t, resolver.c.ipCache)
 	require.Empty(t, resolver.c.txtCache)
-
-	unittest.RequireCloseBefore(t, resolver.Done(), 10*time.Millisecond, "could not stop dns resolver on time")
 }
 
 type ipLookupTestCase struct {
