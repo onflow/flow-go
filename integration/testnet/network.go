@@ -473,7 +473,6 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		require.NoError(t, err)
 	}
 
-
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
 
 	// add each follower to the network
@@ -506,7 +505,6 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	// bootstrap/public-root-information directory
 	err = rootProtocolJsonWithoutAddresses(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
-
 
 	// consensus follower
 	bindPort := testingdock.RandomPort(t)
