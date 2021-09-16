@@ -245,7 +245,10 @@ func (s *ClientSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
 	// convert node identifiers to candece.Value to be passed in as TX argument
 	valueNodeIDs := make([]cadence.Value, 0, len(nodeIDs))
 	for _, nodeID := range nodeIDs {
-		cdcNodeID := cadence.NewString(nodeID.String())
+		cdcNodeID, err := cadence.NewString(nodeID.String())
+		if err != nil {
+			panic(err)
+		}
 		valueNodeIDs = append(valueNodeIDs, cdcNodeID)
 	}
 
@@ -285,7 +288,10 @@ func (s *ClientSuite) createParticipant(nodeID flow.Identifier, authoriser sdk.A
 	err := createParticipantTx.AddArgument(cadence.NewAddress(s.dkgAddress))
 	require.NoError(s.T(), err)
 
-	cdcNodeID := cadence.NewString(nodeID.String())
+	cdcNodeID, err := cadence.NewString(nodeID.String())
+	if err != nil {
+		panic(err)
+	}
 	err = createParticipantTx.AddArgument(cdcNodeID)
 	require.NoError(s.T(), err)
 

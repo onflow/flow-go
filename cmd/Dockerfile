@@ -5,9 +5,7 @@ FROM golang:1.15-buster AS build-setup
 
 RUN apt-get update
 RUN apt-get -y install cmake zip sudo
-
-RUN export GOPRIVATE=github.com/onflow/atree
-
+# add the pubkey of github.com to knownhosts, so ssh-agent doesn't bark
 RUN mkdir -p /root/.ssh && ssh-keyscan -t rsa github.com >> /root/.ssh/known_hosts
 RUN git config --global 'url.ssh://git@github.com/.insteadof' https://github.com/
 
@@ -17,11 +15,14 @@ FROM build-setup AS build-relic
 RUN mkdir /build
 WORKDIR /build
 
-# Copy over the crypto package
-COPY crypto ./crypto
+# Copy over *only* files necessary for Relic
+COPY crypto/relic ./relic
+COPY crypto/relic_build.sh .
 
 # Build Relic (this places build artifacts in /build/relic/build)
-RUN cd ./crypto/ && go generate
+# NOTE: The Relic build script uses Bash-specific features, so we explicitly run
+# it with bash rather than the default shell.
+RUN bash ./relic_build.sh
 
 ## (2) Build the app binary
 FROM build-setup AS build-env
@@ -37,7 +38,7 @@ ARG VERSION
 COPY . .
 
 # Copy over Relic build artifacts
-COPY --from=build-relic /build/crypto/relic/build ./crypto/relic/build
+COPY --from=build-relic /build/relic/build ./crypto/relic/build
 
 FROM build-env as build-production
 WORKDIR /app
