@@ -334,7 +334,7 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	spew.Config.DisableMethods = true
 	spew.Config.DisablePointerMethods = true
 
-	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXESaveExecutionResults)
+	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXEStatePersistExecutionState)
 	defer span.Finish()
 
 	blockID := header.ID()
@@ -346,7 +346,6 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	// but it's the closes thing to atomicity we could have
 	batch := badgerstorage.NewBatch(s.db)
 
-	sp, _ := s.tracer.StartSpanFromContext(ctx, trace.EXEPersistChunkDataPack)
 	for _, chunkDataPack := range chunkDataPacks {
 		err := s.chunkDataPacks.BatchStore(chunkDataPack, batch)
 		if err != nil {
@@ -358,19 +357,13 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 			return fmt.Errorf("cannot index chunk data pack by blockID: %w", err)
 		}
 	}
-	sp.Finish()
 
-	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistStateCommitment)
 	err := s.commits.BatchStore(blockID, endState, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store state commitment: %w", err)
 	}
-	sp.Finish()
-
-	sp, _ = s.tracer.StartSpanFromContext(ctx, trace.EXEPersistEvents)
 
 	err = s.events.BatchStore(blockID, events, batch)
-
 	if err != nil {
 		return fmt.Errorf("cannot store events: %w", err)
 	}
@@ -379,15 +372,13 @@ func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, 
 	if err != nil {
 		return fmt.Errorf("cannot store service events: %w", err)
 	}
-	sp.Finish()
-
-	executionResult := &executionReceipt.ExecutionResult
 
 	err = s.transactionResults.BatchStore(blockID, results, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store transaction result: %w", err)
 	}
 
+	executionResult := &executionReceipt.ExecutionResult
 	err = s.results.BatchStore(executionResult, batch)
 	if err != nil {
 		return fmt.Errorf("cannot store execution result: %w", err)

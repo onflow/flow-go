@@ -93,8 +93,8 @@ func (e *blockComputer) ExecuteBlock(
 
 	span, _, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
 	if isSampled {
-		span.SetTag("block.collectioncount", len(block.CompleteCollections))
-		span.LogFields(log.String("block.hash", block.ID().String()))
+		span.LogFields(log.Int("collection_counts", len(block.CompleteCollections)))
+		span.LogFields(log.String("block_id", block.ID().String()))
 	}
 	defer span.Finish()
 

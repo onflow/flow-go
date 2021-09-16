@@ -804,8 +804,10 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 // check if any of these block becomes executable and execute it if
 // is.
 func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
-
 	collID := collection.ID()
+
+	span, _, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
+	defer span.Finish()
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
@@ -1058,6 +1060,9 @@ func (e *Engine) handleComputationResult(
 	result *execution.ComputationResult,
 	startState flow.StateCommitment,
 ) (flow.StateCommitment, *flow.ExecutionReceipt, error) {
+
+	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEHandleComputationResult)
+	defer span.Finish()
 
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).

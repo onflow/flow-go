@@ -79,12 +79,11 @@ const (
 	// Execution Node
 	//
 
-	EXEHandleBlock            SpanName = "exe.ingestion.handleBlock"
-	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
-	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
-	EXESaveExecutionReceipt   SpanName = "exe.ingestion.saveExecutionReceipt"
-	EXESaveTransactionResults SpanName = "exe.ingestion.saveTransactionResults"
-	EXESaveTransactionEvents  SpanName = "exe.ingestion.saveTransactionEvents"
+	EXEHandleBlock             SpanName = "exe.ingestion.handleBlock"
+	EXEHandleCollection        SpanName = "exe.ingestion.handleCollection"
+	EXEHandleComputationResult SpanName = "exe.ingestion.handleComputationResult"
+	EXEExecuteBlock            SpanName = "exe.ingestion.executeBlock"
+	EXESaveExecutionResults    SpanName = "exe.ingestion.saveExecutionResults"
 
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
@@ -95,17 +94,12 @@ const (
 	EXERunTransaction          SpanName = "exe.computer.runTransaction"
 	EXEMergeTransactionView    SpanName = "exe.computer.mergeTransactionView"
 
+	EXEStatePersistExecutionState         SpanName = "exe.state.persistExecutionState"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
-	EXEGenerateChunkDataPacks             SpanName = "exe.state.generateChunkDataPacks"
 	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
 	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
-	EXEPersistStateCommitment             SpanName = "exe.state.persistStateCommitment"
-	EXEPersistEvents                      SpanName = "exe.state.persistEvents"
-	EXEPersistChunkDataPack               SpanName = "exe.state.persistChunkDataPack"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
-	EXEPersistExecutionResult             SpanName = "exe.state.persistExecutionResult"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
-	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
 	EXEHashEvents                         SpanName = "exe.state.hashEvents"
 
 	// Verification node
