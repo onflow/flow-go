@@ -55,5 +55,5 @@ stop:
 
 .PHONY: load
 load:
-	go run --tags relic ../loader -log-level info -tps 1,0,10,0,100 -tps-durations 30s,10s,30s,10s
+	go run --tags relic ../loader -log-level info -tps 10,0,10,0 -tps-durations 120s,10s,120s,10s
 
