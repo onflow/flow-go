@@ -17,6 +17,10 @@ import (
 
 type SpanName string
 
+func (s SpanName) Child(subOp string) SpanName {
+	return SpanName(string(s) + "." + subOp)
+}
+
 // OpenTracer is the implementation of the Tracer interface
 type OpenTracer struct {
 	opentracing.Tracer
