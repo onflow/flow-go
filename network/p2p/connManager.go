@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 )
 
 // TagLessConnManager is a companion interface to libp2p-core.connmgr.ConnManager which implements a (simplified) tagless variant of the Protect / Unprotect logic
@@ -37,9 +38,19 @@ type ConnManager struct {
 	streamSetupInProgressCnt map[peer.ID]int
 	// mutex for the stream setup map
 	streamSetupMapLk sync.RWMutex
+
+	idProvider id.IdentityProvider
 }
 
-func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics) *ConnManager {
+type ConnManagerOption func(*ConnManager)
+
+func TrackUnstakedConnections(idProvider id.IdentityProvider) ConnManagerOption {
+	return func(cm *ConnManager) {
+		cm.idProvider = idProvider
+	}
+}
+
+func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics, opts ...ConnManagerOption) *ConnManager {
 	cn := &ConnManager{
 		log:                      log,
 		NullConnMgr:              connmgr.NullConnMgr{},
@@ -51,6 +62,11 @@ func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics) *ConnMana
 		ConnectedF:    cn.Connected,
 		DisconnectedF: cn.Disconnected}
 	cn.n = n
+
+	for _, opt := range opts {
+		opt(cn)
+	}
+
 	return cn
 }
 
@@ -83,19 +99,43 @@ func (c *ConnManager) Disconnected(n network.Network, con network.Conn) {
 }
 
 func (c *ConnManager) updateConnectionMetric(n network.Network) {
-	var inbound uint = 0
-	var outbound uint = 0
+	var stakedInbound uint = 0
+	var stakedOutbound uint = 0
+	var totalInbound uint = 0
+	var totalOutbound uint = 0
+
+	stakedPeers := make(map[peer.ID]struct{})
+	if c.idProvider != nil {
+		for _, id := range c.idProvider.Identities(NotEjectedFilter) {
+			pid, err := ExtractPeerID(id.NetworkPubKey)
+			if err != nil {
+				c.log.Fatal().Err(err).Msg("failed to convert network public key of staked node to peer ID")
+			}
+			stakedPeers[pid] = struct{}{}
+		}
+	}
 	for _, conn := range n.Conns() {
+		_, isStaked := stakedPeers[conn.RemotePeer()]
 		switch conn.Stat().Direction {
 		case network.DirInbound:
-			inbound++
+			totalInbound++
+			if isStaked {
+				stakedInbound++
+			}
 		case network.DirOutbound:
-			outbound++
+			totalOutbound++
+			if isStaked {
+				stakedOutbound++
+			}
 		}
 	}
 
-	c.metrics.InboundConnections(inbound)
-	c.metrics.OutboundConnections(outbound)
+	c.metrics.InboundConnections(totalInbound)
+	c.metrics.OutboundConnections(totalOutbound)
+	if c.idProvider != nil {
+		c.metrics.UnstakedInboundConnections(totalInbound - stakedInbound)
+		c.metrics.UnstakedOutboundConnections(totalOutbound - stakedOutbound)
+	}
 }
 
 func (c *ConnManager) logConnectionUpdate(n network.Network, con network.Conn, logMsg string) {
