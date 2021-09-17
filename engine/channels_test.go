@@ -59,7 +59,7 @@ func TestGetChannelByRole(t *testing.T) {
 	// - TestMetric
 	// the roles list should contain collection and consensus roles
 	topics := ChannelsByRole(flow.RoleVerification)
-	assert.Len(t, topics, 7)
+	assert.Len(t, topics, 8)
 	assert.Contains(t, topics, PushBlocks)
 	assert.Contains(t, topics, PushReceipts)
 	assert.Contains(t, topics, PushApprovals)
