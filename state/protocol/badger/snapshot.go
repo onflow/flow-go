@@ -408,7 +408,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	// CASE 2: for any other block, use any valid child
 	child, err := s.validChild()
 	if err != nil {
-		return nil, fmt.Errorf("could not get valid child of block %x: %w", s.blockID, err)
+		return nil, fmt.Errorf("failed to get valid child of block %x: %w", s.blockID, err)
 	}
 
 	seed, err := seed.FromParentSignature(indices, child.ParentVoterSigData)
