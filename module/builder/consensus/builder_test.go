@@ -630,23 +630,23 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	bs.sealDB.On("ByBlockID", b4.ID()).Return(b0seal, nil)
 	bs.build.seals = bs.sealDB
 
-	// Build on top of B4 and check that no seals are included
-	_, err := bs.build.BuildOn(b4.ID(), bs.setter)
-	bs.Require().NoError(err)
-	bs.recPool.AssertExpectations(bs.T())
-	bs.Assert().Empty(bs.assembled.Seals, "should not included any seals")
+	bs.T().Run("Build on top of B4 and check that no seals are included", func(t *testing.T) {
+		_, err := bs.build.BuildOn(b4.ID(), bs.setter)
+		bs.Require().NoError(err)
+		bs.recPool.AssertExpectations(bs.T())
+		bs.Assert().Empty(bs.assembled.Seals, "should not included any seals")
+	})
 
-	// Build on top of B5 and check that seals for B1 is included
+	bs.T().Run("Build on top of B5 and check that seals for B1 is included", func(t *testing.T) {
+		b5 := unittest.BlockWithParentFixture(b4.Header) // creating block b5
+		bs.storeBlock(&b5)
 
-	// Add B5 and check that no seals are included
-	b5 := unittest.BlockWithParentFixture(b4.Header)
-	bs.storeBlock(&b5)
-
-	_, err = bs.build.BuildOn(b5.ID(), bs.setter)
-	bs.Require().NoError(err)
-	bs.recPool.AssertExpectations(bs.T())
-	bs.Assert().Equal(1, len(bs.assembled.Seals), "only seal for B1 expected")
-	bs.Require().Equal(b1seal.Seal, bs.assembled.Seals[0])
+		_, err := bs.build.BuildOn(b5.ID(), bs.setter)
+		bs.Require().NoError(err)
+		bs.recPool.AssertExpectations(bs.T())
+		bs.Assert().Equal(1, len(bs.assembled.Seals), "only seal for B1 expected")
+		bs.Require().Equal(b1seal.Seal, bs.assembled.Seals[0])
+	})
 }
 
 // TestPayloadSeals_Duplicates verifies that the builder does not duplicate seals for already sealed blocks:
