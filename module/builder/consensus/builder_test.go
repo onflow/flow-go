@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -133,9 +132,6 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 			unittest.WithBlock(&block),
 			unittest.WithPreviousResult(*previousResult),
 		)
-
-		fmt.Println("produced block: ", block.ID().String())
-		fmt.Println("adding receipt for block: ", result.BlockID.String())
 
 		bs.resultForBlock[result.BlockID] = result
 		bs.resultByID[result.ID()] = result
@@ -601,46 +597,56 @@ func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 //   (i) Builder does _not_ include seal for B1 when constructing block B5
 //  (ii) Builder _includes_ seal for B1 when constructing block B6
 func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
-	fmt.Println("")
-	fmt.Println("")
-
 	// we use bs.parentID as block B0
 	b0result := bs.resultForBlock[bs.parentID]
-	b0seal := unittest.Seal.Fixture(
-		unittest.Seal.WithResult(b0result),
-	)
+	b0seal := unittest.Seal.Fixture(unittest.Seal.WithResult(b0result))
+
+	// create blocks B1 to B4:
 	b1 := bs.createAndRecordBlock(bs.blocks[bs.parentID])
 	bchain := unittest.ChainFixtureFrom(3, b1.Header) // creates blocks b2, b3, b4
 	b4 := bchain[2]
 
 	// Incorporate result for block B1 into payload of block B4
-	fmt.Println("looking for result for block: ", b1.ID().String())
 	resultB1 := bs.resultForBlock[b1.ID()]
-
 	receiptB1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultB1))
 	b4.SetPayload(
 		flow.Payload{
 			Results:  []*flow.ExecutionResult{&receiptB1.ExecutionResult},
 			Receipts: []*flow.ExecutionReceiptMeta{receiptB1.Meta()},
 		})
-	bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
-	storeSealForIncorporatedResult(resultB1, b4.ID(), bs.pendingSeals)
 
+	// add blocks B2, B3, B4, A5 to the mocked storage layer (block b0 and b1 are already added):
 	a5 := unittest.BlockWithParentFixture(b4.Header)
 	for _, b := range append(bchain, &a5) {
 		bs.storeBlock(b)
 	}
 
+	// mock for of candidate seal mempool:
+	bs.pendingSeals = make(map[flow.Identifier]*flow.IncorporatedResultSeal)
+	b1seal := storeSealForIncorporatedResult(resultB1, b4.ID(), bs.pendingSeals)
+
+	// mock for seals storage layer:
 	bs.sealDB = &storage.Seals{}
 	bs.sealDB.On("ByBlockID", b4.ID()).Return(b0seal, nil)
 	bs.build.seals = bs.sealDB
 
+	// Build on top of B4 and check that no seals are included
 	_, err := bs.build.BuildOn(b4.ID(), bs.setter)
-	//bs.Assert().Empty(bs.assembled.Seals, "should have no guarantees in payload with empty mempool")
-
-	fmt.Println("included seals: ", len(bs.assembled.Seals))
 	bs.Require().NoError(err)
 	bs.recPool.AssertExpectations(bs.T())
+	bs.Assert().Empty(bs.assembled.Seals, "should not included any seals")
+
+	// Build on top of B5 and check that seals for B1 is included
+
+	// Add B5 and check that no seals are included
+	b5 := unittest.BlockWithParentFixture(b4.Header)
+	bs.storeBlock(&b5)
+
+	_, err = bs.build.BuildOn(b5.ID(), bs.setter)
+	bs.Require().NoError(err)
+	bs.recPool.AssertExpectations(bs.T())
+	bs.Assert().Equal(1, len(bs.assembled.Seals), "only seal for B1 expected")
+	bs.Require().Equal(b1seal.Seal, bs.assembled.Seals[0])
 }
 
 // TestPayloadSeals_Duplicates verifies that the builder does not duplicate seals for already sealed blocks:
