@@ -67,6 +67,7 @@ func TestGetChannelByRole(t *testing.T) {
 	assert.Contains(t, topics, RequestChunks)
 	assert.Contains(t, topics, TestMetrics)
 	assert.Contains(t, topics, TestNetwork)
+	assert.Contains(t, topics, SyncCommittee)
 }
 
 // TestIsClusterChannel verifies the correctness of ClusterChannel method
