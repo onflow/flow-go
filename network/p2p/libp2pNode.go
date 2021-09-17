@@ -100,6 +100,7 @@ type NodeBuilder interface {
 	SetPubsubOptions(...PubsubOption) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
 	SetDHTOptions(...dht.Option) NodeBuilder
+	SetTopicValidation(bool) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
 	SetResolver(resolver *madns.Resolver) NodeBuilder
 	Build(context.Context) (*Node, error)
@@ -117,6 +118,7 @@ type DefaultLibP2PNodeBuilder struct {
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
 	dhtOpts          []dht.Option
+	topicValidation  bool
 }
 
 func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcrypto.PrivateKey) NodeBuilder {
@@ -128,11 +130,17 @@ func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcr
 		hostMaker: func(ctx context.Context, opts ...config.Option) (host.Host, error) {
 			return DefaultLibP2PHost(ctx, address, flowKey, opts...)
 		},
+		topicValidation: true,
 	}
 }
 
 func (builder *DefaultLibP2PNodeBuilder) SetDHTOptions(opts ...dht.Option) NodeBuilder {
 	builder.dhtOpts = opts
+	return builder
+}
+
+func (builder *DefaultLibP2PNodeBuilder) SetTopicValidation(enabled bool) NodeBuilder {
+	builder.topicValidation = enabled
 	return builder
 }
 
