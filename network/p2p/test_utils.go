@@ -23,6 +23,7 @@ func createNode(
 	t *testing.T,
 	nodeID flow.Identifier,
 	networkKey crypto.PrivateKey,
+	rootBlockID flow.Identifier,
 	psOpts ...PubsubOption,
 ) *Node {
 	if len(psOpts) == 0 {

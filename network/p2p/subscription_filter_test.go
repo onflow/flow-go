@@ -26,12 +26,12 @@ func TestFilterSubscribe(t *testing.T) {
 	identity2, privateKey2 := createID(t, unittest.WithRole(flow.RoleAccess))
 	ids := flow.IdentityList{identity1, identity2}
 
-	node1 := createNode(t, identity1.NodeID, privateKey1, createSubscriptionFilterPubsubOption(t, ids))
-	node2 := createNode(t, identity2.NodeID, privateKey2, createSubscriptionFilterPubsubOption(t, ids))
+	node1 := createNode(t, identity1.NodeID, privateKey1, rootBlockID, createSubscriptionFilterPubsubOption(t, ids))
+	node2 := createNode(t, identity2.NodeID, privateKey2, rootBlockID, createSubscriptionFilterPubsubOption(t, ids))
 
 	unstakedKey, err := unittest.NetworkingKey()
 	require.NoError(t, err)
-	unstakedNode := createNode(t, flow.ZeroID, unstakedKey)
+	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, rootBlockID)
 
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
@@ -97,7 +97,7 @@ func TestFilterSubscribe(t *testing.T) {
 func TestCanSubscribe(t *testing.T) {
 	identity, privateKey := createID(t, unittest.WithRole(flow.RoleCollection))
 
-	collectionNode := createNode(t, identity.NodeID, privateKey, createSubscriptionFilterPubsubOption(t, flow.IdentityList{identity}))
+	collectionNode := createNode(t, identity.NodeID, privateKey, rootBlockID, createSubscriptionFilterPubsubOption(t, flow.IdentityList{identity}))
 	defer func() {
 		done, err := collectionNode.Stop()
 		require.NoError(t, err)
