@@ -384,16 +384,8 @@ func (c *Controller) phase3() error {
 // preStartDelay returns a duration to delay prior to starting the DKG process.
 // This prevents synchronization of the DKG starting (an expensive operation)
 // across the network, which can impact finalization.
-//
-// The delay is b*n^2 where:
-// * b is a configurable base delay
-// * n is the size of the DKG committee
 func (c *Controller) preStartDelay() time.Duration {
-	maxDelay := time.Duration(math.Pow(float64(c.dkg.Size()), 2)) * c.config.BaseStartDelay
-	if maxDelay <= 0 {
-		return 0
-	}
-	delay := time.Duration(rand.Int63n(maxDelay.Nanoseconds()))
+	delay := computePreprocessingDelay(c.config.BaseStartDelay, c.dkg.Size())
 	return delay
 }
 
@@ -401,12 +393,19 @@ func (c *Controller) preStartDelay() time.Duration {
 // broadcast message. This delay is used only during phase 1 of the DKG.
 // This prevents synchronization of processing verification vectors (an
 // expensive operation) across the network, which can impact finalization.
+func (c *Controller) preHandleBroadcastDelay() time.Duration {
+	delay := computePreprocessingDelay(c.config.BaseHandleBroadcastDelay, c.dkg.Size())
+	return delay
+}
+
+// computePreprocessingDelay computes a random delay to introduce before an
+// expensive operation.
 //
 // The delay is b*n^2 where:
 // * b is a configurable base delay
 // * n is the size of the DKG committee
-func (c *Controller) preHandleBroadcastDelay() time.Duration {
-	maxDelay := time.Duration(math.Pow(float64(c.dkg.Size()), 2)) * c.config.BaseStartDelay
+func computePreprocessingDelay(baseDelay time.Duration, dkgSize int) time.Duration {
+	maxDelay := time.Duration(math.Pow(float64(dkgSize), 2)) * baseDelay
 	if maxDelay <= 0 {
 		return 0
 	}
