@@ -106,6 +106,11 @@ func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateSealForParent bool) *flow.Block {
 	block := unittest.BlockWithParentFixture(parentBlock.Header)
 
+	fmt.Println(" created block ", block.ID().String())
+	if parentBlock != nil {
+		fmt.Println("   parent ", parentBlock.ID().String())
+	}
+
 	// If parentBlock is not nil, create a receipt for a result of the parentBlock block,
 	// and add it to the payload. The corresponding IncorporatedResult will be used to
 	// seal the parentBlock, and to create an IncorporatedResultSeal for the seal mempool.
@@ -210,9 +215,9 @@ func (bs *BuilderSuite) SetupTest() {
 	// initialize behaviour tracking
 	bs.assembled = nil
 
-	fmt.Println("first:")
 	// Construct the [first] block:
 	first := unittest.BlockFixture()
+	fmt.Println("first:", first.ID().String())
 	bs.storeBlock(&first)
 	bs.firstID = first.ID()
 	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(&first))
@@ -566,28 +571,38 @@ func (bs *BuilderSuite) TestPayloadSeals_Limit() {
 // to blocks on the current fork (and _not_ seals for sealable blocks on other forks)
 func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 	// in the test setup, we already created a single fork
-	//  [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+	//    [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [final] <- [A0] <- [A1] <- [A2] ..
+	// For this test, we add fork:                        ^
+	//                                                    └--- [B0] <- [B1] <- ....<- [B6] <- [B7]
 	// Where block
 	//   * [first] is sealed and finalized
-	//   * [F0] ... [F3] are finalized but _not_ sealed
-	//   * [A0] ... [A3] are _not_ finalized and _not_ sealed
-	// We now create an additional fork:  [F3] <- [B0] <- [B1] <- ... <- [B7]
-	var forkHead *flow.Block
-	forkHead = bs.blocks[bs.finalID]
+	//   * [F0] ... [F4] and [final] are finalized, unsealed blocks with candidate seals are included in mempool
+	//   * [A0] ... [A2] are non-finalized, unsealed blocks with candidate seals are included in mempool
+
+	fmt.Println("")
+	fmt.Println("Constructing fork B")
+	forkHead := bs.blocks[bs.finalID]
 	for i := 0; i < 8; i++ {
-		forkHead = bs.createAndRecordBlock(forkHead, true)
-		// Method createAndRecordBlock adds a seal for every block into the mempool.
+		fmt.Print("B", i, " ")
+		// Usually, the blocks [B6] and [B7] will not have candidate seal for the following reason:
+		// For the verifiers to start checking a result R, they need a source of randomness for the block _incorporating_
+		// result R. The result for block [B6] is incorporated in [B7], which does _not_ have a child yet.
+		forkHead = bs.createAndRecordBlock(forkHead, i < 6)
 	}
 
 	bs.pendingSeals = bs.irsMap
 	_, err := bs.build.BuildOn(forkHead.ID(), bs.setter)
 	bs.Require().NoError(err)
 
-	// expected seals: [F0] <- ... <- [F3] <- [B0] <- ... <- [B7]
-	// Note: bs.chain contains seals for blocks  F0 ... F3 then A0 ... A3 and then B0 ... B7
-	bs.Assert().Equal(12, len(bs.assembled.Seals), "unexpected number of seals")
+	for _, s := range bs.assembled.Seals {
+		fmt.Println(" included seal for block ", s.BlockID.String())
+	}
+
+	// expected seals: [F0] <- ... <- [final] <- [B0] <- ... <- [B5]
+	// Note: bs.chain contains seals for blocks [F0]...[A2] followed by seals for [final], [B0]...[B5]
+	bs.Assert().Equal(10, len(bs.assembled.Seals), "unexpected number of seals")
 	bs.Assert().ElementsMatch(bs.chain[:4], bs.assembled.Seals[:4], "should have included only valid chain of seals")
-	bs.Assert().ElementsMatch(bs.chain[len(bs.chain)-8:], bs.assembled.Seals[4:], "should have included only valid chain of seals")
+	bs.Assert().ElementsMatch(bs.chain[8:], bs.assembled.Seals[4:], "should have included only valid chain of seals")
 
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
 }
