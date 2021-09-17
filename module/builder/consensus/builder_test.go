@@ -627,25 +627,27 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 
 	// mock for seals storage layer:
 	bs.sealDB = &storage.Seals{}
-	bs.sealDB.On("ByBlockID", b4.ID()).Return(b0seal, nil)
 	bs.build.seals = bs.sealDB
 
 	bs.T().Run("Build on top of B4 and check that no seals are included", func(t *testing.T) {
+		bs.sealDB.On("ByBlockID", b4.ID()).Return(b0seal, nil)
+
 		_, err := bs.build.BuildOn(b4.ID(), bs.setter)
-		bs.Require().NoError(err)
-		bs.recPool.AssertExpectations(bs.T())
-		bs.Assert().Empty(bs.assembled.Seals, "should not included any seals")
+		require.NoError(t, err)
+		bs.recPool.AssertExpectations(t)
+		require.Empty(t, bs.assembled.Seals, "should not include any seals")
 	})
 
 	bs.T().Run("Build on top of B5 and check that seals for B1 is included", func(t *testing.T) {
 		b5 := unittest.BlockWithParentFixture(b4.Header) // creating block b5
 		bs.storeBlock(&b5)
+		bs.sealDB.On("ByBlockID", b5.ID()).Return(b0seal, nil)
 
 		_, err := bs.build.BuildOn(b5.ID(), bs.setter)
-		bs.Require().NoError(err)
-		bs.recPool.AssertExpectations(bs.T())
-		bs.Assert().Equal(1, len(bs.assembled.Seals), "only seal for B1 expected")
-		bs.Require().Equal(b1seal.Seal, bs.assembled.Seals[0])
+		require.NoError(t, err)
+		bs.recPool.AssertExpectations(t)
+		require.Equal(t, 1, len(bs.assembled.Seals), "only seal for B1 expected")
+		require.Equal(t, b1seal.Seal, bs.assembled.Seals[0])
 	})
 }
 
@@ -772,8 +774,8 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 		storeSealForIncorporatedResult(&receiptChain2[1].ExecutionResult, blocks[2].ID(), bs.pendingSeals)
 
 		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter)
-		bs.Require().NoError(err)
-		bs.Assert().Empty(bs.assembled.Seals, "should not have included seal for conflicting execution fork")
+		require.NoError(t, err)
+		require.Empty(t, bs.assembled.Seals, "should not have included seal for conflicting execution fork")
 	})
 
 	bs.T().Run("verify that multiple execution forks are properly handled", func(t *testing.T) {
@@ -784,8 +786,8 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 		storeSealForIncorporatedResult(&receiptChain2[2].ExecutionResult, blocks[3].ID(), bs.pendingSeals)
 
 		_, err := bs.build.BuildOn(blocks[4].ID(), bs.setter)
-		bs.Require().NoError(err)
-		bs.Assert().ElementsMatch([]*flow.Seal{sealResultA_1.Seal, sealResultB_1.Seal}, bs.assembled.Seals, "valid fork should have been sealed")
+		require.NoError(t, err)
+		require.ElementsMatch(t, []*flow.Seal{sealResultA_1.Seal, sealResultB_1.Seal}, bs.assembled.Seals, "valid fork should have been sealed")
 	})
 }
 
