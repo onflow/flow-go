@@ -35,7 +35,7 @@ func main() {
 // happyPathExample captures the metrics on running VerificationHappyPath with 10 blocks, each with 10 execution receipts of 10 chunks.
 func happyPathExample() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
-		tracer, err := trace.NewTracer(logger, "verification", 0)
+		tracer, err := trace.NewTracer(logger, "verification", trace.SensitivityCaptureAll)
 		if err != nil {
 			panic(err)
 		}
@@ -73,7 +73,7 @@ func happyPathExample() {
 // increases result approvals counter and checked chunks counter 100 times each
 func demo() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
-		tracer, err := trace.NewTracer(logger, "verification", 0)
+		tracer, err := trace.NewTracer(logger, "verification", trace.SensitivityCaptureAll)
 		if err != nil {
 			panic(err)
 		}

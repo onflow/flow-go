@@ -95,7 +95,7 @@ func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Ide
 
 	// creates logger, metrics collector and tracer.
 	log := unittest.Logger().With().Int("index", i).Hex("node_id", identity.NodeID[:]).Str("role", identity.Role.String()).Logger()
-	tracer, err := trace.NewTracer(log, "test", 0)
+	tracer, err := trace.NewTracer(log, "test", trace.SensitivityCaptureAll)
 	require.NoError(t, err)
 	metrics := metrics.NewNoopCollector()
 

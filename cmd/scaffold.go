@@ -130,8 +130,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
-	fnb.flags.UintVar(&fnb.BaseConfig.tracerSamplingPercentage, "tracer-sampling-percentage", defaultConfig.tracerSamplingPercentage,
-		"adjusts the level of sampling when tracing is enabled. 0 means capture nothing, 50 means capture half of the entities, and 100 means capture all.")
+	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
+		"adjusts the level of sampling when tracing is enabled. 0 means capture everything, higher value results in less samples")
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", dns.DefaultTimeToLive, "time-to-live for dns cache")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
@@ -325,7 +325,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	fnb.Tracer = trace.NewNoopTracer()
 	if fnb.BaseConfig.tracerEnabled {
 		serviceName := fnb.BaseConfig.NodeRole + "-" + fnb.BaseConfig.nodeIDHex[:8]
-		tracer, err := trace.NewTracer(fnb.Logger, serviceName, fnb.tracerSamplingPercentage)
+		tracer, err := trace.NewTracer(fnb.Logger, serviceName, fnb.tracerSensitivity)
 		fnb.MustNot(err).Msg("could not initialize tracer")
 		fnb.Logger.Info().Msg("Tracer Started")
 		fnb.Tracer = tracer
