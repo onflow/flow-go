@@ -35,6 +35,8 @@ type VerificationCollector struct {
 	receivedChunkDataResponseMessageTotalRequester prometheus.Counter
 	// total number of chunk data pack sent by requester to fetcher engine.
 	sentChunkDataPackByRequesterTotal prometheus.Counter
+	// maximum number of attempts made for requesting a chunk data pack belonging to the next unsealed height.
+	maxChunkDataPackRequestAttemptForNextUnsealedHeight prometheus.Gauge
 
 	// Verifier Engine
 	receivedVerifiableChunkTotalVerifier prometheus.Counter // total verifiable chunks received by verifier engine
@@ -145,6 +147,17 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		Help:      "total number of chunk data packs requested by fetcher engine",
 	})
 
+	maxChunkDataPackRequestAttemptForNextUnsealedHeight := prometheus.NewGauge(prometheus.GaugeOpts{
+		Name:      "next_unsealed_height_max_chunk_data_pack_request_attempt_times",
+		Namespace: namespaceVerification,
+		Subsystem: subsystemRequesterEngine,
+		// an indicator for when execution nodes is unresponsive to chunk data pack requests,
+		// in which case verification node will keep requesting the chunk data pack, and this
+		// metrics number will go up.
+		Help: "among all the pending chunk data packs requested by the requester engine for the next unsealed height the maximum number of times a" +
+			" certain chunk data pack was requested",
+	})
+
 	// Verifier Engine
 	receivedVerifiableChunksTotalVerifier := prometheus.NewCounter(prometheus.CounterOpts{
 		Name:      "verifiable_chunk_received_total",
@@ -183,6 +196,7 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		sentChunkDataRequestMessagesTotalRequester,
 		receivedChunkDataResponseMessagesTotalRequester,
 		sentChunkDataPackByRequesterTotal,
+		maxChunkDataPackRequestAttemptForNextUnsealedHeight,
 
 		// verifier engine
 		receivedVerifiableChunksTotalVerifier,
@@ -212,10 +226,11 @@ func NewVerificationCollector(tracer module.Tracer, registerer prometheus.Regist
 		receivedVerifiableChunkTotalVerifier: receivedVerifiableChunksTotalVerifier,
 
 		// requester
-		receivedChunkDataPackRequestsTotalRequester:    receivedChunkDataPackRequestsTotalRequester,
-		sentChunkDataRequestMessagesTotalRequester:     sentChunkDataRequestMessagesTotalRequester,
-		receivedChunkDataResponseMessageTotalRequester: receivedChunkDataResponseMessagesTotalRequester,
-		sentChunkDataPackByRequesterTotal:              sentChunkDataPackByRequesterTotal,
+		receivedChunkDataPackRequestsTotalRequester:         receivedChunkDataPackRequestsTotalRequester,
+		sentChunkDataRequestMessagesTotalRequester:          sentChunkDataRequestMessagesTotalRequester,
+		receivedChunkDataResponseMessageTotalRequester:      receivedChunkDataResponseMessagesTotalRequester,
+		sentChunkDataPackByRequesterTotal:                   sentChunkDataPackByRequesterTotal,
+		maxChunkDataPackRequestAttemptForNextUnsealedHeight: maxChunkDataPackRequestAttemptForNextUnsealedHeight,
 	}
 
 	return vc
@@ -277,13 +292,13 @@ func (vc *VerificationCollector) OnChunkDataPackRequestReceivedByRequester() {
 	vc.receivedChunkDataPackRequestsTotalRequester.Inc()
 }
 
-// OnChunkDataPackRequestDispatchedInNetwork increments a counter that keeps track of number of chunk data pack requests that the
+// OnChunkDataPackRequestDispatchedInNetworkByRequester increments a counter that keeps track of number of chunk data pack requests that the
 // requester engine dispatches in the network (to the execution nodes).
 func (vc *VerificationCollector) OnChunkDataPackRequestDispatchedInNetworkByRequester() {
 	vc.sentChunkDataRequestMessagesTotalRequester.Inc()
 }
 
-// OnChunkDataPackResponseReceivedFromNetwork increments a counter that keeps track of number of chunk data pack responses that the
+// OnChunkDataPackResponseReceivedFromNetworkByRequester increments a counter that keeps track of number of chunk data pack responses that the
 // requester engine receives from execution nodes (through network).
 func (vc *VerificationCollector) OnChunkDataPackResponseReceivedFromNetworkByRequester() {
 	vc.receivedChunkDataResponseMessageTotalRequester.Inc()
@@ -316,4 +331,11 @@ func (vc *VerificationCollector) OnChunkConsumerJobDone(processedIndex uint64) {
 // sets the last processed block job index.
 func (vc *VerificationCollector) OnBlockConsumerJobDone(processedIndex uint64) {
 	vc.lastProcessedBlockJobIndexBlockConsumer.Set(float64(processedIndex))
+}
+
+// SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester is invoked when a cycle of requesting chunk data packs is done by requester engine.
+// It updates the maximum number of attempts made by requester engine for requesting the chunk data packs of the next unsealed height.
+// The maximum is taken over the history of all chunk data packs requested during that cycle that belong to the next unsealed height.
+func (vc *VerificationCollector) SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester(attempts uint64) {
+	vc.maxChunkDataPackRequestAttemptForNextUnsealedHeight.Set(float64(attempts))
 }

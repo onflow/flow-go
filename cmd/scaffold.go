@@ -532,6 +532,12 @@ func (fnb *FlowNodeBuilder) initState() {
 		// Bootstrap!
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
+		// generate bootstrap config options as per NodeConfig
+		var options []badgerState.BootstrapConfigOptions
+		if fnb.SkipNwAddressBasedValidations {
+			options = append(options, badgerState.SkipNetworkAddressValidation)
+		}
+
 		fnb.State, err = badgerState.Bootstrap(
 			fnb.Metrics.Compliance,
 			fnb.DB,
@@ -543,6 +549,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Commits,
 			fnb.Storage.Statuses,
 			rootSnapshot,
+			options...,
 		)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 
