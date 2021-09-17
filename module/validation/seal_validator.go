@@ -168,7 +168,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		for _, resultID := range payloadIndex.ResultIDs {
 			result, err := s.results.ByID(resultID)
 			if err != nil {
-				return fmt.Errorf("internal error fetching result %v incorporated in stored block %v: %w", resultID, blockID, err)
+				return fmt.Errorf("internal error fetching result %x incorporated in block %x: %w", resultID, blockID, err)
 			}
 			incorporatedResults[resultID] = flow.NewIncorporatedResult(blockID, result)
 		}
@@ -210,9 +210,10 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		err := s.validateSeal(seal, incorporatedResult)
 		if err != nil {
 			if !engine.IsInvalidInputError(err) {
-				return nil, fmt.Errorf("unexpected internal error while validating seal %x: %w", seal.ID(), err)
+				return nil, fmt.Errorf("unexpected internal error while validating seal %x for result %x for block %x: %w",
+					seal.ID(), seal.ResultID, seal.BlockID, err)
 			}
-			return nil, fmt.Errorf("invalid seal %x for result %x: %w", seal.ID(), seal.ResultID, err)
+			return nil, fmt.Errorf("invalid seal %x for result %x for block %x: %w", seal.ID(), seal.ResultID, seal.BlockID, err)
 		}
 
 		// check that the sealed execution results form a chain
@@ -252,7 +253,8 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 
 	assignments, err := s.assigner.Assign(executionResult, incorporatedResult.IncorporatedBlockID)
 	if err != nil {
-		return fmt.Errorf("could not retreive assignments for block: %v, %w", seal.BlockID, err)
+		return fmt.Errorf("failed to retrieve verifier assignment for result %x incorporated in block %x: %w",
+			executionResult.ID(), incorporatedResult.IncorporatedBlockID, err)
 	}
 
 	// Check that each AggregatedSignature has enough valid signatures from
