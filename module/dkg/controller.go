@@ -390,6 +390,9 @@ func (c *Controller) phase3() error {
 // * n is the size of the DKG committee
 func (c *Controller) preStartDelay() time.Duration {
 	maxDelay := time.Duration(math.Pow(float64(c.dkg.Size()), 2)) * c.config.BaseStartDelay
+	if maxDelay <= 0 {
+		return 0
+	}
 	delay := time.Duration(rand.Int63n(maxDelay.Nanoseconds()))
 	return delay
 }
@@ -404,6 +407,9 @@ func (c *Controller) preStartDelay() time.Duration {
 // * n is the size of the DKG committee
 func (c *Controller) preHandleBroadcastDelay() time.Duration {
 	maxDelay := time.Duration(math.Pow(float64(c.dkg.Size()), 2)) * c.config.BaseStartDelay
+	if maxDelay <= 0 {
+		return 0
+	}
 	delay := time.Duration(rand.Int63n(maxDelay.Nanoseconds()))
 	return delay
 }
