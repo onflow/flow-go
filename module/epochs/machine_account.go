@@ -132,7 +132,7 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 			// either we cannot validate the configuration or there is a critical
 			// misconfiguration - log a warning and retry - we will continue checking
 			// and logging until the problem is resolved
-			log.Warn().
+			log.Error().
 				Err(err).
 				Msg("critical machine account misconfiguration")
 			return retry.RetryableError(err)
@@ -143,7 +143,8 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 		log.Error().Err(err).Msg("failed to check machine account configuration after retry")
 		return
 	}
-	log.Debug().Msg("confirmed valid machine account configuration")
+
+	log.Info().Msg("confirmed valid machine account configuration")
 }
 
 // CheckMachineAccountInfo checks a node machine account config, logging
