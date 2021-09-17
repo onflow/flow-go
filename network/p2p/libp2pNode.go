@@ -181,10 +181,11 @@ func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *madns.Resolver) N
 
 func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	node := &Node{
-		id:     builder.id,
-		topics: make(map[flownet.Topic]*pubsub.Topic),
-		subs:   make(map[flownet.Topic]*pubsub.Subscription),
-		logger: builder.logger,
+		id:              builder.id,
+		topics:          make(map[flownet.Topic]*pubsub.Topic),
+		subs:            make(map[flownet.Topic]*pubsub.Subscription),
+		logger:          builder.logger,
+		topicValidation: builder.topicValidation,
 	}
 
 	if builder.hostMaker == nil {
@@ -289,6 +290,7 @@ type Node struct {
 	pingService          *PingService
 	connMgr              TagLessConnManager
 	dht                  *dht.IpfsDHT
+	topicValidation      bool
 }
 
 // Stop stops the libp2p node.
@@ -492,18 +494,22 @@ func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ..
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		topic_validator := validator.TopicValidator(validators...)
-		if err := n.pubSub.RegisterTopicValidator(
-			topic.String(), topic_validator, pubsub.WithValidatorInline(true),
-		); err != nil {
-			n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
-			return nil, fmt.Errorf("failed to register topic validator: %w", err)
+		if n.topicValidation {
+			topic_validator := validator.TopicValidator(validators...)
+			if err := n.pubSub.RegisterTopicValidator(
+				topic.String(), topic_validator, pubsub.WithValidatorInline(true),
+			); err != nil {
+				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
+				return nil, fmt.Errorf("failed to register topic validator: %w", err)
+			}
 		}
 
 		tp, err = n.pubSub.Join(topic.String())
 		if err != nil {
-			if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
-				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
+			if n.topicValidation {
+				if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
+					n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
+				}
 			}
 
 			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
@@ -545,8 +551,10 @@ func (n *Node) UnSubscribe(topic flownet.Topic) error {
 		return err
 	}
 
-	if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
-		n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
+	if n.topicValidation {
+		if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
+			n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
+		}
 	}
 
 	// attempt to close the topic
