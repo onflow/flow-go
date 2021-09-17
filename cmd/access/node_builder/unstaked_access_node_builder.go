@@ -249,7 +249,7 @@ func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Con
 			return nil, err
 		}
 
-		anb.Network = converter.NewNetwork(network, engine.SyncCommittee, engine.UnstakedSyncCommittee)
+		anb.Network = converter.NewNetwork(network, engine.SyncCommittee, engine.PublicSyncCommittee)
 
 		anb.Logger.Info().Msgf("network will run on address: %s", anb.BindAddr)
 
