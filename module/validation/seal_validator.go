@@ -168,7 +168,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		for _, resultID := range payloadIndex.ResultIDs {
 			result, err := s.results.ByID(resultID)
 			if err != nil {
-				return fmt.Errorf("internal error fetching result %x incorporated in block %x: %w", resultID, blockID, err)
+				return fmt.Errorf("internal error fetching result %v incorporated in block %v: %w", resultID, blockID, err)
 			}
 			incorporatedResults[resultID] = flow.NewIncorporatedResult(blockID, result)
 		}
