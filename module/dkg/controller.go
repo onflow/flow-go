@@ -401,14 +401,24 @@ func (c *Controller) preHandleBroadcastDelay() time.Duration {
 // computePreprocessingDelay computes a random delay to introduce before an
 // expensive operation.
 //
-// The delay is b*n^2 where:
+// The maximum delay is m=b*n^2 where:
 // * b is a configurable base delay
 // * n is the size of the DKG committee
 func computePreprocessingDelay(baseDelay time.Duration, dkgSize int) time.Duration {
+	// sanity checks
+	if baseDelay < 0 {
+		baseDelay = 0
+	}
+	if dkgSize < 0 {
+		dkgSize = 0
+	}
+
+	// m=b*n^2
 	maxDelay := time.Duration(math.Pow(float64(dkgSize), 2)) * baseDelay
 	if maxDelay <= 0 {
 		return 0
 	}
+	// select delay from [0,m)
 	delay := time.Duration(rand.Int63n(maxDelay.Nanoseconds()))
 	return delay
 }

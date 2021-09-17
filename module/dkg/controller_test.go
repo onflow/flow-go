@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
@@ -320,4 +321,36 @@ func checkArtifacts(t *testing.T, nodes []*node, totalNodes int) {
 			}
 		}
 	}
+}
+
+func TestDelay(t *testing.T) {
+
+	t.Run("should return 0 delay for <=0 inputs", func(t *testing.T) {
+		delay := computePreprocessingDelay(0, 100)
+		assert.Equal(t, delay, time.Duration(0))
+		delay = computePreprocessingDelay(time.Hour, 0)
+		assert.Equal(t, delay, time.Duration(0))
+		delay = computePreprocessingDelay(time.Millisecond, -1)
+		assert.Equal(t, delay, time.Duration(0))
+		delay = computePreprocessingDelay(-time.Millisecond, 100)
+		assert.Equal(t, delay, time.Duration(0))
+	})
+
+	t.Run("should return different values for same inputs", func(t *testing.T) {
+		d1 := computePreprocessingDelay(time.Second, 100)
+		d2 := computePreprocessingDelay(time.Second, 100)
+		assert.NotEqual(t, d1, d2)
+	})
+
+	t.Run("should return values in expected range", func(t *testing.T) {
+		baseDelay := time.Second
+		dkgSize := 100
+		minDelay := time.Duration(0)
+		// m=b*n^2
+		maxDelay := int64(baseDelay) * int64(dkgSize) * int64(dkgSize)
+
+		delay := computePreprocessingDelay(baseDelay, dkgSize)
+		assert.LessOrEqual(t, minDelay, delay)
+		assert.GreaterOrEqual(t, maxDelay, delay)
+	})
 }
