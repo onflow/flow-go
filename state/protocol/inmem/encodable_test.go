@@ -37,3 +37,26 @@ func TestEncodeDecode(t *testing.T) {
 	decodedResult, decodedSeal := decodedSnapshot.LatestResult, decodedSnapshot.LatestSeal
 	assert.Equal(t, decodedResult.ID(), decodedSeal.ResultID)
 }
+
+// TestStrippedEncodeDecode tests that the protocol state snapshot can be encoded to JSON skipping the network address
+// and decoded back successfully
+func TestStrippedEncodeDecode(t *testing.T) {
+	participants := unittest.IdentityListFixture(10)
+	initialSnapshot := unittest.RootSnapshotFixture(participants)
+
+	// encode the snapshot
+	strippedSnapshot := inmem.StrippedInmemSnapshot(initialSnapshot.Encodable())
+	snapshotJson, err := json.Marshal(strippedSnapshot)
+	require.NoError(t, err)
+	// check that the json string does not contain "Address"
+	require.NotContains(t, snapshotJson, "Address")
+
+	// decode the snapshots
+	var decodedSnapshot inmem.EncodableSnapshot
+	err = json.Unmarshal(snapshotJson, &decodedSnapshot)
+	require.NoError(t, err)
+	// check that the network addresses for all the identities are still empty
+	assert.Len(t, decodedSnapshot.Identities.Filter(func(id *flow.Identity) bool {
+		return id.Address == ""
+	}), len(participants))
+}

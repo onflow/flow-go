@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestReadyDone(t *testing.T) {
@@ -19,7 +20,7 @@ func TestReadyDone(t *testing.T) {
 // takes longer than the interval, the next call will be blocked
 func TestLaunchPeriod(t *testing.T) {
 	u := engine.NewUnit()
-	<-u.Ready()
+	unittest.RequireCloseBefore(t, u.Ready(), time.Second, "ready did not close")
 	logs := make([]string, 0)
 	u.LaunchPeriodically(func() {
 		logs = append(logs, "running")
@@ -38,11 +39,23 @@ func TestLaunchPeriod(t *testing.T) {
 		"running", "finish",
 		"running",
 	}, logs)
-	<-u.Done()
+	unittest.RequireCloseBefore(t, u.Done(), time.Second, "done did not close")
 
 	require.Equal(t, []string{
 		"running", "finish",
 		"running", "finish",
 		"running", "finish",
 	}, logs)
+}
+
+func TestLaunchPeriod_Delay(t *testing.T) {
+	u := engine.NewUnit()
+	unittest.RequireCloseBefore(t, u.Ready(), time.Second, "ready did not close")
+
+	// launch f with a large initial delay (30s)
+	// the function f should never be invoked, so we use t.Fail
+	u.LaunchPeriodically(t.Fail, time.Millisecond, time.Second*30)
+
+	// ensure we can stop the unit quickly (we should not need to wait for initial delay)
+	unittest.RequireCloseBefore(t, u.Done(), time.Second, "done did not close")
 }
