@@ -384,6 +384,15 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	sealsSuperset := make(map[uint64][]*flow.IncorporatedResultSeal) // map: executedBlock.Height -> candidate Seals
 	sealCollector := func(header *flow.Header) error {
 		blockID := header.ID()
+		// TEMPORARY implementation (unpolished)
+		if blockID == parentID {
+			// Important protocol edge case: There must be at least one block in between the block incorporating a
+			// result and the block sealing the result. This guarantees that a verifier assignment can be computed
+			// without needing information from the block that we are just constructing. Hence, we don't consider
+			// results for sealing that were incorporated in the immediate parent which we are extending.
+			return nil
+		}
+
 		index, err := b.index.ByBlockID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve index for block %x: %w", blockID, err)
@@ -391,7 +400,6 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 
 		// enforce condition (1): only consider seals for results that are incorporated in the fork
 		for _, resultID := range index.ResultIDs {
-
 			result, err := b.resultsDB.ByID(resultID)
 			if err != nil {
 				return fmt.Errorf("could not retrieve execution result %x: %w", resultID, err)
@@ -405,8 +413,8 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 			)
 
 			// enforce condition (0): candidate seals are only constructed once sufficient
-			// have been collected. Hence, any incorporated result for which we find a
-			// candidate seal satisfy condition (0)
+			// approvals have been collected. Hence, any incorporated result for which we
+			// find a candidate seal satisfy condition (0)
 			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
 			if !ok {
 				continue
