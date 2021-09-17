@@ -1,7 +1,6 @@
 package consensus
 
 import (
-	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -106,12 +105,7 @@ func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateSealForParent bool) *flow.Block {
 	block := unittest.BlockWithParentFixture(parentBlock.Header)
 
-	fmt.Println(" created block ", block.ID().String())
-	if parentBlock != nil {
-		fmt.Println("   parent ", parentBlock.ID().String())
-	}
-
-	// If parentBlock is not nil, create a receipt for a result of the parentBlock block,
+	// Create a receipt for a result of the parentBlock block,
 	// and add it to the payload. The corresponding IncorporatedResult will be used to
 	// seal the parentBlock, and to create an IncorporatedResultSeal for the seal mempool.
 	var incorporatedResultForPrevBlock *flow.IncorporatedResult
@@ -157,8 +151,6 @@ func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 		unittest.IncorporatedResultSeal.WithResult(incorporatedResult.Result),
 		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatedResult.IncorporatedBlockID),
 	)
-
-	fmt.Println("   seal ", incorporatedResultSeal.Seal.BlockID.String())
 
 	bs.chain = append(bs.chain, incorporatedResultSeal.Seal)
 	bs.irsMap[incorporatedResultSeal.ID()] = incorporatedResultSeal
@@ -217,7 +209,6 @@ func (bs *BuilderSuite) SetupTest() {
 
 	// Construct the [first] block:
 	first := unittest.BlockFixture()
-	fmt.Println("first:", first.ID().String())
 	bs.storeBlock(&first)
 	bs.firstID = first.ID()
 	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(&first))
@@ -225,7 +216,6 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.resultForBlock[firstResult.BlockID] = firstResult
 	bs.resultByID[firstResult.ID()] = firstResult
 
-	fmt.Println("finalized:")
 	// Construct finalized blocks [F0] ... [F4]
 	previous := &first
 	for n := 0; n < numFinalizedBlocks; n++ {
@@ -234,12 +224,10 @@ func (bs *BuilderSuite) SetupTest() {
 		previous = finalized
 	}
 
-	fmt.Println("Final:")
 	// Construct the last finalized block [final]
 	final := bs.createAndRecordBlock(previous, true)
 	bs.finalID = final.ID()
 
-	fmt.Println("Pending:")
 	// Construct the pending (i.e. unfinalized) ancestors [A0], ..., [A3]
 	previous = final
 	for n := 0; n < numPendingBlocks; n++ {
@@ -541,14 +529,6 @@ func (bs *BuilderSuite) TestPayloadSeals_AllValid() {
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
-	//
-	//for _, s := range bs.assembled.Seals {
-	//	fmt.Println(" included seal for block ", s.BlockID.String())
-	//}
-	//
-	//fmt.Println(len(bs.chain))
-	//// bs.chain contains the 9 seals for F0, F1, ..., A3
-	//
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included valid chain of seals")
 }
 
@@ -578,12 +558,8 @@ func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 	//   * [first] is sealed and finalized
 	//   * [F0] ... [F4] and [final] are finalized, unsealed blocks with candidate seals are included in mempool
 	//   * [A0] ... [A2] are non-finalized, unsealed blocks with candidate seals are included in mempool
-
-	fmt.Println("")
-	fmt.Println("Constructing fork B")
 	forkHead := bs.blocks[bs.finalID]
 	for i := 0; i < 8; i++ {
-		fmt.Print("B", i, " ")
 		// Usually, the blocks [B6] and [B7] will not have candidate seal for the following reason:
 		// For the verifiers to start checking a result R, they need a source of randomness for the block _incorporating_
 		// result R. The result for block [B6] is incorporated in [B7], which does _not_ have a child yet.
@@ -593,10 +569,6 @@ func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 	bs.pendingSeals = bs.irsMap
 	_, err := bs.build.BuildOn(forkHead.ID(), bs.setter)
 	bs.Require().NoError(err)
-
-	for _, s := range bs.assembled.Seals {
-		fmt.Println(" included seal for block ", s.BlockID.String())
-	}
 
 	// expected seals: [F0] <- ... <- [final] <- [B0] <- ... <- [B5]
 	// Note: bs.chain contains seals for blocks [F0]...[A2] followed by seals for [final], [B0]...[B5]
