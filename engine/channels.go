@@ -34,7 +34,7 @@ func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
 // to channelRoleMap as a constant channel type manually.
 func Exists(channel network.Channel) bool {
 	_, exists := RolesByChannel(channel)
-	return exists || UnstakedChannels().Contains(channel)
+	return exists || PublicChannels().Contains(channel)
 }
 
 // ChannelsByRole returns a list of all channels the role subscribes to.
@@ -90,10 +90,10 @@ func Channels() network.ChannelList {
 	return channels
 }
 
-// UnstakedChannels returns all channels that unstaked nodes can send messages on.
-func UnstakedChannels() network.ChannelList {
+// PublicChannels returns all channels that on the public network.
+func PublicChannels() network.ChannelList {
 	return network.ChannelList{
-		UnstakedSyncCommittee,
+		PublicSyncCommittee,
 	}
 }
 
@@ -141,8 +141,8 @@ const (
 	ProvideReceiptsByBlockID = RequestReceiptsByBlockID
 	ProvideApprovalsByChunk  = RequestApprovalsByChunk
 
-	// Unstaked network channels
-	UnstakedSyncCommittee = network.Channel("unstaked-sync-committee")
+	// Public network channels
+	PublicSyncCommittee = network.Channel("public-sync-committee")
 )
 
 // initializeChannelRoleMap initializes an instance of channelRoleMap and populates it with the channels and their
@@ -161,7 +161,7 @@ func initializeChannelRoleMap() {
 	channelRoleMap[ConsensusCommittee] = flow.RoleList{flow.RoleConsensus}
 
 	// Channels for protocols actively synchronizing state across nodes
-	channelRoleMap[SyncCommittee] = flow.RoleList{flow.RoleConsensus}
+	channelRoleMap[SyncCommittee] = flow.Roles()
 	channelRoleMap[SyncExecution] = flow.RoleList{flow.RoleExecution}
 
 	// Channels for DKG communication

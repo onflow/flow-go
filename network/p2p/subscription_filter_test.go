@@ -13,14 +13,11 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestFilterSubscribe(t *testing.T) {
-	// skip for now due to bug in libp2p gossipsub implementation:
-	// https://github.com/libp2p/go-libp2p-pubsub/issues/449
-	t.Skip()
-
 	identity1, privateKey1 := createID(t, unittest.WithRole(flow.RoleAccess))
 	identity2, privateKey2 := createID(t, unittest.WithRole(flow.RoleAccess))
 	ids := flow.IdentityList{identity1, identity2}
@@ -60,6 +57,10 @@ func TestFilterSubscribe(t *testing.T) {
 		}
 		return false
 	}, 1*time.Second, 100*time.Millisecond)
+
+	// skip for now due to bug in libp2p gossipsub implementation:
+	// https://github.com/libp2p/go-libp2p-pubsub/issues/449
+	t.Skip()
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -102,7 +103,17 @@ func TestCanSubscribe(t *testing.T) {
 	_, err := collectionNode.pubSub.Join(goodTopic.String())
 	require.NoError(t, err)
 
-	badTopic := engine.TopicFromChannel(engine.ProvideReceiptsByBlockID, rootBlockID)
+	var badTopic network.Topic
+	allowedChannels := make(map[network.Channel]struct{})
+	for _, ch := range engine.ChannelsByRole(flow.RoleCollection) {
+		allowedChannels[ch] = struct{}{}
+	}
+	for _, ch := range engine.Channels() {
+		if _, ok := allowedChannels[ch]; !ok {
+			badTopic = engine.TopicFromChannel(ch, rootBlockID)
+			break
+		}
+	}
 	_, err = collectionNode.pubSub.Join(badTopic.String())
 	require.Error(t, err)
 
@@ -114,6 +125,6 @@ func TestCanSubscribe(t *testing.T) {
 func createSubscriptionFilterPubsubOption(t *testing.T, ids flow.IdentityList) PubsubOption {
 	idProvider := id.NewFixedIdentityProvider(ids)
 	return func(_ context.Context, h host.Host) (pubsub.Option, error) {
-		return pubsub.WithSubscriptionFilter(NewSubscriptionFilter(h.ID(), rootBlockID, unittest.BlockFixture().Header.ChainID, idProvider)), nil
+		return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(h.ID(), rootBlockID, unittest.BlockFixture().Header.ChainID, idProvider)), nil
 	}
 }

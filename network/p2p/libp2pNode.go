@@ -84,7 +84,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 
 	psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
 	psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
-		return pubsub.WithSubscriptionFilter(NewSubscriptionFilter(
+		return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(
 			h.ID(), rootBlockID, chainID, idProvider,
 		)), nil
 	})

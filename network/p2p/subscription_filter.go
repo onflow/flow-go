@@ -12,15 +12,16 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-type Filter struct {
+// RoleBasedFilter implements a subscription filter that filters subscriptions based on a node's role.
+type RoleBasedFilter struct {
 	idProvider  id.IdentityProvider
 	myPeerID    peer.ID
 	rootBlockID flow.Identifier
 	chainID     flow.ChainID
 }
 
-func NewSubscriptionFilter(pid peer.ID, rootBlockID flow.Identifier, chainID flow.ChainID, idProvider id.IdentityProvider) *Filter {
-	return &Filter{
+func NewRoleBasedFilter(pid peer.ID, rootBlockID flow.Identifier, chainID flow.ChainID, idProvider id.IdentityProvider) *RoleBasedFilter {
+	return &RoleBasedFilter{
 		idProvider,
 		pid,
 		rootBlockID,
@@ -28,18 +29,17 @@ func NewSubscriptionFilter(pid peer.ID, rootBlockID flow.Identifier, chainID flo
 	}
 }
 
-func (f *Filter) allowedTopics(pid peer.ID) map[network.Topic]struct{} {
+func (f *RoleBasedFilter) allowedTopics(pid peer.ID) map[network.Topic]struct{} {
 	id, found := f.idProvider.ByPeerID(pid)
-	var channels network.ChannelList
+	channels := engine.PublicChannels()
 
 	if !found {
-		channels = engine.UnstakedChannels()
 		// TODO: eventually we should have block proposals relayed on a separate
 		// channel on the public network. For now, we need to make sure that
-		// unstaked nodes can subscribe to the block proposal channel.
+		// full observer nodes can subscribe to the block proposal channel.
 		channels = append(channels, engine.ReceiveBlocks)
 	} else {
-		channels = engine.ChannelsByRole(id.Role)
+		channels = append(channels, engine.ChannelsByRole(id.Role)...)
 	}
 
 	topics := make(map[network.Topic]struct{})
@@ -60,12 +60,12 @@ func (f *Filter) allowedTopics(pid peer.ID) map[network.Topic]struct{} {
 	return topics
 }
 
-func (f *Filter) CanSubscribe(topic string) bool {
+func (f *RoleBasedFilter) CanSubscribe(topic string) bool {
 	_, allowed := f.allowedTopics(f.myPeerID)[network.Topic(topic)]
 	return allowed
 }
 
-func (f *Filter) FilterIncomingSubscriptions(from peer.ID, opts []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error) {
+func (f *RoleBasedFilter) FilterIncomingSubscriptions(from peer.ID, opts []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error) {
 	allowedTopics := f.allowedTopics(from)
 	var filtered []*pb.RPC_SubOpts
 

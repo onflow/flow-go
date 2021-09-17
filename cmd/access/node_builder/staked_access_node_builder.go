@@ -214,7 +214,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 	return func() (*p2p.Node, error) {
 		psOpts := p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)
 		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
-			return pubsub.WithSubscriptionFilter(p2p.NewSubscriptionFilter(
+			return pubsub.WithSubscriptionFilter(p2p.NewRoleBasedFilter(
 				h.ID(), builder.RootBlock.ID(), builder.RootChainID, builder.IdentityProvider,
 			)), nil
 		})
