@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"math/rand"
 	"reflect"
 
@@ -65,29 +66,16 @@ func (id Identifier) Format(state fmt.State, verb rune) {
 	}
 }
 
-// IsSampled is a utility method to sample entities based on their ids
-func (id Identifier) IsSampled(sensitivity uint) bool {
-	if sensitivity > 64 {
-		return false
-	}
-	// take the first 8 bytes and check the first few bits based on sensitivity
-	// higher sensitivity means more bits has to be zero, means less number of samples
-	// sensitivity of zero, means everything is sampled
-	return binary.BigEndian.Uint64(id[:8])>>uint64(64-sensitivity) == 0
-}
-
-// IsSampledWithPercent is a utility method to sample entities based on their ids, the sampling rate is 
-// percentage based.
+// IsSampled is a utility method to sample entities based on their ids,
+// percentage adjust how often we sample the entity.
 // 0 means 0 data will be collected.
+// 50 means 50% of the entities would be collected.
 // 100 means all data will be collected.
-func (id Identitifier) IsSampledWithPercent(percentage uint) bool {
-  sensitivity := percentageToSensitivity(percentage)
-  return IsSample(sensitivity)
+func (id Identifier) IsSampled(percentage uint) bool {
+	// take the first 8 bytes and check the first few bits based on the percentage
+	return binary.BigEndian.Uint64(id[:8])>>int(math.Min(float64(percentage)/float64(1.5), 64)) == 0
 }
 
-func percentageToSensitivity(percentage uint) uint {
-  // to be implemented
-}
 func (id Identifier) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
 }

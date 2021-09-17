@@ -17,7 +17,7 @@ import (
 // increases result approvals counter and checked chunks counter 100 times each
 func main() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
-		tracer, err := trace.NewTracer(logger, "collection", trace.SensitivityCaptureAll)
+		tracer, err := trace.NewTracer(logger, "collection", 0)
 		if err != nil {
 			panic(err)
 		}

@@ -17,7 +17,6 @@ import (
 
 const DefaultEntityCacheSize = 1000
 
-const SensitivityCaptureAll = 0
 const EntityTypeBlock = "Block"
 const EntityTypeCollection = "Collection"
 const EntityTypeTransaction = "Transaction"
@@ -31,10 +30,10 @@ func (s SpanName) Child(subOp string) SpanName {
 // OpenTracer is the implementation of the Tracer interface
 type OpenTracer struct {
 	opentracing.Tracer
-	closer      io.Closer
-	log         zerolog.Logger
-	spanCache   *lru.Cache
-	sensitivity uint
+	closer             io.Closer
+	log                zerolog.Logger
+	spanCache          *lru.Cache
+	samplingPercentage uint
 }
 
 type traceLogger struct {
@@ -53,7 +52,7 @@ func (t traceLogger) Infof(msg string, args ...interface{}) {
 // NewTracer creates a new tracer.
 //
 // TODO (ramtin) : we might need to add a mutex lock (not sure if tracer itself is thread-safe)
-func NewTracer(log zerolog.Logger, serviceName string, sensitivity uint) (*OpenTracer, error) {
+func NewTracer(log zerolog.Logger, serviceName string, samplingPercentage uint) (*OpenTracer, error) {
 	cfg, err := config.FromEnv()
 	if err != nil {
 		return nil, err
@@ -74,11 +73,11 @@ func NewTracer(log zerolog.Logger, serviceName string, sensitivity uint) (*OpenT
 	}
 
 	t := &OpenTracer{
-		Tracer:      tracer,
-		closer:      closer,
-		log:         log,
-		spanCache:   spanCache,
-		sensitivity: sensitivity,
+		Tracer:             tracer,
+		closer:             closer,
+		log:                log,
+		spanCache:          spanCache,
+		samplingPercentage: samplingPercentage,
 	}
 
 	return t, nil
@@ -139,7 +138,7 @@ func (t *OpenTracer) StartBlockSpan(
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
 
-	if !blockID.IsSampled(t.sensitivity) {
+	if !blockID.IsSampled(t.samplingPercentage) {
 		return &NoopSpan{&NoopTracer{}}, ctx, false
 	}
 
@@ -154,7 +153,7 @@ func (t *OpenTracer) StartCollectionSpan(
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
 
-	if !collectionID.IsSampled(t.sensitivity) {
+	if !collectionID.IsSampled(t.samplingPercentage) {
 		return &NoopSpan{&NoopTracer{}}, ctx, false
 	}
 
@@ -169,7 +168,7 @@ func (t *OpenTracer) StartTransactionSpan(
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
 
-	if !transactionID.IsSampled(t.sensitivity) {
+	if !transactionID.IsSampled(t.samplingPercentage) {
 		return &NoopSpan{&NoopTracer{}}, ctx, false
 	}
 

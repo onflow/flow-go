@@ -16,7 +16,7 @@ import (
 
 func main() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
-		tracer, err := trace.NewTracer(logger, "collection", trace.SensitivityCaptureAll)
+		tracer, err := trace.NewTracer(logger, "collection", 0)
 		if err != nil {
 			panic(err)
 		}
