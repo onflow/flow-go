@@ -102,11 +102,11 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 
 		anb.
 			Component("unstaked sync request proxy", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				proxyEngine = splitter.New(node.Logger, engine.UnstakedSyncCommittee)
+				proxyEngine = splitter.New(node.Logger, engine.PublicSyncCommittee)
 
 				// register the proxy engine with the unstaked network
 				var err error
-				unstakedNetworkConduit, err = node.Network.Register(engine.UnstakedSyncCommittee, proxyEngine)
+				unstakedNetworkConduit, err = node.Network.Register(engine.PublicSyncCommittee, proxyEngine)
 				if err != nil {
 					return nil, fmt.Errorf("could not register unstaked sync request proxy: %w", err)
 				}
