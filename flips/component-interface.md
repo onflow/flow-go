@@ -2,7 +2,7 @@
 
 | Status        | Proposed                                                  |
 :-------------- |:--------------------------------------------------------- |
-| **FLIP #**    | [1167](https://github.com/onflow/flow-go/pull/1167) Pt. 1 |
+| **FLIP #**    | [1167](https://github.com/onflow/flow-go/pull/1167)       |
 | **Author(s)** | Simon Zhu (simon.zhu@dapperlabs.com)                      |
 | **Sponsor**   | Simon Zhu (simon.zhu@dapperlabs.com)                      |
 | **Updated**   | 9/16/2021                                                 |
