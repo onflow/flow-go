@@ -162,6 +162,8 @@ func (t *OpenTracer) StartCollectionSpan(
 	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
 }
 
+// StartTransactionSpan starts a span that will be aggregated under the given transaction.
+// All spans for the same transaction will be aggregated under a root span
 func (t *OpenTracer) StartTransactionSpan(
 	ctx context.Context,
 	transactionID flow.Identifier,
@@ -190,7 +192,7 @@ func (t *OpenTracer) StartSpanFromContext(
 		return &NoopSpan{&NoopTracer{}}, ctx
 	}
 
-	opts = append(opts, opentracing.ChildOf(parentSpan.Context()))
+	opts = append(opts, opentracing.FollowsFrom(parentSpan.Context()))
 	span := t.Tracer.StartSpan(string(operationName), opts...)
 	return span, opentracing.ContextWithSpan(ctx, span)
 }
@@ -203,7 +205,7 @@ func (t *OpenTracer) StartSpanFromParent(
 	if _, ok := span.(*NoopSpan); ok {
 		return &NoopSpan{&NoopTracer{}}
 	}
-	opts = append(opts, opentracing.FollowsFrom(span.Context()))
+	opts = append(opts, opentracing.ChildOf(span.Context()))
 	return t.Tracer.StartSpan(string(operationName), opts...)
 }
 
