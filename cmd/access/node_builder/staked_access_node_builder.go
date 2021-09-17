@@ -84,8 +84,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 
 	builder.EnqueueMetricsServerInit()
 
-	err := builder.RegisterBadgerMetrics()
-	if err != nil {
+	if err := builder.RegisterBadgerMetrics(); err != nil {
 		return err
 	}
 

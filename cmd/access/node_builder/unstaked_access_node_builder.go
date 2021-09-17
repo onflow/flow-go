@@ -89,18 +89,15 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() error {
 	ctx, cancel := context.WithCancel(context.Background())
 	anb.Cancel = cancel
 
-	err := anb.deriveBootstrapPeerIdentities()
-	if err != nil {
+	if err := anb.deriveBootstrapPeerIdentities(); err != nil {
 		return err
 	}
 
-	err = anb.validateParams()
-	if err != nil {
+	if err := anb.validateParams(); err != nil {
 		return err
 	}
 
-	err = anb.initNodeInfo()
-	if err != nil {
+	if err := anb.initNodeInfo(); err != nil {
 		return err
 	}
 
