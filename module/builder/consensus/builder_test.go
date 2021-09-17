@@ -98,58 +98,46 @@ func (bs *BuilderSuite) storeBlock(block *flow.Block) {
 	}
 }
 
-// createAndRecordBlock creates a new block chained to the previous block (if it
-// is not nil). The new block contains a receipt for a result of the previous
+// createAndRecordBlock creates a new block chained to the previous block.
+// The new block contains a receipt for a result of the previous
 // block, which is also used to create a seal for the previous block. The seal
 // and the result are combined in an IncorporatedResultSeal which is a candidate
 // for the seals mempool.
-func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Block {
-	var block flow.Block
-	if parentBlock == nil {
-		block = unittest.BlockFixture()
-	} else {
-		block = unittest.BlockWithParentFixture(parentBlock.Header)
-	}
-	fmt.Println(" created block ", block.ID().String())
-	if parentBlock != nil {
-		fmt.Println("   parent ", parentBlock.ID().String())
-	}
+func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block, candidateSealForParent bool) *flow.Block {
+	block := unittest.BlockWithParentFixture(parentBlock.Header)
 
 	// If parentBlock is not nil, create a receipt for a result of the parentBlock block,
 	// and add it to the payload. The corresponding IncorporatedResult will be used to
 	// seal the parentBlock, and to create an IncorporatedResultSeal for the seal mempool.
 	var incorporatedResultForPrevBlock *flow.IncorporatedResult
-	if parentBlock != nil {
-		previousResult, found := bs.resultForBlock[parentBlock.ID()]
-		if !found {
-			panic("missing execution result for parent")
-		}
-		receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(previousResult))
-		block.Payload.Receipts = append(block.Payload.Receipts, receipt.Meta())
-		block.Payload.Results = append(block.Payload.Results, &receipt.ExecutionResult)
-
-		incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
-			unittest.IncorporatedResult.WithResult(previousResult),
-			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
-		)
-
-		result := unittest.ExecutionResultFixture(
-			unittest.WithBlock(&block),
-			unittest.WithPreviousResult(*previousResult),
-		)
-
-		bs.resultForBlock[result.BlockID] = result
-		bs.resultByID[result.ID()] = result
-		bs.receiptsByID[receipt.ID()] = receipt
-		bs.receiptsByBlockID[receipt.ExecutionResult.BlockID] = append(bs.receiptsByBlockID[receipt.ExecutionResult.BlockID], receipt)
+	previousResult, found := bs.resultForBlock[parentBlock.ID()]
+	if !found {
+		panic("missing execution result for parent")
 	}
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(previousResult))
+	block.Payload.Receipts = append(block.Payload.Receipts, receipt.Meta())
+	block.Payload.Results = append(block.Payload.Results, &receipt.ExecutionResult)
+
+	incorporatedResultForPrevBlock = unittest.IncorporatedResult.Fixture(
+		unittest.IncorporatedResult.WithResult(previousResult),
+		unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
+	)
+
+	result := unittest.ExecutionResultFixture(
+		unittest.WithBlock(&block),
+		unittest.WithPreviousResult(*previousResult),
+	)
+
+	bs.resultForBlock[result.BlockID] = result
+	bs.resultByID[result.ID()] = result
+	bs.receiptsByID[receipt.ID()] = receipt
+	bs.receiptsByBlockID[receipt.ExecutionResult.BlockID] = append(bs.receiptsByBlockID[receipt.ExecutionResult.BlockID], receipt)
 
 	// record block in dbs
 	bs.storeBlock(&block)
 
-	// seal the parentBlock block with the result included in this block. Do not
-	// seal the first block because it is assumed that it is already sealed.
-	if parentBlock != nil && parentBlock.ID() != bs.firstID {
+	if candidateSealForParent {
+		// seal the parentBlock block with the result included in this block.
 		bs.chainSeal(incorporatedResultForPrevBlock)
 	}
 
@@ -224,52 +212,40 @@ func (bs *BuilderSuite) SetupTest() {
 
 	fmt.Println("first:")
 	// Construct the [first] block:
-	first := bs.createAndRecordBlock(nil)
+	first := unittest.BlockFixture()
+	bs.storeBlock(&first)
 	bs.firstID = first.ID()
-	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(first))
-	bs.lastSeal = unittest.Seal.Fixture(
-		unittest.Seal.WithResult(firstResult),
-	)
+	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(&first))
+	bs.lastSeal = unittest.Seal.Fixture(unittest.Seal.WithResult(firstResult))
 	bs.resultForBlock[firstResult.BlockID] = firstResult
 	bs.resultByID[firstResult.ID()] = firstResult
 
 	fmt.Println("finalized:")
 	// Construct finalized blocks [F0] ... [F4]
-	previous := first
+	previous := &first
 	for n := 0; n < numFinalizedBlocks; n++ {
-		finalized := bs.createAndRecordBlock(previous)
+		finalized := bs.createAndRecordBlock(previous, n > 0) // Do not construct candidate seal for [first], as it is already sealed
 		bs.finalizedBlockIDs = append(bs.finalizedBlockIDs, finalized.ID())
 		previous = finalized
 	}
 
 	fmt.Println("Final:")
 	// Construct the last finalized block [final]
-	final := bs.createAndRecordBlock(previous)
+	final := bs.createAndRecordBlock(previous, true)
 	bs.finalID = final.ID()
 
 	fmt.Println("Pending:")
 	// Construct the pending (i.e. unfinalized) ancestors [A0], ..., [A3]
 	previous = final
 	for n := 0; n < numPendingBlocks; n++ {
-		pending := bs.createAndRecordBlock(previous)
+		pending := bs.createAndRecordBlock(previous, true)
 		bs.pendingBlockIDs = append(bs.pendingBlockIDs, pending.ID())
 		previous = pending
 	}
 
-	// Construct [parent] block; but still a known execution result
-	parent := unittest.BlockWithParentFixture(previous.Header)
-	parent.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{bs.receiptsByID[previous.ID()].Meta()},
-		Results:  []*flow.ExecutionResult{bs.resultForBlock[previous.ID()]},
-	})
+	// Construct [parent] block; but do _not_ add candidate seal for its parent
+	parent := bs.createAndRecordBlock(previous, false)
 	bs.parentID = parent.ID()
-	bs.storeBlock(&parent)
-	parentResult := unittest.ExecutionResultFixture(
-		unittest.WithBlock(&parent),
-		unittest.WithPreviousResult(*bs.resultForBlock[previous.ID()]),
-	)
-	bs.resultForBlock[parentResult.BlockID] = parentResult
-	bs.resultByID[parentResult.ID()] = parentResult
 
 	// set up temporary database for tests
 	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
@@ -599,7 +575,7 @@ func (bs *BuilderSuite) TestPayloadSeals_OnlyFork() {
 	var forkHead *flow.Block
 	forkHead = bs.blocks[bs.finalID]
 	for i := 0; i < 8; i++ {
-		forkHead = bs.createAndRecordBlock(forkHead)
+		forkHead = bs.createAndRecordBlock(forkHead, true)
 		// Method createAndRecordBlock adds a seal for every block into the mempool.
 	}
 
@@ -651,7 +627,7 @@ func (bs *BuilderSuite) TestPayloadSeals_EnforceGap() {
 	b0seal := unittest.Seal.Fixture(unittest.Seal.WithResult(b0result))
 
 	// create blocks B1 to B4:
-	b1 := bs.createAndRecordBlock(bs.blocks[bs.parentID])
+	b1 := bs.createAndRecordBlock(bs.blocks[bs.parentID], true)
 	bchain := unittest.ChainFixtureFrom(3, b1.Header) // creates blocks b2, b3, b4
 	b4 := bchain[2]
 
@@ -852,8 +828,8 @@ func (bs *BuilderSuite) TestValidatePayloadSeals_ExecutionForks() {
 // * latest sealed block for a specific fork is provided by test-local seals storage mock
 func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedResult() {
 	bs.build.cfg.expiry = 4 // reduce expiry so collection dedup algorithm doesn't walk past  [lastSeal]
-	x0 := bs.createAndRecordBlock(bs.blocks[bs.finalID])
-	x1 := bs.createAndRecordBlock(x0)
+	x0 := bs.createAndRecordBlock(bs.blocks[bs.finalID], true)
+	x1 := bs.createAndRecordBlock(x0, true)
 
 	// set last sealed blocks:
 	f2 := bs.blocks[bs.finalizedBlockIDs[2]]
@@ -904,19 +880,19 @@ func (bs *BuilderSuite) TestPayloadReceipts_TraverseExecutionTreeFromLastSealedR
 // While the receipt selection itself is performed by the ExecutionTree, the Builder
 // controls the selection by providing suitable BlockFilter and ReceiptFilter.
 func (bs *BuilderSuite) TestPayloadReceipts_IncludeOnlyReceiptsForCurrentFork() {
-	b1 := bs.createAndRecordBlock(bs.blocks[bs.finalID])
-	b2 := bs.createAndRecordBlock(b1)
-	b3 := bs.createAndRecordBlock(b2)
-	b4 := bs.createAndRecordBlock(b3)
-	b5 := bs.createAndRecordBlock(b4)
+	b1 := bs.createAndRecordBlock(bs.blocks[bs.finalID], true)
+	b2 := bs.createAndRecordBlock(b1, true)
+	b3 := bs.createAndRecordBlock(b2, true)
+	b4 := bs.createAndRecordBlock(b3, true)
+	b5 := bs.createAndRecordBlock(b4, true)
 
-	x1 := bs.createAndRecordBlock(bs.blocks[bs.finalID])
-	y2 := bs.createAndRecordBlock(b1)
-	a6 := bs.createAndRecordBlock(b5)
+	x1 := bs.createAndRecordBlock(bs.blocks[bs.finalID], true)
+	y2 := bs.createAndRecordBlock(b1, true)
+	a6 := bs.createAndRecordBlock(b5, true)
 
-	c3 := bs.createAndRecordBlock(b2)
-	c4 := bs.createAndRecordBlock(c3)
-	d4 := bs.createAndRecordBlock(c3)
+	c3 := bs.createAndRecordBlock(b2, true)
+	c4 := bs.createAndRecordBlock(c3, true)
+	d4 := bs.createAndRecordBlock(c3, true)
 
 	// set last sealed blocks:
 	b1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(bs.resultForBlock[b1.ID()]))
