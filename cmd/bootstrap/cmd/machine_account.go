@@ -7,6 +7,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -30,7 +31,7 @@ func init() {
 	rootCmd.AddCommand(machineAccountCmd)
 
 	machineAccountCmd.Flags().StringVar(&flagMachineAccountAddress, "address", "", "the node's machine account address")
-	_ = machineAccountCmd.MarkFlagRequired("address")
+	cmd.MarkFlagRequired(machineAccountCmd, "address")
 }
 
 // keyCmdRun generate the node staking key, networking key and node information
