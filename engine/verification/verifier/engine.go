@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
@@ -317,8 +318,9 @@ func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verificati
 
 	span, ctx, isSampled := e.tracer.StartBlockSpan(context.Background(), ch.Chunk.BlockID, trace.VERVerVerifyWithMetrics)
 	if isSampled {
-		span.LogKV("result_id", ch.Result.ID())
-		span.LogKV("chunk_index", ch.Chunk.Index)
+		span.LogFields(log.String("result_id", ch.Result.ID().String()))
+		span.LogFields(log.Uint64("chunk_index", ch.Chunk.Index))
+		span.SetTag("origin_id", originID)
 	}
 	defer span.Finish()
 

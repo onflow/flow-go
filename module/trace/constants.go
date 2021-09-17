@@ -38,6 +38,7 @@ const (
 	// Compliance
 	CONCompOnBlockProposal      SpanName = "con.compliance.onBlockProposal"
 	ConCompProcessBlockProposal SpanName = "con.compliance.processBlockProposal"
+	CONCompOnBlockVote          SpanName = "con.compliance.onBlockVote"
 
 	// Matching
 	CONMatchProcessReceipt    SpanName = "con.matching.processReceipt"

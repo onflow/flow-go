@@ -9,6 +9,7 @@ import (
 	"github.com/opentracing/opentracing-go"
 	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"github.com/uber/jaeger-client-go"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -331,12 +332,18 @@ func (e *blockComputer) executeTransaction(
 
 	// we capture two spans one for tx-based view and one for the current context (block-based) view
 	txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-	txSpan.LogFields(log.String("transaction.ID", txID.String()))
+	txSpan.LogFields(log.String("tx_id", txID.String()))
+	txSpan.LogFields(log.Uint32("tx_index", txIndex))
+	txSpan.LogFields(log.Int("col_index", collectionIndex))
 	defer txSpan.Finish()
 
+	var traceID string
 	txInternalSpan, _, isSampled := e.tracer.StartTransactionSpan(context.Background(), txID, trace.EXERunTransaction)
 	if isSampled {
-		txInternalSpan.LogFields(log.String("transaction.ID", txID.String()))
+		txInternalSpan.LogFields(log.String("tx_id", txID.String()))
+		if sc, ok := txInternalSpan.Context().(jaeger.SpanContext); ok {
+			traceID = sc.TraceID().String()
+		}
 	}
 	defer txInternalSpan.Finish()
 
@@ -390,6 +397,7 @@ func (e *blockComputer) executeTransaction(
 
 	e.log.Info().
 		Str("txHash", tx.ID.String()).
+		Str("traceID", traceID).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("transaction executed")
 

@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"github.com/uber/jaeger-client-go"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -79,11 +81,18 @@ func NewCore(
 // OnBlockProposal handles incoming block proposals.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
+	var traceID string
+
 	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONCompOnBlockProposal)
 	if isSampled {
-		span.SetTag("block_id", proposal.Header.ID())
-		span.SetTag("view", proposal.Header.View)
+		span.LogFields(log.Uint64("view", proposal.Header.View))
+		span.LogFields(log.String("origin_id", originID.String()))
+
+		// set proposer as a tag so we can filter based on proposer
 		span.SetTag("proposer", proposal.Header.ProposerID.String())
+		if sc, ok := span.Context().(jaeger.SpanContext); ok {
+			traceID = sc.TraceID().String()
+		}
 	}
 	defer span.Finish()
 
@@ -98,6 +107,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Int("num_signers", len(header.ParentVoterIDs)).
+		Str("traceID", traceID). // traceID is used to connect logs to traces
 		Logger()
 	log.Info().Msg("block proposal received")
 
@@ -262,8 +272,6 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 
 	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.ConCompProcessBlockProposal)
 	if isSampled {
-		span.SetTag("block_id", proposal.Header.ID())
-		span.SetTag("view", proposal.Header.View)
 		span.SetTag("proposer", proposal.Header.ProposerID.String())
 	}
 	defer span.Finish()
@@ -316,6 +324,12 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 
 // OnBlockVote handles incoming block votes.
 func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
+
+	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
+	if isSampled {
+		span.LogFields(log.String("origin_id", originID.String()))
+	}
+	defer span.Finish()
 
 	log := c.log.With().
 		Uint64("block_view", vote.View).

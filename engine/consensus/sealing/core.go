@@ -10,6 +10,7 @@ import (
 
 	"github.com/gammazero/workerpool"
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -344,8 +345,11 @@ func (c *Core) checkBlockOutdated(blockID flow.Identifier) error {
 // * exception in case of unexpected error
 // * nil - successfully processed result approval
 func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
-
-	span, _, _ := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
+	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
+	if isSampled {
+		span.LogFields(log.String("approverId", approval.Body.ApproverID.String()))
+		span.LogFields(log.Uint64("chunkIndex", approval.Body.ChunkIndex))
+	}
 	defer span.Finish()
 
 	startTime := time.Now()
