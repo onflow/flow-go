@@ -145,8 +145,7 @@ func main() {
 			return nil
 		})
 
-	err = nodeBuilder.Initialize()
-	if err != nil {
+	if err = nodeBuilder.Initialize(); err != nil {
 		nodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 

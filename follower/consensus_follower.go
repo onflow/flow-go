@@ -124,8 +124,7 @@ func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessN
 	anb := access.FlowAccessNode(accessNodeOptions...)
 	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
 
-	err := nodeBuilder.Initialize()
-	if err != nil {
+	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
 	}
 	nodeBuilder.BuildConsensusFollower()

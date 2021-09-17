@@ -790,8 +790,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 	fnb.ParseAndPrintFlags()
 
-	err := fnb.extraFlagsValidation()
-	if err != nil {
+	if err := fnb.extraFlagsValidation(); err != nil {
 		return err
 	}
 
@@ -802,8 +801,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()
-		err = fnb.RegisterBadgerMetrics()
-		if err != nil {
+		if err := fnb.RegisterBadgerMetrics(); err != nil {
 			return err
 		}
 	}

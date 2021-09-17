@@ -145,8 +145,7 @@ func main() {
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
 	})
 
-	err = nodeBuilder.Initialize()
-	if err != nil {
+	if err = nodeBuilder.Initialize(); err != nil {
 		nodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 
@@ -160,7 +159,7 @@ func main() {
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 
 			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
@@ -480,7 +479,7 @@ func main() {
 				proposals,
 				syncCore)
 			if err != nil {
-				return nil, fmt.Errorf("coult not initialize compliance core: %w", err)
+				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
 			}
 
 			// initialize the compliance engine
@@ -686,7 +685,7 @@ func main() {
 
 				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
 				if err != nil {
-					return nil, fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
+					return nil, fmt.Errorf("could not get flow identifier from secured access node id: %s", secureAccessNodeID)
 				}
 
 				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))

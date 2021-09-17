@@ -92,8 +92,7 @@ func main() {
 
 	})
 
-	err = nodeBuilder.Initialize()
-	if err != nil {
+	if err = nodeBuilder.Initialize(); err != nil {
 		nodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 
@@ -103,7 +102,7 @@ func main() {
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,

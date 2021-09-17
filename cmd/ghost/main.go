@@ -20,8 +20,7 @@ func main() {
 		flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the GRPC server listens on")
 	})
 
-	err := nodeBuilder.Initialize()
-	if err != nil {
+	if err := nodeBuilder.Initialize(); err != nil {
 		nodeBuilder.Logger.Fatal().Err(err).Send()
 	}
 
