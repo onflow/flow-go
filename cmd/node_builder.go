@@ -64,6 +64,9 @@ type NodeBuilder interface {
 	// `Done`.
 	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
 
+	// AdminCommand registers a new admin command with the admin server
+	AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder
+
 	// MustNot asserts that the given error must not occur.
 	// If the error is nil, returns a nil log event (which acts as a no-op).
 	// If the error is not nil, returns a fatal log event containing the error.
@@ -135,7 +138,6 @@ type NodeConfig struct {
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey
 	NetworkKey        crypto.PrivateKey
-	CommandRunner     *admin.CommandRunner
 
 	// root state information
 	RootBlock   *flow.Block

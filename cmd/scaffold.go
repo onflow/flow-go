@@ -95,14 +95,15 @@ type namedDoneObject struct {
 // of the process in case of nodes such as the unstaked access node where the NodeInfo is not part of the genesis data
 type FlowNodeBuilder struct {
 	*NodeConfig
-	flags       *pflag.FlagSet
-	modules     []namedModuleFunc
-	components  []namedComponentFunc
-	doneObject  []namedDoneObject
-	sig         chan os.Signal
-	preInitFns  []func(NodeBuilder, *NodeConfig)
-	postInitFns []func(NodeBuilder, *NodeConfig)
-	lm          *lifecycle.LifecycleManager
+	flags                    *pflag.FlagSet
+	modules                  []namedModuleFunc
+	components               []namedComponentFunc
+	doneObject               []namedDoneObject
+	sig                      chan os.Signal
+	preInitFns               []func(NodeBuilder, *NodeConfig)
+	postInitFns              []func(NodeBuilder, *NodeConfig)
+	lm                       *lifecycle.LifecycleManager
+	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
@@ -127,7 +128,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
 	fnb.flags.StringVar(&fnb.BaseConfig.adminAddr, "admin-addr", defaultConfig.adminAddr, "address to bind on for admin gRPC service")
-	fnb.flags.StringVar(&fnb.BaseConfig.adminHttpAddr, "admin-http-addr", defaultConfig.adminHttpAddr, "address to bind on for admin gRPC service")
+	fnb.flags.StringVar(&fnb.BaseConfig.adminHttpAddr, "admin-http-addr", defaultConfig.adminHttpAddr, "address to bind on for admin HTTP server")
 
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
@@ -231,12 +232,10 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
 			opts = append(opts, admin.WithHTTPServer(fnb.adminHttpAddr))
 		}
 
-		command_runner := admin.NewCommandRunner(fnb.Logger, fnb.adminAddr, opts...)
+		command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.adminAddr, opts...)
 		if err := command_runner.Start(ctx); err != nil {
 			return nil, err
 		}
-
-		node.CommandRunner = command_runner
 
 		return command_runner, nil
 	})
@@ -644,6 +643,13 @@ func (fnb *FlowNodeBuilder) Module(name string, f func(builder NodeBuilder, node
 	return fnb
 }
 
+// AdminCommand registers a new admin command with the admin server
+func (fnb *FlowNodeBuilder) AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder {
+	fnb.adminCommandBootstrapper.RegisterHandler(command, handler)
+	fnb.adminCommandBootstrapper.RegisterValidator(command, validator)
+	return fnb
+}
+
 // MustNot asserts that the given error must not occur.
 //
 // If the error is nil, returns a nil log event (which acts as a no-op).
@@ -719,8 +725,9 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 			BaseConfig: *config,
 			Logger:     zerolog.New(os.Stderr),
 		},
-		flags: pflag.CommandLine,
-		lm:    lifecycle.NewLifecycleManager(),
+		flags:                    pflag.CommandLine,
+		lm:                       lifecycle.NewLifecycleManager(),
+		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
 	}
 	return builder
 }

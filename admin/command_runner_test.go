@@ -24,9 +24,10 @@ import (
 type CommandRunnerSuite struct {
 	suite.Suite
 
-	runner      *CommandRunner
-	grpcAddress string
-	httpAddress string
+	runner       *CommandRunner
+	bootstrapper *CommandRunnerBootstrapper
+	grpcAddress  string
+	httpAddress  string
 
 	client pb.AdminClient
 	conn   *grpc.ClientConn
@@ -34,18 +35,32 @@ type CommandRunnerSuite struct {
 	cancel context.CancelFunc
 }
 
-func TestClusterCommittee(t *testing.T) {
+func TestCommandRunner(t *testing.T) {
 	suite.Run(t, new(CommandRunnerSuite))
 }
 
 func (suite *CommandRunnerSuite) SetupTest() {
+	suite.grpcAddress = fmt.Sprintf("localhost:%s", testingdock.RandomPort(suite.T()))
+	suite.httpAddress = fmt.Sprintf("localhost:%s", "49626" /*testingdock.RandomPort(suite.T())*/)
+	suite.bootstrapper = NewCommandRunnerBootstrapper()
+}
+
+func (suite *CommandRunnerSuite) TearDownTest() {
+	err := suite.conn.Close()
+	suite.Assert().NoError(err)
+	suite.cancel()
+	<-suite.runner.Done()
+	suite.Assert().Len(suite.runner.commandQ, 0)
+	_, ok := <-suite.runner.commandQ
+	suite.Assert().False(ok)
+}
+
+func (suite *CommandRunnerSuite) SetupCommandRunner() {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
 	logger := zerolog.New(zerolog.NewConsoleWriter())
-	suite.grpcAddress = fmt.Sprintf("localhost:%s", testingdock.RandomPort(suite.T()))
-	suite.httpAddress = fmt.Sprintf("localhost:%s", "49626" /*testingdock.RandomPort(suite.T())*/)
-	suite.runner = NewCommandRunner(logger, suite.grpcAddress, WithHTTPServer(suite.httpAddress))
+	suite.runner = suite.bootstrapper.Bootstrap(logger, suite.grpcAddress, WithHTTPServer(suite.httpAddress))
 	err := suite.runner.Start(ctx)
 	suite.Assert().NoError(err)
 	<-suite.runner.Ready()
@@ -64,20 +79,10 @@ func (suite *CommandRunnerSuite) SetupTest() {
 	suite.client = pb.NewAdminClient(conn)
 }
 
-func (suite *CommandRunnerSuite) TearDownTest() {
-	err := suite.conn.Close()
-	suite.Assert().NoError(err)
-	suite.cancel()
-	<-suite.runner.Done()
-	suite.Assert().Len(suite.runner.commandQ, 0)
-	_, ok := <-suite.runner.commandQ
-	suite.Assert().False(ok)
-}
-
 func (suite *CommandRunnerSuite) TestHandler() {
 	called := false
 
-	suite.runner.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -90,6 +95,8 @@ func (suite *CommandRunnerSuite) TestHandler() {
 
 		return nil
 	})
+
+	suite.SetupCommandRunner()
 
 	data := make(map[string]interface{})
 	data["string"] = "foo"
@@ -107,8 +114,23 @@ func (suite *CommandRunnerSuite) TestHandler() {
 	_, err = suite.client.RunCommand(ctx, request)
 	suite.Assert().NoError(err)
 	suite.Assert().True(called)
+}
 
-	suite.runner.UnregisterHandler("foo")
+func (suite *CommandRunnerSuite) TestUnimplementedHandler() {
+	suite.SetupCommandRunner()
+
+	data := make(map[string]interface{})
+	data["key"] = "value"
+	val, err := structpb.NewStruct(data)
+	suite.Assert().NoError(err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	request := &pb.RunCommandRequest{
+		CommandName: "foo",
+		Data:        val,
+	}
+
 	_, err = suite.client.RunCommand(ctx, request)
 	suite.Assert().Equal(codes.Unimplemented, status.Code(err))
 }
@@ -116,7 +138,7 @@ func (suite *CommandRunnerSuite) TestHandler() {
 func (suite *CommandRunnerSuite) TestValidator() {
 	calls := 0
 
-	suite.runner.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -129,12 +151,14 @@ func (suite *CommandRunnerSuite) TestValidator() {
 	})
 
 	validatorErr := errors.New("unexpected value")
-	suite.runner.RegisterValidator("foo", func(data map[string]interface{}) error {
+	suite.bootstrapper.RegisterValidator("foo", func(data map[string]interface{}) error {
 		if data["key"] != "value" {
 			return validatorErr
 		}
 		return nil
 	})
+
+	suite.SetupCommandRunner()
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
@@ -160,20 +184,11 @@ func (suite *CommandRunnerSuite) TestValidator() {
 	suite.Assert().Equal(status.Convert(err).Message(), validatorErr.Error())
 	suite.Assert().Equal(codes.InvalidArgument, status.Code(err))
 	suite.Assert().Equal(calls, 1)
-
-	suite.runner.UnregisterValidator("foo")
-
-	val, err = structpb.NewStruct(data)
-	suite.Assert().NoError(err)
-	request.Data = val
-	_, err = suite.client.RunCommand(ctx, request)
-	suite.Assert().NoError(err)
-	suite.Assert().Equal(calls, 2)
 }
 
 func (suite *CommandRunnerSuite) TestHandlerError() {
 	handlerErr := errors.New("handler error")
-	suite.runner.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -182,6 +197,8 @@ func (suite *CommandRunnerSuite) TestHandlerError() {
 
 		return handlerErr
 	})
+
+	suite.SetupCommandRunner()
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
@@ -201,10 +218,12 @@ func (suite *CommandRunnerSuite) TestHandlerError() {
 }
 
 func (suite *CommandRunnerSuite) TestTimeout() {
-	suite.runner.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
 		<-ctx.Done()
 		return ctx.Err()
 	})
+
+	suite.SetupCommandRunner()
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
@@ -225,7 +244,7 @@ func (suite *CommandRunnerSuite) TestTimeout() {
 func (suite *CommandRunnerSuite) TestHTTPServer() {
 	called := false
 
-	suite.runner.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -238,6 +257,8 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 		return nil
 	})
 
+	suite.SetupCommandRunner()
+
 	url := fmt.Sprintf("http://%s/admin/run_command", suite.httpAddress)
 	reqBody := bytes.NewBuffer([]byte(`{"commandName": "foo", "data": {"key": "value"}}`))
 	resp, err := http.Post(url, "application/json", reqBody)
@@ -249,10 +270,12 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 }
 
 func (suite *CommandRunnerSuite) TestCleanup() {
-	suite.runner.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
 		<-ctx.Done()
 		return ctx.Err()
 	})
+
+	suite.SetupCommandRunner()
 
 	data := make(map[string]interface{})
 	data["key"] = "value"

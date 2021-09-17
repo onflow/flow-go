@@ -24,6 +24,62 @@ const (
 	CommandRunnerShutdownTimeout = 5 * time.Second
 )
 
+type CommandHandler func(ctx context.Context, data map[string]interface{}) error
+type CommandValidator func(data map[string]interface{}) error
+type CommandRunnerOption func(*CommandRunner)
+
+func WithHTTPServer(httpAddress string) CommandRunnerOption {
+	return func(r *CommandRunner) {
+		r.httpAddress = httpAddress
+	}
+}
+
+type CommandRunnerBootstrapper struct {
+	handlers   map[string]CommandHandler
+	validators map[string]CommandValidator
+}
+
+func NewCommandRunnerBootstrapper() *CommandRunnerBootstrapper {
+	return &CommandRunnerBootstrapper{
+		handlers:   make(map[string]CommandHandler),
+		validators: make(map[string]CommandValidator),
+	}
+}
+
+func (r *CommandRunnerBootstrapper) Bootstrap(logger zerolog.Logger, grpcAddress string, opts ...CommandRunnerOption) *CommandRunner {
+	commandRunner := &CommandRunner{
+		handlers:         r.handlers,
+		validators:       r.validators,
+		commandQ:         make(chan *CommandRequest, CommandRunnerMaxQueueLength),
+		grpcAddress:      grpcAddress,
+		logger:           logger.With().Str("admin", "command_runner").Logger(),
+		startupCompleted: make(chan struct{}),
+		errors:           make(chan error),
+	}
+
+	for _, opt := range opts {
+		opt(commandRunner)
+	}
+
+	return commandRunner
+}
+
+func (r *CommandRunnerBootstrapper) RegisterHandler(command string, handler CommandHandler) bool {
+	if _, ok := r.handlers[command]; ok {
+		return false
+	}
+	r.handlers[command] = handler
+	return true
+}
+
+func (r *CommandRunnerBootstrapper) RegisterValidator(command string, validator CommandValidator) bool {
+	if _, ok := r.validators[command]; ok {
+		return false
+	}
+	r.validators[command] = validator
+	return true
+}
+
 type CommandRunner struct {
 	handlers    map[string]CommandHandler
 	validators  map[string]CommandValidator
@@ -33,9 +89,6 @@ type CommandRunner struct {
 	logger      zerolog.Logger
 
 	errors chan error
-
-	// mutex to guard against concurrent access to handlers and validators
-	mu sync.RWMutex
 
 	// wait for worker routines to be ready
 	workersStarted sync.WaitGroup
@@ -47,75 +100,11 @@ type CommandRunner struct {
 	startupCompleted chan struct{}
 }
 
-type CommandHandler func(ctx context.Context, data map[string]interface{}) error
-type CommandValidator func(data map[string]interface{}) error
-type CommandRunnerOption func(*CommandRunner)
-
-func WithHTTPServer(httpAddress string) CommandRunnerOption {
-	return func(r *CommandRunner) {
-		r.httpAddress = httpAddress
-	}
-}
-
-func NewCommandRunner(logger zerolog.Logger, grpcAddress string, opts ...CommandRunnerOption) *CommandRunner {
-	r := &CommandRunner{
-		handlers:         make(map[string]CommandHandler),
-		validators:       make(map[string]CommandValidator),
-		commandQ:         make(chan *CommandRequest, CommandRunnerMaxQueueLength),
-		grpcAddress:      grpcAddress,
-		logger:           logger.With().Str("admin", "command_runner").Logger(),
-		startupCompleted: make(chan struct{}),
-		errors:           make(chan error),
-	}
-
-	for _, opt := range opts {
-		opt(r)
-	}
-
-	return r
-}
-
-func (r *CommandRunner) RegisterHandler(command string, handler CommandHandler) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, ok := r.handlers[command]; ok {
-		return false
-	}
-	r.handlers[command] = handler
-	return true
-}
-
-func (r *CommandRunner) UnregisterHandler(command string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.handlers, command)
-}
-
-func (r *CommandRunner) RegisterValidator(command string, validator CommandValidator) bool {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, ok := r.validators[command]; ok {
-		return false
-	}
-	r.validators[command] = validator
-	return true
-}
-
-func (r *CommandRunner) UnregisterValidator(command string) {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.validators, command)
-}
-
 func (r *CommandRunner) getHandler(command string) CommandHandler {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 	return r.handlers[command]
 }
 
 func (r *CommandRunner) getValidator(command string) CommandValidator {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
 	return r.validators[command]
 }
 
