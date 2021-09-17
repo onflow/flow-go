@@ -192,7 +192,7 @@ func (t *OpenTracer) StartSpanFromContext(
 		return &NoopSpan{&NoopTracer{}}, ctx
 	}
 
-	opts = append(opts, opentracing.FollowsFrom(parentSpan.Context()))
+	opts = append(opts, opentracing.ChildOf(parentSpan.Context()))
 	span := t.Tracer.StartSpan(string(operationName), opts...)
 	return span, opentracing.ContextWithSpan(ctx, span)
 }

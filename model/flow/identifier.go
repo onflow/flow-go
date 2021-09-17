@@ -73,7 +73,7 @@ func (id Identifier) Format(state fmt.State, verb rune) {
 // 100 means all data will be collected.
 func (id Identifier) IsSampled(percentage uint) bool {
 	// take the first 8 bytes and check the first few bits based on the percentage
-	return binary.BigEndian.Uint64(id[:8])>>int(math.Min(float64(percentage)/float64(1.5), 64)) == 0
+	return binary.BigEndian.Uint64(id[:8])>>(64-int(math.Min(float64(percentage)/float64(1.5), 64))) == 0
 }
 
 func (id Identifier) MarshalText() ([]byte, error) {
