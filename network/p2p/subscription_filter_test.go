@@ -18,6 +18,10 @@ import (
 )
 
 func TestFilterSubscribe(t *testing.T) {
+	// skip for now due to bug in libp2p gossipsub implementation:
+	// https://github.com/libp2p/go-libp2p-pubsub/issues/449
+	t.Skip()
+
 	identity1, privateKey1 := createID(t, unittest.WithRole(flow.RoleAccess))
 	identity2, privateKey2 := createID(t, unittest.WithRole(flow.RoleAccess))
 	ids := flow.IdentityList{identity1, identity2}
@@ -58,10 +62,6 @@ func TestFilterSubscribe(t *testing.T) {
 		return false
 	}, 1*time.Second, 100*time.Millisecond)
 
-	// skip for now due to bug in libp2p gossipsub implementation:
-	// https://github.com/libp2p/go-libp2p-pubsub/issues/449
-	t.Skip()
-
 	var wg sync.WaitGroup
 	wg.Add(2)
 
@@ -78,7 +78,7 @@ func TestFilterSubscribe(t *testing.T) {
 		require.Equal(t, msg.Data, data)
 
 		ctx, cancel = context.WithTimeout(context.Background(), time.Second)
-		msg, err = unstakedSub.Next(ctx)
+		_, err = unstakedSub.Next(ctx)
 		cancel()
 		require.ErrorIs(t, err, context.DeadlineExceeded)
 
