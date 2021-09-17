@@ -68,7 +68,8 @@ func TestFilterSubscribe(t *testing.T) {
 	testPublish := func(wg *sync.WaitGroup, from *Node, sub *pubsub.Subscription) {
 		data := []byte("hello")
 
-		from.Publish(context.TODO(), badTopic, data)
+		err := from.Publish(context.TODO(), badTopic, data)
+		require.NoError(t, err)
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		msg, err := sub.Next(ctx)
@@ -97,7 +98,11 @@ func TestCanSubscribe(t *testing.T) {
 	identity, privateKey := createID(t, unittest.WithRole(flow.RoleCollection))
 
 	collectionNode := createNode(t, identity.NodeID, privateKey, createSubscriptionFilterPubsubOption(t, flow.IdentityList{identity}))
-	defer collectionNode.Stop()
+	defer func() {
+		done, err := collectionNode.Stop()
+		require.NoError(t, err)
+		<-done
+	}()
 
 	goodTopic := engine.TopicFromChannel(engine.ProvideCollections, rootBlockID)
 	_, err := collectionNode.pubSub.Join(goodTopic.String())
