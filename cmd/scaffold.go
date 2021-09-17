@@ -2,8 +2,11 @@ package cmd
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -132,8 +135,10 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
-	fnb.flags.StringVar(&fnb.BaseConfig.adminAddr, "admin-addr", defaultConfig.adminAddr, "address to bind on for admin gRPC service")
-	fnb.flags.StringVar(&fnb.BaseConfig.adminHttpAddr, "admin-http-addr", defaultConfig.adminHttpAddr, "address to bind on for admin HTTP server")
+	fnb.flags.StringVar(&fnb.BaseConfig.adminAddr, "admin-addr", defaultConfig.adminAddr, "address to bind on for admin HTTP server")
+	fnb.flags.StringVar(&fnb.BaseConfig.adminCert, "admin-cert", defaultConfig.adminCert, "admin cert file (for TLS)")
+	fnb.flags.StringVar(&fnb.BaseConfig.adminKey, "admin-key", defaultConfig.adminKey, "admin key file (for TLS)")
+	fnb.flags.StringVar(&fnb.BaseConfig.adminClientCAs, "admin-client-certs", defaultConfig.adminClientCAs, "admin client certs (for mutual TLS)")
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", dns.DefaultTimeToLive, "time-to-live for dns cache")
 
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
@@ -251,8 +256,26 @@ func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
 	fnb.Component("admin server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 		var opts []admin.CommandRunnerOption
-		if fnb.adminHttpAddr != NotSet {
-			opts = append(opts, admin.WithHTTPServer(fnb.adminHttpAddr))
+
+		if node.adminCert != NotSet {
+			serverCert, err := tls.LoadX509KeyPair(node.adminCert, node.adminKey)
+			if err != nil {
+				return nil, err
+			}
+			clientCAs, err := ioutil.ReadFile(node.adminClientCAs)
+			if err != nil {
+				return nil, err
+			}
+			certPool := x509.NewCertPool()
+			certPool.AppendCertsFromPEM(clientCAs)
+			config := &tls.Config{
+				MinVersion:   tls.VersionTLS13,
+				Certificates: []tls.Certificate{serverCert},
+				ClientAuth:   tls.RequireAndVerifyClientCert,
+				ClientCAs:    certPool,
+			}
+
+			opts = append(opts, admin.WithTLS(config))
 		}
 
 		command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.adminAddr, opts...)
@@ -838,6 +861,10 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 	}
 
 	if fnb.adminAddr != NotSet {
+		if (fnb.adminCert != NotSet || fnb.adminKey != NotSet || fnb.adminClientCAs != NotSet) &&
+			!(fnb.adminCert != NotSet && fnb.adminKey != NotSet && fnb.adminClientCAs != NotSet) {
+			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
+		}
 		fnb.EnqueueAdminServerInit(ctx)
 	}
 

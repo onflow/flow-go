@@ -105,7 +105,9 @@ type NodeBuilder interface {
 type BaseConfig struct {
 	nodeIDHex             string
 	adminAddr             string
-	adminHttpAddr         string
+	adminCert             string
+	adminKey              string
+	adminClientCAs        string
 	BindAddr              string
 	NodeRole              string
 	timeout               time.Duration
@@ -171,7 +173,9 @@ func DefaultBaseConfig() *BaseConfig {
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
 		adminAddr:             NotSet,
-		adminHttpAddr:         NotSet,
+		adminCert:             NotSet,
+		adminKey:              NotSet,
+		adminClientCAs:        NotSet,
 		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
 		timeout:               1 * time.Minute,

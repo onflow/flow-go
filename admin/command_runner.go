@@ -2,6 +2,7 @@ package admin
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -10,12 +11,12 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	pb "github.com/onflow/flow-go/admin/admin"
-	"github.com/rs/zerolog"
 )
 
 const (
@@ -28,9 +29,15 @@ type CommandHandler func(ctx context.Context, data map[string]interface{}) error
 type CommandValidator func(data map[string]interface{}) error
 type CommandRunnerOption func(*CommandRunner)
 
-func WithHTTPServer(httpAddress string) CommandRunnerOption {
+func WithTLS(config *tls.Config) CommandRunnerOption {
 	return func(r *CommandRunner) {
-		r.httpAddress = httpAddress
+		r.tlsConfig = config
+	}
+}
+
+func WithGRPCAddress(address string) CommandRunnerOption {
+	return func(r *CommandRunner) {
+		r.grpcAddress = address
 	}
 }
 
@@ -46,12 +53,13 @@ func NewCommandRunnerBootstrapper() *CommandRunnerBootstrapper {
 	}
 }
 
-func (r *CommandRunnerBootstrapper) Bootstrap(logger zerolog.Logger, grpcAddress string, opts ...CommandRunnerOption) *CommandRunner {
+func (r *CommandRunnerBootstrapper) Bootstrap(logger zerolog.Logger, bindAddress string, opts ...CommandRunnerOption) *CommandRunner {
 	commandRunner := &CommandRunner{
 		handlers:         r.handlers,
 		validators:       r.validators,
 		commandQ:         make(chan *CommandRequest, CommandRunnerMaxQueueLength),
-		grpcAddress:      grpcAddress,
+		grpcAddress:      "/tmp/flow-node-admin.sock",
+		httpAddress:      bindAddress,
 		logger:           logger.With().Str("admin", "command_runner").Logger(),
 		startupCompleted: make(chan struct{}),
 		errors:           make(chan error),
@@ -86,6 +94,7 @@ type CommandRunner struct {
 	commandQ    chan *CommandRequest
 	grpcAddress string
 	httpAddress string
+	tlsConfig   *tls.Config
 	logger      zerolog.Logger
 
 	errors chan error
@@ -161,7 +170,7 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 
 	r.logger.Info().Msg("admin server starting up")
 
-	listener, err := net.Listen("tcp", r.grpcAddress)
+	listener, err := net.Listen("unix", r.grpcAddress)
 	if err != nil {
 		return fmt.Errorf("failed to listen on admin server address: %w", err)
 	}
@@ -181,32 +190,40 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 		}
 	}()
 
-	var httpServer *http.Server
+	// Register gRPC server endpoint
+	mux := runtime.NewServeMux()
+	opts := []grpc.DialOption{grpc.WithInsecure()}
 
-	if r.httpAddress != "" {
-		// Register gRPC server endpoint
-		mux := runtime.NewServeMux()
-		opts := []grpc.DialOption{grpc.WithInsecure()}
-		err = pb.RegisterAdminHandlerFromEndpoint(ctx, mux, r.grpcAddress, opts)
-		if err != nil {
-			return fmt.Errorf("failed to register http handlers for admin service: %w", err)
+	err = pb.RegisterAdminHandlerFromEndpoint(ctx, mux, "unix:///"+r.grpcAddress, opts)
+	if err != nil {
+		return fmt.Errorf("failed to register http handlers for admin service: %w", err)
+	}
+
+	httpServer := &http.Server{
+		Addr:      r.httpAddress,
+		Handler:   mux,
+		TLSConfig: r.tlsConfig,
+	}
+
+	r.workersStarted.Add(1)
+	r.workersFinished.Add(1)
+	go func() {
+		defer r.workersFinished.Done()
+		r.workersStarted.Done()
+
+		// Start HTTP server (and proxy calls to gRPC server endpoint)
+		var err error
+		if r.tlsConfig == nil {
+			err = httpServer.ListenAndServe()
+		} else {
+			err = httpServer.ListenAndServeTLS("", "")
 		}
 
-		httpServer = &http.Server{Addr: r.httpAddress, Handler: mux}
-
-		r.workersStarted.Add(1)
-		r.workersFinished.Add(1)
-		go func() {
-			defer r.workersFinished.Done()
-			r.workersStarted.Done()
-
-			// Start HTTP server (and proxy calls to gRPC server endpoint)
-			if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				r.logger.Err(err).Msg("HTTP server encountered error")
-				r.errors <- err
-			}
-		}()
-	}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			r.logger.Err(err).Msg("HTTP server encountered error")
+			r.errors <- err
+		}
+	}()
 
 	r.workersStarted.Add(1)
 	r.workersFinished.Add(1)
