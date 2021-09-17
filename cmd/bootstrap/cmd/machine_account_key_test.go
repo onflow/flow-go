@@ -70,7 +70,7 @@ func TestMachineAccountKeyFileCreated(t *testing.T) {
 
 	unittest.RunWithTempDir(t, func(bootDir string) {
 		var keyFileCreatedRegex = `^generated machine account private key` +
-			`encode machine account public key for entry to Flow Port` +
+			`encoded machine account public key for entry to Flow Port` +
 			`wrote file %s/private-root-information/private-node-info_\S+/node-machine-account-key.priv.json`
 		regex := regexp.MustCompile(fmt.Sprintf(keyFileCreatedRegex, bootDir))
 

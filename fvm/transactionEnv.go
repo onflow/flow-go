@@ -553,6 +553,14 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 }
 
 func (e *TransactionEnv) GetComputationLimit() uint64 {
+	// if gas limit is set to zero fallback to the gas limit set by the context
+	if e.tx.GasLimit == 0 {
+		// if context gasLimit is also zero, fallback to the default gas limit
+		if e.ctx.GasLimit == 0 {
+			return DefaultGasLimit
+		}
+		return e.ctx.GasLimit
+	}
 	return e.tx.GasLimit
 }
 
@@ -933,70 +941,45 @@ func (e *TransactionEnv) ImplementationDebugLog(message string) error {
 	return nil
 }
 
-func (e *TransactionEnv) ProgramParsed(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceParseProgram, duration,
-			[]opentracing.LogRecord{
-				{Timestamp: time.Now(),
-					Fields: []traceLog.Field{traceLog.String("location", locStr)},
-				},
-			},
-		)
+func (e *TransactionEnv) RecordTrace(operation string, location common.Location, duration time.Duration, logs []opentracing.LogRecord) {
+	if !e.isTraceable() {
+		return
 	}
+	if location != nil {
+		if logs == nil {
+			logs = make([]opentracing.LogRecord, 0)
+		}
+		logs = append(logs, opentracing.LogRecord{Timestamp: time.Now(),
+			Fields: []traceLog.Field{traceLog.String("location", location.String())},
+		})
+	}
+
+	spanName := trace.FVMCadenceTrace.Child(operation)
+	e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, spanName, duration, logs)
+}
+
+func (e *TransactionEnv) ProgramParsed(location common.Location, duration time.Duration) {
+	e.RecordTrace("parseProgram", location, duration, nil)
 	e.metrics.ProgramParsed(location, duration)
 }
 
 func (e *TransactionEnv) ProgramChecked(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceCheckProgram, duration,
-			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", locStr)},
-			},
-			},
-		)
-	}
+	e.RecordTrace("checkProgram", location, duration, nil)
 	e.metrics.ProgramChecked(location, duration)
 }
 
 func (e *TransactionEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceInterpretProgram, duration,
-			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", locStr)},
-			},
-			},
-		)
-	}
+	e.RecordTrace("interpretProgram", location, duration, nil)
 	e.metrics.ProgramInterpreted(location, duration)
 }
 
 func (e *TransactionEnv) ValueEncoded(duration time.Duration) {
-	if e.isTraceable() {
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceEncodeValue, duration,
-			[]opentracing.LogRecord{},
-		)
-	}
+	e.RecordTrace("encodeValue", nil, duration, nil)
 	e.metrics.ValueEncoded(duration)
 }
 
 func (e *TransactionEnv) ValueDecoded(duration time.Duration) {
-	if e.isTraceable() {
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceDecodeValue, duration,
-			[]opentracing.LogRecord{},
-		)
-	}
+	e.RecordTrace("decodeValue", nil, duration, nil)
 	e.metrics.ValueDecoded(duration)
 }
 

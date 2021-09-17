@@ -59,7 +59,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 		committer := new(computermock.ViewCommitter)
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil).
+			Return(nil, nil, nil, nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
 		metrics := new(modulemock.ExecutionMetrics)
@@ -84,6 +84,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
+		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
 
 		assertEventHashesMatch(t, 1+1, result)
 
@@ -111,7 +112,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Once() // just system chunk
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil).
+			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
@@ -121,6 +122,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
+		assert.Len(t, result.TrieUpdates, 1)
 		assert.Len(t, result.TransactionResults, 1)
 
 		assertEventHashesMatch(t, 1, result)
@@ -177,12 +179,13 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		block := generateBlock(0, 0, rag)
 
 		comm.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil).
+			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
 		result, err := exe.ExecuteBlock(context.Background(), block, view, progs)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
+		assert.Len(t, result.TrieUpdates, 1)
 		assert.Len(t, result.TransactionResults, 1)
 
 		assert.Empty(t, result.TransactionResults[0].ErrorMessage)
@@ -220,7 +223,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Times(totalTransactionCount)
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil).
+			Return(nil, nil, nil, nil).
 			Times(collectionCount + 1)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
@@ -628,7 +631,7 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	committer := new(computermock.ViewCommitter)
 	committer.On("CommitView", mock.Anything, mock.Anything).
-		Return(nil, nil, nil).
+		Return(nil, nil, nil, nil).
 		Times(1) // only system chunk
 
 	metrics := new(modulemock.ExecutionMetrics)

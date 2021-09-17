@@ -101,6 +101,16 @@ type encodableIdentity struct {
 	NetworkPubKey []byte
 }
 
+// stealthIdentity represents a node identity without an address
+type stealthIdentity struct {
+	NodeID        Identifier
+	Address       string `json:"-"`
+	Role          Role
+	Stake         uint64
+	StakingPubKey []byte
+	NetworkPubKey []byte
+}
+
 func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
 	if iy.StakingPubKey != nil {
@@ -113,11 +123,20 @@ func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 }
 
 func (iy Identity) MarshalJSON() ([]byte, error) {
+	var identity interface{}
 	encodable, err := encodableFromIdentity(iy)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
 	}
-	data, err := json.Marshal(encodable)
+
+	// if the address is empty, suppress the Address field in the output json
+	if encodable.Address == "" {
+		identity = stealthIdentity(encodable)
+	} else {
+		identity = encodable
+	}
+
+	data, err := json.Marshal(identity)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode json: %w", err)
 	}
@@ -386,6 +405,16 @@ func (il IdentityList) ByIndex(index uint) (*Identity, bool) {
 func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 	for _, identity := range il {
 		if identity.NodeID == nodeID {
+			return identity, true
+		}
+	}
+	return nil, false
+}
+
+// ByNetworkingKey gets a node from the list by network public key.
+func (il IdentityList) ByNetworkingKey(key crypto.PublicKey) (*Identity, bool) {
+	for _, identity := range il {
+		if identity.NetworkPubKey.Equals(key) {
 			return identity, true
 		}
 	}

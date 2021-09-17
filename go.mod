@@ -3,7 +3,7 @@ module github.com/onflow/flow-go
 go 1.15
 
 require (
-	cloud.google.com/go/storage v1.10.0
+	cloud.google.com/go/storage v1.16.0
 	github.com/bsipos/thist v1.0.0
 	github.com/btcsuite/btcd v0.21.0-beta
 	github.com/dapperlabs/testingdock v0.4.2
@@ -42,7 +42,7 @@ require (
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/cadence v0.18.1-0.20210730161646-b891a21c51fd
+	github.com/onflow/cadence v0.19.1-0.20210915143754-16d477f6d7d6
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.7
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.7
 	github.com/onflow/flow-emulator v0.20.3
@@ -67,7 +67,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/api v0.31.0
+	google.golang.org/api v0.49.0
 	google.golang.org/genproto v0.0.0-20210903162649-d08c68adba83 // indirect
 	google.golang.org/grpc v1.40.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0

@@ -55,6 +55,12 @@ type NetworkMetrics interface {
 
 	// InboundConnections updates the metric tracking the number of inbound connections of this node
 	InboundConnections(connectionCount uint)
+
+	// UnstakedOutboundConnections updates the metric tracking the number of outbound connections to unstaked nodes
+	UnstakedOutboundConnections(connectionCount uint)
+
+	// UnstakedInboundConnections updates the metric tracking the number of inbound connections from unstaked nodes
+	UnstakedInboundConnections(connectionCount uint)
 }
 
 type EngineMetrics interface {
@@ -228,6 +234,11 @@ type VerificationMetrics interface {
 	// requester engine receives from execution nodes (through network).
 	OnChunkDataPackResponseReceivedFromNetworkByRequester()
 
+	// SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester is invoked when a cycle of requesting chunk data packs is done by requester engine.
+	// It updates the maximum number of attempts made by requester engine for requesting the chunk data packs of the next unsealed height.
+	// The maximum is taken over the history of all chunk data packs requested during that cycle that belong to the next unsealed height.
+	SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester(attempts uint64)
+
 	// OnChunkDataPackSentToFetcher increments a counter that keeps track of number of chunk data packs sent to the fetcher engine from
 	// requester engine.
 	OnChunkDataPackSentToFetcher()
@@ -365,6 +376,10 @@ type ExecutionMetrics interface {
 
 	// ExecutionSync reports when the state syncing is triggered or stopped.
 	ExecutionSync(syncing bool)
+
+	ExecutionBlockDataUploadStarted()
+
+	ExecutionBlockDataUploadFinished(dur time.Duration)
 }
 
 type TransactionMetrics interface {
