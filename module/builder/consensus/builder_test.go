@@ -1,6 +1,7 @@
 package consensus
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"testing"
@@ -109,6 +110,10 @@ func (bs *BuilderSuite) createAndRecordBlock(parentBlock *flow.Block) *flow.Bloc
 	} else {
 		block = unittest.BlockWithParentFixture(parentBlock.Header)
 	}
+	fmt.Println(" created block ", block.ID().String())
+	if parentBlock != nil {
+		fmt.Println("   parent ", parentBlock.ID().String())
+	}
 
 	// If parentBlock is not nil, create a receipt for a result of the parentBlock block,
 	// and add it to the payload. The corresponding IncorporatedResult will be used to
@@ -159,11 +164,26 @@ func (bs *BuilderSuite) chainSeal(incorporatedResult *flow.IncorporatedResult) {
 		unittest.IncorporatedResultSeal.WithResult(incorporatedResult.Result),
 		unittest.IncorporatedResultSeal.WithIncorporatedBlockID(incorporatedResult.IncorporatedBlockID),
 	)
+
+	fmt.Println("   seal ", incorporatedResultSeal.Seal.BlockID.String())
+
 	bs.chain = append(bs.chain, incorporatedResultSeal.Seal)
 	bs.irsMap[incorporatedResultSeal.ID()] = incorporatedResultSeal
 	bs.irsList = append(bs.irsList, incorporatedResultSeal)
 }
 
+// SetupTest constructs the following chain of blocks:
+//    [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [final] <- [A0] <- [A1] <- [A2] <- [A3] <- [parent]
+// Where block
+//   * [first] is sealed and finalized
+//   * [F0] ... [F4] and [final] are finalized, unsealed blocks with candidate seals are included in mempool
+//   * [A0] ... [A2] are non-finalized, unsealed blocks with candidate seals are included in mempool
+//   * [A3] and [parent] are non-finalized, unsealed blocks _without_ candidate seals
+// Each block incorporates the result for its immediate parent.
+//
+// Note: In the happy path, the blocks [A3] and [parent] will not have candidate seal for the following reason:
+// For the verifiers to start checking a result R, they need a source of randomness for the block _incorporating_
+// result R. The result for block [A3] is incorporated in [parent], which does _not_ have a child yet.
 func (bs *BuilderSuite) SetupTest() {
 
 	// set up no-op dependencies
@@ -202,7 +222,8 @@ func (bs *BuilderSuite) SetupTest() {
 	// initialize behaviour tracking
 	bs.assembled = nil
 
-	// insert the first block in our range
+	fmt.Println("first:")
+	// Construct the [first] block:
 	first := bs.createAndRecordBlock(nil)
 	bs.firstID = first.ID()
 	firstResult := unittest.ExecutionResultFixture(unittest.WithBlock(first))
@@ -212,7 +233,8 @@ func (bs *BuilderSuite) SetupTest() {
 	bs.resultForBlock[firstResult.BlockID] = firstResult
 	bs.resultByID[firstResult.ID()] = firstResult
 
-	// insert the finalized blocks between first and final
+	fmt.Println("finalized:")
+	// Construct finalized blocks [F0] ... [F4]
 	previous := first
 	for n := 0; n < numFinalizedBlocks; n++ {
 		finalized := bs.createAndRecordBlock(previous)
@@ -220,11 +242,13 @@ func (bs *BuilderSuite) SetupTest() {
 		previous = finalized
 	}
 
-	// insert the finalized block with an empty payload
+	fmt.Println("Final:")
+	// Construct the last finalized block [final]
 	final := bs.createAndRecordBlock(previous)
 	bs.finalID = final.ID()
 
-	// insert the pending ancestors with empty payload
+	fmt.Println("Pending:")
+	// Construct the pending (i.e. unfinalized) ancestors [A0], ..., [A3]
 	previous = final
 	for n := 0; n < numPendingBlocks; n++ {
 		pending := bs.createAndRecordBlock(previous)
@@ -232,9 +256,20 @@ func (bs *BuilderSuite) SetupTest() {
 		previous = pending
 	}
 
-	// insert the parent block with an empty payload
-	parent := bs.createAndRecordBlock(previous)
+	// Construct [parent] block; but still a known execution result
+	parent := unittest.BlockWithParentFixture(previous.Header)
+	parent.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{bs.receiptsByID[previous.ID()].Meta()},
+		Results:  []*flow.ExecutionResult{bs.resultForBlock[previous.ID()]},
+	})
 	bs.parentID = parent.ID()
+	bs.storeBlock(&parent)
+	parentResult := unittest.ExecutionResultFixture(
+		unittest.WithBlock(&parent),
+		unittest.WithPreviousResult(*bs.resultForBlock[previous.ID()]),
+	)
+	bs.resultForBlock[parentResult.BlockID] = parentResult
+	bs.resultByID[parentResult.ID()] = parentResult
 
 	// set up temporary database for tests
 	bs.db, bs.dir = unittest.TempBadgerDB(bs.T())
@@ -505,20 +540,34 @@ func (bs *BuilderSuite) TestPayloadGuaranteeReferenceExpired() {
 }
 
 // TestPayloadSeals_AllValid checks that builder seals as many blocks as possible (happy path):
-//  [S] <- [F0] <- [F1] <- [F2] <- [F3] <- [A0] <- [A1] <- [A2] <- [A3]
+//    [first] <- [F0] <- [F1] <- [F2] <- [F3] <- [final] <- [A0] <- [A1] <- [A2] <- [A3] <- [parent]
 // Where block
-//   * [S] is sealed and finalized
-//   * [F0] ... [F3] are finalized, unsealed blocks with candidate seals are included in mempool
-//   * [A0] ... [A3] non-finalized, unsealed blocks with candidate seals are included in mempool
+//   * [first] is sealed and finalized
+//   * [F0] ... [F4] and [final] are finalized, unsealed blocks with candidate seals are included in mempool
+//   * [A0] ... [A2] are non-finalized, unsealed blocks with candidate seals are included in mempool
+//   * [A3] and [parent] are non-finalized, unsealed blocks _without_ candidate seals
 // Expected behaviour:
-//  * builder should only include seals [F0], ..., [A3]
+//  * builder should include seals [F0], ..., [A4]
+//  * note: Block [A3] will not have a seal in the happy path for the following reason:
+//    In our example, the result for block A3 is incorporated in block A4. But, for the verifiers to start
+//    their work, they need a child block of A4, because the child contains the source of randomness for
+//    A4. But we are just constructing this child right now. Hence, the verifiers couldn't have checked
+//    the result for A3.
 func (bs *BuilderSuite) TestPayloadSeals_AllValid() {
-	// populate seals mempool with valid chain of seals for blocks [F0], ..., [A3]
+	// populate seals mempool with valid chain of seals for blocks [F0], ..., [A2]
 	bs.pendingSeals = bs.irsMap
 
 	_, err := bs.build.BuildOn(bs.parentID, bs.setter)
 	bs.Require().NoError(err)
 	bs.Assert().Empty(bs.assembled.Guarantees, "should have no guarantees in payload with empty mempool")
+	//
+	//for _, s := range bs.assembled.Seals {
+	//	fmt.Println(" included seal for block ", s.BlockID.String())
+	//}
+	//
+	//fmt.Println(len(bs.chain))
+	//// bs.chain contains the 9 seals for F0, F1, ..., A3
+	//
 	bs.Assert().ElementsMatch(bs.chain, bs.assembled.Seals, "should have included valid chain of seals")
 }
 
