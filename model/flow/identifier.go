@@ -76,6 +76,18 @@ func (id Identifier) IsSampled(sensitivity uint) bool {
 	return binary.BigEndian.Uint64(id[:8])>>uint64(64-sensitivity) == 0
 }
 
+// IsSampledWithPercent is a utility method to sample entities based on their ids, the sampling rate is 
+// percentage based.
+// 0 means 0 data will be collected.
+// 100 means all data will be collected.
+func (id Identitifier) IsSampledWithPercent(percentage uint) bool {
+  sensitivity := percentageToSensitivity(percentage)
+  return IsSample(sensitivity)
+}
+
+func percentageToSensitivity(percentage uint) uint {
+  // to be implemented
+}
 func (id Identifier) MarshalText() ([]byte, error) {
 	return []byte(id.String()), nil
 }
