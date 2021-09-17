@@ -1,0 +1,48 @@
+name: Flakiness Summary
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Run flakiness summary action
+      uses: onflow/flakiness-summary@v1
+      with:
+        test-suite: 'unit'
+        commit-sha: ${{ github.sha }}
+
+  crypto-unit:
+    name: Crypto Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Run flakiness summary action
+      uses: onflow/flakiness-summary@v1
+      with:
+        test-suite: 'crypto-unit'
+        commit-sha: ${{ github.sha }}
+
+  integration-unit:
+    name: Integration Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Run flakiness summary action
+      uses: onflow/flakiness-summary@v1
+      with:
+        test-suite: 'integration-unit'
+        commit-sha: ${{ github.sha }}
+
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Run flakiness summary action
+      uses: onflow/flakiness-summary@v1
+      with:
+        test-suite: 'integration'
+        commit-sha: ${{ github.sha }}
+  
