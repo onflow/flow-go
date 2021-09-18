@@ -143,7 +143,7 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 
 	qc, err := p.buildQC()
 	if err != nil {
-		return fmt.Errorf("could not build QC for vote %v: %w", vote.ID(), err)
+		return fmt.Errorf("internal error constructing QC from votes: %w", err)
 	}
 
 	p.onQCCreated(qc)
