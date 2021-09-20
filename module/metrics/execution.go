@@ -10,13 +10,6 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// Execution spans.
-const (
-	// executionBlockReceivedToExecuted is a duration metric
-	// from a block being received by an execution node to being executed
-	executionBlockReceivedToExecuted = "execution_block_received_to_executed"
-)
-
 type ExecutionCollector struct {
 	tracer                           module.Tracer
 	stateReadsPerBlock               prometheus.Histogram
@@ -505,13 +498,11 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 // StartBlockReceivedToExecuted starts a span to trace the duration of a block
 // from being received for execution to execution being finished
 func (ec *ExecutionCollector) StartBlockReceivedToExecuted(blockID flow.Identifier) {
-	ec.tracer.StartSpan(blockID, executionBlockReceivedToExecuted).SetTag("block_id", blockID.String)
 }
 
 // FinishBlockReceivedToExecuted finishes a span to trace the duration of a block
 // from being received for execution to execution being finished
 func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier) {
-	ec.tracer.FinishSpan(blockID, executionBlockReceivedToExecuted)
 }
 
 // ExecutionBlockExecuted reports computation and total time spent on a block computation

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"golang.org/x/exp/rand"
 
@@ -165,17 +164,15 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // handleChunkDataPackWithTracing encapsulates the logic of handling a chunk data pack with tracing enabled.
 func (e *Engine) handleChunkDataPackWithTracing(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
-	span, ok := e.tracer.GetSpan(chunkDataPack.ChunkID, trace.VERProcessChunkDataPackRequest)
-	if !ok {
-		span = e.tracer.StartSpan(chunkDataPack.ChunkID, trace.VERProcessChunkDataPackRequest)
-		span.SetTag("chunk_id", chunkDataPack.ChunkID)
+	// TODO: change this to block level as well
+	if chunkDataPack.Collection != nil {
+		span, _, isSampled := e.tracer.StartCollectionSpan(e.unit.Ctx(), chunkDataPack.Collection.ID(), trace.VERRequesterHandleChunkDataResponse)
+		if isSampled {
+			span.SetTag("chunk_id", chunkDataPack.ChunkID)
+		}
 		defer span.Finish()
 	}
-
-	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataResponse, func() {
-		e.handleChunkDataPack(originID, chunkDataPack)
-	})
+	e.handleChunkDataPack(originID, chunkDataPack)
 }
 
 // handleChunkDataPack sends the received chunk data pack to the registered handler, and cleans up its request status.
@@ -208,27 +205,17 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 
 // Request receives a chunk data pack request and adds it into the pending requests mempool.
 func (e *Engine) Request(request *verification.ChunkDataPackRequest) {
-	span, ok := e.tracer.GetSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-	if !ok {
-		span = e.tracer.StartSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-		span.SetTag("chunk_id", request.ChunkID)
-		defer span.Finish()
-	}
+	added := e.pendingRequests.Add(request)
 
-	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataRequest, func() {
-		added := e.pendingRequests.Add(request)
+	e.metrics.OnChunkDataPackRequestReceivedByRequester()
 
-		e.metrics.OnChunkDataPackRequestReceivedByRequester()
-
-		e.log.Info().
-			Hex("chunk_id", logging.ID(request.ChunkID)).
-			Uint64("block_height", request.Height).
-			Int("agree_executors", len(request.Agrees)).
-			Int("disagree_executors", len(request.Disagrees)).
-			Bool("added_to_pending_requests", added).
-			Msg("chunk data pack request arrived")
-	})
+	e.log.Info().
+		Hex("chunk_id", logging.ID(request.ChunkID)).
+		Uint64("block_height", request.Height).
+		Int("agree_executors", len(request.Agrees)).
+		Int("disagree_executors", len(request.Disagrees)).
+		Bool("added_to_pending_requests", added).
+		Msg("chunk data pack request arrived")
 }
 
 // onTimer should run periodically, it goes through all pending requests, and requests their chunk data pack.
@@ -261,22 +248,10 @@ func (e *Engine) onTimer() {
 }
 
 // handleChunkDataPackRequestWithTracing encapsulates the logic of dispatching chunk data request in network with tracing enabled.
-// The return value determines number of times this request has been dispatched.
 func (e *Engine) handleChunkDataPackRequestWithTracing(request *verification.ChunkDataPackRequest, lastSealedHeight uint64) uint64 {
-	span, ok := e.tracer.GetSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-	if !ok {
-		span = e.tracer.StartSpan(request.ChunkID, trace.VERProcessChunkDataPackRequest)
-		span.SetTag("chunk_id", request.ChunkID)
-		defer span.Finish()
-	}
-
-	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-	attempts := uint64(0)
-	e.tracer.WithSpanFromContext(ctx, trace.VERRequesterHandleChunkDataRequest, func() {
-		attempts = e.handleChunkDataPackRequest(ctx, request, lastSealedHeight)
-	})
-
-	return attempts
+	// TODO (Ramtin) - enable tracing later
+	ctx := e.unit.Ctx()
+	return e.handleChunkDataPackRequest(ctx, request, lastSealedHeight)
 }
 
 // handleChunkDataPackRequest encapsulates the logic of dispatching the chunk data pack request to the network.

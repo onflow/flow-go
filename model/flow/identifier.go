@@ -3,6 +3,7 @@
 package flow
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math/rand"
@@ -62,6 +63,21 @@ func (id Identifier) Format(state fmt.State, verb rune) {
 	default:
 		_, _ = state.Write([]byte(fmt.Sprintf("%%!%c(%s=%s)", verb, reflect.TypeOf(id), id)))
 	}
+}
+
+// IsSampled is a utility method to sample entities based on their ids
+// the range is from [0, 64].
+// 0 is 100% (all data will be collected)
+// 32 is ~50%
+// 64 is ~0% (no data will be collected)
+func (id Identifier) IsSampled(sensitivity uint) bool {
+	if sensitivity > 64 {
+		return false
+	}
+	// take the first 8 bytes and check the first few bits based on sensitivity
+	// higher sensitivity means more bits has to be zero, means less number of samples
+	// sensitivity of zero, means everything is sampled
+	return binary.BigEndian.Uint64(id[:8])>>uint64(64-sensitivity) == 0
 }
 
 func (id Identifier) MarshalText() ([]byte, error) {
