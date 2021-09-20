@@ -7,6 +7,8 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"go.uber.org/multierr"
+
+	flownet "github.com/onflow/flow-go/network"
 )
 
 type compressedStream struct {
@@ -20,13 +22,13 @@ type compressedStream struct {
 
 type ioFactoryFunc func(network.Stream) (network.Stream, error)
 
-func newCompressedStream(s network.Stream, readerFunc ioFactoryFunc, writerFunc ioFactoryFunc) (network.Stream, error) {
-	r, err := readerFunc(s)
+func newCompressedStream(s network.Stream, compressor flownet.Compressor) (network.Stream, error) {
+	r, err := compressor.NewReader(s)
 	if err != nil {
 		return nil, fmt.Errorf("could not create compressor reader: %w", err)
 	}
 
-	w, err := writerFunc(s)
+	w, err := compressor.NewWriter(s)
 	if err != nil {
 		return nil, fmt.Errorf("could not create compressor writer: %w", err)
 	}
