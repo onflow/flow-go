@@ -290,12 +290,6 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 	// heights would stop the sealing.
 	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, c.config.MaxResultsToRequest)
 
-	// set of blocks for which we have a candidate seal:
-	blocksWithCandidateSeal := make(map[flow.Identifier]struct{})
-	for _, s := range c.seals.All() {
-		blocksWithCandidateSeal[s.Seal.BlockID] = struct{}{}
-	}
-
 	var firstMissingHeight uint64 = math.MaxUint64
 	// traverse each unsealed and finalized block with height from low to high,
 	// if the result is missing, then add the blockID to a missing block list in
@@ -318,9 +312,6 @@ HEIGHT_LOOP:
 		// CAUTION: this is not BFT, as the existence of a candidate seal
 		//          does _not_ imply that all parent results are sealable.
 		// TODO: update for full BFT
-		if _, hasCandidateSeal := blocksWithCandidateSeal[blockID]; hasCandidateSeal {
-			continue
-		}
 
 		receipts, err := c.receiptsDB.ByBlockID(blockID)
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
