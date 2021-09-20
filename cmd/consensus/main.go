@@ -63,7 +63,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -115,6 +114,7 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
+		dkgKeyStore             *bstorage.DKGKeys
 	)
 
 	cmd.FlowNode(flow.RoleConsensus.String()).
@@ -148,6 +148,10 @@ func main() {
 		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
+		}).
+		Module("dkg key storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			dkgKeyStore, err = bstorage.NewDKGKeys(node.Metrics.Cache, node.SecretsDB)
+			return err
 		}).
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
@@ -245,7 +249,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			err = node.Storage.DKGKeys.InsertMyDKGPrivateInfo(epochCounter, privateDKGData)
+			err = dkgKeyStore.InsertMyDKGPrivateInfo(epochCounter, privateDKGData)
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}
@@ -263,7 +267,7 @@ func main() {
 					if err != nil {
 						return err
 					}
-					_, err = node.Storage.DKGKeys.RetrieveMyDKGPrivateInfo(counter)
+					_, err = dkgKeyStore.RetrieveMyDKGPrivateInfo(counter)
 					if err != nil {
 						return err
 					}
@@ -542,7 +546,7 @@ func main() {
 
 			epochLookup := epochs.NewEpochLookup(node.State)
 
-			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, node.Storage.DKGKeys)
+			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeyStore)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.SignerVerifier
@@ -662,10 +666,6 @@ func main() {
 			viewsObserver := gadgets.NewViews()
 			node.ProtocolEvents.AddConsumer(viewsObserver)
 
-			// keyDB is used to store the private key resulting from the node's
-			// participation in the DKG run
-			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
-
 			// create flow client with correct GRPC configuration for QC contract client
 			var flowClient *client.Client
 			if insecureAccessAPI {
@@ -710,7 +710,7 @@ func main() {
 				node.Logger,
 				node.Me,
 				node.State,
-				keyDB,
+				dkgKeyStore,
 				dkgmodule.NewControllerFactory(
 					node.Logger,
 					node.Me,
