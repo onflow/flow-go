@@ -18,8 +18,8 @@ require (
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/onflow/cadence v0.19.1-0.20210915143754-16d477f6d7d6
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.7
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.7
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.21.0
@@ -29,7 +29,6 @@ require (
 	github.com/prometheus/common v0.20.0 // indirect
 	github.com/rs/zerolog v1.21.0
 	github.com/stretchr/testify v1.7.0
-	github.com/uber/jaeger-client-go v2.25.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
