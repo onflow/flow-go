@@ -56,8 +56,8 @@ func (t traceLogger) Infof(msg string, args ...interface{}) {
 //
 // TODO (ramtin) : we might need to add a mutex lock (not sure if tracer itself is thread-safe)
 func NewTracer(log zerolog.Logger,
-	chainID string,
 	serviceName string,
+	chainID string,
 	sensitivity uint) (*OpenTracer, error) {
 	cfg, err := config.FromEnv()
 	if err != nil {
