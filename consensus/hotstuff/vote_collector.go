@@ -5,12 +5,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// VoteConsumer consumes all votes for one specific view. It is registered 
-// with the `VoteCollector` for the respective view. Upon registration, the  
+// VoteConsumer consumes all votes for one specific view. It is registered with
+// the `VoteCollector` for the respective view. Upon registration, the
 // `VoteCollector` feeds votes into the consumer in the order they are received
-// (already cached votes as well as votes received in the future). 
-// Only votes that pass de-duplication and equivocation detection are passed on.
-// CAUTION, VoteConsumer implementations must be 
+// (already cached votes as well as votes received in the future). Only votes
+// that pass de-duplication and equivocation detection are passed on. CAUTION,
+// VoteConsumer implementations must be
 //  * NON-BLOCKING and consume the votes without noteworthy delay, and
 //  * CONCURRENCY SAFE
 type VoteConsumer func(vote *model.Vote)

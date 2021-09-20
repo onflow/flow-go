@@ -185,10 +185,10 @@ func (va *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 	return nil
 }
 
-// InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it can process votes for the invalid
-// block and slash the voters.
-// Expected error returns during normal operations:
-//  * mempool.DecreasingPruningHeightError if proposal's view has already been pruned 
+// InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it
+// can process votes for the invalid block and slash the voters. Expected error
+// returns during normal operations:
+// * mempool.DecreasingPruningHeightError if proposal's view has already been pruned
 func (va *VoteAggregatorV2) InvalidBlock(proposal *model.Proposal) error {
 	slashingVoteConsumer := func(vote *model.Vote) {
 		if proposal.Block.BlockID == vote.BlockID {
