@@ -106,8 +106,9 @@ type BaseConfig struct {
 	level                 string
 	metricsPort           uint
 	BootstrapDir          string
-	peerUpdateInterval    time.Duration
+	PeerUpdateInterval    time.Duration
 	UnicastMessageTimeout time.Duration
+	DNSCacheTTL           time.Duration
 	profilerEnabled       bool
 	profilerDir           string
 	profilerInterval      time.Duration
@@ -149,11 +150,12 @@ type NodeConfig struct {
 	SyncEngineIdentifierProvider id.IdentifierProvider
 
 	// root state information
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
+	RootBlock                     *flow.Block
+	RootQC                        *flow.QuorumCertificate
+	RootResult                    *flow.ExecutionResult
+	RootSeal                      *flow.Seal
+	RootChainID                   flow.ChainID
+	SkipNwAddressBasedValidations bool
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -165,7 +167,7 @@ func DefaultBaseConfig() *BaseConfig {
 		BootstrapDir:          "bootstrap",
 		datadir:               datadir,
 		level:                 "info",
-		peerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
+		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
 		metricsPort:           8080,
 		profilerEnabled:       false,

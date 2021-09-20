@@ -38,6 +38,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 	clusterstate "github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/io"
@@ -227,7 +228,7 @@ type ConsensusFollowerConfig struct {
 }
 
 func NewConsensusFollowerConfig(t *testing.T, networkingPrivKey crypto.PrivateKey, stakedNodeID flow.Identifier, opts ...consensus_follower.Option) ConsensusFollowerConfig {
-	pid, err := p2p.ExtractPeerID(networkingPrivKey.PublicKey())
+	pid, err := keyutils.PeerIDFromFlowPublicKey(networkingPrivKey.PublicKey())
 	assert.NoError(t, err)
 	nodeID, err := p2p.NewUnstakedNetworkIDTranslator().GetFlowID(pid)
 	assert.NoError(t, err)
@@ -472,15 +473,17 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		require.NoError(t, err)
 	}
 
+	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
+
 	// add each follower to the network
 	for _, followerConf := range networkConf.ConsensusFollowers {
-		flowNetwork.addConsensusFollower(t, bootstrapDir, followerConf, confs)
+		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
 
 	return flowNetwork
 }
 
-func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
+func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
 	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-consensus-follower")
 	require.NoError(t, err)
 
@@ -494,8 +497,13 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, bootstrapDir string, 
 	err = os.Mkdir(followerBootstrapDir, 0700)
 	require.NoError(t, err)
 
-	// copy bootstrap files to follower-specific bootstrap directory
-	err = io.CopyDirectory(bootstrapDir, followerBootstrapDir)
+	publicRootInformationDir := filepath.Join(followerBootstrapDir, bootstrap.DirnamePublicBootstrap)
+	err = os.Mkdir(publicRootInformationDir, 0700)
+	require.NoError(t, err)
+
+	// strip out the node addresses from root-protocol-state-snapshot.json and copy it to the follower-specific
+	// bootstrap/public-root-information directory
+	err = rootProtocolJsonWithoutAddresses(rootProtocolSnapshotPath, filepath.Join(followerBootstrapDir, bootstrap.PathRootProtocolStateSnapshot))
 	require.NoError(t, err)
 
 	// consensus follower

@@ -3,8 +3,10 @@ package p2p
 import (
 	"context"
 	"fmt"
+	mrand "math/rand"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 
@@ -43,16 +45,19 @@ func WithInterval(period time.Duration) Option {
 	}
 }
 
+type PeersProvider func() (peer.IDSlice, error)
+
 // NewPeerManager creates a new peer manager which calls the peersProvider callback to get a list of peers to connect to
 // and it uses the connector to actually connect or disconnect from peers.
-func NewPeerManager(logger zerolog.Logger, peersProvider func() (peer.IDSlice, error),
+func NewPeerManager(logger zerolog.Logger, peersProvider PeersProvider,
 	connector Connector, options ...Option) *PeerManager {
 	pm := &PeerManager{
-		unit:          engine.NewUnit(),
-		logger:        logger,
-		peersProvider: peersProvider,
-		connector:     connector,
-		peerRequestQ:  make(chan struct{}, 1),
+		unit:               engine.NewUnit(),
+		logger:             logger,
+		peersProvider:      peersProvider,
+		connector:          connector,
+		peerRequestQ:       make(chan struct{}, 1),
+		peerUpdateInterval: DefaultPeerUpdateInterval,
 	}
 	// apply options
 	for _, o := range options {
@@ -61,14 +66,33 @@ func NewPeerManager(logger zerolog.Logger, peersProvider func() (peer.IDSlice, e
 	return pm
 }
 
+// PeerManagerFactoryFunc is a factory function type for generating a PeerManager instance using the given host,
+// peersProvider and logger
+type PeerManagerFactoryFunc func(host host.Host, peersProvider PeersProvider, logger zerolog.Logger) (*PeerManager, error)
+
+// PeerManagerFactory generates a PeerManagerFunc that produces the default PeerManager with the given peer manager
+// options and that uses the LibP2PConnector with the given LibP2P connector options
+func PeerManagerFactory(peerManagerOptions []Option, connectorOptions ...ConnectorOption) PeerManagerFactoryFunc {
+	return func(host host.Host, peersProvider PeersProvider, logger zerolog.Logger) (*PeerManager, error) {
+		connector, err := NewLibp2pConnector(host, logger, connectorOptions...)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create libp2pConnector: %w", err)
+		}
+		return NewPeerManager(logger, peersProvider, connector, peerManagerOptions...), nil
+	}
+}
+
 // Ready kicks off the ambient periodic connection updates.
 func (pm *PeerManager) Ready() <-chan struct{} {
-	// makes sure that peer update request is invoked
-	// once before returning
+	// makes sure that peer update request is invoked once before returning
 	pm.RequestPeerUpdate()
 
 	// also starts running it periodically
-	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, pm.peerUpdateInterval, time.Duration(0))
+	//
+	// add a random delay to initial launch to avoid synchronizing this
+	// potentially expensive operation across the network
+	delay := time.Duration(mrand.Int63n(pm.peerUpdateInterval.Nanoseconds()))
+	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, pm.peerUpdateInterval, delay)
 
 	pm.unit.Launch(pm.updateLoop)
 

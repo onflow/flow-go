@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
 // For these test, refer to https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md for libp2p
@@ -85,7 +86,7 @@ func createPeerIDFromAlgo(t *testing.T, sa fcrypto.SigningAlgorithm) peer.ID {
 	pubKey := key.PublicKey()
 
 	// extract the corresponding libp2p public Key
-	libp2pPubKey, err := LibP2PPublicKeyFromFlow(pubKey)
+	libp2pPubKey, err := keyutils.LibP2PPublicKeyFromFlow(pubKey)
 	require.NoError(t, err)
 
 	// obtain the PeerID based on libp2p's own rules
