@@ -3,12 +3,10 @@ package voteaggregator
 import (
 	"fmt"
 
-	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
@@ -22,7 +20,6 @@ const defaultVoteAggregatorWorkers = 8
 type VoteAggregatorV2 struct {
 	unit                *engine.Unit
 	log                 zerolog.Logger
-	workerPool          *workerpool.WorkerPool
 	notifier            hotstuff.Consumer
 	committee           hotstuff.Committee
 	voteValidator       hotstuff.Validator
@@ -33,7 +30,6 @@ type VoteAggregatorV2 struct {
 	queuedVotes         *fifoqueue.FifoQueue
 }
 
-// TODO: Move to tests
 var _ hotstuff.VoteAggregatorV2 = &VoteAggregatorV2{}
 
 // NewVoteAggregatorV2 creates an instance of vote aggregator
@@ -46,7 +42,7 @@ func NewVoteAggregatorV2(
 	committee hotstuff.Committee,
 	voteValidator hotstuff.Validator,
 	signer hotstuff.SignerVerifier,
-	verifyingProcessorFactory votecollector.VerifyingVoteProcessorFactory,
+	collectors hotstuff.VoteCollectors,
 ) *VoteAggregatorV2 {
 
 	aggregator := &VoteAggregatorV2{
@@ -57,13 +53,9 @@ func NewVoteAggregatorV2(
 		voteValidator:     voteValidator,
 		signer:            signer,
 		unit:              engine.NewUnit(),
+		collectors:        collectors,
 	}
 
-	newCollectorFactoryMethod := func(view uint64) (hotstuff.VoteCollector, error) {
-		return votecollector.NewStateMachine(view, log, aggregator.workerPool, notifier, verifyingProcessorFactory), nil
-	}
-
-	aggregator.collectors = NewVoteCollectors(highestPrunedView, newCollectorFactoryMethod)
 	return aggregator
 }
 
