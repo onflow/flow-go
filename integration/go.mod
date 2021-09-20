@@ -29,7 +29,6 @@ require (
 	github.com/prometheus/common v0.20.0 // indirect
 	github.com/rs/zerolog v1.21.0
 	github.com/stretchr/testify v1.7.0
-	github.com/uber/jaeger-client-go v2.25.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect

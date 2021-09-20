@@ -3,8 +3,6 @@ package fvm
 import (
 	"fmt"
 
-	"github.com/opentracing/opentracing-go/log"
-
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -35,9 +33,6 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span := ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMSeqNumCheckTransaction)
-		span.LogFields(
-			log.String("transaction.ID", proc.ID.String()),
-		)
 		defer span.Finish()
 	}
 

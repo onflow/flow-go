@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -141,11 +142,16 @@ func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 //   internal state might be corrupted. Hence, returned errors should be treated as fatal.
 func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	startTime := time.Now()
-	receiptSpan := c.tracer.StartSpan(receipt.ID(), trace.CONMatchProcessReceipt)
 	defer func() {
 		c.metrics.OnReceiptProcessingDuration(time.Since(startTime))
-		receiptSpan.Finish()
 	}()
+
+	receiptSpan, _, isSampled := c.tracer.StartBlockSpan(context.Background(), receipt.ExecutionResult.BlockID, trace.CONMatchProcessReceipt)
+	if isSampled {
+		receiptSpan.LogFields(log.String("result_id", receipt.ExecutionResult.ID().String()))
+		receiptSpan.LogFields(log.String("executor", receipt.ExecutorID.String()))
+	}
+	defer receiptSpan.Finish()
 
 	// setup logger to capture basic information about the receipt
 	log := c.log.With().
@@ -340,10 +346,9 @@ HEIGHT_LOOP:
 
 func (c *Core) OnBlockFinalization() error {
 	startTime := time.Now()
-	requestReceiptsSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchRequestPendingReceipts)
+
 	// request execution receipts for unsealed finalized blocks
 	pendingReceiptRequests, firstMissingHeight, err := c.requestPendingReceipts()
-	requestReceiptsSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not request pending block results: %w", err)
 	}

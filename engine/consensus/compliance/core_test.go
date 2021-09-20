@@ -154,7 +154,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 			return cs.snapshot
 		},
 	)
-	cs.state.On("Extend", mock.Anything).Return(nil)
+	cs.state.On("Extend", mock.Anything, mock.Anything).Return(nil)
 
 	// set up protocol snapshot mock
 	cs.snapshot = &protocol.Snapshot{}
@@ -262,7 +262,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", &block)
+	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, &block)
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
@@ -288,7 +288,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", &block)
+	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, &block)
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
@@ -314,14 +314,14 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 			return cs.snapshot
 		},
 	)
-	cs.state.On("Extend", mock.Anything).Return(errors.New("dummy error"))
+	cs.state.On("Extend", mock.Anything, mock.Anything).Return(errors.New("dummy error"))
 
 	// it should be processed without error
 	err := cs.core.OnBlockProposal(originID, proposal)
 	require.Error(cs.T(), err, "proposal with invalid extension should fail")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", &block)
+	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, &block)
 
 	// we should not submit the proposal to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
