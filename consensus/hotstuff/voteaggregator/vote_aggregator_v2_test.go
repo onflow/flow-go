@@ -19,11 +19,15 @@ import (
 
 var voteCollectorsFactoryError = errors.New("factory error")
 
+// TestVoteAggregatorV2 is a test suite for VoteAggregatorV2. Tests happy and unhappy path scenarios
+// for processing proposals, votes and also reporting slashing conditions when invalid proposal/vote was detected.
+// Vote aggregator has a queening mechanism, tests are split into separately testing event delivery and
+// event processing logic.
 func TestVoteAggregatorV2(t *testing.T) {
 	suite.Run(t, new(VoteAggregatorV2TestSuite))
 }
 
-// VoteAggregatorV2TestSuite
+// VoteAggregatorV2TestSuite is a test suite that holds needed mocked state for isolated testing of VoteAggregatorV2.
 type VoteAggregatorV2TestSuite struct {
 	suite.Suite
 
