@@ -31,24 +31,25 @@ type VoteAggregatorV2 interface {
 	// The voting block could either be known or unknown.
 	// If the voting block is unknown, the vote won't be processed until AddBlock is called with the block.
 	// This method can be called concurrently, votes will be queued and processed asynchronously.
-	// It returns:
-	//  - nil if the vote has been added to the queue for async processing
-	//  - error if there is exception adding the vote to the queue
+	// No errors are expected during normal operations, any error should be threatened as exception
 	AddVote(vote *model.Vote) error
 
 	// AddBlock notifies the VoteAggregator about a known block so that it can start processing
 	// pending votes whose block was unknown.
 	// It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
-	// It returns:
-	// - nil if the block is valid
-	//  - model.InvalidBlockError if the block is invalid
-	//  - error if there is exception
+	// Expected error returns during normal operations:
+	// * model.InvalidBlockError if the block is invalid
 	AddBlock(block *model.Proposal) error
 
-	// InvalidBlock notifies the VoteAggregator about an invalid block, so that it can process votes for the invalid
-	// block and slash the voters.
+	// InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it
+	// can process votes for the invalid block and slash the voters. Expected error
+	// returns during normal operations:
+	// * mempool.DecreasingPruningHeightError if proposal's view has already been pruned
 	InvalidBlock(block *model.Proposal) error
 
-	// PruneUpToView will remove any data held for the provided view.
+	// PruneUpToView prunes the vote collectors whose view is below the given view.
+	// If `view` is smaller than the previous value, the previous value is kept
+	// and no operations will be made. Sets highest pruned view which will be used
+	// to drop stale proposals and votes.
 	PruneUpToView(view uint64)
 }

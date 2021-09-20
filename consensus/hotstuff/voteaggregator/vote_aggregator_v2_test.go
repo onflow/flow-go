@@ -32,7 +32,6 @@ type VoteAggregatorV2TestSuite struct {
 	committee  *mocks.Committee
 	signer     *mocks.SignerVerifier
 	notifier   *mocks.Consumer
-	validator  *mocks.Validator
 	collectors *mocks.VoteCollectors
 	aggregator *VoteAggregatorV2
 }
@@ -41,7 +40,6 @@ func (s *VoteAggregatorV2TestSuite) SetupTest() {
 	s.committee = &mocks.Committee{}
 	s.signer = &mocks.SignerVerifier{}
 	s.notifier = &mocks.Consumer{}
-	s.validator = &mocks.Validator{}
 	s.collectors = &mocks.VoteCollectors{}
 
 	s.mockedCollectors = make(map[uint64]*mocks.VoteCollector)
@@ -61,8 +59,7 @@ func (s *VoteAggregatorV2TestSuite) SetupTest() {
 
 	var err error
 
-	s.aggregator, err = NewVoteAggregatorV2(unittest.Logger(), s.notifier, 0, s.committee,
-		s.validator, s.signer, s.collectors)
+	s.aggregator, err = NewVoteAggregatorV2(unittest.Logger(), s.notifier, 0, s.collectors)
 	require.NoError(s.T(), err)
 
 	// startup aggregator

@@ -22,15 +22,12 @@ const defaultVoteQueueCapacity = 1000
 
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
 // VoteAggregator is designed in a way that it can aggregate votes for collection & consensus clusters
-// that is why implementation relies on dependency injection
+// that is why implementation relies on dependency injection.
 type VoteAggregatorV2 struct {
 	unit                *engine.Unit
 	lm                  *lifecycle.LifecycleManager
 	log                 zerolog.Logger
 	notifier            hotstuff.Consumer
-	committee           hotstuff.Committee
-	voteValidator       hotstuff.Validator
-	signer              hotstuff.SignerVerifier
 	highestPrunedView   counters.StrictMonotonousCounter
 	collectors          hotstuff.VoteCollectors
 	queuedVotesNotifier engine.Notifier
@@ -46,9 +43,6 @@ func NewVoteAggregatorV2(
 	log zerolog.Logger,
 	notifier hotstuff.Consumer,
 	highestPrunedView uint64,
-	committee hotstuff.Committee,
-	voteValidator hotstuff.Validator,
-	signer hotstuff.SignerVerifier,
 	collectors hotstuff.VoteCollectors,
 ) (*VoteAggregatorV2, error) {
 
@@ -64,9 +58,6 @@ func NewVoteAggregatorV2(
 		log:                 log,
 		notifier:            notifier,
 		highestPrunedView:   counters.NewMonotonousCounter(highestPrunedView),
-		committee:           committee,
-		voteValidator:       voteValidator,
-		signer:              signer,
 		collectors:          collectors,
 		queuedVotes:         queuedVotes,
 		queuedVotesNotifier: engine.NewNotifier(),
@@ -135,6 +126,8 @@ func (va *VoteAggregatorV2) processQueuedVoteEvents() error {
 	}
 }
 
+// processQueuedVote performs actual processing of queued votes, this method is called from multiple
+// concurrent goroutines.
 func (va *VoteAggregatorV2) processQueuedVote(vote *model.Vote) error {
 	// TODO: log created
 	collector, _, err := va.collectors.GetOrCreateCollector(vote.View)
@@ -161,6 +154,8 @@ func (va *VoteAggregatorV2) processQueuedVote(vote *model.Vote) error {
 	return nil
 }
 
+// AddVote checks if vote is stale and appends vote into processing queue
+// actual vote processing will be called in other dispatching goroutine.
 func (va *VoteAggregatorV2) AddVote(vote *model.Vote) error {
 	// drop stale votes
 	if vote.View <= va.highestPrunedView.Value() {
@@ -176,6 +171,11 @@ func (va *VoteAggregatorV2) AddVote(vote *model.Vote) error {
 	return nil
 }
 
+// AddBlock notifies the VoteAggregator about a known block so that it can start processing
+// pending votes whose block was unknown.
+// It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
+// Expected error returns during normal operations:
+// * model.InvalidBlockError if the block is invalid
 func (va *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
 	if block.Block.View <= va.highestPrunedView.Value() {
