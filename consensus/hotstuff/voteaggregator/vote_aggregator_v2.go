@@ -2,7 +2,6 @@ package voteaggregator
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module/lifecycle"
 
 	"github.com/rs/zerolog"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool"
 )
 
@@ -21,6 +21,8 @@ const defaultVoteAggregatorWorkers = 8
 const defaultVoteQueueCapacity = 1000
 
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
+// VoteAggregator is designed in a way that it can aggregate votes for collection & consensus clusters
+// that is why implementation relies on dependency injection
 type VoteAggregatorV2 struct {
 	unit                *engine.Unit
 	lm                  *lifecycle.LifecycleManager
@@ -211,6 +213,10 @@ func (va *VoteAggregatorV2) InvalidBlock(proposal *model.Proposal) error {
 	block := proposal.Block
 	collector, _, err := va.collectors.GetOrCreateCollector(block.View)
 	if err != nil {
+		// ignore if our routine is outdated and some other one has pruned collectors
+		if mempool.IsDecreasingPruningHeightError(err) {
+			return nil
+		}
 		return fmt.Errorf("could not retrieve vote collector for view %d: %w", block.View, err)
 	}
 	// registering vote consumer will deliver all previously cached votes in strict order
