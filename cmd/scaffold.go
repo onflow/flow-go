@@ -117,7 +117,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
 	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", defaultConfig.timeout, "node startup / shutdown timeout")
-	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the protocol state")
+	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.DurationVar(&fnb.BaseConfig.PeerUpdateInterval, "peerupdate-interval", defaultConfig.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
@@ -405,9 +406,23 @@ func (fnb *FlowNodeBuilder) initDB() {
 		WithValueLogFileSize(128 << 23).
 		WithValueLogMaxEntries(100000) // Default is 1000000
 
-	db, err := badger.Open(opts)
-	fnb.MustNot(err).Msg("could not open key-value store")
-	fnb.DB = db
+	publicDB, err := bstorage.InitPublic(opts)
+	fnb.MustNot(err).Msg("could not open public db")
+	fnb.DB = publicDB
+}
+
+func (fnb *FlowNodeBuilder) initSecretsDB() {
+
+	err := os.MkdirAll(fnb.BaseConfig.secretsdir, 0700)
+	fnb.MustNot(err).Str("dir", fnb.BaseConfig.secretsdir).Msg("could not create secrets db dir")
+
+	log := sutil.NewLogger(fnb.Logger)
+
+	// TODO encryption options
+	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
+	secretsDB, err := bstorage.InitSecret(opts)
+	fnb.MustNot(err).Msg("could not open secrets db")
+	fnb.SecretsDB = secretsDB
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
@@ -868,6 +883,7 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 		fnb.initProfiler()
 
 		fnb.initDB()
+		fnb.initSecretsDB()
 
 		fnb.initMetrics()
 

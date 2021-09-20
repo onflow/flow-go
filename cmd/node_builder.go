@@ -2,8 +2,6 @@ package cmd
 
 import (
 	"context"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -104,6 +102,7 @@ type BaseConfig struct {
 	NodeRole              string
 	timeout               time.Duration
 	datadir               string
+	secretsdir            string
 	level                 string
 	metricsPort           uint
 	BootstrapDir          string
@@ -134,6 +133,7 @@ type NodeConfig struct {
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
+	SecretsDB         *badger.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
@@ -160,14 +160,16 @@ type NodeConfig struct {
 }
 
 func DefaultBaseConfig() *BaseConfig {
-	homedir, _ := os.UserHomeDir()
-	datadir := filepath.Join(homedir, ".flow", "database")
+	defaultDatadir := "/data/protocol"
+	defaultSecretsdir := "/data/secret"
+
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
 		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
 		timeout:               1 * time.Minute,
-		datadir:               datadir,
+		datadir:               defaultDatadir,
+		secretsdir:            defaultSecretsdir,
 		level:                 "info",
 		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
