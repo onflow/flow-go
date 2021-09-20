@@ -168,7 +168,7 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		for _, resultID := range payloadIndex.ResultIDs {
 			result, err := s.results.ByID(resultID)
 			if err != nil {
-				return fmt.Errorf("internal error fetching result %v incorporated in stored block %v: %w", resultID, blockID, err)
+				return fmt.Errorf("internal error fetching result %v incorporated in block %v: %w", resultID, blockID, err)
 			}
 			incorporatedResults[resultID] = flow.NewIncorporatedResult(blockID, result)
 		}
@@ -210,9 +210,10 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		err := s.validateSeal(seal, incorporatedResult)
 		if err != nil {
 			if !engine.IsInvalidInputError(err) {
-				return nil, fmt.Errorf("unexpected internal error while validating seal %x: %w", seal.ID(), err)
+				return nil, fmt.Errorf("unexpected internal error while validating seal %x for result %x for block %x: %w",
+					seal.ID(), seal.ResultID, seal.BlockID, err)
 			}
-			return nil, fmt.Errorf("invalid seal %x for result %x: %w", seal.ID(), seal.ResultID, err)
+			return nil, fmt.Errorf("invalid seal %x for result %x for block %x: %w", seal.ID(), seal.ResultID, seal.BlockID, err)
 		}
 
 		// check that the sealed execution results form a chain
@@ -250,12 +251,11 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 			len(seal.AggregatedApprovalSigs))
 	}
 
-	// TEMPORARY HOT-FIX: reduces security but allows consensus nodes to catch up that are very far behind
-	//
-	//assignments, err := s.assigner.Assign(executionResult, incorporatedResult.IncorporatedBlockID)
-	//if err != nil {
-	//	return fmt.Errorf("could not retreive assignments for block: %v, %v, %w", seal.BlockID, incorporatedResult.IncorporatedBlockID, err)
-	//}
+	assignments, err := s.assigner.Assign(executionResult, incorporatedResult.IncorporatedBlockID)
+	if err != nil {
+		return fmt.Errorf("failed to retrieve verifier assignment for result %x incorporated in block %x: %w",
+			executionResult.ID(), incorporatedResult.IncorporatedBlockID, err)
+	}
 
 	// Check that each AggregatedSignature has enough valid signatures from
 	// verifiers that were assigned to the corresponding chunk.
@@ -288,14 +288,12 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 			}
 		}
 
-		// TEMPORARY HOT-FIX: reduces security but allows consensus nodes to catch up that are very far behind
-		//
 		// only Verification Nodes that were assigned to the chunk are allowed to approve it
-		//for _, signerId := range chunkSigs.SignerIDs {
-		//	if !assignments.HasVerifier(chunk, signerId) {
-		//		return engine.NewInvalidInputErrorf("invalid signer id at chunk: %d", chunk.Index)
-		//	}
-		//}
+		for _, signerId := range chunkSigs.SignerIDs {
+			if !assignments.HasVerifier(chunk, signerId) {
+				return engine.NewInvalidInputErrorf("invalid signer id at chunk: %d", chunk.Index)
+			}
+		}
 
 		// Verification Nodes' approval signatures must be valid
 		err := s.verifySealSignature(chunkSigs, chunk, executionResultID)
