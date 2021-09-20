@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// StakingVoteProcessorFactory generates CombinedVoteProcessor instances
+// StakingVoteProcessorFactory generates StakingVoteProcessor instances
 func StakingVoteProcessorFactory(log zerolog.Logger, proposal *model.Proposal) (*StakingVoteProcessor, error) {
 	processor := &StakingVoteProcessor{
 		log:   log,

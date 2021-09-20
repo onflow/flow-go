@@ -19,6 +19,8 @@ type FinalizationDistributor struct {
 	lock                          sync.RWMutex
 }
 
+var _ hotstuff.Consumer = &FinalizationDistributor{}
+
 func NewFinalizationDistributor() *FinalizationDistributor {
 	return &FinalizationDistributor{
 		blockFinalizedConsumers:    make([]OnBlockFinalizedConsumer, 0),
@@ -102,3 +104,5 @@ func (p *FinalizationDistributor) OnForkChoiceGenerated(uint64, *flow.QuorumCert
 func (p *FinalizationDistributor) OnDoubleVotingDetected(*model.Vote, *model.Vote) {}
 
 func (p *FinalizationDistributor) OnInvalidVoteDetected(*model.Vote) {}
+
+func (p *FinalizationDistributor) OnVoteForInvalidBlockDetected(*model.Vote, *model.Proposal) {}

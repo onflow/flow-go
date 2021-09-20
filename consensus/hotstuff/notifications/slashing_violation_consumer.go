@@ -36,6 +36,15 @@ func (c *SlashingViolationsConsumer) OnInvalidVoteDetected(vote *model.Vote) {
 		Msg("OnInvalidVoteDetected")
 }
 
+func (c *SlashingViolationsConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {
+	c.log.Warn().
+		Uint64("vote_view", vote.View).
+		Hex("voted_block_id", vote.BlockID[:]).
+		Hex("voter_id", vote.SignerID[:]).
+		Hex("proposer_id", proposal.Block.ProposerID[:]).
+		Msg("OnVoteForInvalidBlockDetected")
+}
+
 func (c *SlashingViolationsConsumer) OnDoubleProposeDetected(block1 *model.Block, block2 *model.Block) {
 	c.log.Warn().
 		Hex("proposer_id", block1.ProposerID[:]).

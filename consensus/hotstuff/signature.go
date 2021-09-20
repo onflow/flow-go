@@ -67,9 +67,6 @@ type WeightedSignatureAggregator interface {
 	// TotalWeight returns the total weight presented by the collected sig shares.
 	TotalWeight() uint64
 
-	// Aggregate assumes enough shares have been collected, it aggregates the signatures
-	// and return the aggregated signature.
-	// if called concurrently, only one thread will be running the aggregation.
 	// Aggregate attempts to aggregate the internal signatures and returns the resulting signature data.
 	// It errors if not enough weights have been collected.
 	// The function performs a final verification and errors if the aggregated signature is not valid. This is

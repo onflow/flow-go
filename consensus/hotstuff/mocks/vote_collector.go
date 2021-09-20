@@ -42,6 +42,11 @@ func (_m *VoteCollector) ProcessBlock(block *model.Proposal) error {
 	return r0
 }
 
+// RegisterVoteConsumer provides a mock function with given fields: consumer
+func (_m *VoteCollector) RegisterVoteConsumer(consumer hotstuff.VoteConsumer) {
+	_m.Called(consumer)
+}
+
 // Status provides a mock function with given fields:
 func (_m *VoteCollector) Status() hotstuff.VoteCollectorStatus {
 	ret := _m.Called()
