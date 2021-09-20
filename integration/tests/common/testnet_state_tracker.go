@@ -13,17 +13,19 @@ import (
 	"github.com/onflow/flow-go/integration/tests/common/approvalstate"
 	"github.com/onflow/flow-go/integration/tests/common/blockstate"
 	"github.com/onflow/flow-go/integration/tests/common/receiptstate"
+	"github.com/onflow/flow-go/integration/tests/common/transactionstate"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type TestnetStateTracker struct {
-	ghostTracking bool
-	BlockState    *blockstate.BlockState
-	ReceiptState  *receiptstate.ReceiptState
-	ApprovalState *approvalstate.ResultApprovalState
-	MsgState      MsgState
+	ghostTracking    bool
+	BlockState       *blockstate.BlockState
+	ReceiptState     *receiptstate.ReceiptState
+	ApprovalState    *approvalstate.ResultApprovalState
+	TransactionState *transactionstate.TransactionState
+	MsgState         MsgState
 }
 
 // Track starts to track new blocks, execution receipts and individual messages the ghost receives. The context will
@@ -33,6 +35,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 	tst.BlockState = blockstate.NewBlockState()
 	tst.ReceiptState = receiptstate.NewReceiptState()
 	tst.ApprovalState = approvalstate.NewResultApprovalState()
+	tst.TransactionState = transactionstate.NewTransactionState()
 
 	var reader *client.FlowMessageStreamReader
 
@@ -56,6 +59,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			return
 		}
 	}
+	tst.TransactionState.Reader = reader
 
 	// continue with processing of messages in the background
 	go func() {
@@ -107,6 +111,17 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 					m.ExecutorID,
 					finalState,
 					m.ExecutionResult.ID())
+
+			// case *messages.ClusterBlockProposal:
+			// 	//tst.TransactionState.
+			// 	header := m.Header
+			// 	collection := m.Payload.Collection
+			// 	t.Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
+
+			// case *flow.CollectionGuarantee:
+
+			// case *flow.TransactionBody:
+			// 	t.Log("got tx: ", msg)
 			default:
 				t.Logf("other msg received from %s: %#v", sender, msg)
 				continue

@@ -89,7 +89,9 @@ func (s *Suite) SetupTest(name string, nNodes, nClusters uint) {
 	// create an account to use for sending transactions
 	s.acct.addr, s.acct.key, s.acct.signer = common.GetAccount(s.net.Root().Header.ChainID.Chain())
 
+	//subscribe to the ghost
 	s.Track(s.T(), s.ctx, s.Ghost())
+	s.reader = s.TransactionState.Reader
 }
 
 func (suite *Suite) TearDownTest() {
@@ -234,7 +236,7 @@ func (suite *Suite) AwaitTransactionsIncluded(txIDs ...flow.Identifier) {
 		case *messages.ClusterBlockProposal:
 			header := val.Header
 			collection := val.Payload.Collection
-			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
+			suite.T().Logf("got proposal chain=%x height=%d col_id=%x size=%d", header.ChainID, header.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
 				for _, txID := range collection.Light().Transactions {
 					finalized[txID] = struct{}{}
