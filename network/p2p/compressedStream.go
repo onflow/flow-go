@@ -20,8 +20,6 @@ type compressedStream struct {
 	w io.WriteCloser
 }
 
-type ioFactoryFunc func(network.Stream) (network.Stream, error)
-
 func newCompressedStream(s network.Stream, compressor flownet.Compressor) (network.Stream, error) {
 	r, err := compressor.NewReader(s)
 	if err != nil {
