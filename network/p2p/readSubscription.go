@@ -81,7 +81,7 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 
 		validatorData, ok := rawMsg.ValidatorData.(validator.ValidatorData)
 		if !ok {
-			r.log.Fatal().Str("raw_msg", rawMsg.String()).Msg("validator data missing")
+			r.log.Error().Str("raw_msg", rawMsg.String()).Msg("validator data missing")
 		}
 
 		msg := validatorData.Message

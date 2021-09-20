@@ -51,7 +51,8 @@ func messageSigningID(m *pubsub.Message) (peer.ID, error) {
 	return pid, nil
 }
 
-type MessageValidator func(context.Context, peer.ID, *message.Message) pubsub.ValidationResult
+// MessageValidator validates the given message with original sender `from`.
+type MessageValidator func(ctx context.Context, from peer.ID, msg *message.Message) pubsub.ValidationResult
 
 type ValidatorData struct {
 	Message *message.Message
