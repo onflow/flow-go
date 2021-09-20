@@ -36,6 +36,7 @@ type OpenTracer struct {
 	log         zerolog.Logger
 	spanCache   *lru.Cache
 	sensitivity uint
+	chainID     string
 }
 
 type traceLogger struct {
@@ -54,7 +55,10 @@ func (t traceLogger) Infof(msg string, args ...interface{}) {
 // NewTracer creates a new tracer.
 //
 // TODO (ramtin) : we might need to add a mutex lock (not sure if tracer itself is thread-safe)
-func NewTracer(log zerolog.Logger, serviceName string, sensitivity uint) (*OpenTracer, error) {
+func NewTracer(log zerolog.Logger,
+	chainID string,
+	serviceName string,
+	sensitivity uint) (*OpenTracer, error) {
 	cfg, err := config.FromEnv()
 	if err != nil {
 		return nil, err
@@ -80,6 +84,7 @@ func NewTracer(log zerolog.Logger, serviceName string, sensitivity uint) (*OpenT
 		log:         log,
 		spanCache:   spanCache,
 		sensitivity: sensitivity,
+		chainID:     chainID,
 	}
 
 	return t, nil
@@ -129,9 +134,12 @@ func (t *OpenTracer) entityRootSpan(entityID flow.Identifier, entityType string,
 	)
 	opts = append(opts, jaeger.SelfRef(ctx))
 	span := t.Tracer.StartSpan(string(entityType), opts...)
-	// keep entity id for reference
+	// keep full entityID
 	span.LogFields(log.String("entity_id", entityID.String()))
+	// set chainID as tag for filtering traces from different networks
+	span.SetTag("chainID", t.chainID)
 	t.spanCache.Add(entityID, span)
+
 	span.Finish() // finish span right away
 	return span
 }
