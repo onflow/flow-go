@@ -8,6 +8,7 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
 	"github.com/uber/jaeger-client-go/config"
@@ -128,6 +129,8 @@ func (t *OpenTracer) entityRootSpan(entityID flow.Identifier, entityType string,
 	)
 	opts = append(opts, jaeger.SelfRef(ctx))
 	span := t.Tracer.StartSpan(string(entityType), opts...)
+	// keep entity id for reference
+	span.LogFields(log.String("entity_id", entityID.String()))
 	t.spanCache.Add(entityID, span)
 	span.Finish() // finish span right away
 	return span
