@@ -4,6 +4,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -22,13 +23,6 @@ type voteContainer struct {
 	index int
 }
 
-// VoteConsumer is a callback for consuming votes. VotesCache feeds votes into
-// the consumer in the order they are received. Only votes that pass de-
-// duplication and equivocation detection are passed on.
-// CAUTION: a consumer MUST be NON-BLOCKING and consume the votes without
-// noteworthy delay. Otherwise, consensus speed is impacted.
-type VoteConsumer func(vote *model.Vote)
-
 // VotesCache maintains a _concurrency safe_ cache of votes for one particular
 // view. The cache memorizes the order in which the votes were received. Votes
 // are de-duplicated based on the following rules:
@@ -42,7 +36,7 @@ type VotesCache struct {
 	lock          sync.Mutex
 	view          uint64
 	votes         map[flow.Identifier]voteContainer // signerID -> first vote
-	voteConsumers []VoteConsumer
+	voteConsumers []hotstuff.VoteConsumer
 }
 
 // NewVotesCache instantiates a VotesCache for the given view
@@ -103,7 +97,7 @@ func (vc *VotesCache) AddVote(vote *model.Vote) error {
 // consumer is registered. For the purpose of forensics, we might register a
 // consumer later, when already lots of votes are cached. However, this should
 // be a rare occurrence (we except moderate performance overhead in this case).
-func (vc *VotesCache) RegisterVoteConsumer(consumer VoteConsumer) {
+func (vc *VotesCache) RegisterVoteConsumer(consumer hotstuff.VoteConsumer) {
 	vc.lock.Lock()
 	defer vc.lock.Unlock()
 

@@ -95,6 +95,11 @@ func (_m *Consumer) OnStartingTimeout(_a0 *model.TimerInfo) {
 	_m.Called(_a0)
 }
 
+// OnVoteForInvalidBlockDetected provides a mock function with given fields: vote, invalidProposal
+func (_m *Consumer) OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal) {
+	_m.Called(vote, invalidProposal)
+}
+
 // OnVoting provides a mock function with given fields: vote
 func (_m *Consumer) OnVoting(vote *model.Vote) {
 	_m.Called(vote)

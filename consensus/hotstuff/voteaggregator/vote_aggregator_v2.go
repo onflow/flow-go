@@ -185,8 +185,26 @@ func (va *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 	return nil
 }
 
-func (va *VoteAggregatorV2) InvalidBlock(block *model.Proposal) error {
-	panic("implement me")
+// InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it
+// can process votes for the invalid block and slash the voters. Expected error
+// returns during normal operations:
+// * mempool.DecreasingPruningHeightError if proposal's view has already been pruned
+func (va *VoteAggregatorV2) InvalidBlock(proposal *model.Proposal) error {
+	slashingVoteConsumer := func(vote *model.Vote) {
+		if proposal.Block.BlockID == vote.BlockID {
+			va.notifier.OnVoteForInvalidBlockDetected(vote, proposal)
+		}
+	}
+
+	block := proposal.Block
+	collector, _, err := va.collectors.GetOrCreateCollector(block.View)
+	if err != nil {
+		return fmt.Errorf("could not retrieve vote collector for view %d: %w", block.View, err)
+	}
+	// registering vote consumer will deliver all previously cached votes in strict order
+	// and will keep delivering votes if more are collected
+	collector.RegisterVoteConsumer(slashingVoteConsumer)
+	return nil
 }
 
 // PruneUpToView will delete all votes equal or below to the given view, as well as related indexes.
