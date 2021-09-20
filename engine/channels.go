@@ -29,12 +29,15 @@ func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
 	return roles, ok
 }
 
-// Exists returns true if channel exists in channelRoleMap.
-// At the current state, any developer-defined channel should be added
-// to channelRoleMap as a constant channel type manually.
+// Exists returns true if the channel exists.
 func Exists(channel network.Channel) bool {
-	_, exists := RolesByChannel(channel)
-	return exists || PublicChannels().Contains(channel)
+	if _, ok := RolesByChannel(channel); !ok {
+		if _, isClusterChannel := ClusterChannel(channel); !isClusterChannel {
+			return PublicChannels().Contains(channel)
+		}
+	}
+
+	return true
 }
 
 // ChannelsByRole returns a list of all channels the role subscribes to.
