@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/atree"
 	"github.com/rs/zerolog"
 	"github.com/schollz/progressbar/v3"
-	"github.com/sergi/go-diff/diffmatchpatch"
 
 	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -153,6 +152,7 @@ type StorageFormatV6Migration struct {
 	storage    *atree.PersistentSlabStorage
 	oldInter   *oldInter.Interpreter
 	newInter   *newInter.Interpreter
+	converter  *ValueConverter
 
 	migratedPayloadPaths map[storagePath]bool
 	deferredValuePaths   map[storagePath]bool
@@ -209,6 +209,8 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	m.initOldInterpreter(payloads)
 
 	m.deferredValuePaths = m.getDeferredKeys(payloads)
+
+	m.converter = NewValueConverter(m)
 
 	// Convert payloads.
 	//   - Cadence values are decoded and converted to new values.
@@ -568,16 +570,7 @@ func (m *StorageFormatV6Migration) decodeAndConvert(
 		return err
 	}
 
-	converter := NewValueConverter(m.newInter, m.oldInter, m.storage)
-
-	defer func() {
-		if r := recover(); r != nil {
-			m.missingTypeValues += 1
-			m.Log.Warn().Msgf("failed to convert value: %s", r.(error).Error())
-		}
-	}()
-
-	_ = converter.Convert(rootValue)
+	_ = m.converter.Convert(rootValue)
 
 	// Mark the payload as 'migrated'.
 	m.migratedPayloadPaths[path] = true
@@ -817,24 +810,10 @@ func (m *StorageFormatV6Migration) updateBrokenContracts(payloads []ledger.Paylo
 		ownerHex := hex.EncodeToString(rawOwner)
 		switch {
 		case ownerHex == "ac98da57ce4dd4ef" && strings.HasSuffix(key, "MessageBoard"):
-			checkDiff(string(payload.Value), knownContractMessageBoard)
 			payloads[index].Value = []byte(knownContractMessageBoard)
 		case ownerHex == "dee35303492e5a0b" && strings.HasSuffix(key, "FlowIDTableStaking"):
-			checkDiff(string(payload.Value), knownContractFlowIDTableStaking)
 			payloads[index].Value = []byte(knownContractFlowIDTableStaking)
 		}
-	}
-}
-
-func checkDiff(original string, updated string) {
-	dmp := diffmatchpatch.New()
-
-	diffs := dmp.DiffMain(original, updated, false)
-
-	if len(diffs) != 3 ||
-		diffs[1].Type != diffmatchpatch.DiffInsert ||
-		diffs[1].Text != "Storage" {
-		panic(fmt.Errorf("invalid contract update: %s", dmp.DiffPrettyText(diffs)))
 	}
 }
 
@@ -1085,38 +1064,43 @@ func cborMeLink(value []byte) string {
 // to new cadence interpreter values.
 //
 type ValueConverter struct {
-	result   newInter.Value
-	storage  atree.SlabStorage
-	newInter *newInter.Interpreter
-	oldInter *oldInter.Interpreter
+	result    newInter.Value
+	storage   atree.SlabStorage
+	newInter  *newInter.Interpreter
+	oldInter  *oldInter.Interpreter
+	migration *StorageFormatV6Migration
 }
 
 var _ oldInter.Visitor = &ValueConverter{}
 
 func NewValueConverter(
-	newInter *newInter.Interpreter,
-	oldInter *oldInter.Interpreter,
-	storage atree.SlabStorage,
+	migration *StorageFormatV6Migration,
 ) *ValueConverter {
 	return &ValueConverter{
-		storage:  storage,
-		newInter: newInter,
-		oldInter: oldInter,
+		migration: migration,
+		storage:   migration.storage,
+		newInter:  migration.newInter,
+		oldInter:  migration.oldInter,
 	}
 }
 
-func (c *ValueConverter) Convert(value oldInter.Value) newInter.Value {
+func (c *ValueConverter) Convert(value oldInter.Value) (result newInter.Value) {
 	prevResult := c.result
 	c.result = nil
 
 	defer func() {
+		if r := recover(); r != nil {
+			c.migration.missingTypeValues += 1
+			result = nil
+		}
+
 		c.result = prevResult
 	}()
 
 	value.Accept(c.oldInter, c)
 
 	if c.result == nil {
-		panic("returned nil")
+		panic("converted value is nil")
 	}
 
 	return c.result
@@ -1148,7 +1132,10 @@ func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInte
 	newElements := make([]newInter.Value, value.Count())
 
 	for index, element := range value.Elements() {
-		newElements[index] = c.Convert(element)
+		newElement := c.Convert(element)
+		if newElement != nil {
+			newElements[index] = newElement
+		}
 	}
 
 	arrayStaticType := ConvertStaticType(value.StaticType()).(newInter.ArrayStaticType)
@@ -1249,7 +1236,10 @@ func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *old
 	fields := newInter.NewStringValueOrderedMap()
 
 	value.Fields().Foreach(func(key string, fieldVal oldInter.Value) {
-		fields.Set(key, c.Convert(fieldVal))
+		newValue := c.Convert(fieldVal)
+		if newValue != nil {
+			fields.Set(key, newValue)
+		}
 	})
 
 	c.result = newInter.NewCompositeValue(
@@ -1276,8 +1266,11 @@ func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value
 			continue
 		}
 
-		keysAndValues = append(keysAndValues, c.Convert(key))
-		keysAndValues = append(keysAndValues, c.Convert(entryValue))
+		newValue := c.Convert(entryValue)
+		if newValue != nil {
+			keysAndValues = append(keysAndValues, c.Convert(key))
+			keysAndValues = append(keysAndValues, newValue)
+		}
 	}
 
 	c.result = newInter.NewDictionaryValueWithAddress(
@@ -1323,6 +1316,10 @@ func (c *ValueConverter) VisitNilValue(_ *oldInter.Interpreter, _ oldInter.NilVa
 
 func (c *ValueConverter) VisitSomeValue(_ *oldInter.Interpreter, value *oldInter.SomeValue) bool {
 	innerValue := c.Convert(value.Value)
+	if innerValue == nil {
+		panic("value cannot be nil")
+	}
+
 	c.result = newInter.NewSomeValueNonCopying(innerValue)
 
 	// Do not descent
