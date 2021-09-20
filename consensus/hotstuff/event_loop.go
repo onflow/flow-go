@@ -201,7 +201,7 @@ func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifie
 // once.
 func (el *EventLoop) Ready() <-chan struct{} {
 	el.lm.OnStart(func() {
-		el.unit.LaunchAfter(el.startTime.Sub(time.Now().UTC()), el.loop)
+		el.unit.LaunchAfter(time.Until(el.startTime), el.loop)
 	})
 	return el.lm.Started()
 }

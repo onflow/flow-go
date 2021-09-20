@@ -142,7 +142,7 @@ func main() {
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
 			flags.StringVar(&startupTimeString, "startup-time", cmd.NotSet,
-				"specifies date and time (in ISO 8601 format) when the consensus participant enters the first view")
+				"specifies date and time (in ISO 8601 format) when the consensus participant enters the first view (e.g 2006-01-02T15:04:05Z07:00)")
 
 			// epoch qc contract flags
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
@@ -154,7 +154,7 @@ func main() {
 			if startupTimeString != cmd.NotSet {
 				t, err := time.Parse(time.RFC3339, startupTimeString)
 				if err != nil {
-					return fmt.Errorf("invalid start-time value: %w", err)
+					return fmt.Errorf("invalid start-time value %s: %w", startupTimeString, err)
 				}
 				startupTime = t
 			}
