@@ -66,6 +66,10 @@ func (id Identifier) Format(state fmt.State, verb rune) {
 }
 
 // IsSampled is a utility method to sample entities based on their ids
+// the range is from [0, 64].
+// 0 is 100% (all data will be collected)
+// 32 is ~50%
+// 64 is ~0% (no data will be collected)
 func (id Identifier) IsSampled(sensitivity uint) bool {
 	if sensitivity > 64 {
 		return false
