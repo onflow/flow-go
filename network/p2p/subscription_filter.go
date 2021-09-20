@@ -1,8 +1,6 @@
 package p2p
 
 import (
-	"strings"
-
 	"github.com/libp2p/go-libp2p-core/peer"
 	pb "github.com/libp2p/go-libp2p-pubsub/pb"
 
@@ -32,6 +30,7 @@ func NewRoleBasedFilter(pid peer.ID, rootBlockID flow.Identifier, chainID flow.C
 func (f *RoleBasedFilter) allowedTopics(pid peer.ID) map[network.Topic]struct{} {
 	id, found := f.idProvider.ByPeerID(pid)
 	channels := engine.PublicChannels()
+	topics := make(map[network.Topic]struct{})
 
 	if !found {
 		// TODO: eventually we should have block proposals relayed on a separate
@@ -40,20 +39,13 @@ func (f *RoleBasedFilter) allowedTopics(pid peer.ID) map[network.Topic]struct{} 
 		channels = append(channels, engine.ReceiveBlocks)
 	} else {
 		channels = append(channels, engine.ChannelsByRole(id.Role)...)
+
+		if engine.ClusterChannelRoles().Contains(id.Role) {
+			channels = append(channels, engine.ChannelConsensusCluster(f.chainID), engine.ChannelSyncCluster(f.chainID))
+		}
 	}
 
-	topics := make(map[network.Topic]struct{})
-
 	for _, ch := range channels {
-		consensusCluster := engine.ChannelConsensusCluster(f.chainID)
-		syncCluster := engine.ChannelSyncCluster(f.chainID)
-
-		if strings.HasPrefix(consensusCluster.String(), ch.String()) {
-			ch = consensusCluster
-		} else if strings.HasPrefix(syncCluster.String(), ch.String()) {
-			ch = syncCluster
-		}
-
 		topics[engine.TopicFromChannel(ch, f.rootBlockID)] = struct{}{}
 	}
 

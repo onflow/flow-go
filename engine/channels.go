@@ -194,9 +194,11 @@ func initializeChannelRoleMap() {
 	channelRoleMap[ProvideChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
 	channelRoleMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
 	channelRoleMap[ProvideApprovalsByChunk] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
+}
 
-	channelRoleMap[syncClusterPrefix] = flow.RoleList{flow.RoleCollection}
-	channelRoleMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
+// ClusterChannelRoles returns the list of roles that are involved in cluster-based channels.
+func ClusterChannelRoles() flow.RoleList {
+	return flow.RoleList{flow.RoleCollection}
 }
 
 // ClusterChannel returns true if channel is cluster-based.
