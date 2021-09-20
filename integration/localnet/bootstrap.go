@@ -316,7 +316,8 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 		Command: []string{
 			fmt.Sprintf("--nodeid=%s", container.NodeID),
 			"--bootstrapdir=/bootstrap",
-			"--datadir=/data",
+			"--datadir=/data/protocol",
+			"--secretsdir=/data/secret",
 			"--loglevel=DEBUG",
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
 			"--profiler-dir=/profiler",
