@@ -1122,7 +1122,7 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.PersistExecutionState(childCtx,
+	err = e.execState.SaveExecutionResults(childCtx,
 		block.Header,
 		endState,
 		chdps,

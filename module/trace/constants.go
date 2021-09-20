@@ -95,7 +95,7 @@ const (
 	EXERunTransaction          SpanName = "exe.computer.runTransaction"
 	EXEMergeTransactionView    SpanName = "exe.computer.mergeTransactionView"
 
-	EXEStatePersistExecutionState         SpanName = "exe.state.persistExecutionState"
+	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
 	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
 	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"

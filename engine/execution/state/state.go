@@ -64,7 +64,7 @@ type ExecutionState interface {
 
 	UpdateHighestExecutedBlockIfHigher(context.Context, *flow.Header) error
 
-	PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+	SaveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 		chunkDataPacks []*flow.ChunkDataPack,
 		executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList, results []flow.TransactionResult) error
 }
@@ -327,14 +327,14 @@ func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifie
 	return result.ID(), nil
 }
 
-func (s *state) PersistExecutionState(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
+func (s *state) SaveExecutionResults(ctx context.Context, header *flow.Header, endState flow.StateCommitment,
 	chunkDataPacks []*flow.ChunkDataPack, executionReceipt *flow.ExecutionReceipt, events []flow.EventsList, serviceEvents flow.EventsList,
 	results []flow.TransactionResult) error {
 
 	spew.Config.DisableMethods = true
 	spew.Config.DisablePointerMethods = true
 
-	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXEStatePersistExecutionState)
+	span, childCtx := s.tracer.StartSpanFromContext(ctx, trace.EXEStateSaveExecutionResults)
 	defer span.Finish()
 
 	blockID := header.ID()

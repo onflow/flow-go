@@ -229,7 +229,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		Return(previousExecutionResultID, nil)
 
 	mocked := ctx.executionState.
-		On("PersistExecutionState",
+		On("SaveExecutionResults",
 			mock.Anything,
 			executableBlock.Block.Header,
 			newStateCommitment,
@@ -901,7 +901,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 		Return(previousExecutionResultID, nil)
 
 	execState.
-		On("PersistExecutionState", mock.Anything, executableBlock.Block.Header, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		On("SaveExecutionResults", mock.Anything, executableBlock.Block.Header, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 
 	e := Engine{
