@@ -40,7 +40,7 @@ require (
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/atree v0.0.0-20210827211716-97888c87e47e
+	github.com/onflow/atree v0.0.0-20210903151759-94b860d1f7fc
 	github.com/onflow/cadence v0.20.0
 	github.com/onflow/cadence/v19 v19.0.0-00010101000000-000000000000
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.7
@@ -54,6 +54,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/rs/zerolog v1.19.0
+	github.com/schollz/progressbar/v3 v3.7.6
 	github.com/sethvargo/go-retry v0.1.0
 	github.com/spf13/cobra v1.1.3
 	github.com/spf13/pflag v1.0.5
