@@ -102,25 +102,27 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 
 // Broadcast signs and broadcasts a message to all participants.
 func (b *Broker) Broadcast(data []byte) {
-	if b.broadcasts > 0 {
-		// The Warn log is used by the integration tests to check if this method
-		// is called more than once within one epoch.
-		b.log.Warn().Msgf("DKG broadcast number %d with header %d", b.broadcasts+1, data[0])
-	} else {
-		b.log.Info().Msgf("DKG message broadcast with header %d", data[0])
-	}
-	bcastMsg, err := b.prepareBroadcastMessage(data)
-	if err != nil {
-		b.log.Fatal().Err(err).Msg("failed to create broadcast message")
-	}
-
-	expRetry, err := retry.NewExponential(retryMilliseconds)
-	if err != nil {
-		b.log.Fatal().Err(err).Msg("create retry mechanism")
-	}
-	maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
-
 	b.unit.Launch(func() {
+		b.unit.Lock()
+		if b.broadcasts > 0 {
+			// The Warn log is used by the integration tests to check if this method
+			// is called more than once within one epoch.
+			b.log.Warn().Msgf("DKG broadcast number %d with header %d", b.broadcasts+1, data[0])
+		} else {
+			b.log.Info().Msgf("DKG message broadcast with header %d", data[0])
+		}
+		b.unit.Unlock()
+		bcastMsg, err := b.prepareBroadcastMessage(data)
+		if err != nil {
+			b.log.Fatal().Err(err).Msg("failed to create broadcast message")
+		}
+
+		expRetry, err := retry.NewExponential(retryMilliseconds)
+		if err != nil {
+			b.log.Fatal().Err(err).Msg("create retry mechanism")
+		}
+		maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
+
 		attempts := 1
 		err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
 			err := b.dkgContractClient.Broadcast(bcastMsg)
