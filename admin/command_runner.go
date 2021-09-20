@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"sync"
 	"time"
 
@@ -58,7 +59,7 @@ func (r *CommandRunnerBootstrapper) Bootstrap(logger zerolog.Logger, bindAddress
 		handlers:         r.handlers,
 		validators:       r.validators,
 		commandQ:         make(chan *CommandRequest, CommandRunnerMaxQueueLength),
-		grpcAddress:      "/tmp/flow-node-admin.sock",
+		grpcAddress:      fmt.Sprintf("%s/flow-node-admin.sock", os.TempDir()),
 		httpAddress:      bindAddress,
 		logger:           logger.With().Str("admin", "command_runner").Logger(),
 		startupCompleted: make(chan struct{}),
