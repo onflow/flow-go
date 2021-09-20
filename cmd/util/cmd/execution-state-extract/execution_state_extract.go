@@ -87,6 +87,10 @@ func extractExecutionState(
 				Log:       log,
 				OutputDir: outputDir,
 			},
+			&mgr.BalanceReporter{
+				Log:       log,
+				OutputDir: outputDir,
+			},
 		}
 	}
 	newState, err := led.ExportCheckpointAt(
