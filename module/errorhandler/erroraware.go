@@ -9,7 +9,6 @@ import (
 )
 
 // IrrecoverableSignaler sends the error out
-// little variability on what happens => struct
 type IrrecoverableSignaler struct {
 	irrecoverableErrors chan<- error
 }
@@ -21,19 +20,13 @@ func (e *IrrecoverableSignaler) ThrowIrrecoverable(err error) {
 	runtime.Goexit()
 }
 
-// IrrecoverableHandler reacts to the error
-// lots of variability in how the reaction could go:
+// OnIrrecoverable reacts to the error
+// It could:
 // - restart the component (in production) after cleanup
 // - panic (in canary / benchmark)
 // - log in various Error channels and / or send telemetry ...
 // does not do the plumbing of connecting to the channel
-type IrrecoverableHandler interface {
-	// OnIrrecoverable handles the error, and
-	// executes andThen.
-	// despite the restart use case, andThen
-	// is actually a general instance of a continuation
-	OnIrrecoverable(err error, andThen func())
-}
+type OnIrrecoverable = func(err error, andThen func() error)
 
 ///////////////////////////////////////////////////////
 // Integrating the sending part it in a context      //
@@ -76,9 +69,9 @@ func WithIrrecoverableSignal(ctx context.Context, sig *IrrecoverableSignaler) Ir
 // ThrowIrrecoverable can be a drop-in replacement anywhere we have a context.Context likely
 // to support Irrecoverables. Note: this is not a method
 func ThrowIrrecoverable(ctx context.Context, err error) {
-	signalerAbleContext, ok := ctx.(irrecoverableSignalerCtxt)
+	signalerAbleContext, ok := ctx.(IrrecoverableSignalerContext)
 	if ok {
-		signalerAbleContext.signaler.ThrowIrrecoverable(err)
+		signalerAbleContext.ThrowIrrecoverable(err)
 	}
 	// Be spectacular on how this does not -but should- handle irrecoverables:
 	log.Fatalf("Irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error %v", err)
@@ -88,7 +81,7 @@ func ThrowIrrecoverable(ctx context.Context, err error) {
 // Integrating it w/ ReadyDoneAware & friends //
 ////////////////////////////////////////////////
 
-// If we want to do it using interface composition (see module.Component), we will need to build on the existing intrefaces
+// If we want to do it using interface composition (see module.Component), we will need to build on the existing interfaces
 // note the irrecoverable management needs to be:
 // - set up before the call to start (if the start itself meets an irrecoverable condition)
 // - not throw / return error itself, except to an enclosing context
@@ -104,14 +97,10 @@ type Component interface {
 }
 type ComponentFactory func() (Component, error)
 
-func RunComponent(parentCtx IrrecoverableSignalerContext, componentFactory ComponentFactory, handler IrrecoverableHandler) {
-
-	component, err := componentFactory()
-	if err != nil {
-		parentCtx.ThrowIrrecoverable(err) // failure to generate the component
-	}
+func RunComponent(parentCtx IrrecoverableSignalerContext, componentFactory ComponentFactory, handler OnIrrecoverable) error {
 
 	// reference to per-run signals for the component
+	var component Component
 	var cancel context.CancelFunc
 	var done <-chan struct{}
 	var irrecoverables chan error
@@ -119,7 +108,14 @@ func RunComponent(parentCtx IrrecoverableSignalerContext, componentFactory Compo
 	// Tells us:
 	// - how to get started
 	// - how to create a closure to program the handler with a continuation
-	restart := func() {
+	restart := func() error {
+		var err error // startup error, should be handled out of band
+
+		component, err = componentFactory()
+		if err != nil {
+			return err // failure to generate the component, should be handles out-of-band because a restart won't help
+		}
+
 		// context used to run the component
 		var runCtx context.Context
 		runCtx, cancel = context.WithCancel(parentCtx)
@@ -131,7 +127,7 @@ func RunComponent(parentCtx IrrecoverableSignalerContext, componentFactory Compo
 
 		if err = component.Start(signalingCtx); err != nil {
 			// failed to start component: this should not trigger a restart
-			parentCtx.ThrowIrrecoverable(err)
+			return err
 		}
 		// Anywhere inside the component, we can use signalingCtx.ThrowIrrecoverable(err), if the types support it
 		// and ThrowIrrecoverable(signalingCtx, err) if not
@@ -140,17 +136,23 @@ func RunComponent(parentCtx IrrecoverableSignalerContext, componentFactory Compo
 		<-component.Ready()
 
 		done = component.Done()
+		return nil
 	}
 
-	restart()
+	err := restart()
+	if err != nil {
+		return err // failure to start
+	}
 
 	for {
 		select {
 		case err := <-irrecoverables:
 			// shutdown the component,
 			cancel()
-			// here the handler is programmed with a restart continuation
-			handler.OnIrrecoverable(err, restart)
+			// wait until it's doneC
+			<-done
+			// send error to the handler programmed with a restart continuation
+			handler(err, restart)
 		case <-done:
 			// successful finish
 			break
