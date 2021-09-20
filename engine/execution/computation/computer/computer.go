@@ -26,6 +26,8 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
+const SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
+
 // VirtualMachine runs procedures
 type VirtualMachine interface {
 	Run(fvm.Context, fvm.Procedure, state.View, *programs.Programs) error
@@ -52,6 +54,17 @@ type blockComputer struct {
 	committer      ViewCommitter
 }
 
+func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
+	return fvm.NewContextFromParent(
+		vmCtx,
+		fvm.WithRestrictedDeployment(false),
+		fvm.WithTransactionFeesEnabled(false),
+		fvm.WithServiceEventCollectionEnabled(),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
+		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
+	)
+}
+
 // NewBlockComputer creates a new block executor.
 func NewBlockComputer(
 	vm VirtualMachine,
@@ -61,22 +74,13 @@ func NewBlockComputer(
 	logger zerolog.Logger,
 	committer ViewCommitter,
 ) (BlockComputer, error) {
-
-	systemChunkCtx := fvm.NewContextFromParent(
-		vmCtx,
-		fvm.WithRestrictedDeployment(false),
-		fvm.WithTransactionFeesEnabled(false),
-		fvm.WithServiceEventCollectionEnabled(),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
-	)
-
 	return &blockComputer{
 		vm:             vm,
 		vmCtx:          vmCtx,
 		metrics:        metrics,
 		tracer:         tracer,
 		log:            logger,
-		systemChunkCtx: systemChunkCtx,
+		systemChunkCtx: SystemChunkContext(vmCtx, logger),
 		committer:      committer,
 	}, nil
 }
@@ -143,7 +147,7 @@ func (e *blockComputer) executeBlock(
 
 	stateCommitments := make([]flow.StateCommitment, 0, len(collections)+1)
 	proofs := make([][]byte, 0, len(collections)+1)
-	trieUpdates := make([]*ledger.TrieUpdate, len(collections)+1)
+	trieUpdates := make([]*ledger.TrieUpdate, 0, len(collections)+1)
 
 	bc := blockCommitter{
 		committer: e.committer,

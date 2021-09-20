@@ -235,24 +235,32 @@ func (l *Ledger) Checkpointer() (*wal.Checkpointer, error) {
 }
 
 // ExportCheckpointAt exports a checkpoint at specific state commitment after applying migrations and returns the new state (after migration) and any errors
-func (l *Ledger) ExportCheckpointAt(state ledger.State,
+func (l *Ledger) ExportCheckpointAt(
+	state ledger.State,
 	migrations []ledger.Migration,
 	reporters []ledger.Reporter,
 	targetPathFinderVersion uint8,
-	outputDir, outputFile string) (ledger.State, error) {
+	outputDir, outputFile string,
+) (ledger.State, error) {
 
-	l.logger.Info().Msgf("Ledger is loaded, checkpoint Export has started for state %s, and %d migrations has been planed", state.String(), len(migrations))
+	l.logger.Info().Msgf(
+		"Ledger is loaded, checkpoint export has started for state %s, and %d migrations have been planed",
+		state.String(),
+		len(migrations),
+	)
 
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("cannot get try at the given state commitment: %w", err)
+		return ledger.State(hash.DummyHash),
+			fmt.Errorf("cannot get try at the given state commitment: %w", err)
 	}
 
 	// clean up tries to release memory
 	err = l.keepOnlyOneTrie(state)
 	if err != nil {
-		return ledger.State(hash.DummyHash), fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
+		return ledger.State(hash.DummyHash),
+			fmt.Errorf("failed to clean up tries to reduce memory usage: %w", err)
 	}
 
 	// TODO enable validity check of trie
@@ -271,7 +279,10 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 	for i, migrate := range migrations {
 		l.logger.Info().Msgf("migration %d is underway", i)
 
+		start := time.Now()
 		payloads, err = migrate(payloads)
+		elapsed := time.Since(start)
+
 		if err != nil {
 			return ledger.State(hash.DummyHash), fmt.Errorf("error applying migration (%d): %w", i, err)
 		}
@@ -285,14 +296,17 @@ func (l *Ledger) ExportCheckpointAt(state ledger.State,
 				Int("outcome_size", newPayloadSize).
 				Msg("payload counts has changed during migration, make sure this is expected.")
 		}
-		l.logger.Info().Msgf("migration %d is done", i)
+		l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("migration %d is done", i)
 
 		payloadSize = newPayloadSize
 	}
 
 	// run reporters
 	for i, reporter := range reporters {
+		start := time.Now()
 		err = reporter.Report(payloads)
+		elapsed := time.Since(start)
+		l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("reporter %d is done", i)
 		if err != nil {
 			return ledger.State(hash.DummyHash), fmt.Errorf("error running reporter (%d): %w", i, err)
 		}
