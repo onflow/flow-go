@@ -5,11 +5,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// VoteConsumer is a callback for consuming votes. VotesCache feeds votes into
-// the consumer in the order they are received. Only votes that pass de-
-// duplication and equivocation detection are passed on.
-// CAUTION: a consumer MUST be NON-BLOCKING and consume the votes without
-// noteworthy delay. Otherwise, consensus speed is impacted.
+// VoteConsumer consumes all votes for one specific view. It is registered 
+// with the `VoteCollector` for the respective view. Upon registration, the  
+// `VoteCollector` feeds votes into the consumer in the order they are received
+// (already cached votes as well as votes received in the future). 
+// Only votes that pass de-duplication and equivocation detection are passed on.
+// CAUTION, VoteConsumer implementations must be 
+//  * NON-BLOCKING and consume the votes without noteworthy delay, and
+//  * CONCURRENCY SAFE
 type VoteConsumer func(vote *model.Vote)
 
 // OnQCCreated is a callback which will be used by VoteCollector to submit a QC when it's able to create it
@@ -66,8 +69,9 @@ type VoteCollector interface {
 
 	// RegisterVoteConsumer registers a VoteConsumer. Upon registration, the collector
 	// feeds all cached votes into the consumer in the order they arrived.
-	// CAUTION: a consumer MUST be NON-BLOCKING and consume the votes without
-	// noteworthy delay. Otherwise, consensus speed is impacted.
+	// CAUTION, VoteConsumer implementations must be
+	//  * NON-BLOCKING and consume the votes without noteworthy delay, and
+	//  * CONCURRENCY SAFE
 	RegisterVoteConsumer(consumer VoteConsumer)
 
 	// View returns the view that this instance is collecting votes for.

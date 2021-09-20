@@ -190,7 +190,11 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 	}
 }
 
-// RegisterVoteConsumer effectively delegates call to votes cache
+// RegisterVoteConsumer registers a VoteConsumer. Upon registration, the collector
+// feeds all cached votes into the consumer in the order they arrived.
+// CAUTION, VoteConsumer implementations must be
+//  * NON-BLOCKING and consume the votes without noteworthy delay, and
+//  * CONCURRENCY SAFE
 func (m *VoteCollector) RegisterVoteConsumer(consumer hotstuff.VoteConsumer) {
 	m.votesCache.RegisterVoteConsumer(consumer)
 }

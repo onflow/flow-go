@@ -150,7 +150,7 @@ func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal 
 		Hex("vote_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
 		Hex("proposer_id", proposal.Block.ProposerID[:]).
-		Msg("invalid vote for proposal detected")
+		Msg("vote for invalid proposal detected")
 }
 
 func (lc *LogConsumer) logBasicBlockData(loggerEvent *zerolog.Event, block *model.Block) *zerolog.Event {
