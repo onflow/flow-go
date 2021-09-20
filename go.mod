@@ -40,8 +40,7 @@ require (
 	github.com/mitchellh/mapstructure v1.3.3 // indirect
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/atree v0.0.0-20210903151759-94b860d1f7fc // indirect
-	github.com/onflow/cadence v0.19.1-0.20210916231123-bfe46fb610d7
+	github.com/onflow/cadence v0.19.1-0.20210920190755-bc0d62f9171a
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.7
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.7
 	github.com/onflow/flow-emulator v0.20.3
