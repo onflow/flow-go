@@ -51,7 +51,7 @@ func (lc *LogConsumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
 	lc.log.Debug().
 		Uint64("cur_view", currentView).
 		Uint64("vote_view", vote.View).
-		Hex("vote_id", vote.BlockID[:]).
+		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
 		Msg("processing vote")
 }
@@ -130,7 +130,7 @@ func (lc *LogConsumer) OnForkChoiceGenerated(view uint64, qc *flow.QuorumCertifi
 func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote) {
 	lc.log.Warn().
 		Uint64("vote_view", vote.View).
-		Hex("vote_id", vote.BlockID[:]).
+		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("alt_id", alt.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
 		Msg("double vote detected")
@@ -139,7 +139,7 @@ func (lc *LogConsumer) OnDoubleVotingDetected(vote *model.Vote, alt *model.Vote)
 func (lc *LogConsumer) OnInvalidVoteDetected(vote *model.Vote) {
 	lc.log.Warn().
 		Uint64("vote_view", vote.View).
-		Hex("vote_id", vote.BlockID[:]).
+		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
 		Msg("invalid vote detected")
 }
@@ -147,7 +147,7 @@ func (lc *LogConsumer) OnInvalidVoteDetected(vote *model.Vote) {
 func (lc *LogConsumer) OnVoteForInvalidBlockDetected(vote *model.Vote, proposal *model.Proposal) {
 	lc.log.Warn().
 		Uint64("vote_view", vote.View).
-		Hex("vote_id", vote.BlockID[:]).
+		Hex("voted_block_id", vote.BlockID[:]).
 		Hex("voter_id", vote.SignerID[:]).
 		Hex("proposer_id", proposal.Block.ProposerID[:]).
 		Msg("vote for invalid proposal detected")
