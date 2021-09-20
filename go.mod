@@ -46,10 +46,10 @@ require (
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/atree v0.1.0-beta1.0.20211026173452-734a61c6a1c7
-	github.com/onflow/cadence v0.18.0
-	github.com/onflow/cadence/v18 v18.0.0-00010101000000-000000000000
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.5
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.5
+	github.com/onflow/cadence v0.20.0
+	github.com/onflow/cadence/v19 v19.0.0-00010101000000-000000000000
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.7
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.7
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.21.3
@@ -60,6 +60,7 @@ require (
 	github.com/prometheus/client_golang v1.10.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/rs/zerolog v1.19.0
+	github.com/schollz/progressbar/v3 v3.7.6
 	github.com/sethvargo/go-retry v0.1.0
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.2.1
