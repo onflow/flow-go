@@ -1,6 +1,7 @@
 package vertestutils
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -378,9 +379,9 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 				continue
 			}
 
-			err := state.Extend(receipt.ReferenceBlock)
+			err := state.Extend(context.Background(), receipt.ReferenceBlock)
 			require.NoError(t, err)
-			err = state.Finalize(refBlockID)
+			err = state.Finalize(context.Background(), refBlockID)
 			require.NoError(t, err)
 			blocks = append(blocks, receipt.ReferenceBlock)
 			duplicate[refBlockID] = struct{}{}
@@ -393,9 +394,9 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 			// skips extending state with already duplicate container block
 			continue
 		}
-		err := state.Extend(completeER.ContainerBlock)
+		err := state.Extend(context.Background(), completeER.ContainerBlock)
 		require.NoError(t, err)
-		err = state.Finalize(containerBlockID)
+		err = state.Finalize(context.Background(), containerBlockID)
 		require.NoError(t, err)
 		blocks = append(blocks, completeER.ContainerBlock)
 		duplicate[containerBlockID] = struct{}{}

@@ -1,9 +1,11 @@
 package factories
 
 import (
+	"fmt"
+
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/collection/proposal"
+	"github.com/onflow/flow-go/engine/collection/compliance"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/state/cluster"
@@ -47,22 +49,21 @@ func NewProposalEngineFactory(
 	return factory, nil
 }
 
-func (f *ProposalEngineFactory) Create(clusterState cluster.MutableState, headers storage.Headers, payloads storage.ClusterPayloads) (*proposal.Engine, error) {
+func (f *ProposalEngineFactory) Create(clusterState cluster.MutableState, headers storage.Headers, payloads storage.ClusterPayloads) (*compliance.Engine, error) {
 
 	cache := buffer.NewPendingClusterBlocks()
-	engine, err := proposal.New(
+	core, err := compliance.NewCore(f.log, f.engMetrics, f.mempoolMetrics, f.colMetrics, headers, clusterState, cache)
+	if err != nil {
+		return nil, fmt.Errorf("could create cluster compliance core: %w", err)
+	}
+
+	engine, err := compliance.NewEngine(
 		f.log,
 		f.net,
 		f.me,
-		f.colMetrics,
-		f.engMetrics,
-		f.mempoolMetrics,
 		f.protoState,
-		clusterState,
-		f.transactions,
-		headers,
 		payloads,
-		cache,
+		core,
 	)
 	return engine, err
 }
