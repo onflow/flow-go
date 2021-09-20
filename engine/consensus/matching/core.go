@@ -308,11 +308,6 @@ HEIGHT_LOOP:
 		}
 		blockID := header.ID()
 
-		// if we have already a candidate seal, we skip any further processing
-		// CAUTION: this is not BFT, as the existence of a candidate seal
-		//          does _not_ imply that all parent results are sealable.
-		// TODO: update for full BFT
-
 		receipts, err := c.receiptsDB.ByBlockID(blockID)
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
@@ -321,7 +316,8 @@ HEIGHT_LOOP:
 		// We require at least 2 consistent receipts from different ENs to seal a block. If don't need to fetching receipts.
 		// CAUTION: This is a temporary shortcut incompatible with the mature BFT protocol!
 		// There might be multiple consistent receipts that commit to a wrong result. To guarantee
-		// sealing liveness, we need to fetch receipts from those ENs, whose receipts we don't have yet,
+		// sealing liveness, we need to fetch receipts from those ENs, whose receipts we don't have yet.
+		// TODO: update for full BFT
 		for _, receiptsForResult := range receipts.GroupByResultID() {
 			if receiptsForResult.GroupByExecutorID().NumberGroups() >= 2 {
 				continue HEIGHT_LOOP
