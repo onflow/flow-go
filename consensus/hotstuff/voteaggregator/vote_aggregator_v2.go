@@ -17,6 +17,9 @@ import (
 // defaultVoteAggregatorWorkers number of workers to dispatch events for vote aggregators
 const defaultVoteAggregatorWorkers = 8
 
+// defaultVoteQueueCapacity maximum capacity of block votes queue
+const defaultVoteQueueCapacity = 1000
+
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
 type VoteAggregatorV2 struct {
 	unit                *engine.Unit
@@ -45,21 +48,29 @@ func NewVoteAggregatorV2(
 	voteValidator hotstuff.Validator,
 	signer hotstuff.SignerVerifier,
 	collectors hotstuff.VoteCollectors,
-) *VoteAggregatorV2 {
+) (*VoteAggregatorV2, error) {
 
-	aggregator := &VoteAggregatorV2{
-		unit:              engine.NewUnit(),
-		lm:                lifecycle.NewLifecycleManager(),
-		log:               log,
-		notifier:          notifier,
-		highestPrunedView: counters.NewMonotonousCounter(highestPrunedView),
-		committee:         committee,
-		voteValidator:     voteValidator,
-		signer:            signer,
-		collectors:        collectors,
+	queuedVotes, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultVoteQueueCapacity))
+	if err != nil {
+		return nil, fmt.Errorf("could not initialize votes queue")
 	}
 
-	return aggregator
+	aggregator := &VoteAggregatorV2{
+		unit:                engine.NewUnit(),
+		lm:                  lifecycle.NewLifecycleManager(),
+		log:                 log,
+		notifier:            notifier,
+		highestPrunedView:   counters.NewMonotonousCounter(highestPrunedView),
+		committee:           committee,
+		voteValidator:       voteValidator,
+		signer:              signer,
+		collectors:          collectors,
+		queuedVotes:         queuedVotes,
+		queuedVotesNotifier: engine.NewNotifier(),
+	}
+
+	return aggregator, nil
 }
 
 // Ready returns a ready channel that is closed once the engine has fully
