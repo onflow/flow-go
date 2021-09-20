@@ -78,7 +78,7 @@ func (e *MessagingEngine) Done() <-chan struct{} {
 func (e *MessagingEngine) SubmitLocal(event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(e.me.NodeID(), event)
-		if engine.IsInvalidInputError(err) {
+		if err != nil {
 			e.log.Fatal().Err(err).Str("origin", e.me.NodeID().String()).Msg("failed to submit local message")
 		}
 	})
@@ -90,6 +90,8 @@ func (e *MessagingEngine) Submit(_ network.Channel, originID flow.Identifier, ev
 		err := e.process(originID, event)
 		if engine.IsInvalidInputError(err) {
 			e.log.Error().Err(err).Str("origin", originID.String()).Msg("failed to submit dropping invalid input message")
+		} else if err != nil {
+			e.log.Fatal().Err(err).Str("origin", originID.String()).Msg("failed to submit message unknown error")
 		}
 	})
 }
@@ -98,7 +100,7 @@ func (e *MessagingEngine) Submit(_ network.Channel, originID flow.Identifier, ev
 func (e *MessagingEngine) ProcessLocal(event interface{}) error {
 	return e.unit.Do(func() error {
 		err := e.process(e.me.NodeID(), event)
-		if engine.IsInvalidInputError(err) {
+		if err != nil {
 			e.log.Fatal().Err(err).Str("origin", e.me.NodeID().String()).Msg("failed to process local message")
 		}
 
