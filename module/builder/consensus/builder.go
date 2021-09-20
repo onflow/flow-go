@@ -386,10 +386,13 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 		blockID := header.ID()
 		// TEMPORARY implementation (unpolished)
 		if blockID == parentID {
-			// Important protocol edge case: There must be at least one block in between the block incorporating a
-			// result and the block sealing the result. This guarantees that a verifier assignment can be computed
-			// without needing information from the block that we are just constructing. Hence, we don't consider
-			// results for sealing that were incorporated in the immediate parent which we are extending.
+			// Important protocol edge case: There must be at least one block in between the block incorporating
+			// a result and the block sealing the result. This is because we need the Source of Randomness for
+			// the block that _incorporates_ the result, to compute the verifier assignment. Therefore, we require
+			// that the block _incorporating_ the result has at least one child in the fork, _before_ we include
+			// the seal. Thereby, we guarantee that a verifier assignment can be computed without needing
+			// information from the block that we are just constructing. Hence, we don't consider results for
+			// sealing that were incorporated in the immediate parent which we are extending.
 			return nil
 		}
 
