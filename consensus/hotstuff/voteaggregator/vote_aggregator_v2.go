@@ -2,6 +2,7 @@ package voteaggregator
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module/lifecycle"
 
 	"github.com/rs/zerolog"
 
@@ -19,6 +20,7 @@ const defaultVoteAggregatorWorkers = 8
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected
 type VoteAggregatorV2 struct {
 	unit                *engine.Unit
+	lm                  *lifecycle.LifecycleManager
 	log                 zerolog.Logger
 	notifier            hotstuff.Consumer
 	committee           hotstuff.Committee
@@ -46,13 +48,14 @@ func NewVoteAggregatorV2(
 ) *VoteAggregatorV2 {
 
 	aggregator := &VoteAggregatorV2{
+		unit:              engine.NewUnit(),
+		lm:                lifecycle.NewLifecycleManager(),
 		log:               log,
 		notifier:          notifier,
 		highestPrunedView: counters.NewMonotonousCounter(highestPrunedView),
 		committee:         committee,
 		voteValidator:     voteValidator,
 		signer:            signer,
-		unit:              engine.NewUnit(),
 		collectors:        collectors,
 	}
 
@@ -63,16 +66,22 @@ func NewVoteAggregatorV2(
 // started. For the propagation engine, we consider the engine up and running
 // upon initialization.
 func (va *VoteAggregatorV2) Ready() <-chan struct{} {
-	// launch as many workers as we need
-	for i := 0; i < defaultVoteAggregatorWorkers; i++ {
-		va.unit.Launch(va.queuedVotesProcessingLoop)
-	}
+	va.lm.OnStart(func() {
+		// launch as many workers as we need
+		for i := 0; i < defaultVoteAggregatorWorkers; i++ {
+			va.unit.Launch(va.queuedVotesProcessingLoop)
+		}
 
-	return va.unit.Ready()
+		<-va.unit.Ready()
+	})
+	return va.lm.Started()
 }
 
 func (va *VoteAggregatorV2) Done() <-chan struct{} {
-	return va.unit.Done()
+	va.lm.OnStop(func() {
+		<-va.unit.Done()
+	})
+	return va.lm.Stopped()
 }
 
 func (va *VoteAggregatorV2) queuedVotesProcessingLoop() {
