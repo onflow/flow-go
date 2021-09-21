@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	gohash "hash"
@@ -27,6 +28,21 @@ func GenerateMachineAccountKey(seed []byte) (crypto.PrivateKey, error) {
 		return nil, err
 	}
 	return keys[0], nil
+}
+
+// GenerateSecretsDBEncryptionKey generates an encryption key for encrypting a
+// Badger database.
+func GenerateSecretsDBEncryptionKey() ([]byte, error) {
+	// 32-byte key to use AES-256
+	// https://pkg.go.dev/github.com/dgraph-io/badger/v2#Options.WithEncryptionKey
+	const keyLen = 32
+
+	key := make([]byte, keyLen)
+	_, err := rand.Read(key)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate key: %w", err)
+	}
+	return key, nil
 }
 
 // The unstaked nodes have special networking keys, in two aspects:
