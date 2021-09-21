@@ -60,8 +60,7 @@ type WeightedSignatureAggregator interface {
 	//  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
 	//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 	//  - random error if the execution failed
-	// Todo: update the interface to return (error) and not (bool, error) which requires combined_vote_processor update
-	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
+	Verify(signerID flow.Identifier, sig crypto.Signature) error
 
 	// TrustedAdd adds a signature to the internal set of signatures and adds the signer's
 	// weight to the total collected weight, iff the signature is _not_ a duplicate.
