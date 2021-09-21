@@ -111,7 +111,9 @@ func (b *Broker) Broadcast(data []byte) {
 		} else {
 			b.log.Info().Msgf("DKG message broadcast with header %d", data[0])
 		}
+		b.broadcasts++
 		b.unit.Unlock()
+
 		bcastMsg, err := b.prepareBroadcastMessage(data)
 		if err != nil {
 			b.log.Fatal().Err(err).Msg("failed to create broadcast message")
@@ -140,10 +142,6 @@ func (b *Broker) Broadcast(data []byte) {
 		if err != nil {
 			b.log.Error().Err(err).Msg("failed to broadcast message")
 		}
-
-		b.unit.Lock()
-		b.broadcasts++
-		b.unit.Unlock()
 	})
 }
 
