@@ -3,6 +3,7 @@
 package ingestion
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -171,11 +172,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // * OutdatedInputError
 func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
-	span := e.tracer.StartSpan(guarantee.CollectionID, trace.CONProcessCollection)
-	// TODO finish span if we error? How are they shown in Jaeger?
-	span.SetTag("collection_id", guarantee.CollectionID)
-	childSpan := e.tracer.StartSpanFromParent(span, trace.CONIngOnCollectionGuarantee)
-	defer childSpan.Finish()
+	span, _, isSampled := e.tracer.StartCollectionSpan(context.Background(), guarantee.CollectionID, trace.CONIngOnCollectionGuarantee)
+	if isSampled {
+		span.LogKV("originID", originID.String())
+	}
+	defer span.Finish()
 
 	guaranteeID := guarantee.ID()
 

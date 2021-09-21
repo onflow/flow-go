@@ -134,7 +134,7 @@ func runWithEngine(t *testing.T, f func(testingContext)) {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
 
-	tracer, err := trace.NewTracer(log, "test")
+	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)
 	require.NoError(t, err)
 
 	request.EXPECT().Force().Return().AnyTimes()
@@ -229,7 +229,7 @@ func (ctx *testingContext) assertSuccessfulBlockComputation(
 		Return(previousExecutionResultID, nil)
 
 	mocked := ctx.executionState.
-		On("PersistExecutionState",
+		On("SaveExecutionResults",
 			mock.Anything,
 			executableBlock.Block.Header,
 			newStateCommitment,
@@ -901,7 +901,7 @@ func TestExecutionGenerationResultsAreChained(t *testing.T) {
 		Return(previousExecutionResultID, nil)
 
 	execState.
-		On("PersistExecutionState", mock.Anything, executableBlock.Block.Header, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		On("SaveExecutionResults", mock.Anything, executableBlock.Block.Header, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 		Return(nil)
 
 	e := Engine{
@@ -1119,7 +1119,7 @@ func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
 func newIngestionEngine(t *testing.T, ps *mocks.ProtocolState, es *mocks.ExecutionState) *Engine {
 	log := unittest.Logger()
 	metrics := metrics.NewNoopCollector()
-	tracer, err := trace.NewTracer(log, "test")
+	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)
 	require.NoError(t, err)
 	ctrl := gomock.NewController(t)
 	net := module.NewMockNetwork(ctrl)
