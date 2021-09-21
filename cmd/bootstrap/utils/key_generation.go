@@ -224,6 +224,25 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 	return nil
 }
 
+func WriteSecretsDBEncryptionKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
+
+	for _, nodeInfo := range nodeInfos {
+
+		// generate an encryption key for the node
+		encryptionKey, err := GenerateSecretsDBEncryptionKey()
+		if err != nil {
+			return err
+		}
+
+		path := fmt.Sprintf(bootstrap.PathSecretsEncryptionKey, nodeInfo.NodeID)
+		err = write(path, encryptionKey)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // WriteStakingNetworkingKeyFiles writes staking and networking keys to private
 // node info files.
 func WriteStakingNetworkingKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {

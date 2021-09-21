@@ -823,10 +823,15 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
 	}
 	err = utils.WriteStakingNetworkingKeyFiles(allNodeInfos, writeFile)
-
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to write private key files: %w", err)
 	}
+
+	err = utils.WriteSecretsDBEncryptionKeyFiles(allNodeInfos, writeFile)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("failed to write secrets db key files: %w", err)
+	}
+
 	err = utils.WriteMachineAccountFiles(chainID, stakedNodeInfos, writeFile)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to write machine account files: %w", err)
