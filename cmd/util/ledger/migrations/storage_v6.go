@@ -228,7 +228,6 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		result := m.migratePayload(payload)
 
 		if result.err != nil {
-
 			return nil, fmt.Errorf(
 				"failed to migrate key: %q (owner: %x): %w",
 				rawKey,
@@ -367,7 +366,6 @@ func (m *StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Pa
 }
 
 func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) map[storagePath]bool {
-
 	m.clearProgress()
 	m.Log.Info().Msgf("Collecting deferred keys...")
 
@@ -417,29 +415,32 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 		oldInter.InspectValue(
 			rootValue,
 			func(inspectedValue oldInter.Value) bool {
-				if dictionary, ok := inspectedValue.(*oldInter.DictionaryValue); ok {
-					deferredKeys := dictionary.DeferredKeys()
-
-					if deferredKeys != nil {
-						deferredKeys.Foreach(func(key string, _ struct{}) {
-							storageKey := strings.Join(
-								[]string{
-									dictionary.DeferredStorageKeyBase(),
-									key,
-								},
-								pathSeparator,
-							)
-
-							deferredOwner := dictionary.DeferredOwner().Bytes()
-
-							deferredValuePaths[storagePath{
-								owner: string(deferredOwner),
-								key:   storageKey,
-							}] = true
-						})
-
-					}
+				dictionary, ok := inspectedValue.(*oldInter.DictionaryValue)
+				if !ok {
+					return true
 				}
+
+				deferredKeys := dictionary.DeferredKeys()
+				if deferredKeys == nil {
+					return true
+				}
+
+				deferredKeys.Foreach(func(key string, _ struct{}) {
+					storageKey := strings.Join(
+						[]string{
+							dictionary.DeferredStorageKeyBase(),
+							key,
+						},
+						pathSeparator,
+					)
+
+					deferredOwner := dictionary.DeferredOwner().Bytes()
+
+					deferredValuePaths[storagePath{
+						owner: string(deferredOwner),
+						key:   storageKey,
+					}] = true
+				})
 
 				return true
 			},
@@ -453,7 +454,6 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 }
 
 func (m *StorageFormatV6Migration) migratePayload(payload ledger.Payload) storageFormatV6MigrationResult {
-
 	migratedPayload, err := m.reencodePayload(payload)
 
 	result := storageFormatV6MigrationResult{
@@ -473,7 +473,6 @@ func (m *StorageFormatV6Migration) migratePayload(payload ledger.Payload) storag
 }
 
 func (m *StorageFormatV6Migration) checkStorageFormat(payload ledger.Payload) error {
-
 	if !bytes.HasPrefix(payload.Value, []byte{0x0, 0xca, 0xde}) {
 		return nil
 	}
@@ -487,7 +486,6 @@ func (m *StorageFormatV6Migration) checkStorageFormat(payload ledger.Payload) er
 }
 
 func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*ledger.Payload, error) {
-
 	keyParts := payload.Key.KeyParts
 
 	rawOwner := keyParts[0].Value
@@ -614,8 +612,6 @@ func (m *StorageFormatV6Migration) initNewInterpreter() {
 }
 
 func (m *StorageFormatV6Migration) initOldInterpreter(payloads []ledger.Payload) {
-	// Convert old value to new value
-
 	storageView := newView(payloads)
 
 	inter, err := oldInter.NewInterpreter(
