@@ -58,7 +58,13 @@ const (
 type LibP2PFactoryFunc func() (*Node, error)
 
 // LibP2PStreamFactoryFunc is a factory function type for generating libp2p streams.
-type LibP2PStreamFactoryFunc func(ctx context.Context, p peer.ID, pids ...protocol.ID) (libp2pnet.Stream, error)
+type LibP2PStreamFactoryFunc func(host.Host, context.Context, peer.ID, ...protocol.ID) (libp2pnet.Stream, error)
+
+func LibP2PDefaultStream() LibP2PStreamFactoryFunc {
+	return func(host host.Host, ctx context.Context, peerID peer.ID, pids ...protocol.ID) (libp2pnet.Stream, error) {
+		return host.NewStream(ctx, peerID, pids...)
+	}
+}
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
