@@ -190,9 +190,17 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 	invoker := AccountStorageCapacityInvoker(e.ctx, address)
 	result, invokeErr := invoker.Invoke(e, e.traceSpan)
 
+	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
+	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
+	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
+	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
+	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
+		return 0, nil
 	}
+
+	// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
+	// divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
 	return result.ToGoValue().(uint64) / 100, nil
 }
 
@@ -205,8 +213,9 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 	invoker := AccountBalanceInvoker(e.ctx, address)
 	result, invokeErr := invoker.Invoke(e, e.traceSpan)
 
+	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
 	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
+		return 0, nil
 	}
 	return result.ToGoValue().(uint64), nil
 }
@@ -220,8 +229,11 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 	invoker := AccountAvailableBalanceInvoker(e.ctx, address)
 	result, invokeErr := invoker.Invoke(e, e.traceSpan)
 
+	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
+	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
+	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
 	if invokeErr != nil {
-		return 0, errors.HandleRuntimeError(invokeErr)
+		return 0, nil
 	}
 	return result.ToGoValue().(uint64), nil
 }
