@@ -189,7 +189,9 @@ func TempDir(t testing.TB) string {
 
 func RunWithTempDir(t testing.TB, f func(string)) {
 	dbDir := TempDir(t)
-	defer os.RemoveAll(dbDir)
+	defer func() {
+		require.NoError(t, os.RemoveAll(dbDir))
+	}()
 	f(dbDir)
 }
 
@@ -206,7 +208,9 @@ func BadgerDB(t testing.TB, dir string) *badger.DB {
 func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 	RunWithTempDir(t, func(dir string) {
 		db := BadgerDB(t, dir)
-		defer db.Close()
+		defer func() {
+			require.NoError(t, db.Close())
+		}()
 		f(db)
 	})
 }
