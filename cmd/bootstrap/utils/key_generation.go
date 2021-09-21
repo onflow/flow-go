@@ -149,6 +149,10 @@ func GenerateKeys(algo crypto.SigningAlgorithm, n int, seeds [][]byte) ([]crypto
 // the result to the given path.
 type WriteJSONFileFunc func(relativePath string, value interface{}) error
 
+// WriteFileFunc is the same as WriteJSONFileFunc, but it writes the bytes directly
+// rather than marshalling a structure to json.
+type WriteFileFunc func(relativePath string, data []byte) error
+
 // WriteMachineAccountFiles writes machine account key files for a set of nodeInfos.
 // Assumes that machine accounts have been created using the default execution state
 // bootstrapping. Further assumes that the order of nodeInfos is the same order that
@@ -224,7 +228,7 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 	return nil
 }
 
-func WriteSecretsDBEncryptionKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteJSONFileFunc) error {
+func WriteSecretsDBEncryptionKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteFileFunc) error {
 
 	for _, nodeInfo := range nodeInfos {
 
