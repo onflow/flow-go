@@ -66,6 +66,17 @@ func LibP2PDefaultStream() LibP2PStreamFactoryFunc {
 	}
 }
 
+func LibP2PGzipCompressedStream() LibP2PStreamFactoryFunc {
+	return func(host host.Host, ctx context.Context, peerID peer.ID, pids ...protocol.ID) (libp2pnet.Stream, error) {
+		s, err := host.NewStream(ctx, peerID, pids...)
+		if err != nil {
+			return nil, err
+		}
+
+		newCompressedStream(s)
+	}
+}
+
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
 func DefaultLibP2PNodeFactory(ctx context.Context,
