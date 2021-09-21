@@ -44,8 +44,54 @@ func (s *SealValidationSuite) TestConsistencyCheckOnApprovals() {
 	s.Require().Error(err)
 }
 
-// TestSealValid tests submitting of valid seal
+// TestSealValid tests that a candidate block with a valid seal passes validation.
+// We test with the following fork:
+//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+// The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
+// (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestSealValid() {
+	// Notes:
+	//  * the result for `LatestSealedBlock` is `LatestExecutionResult` (already initialized in test setup)
+	//  * as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
+	)
+
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b1.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+	})
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
+
+	// construct `newBlock`
+	seal := s.validSealForResult(&receipt.ExecutionResult)
+	newBlock := unittest.BlockWithParentFixture(b2.Header)
+	newBlock.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
+	})
+
+	_, err := s.sealValidator.Validate(&newBlock)
+	s.Require().NoError(err)
+}
+
+// TestSeal_EnforceGap checks the seal-validation does _not_ allow to seal a result that was
+// incorporated in the direct parent. In other words, there must be at least a 1-block gap
+// between the block incorporating the result and the block sealing the result. Enforcing
+// such gap is important for the following reason:
+//  * We need the Source of Randomness for the block that _incorporates_ the sealed result,
+//    to compute the verifier assignment. Therefore, we require that the block _incorporating_
+//    the result has at least one child in the fork, _before_ we include the seal.
+//  * Thereby, we guarantee that a verifier assignment can be computed without needing
+//    unverified information (the unverified qc) from the block that we are just constructing.
+func (s *SealValidationSuite) TestSeal_EnforceGap() {
 	// the BaseChainSuite creates the following fork
 	//   RootBlock <- LatestSealedBlock <- LatestFinalizedBlock
 	// with `LatestExecutionResult` as ExecutionResult for LatestSealedBlock
@@ -62,9 +108,9 @@ func (s *SealValidationSuite) TestSealValid() {
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
-
 	s.Extend(&blockParent)
 
+	// block includes seal for direct parent:
 	block := unittest.BlockWithParentFixture(blockParent.Header)
 	seal := s.validSealForResult(&receipt.ExecutionResult)
 	block.SetPayload(flow.Payload{
@@ -72,57 +118,80 @@ func (s *SealValidationSuite) TestSealValid() {
 	})
 
 	_, err := s.sealValidator.Validate(&block)
-
-	s.Require().NoError(err)
+	s.Require().True(engine.IsInvalidInputError(err))
 }
 
 // TestSealInvalidBlockID tests that we reject seal with invalid blockID for
-// submitted seal
+// submitted seal. We test with the following fork:
+//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+// The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
+// (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestSealInvalidBlockID() {
-	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	// Notes:
+	//  * the result for `LatestSealedBlock` is `LatestExecutionResult` (already initialized in test setup)
+	//  * as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
 	)
-	blockParent.SetPayload(flow.Payload{
+
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b1.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
 
-	s.Extend(&blockParent)
-
-	block := unittest.BlockWithParentFixture(blockParent.Header)
+	newBlock := unittest.BlockWithParentFixture(b2.Header)
 	seal := s.validSealForResult(&receipt.ExecutionResult)
 	seal.BlockID = unittest.IdentifierFixture()
-	block.SetPayload(flow.Payload{
+	newBlock.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{seal},
 	})
 
-	_, err := s.sealValidator.Validate(&block)
-
+	_, err := s.sealValidator.Validate(&newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
 }
 
 // TestSealInvalidAggregatedSigCount tests that we reject seal with invalid number of
-// approval signatures for submitted seal
+// approval signatures for submitted seal. We test with the following fork:
+//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+// The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
+// (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
-	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	// Notes:
+	//  * the result for `LatestSealedBlock` is `LatestExecutionResult` (already initialized in test setup)
+	//  * as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
 	)
-	blockParent.SetPayload(flow.Payload{
+
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b1.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
 
-	s.Extend(&blockParent)
-
-	block := unittest.BlockWithParentFixture(blockParent.Header)
+	// construct `newBlock`
+	newBlock := unittest.BlockWithParentFixture(b2.Header)
 	seal := s.validSealForResult(&receipt.ExecutionResult)
 	seal.AggregatedApprovalSigs = seal.AggregatedApprovalSigs[1:]
-	block.SetPayload(flow.Payload{
+	newBlock.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{seal},
 	})
 
@@ -131,7 +200,7 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 	s.metrics.On("EmergencySeal").Run(func(args mock.Arguments) {
 		s.T().Errorf("should not count as emmergency sealed, because seal has fewer approvals than required for Seal Verification")
 	}).Return()
-	_, err := s.sealValidator.Validate(&block)
+	_, err := s.sealValidator.Validate(&newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
 }
@@ -139,11 +208,14 @@ func (s *SealValidationSuite) TestSealInvalidAggregatedSigCount() {
 // TestSealEmergencySeal checks that, when requiredApprovalsForSealVerification
 // is 0, a seal which has 0 signatures for at least one chunk will be accepted,
 // and that the emergency-seal metric will be incremented.
+// We test with the following fork:
+//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+// The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
+// (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestSealEmergencySeal() {
-	// the BaseChainSuite creates the following fork
-	//   RootBlock <- LatestSealedBlock <- LatestFinalizedBlock
-	// with `LatestExecutionResult` as ExecutionResult for LatestSealedBlock
-	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	// Notes:
+	//  * the result for `LatestSealedBlock` is `LatestExecutionResult` (already initialized in test setup)
+	//  * as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(unittest.ExecutionResultFixture(
@@ -151,34 +223,39 @@ func (s *SealValidationSuite) TestSealEmergencySeal() {
 			unittest.WithPreviousResult(*s.LatestExecutionResult),
 		)),
 	)
-	blockParent.SetPayload(flow.Payload{
+
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b1.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
-	s.Extend(&blockParent)
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
 
 	// requiredApprovalsForSealConstruction = 2
 	// receive seal with 2 approvals => _not_ emergency sealed
-	block := s.makeBlockSealingResult(blockParent.Header, &receipt.ExecutionResult, 2)
+	newBlock := s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 2)
 	metrics := &module.ConsensusMetrics{}
 	metrics.On("EmergencySeal").Run(func(args mock.Arguments) {
 		s.T().Errorf("happy path sealing should not be counted as emmergency sealed")
 	}).Return()
 	s.sealValidator.metrics = metrics
 	//
-	_, err := s.sealValidator.Validate(block)
+	_, err := s.sealValidator.Validate(newBlock)
 	s.Require().NoError(err)
 
 	// requiredApprovalsForSealConstruction = 2
 	// requiredApprovalsForSealVerification = 1
 	// receive seal with 1 approval => emergency sealed
 	s.sealValidator.requiredApprovalsForSealVerification = 1
-	block = s.makeBlockSealingResult(blockParent.Header, &receipt.ExecutionResult, 1)
+	newBlock = s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 1)
 	metrics = &module.ConsensusMetrics{}
 	metrics.On("EmergencySeal").Once()
 	s.sealValidator.metrics = metrics
 	//
-	_, err = s.sealValidator.Validate(block)
+	_, err = s.sealValidator.Validate(newBlock)
 	s.Require().NoError(err)
 	metrics.AssertExpectations(s.T())
 
@@ -186,14 +263,14 @@ func (s *SealValidationSuite) TestSealEmergencySeal() {
 	// requiredApprovalsForSealVerification = 1
 	// receive seal with 0 approval => invalid
 	s.sealValidator.requiredApprovalsForSealVerification = 1
-	block = s.makeBlockSealingResult(blockParent.Header, &receipt.ExecutionResult, 0)
+	newBlock = s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 0)
 	metrics = &module.ConsensusMetrics{}
 	metrics.On("EmergencySeal").Run(func(args mock.Arguments) {
 		s.T().Errorf("invaid seal should not be counted as emmergency sealed")
 	}).Return()
 	s.sealValidator.metrics = metrics
 	//
-	_, err = s.sealValidator.Validate(block)
+	_, err = s.sealValidator.Validate(newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
 
@@ -201,12 +278,12 @@ func (s *SealValidationSuite) TestSealEmergencySeal() {
 	// requiredApprovalsForSealVerification = 0
 	// receive seal with 1 approval => emergency sealed
 	s.sealValidator.requiredApprovalsForSealVerification = 0
-	block = s.makeBlockSealingResult(blockParent.Header, &receipt.ExecutionResult, 1)
+	newBlock = s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 1)
 	metrics = &module.ConsensusMetrics{}
 	metrics.On("EmergencySeal").Once()
 	s.sealValidator.metrics = metrics
 	//
-	_, err = s.sealValidator.Validate(block)
+	_, err = s.sealValidator.Validate(newBlock)
 	s.Require().NoError(err)
 	metrics.AssertExpectations(s.T())
 
@@ -214,12 +291,12 @@ func (s *SealValidationSuite) TestSealEmergencySeal() {
 	// requiredApprovalsForSealVerification = 0
 	// receive seal with 0 approval => emergency sealed
 	s.sealValidator.requiredApprovalsForSealVerification = 0
-	block = s.makeBlockSealingResult(blockParent.Header, &receipt.ExecutionResult, 0)
+	newBlock = s.makeBlockSealingResult(b2.Header, &receipt.ExecutionResult, 0)
 	metrics = &module.ConsensusMetrics{}
 	metrics.On("EmergencySeal").Once()
 	s.sealValidator.metrics = metrics
 	//
-	_, err = s.sealValidator.Validate(block)
+	_, err = s.sealValidator.Validate(newBlock)
 	s.Require().NoError(err)
 	metrics.AssertExpectations(s.T())
 }
@@ -227,27 +304,32 @@ func (s *SealValidationSuite) TestSealEmergencySeal() {
 // TestSealInvalidChunkSignersCount tests that we reject seal with invalid approval signatures for
 // submitted seal
 func (s *SealValidationSuite) TestSealInvalidChunkSignersCount() {
-	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
 	)
-	blockParent.SetPayload(flow.Payload{
+
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b1.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
 
-	s.Extend(&blockParent)
-
-	block := unittest.BlockWithParentFixture(blockParent.Header)
+	newBlock := unittest.BlockWithParentFixture(b2.Header)
 	seal := s.validSealForResult(&receipt.ExecutionResult)
 	seal.AggregatedApprovalSigs[0].SignerIDs = seal.AggregatedApprovalSigs[0].SignerIDs[1:]
-	block.SetPayload(flow.Payload{
+	newBlock.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{seal},
 	})
 
-	_, err := s.sealValidator.Validate(&block)
-
+	_, err := s.sealValidator.Validate(&newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
 }
@@ -255,27 +337,32 @@ func (s *SealValidationSuite) TestSealInvalidChunkSignersCount() {
 // TestSealInvalidChunkSignaturesCount tests that we reject seal with invalid approval signatures for
 // submitted seal
 func (s *SealValidationSuite) TestSealInvalidChunkSignaturesCount() {
-	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
 	)
-	blockParent.SetPayload(flow.Payload{
+
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b1.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
 
-	s.Extend(&blockParent)
-
-	block := unittest.BlockWithParentFixture(blockParent.Header)
+	newBlock := unittest.BlockWithParentFixture(b2.Header)
 	seal := s.validSealForResult(&receipt.ExecutionResult)
 	seal.AggregatedApprovalSigs[0].VerifierSignatures = seal.AggregatedApprovalSigs[0].VerifierSignatures[1:]
-	block.SetPayload(flow.Payload{
+	newBlock.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{seal},
 	})
 
-	_, err := s.sealValidator.Validate(&block)
-
+	_, err := s.sealValidator.Validate(&newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
 }
@@ -284,7 +371,6 @@ func (s *SealValidationSuite) TestSealInvalidChunkSignaturesCount() {
 // seal where approvals are repeated. Otherwise, this would open up an attack vector,
 // where the seal contains insufficient approvals when duplicating.
 func (s *SealValidationSuite) TestSealDuplicatedApproval() {
-	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(unittest.ExecutionResultFixture(
@@ -292,49 +378,65 @@ func (s *SealValidationSuite) TestSealDuplicatedApproval() {
 			unittest.WithPreviousResult(*s.LatestExecutionResult),
 		)),
 	)
-	blockParent.SetPayload(flow.Payload{
+
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b1.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
-	s.Extend(&blockParent)
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
 
-	block := unittest.BlockWithParentFixture(blockParent.Header)
+	newBlock := unittest.BlockWithParentFixture(b2.Header)
 	seal := s.validSealForResult(&receipt.ExecutionResult)
 	seal.AggregatedApprovalSigs[0].VerifierSignatures[1] = seal.AggregatedApprovalSigs[0].VerifierSignatures[0]
 	seal.AggregatedApprovalSigs[0].SignerIDs[1] = seal.AggregatedApprovalSigs[0].SignerIDs[0]
-	block.SetPayload(flow.Payload{
+	newBlock.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{seal},
 	})
 
-	_, err := s.sealValidator.Validate(&block)
+	_, err := s.sealValidator.Validate(&newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
 }
 
 // TestSealInvalidChunkAssignment tests that we reject seal with invalid signerID of approval signature for
-// submitted seal
+// submitted seal. We test with the following fork:
+//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ░newBlock{ Seal[B0]}░
+// The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
+// (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
-	blockParent := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	// Notes:
+	//  * the result for `LatestSealedBlock` is `LatestExecutionResult` (already initialized in test setup)
+	//  * as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
 	receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
-		unittest.WithResult(unittest.ExecutionResultFixture(unittest.WithBlock(s.LatestFinalizedBlock))),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
 	)
-	blockParent.SetPayload(flow.Payload{
+
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b1.SetPayload(flow.Payload{
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
 
-	s.Extend(&blockParent)
-
-	block := unittest.BlockWithParentFixture(blockParent.Header)
+	newBlock := unittest.BlockWithParentFixture(b2.Header)
 	seal := s.validSealForResult(&receipt.ExecutionResult)
 	seal.AggregatedApprovalSigs[0].SignerIDs[0] = unittest.IdentifierFixture()
-	block.SetPayload(flow.Payload{
+	newBlock.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{seal},
 	})
 
-	_, err := s.sealValidator.Validate(&block)
-
+	_, err := s.sealValidator.Validate(&newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
 }
@@ -342,13 +444,13 @@ func (s *SealValidationSuite) TestSealInvalidChunkAssignment() {
 // TestHighestSeal tests that Validate will pick the seal corresponding to the
 // highest block when the payload contains multiple seals that are not ordered.
 // We test with the following known fork:
-//    ... <- B1 <- B2 <- B3{Receipt(B2), Result(B2)} <- B4{Receipt(B3), Result(B3)}
+//    ... <- B1 <- B2 <- B3{Receipt(B2), Result(B2)} <- B4{Receipt(B3), Result(B3)} <- B5
 // with
 //  * B1 is the latest sealed block: we use s.LatestSealedBlock,
 //    which has the result s.LatestExecutionResult
 //  * B2 is the latest finalized block: we use s.LatestFinalizedBlock
-// Now we consider the new candidate block B5:
-//    ... <- B4 <-B5{ SealResult(B3), SealResult(B2) }
+// Now we consider the new candidate block B6:
+//    ... <- B5 <-B6{ SealResult(B3), SealResult(B2) }
 // Note that the order of the seals is specifically reversed. We expect that
 // the validator handles this without error.
 func (s *SealValidationSuite) TestHighestSeal() {
@@ -382,18 +484,21 @@ func (s *SealValidationSuite) TestHighestSeal() {
 	})
 	s.Extend(&block4)
 
+	// block B5
+	block5 := unittest.BlockWithParentFixture(block4.Header)
+	s.Extend(&block5)
+
+	// construct block B5 and its payload components, i.e. seals for block B2 and B3
 	seal2 := s.validSealForResult(&block2Receipt.ExecutionResult)
 	seal3 := s.validSealForResult(&block3Receipt.ExecutionResult)
-
-	// include the seals in block5
-	block5 := unittest.BlockWithParentFixture(block4.Header)
-	block5.SetPayload(flow.Payload{
+	block6 := unittest.BlockWithParentFixture(block5.Header)
+	block6.SetPayload(flow.Payload{
 		// placing seals in the reversed order to test
 		// Extend will pick the highest sealed block
 		Seals: []*flow.Seal{seal3, seal2},
 	})
 
-	last, err := s.sealValidator.Validate(&block5)
+	last, err := s.sealValidator.Validate(&block6)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), last.FinalState, seal3.FinalState)
 }
@@ -401,10 +506,13 @@ func (s *SealValidationSuite) TestHighestSeal() {
 // TestValidatePayload_SealsSkipBlock verifies that proposed seals
 // are rejected if the chain of proposed seals skips a block.
 // We test with the following known fork:
-//    S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)}
+//    S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- B4
 // where S is the latest sealed block.
+// The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
+// (see test `TestSeal_EnforceGap` for more details)
+//
 // Now we consider the new candidate block X:
-//    S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <-X
+//    S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- B4 <-X
 // It would be valid for X to seal the chain of execution results R(B0), R(B1), R(B2)
 // We test the two distinct failure cases:
 //  (i) X has no seal for the immediately next unsealed block B0
@@ -424,6 +532,8 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 		Receipts: []*flow.ExecutionReceiptMeta{receipts[0].Meta(), receipts[1].Meta(), receipts[2].Meta()},
 		Results:  []*flow.ExecutionResult{&receipts[0].ExecutionResult, &receipts[1].ExecutionResult, &receipts[2].ExecutionResult},
 	})
+	b4 := unittest.BlockWithParentFixture(blocks[3].Header)
+	blocks = append(blocks, &b4)
 
 	for _, b := range blocks {
 		s.Extend(b)
@@ -433,9 +543,9 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 	block1Seal := s.validSealForResult(&receipts[1].ExecutionResult)
 	block2Seal := s.validSealForResult(&receipts[2].ExecutionResult)
 
-	// S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- X{Seal(R(B1))}
+	// S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- B4 <- X{Seal(R(B1))}
 	s.T().Run("no seal for the immediately next unsealed block", func(t *testing.T) {
-		X := unittest.BlockWithParentFixture(blocks[3].Header)
+		X := unittest.BlockWithParentFixture(b4.Header)
 		X.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{block1Seal},
 		})
@@ -445,9 +555,9 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 		require.True(s.T(), engine.IsInvalidInputError(err), err)
 	})
 
-	// S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- X{Seal(R(B0)), Seal(R(B2))}
+	// S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- B4 <- X{Seal(R(B0)), Seal(R(B2))}
 	s.T().Run("seals skip one of the following blocks", func(t *testing.T) {
-		X := unittest.BlockWithParentFixture(blocks[3].Header)
+		X := unittest.BlockWithParentFixture(b4.Header)
 		X.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{block0Seal, block2Seal},
 		})
@@ -457,9 +567,9 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 		require.True(s.T(), engine.IsInvalidInputError(err), err)
 	})
 
-	// S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- X{Seal(R(B0)), Seal(R(B1)), Seal(R(B2))}
+	// S  <- B0 <- B1 <- B2 <- B3{R(B0), R(B1), R(B2)} <- B4 <- X{Seal(R(B0)), Seal(R(B1)), Seal(R(B2))}
 	s.T().Run("valid test case", func(t *testing.T) {
-		X := unittest.BlockWithParentFixture(blocks[3].Header)
+		X := unittest.BlockWithParentFixture(b4.Header)
 		X.SetPayload(flow.Payload{
 			Seals: []*flow.Seal{block0Seal, block1Seal, block2Seal},
 		})
@@ -561,158 +671,201 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 	})
 }
 
-// TestExtendSealDuplicate tests that payloads containing duplicate seals are rejected.
+// TestSealValid tests that a candidate block with a valid seal passes validation.
+// We test with the following fork:
+//   ... <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- ...
+// The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
+// (see test `TestSeal_EnforceGap` for more details)
 func (s *SealValidationSuite) TestExtendSealDuplicate() {
-	block1 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
-	block1.SetPayload(flow.Payload{})
-	s.Extend(&block1)
+	// Notes:
+	//  * the result for `LatestSealedBlock` is `LatestExecutionResult` (already initialized in test setup)
+	//  * as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
+	)
 
-	// create block2 with an execution receipt for block1
-	block1Receipt := unittest.ReceiptForBlockFixture(&block1)
-	block2 := unittest.BlockWithParentFixture(block1.Header)
-	block2.SetPayload(flow.Payload{
-		Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
-		Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b1.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
-	s.Extend(&block2)
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
 
-	// create seal for block1
-	block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
+	sealB1 := s.validSealForResult(&receipt.ExecutionResult) // seal for block B1
 
-	// B <- B1 <- B2{R(B1)} <- B3{S(R(B1))} <- B4{S(R(B1))}
+	// <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- B3{S(R(B1))} <- B4{S(R(B1))}
 	s.T().Run("Duplicate seal in separate block", func(t *testing.T) {
-		// insert block3 with a seal for block1
-		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{block1Seal},
+		// insert B3 with a seal for block1
+		b3 := unittest.BlockWithParentFixture(b2.Header)
+		b3.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{sealB1},
 		})
-		s.Extend(&block3)
+		s.Extend(&b3)
 
-		// insert block4 with a duplicate seal
-		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{block1Seal},
+		// insert B4 with a duplicate seal
+		b4 := unittest.BlockWithParentFixture(b3.Header)
+		b4.SetPayload(flow.Payload{
+			Seals: []*flow.Seal{sealB1},
 		})
-		_, err := s.sealValidator.Validate(&block4)
 
 		// we expect an error because block 4 contains a seal that is
 		// already contained in another block on the fork
+		_, err := s.sealValidator.Validate(&b4)
 		require.Error(t, err)
 		require.True(t, engine.IsInvalidInputError(err), err)
 	})
 
-	// B <- B1 <- B2{R(B1)} <- B3{S(R(B1)), S(R(B1))}
+	// <- LatestSealedBlock <- B0 <- B1{ Result[B0], Receipt[B0] } <- B2 <- B3{S(R(B1)), S(R(B1))}
 	s.T().Run("Duplicate seal in same payload", func(t *testing.T) {
 		// insert block3 with 2 identical seals for block1
-		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block3 := unittest.BlockWithParentFixture(b2.Header)
 		block3.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{block1Seal, block1Seal},
+			Seals: []*flow.Seal{sealB1, sealB1},
 		})
 
 		_, err := s.sealValidator.Validate(&block3)
 
-		// we expect an error because block 3 contains duplicate seals
-		// within its payload
+		// we expect an error because block 3 contains duplicate seals within its payload
 		require.Error(t, err)
 		require.True(t, engine.IsInvalidInputError(err), err)
 	})
 }
 
-// TestExtendSealNoIncorporatedResult tests that seals are rejected if they correspond to ExecutionResults that are
-// not incorporated in blocks on this fork
-func (s *SealValidationSuite) TestExtendSealNoIncorporatedResult() {
-	block1 := unittest.BlockWithParentFixture(s.LatestSealedBlock.Header)
-	block1.SetPayload(flow.Payload{})
-	s.Extend(&block1)
+// TestExtendSeal_NoIncorporatedResult tests that seals are rejected if _no_ for the sealed block
+// was incorporated in blocks. We test with the following fork:
+//   ... <- LatestSealedBlock <- B0 <- B1 <- B2 <- ░newBlock{ Seal[B0]}░
+// The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
+// (see test `TestSeal_EnforceGap` for more details)
+func (s *SealValidationSuite) TestExtendSeal_NoIncorporatedResult() {
+	// Notes:
+	//  * the result for `LatestSealedBlock` is `LatestExecutionResult` (already initialized in test setup)
+	//  * as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
+	)
 
-	// B-->B1-->B2{Seal(ER1)}
-	//
-	// Should fail because the fork does not contain an IncorporatedResult for the
-	// result (ER1) referenced by the proposed seal.
-	s.T().Run("no IncorporatedResult", func(t *testing.T) {
-		// create block 2 with a seal for block 1
-		block1Result := unittest.ExecutionResultFixture(unittest.WithBlock(&block1))
-		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(block1Result))
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
 
-		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{block1Seal},
-		})
-
-		_, err := s.sealValidator.Validate(&block2)
-		// we expect an error because there is no block on the fork that
-		// contains a receipt committing to block1
-		require.Error(t, err)
-		require.True(t, engine.IsInvalidInputError(err), err)
+	// construct `newBlock`
+	newBlock := unittest.BlockWithParentFixture(b2.Header)
+	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&receipt.ExecutionResult))
+	newBlock.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
 	})
 
-	// B-->B1-->B2{ER1a}-->B3{Seal(ER1b)}
-	//
-	// Should fail because ER1a is different than ER1b, although they
+	// we expect an error because there is no block on the fork that
+	// contains a receipt committing to block1
+	_, err := s.sealValidator.Validate(&newBlock)
+	s.Require().Error(err)
+	s.Require().True(engine.IsInvalidInputError(err), err)
+}
+
+// TestExtendSeal_DifferentIncorporatedResult tests that seals are rejected if a result is sealed that is
+// different than the one incorporated in this fork. We test with the following fork:
+//   ... <- LatestSealedBlock <- B0 <- B1 {ER0a} <- B2 <- ░newBlock{ Seal[ER0b]}░
+// The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
+// (see test `TestSeal_EnforceGap` for more details)
+func (s *SealValidationSuite) TestExtendSeal_DifferentIncorporatedResult() {
+	// Notes:
+	//  * the result for `LatestSealedBlock` is `LatestExecutionResult` (already initialized in test setup)
+	//  * as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
+	incorporatedReceipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
+	)
+	differentResult := unittest.ExecutionResultFixture(
+		unittest.WithBlock(s.LatestFinalizedBlock),
+		unittest.WithPreviousResult(*s.LatestExecutionResult),
+	)
+
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b1.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{incorporatedReceipt.Meta()},
+		Results:  []*flow.ExecutionResult{&incorporatedReceipt.ExecutionResult},
+	})
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
+
+	// construct `newBlock`
+	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(differentResult))
+	newBlock := unittest.BlockWithParentFixture(b2.Header)
+	newBlock.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
+	})
+
+	// Should fail because ER0a is different than ER0b, although they
 	// reference the same block. Technically the fork does not contain an
 	// IncorporatedResult for the result referenced by the proposed seal.
-	s.T().Run("different IncorporatedResult", func(t *testing.T) {
-		// create block2 with an execution receipt for block1
-		block1Receipt := unittest.ReceiptForBlockFixture(&block1)
-		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
-		})
-		s.Extend(&block2)
+	_, err := s.sealValidator.Validate(&newBlock)
+	s.Require().Error(err)
+	s.Require().True(engine.IsInvalidInputError(err), err)
+}
 
-		// create block 3 with a seal for block 1, but DIFFERENT execution
-		// result than that which was included in block1
-		block1Result2 := unittest.ExecutionResultFixture(unittest.WithBlock(&block1))
-		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(block1Result2))
+// TestExtendSeal_ResultIncorporatedOnDifferentFork tests that seals are rejected if they correspond
+// to ExecutionResults that are incorporated in a different fork
+// We test with the following fork:
+//   ... <- LatestSealedBlock <- B0 <- B1 <- B2 <- ░newBlock{ Seal[ER0]}░
+//                                 └-- A1{ ER0 }
+// The gap of 1 block, i.e. B2, is required to avoid a sealing edge-case
+// (see test `TestSeal_EnforceGap` for more details)
+func (s *SealValidationSuite) TestExtendSeal_ResultIncorporatedOnDifferentFork() {
+	// Notes:
+	//  * the result for `LatestSealedBlock` is `LatestExecutionResult` (already initialized in test setup)
+	//  * as block B0, we use `LatestFinalizedBlock` (already initialized in test setup)
+	receipt := unittest.ExecutionReceiptFixture(
+		unittest.WithExecutorID(s.ExeID),
+		unittest.WithResult(unittest.ExecutionResultFixture(
+			unittest.WithBlock(s.LatestFinalizedBlock),
+			unittest.WithPreviousResult(*s.LatestExecutionResult),
+		)),
+	)
 
-		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{block1Seal},
-		})
+	// construct block A1
+	a1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	a1.SetPayload(flow.Payload{
+		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
+		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
+	})
+	s.Extend(&a1)
 
-		_, err := s.sealValidator.Validate(&block3)
-		// we expect an error because there is no block on the fork that
-		// contains a receipt committing to the seal's result
-		require.Error(t, err)
-		require.True(t, engine.IsInvalidInputError(err), err)
+	// construct block B1 and B2
+	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
+	b2 := unittest.BlockWithParentFixture(b1.Header)
+	s.Extend(&b1)
+	s.Extend(&b2)
+
+	// construct `newBlock`
+	seal := s.validSealForResult(&receipt.ExecutionResult)
+	newBlock := unittest.BlockWithParentFixture(b2.Header)
+	newBlock.SetPayload(flow.Payload{
+		Seals: []*flow.Seal{seal},
 	})
 
-	// B-->B1-->B2-->B4{Seal(ER1)}
-	//      |
-	//      +-->B3{ER1}
-	//
-	// Should fail because the IncorporatedResult referenced by the seal is
-	// on a different fork
-	s.T().Run("IncorporatedResult in other fork", func(t *testing.T) {
-		// create block2 and block3 as children of block1 (introducing a fork)
-		block2 := unittest.BlockWithParentFixture(block1.Header)
-		block2.SetPayload(flow.Payload{})
-		s.Extend(&block2)
-
-		// only block 3 contains the result
-		block1Receipt := unittest.ReceiptForBlockFixture(&block1)
-		block3 := unittest.BlockWithParentFixture(block1.Header)
-		block3.SetPayload(flow.Payload{
-			Receipts: []*flow.ExecutionReceiptMeta{block1Receipt.Meta()},
-			Results:  []*flow.ExecutionResult{&block1Receipt.ExecutionResult},
-		})
-		s.Extend(&block3)
-
-		// create block4 on top of block2 containing a seal for the result
-		// contained on the other fork
-		block1Seal := unittest.Seal.Fixture(unittest.Seal.WithResult(&block1Receipt.ExecutionResult))
-		block4 := unittest.BlockWithParentFixture(block2.Header)
-		block4.SetPayload(flow.Payload{
-			Seals: []*flow.Seal{block1Seal},
-		})
-
-		_, err := s.sealValidator.Validate(&block4)
-		// we expect an error because there is no block on the fork that
-		// contains a receipt committing to the seal's result
-		require.Error(t, err)
-		require.True(t, engine.IsInvalidInputError(err), err)
-	})
+	// we expect an error because there is no block on the fork that
+	// contains a receipt committing to the seal's result
+	_, err := s.sealValidator.Validate(&newBlock)
+	s.Require().Error(err)
+	s.Require().True(engine.IsInvalidInputError(err), err)
 }
 
 // validSealForResult generates a valid seal based on ExecutionResult. As part of seal generation it
