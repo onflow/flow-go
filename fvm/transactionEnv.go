@@ -267,33 +267,24 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
-
-	// TODO (ramtin) this shouldn't be this way, it should call the invokeMeta
-	// and we handle the errors and still compute the state interactions
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
+	invoker := NewTransactionContractFunctionInvocator(
+		common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowStorageFeesContract},
+		"calculateAccountCapacity",
+		[]interpreter.Value{
+			interpreter.NewAddressValue(common.BytesToAddress(address.Bytes())),
+		},
+		[]sema.Type{
+			&sema.AddressType{},
+		},
+		e.ctx.Logger,
 	)
-	if err != nil {
-		return 0, err
-	}
 
-	var capacity uint64
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
-	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
-	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-	if script.Err == nil {
-		// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
-		// divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
-		capacity = script.Value.ToGoValue().(uint64) / 100
-	}
+	result, invokeErr := invoker.Invoke(e, e.traceSpan)
 
-	return capacity, nil
+	if invokeErr != nil {
+		return 0, errors.HandleRuntimeError(invokeErr)
+	}
+	return result.ToGoValue().(uint64) / 100, nil
 }
 
 func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
@@ -302,26 +293,24 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
-
-	// TODO similar to the one above
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
+	invoker := NewTransactionContractFunctionInvocator(
+		common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowServiceAccountContract},
+		"defaultTokenBalance",
+		[]interpreter.Value{
+			interpreter.NewAddressValue(common.BytesToAddress(address.Bytes())),
+		},
+		[]sema.Type{
+			sema.PublicAccountType,
+		},
+		e.ctx.Logger,
 	)
-	if err != nil {
-		return 0, err
-	}
 
-	var balance uint64
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
-	if script.Err == nil {
-		balance = script.Value.ToGoValue().(uint64)
-	}
+	result, invokeErr := invoker.Invoke(e, e.traceSpan)
 
-	return balance, nil
+	if invokeErr != nil {
+		return 0, errors.HandleRuntimeError(invokeErr)
+	}
+	return result.ToGoValue().(uint64), nil
 }
 
 func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
@@ -330,28 +319,24 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenAvailableBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
-
-	// TODO similar to the one above
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
+	invoker := NewTransactionContractFunctionInvocator(
+		common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowStorageFeesContract},
+		"defaultTokenAvailableBalance",
+		[]interpreter.Value{
+			interpreter.NewAddressValue(common.BytesToAddress(address.Bytes())),
+		},
+		[]sema.Type{
+			&sema.AddressType{},
+		},
+		e.ctx.Logger,
 	)
-	if err != nil {
-		return 0, err
-	}
 
-	var balance uint64
-	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
-	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
-	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-	if script.Err == nil {
-		balance = script.Value.ToGoValue().(uint64)
-	}
+	result, invokeErr := invoker.Invoke(e, e.traceSpan)
 
-	return balance, nil
+	if invokeErr != nil {
+		return 0, errors.HandleRuntimeError(invokeErr)
+	}
+	return result.ToGoValue().(uint64), nil
 }
 
 func (e *TransactionEnv) ResolveLocation(

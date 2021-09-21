@@ -26,6 +26,7 @@ import (
 const (
 	flowServiceAccountContract = "FlowServiceAccount"
 	deductFeesContractFunction = "deductTransactionFee"
+	flowStorageFeesContract    = "FlowStorageFees"
 )
 
 type TransactionInvocator struct {
