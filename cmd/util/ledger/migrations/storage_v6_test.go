@@ -53,11 +53,11 @@ func TestValueConversion(t *testing.T) {
 		assert.Equal(
 			t,
 			newInter.NewStringValue("foo"),
-			array.GetIndex(migration.newInter, nil, 0),
+			array.Get(migration.newInter, nil, 0),
 		)
 		assert.Equal(t,
 			newInter.NewStringValue("bar"),
-			array.GetIndex(migration.newInter, nil, 1),
+			array.Get(migration.newInter, nil, 1),
 		)
 	})
 
@@ -95,11 +95,11 @@ func TestValueConversion(t *testing.T) {
 		assert.IsType(t, &newInter.DictionaryValue{}, newValue)
 		dictionary := newValue.(*newInter.DictionaryValue)
 
-		value, _, ok := dictionary.GetKey(newInter.NewStringValue("key1"))
+		value, ok := dictionary.Get(nil, nil, newInter.NewStringValue("key1"))
 		require.True(t, ok)
 		assert.Equal(t, newInter.NewStringValue("foo"), value)
 
-		value, _, ok = dictionary.GetKey(newInter.NewStringValue("key2"))
+		value, ok = dictionary.Get(nil, nil, newInter.NewStringValue("key2"))
 		require.True(t, ok)
 		assert.Equal(t, newInter.BoolValue(true), value)
 	})
@@ -149,16 +149,16 @@ func TestValueConversion(t *testing.T) {
 		assert.IsType(t, &newInter.CompositeValue{}, newValue)
 		composite := newValue.(*newInter.CompositeValue)
 
-		fieldValue := composite.GetField("foo")
+		fieldValue := composite.GetField(nil, nil, "foo")
 
 		assert.IsType(t, &newInter.DictionaryValue{}, fieldValue)
 		dictionary := fieldValue.(*newInter.DictionaryValue)
 
-		value, _, ok := dictionary.GetKey(newInter.NewStringValue("key1"))
+		value, ok := dictionary.Get(nil, nil, newInter.NewStringValue("key1"))
 		require.True(t, ok)
 		assert.Equal(t, newInter.NewStringValue("value1"), value)
 
-		value, _, ok = dictionary.GetKey(newInter.NewStringValue("key2"))
+		value, ok = dictionary.Get(nil, nil, newInter.NewStringValue("key2"))
 		require.True(t, ok)
 		assert.Equal(t, newInter.BoolValue(true), value)
 	})
@@ -217,15 +217,15 @@ func TestEncoding(t *testing.T) {
 		assert.IsType(t, &newInter.ArrayValue{}, newValue)
 		array := newValue.(*newInter.ArrayValue)
 
-		value := array.GetIndex(migration.newInter, nil, 0)
+		value := array.Get(migration.newInter, nil, 0)
 		require.NoError(t, err)
 		assert.Equal(t, newInter.NewStringValue("foo"), value)
 
-		value = array.GetIndex(migration.newInter, nil, 1)
+		value = array.Get(migration.newInter, nil, 1)
 		require.NoError(t, err)
 		assert.Equal(t, newInter.NewStringValue("bar"), value)
 
-		value = array.GetIndex(migration.newInter, nil, 2)
+		value = array.Get(migration.newInter, nil, 2)
 		require.NoError(t, err)
 		assert.Equal(t, newInter.BoolValue(true), value)
 	})
@@ -269,7 +269,7 @@ func TestEncoding(t *testing.T) {
 		assert.NoError(t, err)
 
 		encodedValues := baseStorage.ReencodedPayloads
-		require.Len(t, encodedValues, 2)
+		require.Len(t, encodedValues, 1)
 
 		storageId := atree.NewStorageID(
 			atree.Address(address),
@@ -285,11 +285,11 @@ func TestEncoding(t *testing.T) {
 		assert.IsType(t, &newInter.DictionaryValue{}, newValue)
 		dictionary := newValue.(*newInter.DictionaryValue)
 
-		value, _, ok := dictionary.GetKey(newInter.NewStringValue("key1"))
+		value, ok := dictionary.Get(nil, nil, newInter.NewStringValue("key1"))
 		require.True(t, ok)
 		assert.Equal(t, newInter.NewStringValue("foo"), value)
 
-		value, _, ok = dictionary.GetKey(newInter.NewStringValue("key2"))
+		value, ok = dictionary.Get(nil, nil, newInter.NewStringValue("key2"))
 		require.True(t, ok)
 		assert.Equal(t, newInter.BoolValue(true), value)
 	})
@@ -352,7 +352,7 @@ func TestEncoding(t *testing.T) {
 
 		storageId := atree.NewStorageID(
 			atree.Address(address),
-			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 3},
+			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 2},
 		)
 
 		slab, ok, err := migration.storage.Retrieve(storageId)
@@ -364,16 +364,16 @@ func TestEncoding(t *testing.T) {
 		assert.IsType(t, &newInter.CompositeValue{}, storedValue)
 		composite := storedValue.(*newInter.CompositeValue)
 
-		fieldValue := composite.GetField("foo")
+		fieldValue := composite.GetField(nil, nil, "foo")
 
 		assert.IsType(t, &newInter.DictionaryValue{}, fieldValue)
 		dictionary := fieldValue.(*newInter.DictionaryValue)
 
-		value, _, ok := dictionary.GetKey(newInter.NewStringValue("key1"))
+		value, ok := dictionary.Get(nil, nil, newInter.NewStringValue("key1"))
 		require.True(t, ok)
 		assert.Equal(t, newInter.NewStringValue("value1"), value)
 
-		value, _, ok = dictionary.GetKey(newInter.NewStringValue("key2"))
+		value, ok = dictionary.Get(nil, nil, newInter.NewStringValue("key2"))
 		require.True(t, ok)
 		assert.Equal(t, newInter.BoolValue(true), value)
 
@@ -382,7 +382,7 @@ func TestEncoding(t *testing.T) {
 
 		storageId = atree.NewStorageID(
 			atree.Address(address),
-			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 1},
+			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 3},
 		)
 
 		slab, ok, err = migration.storage.Retrieve(storageId)
@@ -392,123 +392,6 @@ func TestEncoding(t *testing.T) {
 		storedValue = newInter.StoredValue(slab, migration.storage)
 		assert.Equal(t, dictionary, storedValue)
 	})
-}
-
-func TestRoundTrip(t *testing.T) {
-
-	t.Parallel()
-
-	t.Run("Array", func(t *testing.T) {
-		t.Parallel()
-
-		// Get the bytes in old format
-		oldArray := oldInter.NewArrayValueUnownedNonCopying(
-			oldInter.VariableSizedStaticType{
-				Type: oldInter.PrimitiveStaticTypeAnyStruct,
-			},
-			oldInter.NewStringValue("foo"),
-			oldInter.NewStringValue("bar"),
-			oldInter.BoolValue(true),
-		)
-
-		encoded, _, err := oldInter.EncodeValue(oldArray, nil, false, nil)
-		require.NoError(t, err)
-
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
-
-		migration.initPersistentSlabStorage(baseStorage)
-		migration.initNewInterpreter()
-		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
-		migration.converter = NewValueConverter(migration)
-
-		address := common.Address{1, 2}
-
-		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
-		assert.NoError(t, err)
-
-		err = migration.storage.Commit()
-		assert.NoError(t, err)
-
-		encodedValues := baseStorage.ReencodedPayloads
-		require.Len(t, encodedValues, 1)
-	})
-
-	t.Run("Dictionary", func(t *testing.T) {
-		t.Parallel()
-
-		inter, err := oldInter.NewInterpreter(nil, utils.TestLocation)
-		require.NoError(t, err)
-
-		// Get the bytes in old format
-		oldDictionary := oldInter.NewDictionaryValueUnownedNonCopying(
-			inter,
-			oldInter.DictionaryStaticType{
-				KeyType:   oldInter.PrimitiveStaticTypeString,
-				ValueType: oldInter.PrimitiveStaticTypeAnyStruct,
-			},
-			oldInter.NewStringValue("key1"),
-			oldInter.NewStringValue("foo"),
-			oldInter.NewStringValue("key2"),
-			oldInter.BoolValue(true),
-		)
-
-		encoded, _, err := oldInter.EncodeValue(oldDictionary, nil, false, nil)
-		require.NoError(t, err)
-
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
-
-		migration.initPersistentSlabStorage(baseStorage)
-		migration.initNewInterpreter()
-		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
-		migration.converter = NewValueConverter(migration)
-
-		address := common.Address{1, 2}
-
-		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
-		assert.NoError(t, err)
-
-		err = migration.storage.Commit()
-		assert.NoError(t, err)
-
-		encodedValues := baseStorage.ReencodedPayloads
-		require.Len(t, encodedValues, 2)
-
-		slabData, version := newInter.StripMagic(encodedValues[0].Value)
-		require.Equal(t, newInter.CurrentEncodingVersion, version)
-
-		storedData := stripSlabPrefix(slabData)
-
-		storageID := atree.NewStorageID(
-			atree.Address(address),
-			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 1},
-		)
-
-		decoder := newInter.CBORDecMode.NewByteStreamDecoder(storedData)
-		decoded, err := newInter.DecodeStorable(decoder, storageID)
-		assert.NoError(t, err)
-
-		value := newInter.StoredValue(decoded, migration.storage)
-		require.NotNil(t, value)
-
-		require.IsType(t, &newInter.DictionaryValue{}, value)
-		dictionary := value.(*newInter.DictionaryValue)
-
-		entryValue := dictionary.Get(nil, nil, newInter.NewStringValue("key1"))
-		require.IsType(t, &newInter.SomeValue{}, entryValue)
-		someValue := entryValue.(*newInter.SomeValue)
-		assert.Equal(t, newInter.NewStringValue("foo"), someValue.Value)
-
-		entryValue = dictionary.Get(nil, nil, newInter.NewStringValue("key2"))
-		require.IsType(t, &newInter.SomeValue{}, entryValue)
-		someValue = entryValue.(*newInter.SomeValue)
-		assert.Equal(t, newInter.BoolValue(true), someValue.Value)
-	})
-}
-
-func stripSlabPrefix(slabData []byte) []byte {
-	return slabData[2:]
 }
 
 func TestPayloadsMigration(t *testing.T) {
