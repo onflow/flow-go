@@ -21,9 +21,8 @@ var channelRoleMap map[network.Channel]flow.RoleList
 
 // RolesByChannel returns list of flow roles involved in the channel.
 func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
-	if clusterChannel, isCluster := ClusterChannel(channel); isCluster {
-		// replaces channel with the stripped-off prefix
-		channel = clusterChannel
+	if _, isCluster := ClusterChannel(channel); isCluster {
+		return ClusterChannelRoles(), true
 	}
 	roles, ok := channelRoleMap[channel]
 	return roles, ok
@@ -193,7 +192,7 @@ func initializeChannelRoleMap() {
 		flow.RoleAccess}
 	channelRoleMap[ReceiveApprovals] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
 
-	channelRoleMap[ProvideCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution}
+	channelRoleMap[ProvideCollections] = flow.RoleList{flow.RoleCollection, flow.RoleExecution, flow.RoleAccess}
 	channelRoleMap[ProvideChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
 	channelRoleMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
 	channelRoleMap[ProvideApprovalsByChunk] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
