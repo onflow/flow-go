@@ -14,6 +14,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
+	storage "github.com/onflow/flow-go/storage/badger"
 )
 
 func ExpectPanic(expectedMsg string, t *testing.T) {
@@ -195,19 +196,37 @@ func RunWithTempDir(t testing.TB, f func(string)) {
 	f(dbDir)
 }
 
-func BadgerDB(t testing.TB, dir string) *badger.DB {
+func badgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
 	opts := badger.
 		DefaultOptions(dir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
-	db, err := badger.Open(opts)
+	db, err := create(opts)
 	require.NoError(t, err)
 	return db
+}
+
+func BadgerDB(t testing.TB, dir string) *badger.DB {
+	return badgerDB(t, dir, badger.Open)
+}
+
+func SecretBadgerDB(t testing.TB, dir string) *badger.DB {
+	return badgerDB(t, dir, storage.InitSecret)
 }
 
 func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 	RunWithTempDir(t, func(dir string) {
 		db := BadgerDB(t, dir)
+		defer func() {
+			require.NoError(t, db.Close())
+		}()
+		f(db)
+	})
+}
+
+func RunWithSecretBadgerDB(t testing.TB, f func(*badger.DB)) {
+	RunWithTempDir(t, func(dir string) {
+		db := SecretBadgerDB(t, dir)
 		defer func() {
 			require.NoError(t, db.Close())
 		}()
