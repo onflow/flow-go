@@ -34,12 +34,15 @@ type BaseClient struct {
 }
 
 // NewBaseClient creates a instance of BaseClient
-func NewBaseClient(log zerolog.Logger,
+func NewBaseClient(
+	log zerolog.Logger,
 	flowClient module.SDKClientWrapper,
 	accountAddress string,
 	accountKeyIndex uint,
 	signer sdkcrypto.Signer,
-	contractAddress string) *BaseClient {
+	contractAddress string,
+) *BaseClient {
+
 	return &BaseClient{
 		Log:             log,
 		ContractAddress: contractAddress,
