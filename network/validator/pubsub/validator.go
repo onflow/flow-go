@@ -52,6 +52,7 @@ func messageSigningID(m *pubsub.Message) (peer.ID, error) {
 }
 
 // MessageValidator validates the given message with original sender `from`.
+// Note: contrarily to pubsub.ValidatorEx, the peerID parameter does not represent the bearer of the message, but its source.
 type MessageValidator func(ctx context.Context, from peer.ID, msg *message.Message) pubsub.ValidationResult
 
 type ValidatorData struct {
