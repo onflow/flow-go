@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// signerInfo holds information about signer, it's stake and index
+// signerInfo holds information about a signer, its stake and index
 type signerInfo struct {
 	weight uint64 //nolint:unused
 	index  int
@@ -54,7 +54,7 @@ func NewWeightedSignatureAggregator(
 		signers:                        signers,
 	}
 
-	// build the internal maps for a faster look-up
+	// build the internal map for a faster look-up
 	for i, id := range signers {
 		weightedAgg.idToSigner[id.NodeID] = signerInfo{
 			weight: id.Stake,
@@ -87,6 +87,9 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 	return nil
 }
 
+// hasSignature returs true if the input ID already included a signature
+// and false otherwise.
+// The function is thread safe.
 func (w *WeightedSignatureAggregator) hasSignature(signerID flow.Identifier) bool {
 	w.lock.RLock()
 	defer w.lock.RUnlock()
