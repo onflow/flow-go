@@ -1229,17 +1229,23 @@ func (c *ValueConverter) VisitUFix64Value(_ *oldInter.Interpreter, value oldInte
 }
 
 func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *oldInter.CompositeValue) bool {
-	fields := newInter.NewStringValueOrderedMap()
+	fields := make([]newInter.CompositeField, 0)
 
 	value.Fields().Foreach(func(key string, fieldVal oldInter.Value) {
 		newValue := c.Convert(fieldVal)
 		if newValue != nil {
-			fields.Set(key, newValue)
+			fields = append(
+				fields,
+				newInter.CompositeField{
+					Name:  key,
+					Value: newValue,
+				},
+			)
 		}
 	})
 
 	c.result = newInter.NewCompositeValue(
-		c.storage,
+		c.newInter,
 		value.Location(),
 		value.QualifiedIdentifier(),
 		value.Kind(),
@@ -1386,10 +1392,7 @@ func (c *ValueConverter) VisitDeployedContractValue(_ *oldInter.Interpreter, _ o
 func ConvertStaticType(staticType oldInter.StaticType) newInter.StaticType {
 	switch typ := staticType.(type) {
 	case oldInter.CompositeStaticType:
-		return newInter.CompositeStaticType{
-			Location:            typ.Location,
-			QualifiedIdentifier: typ.QualifiedIdentifier,
-		}
+		return newInter.NewCompositeStaticType(typ.Location, typ.QualifiedIdentifier)
 	case oldInter.InterfaceStaticType:
 		return newInter.InterfaceStaticType{
 			Location:            typ.Location,
