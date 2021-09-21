@@ -72,8 +72,6 @@ func (s *Suite) TestViewsProgress() {
 		phaseChecks = append(phaseChecks, epochViews...)
 	}
 
-	s.StakeNode(flow.RoleConsensus)
-
 	s.net.StopContainers()
 
 	consensusContainers := []*testnet.Container{}

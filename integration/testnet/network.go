@@ -270,6 +270,23 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt)
 	return c
 }
 
+func NewNetworkConfigWithLens(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64,  opts ...NetworkConfigOpt) NetworkConfig {
+	c := NetworkConfig{
+		Nodes:                 nodes,
+		Name:                  name,
+		NClusters:             1, // default to 1 cluster
+		ViewsInStakingAuction: viewsInStakingAuction,
+		ViewsInDKGPhase:       viewsInDKGPhase,
+		ViewsInEpoch:          viewsInEpoch,
+	}
+
+	for _, apply := range opts {
+		apply(&c)
+	}
+
+	return c
+}
+
 func WithViewsInStakingAuction(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInStakingAuction = views
