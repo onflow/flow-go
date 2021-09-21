@@ -2,7 +2,6 @@ package fvm
 
 import (
 	"github.com/onflow/cadence/runtime/common"
-
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"

@@ -23,23 +23,17 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-const (
-	flowServiceAccountContract = "FlowServiceAccount"
-	deductFeesContractFunction = "deductTransactionFee"
-	flowStorageFeesContract    = "FlowStorageFees"
-)
-
-type TransactionInvocator struct {
+type TransactionInvoker struct {
 	logger zerolog.Logger
 }
 
-func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
-	return &TransactionInvocator{
+func NewTransactionInvoker(logger zerolog.Logger) *TransactionInvoker {
+	return &TransactionInvoker{
 		logger: logger,
 	}
 }
 
-func (i *TransactionInvocator) Process(
+func (i *TransactionInvoker) Process(
 	vm *VirtualMachine,
 	ctx *Context,
 	proc *TransactionProcedure,
@@ -236,26 +230,13 @@ func (i *TransactionInvocator) Process(
 	return txError
 }
 
-func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) error {
+func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) error {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
 
-	invocator := NewTransactionContractFunctionInvocator(
-		common.AddressLocation{
-			Address: common.BytesToAddress(env.ctx.Chain.ServiceAddress().Bytes()),
-			Name:    flowServiceAccountContract,
-		},
-		deductFeesContractFunction,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(common.BytesToAddress(proc.Transaction.Payer.Bytes())),
-		},
-		[]sema.Type{
-			sema.AuthAccountType,
-		},
-		env.ctx.Logger,
-	)
-	_, err := invocator.Invoke(env, proc.TraceSpan)
+	invoker := DeductTransactionFeesInvoker(env.ctx, proc.Transaction.Payer)
+	_, err := invoker.Invoke(env, proc.TraceSpan)
 
 	if err != nil {
 		// TODO: Fee value is currently a constant. this should be changed when it is not
@@ -269,7 +250,7 @@ func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *
 	return nil
 }
 
-func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclaration {
+func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
 	if ctx.AccountFreezeAvailable {
@@ -309,7 +290,16 @@ func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclara
 						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
 							"second argument of setAccountFrozen must be a boolean"))
 					}
-					err := env.SetAccountFrozen(common.Address(address), bool(frozen))
+					var err error
+					switch env.(type) {
+					case *TransactionEnv:
+						err = env.(*TransactionEnv).SetAccountFrozen(common.Address(address), bool(frozen))
+					case *ScriptEnv:
+						err = env.(*ScriptEnv).SetAccountFrozen(common.Address(address), bool(frozen))
+					default:
+						err = errors.NewOperationNotSupportedError("SetAccountFrozen")
+					}
+
 					if err != nil {
 						panic(err)
 					}
@@ -326,7 +316,7 @@ func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclara
 
 // requiresRetry returns true for transactions that has to be rerun
 // this is an additional check which was introduced
-func (i *TransactionInvocator) requiresRetry(err error, proc *TransactionProcedure) bool {
+func (i *TransactionInvoker) requiresRetry(err error, proc *TransactionProcedure) bool {
 	// if no error no retry
 	if err == nil {
 		return false
@@ -378,7 +368,7 @@ func (i *TransactionInvocator) requiresRetry(err error, proc *TransactionProcedu
 
 // logRuntimeError logs run time errors into a file
 // This is a temporary measure.
-func (i *TransactionInvocator) dumpRuntimeError(runtimeErr *runtime.Error, procedure *TransactionProcedure) {
+func (i *TransactionInvoker) dumpRuntimeError(runtimeErr *runtime.Error, procedure *TransactionProcedure) {
 
 	codesJSON, err := json.Marshal(runtimeErr.Codes)
 	if err != nil {

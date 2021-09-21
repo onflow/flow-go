@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
@@ -267,18 +266,7 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		defer sp.Finish()
 	}
 
-	invoker := NewTransactionContractFunctionInvocator(
-		common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowStorageFeesContract},
-		"calculateAccountCapacity",
-		[]interpreter.Value{
-			interpreter.NewAddressValue(common.BytesToAddress(address.Bytes())),
-		},
-		[]sema.Type{
-			&sema.AddressType{},
-		},
-		e.ctx.Logger,
-	)
-
+	invoker := AccountStorageCapacityInvoker(e.ctx, address)
 	result, invokeErr := invoker.Invoke(e, e.traceSpan)
 
 	if invokeErr != nil {
@@ -293,18 +281,7 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 		defer sp.Finish()
 	}
 
-	invoker := NewTransactionContractFunctionInvocator(
-		common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowServiceAccountContract},
-		"defaultTokenBalance",
-		[]interpreter.Value{
-			interpreter.NewAddressValue(common.BytesToAddress(address.Bytes())),
-		},
-		[]sema.Type{
-			sema.PublicAccountType,
-		},
-		e.ctx.Logger,
-	)
-
+	invoker := AccountBalanceInvoker(e.ctx, address)
 	result, invokeErr := invoker.Invoke(e, e.traceSpan)
 
 	if invokeErr != nil {
@@ -319,18 +296,7 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 		defer sp.Finish()
 	}
 
-	invoker := NewTransactionContractFunctionInvocator(
-		common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowStorageFeesContract},
-		"defaultTokenAvailableBalance",
-		[]interpreter.Value{
-			interpreter.NewAddressValue(common.BytesToAddress(address.Bytes())),
-		},
-		[]sema.Type{
-			&sema.AddressType{},
-		},
-		e.ctx.Logger,
-	)
-
+	invoker := AccountAvailableBalanceInvoker(e.ctx, address)
 	result, invokeErr := invoker.Invoke(e, e.traceSpan)
 
 	if invokeErr != nil {
@@ -716,21 +682,7 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		// uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
-		invoker := NewTransactionContractFunctionInvocator(
-			common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowServiceAccountContract},
-			"setupNewAccount",
-			[]interpreter.Value{
-				interpreter.NewAddressValue(common.BytesToAddress(flowAddress.Bytes())),
-				interpreter.NewAddressValue(common.BytesToAddress(payer.Bytes())),
-			},
-			[]sema.Type{
-				sema.AuthAccountType,
-				sema.AuthAccountType,
-			},
-			e.ctx.Logger,
-		)
-
+		invoker := SetupNewAccountInvoker(e.ctx, flowAddress, payer)
 		_, invokeErr := invoker.Invoke(e, e.traceSpan)
 
 		if invokeErr != nil {

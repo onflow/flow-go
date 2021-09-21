@@ -3,7 +3,6 @@ package blueprints
 import (
 	"encoding/hex"
 	"fmt"
-
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
@@ -44,30 +43,6 @@ func DeployStorageFeesContractTransaction(service flow.Address, contract []byte)
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(deployStorageFeesTransactionTemplate, hex.EncodeToString(contract)))).
 		AddAuthorizer(service)
-}
-
-const getFlowTokenAvailableBalanceScriptTemplate = `
-import FlowStorageFees from 0x%s
-
-pub fun main(): UFix64 {
-  return FlowStorageFees.defaultTokenAvailableBalance(0x%s)
-}
-`
-
-func GetFlowTokenAvailableBalanceScript(accountAddress, serviceAddress flow.Address) []byte {
-	return []byte(fmt.Sprintf(getFlowTokenAvailableBalanceScriptTemplate, serviceAddress, accountAddress))
-}
-
-const getStorageCapacityScriptTemplate = `
-import FlowStorageFees from 0x%s
-
-pub fun main(): UFix64 {
-	return FlowStorageFees.calculateAccountCapacity(0x%s)
-}
-`
-
-func GetStorageCapacityScript(accountAddress, serviceAddress flow.Address) []byte {
-	return []byte(fmt.Sprintf(getStorageCapacityScriptTemplate, serviceAddress, accountAddress))
 }
 
 const setupFeesTransactionTemplate = `
