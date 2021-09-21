@@ -16,16 +16,27 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestDKGKeysInsertAndRetrieve(t *testing.T) {
+// TestSecretDBRequirement tests that the DKGKeys constructor will return an
+// error if instantiated using a database not marked with the correct type.
+func TestSecretDBRequirement(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store := badgerstorage.NewDKGKeys(metrics, db)
+		_, err := badgerstorage.NewDKGKeys(metrics, db)
+		require.Error(t, err)
+	})
+}
+
+func TestDKGKeysInsertAndRetrieve(t *testing.T) {
+	unittest.RunWithSecretBadgerDB(t, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store, err := badgerstorage.NewDKGKeys(metrics, db)
+		require.NoError(t, err)
 
 		rand.Seed(time.Now().UnixNano())
 		epochCounter := rand.Uint64()
 
 		// attempt to get a non-existent key
-		_, err := store.RetrieveMyDKGPrivateInfo(epochCounter)
+		_, err = store.RetrieveMyDKGPrivateInfo(epochCounter)
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 
 		// store a key in db
