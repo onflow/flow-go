@@ -35,7 +35,6 @@
 // domain sources at https://github.com/gvanas/KeccakCodePackage
 
 // Offsets in state
-
 #define _ba  (0*8)
 #define _be  (1*8)
 #define _bi  (2*8)
@@ -416,4 +415,3 @@ TEXT ·KeccakF1600(SB), 0, $200-8
 	NOTQ _sa(rpState)
 
 	RET
-    
