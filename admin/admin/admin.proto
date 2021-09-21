@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package admin;
+option go_package = "github.com/onflow/flow-go/admin/admin";
+
+import "google/protobuf/struct.proto";
+import "google/api/annotations.proto";
+
+service Admin {
+  // RunCommand sends a command to the admin server.
+  rpc RunCommand(RunCommandRequest) returns (RunCommandResponse) {
+    option (google.api.http) = {
+      post: "/admin/run_command"
+      body: "*"
+    };
+  }
+}
+
+/* RunCommandRequest represents an admin command with arguments */
+message RunCommandRequest {
+  string commandName = 1;           // Name of the command to run
+  google.protobuf.Struct data = 2;  // Arguments to pass to the command
+}
+
+message RunCommandResponse {}
