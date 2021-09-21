@@ -35,7 +35,7 @@ func (suite *AccessSuite) TearDownTest() {
 		defer suite.cancel()
 	}
 	if suite.net != nil {
-		suite.net.Remove()
+		//suite.net.Remove()
 	}
 }
 
@@ -63,7 +63,7 @@ func (suite *AccessSuite) SetupTest() {
 
 	// need one controllable collection node (used ghost)
 	collID := unittest.IdentifierFixture()
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(collID))
+	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(collID), testnet.WithAdditionalFlag("--insecure-access-api=true"))
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)
