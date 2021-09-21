@@ -266,8 +266,8 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		defer sp.Finish()
 	}
 
-	invoker := AccountStorageCapacityInvoker(e.ctx, address)
-	result, invokeErr := invoker.Invoke(e, e.traceSpan)
+	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
+	result, invokeErr := accountStorageCapacity(address)
 
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
@@ -289,8 +289,8 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 		defer sp.Finish()
 	}
 
-	invoker := AccountBalanceInvoker(e.ctx, address)
-	result, invokeErr := invoker.Invoke(e, e.traceSpan)
+	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
+	result, invokeErr := accountBalance(address)
 
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
 	if invokeErr != nil {
@@ -305,8 +305,8 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 		defer sp.Finish()
 	}
 
-	invoker := AccountAvailableBalanceInvoker(e.ctx, address)
-	result, invokeErr := invoker.Invoke(e, e.traceSpan)
+	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
+	result, invokeErr := accountAvailableBalance(address)
 
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
@@ -694,8 +694,8 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		invoker := SetupNewAccountInvoker(e.ctx, flowAddress, payer)
-		_, invokeErr := invoker.Invoke(e, e.traceSpan)
+		setupNewAccount := SetupNewAccountInvocation(e, e.traceSpan)
+		_, invokeErr := setupNewAccount(flowAddress, payer)
 
 		if invokeErr != nil {
 			return address, errors.HandleRuntimeError(invokeErr)

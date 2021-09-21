@@ -92,15 +92,6 @@ func (vmt vmTest) run(
 	}
 }
 
-func (vmt vmTest) bench(
-	f func(t *testing.B, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
-) func(t *testing.B) {
-	return func(t *testing.B) {
-		vm, chain, ctx, view, p := vmt.setupVM(t)
-		f(t, vm, chain, ctx, view, p)
-	}
-}
-
 func transferTokensTx(chain flow.Chain) *flow.TransactionBody {
 	return flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(`

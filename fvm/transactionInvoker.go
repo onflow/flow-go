@@ -235,8 +235,8 @@ func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *Tr
 		return nil
 	}
 
-	invoker := DeductTransactionFeesInvoker(env.ctx, proc.Transaction.Payer)
-	_, err := invoker.Invoke(env, proc.TraceSpan)
+	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
+	_, err := deductTxFees(proc.Transaction.Payer)
 
 	if err != nil {
 		// TODO: Fee value is currently a constant. this should be changed when it is not
@@ -291,11 +291,11 @@ func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration
 							"second argument of setAccountFrozen must be a boolean"))
 					}
 					var err error
-					switch env.(type) {
+					switch env := env.(type) {
 					case *TransactionEnv:
-						err = env.(*TransactionEnv).SetAccountFrozen(common.Address(address), bool(frozen))
+						err = env.SetAccountFrozen(common.Address(address), bool(frozen))
 					case *ScriptEnv:
-						err = env.(*ScriptEnv).SetAccountFrozen(common.Address(address), bool(frozen))
+						err = env.SetAccountFrozen(common.Address(address), bool(frozen))
 					default:
 						err = errors.NewOperationNotSupportedError("SetAccountFrozen")
 					}

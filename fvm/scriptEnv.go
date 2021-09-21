@@ -7,14 +7,15 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/opentracing/opentracing-go"
-	traceLog "github.com/opentracing/opentracing-go/log"
 
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
@@ -187,8 +188,8 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 		defer sp.Finish()
 	}
 
-	invoker := AccountStorageCapacityInvoker(e.ctx, address)
-	result, invokeErr := invoker.Invoke(e, e.traceSpan)
+	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
+	result, invokeErr := accountStorageCapacity(address)
 
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
@@ -210,8 +211,8 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 		defer sp.Finish()
 	}
 
-	invoker := AccountBalanceInvoker(e.ctx, address)
-	result, invokeErr := invoker.Invoke(e, e.traceSpan)
+	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
+	result, invokeErr := accountBalance(address)
 
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
 	if invokeErr != nil {
@@ -226,8 +227,8 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 		defer sp.Finish()
 	}
 
-	invoker := AccountAvailableBalanceInvoker(e.ctx, address)
-	result, invokeErr := invoker.Invoke(e, e.traceSpan)
+	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
+	result, invokeErr := accountAvailableBalance(address)
 
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
