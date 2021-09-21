@@ -103,6 +103,10 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 // Broadcast signs and broadcasts a message to all participants.
 func (b *Broker) Broadcast(data []byte) {
 	b.unit.Launch(func() {
+
+		// NOTE: We're counting the number of times the underlying DKG
+		// requested a broadcast so we can detect an unhappy path. Thus incrementing
+		// broadcasts before we perform the broadcasts is okay.
 		b.unit.Lock()
 		if b.broadcasts > 0 {
 			// The Warn log is used by the integration tests to check if this method
