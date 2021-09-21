@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
@@ -68,6 +69,9 @@ type NodeBuilder interface {
 	// `Done`.
 	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
 
+	// AdminCommand registers a new admin command with the admin server
+	AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder
+
 	// MustNot asserts that the given error must not occur.
 	// If the error is nil, returns a nil log event (which acts as a no-op).
 	// If the error is not nil, returns a fatal log event containing the error.
@@ -100,6 +104,10 @@ type NodeBuilder interface {
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
 	nodeIDHex             string
+	adminAddr             string
+	adminCert             string
+	adminKey              string
+	adminClientCAs        string
 	BindAddr              string
 	NodeRole              string
 	datadir               string
@@ -114,6 +122,7 @@ type BaseConfig struct {
 	profilerInterval      time.Duration
 	profilerDuration      time.Duration
 	tracerEnabled         bool
+	tracerSensitivity     uint
 	metricsEnabled        bool
 	guaranteesCacheSize   uint
 	receiptsCacheSize     uint
@@ -163,6 +172,10 @@ func DefaultBaseConfig() *BaseConfig {
 	datadir := filepath.Join(homedir, ".flow", "database")
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
+		adminAddr:             NotSet,
+		adminCert:             NotSet,
+		adminKey:              NotSet,
+		adminClientCAs:        NotSet,
 		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
 		datadir:               datadir,
@@ -175,6 +188,7 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerInterval:      15 * time.Minute,
 		profilerDuration:      10 * time.Second,
 		tracerEnabled:         false,
+		tracerSensitivity:     4,
 		metricsEnabled:        true,
 		receiptsCacheSize:     bstorage.DefaultCacheSize,
 		guaranteesCacheSize:   bstorage.DefaultCacheSize,

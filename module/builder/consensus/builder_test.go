@@ -261,8 +261,8 @@ func (bs *BuilderSuite) SetupTest() {
 	}
 
 	bs.state = &protocol.MutableState{}
-	bs.state.On("Extend", mock.Anything).Run(func(args mock.Arguments) {
-		block := args.Get(0).(*flow.Block)
+	bs.state.On("Extend", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
+		block := args.Get(1).(*flow.Block)
 		bs.Assert().Equal(bs.sentinel, block.Header.View)
 		bs.assembled = block.Payload
 	}).Return(nil)

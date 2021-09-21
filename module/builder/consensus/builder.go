@@ -3,10 +3,12 @@
 package consensus
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
@@ -105,8 +107,11 @@ func NewBuilder(
 // given view and applying the custom setter function to allow the caller to
 // make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOn)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOn)
+
+	// since we don't know the blockID when building the block we track the
+	// time indirectly and insert the span directly at the end
+
+	startTime := time.Now()
 
 	// get the collection guarantees to insert in the payload
 	insertableGuarantees, err := b.getInsertableGuarantees(parentID)
@@ -136,10 +141,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnDBInsert)
+	span, ctx, _ := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, opentracing.StartTime(startTime))
+	defer span.Finish()
 
-	err = b.state.Extend(proposal)
+	err = b.state.Extend(ctx, proposal)
 	if err != nil {
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
@@ -248,8 +253,6 @@ func (b *Builder) repopulateExecutionTree() error {
 //
 // 4) Otherwise, this guarantee can be included in the payload.
 func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
 
 	// we look back only as far as the expiry limit for the current height we
 	// are building for; any guarantee with a reference block before that can
@@ -350,9 +353,6 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 //      block or by a seal included earlier in the block that we are constructing).
 // To limit block size, we cap the number of seals to maxSealCount.
 func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
-
 	// get the latest seal in the fork, which we are extending and
 	// the corresponding block, whose result is sealed
 	// Note: the last seal might not be included in a finalized block yet
@@ -490,8 +490,6 @@ type InsertableReceipts struct {
 //
 // Receipts have to be ordered by block height.
 func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableReceipts, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork. This block is not necessarily finalized.
@@ -596,9 +594,6 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	seals []*flow.Seal,
 	insertableReceipts *InsertableReceipts,
 	setter func(*flow.Header) error) (*flow.Block, error) {
-
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreateHeader)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
 
 	// build the payload so we can get the hash
 	payload := &flow.Payload{
