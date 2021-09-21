@@ -35,9 +35,10 @@ func newCache() *cache {
 // Second boolean variable determines whether the domain cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 	c.RLock()
-	defer c.RUnlock()
 
 	entry, ok := c.ipCache[domain]
+
+	c.RUnlock()
 
 	if !ok {
 		// does not exist
@@ -58,9 +59,10 @@ func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
 // Second boolean variable determines whether the txt cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
 	c.RLock()
-	defer c.RUnlock()
 
 	entry, ok := c.txtCache[txt]
+
+	c.RUnlock()
 
 	if !ok {
 		// does not exist
