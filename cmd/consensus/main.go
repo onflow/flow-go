@@ -92,6 +92,8 @@ func main() {
 		emergencySealing                       bool
 
 		// DKG contract client
+		machineAccountInfo *bootstrap.NodeMachineAccountInfo
+		flowClient         *client.Client
 		accessAddress      string
 		secureAccessNodeID string
 		insecureAccessAPI  bool
@@ -334,6 +336,50 @@ func main() {
 		Module("finalization distributor", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			return nil
+		}).
+		Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+			return err
+		}).
+		Module("sdk client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			if accessAddress == "" {
+				return fmt.Errorf("missing required flag --access-address")
+			}
+			// create flow client with correct GRPC configuration for QC contract client
+			if insecureAccessAPI {
+				flowClient, err = common.InsecureFlowClient(accessAddress)
+				return err
+			} else {
+				if secureAccessNodeID == "" {
+					return fmt.Errorf("invalid flag --secure-access-node-id required")
+				}
+
+				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
+				if err != nil {
+					return fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
+				}
+
+				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))
+				if err != nil {
+					return fmt.Errorf("could not get identity of secure access node: %s", secureAccessNodeID)
+				}
+
+				if len(identities) < 1 {
+					return fmt.Errorf("could not find identity of secure access node: %s", secureAccessNodeID)
+				}
+
+				flowClient, err = common.SecureFlowClient(accessAddress, identities[0].NetworkPubKey.String()[2:])
+				return err
+			}
+		}).
+		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			validator, err := epochs.NewMachineAccountConfigValidator(
+				node.Logger,
+				flowClient,
+				flow.RoleCollection,
+				*machineAccountInfo,
+			)
+			return validator, err
 		}).
 		Component("sealing engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
@@ -667,40 +713,8 @@ func main() {
 			// participation in the DKG run
 			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
 
-			// create flow client with correct GRPC configuration for QC contract client
-			var flowClient *client.Client
-			if insecureAccessAPI {
-				flowClient, err = common.InsecureFlowClient(accessAddress)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				if secureAccessNodeID == "" {
-					return nil, fmt.Errorf("invalid flag --secure-access-node-id required")
-				}
-
-				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
-				if err != nil {
-					return nil, fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
-				}
-
-				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))
-				if err != nil {
-					return nil, fmt.Errorf("could not get identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				if len(identities) < 1 {
-					return nil, fmt.Errorf("could not find identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				flowClient, err = common.SecureFlowClient(accessAddress, identities[0].NetworkPubKey.String()[2:])
-				if err != nil {
-					return nil, err
-				}
-			}
-
 			// construct DKG contract client
-			dkgContractClient, err := createDKGContractClient(node, accessAddress, flowClient)
+			dkgContractClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
 			if err != nil {
 				return nil, fmt.Errorf("could not create dkg contract client %w", err)
 			}
@@ -745,7 +759,7 @@ func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPr
 }
 
 // createDKGContractClient creates a DKG contract client
-func createDKGContractClient(node *cmd.NodeConfig, accessAddress string, flowClient *client.Client) (module.DKGContractClient, error) {
+func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client) (module.DKGContractClient, error) {
 
 	var dkgClient module.DKGContractClient
 
@@ -755,23 +769,12 @@ func createDKGContractClient(node *cmd.NodeConfig, accessAddress string, flowCli
 	}
 	dkgContractAddress := contracts.DKG.Address.Hex()
 
-	// if not valid return a mock dkg contract client
-	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
-		return nil, fmt.Errorf("could not validate node machine account config")
-	}
-
-	// attempt to read NodeMachineAccountInfo
-	info, err := cmd.LoadNodeMachineAccountInfoFile(node.BaseConfig.BootstrapDir, node.Me.NodeID())
-	if err != nil {
-		return nil, fmt.Errorf("could not load node machine account info file: %w", err)
-	}
-
 	// construct signer from private key
-	sk, err := crypto.DecodePrivateKey(info.SigningAlgorithm, info.EncodedPrivateKey)
+	sk, err := crypto.DecodePrivateKey(machineAccountInfo.SigningAlgorithm, machineAccountInfo.EncodedPrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
-	txSigner := crypto.NewInMemorySigner(sk, info.HashAlgorithm)
+	txSigner := crypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
 
 	// create actual dkg contract client, all flags and machine account info file found
 	dkgClient = dkgmodule.NewClient(
@@ -779,8 +782,8 @@ func createDKGContractClient(node *cmd.NodeConfig, accessAddress string, flowCli
 		flowClient,
 		txSigner,
 		dkgContractAddress,
-		info.Address,
-		info.KeyIndex,
+		machineAccountInfo.Address,
+		machineAccountInfo.KeyIndex,
 	)
 
 	return dkgClient, nil
