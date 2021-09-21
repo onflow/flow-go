@@ -519,6 +519,7 @@ func main() {
 				node.DB,
 				node.Storage.Headers,
 				mutableState,
+				node.Tracer,
 				finalizer.WithCleanup(finalizer.CleanupMempools(
 					node.Metrics.Mempool,
 					conMetrics,

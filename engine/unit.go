@@ -74,7 +74,12 @@ func (u *Unit) LaunchAfter(delay time.Duration, f func()) {
 // If f is executed, the unit will not shut down until after f returns.
 func (u *Unit) LaunchPeriodically(f func(), interval time.Duration, delay time.Duration) {
 	u.Launch(func() {
-		<-time.After(delay)
+		select {
+		case <-u.ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for {
