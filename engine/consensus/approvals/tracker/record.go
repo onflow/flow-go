@@ -32,13 +32,12 @@ func (r *SealingRecord) ApprovalsMissing(chunksWithMissingApprovals map[uint64]f
 	sufficientApprovals := len(chunksWithMissingApprovals) == 0
 	r.entries["sufficient_approvals_for_sealing"] = sufficientApprovals
 	if !sufficientApprovals {
-		indices := make([]uint64, 0, len(chunksWithMissingApprovals))
-		for i := range chunksWithMissingApprovals {
-			indices = append(indices, i)
+		indices := make([]string, 0, len(chunksWithMissingApprovals))
+		for i, list := range chunksWithMissingApprovals {
+			indices = append(indices, fmt.Sprintf("chunk_index: %v, verifier_ids: %v", i, list))
 		}
 		r.entries["chunks_with_insufficient_approvals"] = indices
 	}
-
 }
 
 func (r *SealingRecord) ApprovalsRequested(requestCount uint) {
