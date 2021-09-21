@@ -319,6 +319,8 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 			"--datadir=/data",
 			"--loglevel=DEBUG",
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
+			// TODO change it to flag
+			fmt.Sprintf("--tracer-enabled=%t", true),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
 		},
