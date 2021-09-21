@@ -463,6 +463,10 @@ func (fnb *FlowNodeBuilder) initDB() {
 
 func (fnb *FlowNodeBuilder) initSecretsDB() {
 
+	if fnb.BaseConfig.secretsdir == NotSet {
+		fnb.Logger.Fatal().Msgf("missing required flag '--secrets-dir'")
+	}
+
 	err := os.MkdirAll(fnb.BaseConfig.secretsdir, 0700)
 	fnb.MustNot(err).Str("dir", fnb.BaseConfig.secretsdir).Msg("could not create secrets db dir")
 

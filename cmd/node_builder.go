@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -169,8 +171,8 @@ type NodeConfig struct {
 }
 
 func DefaultBaseConfig() *BaseConfig {
-	defaultDatadir := "/data/protocol"
-	defaultSecretsdir := "/data/secret"
+	homedir, _ := os.UserHomeDir()
+	datadir := filepath.Join(homedir, ".flow", "database")
 
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
@@ -181,8 +183,8 @@ func DefaultBaseConfig() *BaseConfig {
 		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
 		timeout:               1 * time.Minute,
-		datadir:               defaultDatadir,
-		secretsdir:            defaultSecretsdir,
+		datadir:               datadir,
+		secretsdir:            NotSet,
 		level:                 "info",
 		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
