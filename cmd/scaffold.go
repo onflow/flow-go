@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"os"
@@ -413,7 +414,7 @@ func (fnb *FlowNodeBuilder) initDB() {
 func (fnb *FlowNodeBuilder) initSecretsDB() {
 
 	if fnb.BaseConfig.secretsdir == NotSet {
-		fnb.Logger.Fatal().Msgf("missing required flag '--secrets-dir'")
+		fnb.Logger.Fatal().Msgf("missing required flag '--secretsdir'")
 	}
 
 	err := os.MkdirAll(fnb.BaseConfig.secretsdir, 0700)
@@ -421,8 +422,17 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 
 	log := sutil.NewLogger(fnb.Logger)
 
-	// TODO encryption options
 	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
+	// attempt to read an encryption key for the secrets DB from the canonical path
+	encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.Me.NodeID())
+	if errors.Is(err, os.ErrNotExist) {
+		fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
+	} else if err != nil {
+		fnb.Logger.Fatal().Err(err).Msg("failed to read secrets db encryption key")
+	} else {
+		opts = opts.WithEncryptionKey(encryptionKey)
+	}
+
 	secretsDB, err := bstorage.InitSecret(opts)
 	fnb.MustNot(err).Msg("could not open secrets db")
 	fnb.SecretsDB = secretsDB
@@ -984,4 +994,14 @@ func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoP
 	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
+}
+
+// loadSecretsEncryptionKey loads the encryption key for the secrets database.
+// If the file does not exist, returns os.ErrNotExist.
+func loadSecretsEncryptionKey(dir string, myID flow.Identifier) ([]byte, error) {
+	data, err := io.ReadFile(filepath.Join(dir, fmt.Sprintf(bootstrap.PathSecretsEncryptionKey, myID)))
+	if err != nil {
+		return nil, fmt.Errorf("could not read key: %w", err)
+	}
+	return data, nil
 }
