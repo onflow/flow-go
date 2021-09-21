@@ -102,7 +102,7 @@ func (s *Suite) TearDownTest() {
 	}
 }
 
-//StakeNode will generate initial keys needed for a SN/LN node and onboard this node using the following steps;
+// StakeNode will generate initial keys needed for a SN/LN node and onboard this node using the following steps;
 // 1. Generate keys (networking, staking, machine)
 // 2. Create a new lease account, this will be the staking account
 // 3. Transfer token amount for the given role to the staking account
