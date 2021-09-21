@@ -1,0 +1,4 @@
+version: v1beta1
+name: buf.build/onflow/flow-go
+deps:
+  - buf.build/googleapis/googleapis
