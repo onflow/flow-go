@@ -40,7 +40,7 @@ import (
 
 const (
 
-	// Maximum time to wait for a ping reply from a remote node
+	// maximum time to wait for a ping reply from a remote node
 	PingTimeout = time.Second * 4
 
 	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
@@ -56,6 +56,9 @@ const (
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func() (*Node, error)
+
+// LibP2PStreamFactoryFunc is a factory function type for generating libp2p streams.
+type LibP2PStreamFactoryFunc func(ctx context.Context, p peer.ID, pids ...protocol.ID) (libp2pnet.Stream, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
