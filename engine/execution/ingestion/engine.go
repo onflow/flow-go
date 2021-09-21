@@ -428,8 +428,12 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 // handle block will process the incoming block.
 // the block has passed the consensus validation.
 func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
+
 	blockID := block.ID()
 	log := e.log.With().Hex("block_id", blockID[:]).Logger()
+
+	span, _, _ := e.tracer.StartBlockSpan(ctx, blockID, trace.EXEHandleBlock)
+	defer span.Finish()
 
 	executed, err := state.IsBlockExecuted(e.unit.Ctx(), e.execState, blockID)
 	if err != nil {
@@ -442,8 +446,6 @@ func (e *Engine) handleBlock(ctx context.Context, block *flow.Block) error {
 	}
 
 	// unexecuted block
-	e.metrics.StartBlockReceivedToExecuted(blockID)
-
 	// acquiring the lock so that there is only one process modifying the queue
 	err = e.mempool.Run(func(
 		blockByCollection *stdmap.BlockByCollectionBackdata,
@@ -574,7 +576,8 @@ func (e *Engine) executeBlock(ctx context.Context, executableBlock *entity.Execu
 		return
 	}
 
-	e.metrics.FinishBlockReceivedToExecuted(executableBlock.ID())
+	// TODO: Ramtin - comment out for now
+	// e.metrics.FinishBlockReceivedToExecuted(executableBlock.ID())
 	e.metrics.ExecutionStateReadsPerBlock(computationResult.StateReads)
 
 	finalState, receipt, err := e.handleComputationResult(ctx, computationResult, *executableBlock.StartState)
@@ -801,8 +804,10 @@ func (e *Engine) OnCollection(originID flow.Identifier, entity flow.Entity) {
 // check if any of these block becomes executable and execute it if
 // is.
 func (e *Engine) handleCollection(originID flow.Identifier, collection *flow.Collection) error {
-
 	collID := collection.ID()
+
+	span, _, _ := e.tracer.StartCollectionSpan(context.Background(), collID, trace.EXEHandleCollection)
+	defer span.Finish()
 
 	lg := e.log.With().Hex("collection_id", collID[:]).Logger()
 
@@ -1056,6 +1061,9 @@ func (e *Engine) handleComputationResult(
 	startState flow.StateCommitment,
 ) (flow.StateCommitment, *flow.ExecutionReceipt, error) {
 
+	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.EXEHandleComputationResult)
+	defer span.Finish()
+
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock)).
 		Msg("received computation result")
@@ -1114,7 +1122,7 @@ func (e *Engine) saveExecutionResults(
 		return nil, fmt.Errorf("could not generate execution receipt: %w", err)
 	}
 
-	err = e.execState.PersistExecutionState(childCtx,
+	err = e.execState.SaveExecutionResults(childCtx,
 		block.Header,
 		endState,
 		chdps,
