@@ -4,9 +4,10 @@ import (
 	"context"
 	"errors"
 
-	pb "github.com/onflow/flow-go/admin/admin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	pb "github.com/onflow/flow-go/admin/admin"
 )
 
 type adminServer struct {
