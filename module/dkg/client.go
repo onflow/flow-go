@@ -30,12 +30,14 @@ type Client struct {
 }
 
 // NewClient initializes a new client to the Flow DKG contract
-func NewClient(log zerolog.Logger,
+func NewClient(
+	log zerolog.Logger,
 	flowClient module.SDKClientWrapper,
 	signer sdkcrypto.Signer,
 	dkgContractAddress,
 	accountAddress string,
-	accountKeyIndex uint) *Client {
+	accountKeyIndex uint,
+) *Client {
 
 	log = log.With().Str("component", "dkg_contract_client").Logger()
 	base := epochs.NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, dkgContractAddress)
