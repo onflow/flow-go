@@ -149,8 +149,12 @@ func RunComponent(parentCtx IrrecoverableSignalerContext, componentFactory Compo
 		case err := <-irrecoverables:
 			// shutdown the component,
 			cancel()
-			// wait until it's doneC
-			<-done
+			// wait until it's done
+			select {
+			case <-parentCtx.Done():
+				break
+			case <-done:
+			}
 			// send error to the handler programmed with a restart continuation
 			handler(err, restart)
 		case <-done:
