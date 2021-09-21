@@ -297,15 +297,17 @@ func generateCerts(t *testing.T) (tls.Certificate, *x509.CertPool, tls.Certifica
 	caBytes, err := x509.CreateCertificate(rand.Reader, ca, ca, &caPrivKey.PublicKey, caPrivKey)
 	require.NoError(t, err)
 	caPEM := new(bytes.Buffer)
-	pem.Encode(caPEM, &pem.Block{
+	err = pem.Encode(caPEM, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: caBytes,
 	})
+	require.NoError(t, err)
 	caPrivKeyPem := new(bytes.Buffer)
-	pem.Encode(caPrivKeyPem, &pem.Block{
+	err = pem.Encode(caPrivKeyPem, &pem.Block{
 		Type:  "PRIVATE KEY",
 		Bytes: caPrivKeyBytes,
 	})
+	require.NoError(t, err)
 
 	serverTemplate := &x509.Certificate{
 		SerialNumber: big.NewInt(2),
@@ -326,15 +328,17 @@ func generateCerts(t *testing.T) (tls.Certificate, *x509.CertPool, tls.Certifica
 	serverCertBytes, err := x509.CreateCertificate(rand.Reader, serverTemplate, ca, &serverPrivKey.PublicKey, caPrivKey)
 	require.NoError(t, err)
 	serverCertPEM := new(bytes.Buffer)
-	pem.Encode(serverCertPEM, &pem.Block{
+	err = pem.Encode(serverCertPEM, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: serverCertBytes,
 	})
+	require.NoError(t, err)
 	serverPrivKeyPem := new(bytes.Buffer)
-	pem.Encode(serverPrivKeyPem, &pem.Block{
+	err = pem.Encode(serverPrivKeyPem, &pem.Block{
 		Type:  "PRIVATE KEY",
 		Bytes: serverPrivKeyBytes,
 	})
+	require.NoError(t, err)
 	serverCert, err := tls.X509KeyPair(serverCertPEM.Bytes(), serverPrivKeyPem.Bytes())
 	require.NoError(t, err)
 	serverCert.Leaf, err = x509.ParseCertificate(serverCert.Certificate[0])
@@ -359,15 +363,17 @@ func generateCerts(t *testing.T) (tls.Certificate, *x509.CertPool, tls.Certifica
 	clientCertBytes, err := x509.CreateCertificate(rand.Reader, clientTemplate, ca, &clientPrivKey.PublicKey, caPrivKey)
 	require.NoError(t, err)
 	clientCertPEM := new(bytes.Buffer)
-	pem.Encode(clientCertPEM, &pem.Block{
+	err = pem.Encode(clientCertPEM, &pem.Block{
 		Type:  "CERTIFICATE",
 		Bytes: clientCertBytes,
 	})
+	require.NoError(t, err)
 	clientPrivKeyPem := new(bytes.Buffer)
-	pem.Encode(clientPrivKeyPem, &pem.Block{
+	err = pem.Encode(clientPrivKeyPem, &pem.Block{
 		Type:  "PRIVATE KEY",
 		Bytes: clientPrivKeyBytes,
 	})
+	require.NoError(t, err)
 	clientCert, err := tls.X509KeyPair(clientCertPEM.Bytes(), clientPrivKeyPem.Bytes())
 	require.NoError(t, err)
 	clientCert.Leaf, err = x509.ParseCertificate(clientCert.Certificate[0])
