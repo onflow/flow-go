@@ -290,16 +290,13 @@ func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration
 						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
 							"second argument of setAccountFrozen must be a boolean"))
 					}
+
 					var err error
-					switch env := env.(type) {
-					case *TransactionEnv:
+					if env, isTXEnv := env.(*TransactionEnv); isTXEnv {
 						err = env.SetAccountFrozen(common.Address(address), bool(frozen))
-					case *ScriptEnv:
-						err = env.SetAccountFrozen(common.Address(address), bool(frozen))
-					default:
+					} else {
 						err = errors.NewOperationNotSupportedError("SetAccountFrozen")
 					}
-
 					if err != nil {
 						panic(err)
 					}

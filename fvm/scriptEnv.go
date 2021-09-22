@@ -440,10 +440,6 @@ func (e *ScriptEnv) GetComputationUsed() uint64 {
 	return e.totalGasUsed
 }
 
-func (e *ScriptEnv) SetAccountFrozen(address common.Address, frozen bool) error {
-	return errors.NewOperationNotSupportedError("SetAccountFrozen")
-}
-
 func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
 	if e.isTraceable() && e.ctx.ExtensiveTracing {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvDecodeArgument)
