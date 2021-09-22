@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -42,30 +43,26 @@ func NewAccounts(stateHolder *StateHolder) *Accounts {
 	}
 }
 
-func (a *Accounts) AllocateStorageIndex(address flow.Address) (uint64, error) {
-	var index uint64
+func (a *Accounts) AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error) {
 	indexBytes, err := a.getValue(address, false, KeyStorageIndex)
 	if err != nil {
-		return 0, err
+		return atree.StorageIndex{}, err
 	}
 
 	if len(indexBytes) == 0 {
-		// if not exist for the first time set it to 1 and return
-		// note that zero is reserved for other puporses. (e.g. empty storageIndex checks)
-		index = 1
+		// if not exist for the first time set it to zero and return
+		indexBytes = []byte{0, 0, 0, 0, 0, 0, 0, 1}
 	} else if len(indexBytes) != uint64StorageSize {
-		// this should be fatal
-		return 0, fmt.Errorf("invalid storage index byte size (%d != 8)", len(indexBytes))
-	} else {
-		index = binary.BigEndian.Uint64(indexBytes)
+		return atree.StorageIndex{}, fmt.Errorf("invalid storage index byte size (%d != 8)", len(indexBytes))
 	}
 
-	newIndexBytes := make([]byte, uint64StorageSize)
-	binary.BigEndian.PutUint64(newIndexBytes, uint64(index+1))
+	var index atree.StorageIndex
+	copy(index[:], indexBytes[:8])
+	newIndexBytes := index.Next()
 
-	err = a.setValue(address, false, KeyStorageIndex, newIndexBytes)
+	err = a.setValue(address, false, KeyStorageIndex, newIndexBytes[:])
 	if err != nil {
-		return 0, fmt.Errorf("failed to store the key storage index: %w", err)
+		return atree.StorageIndex{}, fmt.Errorf("failed to store the key storage index: %w", err)
 	}
 	return index, nil
 }

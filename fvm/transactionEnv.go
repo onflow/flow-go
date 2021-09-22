@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
@@ -239,10 +240,10 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 }
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (uint64, error) {
+func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
 	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
-		return 0, fmt.Errorf("storage address allocation failed: %w", err)
+		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
 	}
 	return v, nil
 }
@@ -712,7 +713,6 @@ func (e *TransactionEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, e
 	return runtimeBlockFromHeader(header), true, nil
 }
 
-// TODO (ramtin): check with Janez about not passing env
 func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
 
 	if e.isTraceable() {
@@ -941,70 +941,45 @@ func (e *TransactionEnv) ImplementationDebugLog(message string) error {
 	return nil
 }
 
-func (e *TransactionEnv) ProgramParsed(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceParseProgram, duration,
-			[]opentracing.LogRecord{
-				{Timestamp: time.Now(),
-					Fields: []traceLog.Field{traceLog.String("location", locStr)},
-				},
-			},
-		)
+func (e *TransactionEnv) RecordTrace(operation string, location common.Location, duration time.Duration, logs []opentracing.LogRecord) {
+	if !e.isTraceable() {
+		return
 	}
+	if location != nil {
+		if logs == nil {
+			logs = make([]opentracing.LogRecord, 0)
+		}
+		logs = append(logs, opentracing.LogRecord{Timestamp: time.Now(),
+			Fields: []traceLog.Field{traceLog.String("location", location.String())},
+		})
+	}
+
+	spanName := trace.FVMCadenceTrace.Child(operation)
+	e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, spanName, duration, logs)
+}
+
+func (e *TransactionEnv) ProgramParsed(location common.Location, duration time.Duration) {
+	e.RecordTrace("parseProgram", location, duration, nil)
 	e.metrics.ProgramParsed(location, duration)
 }
 
 func (e *TransactionEnv) ProgramChecked(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceCheckProgram, duration,
-			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", locStr)},
-			},
-			},
-		)
-	}
+	e.RecordTrace("checkProgram", location, duration, nil)
 	e.metrics.ProgramChecked(location, duration)
 }
 
 func (e *TransactionEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceInterpretProgram, duration,
-			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", locStr)},
-			},
-			},
-		)
-	}
+	e.RecordTrace("interpretProgram", location, duration, nil)
 	e.metrics.ProgramInterpreted(location, duration)
 }
 
 func (e *TransactionEnv) ValueEncoded(duration time.Duration) {
-	if e.isTraceable() {
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceEncodeValue, duration,
-			[]opentracing.LogRecord{},
-		)
-	}
+	e.RecordTrace("encodeValue", nil, duration, nil)
 	e.metrics.ValueEncoded(duration)
 }
 
 func (e *TransactionEnv) ValueDecoded(duration time.Duration) {
-	if e.isTraceable() {
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceDecodeValue, duration,
-			[]opentracing.LogRecord{},
-		)
-	}
+	e.RecordTrace("decodeValue", nil, duration, nil)
 	e.metrics.ValueDecoded(duration)
 }
 
