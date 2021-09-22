@@ -128,13 +128,12 @@ func newDelegationStorage(persistentSlabStorage *atree.PersistentSlabStorage) de
 }
 
 func ledgerKeyFromStorageID(id atree.StorageID) ledger.Key {
+	prefixedKey := []byte(atree.LedgerBaseStorageSlabPrefix + string(id.Index[:]))
+
 	return ledger.NewKey([]ledger.KeyPart{
 		ledger.NewKeyPart(execState.KeyPartOwner, id.Address[:]),
 		ledger.NewKeyPart(execState.KeyPartController, []byte{}),
-
-		// TODO: Ude prefixed key. i.e:
-		//  prefixedKey := []byte(LedgerBaseStorageSlabPrefix + string(id.Index[:]))
-		ledger.NewKeyPart(execState.KeyPartKey, id.Index[:]),
+		ledger.NewKeyPart(execState.KeyPartKey, prefixedKey),
 	})
 }
 
