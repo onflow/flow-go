@@ -51,8 +51,12 @@ const (
 	// DefaultBootstrapDir is the default directory for bootstrap files
 	DefaultBootstrapDir = "/bootstrap"
 
+	// DefaultFlowDataDir is the root of all database storage
+	DefaultFlowDataDir = "/data"
 	// DefaultFlowDBDir is the default directory for the node database.
-	DefaultFlowDBDir = "/flowdb"
+	DefaultFlowDBDir = "/data/flow"
+	// DefaultFlowSecretsDBDir is the default directory for secrets database.
+	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node
 	// state database.
 	DefaultExecutionRootDir = "/exedb"
@@ -554,6 +558,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("--nodeid=%s", nodeConf.NodeID.String()),
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
+				fmt.Sprintf("--secretsdir=%s", DefaultFlowSecretsDBDir),
 				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel.String()),
 			}, nodeConf.AdditionalFlags...),
 		},
@@ -577,8 +582,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	}
 
 	// create a directory for the node database
-	flowDBDir := filepath.Join(tmpdir, DefaultFlowDBDir)
-	err = os.Mkdir(flowDBDir, 0700)
+	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
+	err = os.Mkdir(flowDataDir, 0700)
 	require.NoError(t, err)
 
 	// create a directory for the bootstrap files
@@ -598,7 +603,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	// https://github.com/fsouza/go-dockerclient/issues/132#issuecomment-50694902
 	opts.HostConfig.Binds = append(
 		opts.HostConfig.Binds,
-		fmt.Sprintf("%s:%s:rw", flowDBDir, DefaultFlowDBDir),
+		fmt.Sprintf("%s:%s:rw", flowDataDir, DefaultFlowDataDir),
 		fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, DefaultBootstrapDir),
 	)
 
