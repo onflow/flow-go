@@ -298,7 +298,7 @@ func (p *PublicKeyAggregator) deltaKeys(signers []int) (
 	}
 
 	// look for missing signers
-	for signer, _ := range p.lastSigners {
+	for signer := range p.lastSigners {
 		_, ok := signersMap[signer]
 		if !ok {
 			missingSignerKeys = append(missingSignerKeys, p.publicKeys[signer])

@@ -162,7 +162,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 			require.NoError(t, err)
 		}
 		// TrustedAdd
-		for i, _ := range sigs {
+		for i := range sigs {
 			err := aggregator.TrustedAdd(i, sigs[i]) // same signature for same index
 			assert.Error(t, err)
 			assert.IsType(t, duplicate, err)
