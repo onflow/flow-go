@@ -115,6 +115,7 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	header := candidate.Header
 	payload := candidate.Payload
+	parentID := header.ParentID
 
 	// Get the latest seal in the fork that ends with the candidate's parent.
 	// The protocol state saves this information for each block that has been
@@ -124,9 +125,9 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// attached to the main chain, we store the latest seal in the fork that ends with B.
 	// Therefore, _not_ finding the latest sealed block of the parent constitutes
 	// a fatal internal error.
-	lastSealUpToParent, err := s.seals.ByBlockID(header.ParentID)
+	lastSealUpToParent, err := s.seals.ByBlockID(parentID)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", candidate.Header.ParentID, err)
+		return nil, fmt.Errorf("could not retrieve parent seal (%x): %w", parentID, err)
 	}
 
 	// if there is no seal in the block payload, use the last sealed block of
@@ -157,6 +158,17 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// For each visited block collect: IncorporatedResults and block ID
 	forkCollector := func(header *flow.Header) error {
 		blockID := header.ID()
+		if blockID == parentID {
+			// Important protocol edge case: There must be at least one block in between the block incorporating
+			// a result and the block sealing the result. This is because we need the Source of Randomness for
+			// the block that _incorporates_ the result, to compute the verifier assignment. Therefore, we require
+			// that the block _incorporating_ the result has at least one child in the fork, _before_ we include
+			// the seal. Thereby, we guarantee that a verifier assignment can be computed without needing
+			// information from the block that we are just constructing. Hence, we don't allow results to be
+			// sealed that were incorporated in the immediate parent which is being extended.
+			return nil
+		}
+
 		// keep track of blocks on the fork
 		unsealedBlockIDs = append(unsealedBlockIDs, blockID)
 
@@ -168,13 +180,13 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		for _, resultID := range payloadIndex.ResultIDs {
 			result, err := s.results.ByID(resultID)
 			if err != nil {
-				return fmt.Errorf("internal error fetching result %v incorporated in stored block %v: %w", resultID, blockID, err)
+				return fmt.Errorf("internal error fetching result %v incorporated in block %v: %w", resultID, blockID, err)
 			}
 			incorporatedResults[resultID] = flow.NewIncorporatedResult(blockID, result)
 		}
 		return nil
 	}
-	err = fork.TraverseForward(s.headers, header.ParentID, forkCollector, fork.ExcludingBlock(lastSealUpToParent.BlockID))
+	err = fork.TraverseForward(s.headers, parentID, forkCollector, fork.ExcludingBlock(lastSealUpToParent.BlockID))
 	if err != nil {
 		return nil, fmt.Errorf("internal error collecting incorporated results from unsealed fork: %w", err)
 	}
@@ -210,9 +222,10 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 		err := s.validateSeal(seal, incorporatedResult)
 		if err != nil {
 			if !engine.IsInvalidInputError(err) {
-				return nil, fmt.Errorf("unexpected internal error while validating seal %x: %w", seal.ID(), err)
+				return nil, fmt.Errorf("unexpected internal error while validating seal %x for result %x for block %x: %w",
+					seal.ID(), seal.ResultID, seal.BlockID, err)
 			}
-			return nil, fmt.Errorf("invalid seal %x for result %x: %w", seal.ID(), seal.ResultID, err)
+			return nil, fmt.Errorf("invalid seal %x for result %x for block %x: %w", seal.ID(), seal.ResultID, seal.BlockID, err)
 		}
 
 		// check that the sealed execution results form a chain
@@ -252,7 +265,8 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 
 	assignments, err := s.assigner.Assign(executionResult, incorporatedResult.IncorporatedBlockID)
 	if err != nil {
-		return fmt.Errorf("could not retreive assignments for block: %v, %w", seal.BlockID, err)
+		return fmt.Errorf("failed to retrieve verifier assignment for result %x incorporated in block %x: %w",
+			executionResult.ID(), incorporatedResult.IncorporatedBlockID, err)
 	}
 
 	// Check that each AggregatedSignature has enough valid signatures from
