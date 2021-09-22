@@ -118,13 +118,14 @@ func TestMVP_Emulator(t *testing.T) {
 }
 
 func buildMVPNetConfig() testnet.NetworkConfig {
+	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 		// TODO replace these with actual values
 		testnet.WithAdditionalFlag("--access-address=null"),
-		testnet.WithAdditionalFlag("--insecure-access-api=true"),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -132,7 +133,7 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithAdditionalFlag("--insecure-access-api=true"),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 
@@ -145,7 +146,7 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
-		testnet.NewNodeConfig(flow.RoleAccess),
+		acsConfig,
 	}
 
 	return testnet.NewNetworkConfig("mvp", net)

@@ -126,7 +126,7 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithAdditionalFlag("--insecure-access-api=true"),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", stakedConfig.Identifier.String())),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
@@ -135,7 +135,7 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithAdditionalFlag("--insecure-access-api=true"),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", stakedConfig.Identifier.String())),
 		testnet.WithLogLevel(zerolog.DebugLevel),
 	}
 

@@ -40,9 +40,8 @@ func (suite *AccessSuite) TearDownTest() {
 }
 
 func (suite *AccessSuite) SetupTest() {
-	nodeConfigs := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.RoleAccess),
-	}
+	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
+	nodeConfigs := []testnet.NodeConfig{acsConfig}
 
 	// need one dummy execution node (unused ghost)
 	exeConfig := testnet.NewNodeConfig(flow.RoleExecution)
@@ -63,7 +62,7 @@ func (suite *AccessSuite) SetupTest() {
 
 	// need one controllable collection node (used ghost)
 	collID := unittest.IdentifierFixture()
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(collID), testnet.WithAdditionalFlag("--insecure-access-api=true"))
+	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(collID), testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())))
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)
