@@ -14,33 +14,6 @@ import (
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
-// CombinedVoteProcessorFactory generates CombinedVoteProcessor instances
-func CombinedVoteProcessorFactory(log zerolog.Logger, proposal *model.Proposal) (*CombinedVoteProcessor, error) {
-	processor := &CombinedVoteProcessor{
-		log:   log,
-		block: proposal.Block,
-		// TODO: initialize the following dependencies
-		// stakingSigAggtor
-		// rbSigAggtor
-		// rbRector
-		// onQCCreated
-		// packer
-		done: *atomic.NewBool(false),
-	}
-	err := processor.Process(proposal.ProposerVote())
-	if err != nil {
-		if model.IsInvalidVoteError(err) {
-			return nil, model.InvalidBlockError{
-				BlockID: proposal.Block.BlockID,
-				View:    proposal.Block.View,
-				Err:     err,
-			}
-		}
-		return nil, fmt.Errorf("could not process proposer's vote from block %v: %w", proposal.Block.BlockID, err)
-	}
-	return processor, nil
-}
-
 // CombinedVoteProcessor implements the hotstuff.VerifyingVoteProcessor interface.
 // It processes votes from the main consensus committee, where participants vote in
 // favour of a block by proving either their staking key signature or their random
