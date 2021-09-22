@@ -81,7 +81,8 @@ func createNode(
 
 	// keyKeys is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgKeys := badger.NewDKGKeys(core.Metrics, core.DB)
+	dkgKeys, err := badger.NewDKGKeys(core.Metrics, core.DB)
+	require.NoError(t, err)
 
 	// configure the state snapthost at firstBlock to return the desired
 	// Epochs

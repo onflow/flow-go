@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	emulator "github.com/onflow/flow-emulator"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
@@ -406,7 +407,8 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 
 	// keyKeys is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgKeys := badger.NewDKGKeys(core.Metrics, core.DB)
+	dkgKeys, err := badger.NewDKGKeys(core.Metrics, core.DB)
+	s.Require().NoError(err)
 
 	// brokerTunnel is used to communicate between the messaging engine and the
 	// DKG broker/controller
