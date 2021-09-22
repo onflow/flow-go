@@ -2,7 +2,8 @@ package module
 
 import (
 	"context"
-	"runtime"
+
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // ReadyDoneAware provides an easy interface to wait for module startup and shutdown.
@@ -39,105 +40,94 @@ func (n *NoopReadDoneAware) Done() <-chan struct{} {
 // Startable provides an interface to start a component. Once started, the component
 // can be stopped by cancelling the given context.
 type Startable interface {
-	Start(context.Context) error
+	Start(irrecoverable.SignalerContext) error
 }
-
-// ErrorAware provides an interface to be notified of errors encountered during
-// a component's lifecycle.
-type ErrorAware interface {
-	Errors() <-chan error
-}
-
-// ErrorManager implements the ErrorAware interface, and provides a way for components
-// to signal an irrecoverable error.
-type ErrorManager struct {
-	errors chan error
-}
-
-func NewErrorManager() *ErrorManager {
-	return &ErrorManager{make(chan error)}
-}
-
-func (e *ErrorManager) Errors() <-chan error {
-	return e.errors
-}
-
-func (e *ErrorManager) ThrowError(err error) {
-	e.errors <- err
-	runtime.Goexit()
-}
-
-type ErrorHandler func(ctx context.Context, errors <-chan error, restart func())
 
 type Component interface {
 	Startable
 	ReadyDoneAware
-	ErrorAware
 }
 
 type ComponentFactory func() (Component, error)
 
-func RunComponent(ctx context.Context, componentFactory ComponentFactory, errorHandler ErrorHandler) error {
-	restartChan := make(chan struct{})
+// OnError reacts to an irrecoverable error
+// It could:
+// - restart the component (in production) after cleanup
+// - panic (in canary / benchmark)
+// - log in various Error channels and / or send telemetry ...
+type OnError = func(err error, triggerRestart func())
 
-	start := func() (cancel context.CancelFunc, done <-chan struct{}, err error) {
-		var component Component
+func RunComponent(ctx context.Context, componentFactory ComponentFactory, handler OnError) error {
+	// reference to per-run signals for the component
+	var component Component
+	var cancel context.CancelFunc
+	var done <-chan struct{}
+	var irrecoverables chan error
+
+	start := func() error {
+		var err error // startup error, should be handled out of band
+
 		component, err = componentFactory()
 		if err != nil {
-			// failed to create component
-			return
+			return err // failure to generate the component, should be handles out-of-band because a restart won't help
 		}
 
-		// context used to restart the component
+		// context used to run the component
 		var runCtx context.Context
 		runCtx, cancel = context.WithCancel(ctx)
-		defer func() {
-			if err != nil {
-				cancel()
-				cancel = nil
-			}
-		}()
 
-		if err = component.Start(runCtx); err != nil {
-			// failed to start component
-			return
-		}
+		// signaler used for irrecoverables
+		var signalingCtx irrecoverable.SignalerContext
+		irrecoverables = make(chan error)
+		signalingCtx = irrecoverable.WithSignaler(runCtx, irrecoverable.NewSignaler(irrecoverables))
 
-		select {
-		case <-ctx.Done():
-			err = ctx.Err()
-			return
-		case <-component.Ready():
-		}
-
-		go errorHandler(runCtx, component.Errors(), func() {
-			restartChan <- struct{}{}
-			runtime.Goexit()
-		})
-
-		done = component.Done()
-
-		return
-	}
-
-	for {
-		cancel, done, err := start()
-		if err != nil {
+		if err = component.Start(signalingCtx); err != nil {
+			// failed to start component: this should not trigger a restart
 			return err
 		}
 
+		// wait for Ready
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-restartChan:
-			// shutdown the component
-			cancel()
+		case <-component.Ready():
+		}
+
+		done = component.Done()
+		return nil
+	}
+
+	for {
+		if err := start(); err != nil {
+			return err // failure to start
 		}
 
 		select {
+		case err := <-irrecoverables:
+			// shutdown the component
+			cancel()
+
+			// wait until it's done
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-done:
+			}
+
+			// send error to the handler programmed with a restart continuation
+			restartChan := make(chan struct{})
+			go handler(err, func() {
+				close(restartChan)
+			})
+
+			// wait for handler to trigger restart or abort
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			case <-restartChan:
+			}
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-done:
 		}
 	}
 }
