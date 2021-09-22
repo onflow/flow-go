@@ -60,8 +60,8 @@ func extractExecutionState(
 
 	if migrate {
 		storageFormatV6Migration := mgr.StorageFormatV6Migration{
-			Log:            log,
-			OutputDir:      outputDir,
+			Log:       log,
+			OutputDir: outputDir,
 		}
 
 		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
@@ -81,14 +81,14 @@ func extractExecutionState(
 				Log:       log,
 				OutputDir: outputDir,
 			},
-			mgr.StorageReporter{
-				Log:       log,
-				OutputDir: outputDir,
-			},
-			//&mgr.BalanceReporter{
-			//	Log:       log,
-			//	OutputDir: outputDir,
-			//},
+			// mgr.StorageReporter{
+			// 	Log:       log,
+			// 	OutputDir: outputDir,
+			// },
+			// &mgr.BalanceReporter{
+			// 	Log:       log,
+			// 	OutputDir: outputDir,
+			// },
 		}
 	}
 	newState, err := led.ExportCheckpointAt(
