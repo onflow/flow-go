@@ -225,8 +225,7 @@ func migrateContractValue(p ledger.Payload) ([]ledger.Payload, *contractValueMap
 	if len(storedData) == 0 {
 		return []ledger.Payload{}, nil, nil
 	}
-
-	storedValue, err := decode(storedData, version, address)
+	storedValue, err := interpreter.DecodeValue(storedData, &address, []string{"contract"}, version, nil)
 	if err != nil {
 		log.Error().
 			Err(err).
@@ -235,7 +234,7 @@ func migrateContractValue(p ledger.Payload) ([]ledger.Payload, *contractValueMap
 		return nil, nil, err
 	}
 
-	value := interpreter.NewSomeValueNonCopying(storedValue).Value.(*interpreter.CompositeValue)
+	value := interpreter.NewSomeValueOwningNonCopying(storedValue).Value.(*interpreter.CompositeValue)
 	pieces := strings.Split(string(value.TypeID()), ".")
 	if len(pieces) != 3 {
 		log.Error().
