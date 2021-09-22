@@ -145,7 +145,7 @@ func main() {
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
 			flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
 			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
-			flags.StringVar(&startupTimeString, "startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) when the consensus participant enters the first view")
+			flags.StringVar(&startupTimeString, "startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 2006-01-02T15:04:05Z07:00)")
 		}).
 		Initialize().
 		ValidateFlags(func() error {
