@@ -462,9 +462,11 @@ func TestPayloadsMigration(t *testing.T) {
 	// Check whether the query works with new ledger
 
 	migratedLedgerView := newView(migratedPayloads)
-	key := []byte{0, 0, 0, 0, 0, 0, 0, 3}
 
-	migratedValue, err := migratedLedgerView.Get(string(owner.Bytes()), "", string(key))
+	key := []byte{0, 0, 0, 0, 0, 0, 0, 3}
+	prefixedKey := []byte(atree.LedgerBaseStorageSlabPrefix + string(key))
+
+	migratedValue, err := migratedLedgerView.Get(string(owner.Bytes()), "", string(prefixedKey))
 	require.NoError(t, err)
 	require.NotEmpty(t, migratedValue)
 }
