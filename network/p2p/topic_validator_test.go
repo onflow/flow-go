@@ -12,6 +12,8 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/message"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -31,13 +33,13 @@ func TestTopicValidator(t *testing.T) {
 	translator, err := NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	validator := StakedValidator{func(pid peer.ID) (*flow.Identity, bool) {
+	stakedValidator := validator.StakedValidator(func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
 		return ids.ByNodeID(fid)
-	}}
+	})
 
 	unstakedKey, err := unittest.NetworkingKey()
 	require.NoError(t, err)
@@ -51,9 +53,9 @@ func TestTopicValidator(t *testing.T) {
 	require.NoError(t, unstakedNode.AddPeer(context.TODO(), *host.InfoFromHost(node1.host)))
 
 	// node1 and node2 subscribe to the topic with the topic validator
-	sub1, err := node1.Subscribe(context.TODO(), badTopic, validator.Validate)
+	sub1, err := node1.Subscribe(context.TODO(), badTopic, stakedValidator)
 	require.NoError(t, err)
-	sub2, err := node2.Subscribe(context.TODO(), badTopic, validator.Validate)
+	sub2, err := node2.Subscribe(context.TODO(), badTopic, stakedValidator)
 	require.NoError(t, err)
 	// the unstaked node subscribes to the topic WITHOUT the topic validator
 	unstakedSub, err := unstakedNode.Subscribe(context.TODO(), badTopic)
@@ -66,7 +68,11 @@ func TestTopicValidator(t *testing.T) {
 			len(unstakedNode.pubSub.ListPeers(badTopic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
-	data := []byte("hello")
+	m := message.Message{
+		Payload: []byte("hello"),
+	}
+	data, err := m.Marshal()
+	require.NoError(t, err)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
