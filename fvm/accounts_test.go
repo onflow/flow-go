@@ -1098,7 +1098,6 @@ func TestGetAccountKey(t *testing.T) {
 						"keyIndex: %d)",
 					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
 					keyIndex,
-					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1151,7 +1150,6 @@ func TestGetAccountKey(t *testing.T) {
 						"keyIndex: %d)",
 					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
 					keyIndex,
-					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1201,10 +1199,9 @@ func TestGetAccountKey(t *testing.T) {
 							"weight: 1000.00000000, "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 							"isRevoked: false, "+
-							"keyIndex: %d)"+
-							byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
-						i,
+							"keyIndex: %d)",
 						byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
+						i,
 					)
 
 					assert.Equal(t, expected, tx.Logs[i])
