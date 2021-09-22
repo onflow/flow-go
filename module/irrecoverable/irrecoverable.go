@@ -15,9 +15,9 @@ func NewSignaler(errors chan<- error) *Signaler {
 	return &Signaler{errors}
 }
 
-// ThrowError is a narrow drop-in replacement for panic, log.Fatal, log.Panic, etc
+// Throw is a narrow drop-in replacement for panic, log.Fatal, log.Panic, etc
 // anywhere there's something connected to the error channel
-func (e *Signaler) ThrowError(err error) {
+func (e *Signaler) Throw(err error) {
 	e.errors <- err
 	runtime.Goexit()
 }
@@ -26,8 +26,8 @@ func (e *Signaler) ThrowError(err error) {
 // including in interfaces that compose it.
 type SignalerContext interface {
 	context.Context
-	ThrowError(err error) // delegates to the signaler
-	sealed()              // private, to constrain builder to using WithSignal
+	Throw(err error) // delegates to the signaler
+	sealed()         // private, to constrain builder to using WithSignal
 }
 
 // private, to force context derivation / WithSignal
@@ -40,8 +40,8 @@ func (sc signalerCtxt) sealed() {}
 
 // Drop-in replacement for panic, log.Fatal, log.Panic, etc
 // to use when we are able to get an SignalerContext and thread it down in the component
-func (sc signalerCtxt) ThrowError(err error) {
-	sc.signaler.ThrowError(err)
+func (sc signalerCtxt) Throw(err error) {
+	sc.signaler.Throw(err)
 }
 
 // the One True Way of getting a SignalerContext
@@ -49,18 +49,18 @@ func WithSignaler(ctx context.Context, sig *Signaler) SignalerContext {
 	return signalerCtxt{ctx, sig}
 }
 
-// If we have an SignalerContext, we can directly ctx.ThrowError.
+// If we have an SignalerContext, we can directly ctx.Throw.
 //
 // But a lot of library methods expect context.Context, & we want to pass the same w/o boilerplate
 // Moreover, we could have built with: context.WithCancel(irrecoverable.WithSignaler(ctx, sig)),
 // "downcasting" to context.Context. Yet, we can still type-assert and recover.
 //
-// ThrowIrrecoverableError can be a drop-in replacement anywhere we have a context.Context likely
+// Throw can be a drop-in replacement anywhere we have a context.Context likely
 // to support Irrecoverables. Note: this is not a method
-func ThrowIrrecoverableError(ctx context.Context, err error) {
+func Throw(ctx context.Context, err error) {
 	signalerAbleContext, ok := ctx.(SignalerContext)
 	if ok {
-		signalerAbleContext.ThrowError(err)
+		signalerAbleContext.Throw(err)
 	}
 	// Be spectacular on how this does not -but should- handle irrecoverables:
 	log.Fatalf("Irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error %v", err)

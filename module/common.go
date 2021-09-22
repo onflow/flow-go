@@ -51,8 +51,9 @@ type Component interface {
 type ComponentFactory func() (Component, error)
 
 // OnError reacts to an irrecoverable error
-// It could:
-// - restart the component (in production) after cleanup
+// It is meant to inspect the error, determining its type and seeing if e.g. a restart or some other measure is suitable,
+// and optionally trigger the continuation provided by the caller (RunComponent), which defines what "a restart" means.
+// Instead of restarting the component, it could also:
 // - panic (in canary / benchmark)
 // - log in various Error channels and / or send telemetry ...
 type OnError = func(err error, triggerRestart func())
