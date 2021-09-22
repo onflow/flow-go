@@ -464,6 +464,12 @@ func (fnb *FlowNodeBuilder) initDB() {
 
 func (fnb *FlowNodeBuilder) initSecretsDB() {
 
+	// if the secrets DB is disabled (only applicable for Consensus Follower,
+	// which makes use of this same logic), skip this initialization
+	if !fnb.BaseConfig.secretsDBEnabled {
+		return
+	}
+
 	if fnb.BaseConfig.secretsdir == NotSet {
 		fnb.Logger.Fatal().Msgf("missing required flag '--secretsdir'")
 	}
@@ -828,6 +834,12 @@ func WithDataDir(dataDir string) Option {
 		if config.db == nil {
 			config.datadir = dataDir
 		}
+	}
+}
+
+func WithSecretsDBEnabled(enabled bool) Option {
+	return func(config *BaseConfig) {
+		config.secretsDBEnabled = enabled
 	}
 }
 
