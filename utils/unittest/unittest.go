@@ -14,7 +14,6 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
-	storage "github.com/onflow/flow-go/storage/badger"
 )
 
 func ExpectPanic(expectedMsg string, t *testing.T) {
@@ -210,25 +209,26 @@ func BadgerDB(t testing.TB, dir string) *badger.DB {
 	return badgerDB(t, dir, badger.Open)
 }
 
-func SecretBadgerDB(t testing.TB, dir string) *badger.DB {
-	return badgerDB(t, dir, storage.InitSecret)
-}
-
 func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 	RunWithTempDir(t, func(dir string) {
 		db := BadgerDB(t, dir)
 		defer func() {
-			require.NoError(t, db.Close())
+			assert.NoError(t, db.Close())
 		}()
 		f(db)
 	})
 }
 
-func RunWithSecretBadgerDB(t testing.TB, f func(*badger.DB)) {
+// RunWithTypedBadgerDB creates a Badger DB that is passed to f and closed
+// after f returns. The extra create parameter allows passing in a database
+// constructor function which instantiates a database with a particular type
+// marker, for testing storage modules which require a backed with a particular
+// type.
+func RunWithTypedBadgerDB(t testing.TB, create func(badger.Options) (*badger.DB, error), f func(*badger.DB)) {
 	RunWithTempDir(t, func(dir string) {
-		db := SecretBadgerDB(t, dir)
+		db := badgerDB(t, dir, create)
 		defer func() {
-			require.NoError(t, db.Close())
+			assert.NoError(t, db.Close())
 		}()
 		f(db)
 	})
