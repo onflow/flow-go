@@ -113,6 +113,7 @@ type BaseConfig struct {
 	timeout               time.Duration
 	datadir               string
 	secretsdir            string
+	secretsDBEnabled      bool
 	level                 string
 	metricsPort           uint
 	BootstrapDir          string
@@ -185,6 +186,7 @@ func DefaultBaseConfig() *BaseConfig {
 		timeout:               1 * time.Minute,
 		datadir:               datadir,
 		secretsdir:            NotSet,
+		secretsDBEnabled:      true,
 		level:                 "info",
 		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,

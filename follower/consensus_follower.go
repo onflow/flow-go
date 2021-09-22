@@ -100,6 +100,7 @@ func getAccessNodeOptions(config *Config) []access.Option {
 func getBaseOptions(config *Config) []cmd.Option {
 	options := []cmd.Option{
 		cmd.WithMetricsEnabled(false),
+		cmd.WithSecretsDBEnabled(false),
 	}
 	if config.bootstrapDir != "" {
 		options = append(options, cmd.WithBootstrapDir(config.bootstrapDir))
