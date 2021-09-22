@@ -246,6 +246,7 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 			SetPingInfoProvider(pingInfoProvider).
 			SetResolver(resolver).
 			SetLogger(logger).
+			SetTopicValidation(false).
 			Build(suite.ctx)
 		require.NoError(suite.T(), err)
 
