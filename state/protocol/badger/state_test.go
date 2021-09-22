@@ -1,6 +1,7 @@
 package badger_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -416,7 +417,7 @@ func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotoc
 
 // buildBlock builds and marks valid the given block
 func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
-	err := state.Extend(block)
+	err := state.Extend(context.Background(), block)
 	require.NoError(t, err)
 	err = state.MarkValid(block.ID())
 	require.NoError(t, err)
