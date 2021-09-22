@@ -100,3 +100,14 @@ type VerifyingVoteProcessor interface {
 	// when we have received block proposal so this information has to be available.
 	Block() *model.Block
 }
+
+// VoteProcessorFactory is a factory that can be used to create verifying vote processors for current proposal.
+// Depending on factory implementation it will return processors for consensus or collection clusters
+type VoteProcessorFactory interface {
+	// Create creates instance of VerifyingVoteProcessor for processing votes for current proposal.
+	// After constructing VerifyingVoteProcessor validity of proposer vote is checked.
+	// Caller can be sure that proposal vote was verified and processed.
+	// Expected error returns during normal operations:
+	// * model.InvalidBlockError - proposal has invalid proposer vote
+	Create(proposal *model.Proposal) (VerifyingVoteProcessor, error)
+}

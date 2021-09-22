@@ -32,6 +32,31 @@ type CombinedVoteProcessor struct {
 	done             atomic.Bool
 }
 
+// newCombinedVoteProcessor is a helper function to perform object construction
+// no extra logic for validating proposal wasn't added
+func newCombinedVoteProcessor(
+	log zerolog.Logger,
+	block *model.Block,
+	stakingSigAggtor hotstuff.WeightedSignatureAggregator,
+	rbSigAggtor hotstuff.WeightedSignatureAggregator,
+	rbRector hotstuff.RandomBeaconReconstructor,
+	onQCCreated hotstuff.OnQCCreated,
+	packer hotstuff.Packer,
+	minRequiredStake uint64,
+) *CombinedVoteProcessor {
+	return &CombinedVoteProcessor{
+		log:              log,
+		block:            block,
+		stakingSigAggtor: stakingSigAggtor,
+		rbSigAggtor:      rbSigAggtor,
+		rbRector:         rbRector,
+		onQCCreated:      onQCCreated,
+		packer:           packer,
+		minRequiredStake: minRequiredStake,
+		done:             *atomic.NewBool(false),
+	}
+}
+
 func (p *CombinedVoteProcessor) Block() *model.Block {
 	return p.block
 }

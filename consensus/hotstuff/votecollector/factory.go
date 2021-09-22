@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/rs/zerolog"
-	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -14,40 +13,70 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
-//func NewWeightedSignatureAggregator(
-//	signers []flow.Identity, // list of all possible signers
-//	message []byte, // message to get an aggregated signature for
-//	dsTag string, // domain separation tag used by the signature
+// VoteProcessorFactory is a proxy class that delegates construction of vote processor to
+// base factory. Base factory is responsible only for creating objects of combined or staking
+// vote processors while VoteProcessorFactory is responsible for processing proposer vote and
+// returning constructed object.
+type VoteProcessorFactory struct {
+	base hotstuff.VoteProcessorFactory
+}
 
-// CombinedVoteProcessorFactory implements a factory for creating CombinedVoteProcessor
+// CombinedBaseVoteProcessorFactory implements a factory for creating CombinedVoteProcessor
 // holds needed dependencies to initialize CombinedVoteProcessor.
-type CombinedVoteProcessorFactory struct {
+type CombinedBaseVoteProcessorFactory struct {
 	log         zerolog.Logger
 	packer      hotstuff.Packer
 	committee   hotstuff.Committee
 	onQCCreated hotstuff.OnQCCreated
 }
 
-func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, eventHandler hotstuff.EventHandlerV2) *CombinedVoteProcessorFactory {
-	return &CombinedVoteProcessorFactory{
-		log:       log,
-		committee: committee,
-		packer:    &signature.ConsensusSigPackerImpl{}, // TODO: initialize properly when ready
-		onQCCreated: func(qc *flow.QuorumCertificate) {
-			err := eventHandler.OnQCConstructed(qc)
-			if err != nil {
-				log.Fatal().Err(err).Msgf("failed to submit constructed QC at view %d to event handler", qc.View)
-			}
+var _ hotstuff.VoteProcessorFactory = &CombinedBaseVoteProcessorFactory{}
+var _ hotstuff.VoteProcessorFactory = &VoteProcessorFactory{}
+
+func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, eventHandler hotstuff.EventHandlerV2) *VoteProcessorFactory {
+	return &VoteProcessorFactory{
+		base: &CombinedBaseVoteProcessorFactory{
+			log:       log,
+			committee: committee,
+			packer:    &signature.ConsensusSigPackerImpl{}, // TODO: initialize properly when ready
+			onQCCreated: func(qc *flow.QuorumCertificate) {
+				err := eventHandler.OnQCConstructed(qc)
+				if err != nil {
+					log.Fatal().Err(err).Msgf("failed to submit constructed QC at view %d to event handler", qc.View)
+				}
+			},
 		},
 	}
 }
 
-// Create creates CombinedVoteProcessor for processing votes for current proposal.
+// Create creates CombinedVoteProcessor using base factory for processing votes for current proposal.
 // After constructing CombinedVoteProcessor validity of proposer vote is checked.
 // Caller can be sure that proposal vote was verified and processed.
 // Expected error returns during normal operations:
 // * model.InvalidBlockError - proposal has invalid proposer vote
-func (f *CombinedVoteProcessorFactory) Create(proposal *model.Proposal) (*CombinedVoteProcessor, error) {
+func (f *VoteProcessorFactory) Create(proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
+	processor, err := f.base.Create(proposal)
+	if err != nil {
+		return nil, fmt.Errorf("could not create vote processor for block %v: %w", proposal.Block.BlockID, err)
+	}
+
+	err = processor.Process(proposal.ProposerVote())
+	if err != nil {
+		if model.IsInvalidVoteError(err) {
+			return nil, model.InvalidBlockError{
+				BlockID: proposal.Block.BlockID,
+				View:    proposal.Block.View,
+				Err:     err,
+			}
+		}
+		return nil, fmt.Errorf("could not process proposer's vote from block %v: %w", proposal.Block.BlockID, err)
+	}
+	return processor, nil
+}
+
+// Create creates CombinedVoteProcessor for processing votes for current proposal.
+// Caller must treat all errors as exceptions
+func (f *CombinedBaseVoteProcessorFactory) Create(proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
 	allParticipants, err := f.committee.Identities(proposal.Block.BlockID, filter.Any)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
@@ -63,28 +92,15 @@ func (f *CombinedVoteProcessorFactory) Create(proposal *model.Proposal) (*Combin
 
 	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
 
-	processor := &CombinedVoteProcessor{
-		log:              f.log,
-		block:            proposal.Block,
-		stakingSigAggtor: stakingSigAggtor,
-		rbSigAggtor:      rbSigAggtor,
-		rbRector:         rbRector,
-		onQCCreated:      f.onQCCreated,
-		packer:           f.packer,
-		minRequiredStake: minRequiredStake,
-		done:             *atomic.NewBool(false),
-	}
-
-	err = processor.Process(proposal.ProposerVote())
-	if err != nil {
-		if model.IsInvalidVoteError(err) {
-			return nil, model.InvalidBlockError{
-				BlockID: proposal.Block.BlockID,
-				View:    proposal.Block.View,
-				Err:     err,
-			}
-		}
-		return nil, fmt.Errorf("could not process proposer's vote from block %v: %w", proposal.Block.BlockID, err)
-	}
+	processor := newCombinedVoteProcessor(
+		f.log,
+		proposal.Block,
+		stakingSigAggtor,
+		rbSigAggtor,
+		rbRector,
+		f.onQCCreated,
+		f.packer,
+		minRequiredStake,
+	)
 	return processor, nil
 }
