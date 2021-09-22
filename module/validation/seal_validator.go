@@ -158,7 +158,6 @@ func (s *sealValidator) Validate(candidate *flow.Block) (*flow.Seal, error) {
 	// For each visited block collect: IncorporatedResults and block ID
 	forkCollector := func(header *flow.Header) error {
 		blockID := header.ID()
-		// TEMPORARY implementation (unpolished)
 		if blockID == parentID {
 			// Important protocol edge case: There must be at least one block in between the block incorporating
 			// a result and the block sealing the result. This is because we need the Source of Randomness for
