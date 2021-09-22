@@ -254,6 +254,8 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 
 func (r *CommandRunner) processLoop(ctx context.Context) {
 	defer func() {
+		r.logger.Info().Msg("process loop shutting down")
+
 		// cleanup uncompleted requests from the command queue
 		for command := range r.commandQ {
 			close(command.responseChan)
@@ -268,7 +270,7 @@ func (r *CommandRunner) processLoop(ctx context.Context) {
 		select {
 		case command, ok := <-r.commandQ:
 			if !ok {
-				continue
+				return
 			}
 
 			r.logger.Info().Str("command", command.command).Msg("received new command")
@@ -303,7 +305,6 @@ func (r *CommandRunner) processLoop(ctx context.Context) {
 			command.responseChan <- &CommandResponse{err}
 			close(command.responseChan)
 		case <-ctx.Done():
-			r.logger.Info().Msg("process loop shutting down")
 			return
 		}
 	}
