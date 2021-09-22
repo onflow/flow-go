@@ -266,7 +266,11 @@ func (r *CommandRunner) processLoop(ctx context.Context) {
 
 	for {
 		select {
-		case command := <-r.commandQ:
+		case command, ok := <-r.commandQ:
+			if !ok {
+				continue
+			}
+
 			r.logger.Info().Str("command", command.command).Msg("received new command")
 
 			var err error
