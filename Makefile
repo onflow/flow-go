@@ -64,10 +64,8 @@ install-tools: crypto/relic/build check-go-version
 
 .PHONY: unittest
 unittest:
-	# test some packages with Relic library and data race detection enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) -race --tags relic ./access/... ./consensus/... ./model/... ./state/... ./storage/... ./utils/...
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./cmd...  ./engine/... ./fvm/... ./ledger/... ./module/... ./network/...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	$(MAKE) -C crypto test
 	$(MAKE) -C crypto cross-blst-test
 	$(MAKE) -C integration test
@@ -127,7 +125,6 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=fvm -case=underscore -output="./fvm/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=fvm/state -case=underscore -output="./fvm/mock/state" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=ledger -case=underscore -output="./ledger/mock" -outpkg="mock"
-	GO111MODULE=on mockery -name '.*' -dir=network/p2p -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name 'SubscriptionManager' -dir=network/ -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name 'Vertex' -dir="./module/forest" -case=underscore -output="./module/forest/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="./consensus/hotstuff" -case=underscore -output="./consensus/hotstuff/mocks" -outpkg="mocks"
