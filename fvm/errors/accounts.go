@@ -14,7 +14,9 @@ type AccountNotFoundError struct {
 
 // NewAccountNotFoundError constructs a new AccountNotFoundError
 func NewAccountNotFoundError(address flow.Address) error {
-	return &AccountNotFoundError{}
+	return &AccountNotFoundError{
+		address: address,
+	}
 }
 
 func (e AccountNotFoundError) Error() string {
