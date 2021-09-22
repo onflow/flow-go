@@ -37,7 +37,9 @@ type SignatureAggregatorSameMessage struct {
 // A new SignatureAggregatorSameMessage is needed for each set of public keys. If the key set changes,
 // a new structure needs to be instantiated. Participants are defined by their public keys, and are
 // indexed from 0 to n-1 where n is the length of the public key slice.
-// The function errors with engine.InvalidInputError if any input is invalid.
+// The function errors with engine.InvalidInputError if:
+//  - length of keys is zero
+//  - any input public key is not a BLS 12-381 key
 func NewSignatureAggregatorSameMessage(
 	message []byte, // message to be aggregate signatures for
 	dsTag string, // domain separation tag used for signatures

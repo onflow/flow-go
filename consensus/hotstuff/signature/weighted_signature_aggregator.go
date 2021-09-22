@@ -19,12 +19,12 @@ type signerInfo struct {
 
 // WeightedSignatureAggregator implements consensus/hotstuff.WeightedSignatureAggregator
 type WeightedSignatureAggregator struct {
-	*signature.SignatureAggregatorSameMessage                 // low level crypto aggregator, agnostic of weights and flow IDs
-	signers                                   []flow.Identity //nolint:unused
-	idToSigner                                map[flow.Identifier]signerInfo
-	totalWeight                               uint64                       // weight collected
-	lock                                      sync.RWMutex                 // lock for atomic updates
-	collectedIDs                              map[flow.Identifier]struct{} // map of collected IDs
+	aggregator   *signature.SignatureAggregatorSameMessage // low level crypto aggregator, agnostic of weights and flow IDs
+	signers      []flow.Identity                           //nolint:unused
+	idToSigner   map[flow.Identifier]signerInfo
+	totalWeight  uint64                       // weight collected
+	lock         sync.RWMutex                 // lock for atomic updates
+	collectedIDs map[flow.Identifier]struct{} // map of collected IDs
 }
 
 var _ hotstuff.WeightedSignatureAggregator = &WeightedSignatureAggregator{}
@@ -50,8 +50,8 @@ func NewWeightedSignatureAggregator(
 
 	// build the weighted aggregator
 	weightedAgg := &WeightedSignatureAggregator{
-		SignatureAggregatorSameMessage: agg,
-		signers:                        signers,
+		aggregator: agg,
+		signers:    signers,
 	}
 
 	// build the internal map for a faster look-up
@@ -77,7 +77,7 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 		return engine.NewInvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
 	}
 
-	ok, err := w.SignatureAggregatorSameMessage.Verify(info.index, sig)
+	ok, err := w.aggregator.Verify(info.index, sig)
 	if err != nil {
 		return fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
 	}
@@ -123,7 +123,7 @@ func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 	w.lock.Lock()
 	defer w.lock.Unlock()
 
-	err := w.SignatureAggregatorSameMessage.TrustedAdd(info.index, sig)
+	err := w.aggregator.TrustedAdd(info.index, sig)
 	if err != nil {
 		return currentWeight, fmt.Errorf("Trusted add has failed: %w", err)
 	}
@@ -156,7 +156,7 @@ func (w *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, er
 	defer w.lock.Unlock()
 
 	// Aggregate includes the safety check of the aggregated signature
-	indices, aggSignature, err := w.SignatureAggregatorSameMessage.Aggregate()
+	indices, aggSignature, err := w.aggregator.Aggregate()
 	if err != nil {
 		return nil, nil, fmt.Errorf("aggregate has failed: %w", err)
 	}
