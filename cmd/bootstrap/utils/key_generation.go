@@ -228,6 +228,8 @@ func WriteMachineAccountFiles(chainID flow.ChainID, nodeInfos []bootstrap.NodeIn
 	return nil
 }
 
+// WriteSecretsDBEncryptionKeyFiles writes secret db encryption keys to private
+// node info directory.
 func WriteSecretsDBEncryptionKeyFiles(nodeInfos []bootstrap.NodeInfo, write WriteFileFunc) error {
 
 	for _, nodeInfo := range nodeInfos {

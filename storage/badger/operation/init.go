@@ -9,28 +9,25 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// marker used to denote a database type
 type dbTypeMarker int
 
 func (marker dbTypeMarker) String() string {
 	return [...]string{
 		"dbMarkerPublic",
-		"dbMarkerSnowflake",
 		"dbMarkerSecret",
 	}[marker]
 }
 
 const (
+	// dbMarkerPublic denotes the public database
 	dbMarkerPublic dbTypeMarker = iota
-	dbMarkerSnowflake
+	// dbMarkerSecret denotes the secrets database
 	dbMarkerSecret
 )
 
 func InsertPublicDBMarker(txn *badger.Txn) error {
 	return insertDBTypeMarker(dbMarkerPublic)(txn)
-}
-
-func InsertSnowflakeDBMarker(txn *badger.Txn) error {
-	return insertDBTypeMarker(dbMarkerSnowflake)(txn)
 }
 
 func InsertSecretDBMarker(txn *badger.Txn) error {
@@ -39,10 +36,6 @@ func InsertSecretDBMarker(txn *badger.Txn) error {
 
 func EnsurePublicDB(db *badger.DB) error {
 	return ensureDBWithType(db, dbMarkerPublic)
-}
-
-func EnsureSnowflakeDB(db *badger.DB) error {
-	return ensureDBWithType(db, dbMarkerSnowflake)
 }
 
 func EnsureSecretDB(db *badger.DB) error {
