@@ -336,9 +336,10 @@ func TestDelay(t *testing.T) {
 		assert.Equal(t, delay, time.Duration(0))
 	})
 
+	// NOTE: this is a probabilistic test. It will (extremely infrequently) fail.
 	t.Run("should return different values for same inputs", func(t *testing.T) {
-		d1 := computePreprocessingDelay(time.Second, 100)
-		d2 := computePreprocessingDelay(time.Second, 100)
+		d1 := computePreprocessingDelay(time.Hour, 100)
+		d2 := computePreprocessingDelay(time.Hour, 100)
 		assert.NotEqual(t, d1, d2)
 	})
 
