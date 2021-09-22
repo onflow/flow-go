@@ -111,9 +111,9 @@ func (c *cache) invalidateIPCacheEntry(domain string) bool {
 		return false
 	}
 
-	// delete is idempotent and once in a while it is ok to report as exist even
-	// when it may have been deleted to avoid the cost of write lock
+	c.Lock()
 	delete(c.ipCache, domain)
+	c.Unlock()
 
 	return true
 }
@@ -129,9 +129,9 @@ func (c *cache) invalidateTXTCacheEntry(txt string) bool {
 		return false
 	}
 
-	// delete is idempotent and once in a while it is ok to report as exist even
-	// when it may have been deleted to avoid the cost of write lock
+	c.Lock()
 	delete(c.txtCache, txt)
+	c.Unlock()
 
 	return exists
 }
