@@ -93,7 +93,9 @@ func run(*cobra.Command, []string) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("invalid state commitment length")
 		}
-	} else if !flagNoMigration {
+	}
+
+	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 {
 		// read state commitment from root checkpoint
 
 		f, err := os.Open(path.Join(flagExecutionStateDir, bootstrap.FilenameWALRootCheckpoint))
