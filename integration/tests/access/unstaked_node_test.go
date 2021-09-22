@@ -123,10 +123,13 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		testnet.WithLogLevel(zerolog.TraceLevel),
 	)
 
+	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
+
+
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", stakedConfig.Identifier.String())),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
@@ -135,7 +138,7 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", stakedConfig.Identifier.String())),
+		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 		testnet.WithLogLevel(zerolog.DebugLevel),
 	}
 
@@ -149,6 +152,7 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithDebugImage(false)),
 		stakedConfig,
+		acsConfig,
 	}
 
 	unstakedKey1, err := UnstakedNetworkingKey()
