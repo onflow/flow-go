@@ -3,11 +3,14 @@
 package compliance
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
+	"github.com/uber/jaeger-client-go"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -77,22 +80,21 @@ func NewCore(
 
 // OnBlockProposal handles incoming block proposals.
 func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
-	blockSpan, ok := c.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock)
-	if !ok {
-		blockSpan = c.tracer.StartSpan(proposal.Header.ID(), trace.CONProcessBlock)
-		blockSpan.SetTag("block_id", proposal.Header.ID())
-		blockSpan.SetTag("view", proposal.Header.View)
-		blockSpan.SetTag("proposer", proposal.Header.ProposerID.String())
-	}
-	onBlockProposalSpan := c.tracer.StartSpanFromParent(blockSpan, trace.CONCompOnBlockProposal)
-	defer onBlockProposalSpan.Finish()
 
-	for _, g := range proposal.Payload.Guarantees {
-		if span, ok := c.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
-			childSpan := c.tracer.StartSpanFromParent(span, trace.CONCompOnBlockProposal)
-			defer childSpan.Finish()
+	var traceID string
+
+	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.CONCompOnBlockProposal)
+	if isSampled {
+		span.LogFields(log.Uint64("view", proposal.Header.View))
+		span.LogFields(log.String("origin_id", originID.String()))
+
+		// set proposer as a tag so we can filter based on proposer
+		span.SetTag("proposer", proposal.Header.ProposerID.String())
+		if sc, ok := span.Context().(jaeger.SpanContext); ok {
+			traceID = sc.TraceID().String()
 		}
 	}
+	defer span.Finish()
 
 	header := proposal.Header
 	log := c.log.With().
@@ -105,6 +107,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 		Time("timestamp", header.Timestamp).
 		Hex("proposer", header.ProposerID[:]).
 		Int("num_signers", len(header.ParentVoterIDs)).
+		Str("traceID", traceID). // traceID is used to connect logs to traces
 		Logger()
 	log.Info().Msg("block proposal received")
 
@@ -195,10 +198,8 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 	// execution of the entire recursion, which might include processing the
 	// proposal's pending children. There is another span within
 	// processBlockProposal that measures the time spent for a single proposal.
-	recursiveProcessSpan := c.tracer.StartSpanFromParent(onBlockProposalSpan, trace.CONCompOnBlockProposalProcessRecursive)
 	err = c.processBlockAndDescendants(proposal)
 	c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
-	recursiveProcessSpan.Finish()
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
@@ -267,18 +268,13 @@ func (c *Core) processBlockAndDescendants(proposal *messages.BlockProposal) erro
 // the finalized state.
 func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 	startTime := time.Now()
-	blockSpan, ok := c.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock)
-	if !ok {
-		blockSpan = c.tracer.StartSpan(proposal.Header.ID(), trace.CONProcessBlock)
-		blockSpan.SetTag("block_id", proposal.Header.ID())
-		blockSpan.SetTag("view", proposal.Header.View)
-		blockSpan.SetTag("proposer", proposal.Header.ProposerID.String())
+	defer c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
+
+	span, ctx, isSampled := c.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.ConCompProcessBlockProposal)
+	if isSampled {
+		span.SetTag("proposer", proposal.Header.ProposerID.String())
 	}
-	childSpan := c.tracer.StartSpanFromParent(blockSpan, trace.CONCompOnBlockProposalProcessSingle)
-	defer func() {
-		c.complianceMetrics.BlockProposalDuration(time.Since(startTime))
-		childSpan.Finish()
-	}()
+	defer span.Finish()
 
 	header := proposal.Header
 	log := c.log.With().
@@ -299,7 +295,7 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 		Header:  proposal.Header,
 		Payload: proposal.Payload,
 	}
-	err := c.state.Extend(block)
+	err := c.state.Extend(ctx, block)
 	// if the block proposes an invalid extension of the protocol state, then the block is invalid
 	if state.IsInvalidExtensionError(err) {
 		return engine.NewInvalidInputErrorf("invalid extension of protocol state (block: %x, height: %d): %w",
@@ -328,6 +324,12 @@ func (c *Core) processBlockProposal(proposal *messages.BlockProposal) error {
 
 // OnBlockVote handles incoming block votes.
 func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) error {
+
+	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), vote.BlockID, trace.CONCompOnBlockVote)
+	if isSampled {
+		span.LogFields(log.String("origin_id", originID.String()))
+	}
+	defer span.Finish()
 
 	log := c.log.With().
 		Uint64("block_view", vote.View).

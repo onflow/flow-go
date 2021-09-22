@@ -3,6 +3,8 @@
 package protocol
 
 import (
+	"context"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -43,7 +45,7 @@ type MutableState interface {
 	// still checking that the given block is a valid extension of the protocol
 	// state. Depending on implementation it might be a lighter version that checks only
 	// block header.
-	Extend(candidate *flow.Block) error
+	Extend(ctx context.Context, candidate *flow.Block) error
 
 	// Finalize finalizes the block with the given hash.
 	// At this level, we can only finalize one block at a time. This implies
@@ -51,7 +53,7 @@ type MutableState interface {
 	// to be the last finalized block.
 	// It modifies the persistent immutable protocol state accordingly and
 	// forwards the pointer to the latest finalized state.
-	Finalize(blockID flow.Identifier) error
+	Finalize(ctx context.Context, blockID flow.Identifier) error
 
 	// MarkValid marks the block header with the given block hash as valid.
 	// At this level, we can only mark one block at a time as valid. This
