@@ -8,7 +8,6 @@ import (
 	"sort"
 
 	"github.com/fxamacker/cbor/v2"
-
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/errors"

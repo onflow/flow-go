@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
@@ -712,6 +713,6 @@ func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
 }
 
 // AllocateStorageIndex is not implemented in this enviornment
-func (e *ScriptEnv) AllocateStorageIndex(_ []byte) (uint64, error) {
-	return 0, errors.NewOperationNotSupportedError("AllocateStorageIndex")
+func (e *ScriptEnv) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
+	return atree.StorageIndex{}, errors.NewOperationNotSupportedError("AllocateStorageIndex")
 }
