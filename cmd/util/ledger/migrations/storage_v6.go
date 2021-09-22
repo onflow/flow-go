@@ -1582,7 +1582,7 @@ func (e *ValueNotFoundError) Error() string {
 	return fmt.Sprintf("value not found for key: %s", e.key)
 }
 
-//nolint
+//nolint:gosimple
 const knownContract_1864ff317a35af46_FlowIDTableStaking = `
 /*
 
@@ -2571,7 +2571,7 @@ pub contract FlowIDTableStaking {
 }
 `
 
-//nolint
+//nolint:gosimple
 const knownContract_dee35303492e5a0b_FlowIDTableStaking = `
 import FungibleToken from 0xf233dcee88fe0abe
 import FlowToken from 0x1654653399040a61
@@ -3523,7 +3523,7 @@ pub contract FlowIDTableStaking {
 }
 `
 
-// nolint
+//nolint:gosimple
 const knownContract_ac98da57ce4dd4ef_MessageBoard = `
 pub contract MessageBoard {
   // The path to the Admin object in this contract's storage
