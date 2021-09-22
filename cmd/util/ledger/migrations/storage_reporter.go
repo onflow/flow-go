@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/atree"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/utils"
@@ -162,8 +161,7 @@ func (r StorageReporter) balance(address flow.Address, st *state.State) (balance
 	storedData, version := interpreter.StripMagic(vaultResource)
 
 	commonAddress := common.BytesToAddress([]byte(vaultId.Owner))
-
-	storedValue, err := decode(storedData, version, commonAddress)
+	storedValue, err := interpreter.DecodeValue(storedData, &commonAddress, []string{vaultId.Key}, version, nil)
 	if err != nil {
 		return 0, false, fmt.Errorf("could not decode resource at %s: %w", address, err)
 	}
@@ -192,26 +190,4 @@ func resourceId(address flow.Address, path interpreter.PathValue) flow.RegisterI
 		Controller: "",
 		Key:        key,
 	}
-}
-
-func decode(storedData []byte, version uint16, commonAddress common.Address) (interpreter.Value, error) {
-	// TODO: validate version
-
-	storage := interpreter.NewInMemoryStorage()
-
-	storageID := atree.StorageID{
-		Address: atree.Address(commonAddress),
-
-		// TODO:
-		Index: atree.StorageIndex{},
-	}
-
-	decoder := interpreter.CBORDecMode.NewByteStreamDecoder(storedData)
-
-	decoded, err := interpreter.DecodeStorable(decoder, storageID)
-	if err != nil {
-		return nil, err
-	}
-
-	return interpreter.StoredValue(decoded, storage), nil
 }
