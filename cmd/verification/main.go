@@ -77,27 +77,32 @@ func main() {
 		collector   module.VerificationMetrics // used to collect metrics of all engines
 	)
 
-	cmd.FlowNode(flow.RoleVerification.String()).
-		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
-			flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
-			flags.UintVar(&chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers should be assigned to each chunk")
-			flags.DurationVar(&requestInterval, "chunk-request-interval", vereq.DefaultRequestInterval, "time interval chunk data pack request is processed")
-			flags.DurationVar(&backoffMinInterval, "backoff-min-interval", vereq.DefaultBackoffMinInterval, "min time interval a chunk data pack request waits before dispatching")
-			flags.DurationVar(&backoffMaxInterval, "backoff-max-interval", vereq.DefaultBackoffMaxInterval, "min time interval a chunk data pack request waits before dispatching")
-			flags.Float64Var(&backoffMultiplier, "backoff-multiplier", vereq.DefaultBackoffMultiplier, "base of exponent in exponential backoff requesting mechanism")
-			flags.Uint64Var(&requestTargets, "request-targets", vereq.DefaultRequestTargets, "maximum number of execution nodes a chunk data pack request is dispatched to")
-			flags.Uint64Var(&blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
-			flags.Uint64Var(&chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
+	nodeBuilder := cmd.FlowNode(flow.RoleVerification.String())
+	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
+		flags.UintVar(&receiptLimit, "receipt-limit", 1000, "maximum number of execution receipts in the memory pool")
+		flags.UintVar(&chunkLimit, "chunk-limit", 10000, "maximum number of chunk states in the memory pool")
+		flags.UintVar(&chunkAlpha, "chunk-alpha", chunks.DefaultChunkAssignmentAlpha, "number of verifiers should be assigned to each chunk")
+		flags.DurationVar(&requestInterval, "chunk-request-interval", vereq.DefaultRequestInterval, "time interval chunk data pack request is processed")
+		flags.DurationVar(&backoffMinInterval, "backoff-min-interval", vereq.DefaultBackoffMinInterval, "min time interval a chunk data pack request waits before dispatching")
+		flags.DurationVar(&backoffMaxInterval, "backoff-max-interval", vereq.DefaultBackoffMaxInterval, "min time interval a chunk data pack request waits before dispatching")
+		flags.Float64Var(&backoffMultiplier, "backoff-multiplier", vereq.DefaultBackoffMultiplier, "base of exponent in exponential backoff requesting mechanism")
+		flags.Uint64Var(&requestTargets, "request-targets", vereq.DefaultRequestTargets, "maximum number of execution nodes a chunk data pack request is dispatched to")
+		flags.Uint64Var(&blockWorkers, "block-workers", blockconsumer.DefaultBlockWorkers, "maximum number of blocks being processed in parallel")
+		flags.Uint64Var(&chunkWorkers, "chunk-workers", chunkconsumer.DefaultChunkWorkers, "maximum number of execution nodes a chunk data pack request is dispatched to")
 
-		}).
-		Initialize().
+	})
+
+	if err = nodeBuilder.Initialize(); err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	nodeBuilder.
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
