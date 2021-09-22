@@ -20,7 +20,7 @@ import (
 // TestPrefixedHash is a specific test for prefixed hashing
 func TestPrefixedHash(t *testing.T) {
 
-	hashingAlgoToTestingAlgo := map[hash.HashingAlgorithm](func([]byte) []byte){
+	hashingAlgoToTestingAlgo := map[hash.HashingAlgorithm]func([]byte) []byte{
 		hash.SHA2_256: func(data []byte) []byte {
 			h := sha256.Sum256(data)
 			return h[:]
