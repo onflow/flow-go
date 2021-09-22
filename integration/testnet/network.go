@@ -490,7 +490,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// create a directory for the follower database
 	dataDir := filepath.Join(tmpdir, DefaultFlowDBDir)
-	err = os.Mkdir(dataDir, 0700)
+	err = os.MkdirAll(dataDir, 0700)
 	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files
