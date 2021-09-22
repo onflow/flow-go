@@ -13,7 +13,6 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -24,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/validator"
+	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -83,7 +83,6 @@ type Middleware struct {
 	idTranslator               IDTranslator
 	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
-	stakedTopicValidator       *StakedValidator
 }
 
 type MiddlewareOption func(*Middleware)
@@ -233,20 +232,17 @@ func (m *Middleware) UpdateNodeAddresses() {
 func (m *Middleware) Start(ov network.Overlay) error {
 	m.ov = ov
 	libP2PNode, err := m.libP2PNodeFactory()
-
-	if m.idProvider == nil {
-		m.idProvider = NewPeerstoreIdentifierProvider(m.log, libP2PNode.host, m.idTranslator)
-	}
-
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
 
-	m.UpdateNodeAddresses()
+	if m.idProvider == nil {
+		m.idProvider = NewPeerstoreIdentifierProvider(m.log, m.libP2PNode.host, m.idTranslator)
+	}
 
-	m.stakedTopicValidator = &StakedValidator{m.ov.Identity}
+	m.UpdateNodeAddresses()
 
 	if m.connectionGating {
 		m.libP2PNode.UpdateAllowList(m.allPeers())
@@ -390,10 +386,10 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
-	var validators []pubsub.ValidatorEx
+	var validators []psValidator.MessageValidator
 	if !engine.UnstakedChannels().Contains(channel) {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
-		validators = append(validators, m.stakedTopicValidator.Validate)
+		validators = append(validators, psValidator.StakedValidator(m.ov.Identity))
 	}
 
 	s, err := m.libP2PNode.Subscribe(m.ctx, topic, validators...)
@@ -429,7 +425,7 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
-// In particular, it checks the claim of protocol authorship situated in the message against `peerID`
+// In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
 // The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
 // this requirement is fulfilled by e.g. the output of readConnection and readSubscription
 func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID) {
@@ -439,13 +435,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 		return
 	}
 
-	// check the origin of the message corresponds to the one claimed in the OriginID
-	originID := flow.HashToID(msg.OriginID)
-
-	if flowID != originID {
-		m.log.Warn().Msgf("received message claiming to be from nodeID %v was actually from %v and dropped", originID, flowID)
-		return
-	}
+	msg.OriginID = flowID[:]
 
 	m.processMessage(msg)
 }
