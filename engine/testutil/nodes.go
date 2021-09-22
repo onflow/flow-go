@@ -95,7 +95,7 @@ func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Ide
 
 	// creates logger, metrics collector and tracer.
 	log := unittest.Logger().With().Int("index", i).Hex("node_id", identity.NodeID[:]).Str("role", identity.Role.String()).Logger()
-	tracer, err := trace.NewTracer(log, "test")
+	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)
 	require.NoError(t, err)
 	metrics := metrics.NewNoopCollector()
 
@@ -622,7 +622,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	cleaner := storage.NewCleaner(node.Log, node.DB, node.Metrics, flow.DefaultValueLogGCFrequency)
 
 	followerEng, err := follower.New(node.Log, node.Net, node.Me, node.Metrics, node.Metrics, cleaner,
-		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore)
+		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore, node.Tracer)
 	require.NoError(t, err)
 
 	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
@@ -735,7 +735,7 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState 
 	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
-	finalizer := confinalizer.NewFinalizer(node.DB, node.Headers, followerState)
+	finalizer := confinalizer.NewFinalizer(node.DB, node.Headers, followerState, trace.NewNoopTracer())
 
 	pending := make([]*flow.Header, 0)
 
