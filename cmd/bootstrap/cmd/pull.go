@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
 )
 
@@ -33,7 +34,7 @@ func init() {
 
 func addPullCmdFlags() {
 	pullCmd.Flags().StringVar(&flagNetwork, "network", "", "network name to pull partner node information")
-	_ = pullCmd.MarkFlagRequired("network")
+	cmd.MarkFlagRequired(pullCmd, "network")
 
 	pullCmd.Flags().StringVar(&flagBucketName, "bucket", "flow-genesis-bootstrap", "google bucket name")
 }

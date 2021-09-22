@@ -6,7 +6,7 @@ import (
 )
 
 var (
-	ErrInvalidFormat      = errors.New("invalid signature format")
+	ErrInvalidFormat      = errors.New("invalid signature")
 	ErrInsufficientShares = errors.New("insufficient threshold signature shares")
 )
 

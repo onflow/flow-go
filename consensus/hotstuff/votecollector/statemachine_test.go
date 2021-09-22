@@ -230,3 +230,36 @@ func (s *StateMachineTestSuite) Test_VoteProcessorErrorPropagation() {
 	err = s.collector.AddVote(vote)
 	require.ErrorIs(s.T(), err, unexpectedError)
 }
+
+// RegisterVoteConsumer verifies that after registering vote consumer we are receiving all new and past votes
+// in strict ordering of arrival.
+func (s *StateMachineTestSuite) RegisterVoteConsumer() {
+	votes := 10
+	block := helper.MakeBlock(s.T(), helper.WithBlockView(s.view))
+	processor := s.prepareMockedProcessor(block)
+	expectedVotes := make([]*model.Vote, 0)
+	for i := 0; i < votes; i++ {
+		vote := unittest.VoteForBlockFixture(block)
+		// eventually it has to be process by processor
+		processor.On("Process", vote).Return(nil).Once()
+		require.NoError(s.T(), s.collector.AddVote(vote))
+		expectedVotes = append(expectedVotes, vote)
+	}
+
+	actualVotes := make([]*model.Vote, 0)
+	consumer := func(vote *model.Vote) {
+		actualVotes = append(actualVotes, vote)
+	}
+
+	s.collector.RegisterVoteConsumer(consumer)
+
+	for i := 0; i < votes; i++ {
+		vote := unittest.VoteForBlockFixture(block)
+		// eventually it has to be process by processor
+		processor.On("Process", vote).Return(nil).Once()
+		require.NoError(s.T(), s.collector.AddVote(vote))
+		expectedVotes = append(expectedVotes, vote)
+	}
+
+	require.Equal(s.T(), expectedVotes, actualVotes)
+}

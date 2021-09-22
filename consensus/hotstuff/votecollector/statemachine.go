@@ -32,6 +32,8 @@ type VoteCollector struct {
 	votesProcessor atomic.Value
 }
 
+var _ hotstuff.VoteCollector = &VoteCollector{}
+
 func (m *VoteCollector) atomicLoadProcessor() hotstuff.VoteProcessor {
 	return m.votesProcessor.Load().(*atomicValueWrapper).processor
 }
@@ -48,7 +50,7 @@ func NewStateMachine(
 	log zerolog.Logger,
 	workerPool *workerpool.WorkerPool,
 	notifier hotstuff.Consumer,
-	verifyingCollectorFactory VerifyingVoteProcessorFactory,
+	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) *VoteCollector {
 	log = log.With().
 		Str("hotstuff", "VoteCollector").
@@ -58,7 +60,7 @@ func NewStateMachine(
 		log:                      log,
 		workerPool:               workerPool,
 		notifier:                 notifier,
-		createVerifyingProcessor: verifyingCollectorFactory,
+		createVerifyingProcessor: verifyingVoteProcessorFactory,
 		votesCache:               *NewVotesCache(view),
 	}
 
@@ -69,6 +71,9 @@ func NewStateMachine(
 	return sm
 }
 
+// AddVote adds a vote to current vote collector
+// All expected errors are handled via callbacks to notifier.
+// Under normal execution only exceptions are propagated to caller.
 func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	// Cache vote
 	err := m.votesCache.AddVote(vote)
@@ -94,6 +99,7 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 	return nil
 }
 
+// processVote uses compare-and-repeat pattern to process vote with underlying vote processor
 func (m *VoteCollector) processVote(vote *model.Vote) error {
 	for {
 		processor := m.atomicLoadProcessor()
@@ -114,8 +120,14 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 	}
 }
 
+// Status returns the status of underlying vote processor
 func (m *VoteCollector) Status() hotstuff.VoteCollectorStatus {
 	return m.atomicLoadProcessor().Status()
+}
+
+// View returns view associated with this collector
+func (m *VoteCollector) View() uint64 {
+	return m.votesCache.View()
 }
 
 // ProcessBlock performs validation of block signature and processes block with respected collector.
@@ -131,7 +143,7 @@ func (m *VoteCollector) Status() hotstuff.VoteCollectorStatus {
 //         VerifyingVotes -> Invalid
 func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 
-	if proposal.Block.View != m.votesCache.View() {
+	if proposal.Block.View != m.View() {
 		return fmt.Errorf("this VoteCollector accepts proposals only for view %d but received %d", m.votesCache.View(), proposal.Block.View)
 	}
 
@@ -176,6 +188,15 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 
 		return nil
 	}
+}
+
+// RegisterVoteConsumer registers a VoteConsumer. Upon registration, the collector
+// feeds all cached votes into the consumer in the order they arrived.
+// CAUTION, VoteConsumer implementations must be
+//  * NON-BLOCKING and consume the votes without noteworthy delay, and
+//  * CONCURRENCY SAFE
+func (m *VoteCollector) RegisterVoteConsumer(consumer hotstuff.VoteConsumer) {
+	m.votesCache.RegisterVoteConsumer(consumer)
 }
 
 // caching2Verifying ensures that the VoteProcessor is currently in state `VoteCollectorStatusCaching`

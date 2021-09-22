@@ -10,11 +10,11 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
-	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/epochs"
 )
@@ -209,7 +209,7 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.deployQC(service)
 
-	b.deployIDTableStaking(service, fungibleToken, flowToken)
+	b.deployIDTableStaking(service, fungibleToken, flowToken, feeContract)
 
 	// set the list of nodes which are allowed to stake in this network
 	b.setStakingAllowlist(service, b.identities.NodeIDs())
@@ -366,13 +366,12 @@ func (b *BootstrapProcedure) deployQC(service flow.Address) {
 	panicOnMetaInvokeErrf("failed to deploy QC contract: %s", txError, err)
 }
 
-func (b *BootstrapProcedure) deployIDTableStaking(
-	service, fungibleToken,
-	flowToken flow.Address) {
+func (b *BootstrapProcedure) deployIDTableStaking(service, fungibleToken, flowToken, flowFees flow.Address) {
 
 	contract := contracts.FlowIDTableStaking(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
+		flowFees.HexWithPrefix(),
 		true)
 
 	txError, err := b.vm.invokeMetaTransaction(
@@ -846,7 +845,7 @@ func registerNodeTransaction(
 	accountKey := flow.AccountPublicKey{
 		PublicKey: id.NetworkPubKey,
 		SignAlgo:  id.NetworkPubKey.Algorithm(),
-		HashAlgo:  hash.SHA3_256,
+		HashAlgo:  bootstrap.DefaultMachineAccountHashAlgo,
 		Weight:    1000,
 	}
 
