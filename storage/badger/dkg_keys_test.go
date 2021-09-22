@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage"
-	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -21,15 +21,15 @@ import (
 func TestSecretDBRequirement(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		_, err := badgerstorage.NewDKGKeys(metrics, db)
+		_, err := bstorage.NewDKGKeys(metrics, db)
 		require.Error(t, err)
 	})
 }
 
 func TestDKGKeysInsertAndRetrieve(t *testing.T) {
-	unittest.RunWithSecretBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithTypedBadgerDB(t, bstorage.InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := badgerstorage.NewDKGKeys(metrics, db)
+		store, err := bstorage.NewDKGKeys(metrics, db)
 		require.NoError(t, err)
 
 		rand.Seed(time.Now().UnixNano())
