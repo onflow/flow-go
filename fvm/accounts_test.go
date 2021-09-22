@@ -2,11 +2,12 @@ package fvm_test
 
 import (
 	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/format"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -1094,7 +1095,7 @@ func TestGetAccountKey(t *testing.T) {
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(),
+					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1146,7 +1147,7 @@ func TestGetAccountKey(t *testing.T) {
 						"weight: 1000.00000000, "+
 						"isRevoked: false)",
 					keyIndex,
-					interpreter.ByteSliceToByteArrayValue(key.PublicKey.Encode()).String(),
+					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1198,13 +1199,23 @@ func TestGetAccountKey(t *testing.T) {
 							"weight: 1000.00000000, "+
 							"isRevoked: false)",
 						i,
-						interpreter.ByteSliceToByteArrayValue(keys[i].PublicKey.Encode()).String(),
+						byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
 					)
 
 					assert.Equal(t, expected, tx.Logs[i])
 				}
 			}),
 	)
+}
+
+func byteSliceToCadenceArrayLiteral(bytes []byte) string {
+	elements := make([]string, 0, len(bytes))
+
+	for _, b := range bytes {
+		elements = append(elements, strconv.Itoa(int(b)))
+	}
+
+	return format.Array(elements)
 }
 
 func TestAccountBalanceFields(t *testing.T) {
