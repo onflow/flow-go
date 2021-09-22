@@ -35,7 +35,7 @@ func (suite *AccessSuite) TearDownTest() {
 		defer suite.cancel()
 	}
 	if suite.net != nil {
-		//suite.net.Remove()
+		suite.net.Remove()
 	}
 }
 
