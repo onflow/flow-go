@@ -8,6 +8,10 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
+// InitPublic initializes a public database by checking and setting the database
+// type marker. If an existing, inconsistent type marker is set, this method will
+// return an error. Once a database type marker has been set using these methods,
+// the type cannot be changed.
 func InitPublic(opts badger.Options) (*badger.DB, error) {
 
 	db, err := badger.Open(opts)
@@ -22,6 +26,10 @@ func InitPublic(opts badger.Options) (*badger.DB, error) {
 	return db, nil
 }
 
+// InitSecret initializes a secrets database by checking and setting the database
+// type marker. If an existing, inconsistent type marker is set, this method will
+// return an error. Once a database type marker has been set using these methods,
+// the type cannot be changed.
 func InitSecret(opts badger.Options) (*badger.DB, error) {
 
 	db, err := badger.Open(opts)
