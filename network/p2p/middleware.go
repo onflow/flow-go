@@ -232,16 +232,15 @@ func (m *Middleware) UpdateNodeAddresses() {
 func (m *Middleware) Start(ov network.Overlay) error {
 	m.ov = ov
 	libP2PNode, err := m.libP2PNodeFactory()
-
-	if m.idProvider == nil {
-		m.idProvider = NewPeerstoreIdentifierProvider(m.log, libP2PNode.host, m.idTranslator)
-	}
-
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
+
+	if m.idProvider == nil {
+		m.idProvider = NewPeerstoreIdentifierProvider(m.log, m.libP2PNode.host, m.idTranslator)
+	}
 
 	m.UpdateNodeAddresses()
 

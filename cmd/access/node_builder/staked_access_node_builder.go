@@ -69,7 +69,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 	})
 }
 
-func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
+func (builder *StakedAccessNodeBuilder) Initialize() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	builder.Cancel = cancel
@@ -86,11 +86,13 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.EnqueueMetricsServerInit()
 
-	builder.RegisterBadgerMetrics()
+	if err := builder.RegisterBadgerMetrics(); err != nil {
+		return err
+	}
 
 	builder.EnqueueTracer()
 
-	return builder
+	return nil
 }
 
 func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {

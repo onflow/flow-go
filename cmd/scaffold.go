@@ -293,8 +293,8 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
 	})
 }
 
-func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() {
-	metrics.RegisterBadgerMetrics()
+func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
+	return metrics.RegisterBadgerMetrics()
 }
 
 func (fnb *FlowNodeBuilder) EnqueueTracer() {
@@ -847,7 +847,7 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 	return builder
 }
 
-func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
+func (fnb *FlowNodeBuilder) Initialize() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	fnb.Cancel = cancel
@@ -858,7 +858,9 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.ParseAndPrintFlags()
 
-	fnb.extraFlagsValidation()
+	if err := fnb.extraFlagsValidation(); err != nil {
+		return err
+	}
 
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
@@ -867,7 +869,9 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()
-		fnb.RegisterBadgerMetrics()
+		if err := fnb.RegisterBadgerMetrics(); err != nil {
+			return err
+		}
 	}
 
 	if fnb.adminAddr != NotSet {
@@ -880,7 +884,7 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.EnqueueTracer()
 
-	return fnb
+	return nil
 }
 
 // Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
@@ -1002,13 +1006,14 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 	}
 }
 
-func (fnb *FlowNodeBuilder) extraFlagsValidation() {
+func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 	if fnb.extraFlagCheck != nil {
 		err := fnb.extraFlagCheck()
 		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("invalid flags")
+			return fmt.Errorf("invalid flags: %w", err)
 		}
 	}
+	return nil
 }
 
 // loadRootProtocolSnapshot loads the root protocol snapshot from disk
