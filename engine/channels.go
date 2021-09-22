@@ -65,10 +65,9 @@ func UniqueChannels(channels network.ChannelList) network.ChannelList {
 	// has already been added to uniques.
 	// We use identifier of RoleList to determine its uniqueness.
 	for _, channel := range channels {
-		id := channelRoleMap[channel].ID()
-
 		// non-cluster channel deduplicated based identifier of role list
 		if _, cluster := ClusterChannel(channel); !cluster {
+			id := channelRoleMap[channel].ID()
 			if _, ok := added[id]; ok {
 				// a channel with same RoleList already added, hence skips
 				continue

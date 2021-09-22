@@ -122,7 +122,7 @@ func TestCanSubscribe(t *testing.T) {
 	_, err = collectionNode.pubSub.Join(badTopic.String())
 	require.Error(t, err)
 
-	clusterTopic := engine.TopicFromChannel(engine.ChannelSyncCluster(unittest.ClusterBlockFixture().Header.ChainID), rootBlockID)
+	clusterTopic := engine.TopicFromChannel(engine.ChannelSyncCluster(flow.Emulator), rootBlockID)
 	_, err = collectionNode.pubSub.Join(clusterTopic.String())
 	require.NoError(t, err)
 }
@@ -130,6 +130,6 @@ func TestCanSubscribe(t *testing.T) {
 func createSubscriptionFilterPubsubOption(t *testing.T, ids flow.IdentityList) PubsubOption {
 	idProvider := id.NewFixedIdentityProvider(ids)
 	return func(_ context.Context, h host.Host) (pubsub.Option, error) {
-		return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(h.ID(), rootBlockID, unittest.BlockFixture().Header.ChainID, idProvider)), nil
+		return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(h.ID(), rootBlockID, flow.Emulator, idProvider)), nil
 	}
 }
