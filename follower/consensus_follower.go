@@ -12,15 +12,12 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 )
 
 // ConsensusFollower is a standalone module run by third parties which provides
 // a mechanism for observing the block chain. It maintains a set of subscribers
 // and delivers block proposals broadcasted by the consensus nodes to each one.
 type ConsensusFollower interface {
-	module.ErrorAware
-
 	// Run starts the consensus follower.
 	Run(context.Context)
 	// AddOnBlockFinalizedConsumer adds a new block finalization subscriber.
@@ -134,10 +131,9 @@ func buildAccessNode(accessNodeOptions []access.Option) *access.UnstakedAccessNo
 }
 
 type ConsensusFollowerImpl struct {
-	NodeBuilder  *access.UnstakedAccessNodeBuilder
-	consumersMu  sync.RWMutex
-	consumers    []pubsub.OnBlockFinalizedConsumer
-	errorManager *module.ErrorManager
+	NodeBuilder *access.UnstakedAccessNodeBuilder
+	consumersMu sync.RWMutex
+	consumers   []pubsub.OnBlockFinalizedConsumer
 }
 
 // NewConsensusFollower creates a new consensus follower.
@@ -161,10 +157,7 @@ func NewConsensusFollower(
 	accessNodeOptions := getAccessNodeOptions(config)
 
 	anb := buildAccessNode(accessNodeOptions)
-	consensusFollower := &ConsensusFollowerImpl{
-		NodeBuilder:  anb,
-		errorManager: module.NewErrorManager(),
-	}
+	consensusFollower := &ConsensusFollowerImpl{NodeBuilder: anb}
 	anb.BaseConfig.NodeRole = "consensus_follower"
 
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
@@ -193,10 +186,6 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 // Run starts the consensus follower.
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 	runAccessNode(ctx, cf.NodeBuilder)
-}
-
-func (cf *ConsensusFollowerImpl) Errors() <-chan error {
-	return cf.errorManager.Errors()
 }
 
 func runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {
