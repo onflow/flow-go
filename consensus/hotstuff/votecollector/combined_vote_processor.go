@@ -88,12 +88,12 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 	switch sigType {
 
 	case hotstuff.SigTypeStaking:
-		valid, err := p.stakingSigAggtor.Verify(vote.SignerID, sig)
+		err := p.stakingSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
+			if errors.Is(err, msig.ErrInvalidFormat) {
+				return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
+			}
 			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
-		}
-		if !valid {
-			return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
 		}
 		if p.done.Load() {
 			return nil
@@ -104,13 +104,14 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		}
 
 	case hotstuff.SigTypeRandomBeacon:
-		valid, err := p.rbSigAggtor.Verify(vote.SignerID, sig)
+		err := p.rbSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
+			if errors.Is(err, msig.ErrInvalidFormat) {
+				return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
+			}
 			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
 		}
-		if !valid {
-			return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
-		}
+
 		if p.done.Load() {
 			return nil
 		}
