@@ -99,7 +99,7 @@ func (c *ExampleComponent) Start(ctx irrecoverable.SignalerContext) error {
 			select {
 			case <-time.After(20 * time.Millisecond):
 				// encounter irrecoverable error
-				ctx.ThrowError(c.err)
+				ctx.Throw(c.err)
 			case <-ctx.Done():
 				c.printMsg("Cancelled by parent")
 			}
