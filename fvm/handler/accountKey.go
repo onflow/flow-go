@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
@@ -262,7 +263,8 @@ func (e *AccountKeyHandler) AddEncodedAccountKey(address runtime.Address, encode
 
 	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
 	if err != nil {
-		err = errors.NewValueErrorf(string(encodedPublicKey), "invalid encoded public key value: %w", err)
+		hexEncodedPublicKey := hex.EncodeToString(encodedPublicKey)
+		err = errors.NewValueErrorf(hexEncodedPublicKey, "invalid encoded public key value: %w", err)
 		return fmt.Errorf("adding encoded account key failed: %w", err)
 	}
 
