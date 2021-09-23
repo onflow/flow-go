@@ -4,186 +4,264 @@ package signature
 
 import (
 	"crypto/rand"
-	"fmt"
+	mrand "math/rand"
+	"sort"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/module/local"
+	"github.com/onflow/flow-go/engine"
 )
 
-const NUM_AGG_TEST = 7
-const NUM_AGG_BENCH = 100
+func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregatorSameMessage, []crypto.Signature) {
+	// create message and tag
+	msgLen := 100
+	msg := make([]byte, msgLen)
+	tag := "random_tag"
+	hasher := crypto.NewBLSKMAC(tag)
 
-func createAggregationT(t *testing.T) (*AggregationProvider, crypto.PrivateKey) {
-	agg, priv, err := createAggregation()
-	require.NoError(t, err)
-	return agg, priv
-}
-
-func createAggregationB(b *testing.B) (*AggregationProvider, crypto.PrivateKey) {
-	agg, priv, err := createAggregation()
-	if err != nil {
-		b.Fatal(err)
-	}
-	return agg, priv
-}
-
-// TODO: delete in V2
-func createAggregation() (*AggregationProvider, crypto.PrivateKey, error) {
+	// create keys and signatures
+	keys := make([]crypto.PublicKey, 0, signersNumber)
+	sigs := make([]crypto.Signature, 0, signersNumber)
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
-	n, err := rand.Read(seed)
-	if err != nil {
-		return nil, nil, err
-	}
-	if n < len(seed) {
-		return nil, nil, fmt.Errorf("insufficient random bytes")
-	}
-	priv, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
-	if err != nil {
-		return nil, nil, err
-	}
-	local, err := local.New(nil, priv)
-	if err != nil {
-		return nil, nil, err
-	}
-	return NewAggregationProvider("test_staking", local), priv, nil
-}
-
-func TestAggregationSignVerify(t *testing.T) {
-
-	signer, priv := createAggregationT(t)
-	msg := randomByteSliceT(t, 128)
-
-	// create the signature
-	sig, err := signer.Sign(msg)
-	require.NoError(t, err)
-
-	// signature should be valid for the original signer
-	valid, err := signer.Verify(msg, sig, priv.PublicKey())
-	require.NoError(t, err)
-	assert.True(t, valid)
-
-	// signature should not be valid for another signer
-	_, altPriv := createAggregationT(t)
-	valid, err = signer.Verify(msg, sig, altPriv.PublicKey())
-	require.NoError(t, err)
-	assert.False(t, valid)
-
-	// signature should not be valid if we change one byte
-	sig[0]++
-	valid, err = signer.Verify(msg, sig, priv.PublicKey())
-	require.NoError(t, err)
-	assert.False(t, valid)
-	sig[0]--
-}
-
-func TestAggregationAggregateVerifyMany(t *testing.T) {
-
-	// create a certain amount of signers & signatures
-	var keys []crypto.PublicKey
-	var sigs []crypto.Signature
-	msg := randomByteSliceT(t, 128)
-	for i := 0; i < NUM_AGG_TEST; i++ {
-		signer, priv := createAggregationT(t)
-		sig, err := signer.Sign(msg)
+	for i := 0; i < signersNumber; i++ {
+		_, err := rand.Read(seed)
 		require.NoError(t, err)
-		keys = append(keys, priv.PublicKey())
+		sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+		require.NoError(t, err)
+		keys = append(keys, sk.PublicKey())
+		sig, err := sk.Sign(msg, hasher)
+		require.NoError(t, err)
 		sigs = append(sigs, sig)
 	}
-
-	// aggregate the signatures
-	agg, _ := createAggregationT(t)
-	aggSig, err := agg.Aggregate(sigs)
+	aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, keys)
 	require.NoError(t, err)
-
-	// signature should be valid for the given keys
-	valid, err := agg.VerifyMany(msg, aggSig, keys)
-	require.NoError(t, err)
-	require.True(t, valid)
-
-	// signature should fail with one key missing
-	valid, err = agg.VerifyMany(msg, aggSig, keys[1:])
-	require.NoError(t, err)
-	require.False(t, valid)
-
-	// signature should be valid with one key swapped
-	keys[0], keys[1] = keys[1], keys[0]
-	valid, err = agg.VerifyMany(msg, aggSig, keys)
-	require.NoError(t, err)
-	require.True(t, valid)
-
-	// signature should be invalid with one byte changed
-	msg[0]++
-	valid, err = agg.VerifyMany(msg, aggSig, keys)
-	require.NoError(t, err)
-	require.False(t, valid)
-	msg[0]--
+	return aggregator, sigs
 }
 
-func BenchmarkAggregationProviderAggregation(b *testing.B) {
+func TestAggregatorSameMessage(t *testing.T) {
 
-	// stop timer and reset to zero
-	b.StopTimer()
-	b.ResetTimer()
+	signersNum := 20
 
-	// create the desired number of signers
-	var signer *AggregationProvider
-	msg := randomByteSliceB(b)
-	sigs := make([]crypto.Signature, 0, NUM_AGG_BENCH)
-	for i := 0; i < NUM_AGG_BENCH; i++ {
-		signer, _ = createAggregationB(b)
-		sig, err := signer.Sign(msg)
-		if err != nil {
-			b.Fatal(err)
+	// constrcutor edge cases
+	t.Run("constructor", func(t *testing.T) {
+		msg := []byte("random_msg")
+		tag := "random_tag"
+		// empty keys
+		_, err := NewSignatureAggregatorSameMessage(msg, tag, []crypto.PublicKey{})
+		assert.Error(t, err)
+		// wrong key types
+		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+		_, err = rand.Read(seed)
+		require.NoError(t, err)
+		sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
+		require.NoError(t, err)
+		_, err = NewSignatureAggregatorSameMessage(msg, tag, []crypto.PublicKey{sk.PublicKey()})
+		assert.Error(t, err)
+		_, err = NewSignatureAggregatorSameMessage(msg, tag, []crypto.PublicKey{nil})
+		assert.Error(t, err)
+	})
+
+	// Happy paths
+	t.Run("happy path", func(t *testing.T) {
+		aggregator, sigs := createAggregationData(t, signersNum)
+		// only add half of the signatures
+		subSet := signersNum / 2
+		for i, sig := range sigs[subSet:] {
+			index := i + subSet
+			// test Verify
+			ok, err := aggregator.Verify(index, sig)
+			assert.NoError(t, err)
+			assert.True(t, ok)
+			// test HasSignature with existing sig
+			ok, err = aggregator.HasSignature(index)
+			assert.NoError(t, err)
+			assert.False(t, ok)
+			// test TrustedAdd
+			err = aggregator.TrustedAdd(index, sig)
+			assert.NoError(t, err)
+			// test HasSignature with non existing sig
+			ok, err = aggregator.HasSignature(index)
+			assert.NoError(t, err)
+			assert.True(t, ok)
 		}
-		sigs = append(sigs, sig)
-	}
-
-	// start the timer and benchmark the aggregation
-	b.StartTimer()
-	for n := 0; n < b.N; n++ {
-		_, err := signer.Aggregate(sigs)
-		if err != nil {
-			b.Fatal(err)
+		signers, agg, err := aggregator.Aggregate()
+		assert.NoError(t, err)
+		ok, err := aggregator.VerifyAggregate(signers, agg)
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		// check signers
+		sort.Ints(signers)
+		for i := 0; i < subSet; i++ {
+			index := i + subSet
+			assert.Equal(t, index, signers[i])
 		}
-	}
+		// add remaining signatures
+		for i, sig := range sigs[:subSet] {
+			err = aggregator.TrustedAdd(i, sig)
+			assert.NoError(t, err)
+		}
+		signers, agg, err = aggregator.Aggregate()
+		assert.NoError(t, err)
+		ok, err = aggregator.VerifyAggregate(signers, agg)
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		// check signers
+		sort.Ints(signers)
+		for i := 0; i < signersNum; i++ {
+			assert.Equal(t, i, signers[i])
+		}
+	})
+
+	invalidInput := engine.NewInvalidInputError("some error")
+	duplicate := newErrDuplicatedSigner("some error")
+
+	// Unhappy paths
+	t.Run("invalid inputs", func(t *testing.T) {
+		aggregator, sigs := createAggregationData(t, signersNum)
+		// loop through invalid inputs
+		for _, index := range []int{-1, signersNum} {
+			ok, err := aggregator.Verify(index, sigs[0])
+			assert.False(t, ok)
+			assert.Error(t, err)
+			assert.IsType(t, invalidInput, err)
+
+			ok, err = aggregator.VerifyAndAdd(index, sigs[0])
+			assert.False(t, ok)
+			assert.Error(t, err)
+			assert.IsType(t, invalidInput, err)
+
+			err = aggregator.TrustedAdd(index, sigs[0])
+			assert.Error(t, err)
+			assert.IsType(t, invalidInput, err)
+
+			ok, err = aggregator.HasSignature(index)
+			assert.False(t, ok)
+			assert.Error(t, err)
+			assert.IsType(t, invalidInput, err)
+
+			ok, err = aggregator.VerifyAggregate([]int{index}, sigs[0])
+			assert.False(t, ok)
+			assert.Error(t, err)
+			assert.IsType(t, invalidInput, err)
+		}
+		// empty list
+		ok, err := aggregator.VerifyAggregate([]int{}, sigs[0])
+		assert.False(t, ok)
+		assert.Error(t, err)
+		assert.IsType(t, invalidInput, err)
+	})
+
+	t.Run("duplicate signature", func(t *testing.T) {
+		aggregator, sigs := createAggregationData(t, signersNum)
+		for i, sig := range sigs {
+			err := aggregator.TrustedAdd(i, sig)
+			require.NoError(t, err)
+		}
+		// TrustedAdd
+		for i := range sigs {
+			err := aggregator.TrustedAdd(i, sigs[i]) // same signature for same index
+			assert.Error(t, err)
+			assert.IsType(t, duplicate, err)
+			err = aggregator.TrustedAdd(0, sigs[(i+1)%signersNum]) // different signature for same index
+			assert.Error(t, err)
+			assert.IsType(t, duplicate, err)
+			// VerifyAndAdd
+			ok, err := aggregator.VerifyAndAdd(i, sigs[i]) // valid but redundant signature
+			assert.False(t, ok)
+			assert.Error(t, err)
+			assert.IsType(t, duplicate, err)
+		}
+	})
+
+	t.Run("invalid signature", func(t *testing.T) {
+		aggregator, sigs := createAggregationData(t, signersNum)
+		// corrupt sigs[0]
+		sigs[0][4] ^= 1
+		// test Verify
+		ok, err := aggregator.Verify(0, sigs[0])
+		require.NoError(t, err)
+		assert.False(t, ok)
+		// test Verify and Add
+		ok, err = aggregator.VerifyAndAdd(0, sigs[0])
+		require.NoError(t, err)
+		assert.False(t, ok)
+		// check signature is still not added
+		ok, err = aggregator.HasSignature(0)
+		require.NoError(t, err)
+		assert.False(t, ok)
+		// add signatures for aggregation including corrupt sigs[0]
+		for i, sig := range sigs {
+			err := aggregator.TrustedAdd(i, sig)
+			require.NoError(t, err)
+		}
+		signers, agg, err := aggregator.Aggregate()
+		assert.Error(t, err)
+		assert.Nil(t, agg)
+		assert.Nil(t, signers)
+		// fix sigs[0]
+		sigs[0][4] ^= 1
+	})
 }
 
-func BenchmarkVerifyMany(b *testing.B) {
+func TestKeyAggregator(t *testing.T) {
+	r := time.Now().UnixNano()
+	mrand.Seed(r)
+	t.Logf("math rand seed is %d", r)
 
-	// stop timer and reset to zero
-	b.StopTimer()
-	b.ResetTimer()
+	signersNum := 20
+	// create keys
+	indices := make([]int, 0, signersNum)
+	keys := make([]crypto.PublicKey, 0, signersNum)
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	for i := 0; i < signersNum; i++ {
+		indices = append(indices, i)
+		_, err := rand.Read(seed)
+		require.NoError(t, err)
+		sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+		require.NoError(t, err)
+		keys = append(keys, sk.PublicKey())
+	}
+	aggregator, err := NewPublicKeyAggregator(keys)
+	require.NoError(t, err)
 
-	// create the desired number of signers
-	var signer *AggregationProvider
-	var priv crypto.PrivateKey
-	msg := randomByteSliceB(b)
-	sigs := make([]crypto.Signature, 0, NUM_AGG_BENCH)
-	keys := make([]crypto.PublicKey, 0, NUM_AGG_BENCH)
-	for i := 0; i < NUM_AGG_BENCH; i++ {
-		signer, priv = createAggregationB(b)
-		sig, err := signer.Sign(msg)
-		if err != nil {
-			b.Fatal(err)
+	// constrcutor edge cases
+	t.Run("constructor", func(t *testing.T) {
+		// wrong key types
+		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+		_, err = rand.Read(seed)
+		require.NoError(t, err)
+		sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
+		require.NoError(t, err)
+		_, err = NewPublicKeyAggregator([]crypto.PublicKey{sk.PublicKey()})
+		assert.Error(t, err)
+		_, err = NewPublicKeyAggregator([]crypto.PublicKey{nil})
+		assert.Error(t, err)
+	})
+
+	t.Run("greedy algorithm", func(t *testing.T) {
+		// iterate over different random cases to make sure
+		// the delta algorithm works
+		rounds := 30
+		for i := 0; i < rounds; i++ {
+			go func() { // test module concurrency
+				low := mrand.Intn(signersNum)
+				high := low + mrand.Intn(signersNum-low)
+				var key, expectedKey crypto.PublicKey
+				var err error
+				key, err = aggregator.KeyAggregate(indices[low:high])
+				require.NoError(t, err)
+				if low == high {
+					expectedKey = crypto.NeutralBLSPublicKey()
+				} else {
+					expectedKey, err = crypto.AggregateBLSPublicKeys(keys[low:high])
+					require.NoError(t, err)
+				}
+				assert.True(t, key.Equals(expectedKey))
+			}()
 		}
-		sigs = append(sigs, sig)
-		keys = append(keys, priv.PublicKey())
-	}
-	sig, err := signer.Aggregate(sigs)
-	if err != nil {
-		b.Fatal(err)
-	}
-
-	// start the timer and benchmark the aggregation
-	b.StartTimer()
-	for n := 0; n < b.N; n++ {
-		_, err := signer.VerifyMany(msg, sig, keys)
-		if err != nil {
-			b.Fatal(err)
-		}
-	}
+	})
 }
