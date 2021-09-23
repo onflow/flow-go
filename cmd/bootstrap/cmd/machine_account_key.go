@@ -47,7 +47,7 @@ func machineAccountKeyRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not check if node-machine-account-key.priv.json exists")
 	}
 	if keyExists {
-		log.Warn().Msg("machine account private key already exists")
+		log.Warn().Msg("machine account private key already exists, exiting...")
 		return
 	}
 
