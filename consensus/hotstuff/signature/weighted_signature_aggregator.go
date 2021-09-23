@@ -29,7 +29,12 @@ type WeightedSignatureAggregator struct {
 
 var _ hotstuff.WeightedSignatureAggregator = &WeightedSignatureAggregator{}
 
-// NewWeightedSignatureAggregator returns a weighted aggregator initialized with the input data.
+// NewWeightedSignatureAggregator returns a weighted aggregator initialized with a list of flow
+// identities, a message and a domain separation tag. The identities represent the list of all
+// possible signers.
+//
+// The constructor errors if the list of identities is empty, or if any identity doesn't
+// hold a valid staking key.
 //
 // A weighted aggregator is used for one aggregation only. A new instance should be used for each use.
 func NewWeightedSignatureAggregator(

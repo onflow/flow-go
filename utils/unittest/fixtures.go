@@ -958,7 +958,7 @@ func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
 // can be customized (ie. set their role) by passing in a function that modifies
 // the input identities as required.
 func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList {
-	identities := make(flow.IdentityList, n)
+	identities := make(flow.IdentityList, 0, n)
 
 	for i := 0; i < n; i++ {
 		identity := IdentityFixture()
@@ -966,7 +966,7 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 		for _, opt := range opts {
 			opt(identity)
 		}
-		identities[i] = identity
+		identities = append(identities, identity)
 	}
 
 	return identities
