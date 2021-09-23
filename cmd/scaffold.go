@@ -2,8 +2,11 @@ package cmd
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"math/rand"
 	"os"
 	"os/signal"
@@ -17,6 +20,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
@@ -98,15 +102,16 @@ type namedDoneObject struct {
 // of the process in case of nodes such as the unstaked access node where the NodeInfo is not part of the genesis data
 type FlowNodeBuilder struct {
 	*NodeConfig
-	flags          *pflag.FlagSet
-	modules        []namedModuleFunc
-	components     []namedComponentFunc
-	doneObject     []namedDoneObject
-	sig            chan os.Signal
-	preInitFns     []func(NodeBuilder, *NodeConfig)
-	postInitFns    []func(NodeBuilder, *NodeConfig)
-	lm             *lifecycle.LifecycleManager
-	extraFlagCheck func() error
+	flags                    *pflag.FlagSet
+	modules                  []namedModuleFunc
+	components               []namedComponentFunc
+	doneObject               []namedDoneObject
+	sig                      chan os.Signal
+	preInitFns               []func(NodeBuilder, *NodeConfig)
+	postInitFns              []func(NodeBuilder, *NodeConfig)
+	lm                       *lifecycle.LifecycleManager
+	extraFlagCheck           func() error
+	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
@@ -130,10 +135,18 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
-	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", dns.DefaultTimeToLive, "time-to-live for dns cache")
+	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
+		"adjusts the level of sampling when tracing is enabled. 0 means capture everything, higher value results in less samples")
 
+	fnb.flags.StringVar(&fnb.BaseConfig.adminAddr, "admin-addr", defaultConfig.adminAddr, "address to bind on for admin HTTP server")
+	fnb.flags.StringVar(&fnb.BaseConfig.adminCert, "admin-cert", defaultConfig.adminCert, "admin cert file (for TLS)")
+	fnb.flags.StringVar(&fnb.BaseConfig.adminKey, "admin-key", defaultConfig.adminKey, "admin key file (for TLS)")
+	fnb.flags.StringVar(&fnb.BaseConfig.adminClientCAs, "admin-client-certs", defaultConfig.adminClientCAs, "admin client certs (for mutual TLS)")
+
+	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", dns.DefaultTimeToLive, "time-to-live for dns cache")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
+
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
@@ -244,8 +257,42 @@ func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() {
-	metrics.RegisterBadgerMetrics()
+func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
+	fnb.Component("admin server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+		var opts []admin.CommandRunnerOption
+
+		if node.adminCert != NotSet {
+			serverCert, err := tls.LoadX509KeyPair(node.adminCert, node.adminKey)
+			if err != nil {
+				return nil, err
+			}
+			clientCAs, err := ioutil.ReadFile(node.adminClientCAs)
+			if err != nil {
+				return nil, err
+			}
+			certPool := x509.NewCertPool()
+			certPool.AppendCertsFromPEM(clientCAs)
+			config := &tls.Config{
+				MinVersion:   tls.VersionTLS13,
+				Certificates: []tls.Certificate{serverCert},
+				ClientAuth:   tls.RequireAndVerifyClientCert,
+				ClientCAs:    certPool,
+			}
+
+			opts = append(opts, admin.WithTLS(config))
+		}
+
+		command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.adminAddr, opts...)
+		if err := command_runner.Start(ctx); err != nil {
+			return nil, err
+		}
+
+		return command_runner, nil
+	})
+}
+
+func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
+	return metrics.RegisterBadgerMetrics()
 }
 
 func (fnb *FlowNodeBuilder) EnqueueTracer() {
@@ -322,7 +369,11 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 
 	fnb.Tracer = trace.NewNoopTracer()
 	if fnb.BaseConfig.tracerEnabled {
-		tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.NodeRole)
+		serviceName := fnb.BaseConfig.NodeRole + "-" + fnb.BaseConfig.nodeIDHex[:8]
+		tracer, err := trace.NewTracer(fnb.Logger,
+			serviceName,
+			fnb.RootChainID.String(),
+			fnb.tracerSensitivity)
 		fnb.MustNot(err).Msg("could not initialize tracer")
 		fnb.Logger.Info().Msg("Tracer Started")
 		fnb.Tracer = tracer
@@ -689,6 +740,13 @@ func (fnb *FlowNodeBuilder) Module(name string, f func(builder NodeBuilder, node
 	return fnb
 }
 
+// AdminCommand registers a new admin command with the admin server
+func (fnb *FlowNodeBuilder) AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder {
+	fnb.adminCommandBootstrapper.RegisterHandler(command, handler)
+	fnb.adminCommandBootstrapper.RegisterValidator(command, validator)
+	return fnb
+}
+
 // MustNot asserts that the given error must not occur.
 //
 // If the error is nil, returns a nil log event (which acts as a no-op).
@@ -780,13 +838,14 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 			BaseConfig: *config,
 			Logger:     zerolog.New(os.Stderr),
 		},
-		flags: pflag.CommandLine,
-		lm:    lifecycle.NewLifecycleManager(),
+		flags:                    pflag.CommandLine,
+		lm:                       lifecycle.NewLifecycleManager(),
+		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
 	}
 	return builder
 }
 
-func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
+func (fnb *FlowNodeBuilder) Initialize() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	fnb.Cancel = cancel
@@ -797,7 +856,9 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.ParseAndPrintFlags()
 
-	fnb.extraFlagsValidation()
+	if err := fnb.extraFlagsValidation(); err != nil {
+		return err
+	}
 
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
@@ -806,12 +867,22 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()
-		fnb.RegisterBadgerMetrics()
+		if err := fnb.RegisterBadgerMetrics(); err != nil {
+			return err
+		}
+	}
+
+	if fnb.adminAddr != NotSet {
+		if (fnb.adminCert != NotSet || fnb.adminKey != NotSet || fnb.adminClientCAs != NotSet) &&
+			!(fnb.adminCert != NotSet && fnb.adminKey != NotSet && fnb.adminClientCAs != NotSet) {
+			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
+		}
+		fnb.EnqueueAdminServerInit(ctx)
 	}
 
 	fnb.EnqueueTracer()
 
-	return fnb
+	return nil
 }
 
 // Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
@@ -933,13 +1004,14 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 	}
 }
 
-func (fnb *FlowNodeBuilder) extraFlagsValidation() {
+func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 	if fnb.extraFlagCheck != nil {
 		err := fnb.extraFlagCheck()
 		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("invalid flags")
+			return fmt.Errorf("invalid flags: %w", err)
 		}
 	}
+	return nil
 }
 
 // loadRootProtocolSnapshot loads the root protocol snapshot from disk

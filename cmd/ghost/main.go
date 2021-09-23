@@ -15,11 +15,16 @@ func main() {
 		rpcConf engine.Config
 	)
 
-	cmd.FlowNode("ghost").
-		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the GRPC server listens on")
-		}).
-		Initialize().
+	nodeBuilder := cmd.FlowNode("ghost")
+	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
+		flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "r", "localhost:9000", "the address the GRPC server listens on")
+	})
+
+	if err := nodeBuilder.Initialize(); err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	nodeBuilder.
 		Module("message validators", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			validators := []network.MessageValidator{
 				// filter out messages sent by this node itself

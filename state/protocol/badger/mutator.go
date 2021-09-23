@@ -3,6 +3,7 @@
 package badger
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -105,11 +106,10 @@ func NewFullConsensusState(
 // Instead, the consensus follower relies on the consensus participants to
 // validate the full payload. Therefore, a follower a QC (i.e. a child block) as
 // proof that a block is valid.
-func (m *FollowerState) Extend(candidate *flow.Block) error {
+func (m *FollowerState) Extend(ctx context.Context, candidate *flow.Block) error {
 
-	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorHeaderExtend)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorHeaderExtend)
+	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorHeaderExtend)
+	defer span.Finish()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
@@ -124,7 +124,7 @@ func (m *FollowerState) Extend(candidate *flow.Block) error {
 	}
 
 	// insert the block and index the last seal for the block
-	err = m.insert(candidate, last)
+	err = m.insert(ctx, candidate, last)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
 	}
@@ -134,11 +134,10 @@ func (m *FollowerState) Extend(candidate *flow.Block) error {
 
 // Extend extends the protocol state of a CONSENSUS PARTICIPANT. It checks
 // the validity of the _entire block_ (header and full payload).
-func (m *MutableState) Extend(candidate *flow.Block) error {
+func (m *MutableState) Extend(ctx context.Context, candidate *flow.Block) error {
 
-	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtend)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtend)
+	span, ctx := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtend)
+	defer span.Finish()
 
 	// check if the block header is a valid extension of the finalized state
 	err := m.headerExtend(candidate)
@@ -147,26 +146,26 @@ func (m *MutableState) Extend(candidate *flow.Block) error {
 	}
 
 	// check if the guarantees in the payload is a valid extension of the finalized state
-	err = m.guaranteeExtend(candidate)
+	err = m.guaranteeExtend(ctx, candidate)
 	if err != nil {
 		return fmt.Errorf("guarantee does not compliance the chain state: %w", err)
 	}
 
 	// check if the receipts in the payload are valid
-	err = m.receiptExtend(candidate)
+	err = m.receiptExtend(ctx, candidate)
 	if err != nil {
 		return fmt.Errorf("payload receipts not compliant with chain state: %w", err)
 	}
 
 	// check if the seals in the payload is a valid extension of the finalized
 	// state
-	lastSeal, err := m.sealExtend(candidate)
+	lastSeal, err := m.sealExtend(ctx, candidate)
 	if err != nil {
 		return fmt.Errorf("seal in parent block does not compliance the chain state: %w", err)
 	}
 
 	// insert the block and index the last seal for the block
-	err = m.insert(candidate, lastSeal)
+	err = m.insert(ctx, candidate, lastSeal)
 	if err != nil {
 		return fmt.Errorf("failed to insert the block: %w", err)
 	}
@@ -177,11 +176,6 @@ func (m *MutableState) Extend(candidate *flow.Block) error {
 // headerExtend verifies the validity of the block header (excluding verification of the
 // consensus rules). Specifically, we check that the block connects to the last finalized block.
 func (m *FollowerState) headerExtend(candidate *flow.Block) error {
-
-	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckHeader)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckHeader)
-
 	// FIRST: We do some initial cheap sanity checks, like checking the payload
 	// hash is consistent
 
@@ -259,11 +253,10 @@ func (m *FollowerState) headerExtend(candidate *flow.Block) error {
 // guaranteeExtend verifies the validity of the collection guarantees that are
 // included in the block. Specifically, we check for expired collections and
 // duplicated collections (also including ancestor blocks).
-func (m *MutableState) guaranteeExtend(candidate *flow.Block) error {
+func (m *MutableState) guaranteeExtend(ctx context.Context, candidate *flow.Block) error {
 
-	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckGuarantees)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckGuarantees)
+	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckGuarantees)
+	defer span.Finish()
 
 	header := candidate.Header
 	payload := candidate.Payload
@@ -335,10 +328,10 @@ func (m *MutableState) guaranteeExtend(candidate *flow.Block) error {
 
 // sealExtend checks the compliance of the payload seals. Returns last seal that form a chain for
 // candidate block.
-func (m *MutableState) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
-	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckSeals)
+func (m *MutableState) sealExtend(ctx context.Context, candidate *flow.Block) (*flow.Seal, error) {
+
+	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckSeals)
+	defer span.Finish()
 
 	lastSeal, err := m.sealValidator.Validate(candidate)
 	if err != nil {
@@ -354,10 +347,10 @@ func (m *MutableState) sealExtend(candidate *flow.Block) (*flow.Seal, error) {
 //   * Receipts should pass the ReceiptValidator check
 //   * No seal has been included for the respective block in this particular fork
 // We require the receipts to be sorted by block height (within a payload).
-func (m *MutableState) receiptExtend(candidate *flow.Block) error {
-	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendCheckReceipts)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendCheckReceipts)
+func (m *MutableState) receiptExtend(ctx context.Context, candidate *flow.Block) error {
+
+	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendCheckReceipts)
+	defer span.Finish()
 
 	err := m.receiptValidator.ValidatePayload(candidate)
 	if err != nil {
@@ -381,11 +374,6 @@ func (m *MutableState) receiptExtend(candidate *flow.Block) error {
 // Now, if block 101 is extending block 100, and its payload has a seal for 96, then it will
 // be the last sealed for block 101.
 func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
-
-	blockID := candidate.ID()
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorHeaderExtendGetLastSealed)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorHeaderExtendGetLastSealed)
-
 	header := candidate.Header
 	payload := candidate.Payload
 
@@ -417,12 +405,12 @@ func (m *FollowerState) lastSealed(candidate *flow.Block) (*flow.Seal, error) {
 
 // insert stores the candidate block in the data base. The
 // `candidate` block _must be valid_ (otherwise, the state will be corrupted).
-func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
+func (m *FollowerState) insert(ctx context.Context, candidate *flow.Block, last *flow.Seal) error {
+
+	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorExtendDBInsert)
+	defer span.Finish()
 
 	blockID := candidate.ID()
-
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorExtendDBInsert)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorExtendDBInsert)
 
 	// SIXTH: epoch transitions and service events
 	//    (i) Determine protocol state for block's _current_ Epoch.
@@ -481,10 +469,10 @@ func (m *FollowerState) insert(candidate *flow.Block, last *flow.Seal) error {
 // Finalize marks the specified block as finalized. This method only
 // finalizes one block at a time. Hence, the parent of `blockID`
 // has to be the last finalized block.
-func (m *FollowerState) Finalize(blockID flow.Identifier) error {
+func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) error {
 	// preliminaries: start tracer and retrieve full block
-	m.tracer.StartSpan(blockID, trace.ProtoStateMutatorFinalize)
-	defer m.tracer.FinishSpan(blockID, trace.ProtoStateMutatorFinalize)
+	span, _ := m.tracer.StartSpanFromContext(ctx, trace.ProtoStateMutatorFinalize)
+	defer span.Finish()
 	block, err := m.blocks.ByID(blockID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve full block that should be finalized: %w", err)

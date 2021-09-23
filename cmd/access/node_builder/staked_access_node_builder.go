@@ -67,7 +67,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 	})
 }
 
-func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
+func (builder *StakedAccessNodeBuilder) Initialize() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	builder.Cancel = cancel
@@ -84,11 +84,13 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.EnqueueMetricsServerInit()
 
-	builder.RegisterBadgerMetrics()
+	if err := builder.RegisterBadgerMetrics(); err != nil {
+		return err
+	}
 
 	builder.EnqueueTracer()
 
-	return builder
+	return nil
 }
 
 func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
@@ -208,10 +210,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
 
-	resolver, err := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
-	if err != nil {
-		return nil, fmt.Errorf("could not create dns resolver: %w", err)
-	}
+	resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 
 	return func() (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).

@@ -46,11 +46,12 @@ func (i *TransactionInvocator) Process(
 	programs *programs.Programs,
 ) (processErr error) {
 
+	txIDStr := proc.ID.String()
 	var span opentracing.Span
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
 		span.LogFields(
-			traceLog.String("transaction.ID", proc.ID.String()),
+			traceLog.String("transaction_id", txIDStr),
 		)
 		defer span.Finish()
 	}
@@ -76,7 +77,7 @@ func (i *TransactionInvocator) Process(
 			// error transaction
 			msg := "child state doesn't match the active state on the state holder"
 			i.logger.Error().
-				Str("txHash", proc.ID.String()).
+				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
 				Msg(msg)
 
@@ -102,7 +103,7 @@ func (i *TransactionInvocator) Process(
 			programs.ForceCleanup()
 
 			i.logger.Warn().
-				Str("txHash", proc.ID.String()).
+				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
 				Int("retries_count", numberOfRetries).
 				Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
@@ -110,8 +111,8 @@ func (i *TransactionInvocator) Process(
 
 			// reset error part of proc
 			// Warning right now the tx requires retry logic doesn't change
-			// anything on state but we might want to revert the state changes (or not commiting)
-			// if we decided to expand it furthur.
+			// anything on state but we might want to revert the state changes (or not committing)
+			// if we decided to expand it further.
 			proc.Err = nil
 			proc.Logs = make([]string, 0)
 			proc.Events = make([]flow.Event, 0)
@@ -180,7 +181,7 @@ func (i *TransactionInvocator) Process(
 		programs.Cleanup(nil)
 		// log transaction as failed
 		i.logger.Info().
-			Str("txHash", proc.ID.String()).
+			Str("txHash", txIDStr).
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
@@ -202,7 +203,7 @@ func (i *TransactionInvocator) Process(
 			childState.View().DropDelta()
 			programs.Cleanup(nil)
 			i.logger.Info().
-				Str("txHash", proc.ID.String()).
+				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
 				Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 				Msg("transaction fee deduction executed with error")
@@ -212,7 +213,7 @@ func (i *TransactionInvocator) Process(
 	} else {
 		// transaction is ok, log as successful
 		i.logger.Info().
-			Str("txHash", proc.ID.String()).
+			Str("txHash", txIDStr).
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Int("retried", proc.Retried).

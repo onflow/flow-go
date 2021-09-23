@@ -156,7 +156,7 @@ func (e StateKeySizeLimitError) Error() string {
 
 // Code returns the error code for this error
 func (e StateKeySizeLimitError) Code() ErrorCode {
-	return ErrCodeStateValueSizeLimitError
+	return ErrCodeStateKeySizeLimitError
 }
 
 // A StateValueSizeLimitError indicates that the provided value has exceeded the size limit allowed by the storage
