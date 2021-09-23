@@ -1,6 +1,7 @@
 package follower
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -13,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
@@ -34,6 +36,7 @@ type Engine struct {
 	follower       module.HotStuffFollower
 	con            network.Conduit
 	sync           module.BlockRequester
+	tracer         module.Tracer
 }
 
 func New(
@@ -49,6 +52,7 @@ func New(
 	pending module.PendingBlockBuffer,
 	follower module.HotStuffFollower,
 	sync module.BlockRequester,
+	tracer module.Tracer,
 ) (*Engine, error) {
 
 	e := &Engine{
@@ -64,6 +68,7 @@ func New(
 		pending:        pending,
 		follower:       follower,
 		sync:           sync,
+		tracer:         tracer,
 	}
 
 	con, err := net.Register(engine.ReceiveBlocks, e)
@@ -167,6 +172,9 @@ func (e *Engine) onSyncedBlock(originID flow.Identifier, synced *events.SyncedBl
 // onBlockProposal handles incoming block proposals.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
 
+	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), proposal.Header.ID(), trace.FollowerOnBlockProposal)
+	defer span.Finish()
+
 	header := proposal.Header
 
 	log := e.log.With().
@@ -264,7 +272,7 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 
 	// at this point, we should be able to connect the proposal to the finalized
 	// state and should process it to see whether to forward to hotstuff or not
-	err = e.processBlockProposal(proposal)
+	err = e.processBlockProposal(ctx, proposal)
 	if err != nil {
 		return fmt.Errorf("could not process block proposal: %w", err)
 	}
@@ -282,7 +290,10 @@ func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.Bl
 // the finalized state; if a parent of children is validly processed, it means
 // the children are also still on a valid chain and all missing links are there;
 // no need to do all the processing again.
-func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
+func (e *Engine) processBlockProposal(ctx context.Context, proposal *messages.BlockProposal) error {
+
+	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessBlockProposal)
+	defer span.Finish()
 
 	header := proposal.Header
 
@@ -309,7 +320,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	// check whether the block is a valid extension of the chain.
 	// it only checks the block header, since checking block body is expensive.
 	// The full block check is done by the consensus participants.
-	err := e.state.Extend(block)
+	err := e.state.Extend(ctx, block)
 	// if the error is a known invalid extension of the protocol state, then
 	// the input is invalid
 	if state.IsInvalidExtensionError(err) {
@@ -338,7 +349,7 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 	e.follower.SubmitProposal(header, parent.View)
 
 	// check for any descendants of the block to process
-	err = e.processPendingChildren(header)
+	err = e.processPendingChildren(ctx, header)
 	if err != nil {
 		return fmt.Errorf("could not process pending children: %w", err)
 	}
@@ -349,7 +360,11 @@ func (e *Engine) processBlockProposal(proposal *messages.BlockProposal) error {
 // processPendingChildren checks if there are proposals connected to the given
 // parent block that was just processed; if this is the case, they should now
 // all be validly connected to the finalized state and we should process them.
-func (e *Engine) processPendingChildren(header *flow.Header) error {
+func (e *Engine) processPendingChildren(ctx context.Context, header *flow.Header) error {
+
+	span, ctx := e.tracer.StartSpanFromContext(ctx, trace.FollowerProcessPendingChildren)
+	defer span.Finish()
+
 	blockID := header.ID()
 
 	// check if there are any children for this parent in the cache
@@ -365,7 +380,7 @@ func (e *Engine) processPendingChildren(header *flow.Header) error {
 			Header:  child.Header,
 			Payload: child.Payload,
 		}
-		err := e.processBlockProposal(proposal)
+		err := e.processBlockProposal(ctx, proposal)
 		if err != nil {
 			result = multierror.Append(result, err)
 		}

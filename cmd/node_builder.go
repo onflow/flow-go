@@ -115,6 +115,7 @@ type BaseConfig struct {
 	profilerInterval      time.Duration
 	profilerDuration      time.Duration
 	tracerEnabled         bool
+	tracerSensitivity     uint
 	metricsEnabled        bool
 	guaranteesCacheSize   uint
 	receiptsCacheSize     uint
@@ -151,11 +152,12 @@ type NodeConfig struct {
 	SyncEngineIdentifierProvider id.IdentifierProvider
 
 	// root state information
-	RootBlock   *flow.Block
-	RootQC      *flow.QuorumCertificate
-	RootResult  *flow.ExecutionResult
-	RootSeal    *flow.Seal
-	RootChainID flow.ChainID
+	RootBlock                     *flow.Block
+	RootQC                        *flow.QuorumCertificate
+	RootResult                    *flow.ExecutionResult
+	RootSeal                      *flow.Seal
+	RootChainID                   flow.ChainID
+	SkipNwAddressBasedValidations bool
 }
 
 func DefaultBaseConfig() *BaseConfig {
@@ -176,6 +178,7 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerInterval:      15 * time.Minute,
 		profilerDuration:      10 * time.Second,
 		tracerEnabled:         false,
+		tracerSensitivity:     4,
 		metricsEnabled:        true,
 		receiptsCacheSize:     bstorage.DefaultCacheSize,
 		guaranteesCacheSize:   bstorage.DefaultCacheSize,

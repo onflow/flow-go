@@ -130,10 +130,12 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"the duration to run the auto-profile for")
 	fnb.flags.BoolVar(&fnb.BaseConfig.tracerEnabled, "tracer-enabled", defaultConfig.tracerEnabled,
 		"whether to enable tracer")
+	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
+		"adjusts the level of sampling when tracing is enabled. 0 means capture everything, higher value results in less samples")
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", dns.DefaultTimeToLive, "time-to-live for dns cache")
-
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
+
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
@@ -322,7 +324,11 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 
 	fnb.Tracer = trace.NewNoopTracer()
 	if fnb.BaseConfig.tracerEnabled {
-		tracer, err := trace.NewTracer(fnb.Logger, fnb.BaseConfig.NodeRole)
+		serviceName := fnb.BaseConfig.NodeRole + "-" + fnb.BaseConfig.nodeIDHex[:8]
+		tracer, err := trace.NewTracer(fnb.Logger,
+			serviceName,
+			fnb.RootChainID.String(),
+			fnb.tracerSensitivity)
 		fnb.MustNot(err).Msg("could not initialize tracer")
 		fnb.Logger.Info().Msg("Tracer Started")
 		fnb.Tracer = tracer
@@ -530,6 +536,12 @@ func (fnb *FlowNodeBuilder) initState() {
 		// Bootstrap!
 		fnb.Logger.Info().Msg("bootstrapping empty protocol state")
 
+		// generate bootstrap config options as per NodeConfig
+		var options []badgerState.BootstrapConfigOptions
+		if fnb.SkipNwAddressBasedValidations {
+			options = append(options, badgerState.SkipNetworkAddressValidation)
+		}
+
 		fnb.State, err = badgerState.Bootstrap(
 			fnb.Metrics.Compliance,
 			fnb.DB,
@@ -541,6 +553,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Commits,
 			fnb.Storage.Statuses,
 			rootSnapshot,
+			options...,
 		)
 		fnb.MustNot(err).Msg("could not bootstrap protocol state")
 

@@ -11,17 +11,17 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// ConsensusSigPackerImpl implements the hotstuff.Packer interface.
+// ConsensusSigDataPacker implements the hotstuff.Packer interface.
 // The encoding method is RLP.
-type ConsensusSigPackerImpl struct {
+type ConsensusSigDataPacker struct {
 	committees hotstuff.Committee
 	encoder    *rlp.Encoder // rlp encoder is used in order to ensure deterministic encoding
 }
 
-var _ hotstuff.Packer = &ConsensusSigPackerImpl{}
+var _ hotstuff.Packer = &ConsensusSigDataPacker{}
 
-func NewConsensusSigPackerImpl(committees hotstuff.Committee) *ConsensusSigPackerImpl {
-	return &ConsensusSigPackerImpl{
+func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataPacker {
+	return &ConsensusSigDataPacker{
 		committees: committees,
 		encoder:    rlp.NewEncoder(),
 	}
@@ -42,7 +42,7 @@ type signatureData struct {
 // To pack the block signature data, we first build a compact data type, and then encode it into bytes.
 // Expected error returns during normal operations:
 //  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
-func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
+func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.BlockSignatureData) ([]flow.Identifier, []byte, error) {
 	// breaking staking and random beacon signers into signerIDs and sig type for compaction
 	// each signer must have its signerID and sig type stored at the same index in the two slices
 	count := len(sig.StakingSigners) + len(sig.RandomBeaconSigners)
@@ -107,7 +107,7 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 // It returns:
 //  - (sigData, nil) if successfully unpacked the signature data
 //  - (nil, signature.ErrInvalidFormat) if failed to unpack the signature data
-func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
+func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
 	var data signatureData
 	err := p.encoder.Decode(sigData, &data)
