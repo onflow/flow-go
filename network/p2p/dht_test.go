@@ -236,8 +236,7 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 
 		pingInfoProvider, _, _ := MockPingInfoProvider()
 
-		resolver, err := dns.NewResolver(noopMetrics)
-		require.NoError(suite.T(), err)
+		resolver := dns.NewResolver(noopMetrics)
 
 		n, err := NewDefaultLibP2PNodeBuilder(flow.Identifier{}, "0.0.0.0:0", key).
 			SetRootBlockID(rootBlockID).
