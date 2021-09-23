@@ -162,10 +162,20 @@ func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flo
 	}, nil
 }
 
+// the total number of bytes required to fit the `count` number of bits
+func bytesCount(count int) int {
+	totalBytes := count / 8
+	if count%8 > 0 {
+		totalBytes++
+	}
+	return totalBytes
+}
+
 // serializeToBytes encodes the given sigTypes into a bit vector.
 // We append tailing `0`s to the vector to represent it as bytes.
 func serializeToBytes(sigTypes []hotstuff.SigType) ([]byte, error) {
-	bytes := make([]byte, 0)
+	totalBytes := bytesCount(len(sigTypes))
+	bytes := make([]byte, 0, totalBytes)
 	// a sig type can be converted into one bit.
 	// so every 8 sig types will fit into one byte.
 	// iterate through every 8 sig types, for each sig type in each
@@ -201,10 +211,7 @@ func deserializeFromBytes(serialized []byte, count int) ([]hotstuff.SigType, err
 
 	// validate the length of serialized
 	// it must have enough bytes to fit the `count` number of bits
-	totalBytes := count / 8
-	if count%8 > 0 {
-		totalBytes++
-	}
+	totalBytes := bytesCount(count)
 
 	if len(serialized) != totalBytes {
 		return nil, fmt.Errorf("mismatching bytes for serialized sig types, total signers: %v"+
