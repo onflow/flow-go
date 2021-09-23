@@ -123,9 +123,6 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		testnet.WithLogLevel(zerolog.TraceLevel),
 	)
 
-	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
-
-
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
@@ -150,7 +147,6 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithDebugImage(false)),
 		stakedConfig,
-		acsConfig,
 	}
 
 	unstakedKey1, err := UnstakedNetworkingKey()

@@ -81,6 +81,9 @@ const (
 	// default network port
 	DefaultFlowPort = 2137
 
+	// DefaultSecureGRPCPort is the port used to access secure GRPC server running on ANs
+	DefaultSecureGRPCPort = 9001
+
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
 	DefaultViewsInEpoch          uint64 = 180
@@ -492,7 +495,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			if !nodeConf.Ghost {
 				nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
 				nodeContainer.addFlag("insecure-access-api", "false")
-				nodeContainer.addFlag("access-address", fmt.Sprintf("%s:9001", accessNode.ContainerName))
+				nodeContainer.addFlag("access-address", fmt.Sprintf("%s:%x", accessNode.ContainerName, DefaultSecureGRPCPort))
 				nodeContainer.addFlag("secure-access-node-id", accessNode.NodeID.String())
 			}
 		}
