@@ -30,7 +30,6 @@ func (s *Suite) SetupTest() {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 
@@ -39,7 +38,7 @@ func (s *Suite) SetupTest() {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
+
 		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 
@@ -52,6 +51,7 @@ func (s *Suite) SetupTest() {
 		testnet.AsGhost())
 
 	confs := []testnet.NodeConfig{
+		acsConfig,
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
@@ -60,7 +60,6 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
-		acsConfig,
 		ghostConNode,
 	}
 

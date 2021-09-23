@@ -123,9 +123,6 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		// TODO replace these with actual values
-		testnet.WithAdditionalFlag("--access-address=null"),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -133,7 +130,6 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 		testnet.WithLogLevel(zerolog.InfoLevel),
 	}
 

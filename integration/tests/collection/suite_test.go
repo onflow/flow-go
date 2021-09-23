@@ -65,19 +65,19 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 
 	// default set of non-collector nodes
 	var (
+		acsNode = testnet.NewNodeConfig(flow.RoleAccess)
 		conNode = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 		exeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 	)
 	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection, testnet.WithAdditionalFlag("--block-rate-delay=1ms"))
-
 	suite.nClusters = nClusters
 
 	// set one of the non-collector nodes to be the ghost
 	suite.ghostID = conNode.Identifier
 
 	// instantiate the network
-	nodes := append(colNodes, conNode, exeNode, verNode)
+	nodes := append(colNodes, conNode, exeNode, verNode, acsNode)
 	conf := testnet.NewNetworkConfig(name, nodes, testnet.WithClusters(nClusters))
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
 

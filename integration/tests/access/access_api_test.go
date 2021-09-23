@@ -62,7 +62,7 @@ func (suite *AccessSuite) SetupTest() {
 
 	// need one controllable collection node (used ghost)
 	collID := unittest.IdentifierFixture()
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(collID), testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())))
+	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(collID))
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)

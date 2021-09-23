@@ -70,7 +70,6 @@ func (s *Suite) SetupTest() {
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(nodeID),
 			testnet.WithLogLevel(zerolog.FatalLevel),
 			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
-			testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 			testnet.WithAdditionalFlag(blockRateFlag),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
@@ -86,12 +85,10 @@ func (s *Suite) SetupTest() {
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.WithAdditionalFlag(blockRateFlag),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.WithAdditionalFlag(blockRateFlag),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 

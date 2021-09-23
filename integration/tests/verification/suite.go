@@ -78,7 +78,6 @@ func (s *Suite) SetupSuite() {
 			testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 			testnet.WithAdditionalFlag("--required-verification-seal-approvals=1"),
 			testnet.WithAdditionalFlag("--required-construction-seal-approvals=1"),
-			testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 			testnet.WithAdditionalFlag(blockRateFlag),
 		)
 		s.nodeConfigs = append(s.nodeConfigs, nodeConfig)
@@ -108,12 +107,10 @@ func (s *Suite) SetupSuite() {
 	coll1Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.WithAdditionalFlag(blockRateFlag),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 	)
 	coll2Config := testnet.NewNodeConfig(flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.WithAdditionalFlag(blockRateFlag),
-		testnet.WithAdditionalFlag(fmt.Sprintf("--secure-access-node-id=%s", acsConfig.Identifier.String())),
 	)
 	s.nodeConfigs = append(s.nodeConfigs, coll1Config, coll2Config)
 
