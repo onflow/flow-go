@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/contracts"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	emulator "github.com/onflow/flow-emulator"
+
 	sdk "github.com/onflow/flow-go-sdk"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
@@ -434,6 +435,12 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 		controllerFactoryLogger = zerolog.New(os.Stdout).Hook(hook)
 	}
 
+	// create a config with no delays for tests
+	config := dkg.ControllerConfig{
+		BaseStartDelay:           0,
+		BaseHandleBroadcastDelay: 0,
+	}
+
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -446,6 +453,7 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 			core.Me,
 			node.dkgContractClient,
 			brokerTunnel,
+			config,
 		),
 		viewsObserver,
 	)

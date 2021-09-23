@@ -90,6 +90,7 @@ func main() {
 		requiredApprovalsForSealVerification   uint
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
+		dkgControllerConfig                    dkgmodule.ControllerConfig
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
@@ -145,6 +146,8 @@ func main() {
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
 			flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
 			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
+			flags.DurationVar(&dkgControllerConfig.BaseStartDelay, "dkg-controller-base-start-delay", dkgmodule.DefaultBaseStartDelay, "used to define the range for jitter prior to DKG start (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
+			flags.DurationVar(&dkgControllerConfig.BaseHandleBroadcastDelay, "dkg-controller-base-handle-broadcast-delay", dkgmodule.DefaultBaseHandleBroadcastDelay, "used to define the range for jitter prior to DKG handling broadcast messages (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
 		}).
 		Initialize().
 		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -731,6 +734,7 @@ func main() {
 					node.Me,
 					dkgContractClient,
 					dkgBrokerTunnel,
+					dkgControllerConfig,
 				),
 				viewsObserver,
 			)
