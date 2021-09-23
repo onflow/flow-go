@@ -226,7 +226,7 @@ func deserializeFromBytes(serialized []byte, count int) ([]hotstuff.SigType, err
 	// if there are remaining bits, they must be all `0`s
 	if count%8 > 0 {
 		// since we've validated the length of serialized, then the last byte
-		// must contains the remaining bits
+		// must contain the remaining bits
 		last := serialized[len(serialized)-1]
 		remainings := last << (count % 8) // shift away the last used bits
 		if remainings != byte(0) {
