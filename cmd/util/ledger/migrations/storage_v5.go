@@ -39,7 +39,7 @@ type storageFormatV5MigrationResult struct {
 type StorageFormatV5Migration struct {
 	Log                 zerolog.Logger
 	OutputDir           string
-	accounts            *state.Accounts
+	accounts            state.Accounts
 	programs            *programs.Programs
 	brokenTypeIDs       map[common.TypeID]brokenTypeCause
 	reportFile          *os.File
@@ -160,7 +160,7 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	return migratedPayloads, nil
 }
 
-func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
+func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.AccountsState {
 	var filteredPayloads []ledger.Payload
 
 	for _, payload := range payloads {
@@ -1761,7 +1761,7 @@ func (m StorageFormatV5Migration) loadProgram(
 }
 
 type migrationRuntimeInterface struct {
-	accounts *state.Accounts
+	accounts state.Accounts
 	programs *programs.Programs
 }
 
