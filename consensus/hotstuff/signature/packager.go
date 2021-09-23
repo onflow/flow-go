@@ -133,8 +133,8 @@ func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flo
 
 	// read each signer's signerID and sig type from two different slices
 	// group signers by its sig type
-	stakingSigners := make([]flow.Identifier, 0)
-	randomBeaconSigners := make([]flow.Identifier, 0)
+	stakingSigners := make([]flow.Identifier, 0, len(signerIDs))
+	randomBeaconSigners := make([]flow.Identifier, 0, len(signerIDs))
 
 	for i, sigType := range sigTypes {
 		signerID := signerIDs[i]
@@ -214,14 +214,15 @@ func deserializeFromBytes(serialized []byte, count int) ([]hotstuff.SigType, err
 	totalBytes := bytesCount(count)
 
 	if len(serialized) != totalBytes {
-		return nil, fmt.Errorf("mismatching bytes for serialized sig types, total signers: %v"+
-			", expect bytes: %v, actual bytes: %v, %w", count, totalBytes, len(serialized), signature.ErrInvalidFormat)
+		return nil, fmt.Errorf("encoding sig types of %d signers requires %d bytes but got %d bytes: %w",
+			count, totalBytes, len(serialized), signature.ErrInvalidFormat)
 	}
 
 	// parse each bit in the bit-vector, bit 0 is SigTypeStaking, bit 1 is SigTypeRandomBeacon
 	for i := 0; i < count; i++ {
 		byt := serialized[i/8]
-		posMask := byte((1 << 7) >> (i % 8))
+		offset := 7 - (i % 8)
+		posMask := byte(1 << offset)
 		if byt&posMask == 0 {
 			types = append(types, hotstuff.SigTypeStaking)
 		} else {
@@ -232,11 +233,11 @@ func deserializeFromBytes(serialized []byte, count int) ([]hotstuff.SigType, err
 	// if there are remaining bits, they must be all `0`s
 	if count%8 > 0 {
 		// since we've validated the length of serialized, then the last byte
-		// must contains the remaining bits
+		// must contain the remaining bits
 		last := serialized[len(serialized)-1]
 		remainings := last << (count % 8) // shift away the last used bits
 		if remainings != byte(0) {
-			return nil, fmt.Errorf("the remaining bits are expect to be all 0s, but actually are: %v: %w",
+			return nil, fmt.Errorf("the remaining bits are expect to be all 0s, but actually are %v: %w",
 				remainings, signature.ErrInvalidFormat)
 		}
 	}
