@@ -79,14 +79,14 @@ func (p *ConsensusSigPackerImpl) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 		}
 	}
 
-	// seralize the sig type for compaction
-	seralized, err := seralizeToBytes(sigTypes)
+	// serialize the sig type for compaction
+	serialized, err := serializeToBytes(sigTypes)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not seralize sig types to bytes at block: %v, %w", blockID, err)
+		return nil, nil, fmt.Errorf("could not serialize sig types to bytes at block: %v, %w", blockID, err)
 	}
 
 	data := signatureData{
-		SigType:                   seralized,
+		SigType:                   serialized,
 		AggregatedStakingSig:      sig.AggregatedStakingSig,
 		AggregatedRandomBeaconSig: sig.AggregatedRandomBeaconSig,
 		RandomBeacon:              sig.ReconstructedRandomBeaconSig,
@@ -115,10 +115,10 @@ func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flo
 		return nil, fmt.Errorf("could not decode sig data %s: %w", err, signature.ErrInvalidFormat)
 	}
 
-	// deseralize the compact sig types
-	sigTypes, err := deseralizeFromBytes(data.SigType, len(signerIDs))
+	// deserialize the compact sig types
+	sigTypes, err := deserializeFromBytes(data.SigType, len(signerIDs))
 	if err != nil {
-		return nil, fmt.Errorf("failed to deseralize sig types from bytes: %w", err)
+		return nil, fmt.Errorf("failed to deserialize sig types from bytes: %w", err)
 	}
 
 	// read all the possible signer IDs at the given block
@@ -162,8 +162,9 @@ func (p *ConsensusSigPackerImpl) Unpack(blockID flow.Identifier, signerIDs []flo
 	}, nil
 }
 
-// seralize the sig types into a compact format
-func seralizeToBytes(sigTypes []hotstuff.SigType) ([]byte, error) {
+// serializeToBytes encodes the given sigTypes into a bit vector.
+// We append tailing `0`s to the vector to represent it as bytes.
+func serializeToBytes(sigTypes []hotstuff.SigType) ([]byte, error) {
 	bytes := make([]byte, 0)
 	// a sig type can be converted into one bit.
 	// so every 8 sig types will fit into one byte.
@@ -188,31 +189,31 @@ func seralizeToBytes(sigTypes []hotstuff.SigType) ([]byte, error) {
 	return bytes, nil
 }
 
-// deseralize the sig types from bytes
-// - seralized: seralized bytes
-// - count: the total number of sig types to be deseralized from the given bytes
+// deserializeFromBytes decodes the sig types from the given bit vector
+// - serialized: bit-vector, one bit for each signer (tailing `0`s appended to make full bytes)
+// - count: the total number of sig types to be deserialized from the given bytes
 // It returns:
-// - (sigTypes, nil) if successfully deseralized sig types
-// - (nil, signature.ErrInvalidFormat) if the number of seralized bytes doesn't match the given number of sig types
+// - (sigTypes, nil) if successfully deserialized sig types
+// - (nil, signature.ErrInvalidFormat) if the number of serialized bytes doesn't match the given number of sig types
 // - (nil, signature.ErrInvalidFormat) if the remaining bits in the last byte are not all 0s
-func deseralizeFromBytes(seralized []byte, count int) ([]hotstuff.SigType, error) {
+func deserializeFromBytes(serialized []byte, count int) ([]hotstuff.SigType, error) {
 	types := make([]hotstuff.SigType, 0, count)
 
-	// validate the length of seralized
+	// validate the length of serialized
 	// it must have enough bytes to fit the `count` number of bits
 	totalBytes := count / 8
 	if count%8 > 0 {
 		totalBytes++
 	}
 
-	if len(seralized) != totalBytes {
-		return nil, fmt.Errorf("mismatching bytes for seralized sig types, total signers: %v"+
-			", expect bytes: %v, actual bytes: %v, %w", count, totalBytes, len(seralized), signature.ErrInvalidFormat)
+	if len(serialized) != totalBytes {
+		return nil, fmt.Errorf("mismatching bytes for serialized sig types, total signers: %v"+
+			", expect bytes: %v, actual bytes: %v, %w", count, totalBytes, len(serialized), signature.ErrInvalidFormat)
 	}
 
 	// parse each bit in the bit-vector, bit 0 is SigTypeStaking, bit 1 is SigTypeRandomBeacon
 	for i := 0; i < count; i++ {
-		byt := seralized[i/8]
+		byt := serialized[i/8]
 		posMask := byte((1 << 7) >> (i % 8))
 		if byt&posMask == 0 {
 			types = append(types, hotstuff.SigTypeStaking)
@@ -223,9 +224,9 @@ func deseralizeFromBytes(seralized []byte, count int) ([]hotstuff.SigType, error
 
 	// if there are remaining bits, they must be all `0`s
 	if count%8 > 0 {
-		// since we've validated the length of seralized, then the last byte
+		// since we've validated the length of serialized, then the last byte
 		// must contains the remaining bits
-		last := seralized[len(seralized)-1]
+		last := serialized[len(serialized)-1]
 		remainings := last << (count % 8) // shift away the last used bits
 		if remainings != byte(0) {
 			return nil, fmt.Errorf("the remaining bits are expect to be all 0s, but actually are: %v: %w",
