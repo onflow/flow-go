@@ -30,6 +30,7 @@ type SignatureAggregatorSameMessage struct {
 	n                int                // number of participants indexed from 0 to n-1
 	publicKeys       []crypto.PublicKey // keys indexed from 0 to n-1, signer i is assigned to public key i
 	indexToSignature map[int]string     // signatures indexed by the signer index
+	cashedSignature  crypto.Signature   // cached aggrgeted signature
 }
 
 // NewSignatureAggregatorSameMessage returns a new SignatureAggregatorSameMessage structure.
@@ -62,6 +63,7 @@ func NewSignatureAggregatorSameMessage(
 		n:                len(publicKeys),
 		publicKeys:       publicKeys,
 		indexToSignature: make(map[int]string),
+		cashedSignature:  nil,
 	}, nil
 }
 
@@ -105,6 +107,7 @@ func (s *SignatureAggregatorSameMessage) VerifyAndAdd(signer int, sig crypto.Sig
 	// signature is new
 	ok, err := s.publicKeys[signer].Verify(sig, s.message, s.hasher)
 	if ok {
+		s.cashedSignature = nil
 		s.indexToSignature[signer] = string(sig)
 	}
 	return ok, err
@@ -129,6 +132,7 @@ func (s *SignatureAggregatorSameMessage) TrustedAdd(signer int, sig crypto.Signa
 		return newErrDuplicatedSigner("signer %d was already added", signer)
 	}
 	// signature is new
+	s.cashedSignature = nil
 	s.indexToSignature[signer] = string(sig)
 	return nil
 }
@@ -159,11 +163,19 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 // to a compact bit vector.
 func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, error) {
 	sharesNum := len(s.indexToSignature)
-	signatures := make([]crypto.Signature, 0, sharesNum)
 	indices := make([]int, 0, sharesNum)
-	for index, sig := range s.indexToSignature {
-		signatures = append(signatures, []byte(sig))
+	for index, _ := range s.indexToSignature {
 		indices = append(indices, index)
+	}
+
+	// check if signature was already computed
+	if s.cashedSignature != nil {
+		return indices, s.cashedSignature, nil
+	}
+
+	signatures := make([]crypto.Signature, 0, sharesNum)
+	for _, sig := range s.indexToSignature {
+		signatures = append(signatures, []byte(sig))
 	}
 
 	aggregatedSignature, err := crypto.AggregateBLSSignatures(signatures)
@@ -177,6 +189,7 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 	if !ok {
 		return nil, nil, errors.New("resulting BLS aggregated signatutre is invalid")
 	}
+	s.cashedSignature = aggregatedSignature
 	return indices, aggregatedSignature, nil
 }
 

@@ -99,6 +99,14 @@ func TestAggregatorSameMessage(t *testing.T) {
 			index := i + subSet
 			assert.Equal(t, index, signers[i])
 		}
+		// cached aggregated signature
+		_, aggCached, err := aggregator.Aggregate()
+		assert.NoError(t, err)
+		// make sure signature is equal, even though this doesn't mean caching is working
+		assert.Equal(t, agg, aggCached)
+		// In the following, new signatures are added which makes sure cached signature
+		// was cleared.
+
 		// add remaining signatures
 		for i, sig := range sigs[:subSet] {
 			err = aggregator.TrustedAdd(i, sig)
@@ -204,6 +212,11 @@ func TestAggregatorSameMessage(t *testing.T) {
 		assert.Nil(t, signers)
 		// fix sigs[0]
 		sigs[0][4] ^= 1
+	})
+
+	// cached aggregated signature
+	t.Run("cached aggregated signature", func(t *testing.T) {
+
 	})
 }
 
