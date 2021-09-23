@@ -3,6 +3,7 @@ package testutil
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -153,7 +154,8 @@ func GenericNodeWithStateFixture(t testing.TB,
 		Log:            log,
 		Metrics:        metrics,
 		Tracer:         tracer,
-		DB:             stateFixture.DB,
+		DB:             stateFixture.PublicDB,
+		SecretsDB:      stateFixture.SecretsDB,
 		State:          stateFixture.State,
 		Headers:        stateFixture.Storage.Headers,
 		Guarantees:     stateFixture.Storage.Guarantees,
@@ -198,9 +200,12 @@ func CompleteStateFixture(
 	rootSnapshot protocol.Snapshot,
 ) *testmock.StateFixture {
 
-	dbDir := unittest.TempDir(t)
-	db := unittest.BadgerDB(t, dbDir)
+	dataDir := unittest.TempDir(t)
+	publicDBDir := filepath.Join(dataDir, "protocol")
+	secretsDBDir := filepath.Join(dataDir, "secrets")
+	db := unittest.TypedBadgerDB(t, publicDBDir, storage.InitPublic)
 	s := storage.InitAll(metric, db)
+	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storage.InitSecret)
 	consumer := events.NewDistributor()
 
 	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
@@ -211,9 +216,10 @@ func CompleteStateFixture(
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
-		DB:             db,
+		PublicDB:       db,
+		SecretsDB:      secretsDB,
 		Storage:        s,
-		DBDir:          dbDir,
+		DBDir:          dataDir,
 		ProtocolEvents: consumer,
 		State:          mutableState,
 	}
