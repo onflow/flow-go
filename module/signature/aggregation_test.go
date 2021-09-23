@@ -107,9 +107,10 @@ func TestAggregatorSameMessage(t *testing.T) {
 		// In the following, new signatures are added which makes sure cached signature
 		// was cleared.
 
-		// add remaining signatures
+		// add remaining signatures, this time using VerifyAndAdd
 		for i, sig := range sigs[:subSet] {
-			err = aggregator.TrustedAdd(i, sig)
+			ok, err = aggregator.VerifyAndAdd(i, sig)
+			assert.True(t, ok)
 			assert.NoError(t, err)
 		}
 		signers, agg, err = aggregator.Aggregate()
