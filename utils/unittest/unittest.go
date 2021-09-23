@@ -209,6 +209,10 @@ func BadgerDB(t testing.TB, dir string) *badger.DB {
 	return badgerDB(t, dir, badger.Open)
 }
 
+func TypedBadgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
+	return badgerDB(t, dir, create)
+}
+
 func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 	RunWithTempDir(t, func(dir string) {
 		db := BadgerDB(t, dir)

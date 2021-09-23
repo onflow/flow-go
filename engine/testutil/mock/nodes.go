@@ -55,9 +55,10 @@ import (
 // StateFixture is a test helper struct that encapsulates a flow protocol state
 // as well as all of its backend dependencies.
 type StateFixture struct {
-	DB             *badger.DB
-	Storage        *storage.All
 	DBDir          string
+	PublicDB       *badger.DB
+	SecretsDB      *badger.DB
+	Storage        *storage.All
 	ProtocolEvents *events.Distributor
 	State          protocol.MutableState
 }
@@ -68,6 +69,7 @@ type GenericNode struct {
 	Metrics        *metrics.NoopCollector
 	Tracer         module.Tracer
 	DB             *badger.DB
+	SecretsDB      *badger.DB
 	Headers        storage.Headers
 	Identities     storage.Identities
 	Guarantees     storage.Guarantees
