@@ -23,7 +23,7 @@ transaction(addresses: [Address], path: StoragePath) {
 }
 `
 
-// SetContractDeploymentAuthorizersTransaction returns a transaction for updating list of authroized accounts allowed to deploy/update contracts
+// SetContractDeploymentAuthorizersTransaction returns a transaction for updating list of authorized accounts allowed to deploy/update contracts
 func SetContractDeploymentAuthorizersTransaction(serviceAccount flow.Address, authorized []flow.Address) (*flow.TransactionBody, error) {
 	arg1, err := jsoncdc.Encode(utils.AddressSliceToCadenceValue(utils.FlowAddressSliceToCadenceAddressSlice(authorized)))
 	if err != nil {
