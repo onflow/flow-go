@@ -26,7 +26,7 @@ type Suite struct {
 }
 
 func (s *Suite) SetupTest() {
-	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
+	anConfig := testnet.NewNodeConfig(flow.RoleAccess)
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
@@ -51,7 +51,7 @@ func (s *Suite) SetupTest() {
 		testnet.AsGhost())
 
 	confs := []testnet.NodeConfig{
-		acsConfig,
+		anConfig,
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),

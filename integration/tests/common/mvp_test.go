@@ -118,7 +118,7 @@ func TestMVP_Emulator(t *testing.T) {
 }
 
 func buildMVPNetConfig() testnet.NetworkConfig {
-	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
+	anConfig := testnet.NewNodeConfig(flow.RoleAccess)
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
@@ -142,7 +142,7 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
-		acsConfig,
+		anConfig,
 	}
 
 	return testnet.NewNetworkConfig("mvp", net)

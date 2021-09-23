@@ -65,9 +65,9 @@ func (s *Suite) SetupSuite() {
 	blockRateFlag := "--block-rate-delay=1ms"
 
 	// generates one access node
-	acsConfig := testnet.NewNodeConfig(flow.RoleAccess,
+	anConfig := testnet.NewNodeConfig(flow.RoleAccess,
 		testnet.WithLogLevel(zerolog.FatalLevel))
-	s.nodeConfigs = append(s.nodeConfigs, acsConfig)
+	s.nodeConfigs = append(s.nodeConfigs, anConfig)
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)

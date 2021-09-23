@@ -221,7 +221,7 @@ func (net *FlowNetwork) ConsensusFollowerByID(id flow.Identifier) consensus_foll
 // Otherwise fails the test.
 func (net *FlowNetwork) ContainerByName(name string) *Container {
 	container, exists := net.Containers[name]
-	require.True(net.t, exists, fmt.Sprintf("container %s does not exists", name))
+	require.True(net.t, exists, "container %s does not exists", name)
 	return container
 }
 

@@ -40,8 +40,8 @@ func (suite *AccessSuite) TearDownTest() {
 }
 
 func (suite *AccessSuite) SetupTest() {
-	acsConfig := testnet.NewNodeConfig(flow.RoleAccess)
-	nodeConfigs := []testnet.NodeConfig{acsConfig}
+	anConfig := testnet.NewNodeConfig(flow.RoleAccess)
+	nodeConfigs := []testnet.NodeConfig{anConfig}
 
 	// need one dummy execution node (unused ghost)
 	exeConfig := testnet.NewNodeConfig(flow.RoleExecution)
