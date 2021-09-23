@@ -275,24 +275,8 @@ func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclara
 	if ctx.AccountFreezeAvailable {
 		// TODO return the errors instead of panicing
 		setAccountFrozen := runtime.ValueDeclaration{
-			Name: "setAccountFrozen",
-			Type: &sema.FunctionType{
-				Parameters: []*sema.Parameter{
-					{
-						Label:          sema.ArgumentLabelNotRequired,
-						Identifier:     "account",
-						TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
-					},
-					{
-						Label:          sema.ArgumentLabelNotRequired,
-						Identifier:     "frozen",
-						TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
-					},
-				},
-				ReturnTypeAnnotation: &sema.TypeAnnotation{
-					Type: sema.VoidType,
-				},
-			},
+			Name:           "setAccountFrozen",
+			Type:           setAccountFrozenFunctionType,
 			Kind:           common.DeclarationKindFunction,
 			IsConstant:     true,
 			ArgumentLabels: nil,
@@ -316,12 +300,31 @@ func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclara
 
 					return interpreter.VoidValue{}
 				},
+				setAccountFrozenFunctionType,
 			),
 		}
 
 		predeclaredValues = append(predeclaredValues, setAccountFrozen)
 	}
 	return predeclaredValues
+}
+
+var setAccountFrozenFunctionType = &sema.FunctionType{
+	Parameters: []*sema.Parameter{
+		{
+			Label:          sema.ArgumentLabelNotRequired,
+			Identifier:     "account",
+			TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
+		},
+		{
+			Label:          sema.ArgumentLabelNotRequired,
+			Identifier:     "frozen",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
+		},
+	},
+	ReturnTypeAnnotation: &sema.TypeAnnotation{
+		Type: sema.VoidType,
+	},
 }
 
 // requiresRetry returns true for transactions that has to be rerun
