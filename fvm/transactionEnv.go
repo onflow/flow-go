@@ -38,7 +38,7 @@ type TransactionEnv struct {
 	ctx              Context
 	sth              *state.StateHolder
 	programs         *handler.ProgramsHandler
-	accounts         *state.Accounts
+	accounts         state.Accounts
 	uuidGenerator    *state.UUIDGenerator
 	contracts        *handler.ContractHandler
 	accountKeys      *handler.AccountKeyHandler
