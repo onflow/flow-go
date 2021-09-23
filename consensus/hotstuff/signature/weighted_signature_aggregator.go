@@ -55,8 +55,10 @@ func NewWeightedSignatureAggregator(
 
 	// build the weighted aggregator
 	weightedAgg := &WeightedSignatureAggregator{
-		aggregator: agg,
-		signers:    signers,
+		aggregator:   agg,
+		signers:      signers,
+		idToSigner:   make(map[flow.Identifier]signerInfo),
+		collectedIDs: make(map[flow.Identifier]struct{}),
 	}
 
 	// build the internal map for a faster look-up

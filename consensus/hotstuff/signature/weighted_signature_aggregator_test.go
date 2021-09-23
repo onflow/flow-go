@@ -1,7 +1,9 @@
 package signature
 
 import (
+	"bytes"
 	"crypto/rand"
+	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,9 +16,30 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func createAggregationData(t *testing.T, signersNumber int) (hotstuff.WeightedSignatureAggregator, []crypto.Signature) {
+func sortIdentities(ids []flow.Identity) []flow.Identity {
+	canonicalOrder := func(i, j int) bool {
+		return bytes.Compare(ids[i].NodeID[:], ids[j].NodeID[:]) < 0
+	}
+	sort.Slice(ids, canonicalOrder)
+	return ids
+}
+
+func sortIdentifiers(ids []flow.Identifier) []flow.Identifier {
+	canonicalOrder := func(i, j int) bool {
+		return bytes.Compare(ids[i][:], ids[j][:]) < 0
+	}
+	sort.Slice(ids, canonicalOrder)
+	return ids
+}
+
+func createAggregationData(t *testing.T, signersNumber int) (
+	hotstuff.WeightedSignatureAggregator, []flow.Identity, []crypto.Signature) {
 	// create identities
-	signers := make([]flow.Identity, 0, signersNumber)
+	ids := make([]flow.Identity, 0, signersNumber)
+	for i := 0; i < signersNumber; i++ {
+		ids = append(ids, *unittest.IdentityFixture())
+	}
+	ids = sortIdentities(ids)
 
 	// create message and tag
 	msgLen := 100
@@ -28,26 +51,24 @@ func createAggregationData(t *testing.T, signersNumber int) (hotstuff.WeightedSi
 	sigs := make([]crypto.Signature, 0, signersNumber)
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
 	for i := 0; i < signersNumber; i++ {
-		// ids
-		signers = append(signers, *unittest.IdentityFixture())
 		// keys
 		_, err := rand.Read(seed)
 		require.NoError(t, err)
 		sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 		require.NoError(t, err)
-		signers[i].StakingPubKey = sk.PublicKey()
+		ids[i].StakingPubKey = sk.PublicKey()
 		// signatures
 		sig, err := sk.Sign(msg, hasher)
 		require.NoError(t, err)
 		sigs = append(sigs, sig)
 	}
-	aggregator, err := NewWeightedSignatureAggregator(signers, msg, tag)
+	aggregator, err := NewWeightedSignatureAggregator(ids, msg, tag)
 	require.NoError(t, err)
-	return aggregator, sigs
+	return aggregator, ids, sigs
 }
 
 func TestWeightedSignatureAggregator(t *testing.T) {
-	//signersNum := 20
+	signersNum := 20
 
 	// constrcutor edge cases
 	t.Run("constructor", func(t *testing.T) {
@@ -71,67 +92,55 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		_, err = NewWeightedSignatureAggregator([]flow.Identity{}, msg, tag)
 		assert.Error(t, err)
 	})
+
+	// Happy paths
+	t.Run("happy path", func(t *testing.T) {
+		aggregator, ids, sigs := createAggregationData(t, signersNum)
+		// only add half of the signatures
+		subSet := signersNum / 2
+		var expectedWeight uint64
+		for i, sig := range sigs[subSet:] {
+			index := i + subSet
+			// test Verify
+			err := aggregator.Verify(ids[index].NodeID, sig)
+			assert.NoError(t, err)
+			// test TrustedAdd
+			weight, err := aggregator.TrustedAdd(ids[index].NodeID, sig)
+			assert.NoError(t, err)
+			expectedWeight += ids[index].Stake
+			assert.Equal(t, expectedWeight, weight)
+		}
+		signers, _, err := aggregator.Aggregate()
+		assert.NoError(t, err)
+		//ok, err := verifyAggregate(signers, agg)
+		//assert.NoError(t, err)
+		//assert.True(t, ok)
+		// check signers
+		signers = sortIdentifiers(signers)
+		for i := 0; i < subSet; i++ {
+			index := i + subSet
+			assert.Equal(t, signers[i], ids[index].NodeID)
+		}
+
+		// add remaining signatures
+		for i, sig := range sigs[:subSet] {
+			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sig)
+			assert.NoError(t, err)
+			expectedWeight += ids[i].Stake
+			assert.Equal(t, expectedWeight, weight)
+		}
+		signers, _, err = aggregator.Aggregate()
+		assert.NoError(t, err)
+		//ok, err = verifyAggregate(signers, agg)
+		//assert.NoError(t, err)
+		//assert.True(t, ok)
+		// check signers
+		signers = sortIdentifiers(signers)
+		for i := 0; i < signersNum; i++ {
+			assert.Equal(t, signers[i], ids[i].NodeID)
+		}
+	})
 	/*
-		// Happy paths
-		t.Run("happy path", func(t *testing.T) {
-			aggregator, sigs := createAggregationData(t, signersNum)
-			// only add half of the signatures
-			subSet := signersNum / 2
-			for i, sig := range sigs[subSet:] {
-				index := i + subSet
-				// test Verify
-				ok, err := aggregator.Verify(index, sig)
-				assert.NoError(t, err)
-				assert.True(t, ok)
-				// test HasSignature with existing sig
-				ok, err = aggregator.HasSignature(index)
-				assert.NoError(t, err)
-				assert.False(t, ok)
-				// test TrustedAdd
-				err = aggregator.TrustedAdd(index, sig)
-				assert.NoError(t, err)
-				// test HasSignature with non existing sig
-				ok, err = aggregator.HasSignature(index)
-				assert.NoError(t, err)
-				assert.True(t, ok)
-			}
-			signers, agg, err := aggregator.Aggregate()
-			assert.NoError(t, err)
-			ok, err := aggregator.VerifyAggregate(signers, agg)
-			assert.NoError(t, err)
-			assert.True(t, ok)
-			// check signers
-			sort.Ints(signers)
-			for i := 0; i < subSet; i++ {
-				index := i + subSet
-				assert.Equal(t, index, signers[i])
-			}
-			// cached aggregated signature
-			_, aggCached, err := aggregator.Aggregate()
-			assert.NoError(t, err)
-			// make sure signature is equal, even though this doesn't mean caching is working
-			assert.Equal(t, agg, aggCached)
-			// In the following, new signatures are added which makes sure cached signature
-			// was cleared.
-
-			// add remaining signatures, this time using VerifyAndAdd
-			for i, sig := range sigs[:subSet] {
-				ok, err = aggregator.VerifyAndAdd(i, sig)
-				assert.True(t, ok)
-				assert.NoError(t, err)
-			}
-			signers, agg, err = aggregator.Aggregate()
-			assert.NoError(t, err)
-			ok, err = aggregator.VerifyAggregate(signers, agg)
-			assert.NoError(t, err)
-			assert.True(t, ok)
-			// check signers
-			sort.Ints(signers)
-			for i := 0; i < signersNum; i++ {
-				assert.Equal(t, i, signers[i])
-			}
-		})
-
 		invalidInput := engine.NewInvalidInputError("some error")
 		duplicate := newErrDuplicatedSigner("some error")
 
