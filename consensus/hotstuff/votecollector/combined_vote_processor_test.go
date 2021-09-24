@@ -105,6 +105,9 @@ func (s *CombinedVoteProcessorTestSuite) SetupTest() {
 	)
 }
 
+// onQCCreated is a special function that registers call in mocked state.
+// ATTENTION: don't change name of this function since the same name is used in:
+// s.onQCCreatedState.On("onQCCreated") statements
 func (s *CombinedVoteProcessorTestSuite) onQCCreated(qc *flow.QuorumCertificate) {
 	s.onQCCreatedState.Called(qc)
 }
