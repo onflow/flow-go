@@ -144,8 +144,8 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 
 	stakingSigners := unittest.IdentifierListFixture(10)
 	expectedSigs := unittest.SignaturesFixture(3)
-	s.stakingAggregator.On("Aggregate").Return(stakingSigners, expectedSigs[0], nil)
-	s.rbSigAggregator.On("Aggregate").Return(stakingSigners, expectedSigs[1], nil)
+	s.stakingAggregator.On("Aggregate").Return(stakingSigners, []byte(expectedSigs[0]), nil)
+	s.rbSigAggregator.On("Aggregate").Return(stakingSigners, []byte(expectedSigs[1]), nil)
 	s.reconstructor.On("Reconstruct").Return(expectedSigs[2], nil)
 	expectedSigData := unittest.RandomBytes(128)
 
@@ -160,7 +160,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 			SigData:   qc.SigData,
 		}
 		require.Equal(s.T(), expectedQC, qc)
-	}).Return(nil)
+	}).Return(nil).Once()
 
 	for i := uint64(0); i < s.minRequiredShares; i++ {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
@@ -170,5 +170,13 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	}
 
 	require.True(s.T(), s.processor.done.Load())
+	s.onQCCreatedState.AssertExpectations(s.T())
+
+	// processing extra votes shouldn't result in creating new QCs
+	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
+	s.rbSigAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
+	err := s.processor.Process(vote)
+	require.NoError(s.T(), err)
+
 	s.onQCCreatedState.AssertExpectations(s.T())
 }
