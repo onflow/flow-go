@@ -81,10 +81,12 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 	resolver := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
 
 	psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
+
+	// only use subscription filters on Mainnet to allow ghost nodes to run on all other networks
 	if chainID == flow.Mainnet {
 		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
 			return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(
-				h.ID(), rootBlockID, chainID, idProvider,
+				h.ID(), rootBlockID, idProvider,
 			)), nil
 		})
 	}
