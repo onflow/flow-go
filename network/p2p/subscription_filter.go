@@ -38,7 +38,10 @@ func (f *RoleBasedFilter) getRole(pid peer.ID) *flow.Role {
 }
 
 func (f *RoleBasedFilter) allowed(role *flow.Role, topic string) bool {
-	channel := engine.ChannelFromTopic(network.Topic(topic))
+	channel, ok := engine.ChannelFromTopic(network.Topic(topic))
+	if !ok {
+		return false
+	}
 
 	if role == nil {
 		// TODO: eventually we should have block proposals relayed on a separate

@@ -247,12 +247,16 @@ func TopicFromChannel(channel network.Channel, rootBlockID flow.Identifier) netw
 	return network.Topic(fmt.Sprintf("%s/%s", string(channel), rootBlockID.String()))
 }
 
-func ChannelFromTopic(topic network.Topic) network.Channel {
+func ChannelFromTopic(topic network.Topic) (network.Channel, bool) {
 	if IsClusterChannel(network.Channel(topic)) {
-		return network.Channel(topic)
+		return network.Channel(topic), true
 	}
 
-	return network.Channel(topic[strings.LastIndex(topic.String(), "/")+1:])
+	if index := strings.LastIndex(topic.String(), "/"); index != -1 {
+		return network.Channel(topic[:index]), true
+	}
+
+	return "", false
 }
 
 // ChannelConsensusCluster returns a dynamic cluster consensus channel based on

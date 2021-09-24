@@ -135,6 +135,6 @@ func TestCanSubscribe(t *testing.T) {
 func createSubscriptionFilterPubsubOption(t *testing.T, ids flow.IdentityList) PubsubOption {
 	idProvider := id.NewFixedIdentityProvider(ids)
 	return func(_ context.Context, h host.Host) (pubsub.Option, error) {
-		return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(h.ID(), rootBlockID, flow.Emulator, idProvider)), nil
+		return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(h.ID(), rootBlockID, idProvider)), nil
 	}
 }

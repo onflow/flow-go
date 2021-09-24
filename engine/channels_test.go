@@ -75,20 +75,17 @@ func TestGetChannelByRole(t *testing.T) {
 func TestIsClusterChannel(t *testing.T) {
 	// creates a consensus cluster channel and verifies it
 	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
-	clusterChannel, ok := ClusterChannel(conClusterChannel)
+	ok := IsClusterChannel(conClusterChannel)
 	require.True(t, ok)
-	require.Equal(t, clusterChannel, consensusClusterPrefix)
 
 	// creates a sync cluster channel and verifies it
 	syncClusterChannel := ChannelSyncCluster("some-sync-cluster-id")
-	clusterChannel, ok = ClusterChannel(syncClusterChannel)
+	ok = IsClusterChannel(syncClusterChannel)
 	require.True(t, ok)
-	require.Equal(t, clusterChannel, syncClusterPrefix)
 
 	// non-cluster channel should not be verified
-	clusterChannel, ok = ClusterChannel("non-cluster-channel-id")
+	ok = IsClusterChannel("non-cluster-channel-id")
 	require.False(t, ok)
-	require.Empty(t, clusterChannel)
 }
 
 // TestUniqueChannels_Uniqueness verifies that non-cluster channels returned by
@@ -101,7 +98,7 @@ func TestUniqueChannels_Uniqueness(t *testing.T) {
 		visited := make(map[flow.Identifier]struct{})
 		for _, channel := range uniques {
 
-			if _, ok := ClusterChannel(channel); ok {
+			if IsClusterChannel(channel) {
 				continue //only considering non-cluster channel in this test case
 			}
 
