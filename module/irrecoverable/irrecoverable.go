@@ -18,8 +18,13 @@ func NewSignaler(errors chan<- error) *Signaler {
 // Throw is a narrow drop-in replacement for panic, log.Fatal, log.Panic, etc
 // anywhere there's something connected to the error channel
 func (e *Signaler) Throw(err error) {
+	defer func() {
+		recover()
+		// TODO: log unhandled irrecoverable if return value from recover is not nil
+		runtime.Goexit()
+	}()
 	e.errors <- err
-	runtime.Goexit()
+	close(e.errors)
 }
 
 // We define a constrained interface to provide a drop-in replacement for context.Context
