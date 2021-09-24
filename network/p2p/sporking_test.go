@@ -82,7 +82,7 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 
 	// root id before spork
-	rootID1 := unittest.BlockFixture().ID()
+	rootID1 := unittest.IdentifierFixture()
 
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
@@ -104,7 +104,7 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	StopNode(suite.T(), node2)
 
 	// update the flow root id for node 2. node1 is still listening on the old protocol
-	rootID2 := unittest.BlockFixture().ID()
+	rootID2 := unittest.IdentifierFixture()
 
 	// start node2 with the same address and root key but different root block id
 	node2, id2New := NodeFixture(suite.T(), suite.logger, node2key, rootID2, nil, false, id2.Address)
@@ -123,7 +123,7 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 
 	// root id before spork
-	rootIDBeforeSpork := unittest.BlockFixture().ID()
+	rootIDBeforeSpork := unittest.IdentifierFixture()
 
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
@@ -160,7 +160,7 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	testOneToKMessagingSucceeds(ctx, suite.T(), node1, sub2, topicBeforeSpork)
 
 	// new root id after spork
-	rootIDAfterSpork := unittest.BlockFixture().ID()
+	rootIDAfterSpork := unittest.IdentifierFixture()
 
 	// topic after the spork
 	topicAfterSpork := engine.TopicFromChannel(engine.TestNetwork, rootIDAfterSpork)

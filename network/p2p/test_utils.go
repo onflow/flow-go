@@ -8,16 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func createID(t *testing.T, opts ...func(*flow.Identity)) (*flow.Identity, crypto.PrivateKey) {
-	networkKey, err := unittest.NetworkingKey()
-	require.NoError(t, err)
-	opts = append(opts, unittest.WithNetworkingKey(networkKey.PublicKey()))
-	id := unittest.IdentityFixture(opts...)
-	return id, networkKey
-}
 
 func createNode(
 	t *testing.T,

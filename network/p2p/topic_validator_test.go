@@ -21,10 +21,10 @@ import (
 func TestTopicValidator(t *testing.T) {
 
 	// create two staked nodes - node1 and node2
-	identity1, privateKey1 := createID(t, unittest.WithRole(flow.RoleAccess))
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	node1 := createNode(t, identity1.NodeID, privateKey1, rootBlockID)
 
-	identity2, privateKey2 := createID(t, unittest.WithRole(flow.RoleAccess))
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	node2 := createNode(t, identity2.NodeID, privateKey2, rootBlockID)
 
 	badTopic := engine.TopicFromChannel(engine.SyncCommittee, rootBlockID)

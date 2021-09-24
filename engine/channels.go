@@ -30,13 +30,15 @@ func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
 
 // Exists returns true if the channel exists.
 func Exists(channel network.Channel) bool {
-	if _, ok := RolesByChannel(channel); !ok {
-		if _, isClusterChannel := ClusterChannel(channel); !isClusterChannel {
-			return PublicChannels().Contains(channel)
-		}
+	if _, ok := RolesByChannel(channel); ok {
+		return true
 	}
 
-	return true
+	if _, ok := ClusterChannel(channel); ok {
+		return true
+	}
+
+	return PublicChannels().Contains(channel)
 }
 
 // ChannelsByRole returns a list of all channels the role subscribes to.
@@ -91,7 +93,7 @@ func Channels() network.ChannelList {
 	return channels
 }
 
-// PublicChannels returns all channels that on the public network.
+// PublicChannels returns all channels that are used on the public network.
 func PublicChannels() network.ChannelList {
 	return network.ChannelList{
 		PublicSyncCommittee,

@@ -17,13 +17,15 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestFilterSubscribe tests that if node X is filtered out on a specific channel by node Y's subscription
+// filter, then node Y will never propagate any of node X's messages on that channel
 func TestFilterSubscribe(t *testing.T) {
 	// skip for now due to bug in libp2p gossipsub implementation:
 	// https://github.com/libp2p/go-libp2p-pubsub/issues/449
 	t.Skip()
 
-	identity1, privateKey1 := createID(t, unittest.WithRole(flow.RoleAccess))
-	identity2, privateKey2 := createID(t, unittest.WithRole(flow.RoleAccess))
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	ids := flow.IdentityList{identity1, identity2}
 
 	node1 := createNode(t, identity1.NodeID, privateKey1, rootBlockID, createSubscriptionFilterPubsubOption(t, ids))
@@ -53,6 +55,7 @@ func TestFilterSubscribe(t *testing.T) {
 			len(unstakedNode.pubSub.ListPeers(badTopic.String())) > 0
 	}, 1*time.Second, 100*time.Millisecond)
 
+	// check that node1 and node2 don't accept unstakedNode as a peer
 	require.Never(t, func() bool {
 		for _, pid := range node1.pubSub.ListPeers(badTopic.String()) {
 			if pid == unstakedNode.Host().ID() {
@@ -94,8 +97,10 @@ func TestFilterSubscribe(t *testing.T) {
 	wg.Wait()
 }
 
+// TestCanSubscribe tests that the subscription filter blocks a node from subscribing
+// to channels that its role shouldn't subscribe to
 func TestCanSubscribe(t *testing.T) {
-	identity, privateKey := createID(t, unittest.WithRole(flow.RoleCollection))
+	identity, privateKey := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 
 	collectionNode := createNode(t, identity.NodeID, privateKey, rootBlockID, createSubscriptionFilterPubsubOption(t, flow.IdentityList{identity}))
 	defer func() {

@@ -120,7 +120,7 @@ type NodeBuilder interface {
 
 type DefaultLibP2PNodeBuilder struct {
 	id               flow.Identifier
-	rootBlockID      flow.Identifier
+	rootBlockID      *flow.Identifier
 	logger           zerolog.Logger
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
@@ -157,7 +157,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetTopicValidation(enabled bool) NodeBu
 }
 
 func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId flow.Identifier) NodeBuilder {
-	builder.rootBlockID = rootBlockId
+	builder.rootBlockID = &rootBlockId
 	return builder
 }
 
@@ -208,10 +208,10 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, errors.New("unable to create libp2p pubsub: factory function not provided")
 	}
 
-	if builder.rootBlockID == flow.ZeroID {
+	if builder.rootBlockID == nil {
 		return nil, errors.New("root block ID must be provided")
 	}
-	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
+	node.flowLibP2PProtocolID = generateFlowProtocolID(*builder.rootBlockID)
 
 	var opts []config.Option
 
@@ -249,7 +249,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 
 	if builder.pingInfoProvider != nil {
-		pingLibP2PProtocolID := generatePingProtcolID(builder.rootBlockID)
+		pingLibP2PProtocolID := generatePingProtcolID(*builder.rootBlockID)
 		pingService := NewPingService(libp2pHost, pingLibP2PProtocolID, builder.pingInfoProvider, node.logger)
 		node.pingService = pingService
 	}
@@ -736,6 +736,7 @@ func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 		pubSubOptionFunc(pubsub.WithStrictSignatureVerification(true)),
 		// set max message size limit for 1-k PubSub messaging
 		pubSubOptionFunc(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
+		// no discovery
 	}
 }
 
