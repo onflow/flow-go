@@ -1050,9 +1050,10 @@ func (fnb *FlowNodeBuilder) extraFlagsValidation() {
 
 // loadRootProtocolSnapshot loads the root protocol snapshot from disk
 func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
-	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootProtocolStateSnapshot))
+	path := filepath.Join(dir, bootstrap.PathRootProtocolStateSnapshot)
+	data, err := io.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not read root snapshot (path=%s): %w", path, err)
 	}
 
 	var snapshot inmem.EncodableSnapshot
@@ -1066,9 +1067,10 @@ func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
 func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
-	data, err := io.ReadFile(filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID)))
+	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID))
+	data, err := io.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not read private node info (path=%s): %w", path, err)
 	}
 	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
@@ -1078,9 +1080,10 @@ func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoP
 // loadSecretsEncryptionKey loads the encryption key for the secrets database.
 // If the file does not exist, returns os.ErrNotExist.
 func loadSecretsEncryptionKey(dir string, myID flow.Identifier) ([]byte, error) {
-	data, err := io.ReadFile(filepath.Join(dir, fmt.Sprintf(bootstrap.PathSecretsEncryptionKey, myID)))
+	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathSecretsEncryptionKey, myID))
+	data, err := io.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("could not read key: %w", err)
+		return nil, fmt.Errorf("could not read secrets db encryption key (path=%s): %w", path, err)
 	}
 	return data, nil
 }
