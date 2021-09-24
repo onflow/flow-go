@@ -32,6 +32,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
@@ -74,7 +75,7 @@ func LibP2PGzipCompressedStream() LibP2PStreamFactoryFunc {
 			return nil, err
 		}
 
-		newCompressedStream(s)
+		return newCompressedStream(s, compressor.GzipStreamCompressor{})
 	}
 }
 
