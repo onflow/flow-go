@@ -362,7 +362,6 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 // handleIncomingStream handles an incoming stream from a remote peer
 // it is a callback that gets called for each incoming stream by libp2p with a new stream object
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
-
 	// qualify the logger with local and remote address
 	log := streamLogger(m.log, s)
 
