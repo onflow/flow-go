@@ -14,55 +14,56 @@ import (
 type RoleBasedFilter struct {
 	idProvider  id.IdentityProvider
 	myPeerID    peer.ID
+	myRole      *flow.Role
 	rootBlockID flow.Identifier
-	chainID     flow.ChainID
 }
 
-func NewRoleBasedFilter(pid peer.ID, rootBlockID flow.Identifier, chainID flow.ChainID, idProvider id.IdentityProvider) *RoleBasedFilter {
-	return &RoleBasedFilter{
-		idProvider,
-		pid,
-		rootBlockID,
-		chainID,
+func NewRoleBasedFilter(pid peer.ID, rootBlockID flow.Identifier, idProvider id.IdentityProvider) *RoleBasedFilter {
+	filter := &RoleBasedFilter{
+		idProvider:  idProvider,
+		myPeerID:    pid,
+		rootBlockID: rootBlockID,
 	}
+	filter.myRole = filter.getRole(pid)
+
+	return filter
 }
 
-func (f *RoleBasedFilter) allowedTopics(pid peer.ID) map[network.Topic]struct{} {
-	id, found := f.idProvider.ByPeerID(pid)
-	channels := engine.PublicChannels()
-	topics := make(map[network.Topic]struct{})
+func (f *RoleBasedFilter) getRole(pid peer.ID) *flow.Role {
+	if id, ok := f.idProvider.ByPeerID(pid); ok {
+		return &id.Role
+	}
 
-	if !found {
+	return nil
+}
+
+func (f *RoleBasedFilter) allowed(role *flow.Role, topic string) bool {
+	channel := engine.ChannelFromTopic(network.Topic(topic))
+
+	if role == nil {
 		// TODO: eventually we should have block proposals relayed on a separate
 		// channel on the public network. For now, we need to make sure that
 		// full observer nodes can subscribe to the block proposal channel.
-		channels = append(channels, engine.ReceiveBlocks)
+		return append(engine.PublicChannels(), engine.ReceiveBlocks).Contains(channel)
 	} else {
-		channels = append(channels, engine.ChannelsByRole(id.Role)...)
-
-		if engine.ClusterChannelRoles().Contains(id.Role) {
-			channels = append(channels, engine.ChannelConsensusCluster(f.chainID), engine.ChannelSyncCluster(f.chainID))
+		if roles, ok := engine.RolesByChannel(channel); ok {
+			return roles.Contains(*role)
 		}
-	}
 
-	for _, ch := range channels {
-		topics[engine.TopicFromChannel(ch, f.rootBlockID)] = struct{}{}
+		return false
 	}
-
-	return topics
 }
 
 func (f *RoleBasedFilter) CanSubscribe(topic string) bool {
-	_, allowed := f.allowedTopics(f.myPeerID)[network.Topic(topic)]
-	return allowed
+	return f.allowed(f.myRole, topic)
 }
 
 func (f *RoleBasedFilter) FilterIncomingSubscriptions(from peer.ID, opts []*pb.RPC_SubOpts) ([]*pb.RPC_SubOpts, error) {
-	allowedTopics := f.allowedTopics(from)
+	role := f.getRole(from)
 	var filtered []*pb.RPC_SubOpts
 
 	for _, opt := range opts {
-		if _, allowed := allowedTopics[network.Topic(opt.GetTopicid())]; allowed {
+		if f.allowed(role, opt.GetTopicid()) {
 			filtered = append(filtered, opt)
 		}
 	}

@@ -11,7 +11,7 @@ import (
 )
 
 // init is called first time this package is imported.
-// It creates and initializes the channelRoleMap map.
+// It creates and initializes channelRoleMap and clusterChannelPrefixRoleMap.
 func init() {
 	initializeChannelRoleMap()
 }
@@ -19,10 +19,18 @@ func init() {
 // channelRoleMap keeps a map between channels and the list of flow roles involved in them.
 var channelRoleMap map[network.Channel]flow.RoleList
 
+// clusterChannelPrefixRoleMap keeps a map between cluster channel prefixes and the list of flow roles involved in them.
+var clusterChannelPrefixRoleMap map[string]flow.RoleList
+
 // RolesByChannel returns list of flow roles involved in the channel.
+// If the given channel is a public channel, the returned list will
+// contain all roles.
 func RolesByChannel(channel network.Channel) (flow.RoleList, bool) {
-	if _, isCluster := ClusterChannel(channel); isCluster {
-		return ClusterChannelRoles(), true
+	if IsClusterChannel(channel) {
+		return ClusterChannelRoles(channel), true
+	}
+	if PublicChannels().Contains(channel) {
+		return flow.Roles(), true
 	}
 	roles, ok := channelRoleMap[channel]
 	return roles, ok
@@ -34,14 +42,10 @@ func Exists(channel network.Channel) bool {
 		return true
 	}
 
-	if _, ok := ClusterChannel(channel); ok {
-		return true
-	}
-
-	return PublicChannels().Contains(channel)
+	return false
 }
 
-// ChannelsByRole returns a list of all channels the role subscribes to.
+// ChannelsByRole returns a list of all channels the role subscribes to (except cluster-based channels and public channels).
 func ChannelsByRole(role flow.Role) network.ChannelList {
 	channels := make(network.ChannelList, 0)
 	for channel, roles := range channelRoleMap {
@@ -68,7 +72,7 @@ func UniqueChannels(channels network.ChannelList) network.ChannelList {
 	// We use identifier of RoleList to determine its uniqueness.
 	for _, channel := range channels {
 		// non-cluster channel deduplicated based identifier of role list
-		if _, cluster := ClusterChannel(channel); !cluster {
+		if !IsClusterChannel(channel) {
 			id := channelRoleMap[channel].ID()
 			if _, ok := added[id]; ok {
 				// a channel with same RoleList already added, hence skips
@@ -83,12 +87,13 @@ func UniqueChannels(channels network.ChannelList) network.ChannelList {
 	return uniques
 }
 
-// Channels returns all channels that nodes of any role have subscribed to.
+// Channels returns all channels that nodes of any role have subscribed to (except cluster-based channels).
 func Channels() network.ChannelList {
 	channels := make(network.ChannelList, 0)
 	for channel := range channelRoleMap {
 		channels = append(channels, channel)
 	}
+	channels = append(channels, PublicChannels()...)
 
 	return channels
 }
@@ -109,11 +114,11 @@ const (
 
 	// Channels for consensus protocols
 	ConsensusCommittee     = network.Channel("consensus-committee")
-	consensusClusterPrefix = network.Channel("consensus-cluster") // dynamic channel, use ChannelConsensusCluster function
+	consensusClusterPrefix = "consensus-cluster" // dynamic channel, use ChannelConsensusCluster function
 
 	// Channels for protocols actively synchronizing state across nodes
 	SyncCommittee     = network.Channel("sync-committee")
-	syncClusterPrefix = network.Channel("sync-cluster") // dynamic channel, use ChannelSyncCluster function
+	syncClusterPrefix = "sync-cluster" // dynamic channel, use ChannelSyncCluster function
 	SyncExecution     = network.Channel("sync-execution")
 
 	// Channels for dkg communication
@@ -197,26 +202,37 @@ func initializeChannelRoleMap() {
 	channelRoleMap[ProvideChunks] = flow.RoleList{flow.RoleExecution, flow.RoleVerification}
 	channelRoleMap[ProvideReceiptsByBlockID] = flow.RoleList{flow.RoleConsensus, flow.RoleExecution}
 	channelRoleMap[ProvideApprovalsByChunk] = flow.RoleList{flow.RoleConsensus, flow.RoleVerification}
+
+	clusterChannelPrefixRoleMap = make(map[string]flow.RoleList)
+
+	clusterChannelPrefixRoleMap[syncClusterPrefix] = flow.RoleList{flow.RoleCollection}
+	clusterChannelPrefixRoleMap[consensusClusterPrefix] = flow.RoleList{flow.RoleCollection}
 }
 
-// ClusterChannelRoles returns the list of roles that are involved in cluster-based channels.
-func ClusterChannelRoles() flow.RoleList {
-	return flow.RoleList{flow.RoleCollection}
-}
-
-// ClusterChannel returns true if channel is cluster-based.
-// At the current implementation, only collection nodes are involved in a cluster-based channels.
-// If the channel is a cluster-based one, this method also strips off the channel prefix and returns it.
-func ClusterChannel(channel network.Channel) (network.Channel, bool) {
-	if strings.HasPrefix(channel.String(), syncClusterPrefix.String()) {
-		return syncClusterPrefix, true
+// ClusterChannelRoles returns the list of roles that are involved in the given cluster-based channel.
+func ClusterChannelRoles(clusterChannel network.Channel) flow.RoleList {
+	if prefix, ok := clusterChannelPrefix(clusterChannel); ok {
+		return clusterChannelPrefixRoleMap[prefix]
 	}
 
-	if strings.HasPrefix(channel.String(), consensusClusterPrefix.String()) {
-		return consensusClusterPrefix, true
+	return flow.RoleList{}
+}
+
+func clusterChannelPrefix(clusterChannel network.Channel) (string, bool) {
+	for prefix := range clusterChannelPrefixRoleMap {
+		if strings.HasPrefix(clusterChannel.String(), prefix) {
+			return prefix, true
+		}
 	}
 
 	return "", false
+}
+
+// IsClusterChannel returns true if channel is cluster-based.
+// Currently, only collection nodes are involved in a cluster-based channels.
+func IsClusterChannel(channel network.Channel) bool {
+	_, ok := clusterChannelPrefix(channel)
+	return ok
 }
 
 // TopicFromChannel returns the unique LibP2P topic form the channel.
@@ -225,10 +241,18 @@ func ClusterChannel(channel network.Channel) (network.Channel, bool) {
 func TopicFromChannel(channel network.Channel, rootBlockID flow.Identifier) network.Topic {
 	// skip root block suffix, if this is a cluster specific channel. A cluster specific channel is inherently
 	// unique for each epoch
-	if _, isClusterChannel := ClusterChannel(channel); isClusterChannel {
+	if IsClusterChannel(channel) {
 		return network.Topic(channel)
 	}
 	return network.Topic(fmt.Sprintf("%s/%s", string(channel), rootBlockID.String()))
+}
+
+func ChannelFromTopic(topic network.Topic) network.Channel {
+	if IsClusterChannel(network.Channel(topic)) {
+		return network.Channel(topic)
+	}
+
+	return network.Channel(topic[strings.LastIndex(topic.String(), "/")+1:])
 }
 
 // ChannelConsensusCluster returns a dynamic cluster consensus channel based on
