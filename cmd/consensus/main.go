@@ -716,38 +716,6 @@ func main() {
 			viewsObserver := gadgets.NewViews()
 			node.ProtocolEvents.AddConsumer(viewsObserver)
 
-			// create flow client with correct GRPC configuration for QC contract client
-			var flowClient *client.Client
-			if insecureAccessAPI {
-				flowClient, err = common.InsecureFlowClient(accessAddress)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				if secureAccessNodeID == "" {
-					return nil, fmt.Errorf("invalid flag --secure-access-node-id required")
-				}
-
-				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
-				if err != nil {
-					return nil, fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
-				}
-
-				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))
-				if err != nil {
-					return nil, fmt.Errorf("could not get identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				if len(identities) < 1 {
-					return nil, fmt.Errorf("could not find identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				flowClient, err = common.SecureFlowClient(accessAddress, identities[0].NetworkPubKey.String()[2:])
-				if err != nil {
-					return nil, err
-				}
-			}
-
 			// construct DKG contract client
 			dkgContractClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
 			if err != nil {
