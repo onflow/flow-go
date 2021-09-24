@@ -5,7 +5,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// RandomBeaconReconstructor collects verified signature shares, and reconstructs the
+// RandomBeaconReconstructor collects signature shares, and reconstructs the
 // group signature with enough shares.
 type RandomBeaconReconstructor interface {
 	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message agreed about upfront.
@@ -48,31 +48,39 @@ func (t SigType) Valid() bool {
 	return t == SigTypeStaking || t == SigTypeRandomBeacon
 }
 
-// WeightedSignatureAggregator aggregates signatures of the same signature scheme from different signers.
-// The module is aware of weights assigned to each signer.
-// It can either be used to aggregate staking signatures or aggregate random beacon signatures,
-// but not a mix of both.
+// WeightedSignatureAggregator aggregates signatures of the same signature scheme and the same message from different signers.
+// The public keys and message are aggreed upon upfront.
+// It is also recommended to only aggregate signatures generated with keys representing equivalent security-bit level.
+// The module is aware of weights assigned to each signer, as well as a total weight threshold.
 // Implementation of SignatureAggregator must be concurrent safe.
 type WeightedSignatureAggregator interface {
-	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message.
-	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
+	// Verify verifies the signature under the stored public and message.
+	//
+	// The function errors:
+	//  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
+	//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
+	//  - random error if the execution failed
+	Verify(signerID flow.Identifier, sig crypto.Signature) error
 
-	// TrustedAdd adds an already verified signature, with weight for the given signer,
-	// and add it to the total weight, and returns the total weight that have been collected.
-	// return (1000, nil) means the signature has been added, and 1000 weight has been collected in total.
-	//   (1000 is just an example)
-	// return (1000, nil) means the signature is a duplication and 1000 weight has been collected in total.
+	// TrustedAdd adds a signature to the internal set of signatures and adds the signer's
+	// weight to the total collected weight, iff the signature is _not_ a duplicate.
+	//
+	// The total weight of all collected signatures (excluding duplicates) is returned regardless
+	// of any returned error.
+	// The function errors
+	//  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
+	//  - engine.DuplicatedEntryError if the signer has been already added
 	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (totalWeight uint64, exception error)
 
-	// TotalWeight returns the total weight presented by the collected sig shares.
+	// TotalWeight returns the total weight presented by the collected signatures.
 	TotalWeight() uint64
 
+	// Aggregate aggregates the signatures and returns the aggregated signature.
+	//
 	// Aggregate attempts to aggregate the internal signatures and returns the resulting signature data.
-	// It errors if not enough weights have been collected.
 	// The function performs a final verification and errors if the aggregated signature is not valid. This is
 	// required for the function safety since "TrustedAdd" allows adding invalid signatures.
-	// If called concurrently, only one thread will be running the aggregation.
-	Aggregate() ([]flow.Identifier, crypto.Signature, error)
+	Aggregate() ([]flow.Identifier, []byte, error)
 }
 
 // BlockSignatureData is an intermediate struct for Packer to pack the
@@ -80,18 +88,24 @@ type WeightedSignatureAggregator interface {
 type BlockSignatureData struct {
 	StakingSigners               []flow.Identifier
 	RandomBeaconSigners          []flow.Identifier
-	AggregatedStakingSig         []byte
-	AggregatedRandomBeaconSig    []byte
+	AggregatedStakingSig         []byte // if BLS is used, this is equivalent to crypto.Signature
+	AggregatedRandomBeaconSig    []byte // if BLS is used, this is equivalent to crypto.Signature
 	ReconstructedRandomBeaconSig crypto.Signature
 }
 
 // Packer packs aggregated signature data into raw bytes to be used in block header.
 type Packer interface {
-	// blockID is the block that the aggregated sig is for
-	// sig is the aggregated signature data
+	// blockID is the block that the aggregated signature is for.
+	// sig is the aggregated signature data.
+	// Expected error returns during normal operations:
+	//  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
 	Pack(blockID flow.Identifier, sig *BlockSignatureData) ([]flow.Identifier, []byte, error)
 
+	// Unpack de-serializes the provided signature data.
 	// blockID is the block that the aggregated sig is signed for
 	// sig is the aggregated signature data
+	// It returns:
+	//  - (sigData, nil) if successfully unpacked the signature data
+	//  - (nil, signature.ErrInvalidFormat) if failed to unpack the signature data
 	Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
 }
