@@ -510,7 +510,8 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 			continue
 		}
 
-		s, err = n.host.NewStream(ctx, peerID, n.flowLibP2PProtocolID)
+		// creates stream using stream factory
+		s, err = n.streamFactory(n.host, ctx, peerID, n.flowLibP2PProtocolID)
 		if err != nil {
 			// if the stream creation failed due to invalid protocol id, skip the re-attempt
 			if strings.Contains(err.Error(), "protocol not supported") {
