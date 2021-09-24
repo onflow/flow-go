@@ -42,7 +42,7 @@ import (
 
 const (
 
-	// maximum time to wait for a ping reply from a remote node
+	// PingTimeout is maximum time to wait for a ping reply from a remote node
 	PingTimeout = time.Second * 4
 
 	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
