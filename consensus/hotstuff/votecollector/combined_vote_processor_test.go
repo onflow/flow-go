@@ -1,18 +1,19 @@
 package votecollector
 
 import (
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/mock"
 	"testing"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 )
 
 func TestCombinedVoteProcessor(t *testing.T) {
@@ -120,7 +121,7 @@ func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
 func (s *CombinedVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
 	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
-		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(true, nil)
+		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
 		err := s.processor.Process(vote)
 		require.NoError(s.T(), err)
 	}
@@ -136,7 +137,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
 func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
-		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(true, nil)
+		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
 		err := s.processor.Process(vote)
 		require.NoError(s.T(), err)
 	}
@@ -163,7 +164,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 
 	for i := uint64(0); i < s.minRequiredShares; i++ {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
-		s.rbSigAggregator.On("Verify", vote.SignerID, mock.Anything).Return(true, nil)
+		s.rbSigAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
 		err := s.processor.Process(vote)
 		require.NoError(s.T(), err)
 	}

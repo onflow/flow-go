@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
@@ -38,7 +39,7 @@ func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Comm
 		base: &CombinedBaseVoteProcessorFactory{
 			log:       log,
 			committee: committee,
-			packer:    &signature.ConsensusSigPackerImpl{}, // TODO: initialize properly when ready
+			packer:    signature.NewConsensusSigDataPacker(committee),
 			onQCCreated: func(qc *flow.QuorumCertificate) {
 				err := eventHandler.OnQCConstructed(qc)
 				if err != nil {
@@ -83,12 +84,19 @@ func (f *CombinedBaseVoteProcessorFactory) Create(proposal *model.Proposal) (hot
 	}
 
 	// message that has to be verified against aggregated signature
-	_ = verification.MakeVoteMessage(proposal.Block.View, proposal.Block.BlockID)
+	msg := verification.MakeVoteMessage(proposal.Block.View, proposal.Block.BlockID)
 
-	// TODO: initialize properly when ready
-	stakingSigAggtor := &signature.WeightedSignatureAggregator{}
-	rbSigAggtor := &signature.WeightedSignatureAggregator{}
-	rbRector := &signature.RandomBeaconReconstructor{}
+	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.ConsensusVoteTag)
+	if err != nil {
+		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
+	}
+
+	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.ConsensusVoteTag)
+	if err != nil {
+		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
+	}
+
+	rbRector := &signature.RandomBeaconReconstructor{} // TODO: initialize properly when ready
 
 	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
 
