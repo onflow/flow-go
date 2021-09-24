@@ -170,7 +170,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 	})
 
 	invalidInput := engine.NewInvalidInputError("some error")
-	//duplicate := engine.NewDuplicatedEntryErrorf("some error")
+	duplicate := engine.NewDuplicatedEntryErrorf("some error")
 
 	// Unhappy paths
 	t.Run("invalid signer ID", func(t *testing.T) {
@@ -186,29 +186,30 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		assert.Equal(t, uint64(0), weight)
 		assert.Error(t, err)
 		assert.IsType(t, invalidInput, err)
-	}) /*
+	})
 
-		t.Run("duplicate signature", func(t *testing.T) {
-			aggregator, sigs := createAggregationData(t, signersNum)
-			for i, sig := range sigs {
-				err := aggregator.TrustedAdd(i, sig)
-				require.NoError(t, err)
-			}
-			// TrustedAdd
-			for i := range sigs {
-				err := aggregator.TrustedAdd(i, sigs[i]) // same signature for same index
-				assert.Error(t, err)
-				assert.IsType(t, duplicate, err)
-				err = aggregator.TrustedAdd(0, sigs[(i+1)%signersNum]) // different signature for same index
-				assert.Error(t, err)
-				assert.IsType(t, duplicate, err)
-				// VerifyAndAdd
-				ok, err := aggregator.VerifyAndAdd(i, sigs[i]) // valid but redundant signature
-				assert.False(t, ok)
-				assert.Error(t, err)
-				assert.IsType(t, duplicate, err)
-			}
-		})
+	t.Run("duplicate signature", func(t *testing.T) {
+		aggregator, ids, sigs, _, _ := createAggregationData(t, signersNum)
+		expectedWeight := uint64(0)
+		// add a few signatures
+		for i, sig := range sigs {
+			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sig)
+			expectedWeight += ids[i].Stake
+			assert.Equal(t, expectedWeight, weight)
+			require.NoError(t, err)
+		}
+		// add same duplicates
+		for i := range sigs {
+			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sigs[i]) // same signature for same index
+			assert.Equal(t, expectedWeight, weight)
+			assert.Error(t, err)
+			assert.IsType(t, duplicate, err)
+			weight, err = aggregator.TrustedAdd(ids[i].NodeID, sigs[(i+1)%signersNum]) // different signature for same index
+			assert.Equal(t, expectedWeight, weight)
+			assert.Error(t, err)
+			assert.IsType(t, duplicate, err)
+		}
+	}) /*
 
 		t.Run("invalid signature", func(t *testing.T) {
 			aggregator, sigs := createAggregationData(t, signersNum)

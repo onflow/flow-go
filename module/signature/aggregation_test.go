@@ -175,7 +175,7 @@ func TestAggregatorSameMessage(t *testing.T) {
 			err := aggregator.TrustedAdd(i, sigs[i]) // same signature for same index
 			assert.Error(t, err)
 			assert.IsType(t, duplicate, err)
-			err = aggregator.TrustedAdd(0, sigs[(i+1)%signersNum]) // different signature for same index
+			err = aggregator.TrustedAdd(i, sigs[(i+1)%signersNum]) // different signature for same index
 			assert.Error(t, err)
 			assert.IsType(t, duplicate, err)
 			// VerifyAndAdd
