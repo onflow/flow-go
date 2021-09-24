@@ -114,7 +114,7 @@ type NodeBuilder interface {
 	SetTopicValidation(bool) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
 	SetResolver(*dns.Resolver) NodeBuilder
-	SetStreamCompressor(LibP2PStreamCompressorWrapperFunc) NodeBuilder
+	EnableStreamCompressor(bool) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -192,8 +192,10 @@ func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *dns.Resolver) Nod
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetStreamCompressor(factory LibP2PStreamCompressorWrapperFunc) NodeBuilder {
-	builder.streamFactory = factory
+func (builder *DefaultLibP2PNodeBuilder) EnableStreamCompressor(enable bool) NodeBuilder {
+	if enable {
+		builder.streamFactory = WithGzipCompression
+	}
 	return builder
 }
 
