@@ -391,14 +391,9 @@ const TransferTxTemplate = `
 			}
 		}`
 
-// BenchmarkRuntimeNFTBatchTransfer simulates executing blocks with `transactionsPerBlock`
-// where each transaction transfers `testTokensPerTransaction` testTokens (NFTs)
+// BenchmarkRuntimeNFTBatchTransfer runs BenchRunNFTBatchTransfer with BasicBlockExecutor
 func BenchmarkRuntimeNFTBatchTransfer(b *testing.B) {
-	transactionsPerBlock := 10
-	testTokensPerTransaction := 10
-
 	blockExecutor := NewBasicBlockExecutor(b, flow.Testnet.Chain())
-	serviceAccount := blockExecutor.ServiceAccount(b)
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(3)
@@ -407,6 +402,19 @@ func BenchmarkRuntimeNFTBatchTransfer(b *testing.B) {
 	// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
 	accounts := blockExecutor.SetupAccounts(b, privateKeys)
 
+	BenchRunNFTBatchTransfer(b, blockExecutor, accounts)
+}
+
+// BenchRunNFTBatchTransfer simulates executing blocks with `transactionsPerBlock`
+// where each transaction transfers `testTokensPerTransaction` testTokens (NFTs)
+func BenchRunNFTBatchTransfer(b *testing.B,
+	blockExecutor TestBenchBlockExecutor,
+	accounts []TestBenchAccount) {
+
+	transactionsPerBlock := 10
+	testTokensPerTransaction := 10
+
+	serviceAccount := blockExecutor.ServiceAccount(b)
 	// deploy NFT
 	nftAccount := accounts[0]
 	deployNFT(b, blockExecutor, &nftAccount)
