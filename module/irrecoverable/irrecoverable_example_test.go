@@ -79,7 +79,7 @@ func NewExampleComponent(id int) *ExampleComponent {
 
 // start the component and register its shutdown handler
 // this component will throw an error after 20ms to demonstrate the error handling
-func (c *ExampleComponent) Start(ctx irrecoverable.SignalerContext) error {
+func (c *ExampleComponent) Start(ctx irrecoverable.SignalerContext) {
 	c.lm.OnStart(func() {
 		go c.shutdownOnCancel(ctx)
 
@@ -101,8 +101,6 @@ func (c *ExampleComponent) Start(ctx irrecoverable.SignalerContext) error {
 			}
 		}()
 	})
-
-	return nil
 }
 
 // run the lifecycle OnStop when the component's context is cancelled

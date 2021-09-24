@@ -46,7 +46,7 @@ func (n *NoopReadDoneAware) Done() <-chan struct{} {
 // Startable provides an interface to start a component. Once started, the component
 // can be stopped by cancelling the given context.
 type Startable interface {
-	Start(irrecoverable.SignalerContext) error
+	Start(irrecoverable.SignalerContext)
 }
 
 type Component interface {
@@ -86,11 +86,9 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 		irrecoverables = make(chan error)
 		signalingCtx = irrecoverable.WithSignaler(runCtx, irrecoverable.NewSignaler(irrecoverables))
 
-		// start the component
-		if err = component.Start(signalingCtx); err != nil {
-			cancel()
-			return
-		}
+		// the component must be started in a separate goroutine in case an irrecoverable error
+		// is thrown during the call to Start, which terminates the calling goroutine
+		go component.Start(signalingCtx)
 
 		done = component.Done()
 		return
