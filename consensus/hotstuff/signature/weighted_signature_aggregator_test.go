@@ -138,6 +138,9 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 			assert.NoError(t, err)
 			expectedWeight += ids[index].Stake
 			assert.Equal(t, expectedWeight, weight)
+			// test TotalWeight
+			assert.Equal(t, expectedWeight, aggregator.TotalWeight())
+
 		}
 		signers, agg, err := aggregator.Aggregate()
 		assert.NoError(t, err)
@@ -186,6 +189,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 
 		weight, err := aggregator.TrustedAdd(invalidId, sigs[0])
 		assert.Equal(t, uint64(0), weight)
+		assert.Equal(t, uint64(0), aggregator.TotalWeight())
 		assert.Error(t, err)
 		assert.IsType(t, invalidInput, err)
 	})
