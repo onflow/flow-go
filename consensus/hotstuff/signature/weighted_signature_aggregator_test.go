@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -171,6 +172,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 
 	invalidInput := engine.NewInvalidInputError("some error")
 	duplicate := engine.NewDuplicatedEntryErrorf("some error")
+	invalidSig := signature.ErrInvalidFormat
 
 	// Unhappy paths
 	t.Run("invalid signer ID", func(t *testing.T) {
@@ -209,35 +211,30 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 			assert.Error(t, err)
 			assert.IsType(t, duplicate, err)
 		}
-	}) /*
+	})
 
-		t.Run("invalid signature", func(t *testing.T) {
-			aggregator, sigs := createAggregationData(t, signersNum)
-			// corrupt sigs[0]
-			sigs[0][4] ^= 1
-			// test Verify
-			ok, err := aggregator.Verify(0, sigs[0])
+	t.Run("invalid signature", func(t *testing.T) {
+		aggregator, ids, sigs, _, _ := createAggregationData(t, signersNum)
+		// corrupt sigs[0]
+		sigs[0][4] ^= 1
+		// test Verify
+		err := aggregator.Verify(ids[0].NodeID, sigs[0])
+		require.Error(t, err)
+		assert.IsType(t, invalidSig, err)
+
+		// add signatures for aggregation including corrupt sigs[0]
+		expectedWeight := uint64(0)
+		for i, sig := range sigs {
+			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sig)
 			require.NoError(t, err)
-			assert.False(t, ok)
-			// test Verify and Add
-			ok, err = aggregator.VerifyAndAdd(0, sigs[0])
-			require.NoError(t, err)
-			assert.False(t, ok)
-			// check signature is still not added
-			ok, err = aggregator.HasSignature(0)
-			require.NoError(t, err)
-			assert.False(t, ok)
-			// add signatures for aggregation including corrupt sigs[0]
-			for i, sig := range sigs {
-				err := aggregator.TrustedAdd(i, sig)
-				require.NoError(t, err)
-			}
-			signers, agg, err := aggregator.Aggregate()
-			assert.Error(t, err)
-			assert.Nil(t, agg)
-			assert.Nil(t, signers)
-			// fix sigs[0]
-			sigs[0][4] ^= 1
-		})
-	*/
+			expectedWeight += ids[i].Stake
+			assert.Equal(t, expectedWeight, weight)
+		}
+		signers, agg, err := aggregator.Aggregate()
+		assert.Error(t, err)
+		assert.Nil(t, agg)
+		assert.Nil(t, signers)
+		// fix sigs[0]
+		sigs[0][4] ^= 1
+	})
 }
