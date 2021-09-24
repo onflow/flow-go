@@ -13,26 +13,20 @@ import (
 )
 
 /*
-#include <stdlib.h>
-
+// check if the amd64 machine supports AVX512 instructions at build time and call
+// an assembly function using AVX512 if so.
 #if (__AVX512CD__ |  __AVX512ER__ | __AVX512F__ | __AVX512PF__ == 1)
-void KeccakP1600_Permute_24rounds(void *state);
-
-void callKeccakF1600(unsigned long* state) {
-	KeccakP1600_Permute_24rounds(state);
-}
+void KeccakF1600_AVX512(void *state);
 #else
-void callKeccakF1600(unsigned long* state) {
-
-}
+void KeccakF1600_AVX512(unsigned long* state) {};
 #endif
 */
 import "C"
 
 func keccakF1600(a *[25]uint64) {
 	if cpu.X86.HasAVX512 {
-		C.callKeccakF1600((*C.ulong)(&a[0]))
+		C.KeccakF1600_AVX512((*C.ulong)(&a[0]))
 	} else {
-		keccak.KeccakF1600(a)
+		keccak.KeccakF1600GenericAMD(a)
 	}
 }

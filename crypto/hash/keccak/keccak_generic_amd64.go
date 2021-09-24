@@ -7,5 +7,5 @@
 
 package keccak
 
-// this is called when AVX512 is unavailable
-func KeccakF1600(a *[25]uint64)
+// this is called for amd64 when AVX512 is unavailable
+func KeccakF1600GenericAMD(a *[25]uint64)

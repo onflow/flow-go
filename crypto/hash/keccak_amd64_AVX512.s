@@ -9,7 +9,7 @@
 # For further details see http://www.openssl.org/~appro/cryptogams/.
 #
 # Notes:
-# The code for the permutation (__KeccakF1600) was generated with
+# The code for the permutation (__KeccakF1600GenericAMD) was generated with
 # Andy Polyakov's keccak1600-avx512.pl from the CRYPTOGAMS project
 # (https://github.com/dot-asm/cryptogams/blob/master/x86_64/keccak1600-avx512.pl).
 # The rest of the code was written by Ronny Van Keer.
@@ -349,10 +349,10 @@ KeccakP1600_ExtractAndAddBytes_Exit:
 #
 .text
 .ifndef no_type
-.type    __KeccakF1600,@function
+.type    __KeccakF1600GenericAMD,@function
 .endif
 .balign 32
-__KeccakF1600:
+__KeccakF1600GenericAMD:
 .Loop_avx512:
     ######################################### Theta, even round
     vmovdqa64    %zmm0,%zmm5        # put aside original A00
@@ -460,23 +460,23 @@ __KeccakF1600:
     jnz        .Loop_avx512
     ret
 .ifndef no_size
-.size    __KeccakF1600,.-__KeccakF1600
+.size    __KeccakF1600GenericAMD,.-__KeccakF1600GenericAMD
 .endif
 
 # -----------------------------------------------------------------------------
 #
-# void KeccakP1600_Permute_24rounds(void *state);
+# void KeccakF1600GenericAMD_AVX512(void *state);
 #                                        %rdi
 #
 .ifdef add_underscore
 .globl  _KeccakP1600_Permute_24rounds
 _KeccakP1600_Permute_24rounds:
 .else
-.globl  KeccakP1600_Permute_24rounds
+.globl  KeccakF1600_AVX512
 .ifndef no_type
-.type   KeccakP1600_Permute_24rounds,@function
+.type   KeccakF1600_AVX512,@function
 .endif
-KeccakP1600_Permute_24rounds:
+KeccakF1600_AVX512:
 .endif
 .balign 32
     lea         96(%rdi),%rdi
@@ -525,7 +525,7 @@ KeccakP1600_Permute_24rounds:
     vzeroupper
     ret
 .ifndef no_size
-.size   KeccakP1600_Permute_24rounds,.-KeccakP1600_Permute_24rounds
+.size   KeccakF1600_AVX512,.-KeccakF1600_AVX512
 .endif
 
 # -----------------------------------------------------------------------------
@@ -859,10 +859,10 @@ KeccakF1600_FastLoop_Absorb_LanesAddLoop:
 .ifdef add_underscore
     call            _KeccakP1600_Permute_24rounds
 .else
-    call            KeccakP1600_Permute_24rounds
+    call            KeccakF1600_AVX512
 .endif
 .else
-    call            KeccakP1600_Permute_24rounds@PLT
+    call            KeccakF1600_AVX512@PLT
 .endif
     pop             %rcx
     pop             %rdx
