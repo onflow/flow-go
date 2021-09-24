@@ -684,12 +684,19 @@ func (n *Node) SetFlowProtocolStreamHandler(handler libp2pnet.StreamHandler) {
 		if err != nil {
 			n.logger.Error().Err(err).Msg("could not create compressed stream")
 		}
+		handler(s)
 	})
 }
 
 // SetPingStreamHandler sets the stream handler for the Flow Ping protocol.
 func (n *Node) SetPingStreamHandler(handler libp2pnet.StreamHandler) {
-	n.host.SetStreamHandler(n.flowLibP2PProtocolID, handler)
+	n.host.SetStreamHandler(n.flowLibP2PProtocolID, func(s libp2pnet.Stream) {
+		s, err := n.compressedStream(s)
+		if err != nil {
+			n.logger.Error().Err(err).Msg("could not create compressed stream")
+		}
+		handler(s)
+	})
 }
 
 // IsConnected returns true is address is a direct peer of this node else false
