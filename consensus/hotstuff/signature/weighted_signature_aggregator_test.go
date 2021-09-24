@@ -3,6 +3,7 @@ package signature
 import (
 	"bytes"
 	"crypto/rand"
+	"errors"
 	"sort"
 	"testing"
 
@@ -33,7 +34,7 @@ func sortIdentifiers(ids []flow.Identifier) []flow.Identifier {
 }
 
 func createAggregationData(t *testing.T, signersNumber int) (
-	hotstuff.WeightedSignatureAggregator, []flow.Identity, []crypto.Signature) {
+	hotstuff.WeightedSignatureAggregator, []flow.Identity, []crypto.Signature, []byte, string) {
 	// create identities
 	ids := make([]flow.Identity, 0, signersNumber)
 	for i := 0; i < signersNumber; i++ {
@@ -64,7 +65,34 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	}
 	aggregator, err := NewWeightedSignatureAggregator(ids, msg, tag)
 	require.NoError(t, err)
-	return aggregator, ids, sigs
+	return aggregator, ids, sigs, msg, tag
+}
+
+func verifyAggregate(signers []flow.Identifier, ids []flow.Identity, sig []byte,
+	msg []byte, tag string) (bool, error) {
+	// query identity using identifier
+	// done linearly just for testing
+	getIdentity := func(signer flow.Identifier) *flow.Identity {
+		for _, id := range ids {
+			if id.NodeID == signer {
+				return &id
+			}
+		}
+		return nil
+	}
+
+	// get keys
+	keys := make([]crypto.PublicKey, 0, len(ids))
+	for _, signer := range signers {
+		id := getIdentity(signer)
+		if id == nil {
+			return false, errors.New("unexpected test error")
+		}
+		keys = append(keys, id.StakingPubKey)
+	}
+	// verify signature
+	hasher := crypto.NewBLSKMAC(tag)
+	return crypto.VerifyBLSSignatureOneMessage(keys, sig, msg, hasher)
 }
 
 func TestWeightedSignatureAggregator(t *testing.T) {
@@ -95,7 +123,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 
 	// Happy paths
 	t.Run("happy path", func(t *testing.T) {
-		aggregator, ids, sigs := createAggregationData(t, signersNum)
+		aggregator, ids, sigs, msg, tag := createAggregationData(t, signersNum)
 		// only add half of the signatures
 		subSet := signersNum / 2
 		var expectedWeight uint64
@@ -110,11 +138,11 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 			expectedWeight += ids[index].Stake
 			assert.Equal(t, expectedWeight, weight)
 		}
-		signers, _, err := aggregator.Aggregate()
+		signers, agg, err := aggregator.Aggregate()
 		assert.NoError(t, err)
-		//ok, err := verifyAggregate(signers, agg)
-		//assert.NoError(t, err)
-		//assert.True(t, ok)
+		ok, err := verifyAggregate(signers, ids, agg, msg, tag)
+		assert.NoError(t, err)
+		assert.True(t, ok)
 		// check signers
 		signers = sortIdentifiers(signers)
 		for i := 0; i < subSet; i++ {
@@ -129,11 +157,11 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 			expectedWeight += ids[i].Stake
 			assert.Equal(t, expectedWeight, weight)
 		}
-		signers, _, err = aggregator.Aggregate()
+		signers, agg, err = aggregator.Aggregate()
 		assert.NoError(t, err)
-		//ok, err = verifyAggregate(signers, agg)
-		//assert.NoError(t, err)
-		//assert.True(t, ok)
+		ok, err = verifyAggregate(signers, ids, agg, msg, tag)
+		assert.NoError(t, err)
+		assert.True(t, ok)
 		// check signers
 		signers = sortIdentifiers(signers)
 		for i := 0; i < signersNum; i++ {

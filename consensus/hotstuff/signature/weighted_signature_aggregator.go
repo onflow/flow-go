@@ -20,7 +20,7 @@ type signerInfo struct {
 // WeightedSignatureAggregator implements consensus/hotstuff.WeightedSignatureAggregator
 type WeightedSignatureAggregator struct {
 	aggregator   *signature.SignatureAggregatorSameMessage // low level crypto aggregator, agnostic of weights and flow IDs
-	signers      []flow.Identity                           //nolint:unused
+	ids          []flow.Identity                           //nolint:unused
 	idToSigner   map[flow.Identifier]signerInfo
 	totalWeight  uint64                       // weight collected
 	lock         sync.RWMutex                 // lock for atomic updates
@@ -38,14 +38,14 @@ var _ hotstuff.WeightedSignatureAggregator = &WeightedSignatureAggregator{}
 //
 // A weighted aggregator is used for one aggregation only. A new instance should be used for each use.
 func NewWeightedSignatureAggregator(
-	signers []flow.Identity, // list of all possible signers
+	ids []flow.Identity, // list of all possible signers
 	message []byte, // message to get an aggregated signature for
 	dsTag string, // domain separation tag used by the signature
 ) (*WeightedSignatureAggregator, error) {
 
 	// build a low level crypto aggregator
-	publicKeys := make([]crypto.PublicKey, 0, len(signers))
-	for _, id := range signers {
+	publicKeys := make([]crypto.PublicKey, 0, len(ids))
+	for _, id := range ids {
 		publicKeys = append(publicKeys, id.StakingPubKey)
 	}
 	agg, err := signature.NewSignatureAggregatorSameMessage(message, dsTag, publicKeys)
@@ -56,13 +56,13 @@ func NewWeightedSignatureAggregator(
 	// build the weighted aggregator
 	weightedAgg := &WeightedSignatureAggregator{
 		aggregator:   agg,
-		signers:      signers,
+		ids:          ids,
 		idToSigner:   make(map[flow.Identifier]signerInfo),
 		collectedIDs: make(map[flow.Identifier]struct{}),
 	}
 
 	// build the internal map for a faster look-up
-	for i, id := range signers {
+	for i, id := range ids {
 		weightedAgg.idToSigner[id.NodeID] = signerInfo{
 			weight: id.Stake,
 			index:  i,
@@ -169,7 +169,7 @@ func (w *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, er
 	}
 	signerIDs := make([]flow.Identifier, 0, len(indices))
 	for _, index := range indices {
-		signerIDs = append(signerIDs, w.signers[index].NodeID)
+		signerIDs = append(signerIDs, w.ids[index].NodeID)
 	}
 
 	return signerIDs, aggSignature, nil
