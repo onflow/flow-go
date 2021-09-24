@@ -214,11 +214,6 @@ func TestAggregatorSameMessage(t *testing.T) {
 		// fix sigs[0]
 		sigs[0][4] ^= 1
 	})
-
-	// cached aggregated signature
-	t.Run("cached aggregated signature", func(t *testing.T) {
-
-	})
 }
 
 func TestKeyAggregator(t *testing.T) {

@@ -12,7 +12,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/crypto"
-	_ "github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -168,45 +168,25 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 			assert.Equal(t, signers[i], ids[i].NodeID)
 		}
 	})
-	/*
-		invalidInput := engine.NewInvalidInputError("some error")
-		duplicate := newErrDuplicatedSigner("some error")
 
-		// Unhappy paths
-		t.Run("invalid inputs", func(t *testing.T) {
-			aggregator, sigs := createAggregationData(t, signersNum)
-			// loop through invalid inputs
-			for _, index := range []int{-1, signersNum} {
-				ok, err := aggregator.Verify(index, sigs[0])
-				assert.False(t, ok)
-				assert.Error(t, err)
-				assert.IsType(t, invalidInput, err)
+	invalidInput := engine.NewInvalidInputError("some error")
+	//duplicate := engine.NewDuplicatedEntryErrorf("some error")
 
-				ok, err = aggregator.VerifyAndAdd(index, sigs[0])
-				assert.False(t, ok)
-				assert.Error(t, err)
-				assert.IsType(t, invalidInput, err)
+	// Unhappy paths
+	t.Run("invalid signer ID", func(t *testing.T) {
+		aggregator, _, sigs, _, _ := createAggregationData(t, signersNum)
+		// generate an ID that is not in the node ID list
+		invalidId := unittest.IdentityFixture().NodeID
 
-				err = aggregator.TrustedAdd(index, sigs[0])
-				assert.Error(t, err)
-				assert.IsType(t, invalidInput, err)
+		err := aggregator.Verify(invalidId, sigs[0])
+		assert.Error(t, err)
+		assert.IsType(t, invalidInput, err)
 
-				ok, err = aggregator.HasSignature(index)
-				assert.False(t, ok)
-				assert.Error(t, err)
-				assert.IsType(t, invalidInput, err)
-
-				ok, err = aggregator.VerifyAggregate([]int{index}, sigs[0])
-				assert.False(t, ok)
-				assert.Error(t, err)
-				assert.IsType(t, invalidInput, err)
-			}
-			// empty list
-			ok, err := aggregator.VerifyAggregate([]int{}, sigs[0])
-			assert.False(t, ok)
-			assert.Error(t, err)
-			assert.IsType(t, invalidInput, err)
-		})
+		weight, err := aggregator.TrustedAdd(invalidId, sigs[0])
+		assert.Equal(t, uint64(0), weight)
+		assert.Error(t, err)
+		assert.IsType(t, invalidInput, err)
+	}) /*
 
 		t.Run("duplicate signature", func(t *testing.T) {
 			aggregator, sigs := createAggregationData(t, signersNum)
@@ -258,9 +238,5 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 			// fix sigs[0]
 			sigs[0][4] ^= 1
 		})
-
-		// cached aggregated signature
-		t.Run("cached aggregated signature", func(t *testing.T) {
-
-		})*/
+	*/
 }
