@@ -2,6 +2,7 @@ package irrecoverable
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"runtime"
 )
@@ -19,8 +20,9 @@ func NewSignaler(errors chan<- error) *Signaler {
 // anywhere there's something connected to the error channel
 func (e *Signaler) Throw(err error) {
 	defer func() {
-		recover()
-		// TODO: log unhandled irrecoverable if return value from recover is not nil
+		if r := recover(); r != nil {
+			log.Default().Println(fmt.Errorf("unhandled irrecoverable: %w", err))
+		}
 		runtime.Goexit()
 	}()
 	e.errors <- err
