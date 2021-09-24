@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -19,15 +18,13 @@ type signerInfo struct {
 
 // WeightedSignatureAggregator implements consensus/hotstuff.WeightedSignatureAggregator
 type WeightedSignatureAggregator struct {
-	aggregator   *signature.SignatureAggregatorSameMessage // low level crypto aggregator, agnostic of weights and flow IDs
+	aggregator   *signature.SignatureAggregatorSameMessage // low level crypto BLS aggregator, agnostic of weights and flow IDs
 	ids          []flow.Identity                           //nolint:unused
-	idToSigner   map[flow.Identifier]signerInfo
+	idToInfo     map[flow.Identifier]signerInfo
 	totalWeight  uint64                       // weight collected
-	lock         sync.RWMutex                 // lock for atomic updates
 	collectedIDs map[flow.Identifier]struct{} // map of collected IDs
+	lock         sync.RWMutex                 // lock for atomic updates
 }
-
-var _ hotstuff.WeightedSignatureAggregator = &WeightedSignatureAggregator{}
 
 // NewWeightedSignatureAggregator returns a weighted aggregator initialized with a list of flow
 // identities, a message and a domain separation tag. The identities represent the list of all
@@ -57,13 +54,13 @@ func NewWeightedSignatureAggregator(
 	weightedAgg := &WeightedSignatureAggregator{
 		aggregator:   agg,
 		ids:          ids,
-		idToSigner:   make(map[flow.Identifier]signerInfo),
+		idToInfo:     make(map[flow.Identifier]signerInfo),
 		collectedIDs: make(map[flow.Identifier]struct{}),
 	}
 
 	// build the internal map for a faster look-up
 	for i, id := range ids {
-		weightedAgg.idToSigner[id.NodeID] = signerInfo{
+		weightedAgg.idToInfo[id.NodeID] = signerInfo{
 			weight: id.Stake,
 			index:  i,
 		}
@@ -79,7 +76,7 @@ func NewWeightedSignatureAggregator(
 //  - random error if the execution failed
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
-	info, ok := w.idToSigner[signerID]
+	info, ok := w.idToInfo[signerID]
 	if !ok {
 		return engine.NewInvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
 	}
@@ -117,7 +114,7 @@ func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 
 	currentWeight := w.TotalWeight()
 
-	info, found := w.idToSigner[signerID]
+	info, found := w.idToInfo[signerID]
 	if !found {
 		return currentWeight, engine.NewInvalidInputErrorf("couldn't find signerID %s in the map", signerID)
 	}
