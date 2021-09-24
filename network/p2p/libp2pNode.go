@@ -123,6 +123,7 @@ type NodeBuilder interface {
 	SetTopicValidation(bool) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
 	SetResolver(*dns.Resolver) NodeBuilder
+	SetStreamCompressor(LibP2PStreamFactoryFunc) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -134,6 +135,7 @@ type DefaultLibP2PNodeBuilder struct {
 	connMngr         TagLessConnManager
 	pingInfoProvider PingInfoProvider
 	resolver         *dns.Resolver
+	streamFactory    LibP2PStreamFactoryFunc
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
@@ -199,6 +201,11 @@ func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *dns.Resolver) Nod
 	return builder
 }
 
+func (builder *DefaultLibP2PNodeBuilder) SetStreamCompressor(factory LibP2PStreamFactoryFunc) NodeBuilder {
+	builder.streamFactory = factory
+	return builder
+}
+
 func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	node := &Node{
 		id:              builder.id,
@@ -206,6 +213,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		subs:            make(map[flownet.Topic]*pubsub.Subscription),
 		logger:          builder.logger,
 		topicValidation: builder.topicValidation,
+		streamFactory:   LibP2PDefaultStream(),
 	}
 
 	if builder.hostMaker == nil {
@@ -255,6 +263,10 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		}
 
 		opts = append(opts, libp2p.MultiaddrResolver(libp2pResolver))
+	}
+
+	if builder.streamFactory != nil {
+		node.streamFactory = builder.streamFactory
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -319,6 +331,7 @@ type Node struct {
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
+	streamFactory        LibP2PStreamFactoryFunc
 	pingService          *PingService
 	connMgr              TagLessConnManager
 	dht                  *dht.IpfsDHT
