@@ -2,6 +2,7 @@
 package votecollector
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -10,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
 )
 
 // StakingVoteProcessorFactory generates StakingVoteProcessor instances
@@ -64,12 +66,12 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	if p.done.Load() {
 		return nil
 	}
-	valid, err := p.stakingSigAggtor.Verify(vote.SignerID, vote.SigData)
+	err = p.stakingSigAggtor.Verify(vote.SignerID, vote.SigData)
 	if err != nil {
+		if errors.Is(err, msig.ErrInvalidFormat) {
+			return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
+		}
 		return fmt.Errorf("internal error checking signature validity: %w", err)
-	}
-	if !valid {
-		return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
 	}
 
 	if p.done.Load() {
