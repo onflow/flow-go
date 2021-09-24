@@ -701,8 +701,8 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	pingInfoProvider, _, _ := MockPingInfoProvider()
 
 	// dns resolver
-	resolver, err := dns.NewResolver(metrics.NewNoopCollector())
-	require.NoError(t, err)
+	resolver := dns.NewResolver(metrics.NewNoopCollector())
+	unittest.RequireCloseBefore(t, resolver.Ready(), 10*time.Millisecond, "could not start resolver")
 
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := NewConnManager(log, noopMetrics)

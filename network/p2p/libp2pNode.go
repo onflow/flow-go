@@ -75,10 +75,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 
 	connGater := NewConnGater(log)
 
-	resolver, err := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
-	if err != nil {
-		return nil, fmt.Errorf("could not create dns resolver: %w", err)
-	}
+	resolver := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
 
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
@@ -102,7 +99,7 @@ type NodeBuilder interface {
 	SetDHTOptions(...dht.Option) NodeBuilder
 	SetTopicValidation(bool) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
-	SetResolver(resolver *madns.Resolver) NodeBuilder
+	SetResolver(*dns.Resolver) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -113,7 +110,7 @@ type DefaultLibP2PNodeBuilder struct {
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
 	pingInfoProvider PingInfoProvider
-	resolver         *madns.Resolver
+	resolver         *dns.Resolver
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
@@ -174,7 +171,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetLogger(logger zerolog.Logger) NodeBu
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *madns.Resolver) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *dns.Resolver) NodeBuilder {
 	builder.resolver = resolver
 	return builder
 }
@@ -223,7 +220,18 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 
 	if builder.resolver != nil { // sets DNS resolver
-		opts = append(opts, libp2p.MultiaddrResolver(builder.resolver))
+		libp2pResolver, err := madns.NewResolver(madns.WithDefaultResolver(builder.resolver))
+		if err != nil {
+			return nil, fmt.Errorf("could not create libp2p resolver: %w", err)
+		}
+
+		select {
+		case <-builder.resolver.Ready():
+		case <-time.After(30 * time.Second):
+			return nil, fmt.Errorf("could not start resolver on time")
+		}
+
+		opts = append(opts, libp2p.MultiaddrResolver(libp2pResolver))
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -287,13 +295,14 @@ type Node struct {
 	subs                 map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
+	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
 	pingService          *PingService
 	connMgr              TagLessConnManager
 	dht                  *dht.IpfsDHT
 	topicValidation      bool
 }
 
-// Stop stops the libp2p node.
+// Stop terminates the libp2p node.
 func (n *Node) Stop() (chan struct{}, error) {
 	var result error
 	done := make(chan struct{})
@@ -345,6 +354,12 @@ func (n *Node) Stop() (chan struct{}, error) {
 				addrs = len(n.host.Network().ListenAddresses())
 			}
 		}
+
+		if n.resolver != nil {
+			// non-nil resolver means a non-default one, so it must be stopped.
+			n.resolver.Done()
+		}
+
 		n.logger.Debug().
 			Hex("node_id", logging.ID(n.id)).
 			Msg("libp2p node stopped successfully")
