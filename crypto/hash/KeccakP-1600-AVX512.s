@@ -16,6 +16,8 @@
 # Adaptations for macOS by Stéphane Léon.
 # Adaptations for mingw-w64 (changes macOS too) by Jorrit Jongma.
 
+#if (__AVX512CD__ |  __AVX512ER__ | __AVX512F__ | __AVX512PF__ == 1)
+
 .text
 
 # -----------------------------------------------------------------------------
@@ -1070,3 +1072,5 @@ iotas:
     .quad    0x8000000080008008
 iotas_end:
 .asciz    "Keccak-1600 for AVX-512F, CRYPTOGAMS by <appro@openssl.org>"
+
+#endif

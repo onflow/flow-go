@@ -15,18 +15,19 @@ import (
 /*
 #include <stdlib.h>
 
+#if (__AVX512CD__ |  __AVX512ER__ | __AVX512F__ | __AVX512PF__ == 1)
 void KeccakP1600_Permute_24rounds(void *state);
 
-void callKeccakF1600(ulong* state) {
+void callKeccakF1600(unsigned long* state) {
 	KeccakP1600_Permute_24rounds(state);
 }
+#else
+void callKeccakF1600(unsigned long* state) {
 
+}
+#endif
 */
 import "C"
-
-func AVXKeccakF1600(a *[25]uint64) {
-	keccakF1600(a)
-}
 
 func keccakF1600(a *[25]uint64) {
 	if cpu.X86.HasAVX512 {
