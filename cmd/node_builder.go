@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
 	bstorage "github.com/onflow/flow-go/storage/badger"
@@ -103,31 +104,32 @@ type NodeBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
-	nodeIDHex             string
-	adminAddr             string
-	adminCert             string
-	adminKey              string
-	adminClientCAs        string
-	BindAddr              string
-	NodeRole              string
-	timeout               time.Duration
-	datadir               string
-	level                 string
-	metricsPort           uint
-	BootstrapDir          string
-	PeerUpdateInterval    time.Duration
-	UnicastMessageTimeout time.Duration
-	DNSCacheTTL           time.Duration
-	profilerEnabled       bool
-	profilerDir           string
-	profilerInterval      time.Duration
-	profilerDuration      time.Duration
-	tracerEnabled         bool
-	tracerSensitivity     uint
-	metricsEnabled        bool
-	guaranteesCacheSize   uint
-	receiptsCacheSize     uint
-	db                    *badger.DB
+	nodeIDHex                string
+	adminAddr                string
+	adminCert                string
+	adminKey                 string
+	adminClientCAs           string
+	BindAddr                 string
+	NodeRole                 string
+	timeout                  time.Duration
+	datadir                  string
+	level                    string
+	metricsPort              uint
+	BootstrapDir             string
+	PeerUpdateInterval       time.Duration
+	UnicastMessageTimeout    time.Duration
+	DNSCacheTTL              time.Duration
+	profilerEnabled          bool
+	profilerDir              string
+	profilerInterval         time.Duration
+	profilerDuration         time.Duration
+	tracerEnabled            bool
+	tracerSensitivity        uint
+	metricsEnabled           bool
+	LibP2PCompressionEnabled bool
+	guaranteesCacheSize      uint
+	receiptsCacheSize        uint
+	db                       *badger.DB
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -172,27 +174,29 @@ func DefaultBaseConfig() *BaseConfig {
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
 	return &BaseConfig{
-		nodeIDHex:             NotSet,
-		adminAddr:             NotSet,
-		adminCert:             NotSet,
-		adminKey:              NotSet,
-		adminClientCAs:        NotSet,
-		BindAddr:              NotSet,
-		BootstrapDir:          "bootstrap",
-		timeout:               1 * time.Minute,
-		datadir:               datadir,
-		level:                 "info",
-		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
-		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
-		metricsPort:           8080,
-		profilerEnabled:       false,
-		profilerDir:           "profiler",
-		profilerInterval:      15 * time.Minute,
-		profilerDuration:      10 * time.Second,
-		tracerEnabled:         false,
-		tracerSensitivity:     4,
-		metricsEnabled:        true,
-		receiptsCacheSize:     bstorage.DefaultCacheSize,
-		guaranteesCacheSize:   bstorage.DefaultCacheSize,
+		nodeIDHex:                NotSet,
+		adminAddr:                NotSet,
+		adminCert:                NotSet,
+		adminKey:                 NotSet,
+		adminClientCAs:           NotSet,
+		BindAddr:                 NotSet,
+		BootstrapDir:             "bootstrap",
+		timeout:                  1 * time.Minute,
+		datadir:                  datadir,
+		level:                    "info",
+		PeerUpdateInterval:       p2p.DefaultPeerUpdateInterval,
+		UnicastMessageTimeout:    p2p.DefaultUnicastTimeout,
+		metricsPort:              8080,
+		profilerEnabled:          false,
+		profilerDir:              "profiler",
+		profilerInterval:         15 * time.Minute,
+		profilerDuration:         10 * time.Second,
+		tracerEnabled:            false,
+		tracerSensitivity:        4,
+		metricsEnabled:           true,
+		receiptsCacheSize:        bstorage.DefaultCacheSize,
+		guaranteesCacheSize:      bstorage.DefaultCacheSize,
+		LibP2PCompressionEnabled: true,
+		DNSCacheTTL:              dns.DefaultTimeToLive,
 	}
 }

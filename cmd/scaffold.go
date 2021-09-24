@@ -34,7 +34,6 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -143,7 +142,9 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.adminKey, "admin-key", defaultConfig.adminKey, "admin key file (for TLS)")
 	fnb.flags.StringVar(&fnb.BaseConfig.adminClientCAs, "admin-client-certs", defaultConfig.adminClientCAs, "admin client certs (for mutual TLS)")
 
-	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", dns.DefaultTimeToLive, "time-to-live for dns cache")
+	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
+	fnb.flags.BoolVar(&fnb.BaseConfig.LibP2PCompressionEnabled, "libp2p-compression-enabled", defaultConfig.LibP2PCompressionEnabled,
+		"whether to enable libp2p stream compression")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 

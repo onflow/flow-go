@@ -376,7 +376,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	//create a new readConnection with the context of the middleware
 	conn := newReadConnection(m.ctx, s, m.processAuthenticatedMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize, isStaked)
 
-	// kick off the receive loop to continuously receive messages
+	// kick off the reception loop to continuously receive messages
 	m.wg.Add(1)
 	go conn.receiveLoop(m.wg)
 }
