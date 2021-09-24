@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -26,8 +25,6 @@ type WeightedSignatureAggregator struct {
 	collectedIDs map[flow.Identifier]struct{}              // map of collected IDs (gets updated)
 	lock         sync.RWMutex                              // lock for atomic updates to totalWeight and collectedIDs
 }
-
-var _ hotstuff.WeightedSignatureAggregator = &WeightedSignatureAggregator{}
 
 // NewWeightedSignatureAggregator returns a weighted aggregator initialized with a list of flow
 // identities, a message and a domain separation tag. The identities represent the list of all
