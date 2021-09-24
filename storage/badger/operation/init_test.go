@@ -28,22 +28,23 @@ func TestInsertRetrieveDBTypeMarker(t *testing.T) {
 				err = operation.EnsureSecretDB(db)
 				require.Error(t, err)
 			})
-			t.Run("secret", func(t *testing.T) {
-				unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		})
 
-					// can insert db marker to empty DB
-					err := db.Update(operation.InsertSecretDBMarker)
-					require.NoError(t, err)
-					// can insert db marker twice
-					err = db.Update(operation.InsertSecretDBMarker)
-					require.NoError(t, err)
-					// ensure correct db type succeeds
-					err = operation.EnsureSecretDB(db)
-					require.NoError(t, err)
-					// ensure other db type fails
-					err = operation.EnsurePublicDB(db)
-					require.Error(t, err)
-				})
+		t.Run("secret", func(t *testing.T) {
+			unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+
+				// can insert db marker to empty DB
+				err := db.Update(operation.InsertSecretDBMarker)
+				require.NoError(t, err)
+				// can insert db marker twice
+				err = db.Update(operation.InsertSecretDBMarker)
+				require.NoError(t, err)
+				// ensure correct db type succeeds
+				err = operation.EnsureSecretDB(db)
+				require.NoError(t, err)
+				// ensure other db type fails
+				err = operation.EnsurePublicDB(db)
+				require.Error(t, err)
 			})
 		})
 	})
