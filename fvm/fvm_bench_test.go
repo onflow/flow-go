@@ -30,6 +30,13 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TODO (ramtin)
+// - move block computer logic to its own location inside exec node, so we embed a real
+// block computer, simplify this one to use an in-mem ledger
+// - time track different part of execution (execution, ledger update, ...)
+// - add metrics like number of registers touched, proof size
+//
+
 type TestBenchBlockExecutor interface {
 	ExecuteCollections(tb testing.TB, collections [][]*flow.TransactionBody) *execution.ComputationResult
 	Chain(tb testing.TB) flow.Chain
@@ -161,8 +168,7 @@ func (b *BasicBlockExecutor) ExecuteCollections(tb testing.TB, collections [][]*
 	return computationResult
 }
 
-func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB,
-	privateKeys []flow.AccountPrivateKey) []TestBenchAccount {
+func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.AccountPrivateKey) []TestBenchAccount {
 	accounts := make([]TestBenchAccount, 0)
 	serviceAddress := b.Chain(tb).ServiceAddress()
 
@@ -362,41 +368,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	})
 }
 
-const (
-	MintScriptTemplate = `
-		import BatchNFT from 0x%s
-		transaction {
-			prepare(signer: AuthAccount) {
-				let adminRef = signer.borrow<&BatchNFT.Admin>(from: /storage/BatchNFTAdmin)!
-				let playID = adminRef.createPlay(metadata: {"name": "Test"})
-				let setID = BatchNFT.nextSetID
-				adminRef.createSet(name: "Test")
-				let setRef = adminRef.borrowSet(setID: setID)
-				setRef.addPlay(playID: playID)
-				let testTokens <- setRef.batchMintTestToken(playID: playID, quantity: %d)
-				signer.borrow<&BatchNFT.Collection>(from: /storage/TestTokenCollection)!
-					.batchDeposit(tokens: <-testTokens)
-			}
-		}`
-
-	SetUpReceiverTemplate = `
-		import NonFungibleToken from 0x%s
-		import BatchNFT from 0x%s
-		
-		transaction {
-			prepare(signer: AuthAccount) {
-				signer.save(
-					<-BatchNFT.createEmptyCollection(),
-					to: /storage/TestTokenCollection
-				)
-				signer.link<&BatchNFT.Collection>(
-					/public/TestTokenCollection,
-					target: /storage/TestTokenCollection
-				)
-			}
-		}`
-
-	TransferTxTemplate = `
+const TransferTxTemplate = `
 		import NonFungibleToken from 0x%s
 		import BatchNFT from 0x%s
 
@@ -418,7 +390,6 @@ const (
 				receiverRef.batchDeposit(tokens: <-self.transferTokens)
 			}
 		}`
-)
 
 // BenchmarkRuntimeNFTBatchTransfer simulates executing blocks with `transactionsPerBlock`
 // where each transaction transfers `testTokensPerTransaction` testTokens (NFTs)
@@ -447,49 +418,19 @@ func BenchmarkRuntimeNFTBatchTransfer(b *testing.B) {
 	// fund all accounts so not to run into storage problems
 	fundAccounts(b, blockExecutor, cadence.UFix64(10_0000_0000), nftAccount.Address, batchNFTAccount.Address, accounts[2].Address)
 
-	// TODO move these into their own methods
-	// mint NFT testTokens
-	mintScript := []byte(fmt.Sprintf(MintScriptTemplate, accounts[1].Address.Hex(), transactionsPerBlock*testTokensPerTransaction*b.N))
+	// mint nfts into the batchNFT account
+	mintNFTs(b, blockExecutor, &accounts[1], transactionsPerBlock*testTokensPerTransaction*b.N)
 
-	txBody := flow.NewTransactionBody().
-		SetGasLimit(999999).
-		SetScript(mintScript).
-		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
-		AddAuthorizer(batchNFTAccount.Address).
-		SetPayer(serviceAccount.Address)
-
-	err = testutil.SignPayload(txBody, batchNFTAccount.Address, batchNFTAccount.PrivateKey)
-	require.NoError(b, err)
-
-	err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
-	require.NoError(b, err)
-
-	computationResult := blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
-
-	// Set up receiver
-	setupTx := []byte(fmt.Sprintf(SetUpReceiverTemplate, accounts[0].Address.Hex(), accounts[1].Address.Hex()))
-
-	txBody = flow.NewTransactionBody().
-		SetScript(setupTx).
-		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
-		AddAuthorizer(accounts[2].Address).
-		SetPayer(serviceAccount.Address)
-
-	err = testutil.SignPayload(txBody, accounts[2].Address, accounts[2].PrivateKey)
-	require.NoError(b, err)
-
-	err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
-	require.NoError(b, err)
-
-	computationResult = blockExecutor.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
-	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+	// set up receiver
+	setupReceiver(b, blockExecutor, &nftAccount, &batchNFTAccount, &accounts[2])
 
 	// Transfer NFTs
 	transferTx := []byte(fmt.Sprintf(TransferTxTemplate, accounts[0].Address.Hex(), accounts[1].Address.Hex()))
 
 	encodedAddress, err := jsoncdc.Encode(cadence.BytesToAddress(accounts[2].Address.Bytes()))
 	require.NoError(b, err)
+
+	var computationResult *execution.ComputationResult
 
 	b.ResetTimer() // setup done, lets start measuring
 	for i := 0; i < b.N; i++ {
@@ -528,6 +469,80 @@ func BenchmarkRuntimeNFTBatchTransfer(b *testing.B) {
 			require.Empty(b, computationResult.TransactionResults[j].ErrorMessage)
 		}
 	}
+}
+
+func setupReceiver(b *testing.B, be TestBenchBlockExecutor, nftAccount, batchNFTAccount, targetAccount *TestBenchAccount) {
+	serviceAccount := be.ServiceAccount(b)
+
+	setUpReceiverTemplate := `
+	import NonFungibleToken from 0x%s
+	import BatchNFT from 0x%s
+	
+	transaction {
+		prepare(signer: AuthAccount) {
+			signer.save(
+				<-BatchNFT.createEmptyCollection(),
+				to: /storage/TestTokenCollection
+			)
+			signer.link<&BatchNFT.Collection>(
+				/public/TestTokenCollection,
+				target: /storage/TestTokenCollection
+			)
+		}
+	}`
+
+	setupTx := []byte(fmt.Sprintf(setUpReceiverTemplate, nftAccount.Address.Hex(), batchNFTAccount.Address.Hex()))
+
+	txBody := flow.NewTransactionBody().
+		SetScript(setupTx).
+		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
+		AddAuthorizer(targetAccount.Address).
+		SetPayer(serviceAccount.Address)
+
+	err := testutil.SignPayload(txBody, targetAccount.Address, targetAccount.PrivateKey)
+	require.NoError(b, err)
+
+	err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
+	require.NoError(b, err)
+
+	computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
+	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
+}
+
+func mintNFTs(b *testing.B, be TestBenchBlockExecutor, batchNFTAccount *TestBenchAccount, size int) {
+	serviceAccount := be.ServiceAccount(b)
+	mintScriptTemplate := `
+	import BatchNFT from 0x%s
+	transaction {
+		prepare(signer: AuthAccount) {
+			let adminRef = signer.borrow<&BatchNFT.Admin>(from: /storage/BatchNFTAdmin)!
+			let playID = adminRef.createPlay(metadata: {"name": "Test"})
+			let setID = BatchNFT.nextSetID
+			adminRef.createSet(name: "Test")
+			let setRef = adminRef.borrowSet(setID: setID)
+			setRef.addPlay(playID: playID)
+			let testTokens <- setRef.batchMintTestToken(playID: playID, quantity: %d)
+			signer.borrow<&BatchNFT.Collection>(from: /storage/TestTokenCollection)!
+				.batchDeposit(tokens: <-testTokens)
+		}
+	}`
+	mintScript := []byte(fmt.Sprintf(mintScriptTemplate, batchNFTAccount.Address.Hex(), size))
+
+	txBody := flow.NewTransactionBody().
+		SetGasLimit(999999).
+		SetScript(mintScript).
+		SetProposalKey(serviceAccount.Address, 0, serviceAccount.RetAndIncSeqNumber()).
+		AddAuthorizer(batchNFTAccount.Address).
+		SetPayer(serviceAccount.Address)
+
+	err := testutil.SignPayload(txBody, batchNFTAccount.Address, batchNFTAccount.PrivateKey)
+	require.NoError(b, err)
+
+	err = testutil.SignEnvelope(txBody, serviceAccount.Address, serviceAccount.PrivateKey)
+	require.NoError(b, err)
+
+	computationResult := be.ExecuteCollections(b, [][]*flow.TransactionBody{{txBody}})
+	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
 }
 
 func fundAccounts(b *testing.B, be TestBenchBlockExecutor, value cadence.UFix64, accounts ...flow.Address) {
@@ -933,7 +948,6 @@ func deployBatchNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAcc
 		`, nftAddress.Hex())
 	}
 	owner.DeployContract(b, be, "BatchNFT", batchNFTContract(nftAddress))
-
 }
 
 func deployNFT(b *testing.B, be TestBenchBlockExecutor, owner *TestBenchAccount) {
