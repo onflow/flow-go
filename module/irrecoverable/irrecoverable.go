@@ -30,7 +30,7 @@ type SignalerContext interface {
 	sealed()         // private, to constrain builder to using WithSignaler
 }
 
-// private, to force context derivation / WithSignal
+// private, to force context derivation / WithSignaler
 type signalerCtxt struct {
 	context.Context
 	signaler *Signaler

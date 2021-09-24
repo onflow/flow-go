@@ -11,20 +11,11 @@ import (
 	"github.com/onflow/flow-go/module/lifecycle"
 )
 
-type TemporaryError struct {
-	message string
-}
-
-func (s TemporaryError) Error() string {
-	return s.message
-}
+var ErrTriggerRestart = errors.New("restart me")
+var ErrNoRestart = errors.New("fatal, no restarts")
 
 func Example() {
-	// Irrecoverable error handling is built using a heirachy of contexts. This
-	// simplifies the signalling by separating the shutdown logic from the
-	// ReadyDoneAware interface. This context is mandatory and is used to both
-	// pass the irrecoverable error channel and is the only way to shutdown child
-	// components.
+	// a context is mandatory in order to call RunComponent
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// module.ComponentFactory encapsulates all of the component building logic
@@ -35,37 +26,27 @@ func Example() {
 		return NewExampleComponent(starts), nil
 	}
 
-	// irrecoverable.OnError is run when the component throws an irrecoverable
-	// error, or after cancelling its context and waiting for its Done channel
-	// to close.
-	// This is the place to inspect the specific error returned to determine if
-	// it's appropriate to restart the component, or shutdown/panic. It's also
-	// where logic to perform additional cleanup or any alerting/telemetry goes.
+	// this is the place to inspect the encountered error and implement the appropriate error
+	// handling behaviors, e.g. restarting the component, firing an alert to pagerduty, etc ...
+	// the shutdown of the component is handled for you by RunComponent, but you may consider
+	// performing additional cleanup here
 	onError := func(err error, triggerRestart func()) {
-		// check to make sure it's safe to restart the component
-		var tmp TemporaryError
-		if errors.As(err, &tmp) {
+		// check the error type to decide whether to restart or shutdown
+		if errors.Is(err, ErrTriggerRestart) {
 			fmt.Printf("Restarting component after fatal error: %v\n", err)
 			triggerRestart()
 			return
+		} else {
+			fmt.Printf("An unrecoverable error occurred: %v\n", err)
+			// shutdown other components. it might also make sense to just panic here
+			// depending on the circumstances
+			cancel()
 		}
 
-		// it's not safe to restart, shutdown instead
-		fmt.Printf("An unrecoverable error occurred: %v\n", err)
-
-		// cleanly shutdown other components. the component itself is cancelled
-		// within RunComponent.
-		cancel()
 	}
 
-	// run the component. this will return an error immediately if it fails to
-	// start the component, otherwise it will block (and restart) until:
-	// * onError is called and does not call the triggerRestart() callback
-	// * ctx is cancelled
-	// If the component needs to start additional subcomponents, the same
-	// approach can be applied by using the same context and creating new
-	// ComponentFactory and OnError handlers. This creates a hierarchical
-	// model where the parent components supervise and restart their children
+	// run the component. this is a blocking call, and will return with an error if the
+	// first startup or any subsequent restart attempts fails or the context is canceled
 	err := module.RunComponent(ctx, componentFactory, onError)
 	if err != nil {
 		fmt.Printf("Error returned from RunComponent: %v\n", err)
@@ -74,22 +55,16 @@ func Example() {
 	// Output:
 	// [Component 1] Starting up
 	// [Component 1] Running cleanup
-	// Restarting component after fatal error: Restart me!
+	// Restarting component after fatal error: restart me
 	// [Component 2] Starting up
 	// [Component 2] Running cleanup
-	// An unrecoverable error occurred: Fatal! No restarts
+	// An unrecoverable error occurred: fatal, no restarts
 	// Error returned from RunComponent: context canceled
 }
 
-///////////////////////////////////////////////////////////////////////////////
-//                                                                           //
-// The following is an example of a standard Component which implements      //
-// ReadyDoneAware and Startable. Nothing here is required except for some    //
-// implementation of the interface methods. Ready and Done should return     //
-// their respective channels, and perform no startup/shutdown logic.         //
-//                                                                           //
-///////////////////////////////////////////////////////////////////////////////
-
+// ExampleComponent is an example of a typical LifecycleManager-equipped component
+// The use of LifecycleManager is completely optional for this example, and any
+// implementation of the Component interface will work.
 type ExampleComponent struct {
 	id int
 	lm *lifecycle.LifecycleManager
@@ -116,10 +91,11 @@ func (c *ExampleComponent) Start(ctx irrecoverable.SignalerContext) error {
 			select {
 			case <-time.After(20 * time.Millisecond):
 				// encounter irrecoverable error
-				if c.id%2 == 0 {
-					ctx.Throw(errors.New("Fatal! No restarts"))
+				if c.id > 1 {
+					ctx.Throw(ErrNoRestart)
+				} else {
+					ctx.Throw(ErrTriggerRestart)
 				}
-				ctx.Throw(TemporaryError{"Restart me!"})
 			case <-ctx.Done():
 				c.printMsg("Cancelled by parent")
 			}
