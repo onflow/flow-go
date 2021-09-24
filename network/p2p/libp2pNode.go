@@ -62,12 +62,14 @@ type LibP2PFactoryFunc func() (*Node, error)
 // LibP2PStreamFactoryFunc is a factory function type for generating libp2p streams.
 type LibP2PStreamFactoryFunc func(host.Host, context.Context, peer.ID, ...protocol.ID) (libp2pnet.Stream, error)
 
+// LibP2PDefaultStream returns a stream factory that creates default native libp2p streams.
 func LibP2PDefaultStream() LibP2PStreamFactoryFunc {
 	return func(host host.Host, ctx context.Context, peerID peer.ID, pids ...protocol.ID) (libp2pnet.Stream, error) {
 		return host.NewStream(ctx, peerID, pids...)
 	}
 }
 
+// LibP2PGzipCompressedStream returns a stream factory that creates compressed gzip-based libp2p streams.
 func LibP2PGzipCompressedStream() LibP2PStreamFactoryFunc {
 	return func(host host.Host, ctx context.Context, peerID peer.ID, pids ...protocol.ID) (libp2pnet.Stream, error) {
 		s, err := host.NewStream(ctx, peerID, pids...)
