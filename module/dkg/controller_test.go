@@ -249,8 +249,9 @@ func initNodes(t *testing.T, n int, phase1Duration, phase2Duration, phase3Durati
 
 		// create a config with no delays for tests
 		config := ControllerConfig{
-			BaseStartDelay:           0,
-			BaseHandleBroadcastDelay: 0,
+			BaseStartDelay:                 0,
+			BaseHandleFirstBroadcastDelay:  0,
+			HandleSubsequentBroadcastDelay: 0,
 		}
 
 		controller := NewController(
