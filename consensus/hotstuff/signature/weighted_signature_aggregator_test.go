@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"sort"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -123,25 +124,30 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 	})
 
 	// Happy paths
-	t.Run("happy path", func(t *testing.T) {
+	t.Run("happy path and thread safety", func(t *testing.T) {
 		aggregator, ids, sigs, msg, tag := createAggregationData(t, signersNum)
 		// only add half of the signatures
 		subSet := signersNum / 2
-		var expectedWeight uint64
+		expectedWeight := uint64(0)
+		var wg sync.WaitGroup
 		for i, sig := range sigs[subSet:] {
-			index := i + subSet
-			// test Verify
-			err := aggregator.Verify(ids[index].NodeID, sig)
-			assert.NoError(t, err)
-			// test TrustedAdd
-			weight, err := aggregator.TrustedAdd(ids[index].NodeID, sig)
-			assert.NoError(t, err)
-			expectedWeight += ids[index].Stake
-			assert.Equal(t, expectedWeight, weight)
-			// test TotalWeight
-			assert.Equal(t, expectedWeight, aggregator.TotalWeight())
-
+			wg.Add(1)
+			// test thread safety
+			go func(i int, sig crypto.Signature) {
+				defer wg.Done()
+				index := i + subSet
+				// test Verify
+				err := aggregator.Verify(ids[index].NodeID, sig)
+				assert.NoError(t, err)
+				// test TrustedAdd
+				_, err = aggregator.TrustedAdd(ids[index].NodeID, sig)
+				// ignore weight as comparing against expected weight is not thread safe
+				assert.NoError(t, err)
+			}(i, sig)
+			expectedWeight += ids[i+subSet].Stake
 		}
+
+		wg.Wait()
 		signers, agg, err := aggregator.Aggregate()
 		assert.NoError(t, err)
 		ok, err := verifyAggregate(signers, ids, agg, msg, tag)
@@ -154,12 +160,14 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 			assert.Equal(t, signers[i], ids[index].NodeID)
 		}
 
-		// add remaining signatures
+		// add remaining signatures in one thread in order to test the returned weight
 		for i, sig := range sigs[:subSet] {
 			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sig)
 			assert.NoError(t, err)
 			expectedWeight += ids[i].Stake
 			assert.Equal(t, expectedWeight, weight)
+			// test TotalWeight
+			assert.Equal(t, expectedWeight, aggregator.TotalWeight())
 		}
 		signers, agg, err = aggregator.Aggregate()
 		assert.NoError(t, err)
@@ -197,24 +205,33 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 	t.Run("duplicate signature", func(t *testing.T) {
 		aggregator, ids, sigs, _, _ := createAggregationData(t, signersNum)
 		expectedWeight := uint64(0)
-		// add a few signatures
+		// add signatures
 		for i, sig := range sigs {
 			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sig)
 			expectedWeight += ids[i].Stake
 			assert.Equal(t, expectedWeight, weight)
 			require.NoError(t, err)
 		}
-		// add same duplicates
-		for i := range sigs {
-			weight, err := aggregator.TrustedAdd(ids[i].NodeID, sigs[i]) // same signature for same index
-			assert.Equal(t, expectedWeight, weight)
-			assert.Error(t, err)
-			assert.IsType(t, duplicate, err)
-			weight, err = aggregator.TrustedAdd(ids[i].NodeID, sigs[(i+1)%signersNum]) // different signature for same index
-			assert.Equal(t, expectedWeight, weight)
-			assert.Error(t, err)
-			assert.IsType(t, duplicate, err)
+		// add same duplicates and test thread safety
+		var wg sync.WaitGroup
+		for i, sig := range sigs {
+			wg.Add(1)
+			// test thread safety
+			go func(i int, sig crypto.Signature) {
+				defer wg.Done()
+				weight, err := aggregator.TrustedAdd(ids[i].NodeID, sigs[i]) // same signature for same index
+				// weight should not change
+				assert.Equal(t, expectedWeight, weight)
+				assert.Error(t, err)
+				assert.IsType(t, duplicate, err)
+				weight, err = aggregator.TrustedAdd(ids[i].NodeID, sigs[(i+1)%signersNum]) // different signature for same index
+				// weight should not change
+				assert.Equal(t, expectedWeight, weight)
+				assert.Error(t, err)
+				assert.IsType(t, duplicate, err)
+			}(i, sig)
 		}
+		wg.Wait()
 	})
 
 	t.Run("invalid signature", func(t *testing.T) {
