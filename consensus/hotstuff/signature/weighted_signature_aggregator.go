@@ -19,11 +19,11 @@ type signerInfo struct {
 // WeightedSignatureAggregator implements consensus/hotstuff.WeightedSignatureAggregator
 type WeightedSignatureAggregator struct {
 	aggregator   *signature.SignatureAggregatorSameMessage // low level crypto BLS aggregator, agnostic of weights and flow IDs
-	ids          []flow.Identity                           //nolint:unused
-	idToInfo     map[flow.Identifier]signerInfo
-	totalWeight  uint64                       // weight collected
-	collectedIDs map[flow.Identifier]struct{} // map of collected IDs
-	lock         sync.RWMutex                 // lock for atomic updates
+	ids          []flow.Identity                           //nolint:unused (only gets updated by constructor)
+	idToInfo     map[flow.Identifier]signerInfo            // (only gets updated by constructor)
+	totalWeight  uint64                                    // weight collected (gets updated)
+	collectedIDs map[flow.Identifier]struct{}              // map of collected IDs (gets updated)
+	lock         sync.RWMutex                              // lock for atomic updates to totalWeight and collectedIDs
 }
 
 // NewWeightedSignatureAggregator returns a weighted aggregator initialized with a list of flow
