@@ -7,12 +7,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 )
 
-type gzipStreamCompressor struct{}
+type GzipStreamCompressor struct{}
 
-func (g gzipStreamCompressor) NewReader(s network.Stream) (io.ReadCloser, error) {
+func (g GzipStreamCompressor) NewReader(s network.Stream) (io.ReadCloser, error) {
 	return gzip.NewReader(s)
 }
 
-func (g gzipStreamCompressor) NewWriter(s network.Stream) (io.WriteCloser, error) {
+func (g GzipStreamCompressor) NewWriter(s network.Stream) (io.WriteCloser, error) {
 	return gzip.NewWriter(s), nil
 }
