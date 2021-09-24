@@ -50,22 +50,23 @@ func NewWeightedSignatureAggregator(
 		return nil, fmt.Errorf("new signature aggregator failed: %w", err)
 	}
 
-	// build the weighted aggregator
-	weightedAgg := &WeightedSignatureAggregator{
-		aggregator:   agg,
-		ids:          ids,
-		idToInfo:     make(map[flow.Identifier]signerInfo),
-		collectedIDs: make(map[flow.Identifier]struct{}),
-	}
+	idToInfo := make(map[flow.Identifier]signerInfo)
 
 	// build the internal map for a faster look-up
 	for i, id := range ids {
-		weightedAgg.idToInfo[id.NodeID] = signerInfo{
+		idToInfo[id.NodeID] = signerInfo{
 			weight: id.Stake,
 			index:  i,
 		}
 	}
-	return weightedAgg, nil
+
+	// build the weighted aggregator
+	return &WeightedSignatureAggregator{
+		aggregator:   agg,
+		ids:          ids,
+		idToInfo:     idToInfo,
+		collectedIDs: make(map[flow.Identifier]struct{}),
+	}, nil
 }
 
 // Verify verifies the signature under the stored public and message.
@@ -86,7 +87,7 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 		return fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
 	}
 	if !ok {
-		return signature.ErrInvalidFormat
+		return fmt.Errorf("invalid aggregated sig from signer (%s): %w", signerID, signature.ErrInvalidFormat)
 	}
 	return nil
 }
@@ -111,16 +112,13 @@ func (w *WeightedSignatureAggregator) hasSignature(signerID flow.Identifier) boo
 //  - engine.DuplicatedEntryError if the signer has been already added
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
-
-	currentWeight := w.TotalWeight()
-
 	info, found := w.idToInfo[signerID]
 	if !found {
-		return currentWeight, engine.NewInvalidInputErrorf("couldn't find signerID %s in the map", signerID)
+		return w.TotalWeight(), engine.NewInvalidInputErrorf("couldn't find signerID %s in the map", signerID)
 	}
 
 	if w.hasSignature(signerID) {
-		return currentWeight, engine.NewDuplicatedEntryErrorf("SigneID %s was already added", signerID)
+		return w.TotalWeight(), engine.NewDuplicatedEntryErrorf("SigneID %s was already added", signerID)
 	}
 
 	// atomically update the signatures pool and the total weight
@@ -129,7 +127,7 @@ func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 
 	err := w.aggregator.TrustedAdd(info.index, sig)
 	if err != nil {
-		return currentWeight, fmt.Errorf("Trusted add has failed: %w", err)
+		return w.totalWeight, fmt.Errorf("Trusted add has failed: %w", err)
 	}
 
 	w.collectedIDs[signerID] = struct{}{}
