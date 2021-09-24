@@ -9,8 +9,7 @@
 
 ## Objective
 
-FLIP to separate the API through which components are started from the API through which
-they expose their status, and introduce a standard interface for handling irrecoverable errors that occur within a component.
+FLIP to separate the API through which components are started from the API through which they expose their status.
 
 ## Current Implementation
 
@@ -24,27 +23,16 @@ This introduces issues of concurrency safety / idempotency, as most implementati
 
 [Clearer documentation](https://github.com/onflow/flow-go/pull/1032) and a new [`LifecycleManager`](https://github.com/onflow/flow-go/pull/1031) component were introduced as a step towards fixing this by providing concurrency-safety for components implementing `ReadyDoneAware`, but this still does not provide a clear separation between the ability to start / stop a component and the ability to check its state. A component usually only needs to be started once, whereas multiple other components may wish to check its state.
 
-Also, there currently does not exist any mechanism to handle fatal errors within a component. We want to enable a way for such errors to be handled by the parent of the component (e.g restart the component, propagate the error further up the stack by throwing a fatal error itself) rather than crashing the entire program.
-
 ## Proposal
 
-Moving forward, we will add two new interfaces in addition to the existing `ReadyDoneAware`:
-- A `Startable` interface which can be used to start and stop a component:
-  ```golang
-  type Startable interface {
-    // Start will start the component or return an error. If the component is started successfully,
-    // it can be stopped by cancelling the provided Context.
-    Start(context.Context) error
-  }
-  ```
-- An `ErrorAware` interface which a component uses to expose any irrecoverable errors it encounters:
-  ```golang
-  type ErrorAware interface {
-    // Errors returns a channel which receives any irrecoverable errors encountered by the component.
-    Errors() <-chan error
-  }
-  ```
-
+Moving forward, we will add a new `Startable` interface in addition to the existing `ReadyDoneAware`:
+```golang
+type Startable interface {
+  // Start will start the component or return an error. If the component is started successfully,
+  // it can be stopped by cancelling the provided Context.
+  Start(context.Context) error
+}
+```
 Then, the semantics of `ReadyDoneAware` can be redefined to only be used to check a component's state (i.e wait for startup / shutdown to complete)
 ```golang
 type ReadyDoneAware interface {
@@ -55,12 +43,11 @@ type ReadyDoneAware interface {
 }
 ```
 
-Finally, we can define a `Component` interface which combines all of the three interfaces above:
+Finally, we can define a `Component` interface which combines both of these interfaces:
 ```golang
 type Component interface {
   Startable
   ReadyDoneAware
-  ErrorAware
 }
 ```
 
@@ -176,91 +163,6 @@ A component will now be started by passing a `Context` to its `Start` method, an
         default:
           // do work with foo...
         }
-      }
-    }
-  }
-  ```
-
-* `ErrorAware` can be implemented with the help of an `ErrorManager` struct:
-
-  ```golang
-  // ErrorManager implements the ErrorAware interface, and provides a way for components
-  // to signal an irrecoverable error.
-  type ErrorManager struct {
-    errors chan error
-  }
-
-  func NewErrorManager() *ErrorManager {
-    return &ErrorManager{make(chan error)}
-  }
-
-  func (e *ErrorManager) Errors() <-chan error {
-    return e.errors
-  }
-
-  func (e *ErrorManager) ThrowError(err error) {
-    e.errors <- err
-    runtime.Goexit()
-  }
-  ```
-
-  Error handling for components can be implemented like so:
-
-  ```golang
-  type ErrorHandler func(ctx context.Context, errors <-chan error, restart func())
-
-  type ComponentFactory func() (Component, error)
-
-  func RunComponent(ctx context.Context, componentFactory ComponentFactory, errorHandler ErrorHandler) error {
-    restartChan := make(chan struct{})
-
-    start := func() (context.CancelFunc, <-chan struct{}, error) {
-      component, err := componentFactory()
-      if err != nil {
-        // failed to create component
-        return nil, nil, err
-      }
-
-      // context used to restart the component
-      runCtx, cancel := context.WithCancel(ctx)
-      if err := component.Start(runCtx); err != nil {
-        // failed to start component
-        cancel()
-        return nil, nil, err
-      }
-
-      select {
-      case <-ctx.Done():
-        return nil, nil, ctx.Err()
-      case <-component.Ready():
-      }
-
-      go errorHandler(runCtx, component.Errors(), func() {
-        restartChan <- struct{}{}
-        runtime.Goexit()
-      })
-
-      return cancel, component.Done(), nil
-    }
-
-    for {
-      cancel, done, err := start()
-      if err != nil {
-        return err
-      }
-
-      select {
-      case <-ctx.Done():
-        return ctx.Err()
-      case <-restartChan:
-        // shutdown the component
-        cancel()
-      }
-
-      select {
-      case <-ctx.Done():
-        return ctx.Err()
-      case <-done:
       }
     }
   }
