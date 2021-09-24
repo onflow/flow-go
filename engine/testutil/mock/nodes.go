@@ -68,7 +68,7 @@ type GenericNode struct {
 	Log            zerolog.Logger
 	Metrics        *metrics.NoopCollector
 	Tracer         module.Tracer
-	DB             *badger.DB
+	PublicDB       *badger.DB
 	SecretsDB      *badger.DB
 	Headers        storage.Headers
 	Identities     storage.Identities
@@ -86,7 +86,7 @@ type GenericNode struct {
 }
 
 func (g *GenericNode) Done() {
-	_ = g.DB.Close()
+	_ = g.PublicDB.Close()
 	_ = os.RemoveAll(g.DBDir)
 
 	<-g.Tracer.Done()
@@ -110,7 +110,7 @@ func RequireGenericNodesDoneBefore(t testing.TB, duration time.Duration, nodes .
 
 // CloseDB closes the badger database of the node
 func (g *GenericNode) CloseDB() error {
-	return g.DB.Close()
+	return g.PublicDB.Close()
 }
 
 // CollectionNode implements an in-process collection node for tests.

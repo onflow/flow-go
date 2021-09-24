@@ -1640,7 +1640,7 @@ func TestCacheAtomicity(t *testing.T) {
 					require.NoError(t, err)
 
 					_, err = index.ByBlockID(blockID)
-					require.NoError(t, err, "found block ID, but index is missing, PublicDB updates is non-atomic")
+					require.NoError(t, err, "found block ID, but index is missing, DB updates is non-atomic")
 				}
 				wg.Done()
 			}(blockID)

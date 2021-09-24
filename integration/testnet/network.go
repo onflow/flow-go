@@ -54,7 +54,7 @@ const (
 	// DefaultFlowDataDir is the root of all database storage
 	DefaultFlowDataDir = "/data"
 	// DefaultFlowDBDir is the default directory for the node database.
-	DefaultFlowDBDir = "/data/flow"
+	DefaultFlowDBDir = "/data/protocol"
 	// DefaultFlowSecretsDBDir is the default directory for secrets database.
 	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node
