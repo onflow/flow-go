@@ -302,15 +302,19 @@ func (c *Controller) doBackgroundWork() {
 
 				// introduce a large, uniformly sampled delay prior to processing
 				// the first message
+				isFirstMessage := false
 				c.once.Do(func() {
+					isFirstMessage = true
 					delay := c.preHandleFirstBroadcastDelay()
 					c.log.Debug().Msgf("sleeping for %s before processing first phase 1 broadcast message", delay)
 					time.Sleep(delay)
 				})
 
-				// introduce a constant delay for all subsequent messages
-				c.log.Debug().Msgf("sleeping for %s before processing subsequent phase 1 broadcast message", c.config.HandleSubsequentBroadcastDelay)
-				time.Sleep(c.config.HandleSubsequentBroadcastDelay)
+				if !isFirstMessage {
+					// introduce a constant delay for all subsequent messages
+					c.log.Debug().Msgf("sleeping for %s before processing subsequent phase 1 broadcast message", c.config.HandleSubsequentBroadcastDelay)
+					time.Sleep(c.config.HandleSubsequentBroadcastDelay)
+				}
 			}
 
 			c.dkgLock.Lock()
