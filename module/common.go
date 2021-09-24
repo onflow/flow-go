@@ -46,7 +46,7 @@ func (n *NoopReadDoneAware) Done() <-chan struct{} {
 // Startable provides an interface to start a component. Once started, the component
 // can be stopped by cancelling the given context.
 type Startable interface {
-	Start(irrecoverable.SignalerContext)
+	Start(irrecoverable.SignalerContext) error
 }
 
 type Component interface {
@@ -71,12 +71,10 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 	var done <-chan struct{}
 	var irrecoverables chan error
 
-	start := func() error {
-		var err error // startup error, should be handled out of band
-
+	start := func() (err error) {
 		component, err = componentFactory()
 		if err != nil {
-			return err // failure to generate the component, should be handles out-of-band because a restart won't help
+			return // failure to generate the component, should be handled out-of-band because a restart won't help
 		}
 
 		// context used to run the component
@@ -88,21 +86,41 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 		irrecoverables = make(chan error)
 		signalingCtx = irrecoverable.WithSignaler(runCtx, irrecoverable.NewSignaler(irrecoverables))
 
-		// we need to start the component in a separate goroutine because an irrecoverable error may
-		// be thrown during the call to component.Start which will terminate the calling goroutine
-		go component.Start(signalingCtx)
-
-		// wait for Ready
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-irrecoverables:
-			// failed to start component: this should not trigger a restart
-			return err
-		case <-component.Ready():
+		// start the component
+		if err = component.Start(signalingCtx); err != nil {
+			cancel()
+			return
 		}
 
 		done = component.Done()
+		return
+	}
+
+	shutdownAndWaitForRestart := func(err error) error {
+		// shutdown the component
+		cancel()
+
+		// wait until it's done
+		// note that irrecoverables which are encountered during shutdown are ignored
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-done:
+		}
+
+		// send error to the handler programmed with a restart continuation
+		restartChan := make(chan struct{})
+		go handler(err, func() {
+			close(restartChan)
+		})
+
+		// wait for handler to trigger restart or abort
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-restartChan:
+		}
+
 		return nil
 	}
 
@@ -112,32 +130,12 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 		}
 
 		select {
-		case err := <-irrecoverables:
-			// shutdown the component
-			cancel()
-
-			// wait until it's done
-			// note that irrecoverables which are encountered during shutdown are ignored
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-done:
-			}
-
-			// send error to the handler programmed with a restart continuation
-			restartChan := make(chan struct{})
-			go handler(err, func() {
-				close(restartChan)
-			})
-
-			// wait for handler to trigger restart or abort
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			case <-restartChan:
-			}
 		case <-ctx.Done():
 			return ctx.Err()
+		case err := <-irrecoverables:
+			if canceled := shutdownAndWaitForRestart(err); canceled != nil {
+				return canceled
+			}
 		}
 	}
 }
