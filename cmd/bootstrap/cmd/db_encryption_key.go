@@ -31,8 +31,10 @@ func dbEncryptionKeyRun(_ *cobra.Command, _ []string) {
 		log.Fatal().Err(err).Msg("could not read node id")
 	}
 
-	// check if the key already exists
 	dbEncryptionKeyPath := fmt.Sprintf(model.PathSecretsEncryptionKey, nodeID)
+	log = log.With().Str("path", dbEncryptionKeyPath).Logger()
+
+	// check if the key already exists
 	exists, err := pathExists(path.Join(flagOutdir, dbEncryptionKeyPath))
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not check if db encryption key already exists")
