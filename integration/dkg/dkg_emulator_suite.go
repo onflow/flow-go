@@ -437,8 +437,8 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 
 	// create a config with no delays for tests
 	config := dkg.ControllerConfig{
-		BaseStartDelay:           0,
-		BaseHandleBroadcastDelay: 0,
+		BaseStartDelay:                0,
+		BaseHandleFirstBroadcastDelay: 0,
 	}
 
 	// the reactor engine reacts to new views being finalized and drives the
