@@ -164,7 +164,7 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, error) {
 	sharesNum := len(s.indexToSignature)
 	indices := make([]int, 0, sharesNum)
-	for index, _ := range s.indexToSignature {
+	for index := range s.indexToSignature {
 		indices = append(indices, index)
 	}
 
