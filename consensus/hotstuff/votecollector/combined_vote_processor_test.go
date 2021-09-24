@@ -1,6 +1,8 @@
 package votecollector
 
 import (
+	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -13,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,10 +26,7 @@ func TestCombinedVoteProcessor(t *testing.T) {
 // 1. if the proposal is invalid, it should return InvalidBlockError
 // 2. if the proposal is valid, then a vote processor should be created. The status of created processor is Verifying
 
-// 10. if a vote is invalid, it should return InvalidVoteError
-// 11. concurrency: when sending concurrently with votes that have just enough stakes and more beacon shares, a QC should be built
-// 12. concurrency: when sending concurrently with votes that have more stakes and just enough beacon shares, a QC should be built
-
+// CombinedVoteProcessorTestSuite is a test suite that holds mocked state for isolated testing of CombinedVoteProcessor.
 type CombinedVoteProcessorTestSuite struct {
 	suite.Suite
 
@@ -115,6 +115,196 @@ func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.processor.Status())
 }
 
+// TestProcess_VoteNotForProposal tests that vote should pass to validation only if it has correct
+// view and block ID matching proposal that is locked in CombinedVoteProcessor
+func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
+	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
+	require.Error(s.T(), err)
+	err = s.processor.Process(unittest.VoteFixture(unittest.WithVoteBlockID(s.proposal.Block.BlockID)))
+	require.Error(s.T(), err)
+	s.stakingAggregator.AssertNotCalled(s.T(), "Verify")
+	s.rbSigAggregator.AssertNotCalled(s.T(), "Verify")
+}
+
+// TestProcess_InvalidSignatureFormat ensures that we process signatures only with valid format.
+// If we have received vote with signature in invalid format we should return with sentinel error
+func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignatureFormat() {
+	// signature is random in this case
+	vote := unittest.VoteForBlockFixture(s.proposal.Block)
+	err := s.processor.Process(vote)
+	require.Error(s.T(), err)
+	require.True(s.T(), model.IsInvalidVoteError(err))
+	require.ErrorIs(s.T(), err.(model.InvalidVoteError).Err, msig.ErrInvalidFormat)
+}
+
+// TestProcess_InvalidSignature tests that CombinedVoteProcessor doesn't collect signatures for votes with invalid signature.
+// Checks are made for cases where both staking and threshold signatures were submitted.
+func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
+	invalidVoteException := errors.New("invalid-vote-exception")
+	// test for staking signatures
+	s.Run("staking-sig", func() {
+		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+
+		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
+
+		// expect sentinel error in case Verify returns ErrInvalidFormat
+		err := s.processor.Process(stakingVote)
+		require.Error(s.T(), err)
+		require.True(s.T(), model.IsInvalidVoteError(err))
+		require.ErrorIs(s.T(), err.(model.InvalidVoteError).Err, msig.ErrInvalidFormat)
+
+		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(invalidVoteException)
+
+		// except exception
+		err = s.processor.Process(stakingVote)
+		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, invalidVoteException)
+
+		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
+	})
+	// test same cases for threshold signature
+	s.Run("threshold-sig", func() {
+		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
+
+		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
+
+		// expect sentinel error in case Verify returns ErrInvalidFormat
+		err := s.processor.Process(thresholdVote)
+		require.Error(s.T(), err)
+		require.True(s.T(), model.IsInvalidVoteError(err))
+
+		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(invalidVoteException)
+
+		// except exception
+		err = s.processor.Process(thresholdVote)
+		require.Error(s.T(), err)
+		require.ErrorIs(s.T(), err, invalidVoteException)
+
+		s.rbSigAggregator.AssertNotCalled(s.T(), "TrustedAdd")
+		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
+	})
+
+}
+
+// TestProcess_TrustedAddError tests a case where we were able to successfully verify signature but failed to collect it.
+func (s *CombinedVoteProcessorTestSuite) TestProcess_TrustedAddError() {
+	trustedAddException := errors.New("trusted-add-exception")
+	s.Run("staking-sig", func() {
+		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+		*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
+		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(nil).Once()
+		s.stakingAggregator.On("TrustedAdd", stakingVote.SignerID, mock.Anything).Return(uint64(0), trustedAddException).Once()
+		err := s.processor.Process(stakingVote)
+		require.ErrorIs(s.T(), err, trustedAddException)
+	})
+	s.Run("threshold-sig", func() {
+		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
+		*s.rbSigAggregator = mockhotstuff.WeightedSignatureAggregator{}
+		*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
+		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(nil)
+		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(uint64(0), trustedAddException).Once()
+		err := s.processor.Process(thresholdVote)
+		require.ErrorIs(s.T(), err, trustedAddException)
+		// test also if reconstructor failed to add it
+		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(s.sigWeight, nil).Once()
+		s.reconstructor.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(false, trustedAddException).Once()
+		err = s.processor.Process(thresholdVote)
+		require.ErrorIs(s.T(), err, trustedAddException)
+	})
+}
+
+// TestProcess_BuildQCError tests all error paths during process of building QC.
+// Building QC is a one time operation, we need to make sure that failing in one of the steps leads to exception.
+// Since it's a one time operation we need a complicated test to test all conditions.
+func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
+	mockAggregator := func(aggregator *mockhotstuff.WeightedSignatureAggregator) {
+		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
+		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredStake, nil)
+		aggregator.On("TotalWeight").Return(s.minRequiredStake)
+	}
+
+	stakingSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+	thresholdSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+	reconstructor := &mockhotstuff.RandomBeaconReconstructor{}
+	packer := &mockhotstuff.Packer{}
+
+	identities := unittest.IdentifierListFixture(5)
+
+	// In this test we will mock all dependencies for happy path, and replace some branches with unhappy path
+	// to simulate errors along the branches.
+
+	mockAggregator(stakingSigAggregator)
+	stakingSigAggregator.On("Aggregate").Return(identities, unittest.RandomBytes(128), nil)
+
+	mockAggregator(thresholdSigAggregator)
+	thresholdSigAggregator.On("Aggregate").Return(identities, unittest.RandomBytes(128), nil)
+
+	reconstructor.On("HasSufficientShares").Return(true)
+	reconstructor.On("Reconstruct").Return(unittest.SignatureFixture(), nil)
+
+	packer.On("Pack", mock.Anything, mock.Anything).Return(identities, unittest.RandomBytes(128), nil)
+
+	// Helper factory function to create processors. We need new processor for every test case
+	// because QC creation is one time operation and is triggered as soon as we have collected enough weight and shares.
+	createProcessor := func(stakingAggregator *mockhotstuff.WeightedSignatureAggregator,
+		rbSigAggregator *mockhotstuff.WeightedSignatureAggregator,
+		rbReconstructor *mockhotstuff.RandomBeaconReconstructor,
+		packer *mockhotstuff.Packer) *CombinedVoteProcessor {
+		return newCombinedVoteProcessor(
+			unittest.Logger(),
+			s.proposal.Block,
+			stakingAggregator,
+			rbSigAggregator,
+			rbReconstructor,
+			s.onQCCreated,
+			packer,
+			s.minRequiredStake,
+		)
+	}
+
+	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+
+	// in this test case we aren't able to aggregate staking signature
+	s.Run("staking-sig-aggregate", func() {
+		exception := errors.New("staking-aggregate-exception")
+		stakingSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+		mockAggregator(stakingSigAggregator)
+		stakingSigAggregator.On("Aggregate").Return(nil, nil, exception)
+		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
+		err := processor.Process(vote)
+		require.ErrorIs(s.T(), err, exception)
+	})
+	// in this test case we aren't able to aggregate threshold signature
+	s.Run("threshold-sig-aggregate", func() {
+		exception := errors.New("threshold-aggregate-exception")
+		thresholdSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+		mockAggregator(thresholdSigAggregator)
+		thresholdSigAggregator.On("Aggregate").Return(nil, nil, exception)
+		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
+		err := processor.Process(vote)
+		require.ErrorIs(s.T(), err, exception)
+	})
+	// in this test case we aren't able to reconstruct signature
+	s.Run("reconstruct", func() {
+		exception := errors.New("reconstruct-exception")
+		reconstructor := &mockhotstuff.RandomBeaconReconstructor{}
+		reconstructor.On("HasSufficientShares").Return(true)
+		reconstructor.On("Reconstruct").Return(nil, exception)
+		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
+		err := processor.Process(vote)
+		require.ErrorIs(s.T(), err, exception)
+	})
+	// in this test case we aren't able to pack signatures
+	s.Run("pack", func() {
+		exception := errors.New("pack-qc-exception")
+		packer := &mockhotstuff.Packer{}
+		packer.On("Pack", mock.Anything, mock.Anything).Return(nil, nil, exception)
+		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
+		err := processor.Process(vote)
+		require.ErrorIs(s.T(), err, exception)
+	})
+}
+
 // TestProcess_NotEnoughStakingWeight tests a scenario where we first don't have enough stake,
 // then we iteratively increase it to the point where we have enough staking weight. No QC should be created
 // in this scenario since there is not enough random beacon shares.
@@ -135,6 +325,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
 // and proceed to build QC. Created QC has to have all signatures and identities aggregated by
 // aggregators and packed with consensus packer.
 func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
+	// generate staking signatures till we reach enough stake
 	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
@@ -142,6 +333,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 		require.NoError(s.T(), err)
 	}
 
+	// prepare for aggregation, as soon as we will collect enough shares we will try to create QC
 	stakingSigners := unittest.IdentifierListFixture(10)
 	expectedSigs := unittest.SignaturesFixture(3)
 	s.stakingAggregator.On("Aggregate").Return(stakingSigners, []byte(expectedSigs[0]), nil)
@@ -162,6 +354,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 		require.Equal(s.T(), expectedQC, qc)
 	}).Return(nil).Once()
 
+	// generate threshold signatures till we have enough random beacon shares
 	for i := uint64(0); i < s.minRequiredShares; i++ {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
 		s.rbSigAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
@@ -179,4 +372,51 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	require.NoError(s.T(), err)
 
 	s.onQCCreatedState.AssertExpectations(s.T())
+}
+
+// TestProcess_ConcurrentCreatingQC tests a scenario where multiple goroutines process vote at same time,
+// we expect only one QC created in this scenario.
+func (s *CombinedVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
+	stakingSigners := unittest.IdentifierListFixture(10)
+	mockAggregator := func(aggregator *mockhotstuff.WeightedSignatureAggregator) {
+		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
+		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredStake, nil)
+		aggregator.On("TotalWeight").Return(s.minRequiredStake)
+		aggregator.On("Aggregate").Return(stakingSigners, unittest.RandomBytes(128), nil)
+	}
+
+	// mock aggregators, so we have enough weight and shares for creating QC
+	*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
+	mockAggregator(s.stakingAggregator)
+	*s.rbSigAggregator = mockhotstuff.WeightedSignatureAggregator{}
+	mockAggregator(s.rbSigAggregator)
+	*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
+	s.reconstructor.On("Reconstruct").Return(unittest.SignatureFixture(), nil)
+	s.reconstructor.On("HasSufficientShares").Return(true)
+
+	// at this point sending any vote should result in creating QC.
+	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(stakingSigners, unittest.RandomBytes(128), nil)
+	s.onQCCreatedState.On("onQCCreated", mock.Anything).Return(nil).Once()
+
+	var startupWg, shutdownWg sync.WaitGroup
+
+	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+	startupWg.Add(1)
+	// prepare goroutines, so they are ready to submit a vote at roughly same time
+	for i := 0; i < 5; i++ {
+		shutdownWg.Add(1)
+		go func() {
+			defer shutdownWg.Done()
+			startupWg.Wait()
+			err := s.processor.Process(vote)
+			require.NoError(s.T(), err)
+		}()
+	}
+
+	startupWg.Done()
+
+	// wait for all routines to finish
+	shutdownWg.Wait()
+
+	s.onQCCreatedState.AssertNumberOfCalls(s.T(), "onQCCreated", 1)
 }

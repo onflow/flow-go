@@ -78,7 +78,7 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 	sigType, sig, err := signature.DecodeSingleSig(vote.SigData)
 	if err != nil {
 		if errors.Is(err, msig.ErrInvalidFormat) {
-			return model.InvalidVoteError{VoteID: vote.ID(), View: vote.View, Err: err}
+			return model.NewInvalidVoteErrorf(vote, "could not decode signature: %w", err)
 		}
 		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
 	}
@@ -89,7 +89,8 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		err := p.stakingSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
 			if errors.Is(err, msig.ErrInvalidFormat) {
-				return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
+				return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d: %w",
+					vote.ID(), vote.View, err)
 			}
 			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
 		}
@@ -105,7 +106,8 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		err := p.rbSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
 			if errors.Is(err, msig.ErrInvalidFormat) {
-				return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
+				return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d: %w",
+					vote.ID(), vote.View, err)
 			}
 			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
 		}
@@ -140,6 +142,10 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		return nil
 	}
 
+	// ATTENTION: this code will be called only once, if by some reason building QC will finish with error
+	// we won't be able to try again unless we create new vote processor.
+	// This behavior is desired since a failure to create QC is not an expected error and means we have received
+	// an exception.
 	qc, err := p.buildQC()
 	if err != nil {
 		return fmt.Errorf("internal error constructing QC from votes: %w", err)
