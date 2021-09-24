@@ -20,25 +20,28 @@ func (s TemporaryError) Error() string {
 }
 
 func Example() {
-
+	// Irrecoverable error handling is built using a heirachy of contexts. This
+	// simplifies the signalling by separating the shutdown logic from the
+	// ReadyDoneAware interface. This context is mandatory and is used to both
+	// pass the irrecoverable error channel and is the only way to shutdown child
+	// components.
 	ctx, cancel := context.WithCancel(context.Background())
 
+	// module.ComponentFactory encapsulates all of the component building logic
+	// required before running Start()
 	starts := 0
-	var componentFactory module.ComponentFactory
-	componentFactory = func() (module.Component, error) {
-		var err error
+	componentFactory := func() (module.Component, error) {
 		starts++
-		if starts > 1 {
-			err = errors.New("Fatal! No restarts")
-		} else {
-			err = TemporaryError{"Restart me!"}
-		}
-
-		return NewExampleComponent(starts, err), nil
+		return NewExampleComponent(starts), nil
 	}
 
-	var onError module.OnError
-	onError = func(err error, triggerRestart func()) {
+	// irrecoverable.OnError is run when the component throws an irrecoverable
+	// error, or after cancelling its context and waiting for its Done channel
+	// to close.
+	// This is the place to inspect the specific error returned to determine if
+	// it's appropriate to restart the component, or shutdown/panic. It's also
+	// where logic to perform additional cleanup or any alerting/telemetry goes.
+	onError := func(err error, triggerRestart func()) {
 		// check to make sure it's safe to restart the component
 		var tmp TemporaryError
 		if errors.As(err, &tmp) {
@@ -49,13 +52,20 @@ func Example() {
 
 		// it's not safe to restart, shutdown instead
 		fmt.Printf("An unrecoverable error occurred: %v\n", err)
-		// shutdown other components. it might make sense to just panic here
-		// depending on the circumstances
+
+		// cleanly shutdown other components. the component itself is cancelled
+		// within RunComponent.
 		cancel()
 	}
 
-	// run the component. this will block until onError fails to restart the component
-	// or its context is cancelled
+	// run the component. this will return an error immediately if it fails to
+	// start the component, otherwise it will block (and restart) until:
+	// * onError is called and does not call the triggerRestart() callback
+	// * ctx is cancelled
+	// If the component needs to start additional subcomponents, the same
+	// approach can be applied by using the same context and creating new
+	// ComponentFactory and OnError handlers. This creates a hierarchical
+	// model where the parent components supervise and restart their children
 	err := module.RunComponent(ctx, componentFactory, onError)
 	if err != nil {
 		fmt.Printf("Error returned from RunComponent: %v\n", err)
@@ -71,17 +81,24 @@ func Example() {
 	// Error returned from RunComponent: context canceled
 }
 
+///////////////////////////////////////////////////////////////////////////////
+//                                                                           //
+// The following is an example of a standard Component which implements      //
+// ReadyDoneAware and Startable. Nothing here is required except for some    //
+// implementation of the interface methods. Ready and Done should return     //
+// their respective channels, and perform no startup/shutdown logic.         //
+//                                                                           //
+///////////////////////////////////////////////////////////////////////////////
+
 type ExampleComponent struct {
-	id  int
-	err error
-	lm  *lifecycle.LifecycleManager
+	id int
+	lm *lifecycle.LifecycleManager
 }
 
-func NewExampleComponent(id int, err error) *ExampleComponent {
+func NewExampleComponent(id int) *ExampleComponent {
 	return &ExampleComponent{
-		id:  id,
-		err: err,
-		lm:  lifecycle.NewLifecycleManager(),
+		id: id,
+		lm: lifecycle.NewLifecycleManager(),
 	}
 }
 
@@ -99,7 +116,10 @@ func (c *ExampleComponent) Start(ctx irrecoverable.SignalerContext) error {
 			select {
 			case <-time.After(20 * time.Millisecond):
 				// encounter irrecoverable error
-				ctx.Throw(c.err)
+				if c.id%2 == 0 {
+					ctx.Throw(errors.New("Fatal! No restarts"))
+				}
+				ctx.Throw(TemporaryError{"Restart me!"})
 			case <-ctx.Done():
 				c.printMsg("Cancelled by parent")
 			}

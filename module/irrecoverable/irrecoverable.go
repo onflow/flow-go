@@ -27,7 +27,7 @@ func (e *Signaler) Throw(err error) {
 type SignalerContext interface {
 	context.Context
 	Throw(err error) // delegates to the signaler
-	sealed()         // private, to constrain builder to using WithSignal
+	sealed()         // private, to constrain builder to using WithSignaler
 }
 
 // private, to force context derivation / WithSignal
