@@ -16,13 +16,7 @@
 # Adaptations for macOS by Stéphane Léon.
 # Adaptations for mingw-w64 (changes macOS too) by Jorrit Jongma.
 
-#define __AVX512BW__ 1
-#define __AVX512CD__ 1
-#define __AVX512DQ__ 1
-#define __AVX512F__ 1
-#define __AVX512VL__ 1
-
-#if (defined __AVX512CD__ ||  defined __AVX512ER__  || defined __AVX512F__ || defined__AVX512PF__)
+#if (defined __AVX512F__)
 
 .text
 

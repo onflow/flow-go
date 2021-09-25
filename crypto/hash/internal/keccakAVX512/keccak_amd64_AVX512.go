@@ -10,7 +10,7 @@ package keccakAVX512
 /*
 // check if the amd64 machine supports AVX512 instructions at build time and call
 // an assembly function using AVX512 if so.
-#if (defined __AVX512CD__ ||  defined __AVX512ER__  || defined __AVX512F__ || defined__AVX512PF__)
+#if (defined __AVX512F__)
 	void keccakF1600_AVX512(unsigned long* state);
 #else
 	void keccakF1600_AVX512(unsigned long* state) {};
