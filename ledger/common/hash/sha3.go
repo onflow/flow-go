@@ -2,6 +2,7 @@ package hash
 
 import (
 	"encoding/binary"
+	"github.com/onflow/flow-go/crypto/hash/keccak"
 )
 
 // All functions are copied and modified from golang.org/x/crypto/sha3
@@ -90,7 +91,7 @@ func (d *state) hash256Plus(p1 Hash, p2 []byte) Hash {
 
 	for len(p2)+written >= rate {
 		xorInAtIndex(d, p2[:rate-written], written>>3)
-		keccakF1600(&d.a)
+		keccak.KeccakF1600(&d.a)
 		p2 = p2[rate-written:]
 		written = 0
 	}
@@ -113,7 +114,7 @@ func (d *state) hash256Plus(p1 Hash, p2 []byte) Hash {
 	d.a[16] ^= paddingEnd
 
 	// permute
-	keccakF1600(&d.a)
+	keccak.KeccakF1600(&d.a)
 
 	// reverse and output
 	return copyOut(d)
@@ -124,7 +125,7 @@ func (d *state) hash256Plus(p1 Hash, p2 []byte) Hash {
 func (d *state) hash256plus256(p1, p2 Hash) Hash {
 	copyIn512(d, p1, p2)
 	// permute
-	keccakF1600(&d.a)
+	keccak.KeccakF1600(&d.a)
 	// reverse the endianess to the output
 	return copyOut(d)
 }
