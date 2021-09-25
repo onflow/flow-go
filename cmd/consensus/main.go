@@ -94,6 +94,8 @@ func main() {
 		startupTime                            time.Time
 
 		// DKG contract client
+		machineAccountInfo *bootstrap.NodeMachineAccountInfo
+		flowClient         *client.Client
 		accessAddress      string
 		secureAccessNodeID string
 		insecureAccessAPI  bool
@@ -119,35 +121,40 @@ func main() {
 		finalizedHeader         *synceng.FinalizedHeaderCache
 	)
 
-	cmd.FlowNode(flow.RoleConsensus.String()).
-		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
-			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
-			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
-			// the default value is able to buffer as many seals as would be generated over ~12 hours. In case it
-			// ever gets full, the node will simply crash instead of employing complex ejection logic.
-			flags.UintVar(&sealLimit, "seal-limit", 44200, "maximum number of block seals in the memory pool")
-			flags.UintVar(&pendingReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
-			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
-			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
-			flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
-			flags.UintVar(&maxGuaranteePerBlock, "max-guarantee-per-block", 100, "the maximum number of collection guarantees to be included in a block")
-			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
-			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
-			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
-			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
-			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
-			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
-			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
-			flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
-			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
-			flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
-			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
-			flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
-			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
-			flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 2006-01-02T15:04:05Z07:00)")
-		}).
-		Initialize().
+	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
+	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
+		flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
+		flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
+		flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
+		// the default value is able to buffer as many seals as would be generated over ~12 hours. In case it
+		// ever gets full, the node will simply crash instead of employing complex ejection logic.
+		flags.UintVar(&sealLimit, "seal-limit", 44200, "maximum number of block seals in the memory pool")
+		flags.UintVar(&pendingReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
+		flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
+		flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
+		flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
+		flags.UintVar(&maxGuaranteePerBlock, "max-guarantee-per-block", 100, "the maximum number of collection guarantees to be included in a block")
+		flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
+		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
+		flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
+		flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
+		flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
+		flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
+		flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
+		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
+		flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
+		flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
+		flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
+		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
+		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 2006-01-02T15:04:05Z07:00)")
+	})
+
+	if err = nodeBuilder.Initialize(); err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	nodeBuilder.
 		ValidateFlags(func() error {
 			if startupTimeString != cmd.NotSet {
 				t, err := time.Parse(time.RFC3339, startupTimeString)
@@ -167,7 +174,7 @@ func main() {
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 
 			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
@@ -348,6 +355,50 @@ func main() {
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			return nil
 		}).
+		Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+			return err
+		}).
+		Module("sdk client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			if accessAddress == "" {
+				return fmt.Errorf("missing required flag --access-address")
+			}
+			// create flow client with correct GRPC configuration for QC contract client
+			if insecureAccessAPI {
+				flowClient, err = common.InsecureFlowClient(accessAddress)
+				return err
+			} else {
+				if secureAccessNodeID == "" {
+					return fmt.Errorf("invalid flag --secure-access-node-id required")
+				}
+
+				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
+				if err != nil {
+					return fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
+				}
+
+				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))
+				if err != nil {
+					return fmt.Errorf("could not get identity of secure access node: %s", secureAccessNodeID)
+				}
+
+				if len(identities) < 1 {
+					return fmt.Errorf("could not find identity of secure access node: %s", secureAccessNodeID)
+				}
+
+				flowClient, err = common.SecureFlowClient(accessAddress, identities[0].NetworkPubKey.String()[2:])
+				return err
+			}
+		}).
+		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			validator, err := epochs.NewMachineAccountConfigValidator(
+				node.Logger,
+				flowClient,
+				flow.RoleCollection,
+				*machineAccountInfo,
+			)
+			return validator, err
+		}).
 		Component("sealing engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
@@ -487,7 +538,7 @@ func main() {
 				proposals,
 				syncCore)
 			if err != nil {
-				return nil, fmt.Errorf("coult not initialize compliance core: %w", err)
+				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
 			}
 
 			// initialize the compliance engine
@@ -527,6 +578,7 @@ func main() {
 				node.DB,
 				node.Storage.Headers,
 				mutableState,
+				node.Tracer,
 				finalizer.WithCleanup(finalizer.CleanupMempools(
 					node.Metrics.Mempool,
 					conMetrics,
@@ -687,40 +739,8 @@ func main() {
 			// participation in the DKG run
 			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
 
-			// create flow client with correct GRPC configuration for QC contract client
-			var flowClient *client.Client
-			if insecureAccessAPI {
-				flowClient, err = common.InsecureFlowClient(accessAddress)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				if secureAccessNodeID == "" {
-					return nil, fmt.Errorf("invalid flag --secure-access-node-id required")
-				}
-
-				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
-				if err != nil {
-					return nil, fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
-				}
-
-				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))
-				if err != nil {
-					return nil, fmt.Errorf("could not get identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				if len(identities) < 1 {
-					return nil, fmt.Errorf("could not find identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				flowClient, err = common.SecureFlowClient(accessAddress, identities[0].NetworkPubKey.String()[2:])
-				if err != nil {
-					return nil, err
-				}
-			}
-
 			// construct DKG contract client
-			dkgContractClient, err := createDKGContractClient(node, accessAddress, flowClient)
+			dkgContractClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
 			if err != nil {
 				return nil, fmt.Errorf("could not create dkg contract client %w", err)
 			}
@@ -765,7 +785,7 @@ func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPr
 }
 
 // createDKGContractClient creates a DKG contract client
-func createDKGContractClient(node *cmd.NodeConfig, accessAddress string, flowClient *client.Client) (module.DKGContractClient, error) {
+func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client) (module.DKGContractClient, error) {
 
 	var dkgClient module.DKGContractClient
 
@@ -775,23 +795,12 @@ func createDKGContractClient(node *cmd.NodeConfig, accessAddress string, flowCli
 	}
 	dkgContractAddress := contracts.DKG.Address.Hex()
 
-	// if not valid return a mock dkg contract client
-	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
-		return nil, fmt.Errorf("could not validate node machine account config")
-	}
-
-	// attempt to read NodeMachineAccountInfo
-	info, err := cmd.LoadNodeMachineAccountInfoFile(node.BaseConfig.BootstrapDir, node.Me.NodeID())
-	if err != nil {
-		return nil, fmt.Errorf("could not load node machine account info file: %w", err)
-	}
-
 	// construct signer from private key
-	sk, err := crypto.DecodePrivateKey(info.SigningAlgorithm, info.EncodedPrivateKey)
+	sk, err := crypto.DecodePrivateKey(machineAccountInfo.SigningAlgorithm, machineAccountInfo.EncodedPrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
-	txSigner := crypto.NewInMemorySigner(sk, info.HashAlgorithm)
+	txSigner := crypto.NewInMemorySigner(sk, machineAccountInfo.HashAlgorithm)
 
 	// create actual dkg contract client, all flags and machine account info file found
 	dkgClient = dkgmodule.NewClient(
@@ -799,8 +808,8 @@ func createDKGContractClient(node *cmd.NodeConfig, accessAddress string, flowCli
 		flowClient,
 		txSigner,
 		dkgContractAddress,
-		info.Address,
-		info.KeyIndex,
+		machineAccountInfo.Address,
+		machineAccountInfo.KeyIndex,
 	)
 
 	return dkgClient, nil

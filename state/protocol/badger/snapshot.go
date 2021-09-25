@@ -71,7 +71,7 @@ func (s *Snapshot) QuorumCertificate() (*flow.QuorumCertificate, error) {
 	// CASE 2: for any other block, generate the root QC from a valid child
 	child, err := s.validChild()
 	if err != nil {
-		return nil, fmt.Errorf("could not get child: %w", err)
+		return nil, fmt.Errorf("could not get valid child of block %x: %w", s.blockID, err)
 	}
 
 	// sanity check: ensure the child has the snapshot block as parent
@@ -118,7 +118,7 @@ func (s *Snapshot) validChild() (*flow.Header, error) {
 			continue
 		}
 		if err != nil {
-			return nil, fmt.Errorf("could not get child validity: %w", err)
+			return nil, fmt.Errorf("failed to determine validity of child block %v: %w", childID, err)
 		}
 		if valid {
 			validChildID = childID
@@ -380,6 +380,8 @@ func (s *Snapshot) descendants(blockID flow.Identifier) ([]flow.Identifier, erro
 }
 
 // Seed returns the random seed at the given indices for the current block snapshot.
+// Expected error returns:
+// * state.NoValidChildBlockError if no valid child is known
 func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 
 	// CASE 1: for the root block, generate the seed from the root qc
@@ -406,7 +408,7 @@ func (s *Snapshot) Seed(indices ...uint32) ([]byte, error) {
 	// CASE 2: for any other block, use any valid child
 	child, err := s.validChild()
 	if err != nil {
-		return nil, fmt.Errorf("could not get child: %w", err)
+		return nil, fmt.Errorf("failed to get valid child of block %x: %w", s.blockID, err)
 	}
 
 	seed, err := seed.FromParentSignature(indices, child.ParentVoterSigData)
