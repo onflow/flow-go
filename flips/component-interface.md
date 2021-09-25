@@ -70,6 +70,7 @@ A component will now be started by passing a `Context` to its `Start` method, an
 
     childRoutinesStarted  sync.WaitGroup
     childRoutinesFinished sync.WaitGroup
+    started               chan struct{}
   }
 
   type ComponentManagerBuilder interface {
@@ -96,12 +97,15 @@ A component will now be started by passing a `Context` to its `Start` method, an
         routine(ctx)
       }(routine)
     }
+    
+    close(c.started)
   }
 
   func (c *ComponentManager) Ready() <-chan struct{} {
     ready := make(chan struct{})
 
     go func() {
+      <-c.started
       <-lifecycle.AllReady(c.subComponents...)
       c.childRoutinesStarted.Wait()
       close(ready)
@@ -114,6 +118,7 @@ A component will now be started by passing a `Context` to its `Start` method, an
     done := make(chan struct{})
 
     go func() {
+      <-c.started
       <-lifecycle.AllDone(c.subComponents...)
       c.childRoutinesFinished.Wait()
       close(done)
