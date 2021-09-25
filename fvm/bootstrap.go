@@ -227,6 +227,10 @@ func (b *BootstrapProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 
 	b.registerNodes(service, fungibleToken, flowToken)
 
+	// deploy other contracts (ie, NonFungibleToken and Marketplace)
+	nonFungibleToken := b.deployNonFungibleToken()
+	b.deployExampleNFT(nonFungibleToken)
+
 	return nil
 }
 
@@ -271,6 +275,37 @@ func (b *BootstrapProcedure) deployFungibleToken() flow.Address {
 	)
 	panicOnMetaInvokeErrf("failed to deploy fungible token contract: %s", txError, err)
 	return fungibleToken
+}
+
+func (b *BootstrapProcedure) deployNonFungibleToken() flow.Address {
+	nonFungibleToken := b.createAccount()
+
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployNonFungibleTokenTransaction(nonFungibleToken),
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to deploy NonFungibleToken contract: %s", txError, err)
+	return nonFungibleToken
+}
+
+func (b *BootstrapProcedure) deployExampleNFT(nonFungibleToken flow.Address) flow.Address {
+	exampleNFT := b.createAccount()
+	txError, err := b.vm.invokeMetaTransaction(
+		b.ctx,
+		Transaction(
+			blueprints.DeployExampleNFTTransaction(
+				nonFungibleToken,
+				exampleNFT),
+			0),
+		b.sth,
+		b.programs,
+	)
+	panicOnMetaInvokeErrf("failed to deploy ExampleNFT: %s", txError, err)
+	return exampleNFT
 }
 
 func (b *BootstrapProcedure) deployFlowToken(service, fungibleToken flow.Address) flow.Address {
@@ -910,9 +945,11 @@ func bytesToCadenceArray(b []byte) cadence.Array {
 }
 
 const (
-	fungibleTokenAccountIndex = 2
-	flowTokenAccountIndex     = 3
-	flowFeesAccountIndex      = 4
+	fungibleTokenAccountIndex    = 2
+	flowTokenAccountIndex        = 3
+	flowFeesAccountIndex         = 4
+	nonFungibleTokenAccountIndex = 5
+	exampleNFTAccountIndex       = 6
 )
 
 func panicOnMetaInvokeErrf(msg string, txError errors.Error, err error) {
@@ -936,5 +973,15 @@ func FlowTokenAddress(chain flow.Chain) flow.Address {
 
 func FlowFeesAddress(chain flow.Chain) flow.Address {
 	address, _ := chain.AddressAtIndex(flowFeesAccountIndex)
+	return address
+}
+
+func NonFungibleTokenAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(nonFungibleTokenAccountIndex)
+	return address
+}
+
+func ExampleNFTAddress(chain flow.Chain) flow.Address {
+	address, _ := chain.AddressAtIndex(exampleNFTAccountIndex)
 	return address
 }
