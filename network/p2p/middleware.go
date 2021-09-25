@@ -10,9 +10,13 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
+	bsnet "github.com/ipfs/go-bitswap/network"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	exchange "github.com/ipfs/go-ipfs-exchange-interface"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -83,6 +87,9 @@ type Middleware struct {
 	idTranslator               IDTranslator
 	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
+	bsBlockstore               blockstore.Blockstore
+	bsNetwork                  bsnet.BitSwapNetwork
+	bsEexchange                exchange.Interface
 }
 
 type MiddlewareOption func(*Middleware)
@@ -102,6 +109,12 @@ func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOpt
 func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.peerManagerFactory = peerManagerFunc
+	}
+}
+
+func WithBitswap(bstore blockstore.Blockstore) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.bsBlockstore = bstore
 	}
 }
 
@@ -263,6 +276,14 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		case <-time.After(30 * time.Second):
 			return fmt.Errorf("could not start peer manager")
 		}
+	}
+
+	if m.bsBlockstore != nil {
+		// TODO: either use DHT or some other default implementation
+		var router routing.ContentRouting
+
+		m.bsNetwork = bsnet.NewFromIPFSHost(m.libP2PNode.host, router)
+		m.bsExchange = bitswap.New(ctx, bsNetwork, m.bsBlockstore)
 	}
 
 	return nil

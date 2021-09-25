@@ -26,6 +26,9 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/improbable-eng/grpc-web v0.12.0
+	github.com/ipfs/go-bitswap v0.4.0 // indirect
+	github.com/ipfs/go-graphsync v0.9.2 // indirect
+	github.com/ipfs/go-ipfs-exchange-interface v0.0.1 // indirect
 	github.com/ipfs/go-log v1.0.5
 	github.com/jrick/bitset v1.0.0
 	github.com/kr/text v0.2.0 // indirect

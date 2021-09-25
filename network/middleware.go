@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	blocks "github.com/ipfs/go-block-format"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/message"
@@ -58,6 +59,10 @@ type Middleware interface {
 	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()
+
+	GetEntities(ctx context.Context, cb (id flow.Identifier, block blocks.Block), ids ...flow.Identifier)
+
+	GetRelatedEntities(ctx context.Context, cb (id flow.Identifier, block blocks.Block), ids ...flow.Identifier)
 }
 
 // Overlay represents the interface that middleware uses to interact with the

@@ -3,6 +3,7 @@
 package module
 
 import (
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -11,7 +12,6 @@ import (
 // a unique engine ID. The returned conduit allows the process to communicate to
 // the same engine on other nodes across the network in a network-agnostic way.
 type Network interface {
-
 	// Register will subscribe to the channel with the given engine and
 	// the engine will be notified with incoming messages on the channel.
 	// The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
