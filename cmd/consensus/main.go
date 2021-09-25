@@ -93,7 +93,7 @@ func main() {
 		dkgControllerConfig                    dkgmodule.ControllerConfig
 
 		// DKG contract client
-		machineAccountInfo *bootstrap.NodeMachineAccountInfo
+		//machineAccountInfo *bootstrap.NodeMachineAccountInfo
 		flowClient         *client.Client
 		accessAddress      string
 		secureAccessNodeID string
@@ -340,10 +340,10 @@ func main() {
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			return nil
 		}).
-		Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
-			return err
-		}).
+		//Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		//	machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+		//	return err
+		//}).
 		Module("sdk client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			if accessAddress == "" {
 				return fmt.Errorf("missing required flag --access-address")
@@ -375,15 +375,15 @@ func main() {
 				return err
 			}
 		}).
-		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			validator, err := epochs.NewMachineAccountConfigValidator(
-				node.Logger,
-				flowClient,
-				flow.RoleCollection,
-				*machineAccountInfo,
-			)
-			return validator, err
-		}).
+		//Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		//	validator, err := epochs.NewMachineAccountConfigValidator(
+		//		node.Logger,
+		//		flowClient,
+		//		flow.RoleCollection,
+		//		*machineAccountInfo,
+		//	)
+		//	return validator, err
+		//}).
 		Component("sealing engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
@@ -716,11 +716,8 @@ func main() {
 			// participation in the DKG run
 			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
 
-			// construct DKG contract client
-			dkgContractClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
-			if err != nil {
-				return nil, fmt.Errorf("could not create dkg contract client %w", err)
-			}
+			// construct a mock DKG contract client
+			dkgContractClient := dkgmodule.NewMockClient(node.Logger)
 
 			// the reactor engine reacts to new views being finalized and drives the
 			// DKG protocol

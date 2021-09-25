@@ -88,7 +88,7 @@ func main() {
 		accessAddress      string
 		secureAccessNodeID string
 		insecureAccessAPI  bool
-		machineAccountInfo *bootstrap.NodeMachineAccountInfo
+		// machineAccountInfo *bootstrap.NodeMachineAccountInfo
 		flowClient         *client.Client
 	)
 
@@ -183,10 +183,10 @@ func main() {
 			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
-			return err
-		}).
+		//Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		//	machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+		//	return err
+		//}).
 		Module("sdk client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			if accessAddress == "" {
 				return fmt.Errorf("missing required flag --access-address")
@@ -218,15 +218,15 @@ func main() {
 				return err
 			}
 		}).
-		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			validator, err := epochs.NewMachineAccountConfigValidator(
-				node.Logger,
-				flowClient,
-				flow.RoleCollection,
-				*machineAccountInfo,
-			)
-			return validator, err
-		}).
+		//Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		//	validator, err := epochs.NewMachineAccountConfigValidator(
+		//		node.Logger,
+		//		flowClient,
+		//		flow.RoleCollection,
+		//		*machineAccountInfo,
+		//	)
+		//	return validator, err
+		//}).
 		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
@@ -449,10 +449,11 @@ func main() {
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
 			// construct QC contract client
-			qcContractClient, err := createQCContractClient(node, machineAccountInfo, flowClient)
-			if err != nil {
-				return nil, fmt.Errorf("could not create qc contract client %w", err)
-			}
+			//qcContractClient, err := createQCContractClient(node, machineAccountInfo, flowClient)
+			//if err != nil {
+			//	return nil, fmt.Errorf("could not create qc contract client %w", err)
+			//}
+			qcContractClient := epochs.NewMockQCContractClient(node.Logger)
 
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
