@@ -5,7 +5,7 @@
 //go:build amd64 && !purego && gc
 // +build amd64,!purego,gc
 
-package keccak
+package keccakAMD
 
 // this is called for amd64 when AVX512 is unavailable
 func KeccakF1600GenericAMD(a *[25]uint64)

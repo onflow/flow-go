@@ -1,5 +1,9 @@
 package hash
 
+import (
+	"github.com/onflow/flow-go/crypto/hash/keccak"
+)
+
 const (
 	rateSha3_256 = 136
 	rateSha3_384 = 104
@@ -131,7 +135,7 @@ func (d *sha3State) permute() {
 	// xor the input into the state before applying the permutation.
 	xorIn(d, d.buf)
 	d.buf = d.storage.asBytes()[:0]
-	keccakF1600(&d.a)
+	keccak.KeccakF1600(&d.a)
 }
 
 func (d *sha3State) write(p []byte) {
@@ -144,7 +148,7 @@ func (d *sha3State) write(p []byte) {
 			// The fast path; absorb a full "rate" bytes of input and apply the permutation.
 			xorIn(d, p[:d.rate])
 			p = p[d.rate:]
-			keccakF1600(&d.a)
+			keccak.KeccakF1600(&d.a)
 		} else {
 			// The slow path; buffer the input until we can fill the sponge, and then xor it in.
 			todo := d.rate - len(d.buf)

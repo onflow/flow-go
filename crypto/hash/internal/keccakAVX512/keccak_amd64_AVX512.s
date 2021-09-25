@@ -472,11 +472,11 @@ __KeccakF1600GenericAMD:
 .globl  _KeccakP1600_Permute_24rounds
 _KeccakP1600_Permute_24rounds:
 .else
-.globl  KeccakF1600_AVX512
+.globl  keccakF1600_AVX512
 .ifndef no_type
-.type   KeccakF1600_AVX512,@function
+.type   keccakF1600_AVX512,@function
 .endif
-KeccakF1600_AVX512:
+keccakF1600_AVX512:
 .endif
 .balign 32
     lea         96(%rdi),%rdi
@@ -525,7 +525,7 @@ KeccakF1600_AVX512:
     vzeroupper
     ret
 .ifndef no_size
-.size   KeccakF1600_AVX512,.-KeccakF1600_AVX512
+.size   keccakF1600_AVX512,.-keccakF1600_AVX512
 .endif
 
 # -----------------------------------------------------------------------------
@@ -859,10 +859,10 @@ KeccakF1600_FastLoop_Absorb_LanesAddLoop:
 .ifdef add_underscore
     call            _KeccakP1600_Permute_24rounds
 .else
-    call            KeccakF1600_AVX512
+    call            keccakF1600_AVX512
 .endif
 .else
-    call            KeccakF1600_AVX512@PLT
+    call            keccakF1600_AVX512@PLT
 .endif
     pop             %rcx
     pop             %rdx
