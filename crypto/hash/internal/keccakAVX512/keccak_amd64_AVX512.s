@@ -9,7 +9,7 @@
 # For further details see http://www.openssl.org/~appro/cryptogams/.
 #
 # Notes:
-# The code for the permutation (__KeccakF1600GenericAMD) was generated with
+# The code for the permutation (__KeccakF1600) was generated with
 # Andy Polyakov's keccak1600-avx512.pl from the CRYPTOGAMS project
 # (https://github.com/dot-asm/cryptogams/blob/master/x86_64/keccak1600-avx512.pl).
 # The rest of the code was written by Ronny Van Keer.
@@ -349,10 +349,10 @@ KeccakP1600_ExtractAndAddBytes_Exit:
 #
 .text
 .ifndef no_type
-.type    __KeccakF1600GenericAMD,@function
+.type    __KeccakF1600,@function
 .endif
 .balign 32
-__KeccakF1600GenericAMD:
+__KeccakF1600:
 .Loop_avx512:
     ######################################### Theta, even round
     vmovdqa64    %zmm0,%zmm5        # put aside original A00
@@ -460,12 +460,12 @@ __KeccakF1600GenericAMD:
     jnz        .Loop_avx512
     ret
 .ifndef no_size
-.size    __KeccakF1600GenericAMD,.-__KeccakF1600GenericAMD
+.size    __KeccakF1600,.-__KeccakF1600
 .endif
 
 # -----------------------------------------------------------------------------
 #
-# void KeccakF1600GenericAMD_AVX512(void *state);
+# void keccakF1600_AVX512(void *state);
 #                                        %rdi
 #
 .ifdef add_underscore
