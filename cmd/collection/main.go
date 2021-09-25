@@ -141,7 +141,7 @@ func main() {
 				"additional fraction of replica timeout that the primary will wait for votes")
 			flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 				"the delay to broadcast block proposal in order to control block production rate")
-			flags.StringVar(&startupTimeString, "startup-time", cmd.NotSet,
+			flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet,
 				"specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 2006-01-02T15:04:05Z07:00)")
 
 			// epoch qc contract flags
