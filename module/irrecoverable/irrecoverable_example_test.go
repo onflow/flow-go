@@ -4,11 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/lifecycle"
 )
 
 var ErrTriggerRestart = errors.New("restart me")
@@ -54,75 +54,91 @@ func Example() {
 
 	// Output:
 	// [Component 1] Starting up
-	// [Component 1] Running cleanup
+	// [Component 1] Shutting down
 	// Restarting component after fatal error: restart me
 	// [Component 2] Starting up
-	// [Component 2] Running cleanup
+	// [Component 2] Shutting down
 	// An unrecoverable error occurred: fatal, no restarts
 	// Error returned from RunComponent: context canceled
 }
 
-// ExampleComponent is an example of a typical LifecycleManager-equipped component
-// The use of LifecycleManager is completely optional for this example, and any
-// implementation of the Component interface will work.
+// ExampleComponent is an example of a typical component
 type ExampleComponent struct {
-	id int
-	lm *lifecycle.LifecycleManager
+	id      int
+	started chan struct{}
+	ready   sync.WaitGroup
+	done    sync.WaitGroup
 }
 
 func NewExampleComponent(id int) *ExampleComponent {
 	return &ExampleComponent{
-		id: id,
-		lm: lifecycle.NewLifecycleManager(),
+		id:      id,
+		started: make(chan struct{}),
 	}
 }
 
 // start the component and register its shutdown handler
 // this component will throw an error after 20ms to demonstrate the error handling
 func (c *ExampleComponent) Start(ctx irrecoverable.SignalerContext) {
-	c.lm.OnStart(func() {
-		go c.shutdownOnCancel(ctx)
+	c.printMsg("Starting up")
 
-		c.printMsg("Starting up")
+	// do some setup...
 
-		// do some setup...
+	c.ready.Add(2)
+	c.done.Add(2)
 
-		go func() {
-			select {
-			case <-time.After(20 * time.Millisecond):
-				// encounter irrecoverable error
-				if c.id > 1 {
-					ctx.Throw(ErrNoRestart)
-				} else {
-					ctx.Throw(ErrTriggerRestart)
-				}
-			case <-ctx.Done():
-				c.printMsg("Cancelled by parent")
-			}
-		}()
-	})
-}
+	go func() {
+		c.ready.Done()
+		defer c.done.Done()
 
-// run the lifecycle OnStop when the component's context is cancelled
-func (c *ExampleComponent) shutdownOnCancel(ctx context.Context) {
-	<-ctx.Done()
+		<-ctx.Done()
 
-	c.lm.OnStop(func() {
-		c.printMsg("Running cleanup")
+		c.printMsg("Shutting down")
 		// do some cleanup...
-	})
+	}()
+
+	go func() {
+		c.ready.Done()
+		defer c.done.Done()
+
+		select {
+		case <-time.After(20 * time.Millisecond):
+			// encounter irrecoverable error
+			if c.id > 1 {
+				ctx.Throw(ErrNoRestart)
+			} else {
+				ctx.Throw(ErrTriggerRestart)
+			}
+		case <-ctx.Done():
+			c.printMsg("Cancelled by parent")
+		}
+	}()
+
+	close(c.started)
 }
 
 // simply return the Started channel
 // all startup processing is done in Start()
 func (c *ExampleComponent) Ready() <-chan struct{} {
-	return c.lm.Started()
+	ready := make(chan struct{})
+	go func() {
+		<-c.started
+		c.ready.Wait()
+		close(ready)
+	}()
+	return ready
 }
 
 // simply return the Stopped channel
 // all shutdown processing is done in shutdownOnCancel()
 func (c *ExampleComponent) Done() <-chan struct{} {
-	return c.lm.Stopped()
+	done := make(chan struct{})
+	go func() {
+		<-c.started
+		c.done.Wait()
+		close(done)
+	}()
+	return done
 }
 
 func (c *ExampleComponent) printMsg(msg string) {
