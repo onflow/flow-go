@@ -129,7 +129,7 @@ func NewParticipant(
 	}
 
 	// initialize and return the event loop
-	loop, err := hotstuff.NewEventLoop(log, metrics, handler)
+	loop, err := hotstuff.NewEventLoop(log, metrics, handler, cfg.StartupTime)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event loop: %w", err)
 	}
