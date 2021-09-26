@@ -47,32 +47,6 @@ func (c *StartupErroringComponent) Done() <-chan struct{} {
 	return c.done
 }
 
-type StartErroringComponent struct {
-	ready chan struct{}
-	done  chan struct{}
-}
-
-func NewStartErroringComponent() *StartErroringComponent {
-	return &StartErroringComponent{
-		ready: make(chan struct{}),
-		done:  make(chan struct{}),
-	}
-}
-
-func (c *StartErroringComponent) Start(ctx irrecoverable.SignalerContext) {
-	defer close(c.done)
-
-	// throw fatal error synchronously during startup
-	ctx.Throw(ErrFatal)
-}
-func (c *StartErroringComponent) Ready() <-chan struct{} {
-	return c.ready
-}
-
-func (c *StartErroringComponent) Done() <-chan struct{} {
-	return c.done
-}
-
 type ShutdownErroringComponent struct {
 	ready   sync.WaitGroup
 	done    sync.WaitGroup
@@ -184,25 +158,6 @@ func (c *ConcurrentErroringComponent) Done() <-chan struct{} {
 		close(done)
 	}()
 	return done
-}
-
-func TestRunComponentStartError(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-
-	componentFactory := func() (Component, error) {
-		return NewStartErroringComponent(), nil
-	}
-
-	called := false
-	onError := func(err error, triggerRestart func()) {
-		called = true
-		require.ErrorIs(t, err, ErrFatal)
-		cancel()
-	}
-
-	err := RunComponent(ctx, componentFactory, onError)
-	require.ErrorIs(t, err, context.Canceled)
-	require.True(t, called)
 }
 func TestRunComponentStartupError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())

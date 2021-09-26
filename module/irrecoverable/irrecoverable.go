@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"runtime"
 )
 
@@ -21,10 +20,8 @@ func NewSignaler(errors chan<- error) *Signaler {
 // anywhere there's something connected to the error channel
 func (e *Signaler) Throw(err error) {
 	defer func() {
-		// If the error channel was already closed by a concurrent call to Throw, the call
-		// to close below will panic. We simply log the unhandled irrecoverable for now.
 		if r := recover(); r != nil {
-			log.New(os.Stderr, "", log.LstdFlags).Println(fmt.Errorf("unhandled irrecoverable: %w", err))
+			log.Default().Println(fmt.Errorf("unhandled irrecoverable: %w", err))
 		}
 		runtime.Goexit()
 	}()
@@ -73,5 +70,5 @@ func Throw(ctx context.Context, err error) {
 		signalerAbleContext.Throw(err)
 	}
 	// Be spectacular on how this does not -but should- handle irrecoverables:
-	log.Fatalf("irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error %v", err)
+	log.Fatalf("Irrecoverable error signaler not found for context, please implement! Unhandled irrecoverable error %v", err)
 }
