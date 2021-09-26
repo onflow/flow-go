@@ -9,6 +9,9 @@ import (
 	"math/rand"
 	"reflect"
 
+	cid "github.com/ipfs/go-cid"
+	"github.com/multiformats/go-multihash"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -16,8 +19,10 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
+const IdentifierLen = 32
+
 // Identifier represents a 32-byte unique identifier for an entity.
-type Identifier [32]byte
+type Identifier [IdentifierLen]byte
 
 // IdentifierFilter is a filter on identifiers.
 type IdentifierFilter func(Identifier) bool
@@ -114,6 +119,24 @@ func MakeID(entity interface{}) Identifier {
 	id := HashToID(hash)
 	//binstat.Leave(bs2)
 	return id
+}
+
+func IDToMultihash(id Identifier) multihash.Multihash {
+	// TODO: test making the multihash directly from the data,
+	// vs making the multihash via MakeID -> IDToMultihash
+
+	mHashBuf, _ := multihash.Encode(id[:], multihash.SHA3_256)
+	return multihash.Multihash(mHashBuf)
+}
+
+func IDToCid(id Identifier) cid.Cid {
+	// TODO: support different codecs?
+	// e.g cid.DagCBOR for Merkle DAG root of multi-block state diff
+	return cid.NewCidV1(cid.Raw, IDToMultihash(id))
+}
+
+func IDFromCid(cID cid.Cid) Identifier {
+	// TODO
 }
 
 // PublicKeyToID creates an ID from a public key.

@@ -3,10 +3,10 @@
 package network
 
 import (
+	"context"
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
-	blocks "github.com/ipfs/go-block-format"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/message"
@@ -59,10 +59,24 @@ type Middleware interface {
 	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()
+}
 
-	GetEntities(ctx context.Context, cb (id flow.Identifier, block blocks.Block), ids ...flow.Identifier)
+type EntityExchange interface {
+	// TODO: make this Startable and ReadyDoneAware
+	EntityExchangeFetcher
+	GetSession(ctx context.Context) EntityExchangeFetcher
+	HasEntity(entity flow.Entity)
+}
 
-	GetRelatedEntities(ctx context.Context, cb (id flow.Identifier, block blocks.Block), ids ...flow.Identifier)
+type EntityExchangeFetcher interface {
+	GetEntities(ctx context.Context, cb func(entity flow.Entity), ids ...flow.Identifier)
+}
+
+type EntityExchangeMiddleware interface {
+	Middleware
+	EntityExchange
+	// TODO:
+	// can add more methods here, e.g to access underlying blockstore
 }
 
 // Overlay represents the interface that middleware uses to interact with the

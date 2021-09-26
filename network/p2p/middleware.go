@@ -10,13 +10,15 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
+	bitswap "github.com/ipfs/go-bitswap"
 	bsnet "github.com/ipfs/go-bitswap/network"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	exchange "github.com/ipfs/go-ipfs-exchange-interface"
+	blocks "github.com/ipfs/go-block-format"
+	"github.com/ipfs/go-cid"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
 	"github.com/libp2p/go-libp2p-core/routing"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -75,7 +77,7 @@ type Middleware struct {
 	ov                         network.Overlay
 	wg                         *sync.WaitGroup
 	libP2PNode                 *Node
-	libP2PNodeFactory          LibP2PFactoryFunc
+	libP2PNodeBuilder          NodeBuilder
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
 	rootBlockID                flow.Identifier
@@ -87,9 +89,8 @@ type Middleware struct {
 	idTranslator               IDTranslator
 	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
-	bsBlockstore               blockstore.Blockstore
-	bsNetwork                  bsnet.BitSwapNetwork
-	bsEexchange                exchange.Interface
+
+	dht *dht.IpfsDHT
 }
 
 type MiddlewareOption func(*Middleware)
@@ -112,9 +113,10 @@ func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 	}
 }
 
-func WithBitswap(bstore blockstore.Blockstore) MiddlewareOption {
+// TODO: implement DHT in middleware
+func WithDHT(dht *dht.IpfsDHT) MiddlewareOption {
 	return func(mw *Middleware) {
-		mw.bsBlockstore = bstore
+		mw.dht = dht
 	}
 }
 
@@ -129,7 +131,7 @@ func WithBitswap(bstore blockstore.Blockstore) MiddlewareOption {
 // validators are the set of the different message validators that each inbound messages is passed through
 func NewMiddleware(
 	log zerolog.Logger,
-	libP2PNodeFactory LibP2PFactoryFunc,
+	libP2PNodeBuilder NodeBuilder,
 	flowID flow.Identifier,
 	metrics module.NetworkMetrics,
 	rootBlockID flow.Identifier,
@@ -151,7 +153,7 @@ func NewMiddleware(
 		log:                   log,
 		wg:                    &sync.WaitGroup{},
 		me:                    flowID,
-		libP2PNodeFactory:     libP2PNodeFactory,
+		libP2PNodeBuilder:     libP2PNodeBuilder,
 		metrics:               metrics,
 		rootBlockID:           rootBlockID,
 		validators:            DefaultValidators(log, flowID),
@@ -283,10 +285,34 @@ func (m *Middleware) Start(ov network.Overlay) error {
 		var router routing.ContentRouting
 
 		m.bsNetwork = bsnet.NewFromIPFSHost(m.libP2PNode.host, router)
-		m.bsExchange = bitswap.New(ctx, bsNetwork, m.bsBlockstore)
+		m.bsExchange = bitswap.New(context.TODO(), m.bsNetwork, m.bsBlockstore)
 	}
 
 	return nil
+}
+
+func (m *Middleware) GetEntities(ctx context.Context, cb func(id flow.Identifier, block blocks.Block), ids ...flow.Identifier) {
+	if exchange := n.mw.Exchange(); exchange != nil {
+		var cids []cid.Cid
+		// TODO: convert flow IDs to cids
+		blocksChan, err := exchange.GetBlocks(ctx, cids)
+		if err != nil {
+			// TODO
+		}
+		go func() {
+			for block := range blocksChan {
+				// convert the block's cid to a flow Identifier
+				id := flow.IDFromCid(block.Cid())
+				// TODO: verify if block data matches cid?
+				// or is this done for us by bitswap?
+				cb(id, block)
+			}
+		}()
+	}
+}
+
+func (m *Middleware) GetSession(ctx context.Context) network.EntityExchangeSession {
+
 }
 
 // Stop will end the execution of the middleware and wait for it to end.
