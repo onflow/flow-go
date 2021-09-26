@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
@@ -61,6 +62,8 @@ const (
 	LargeMsgUnicastTimeout = 1000 * time.Second
 )
 
+var _ network.Middleware = (*Middleware)(nil)
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
@@ -83,6 +86,7 @@ type Middleware struct {
 	idTranslator               IDTranslator
 	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
+	*module.ComponentManager
 }
 
 type MiddlewareOption func(*Middleware)
@@ -151,6 +155,8 @@ func NewMiddleware(
 	for _, opt := range opts {
 		opt(mw)
 	}
+
+	mw.buildComponentManager()
 
 	return mw
 }
@@ -228,9 +234,21 @@ func (m *Middleware) UpdateNodeAddresses() {
 	m.previousProtocolStatePeers = newInfos
 }
 
-// Start will start the middleware.
-func (m *Middleware) Start(ov network.Overlay) error {
+func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
+}
+
+func (m *Middleware) buildComponentManager() {
+	m.ComponentManager = module.NewComponentManagerBuilder().OnStart(func(ctx context.Context) error {
+		return m.start(ctx)
+	}).AddWorker(func(ctx irrecoverable.SignalerContext) {
+		<-ctx.Done()
+		m.stop()
+	}).Build()
+}
+
+// start will start the middleware.
+func (m *Middleware) start(ctx context.Context) error {
 	libP2PNode, err := m.libP2PNodeFactory()
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
@@ -268,8 +286,8 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	return nil
 }
 
-// Stop will end the execution of the middleware and wait for it to end.
-func (m *Middleware) Stop() {
+// stop will end the execution of the middleware and wait for it to end.
+func (m *Middleware) stop() {
 	mgr, found := m.peerMgr()
 	if found {
 		// stops peer manager

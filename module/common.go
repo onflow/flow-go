@@ -2,6 +2,7 @@ package module
 
 import (
 	"context"
+	"sync"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
@@ -96,7 +97,12 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 
 	shutdownAndWaitForRestart := func(err error) error {
 		// shutdown the component
-		cancel()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+			cancel()
+		}
 
 		// wait until it's done
 		// note that irrecoverables which are encountered during shutdown are ignored
@@ -136,4 +142,91 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			}
 		}
 	}
+}
+
+type ComponentWorker func(ctx irrecoverable.SignalerContext)
+type ComponentStartup func(context.Context) error
+
+type ComponentManagerBuilder interface {
+	OnStart(ComponentStartup) ComponentManagerBuilder
+	AddWorker(ComponentWorker) ComponentManagerBuilder
+	// AddComponent(Component) ComponentManagerBuilder
+	Build() *ComponentManager
+}
+
+type ComponentManagerBuilderImpl struct {
+	startup ComponentStartup
+	workers []ComponentWorker
+}
+
+func NewComponentManagerBuilder() *ComponentManagerBuilderImpl {
+	return &ComponentManagerBuilderImpl{
+		startup: func(_ context.Context) error { return nil },
+	}
+}
+
+func (c *ComponentManagerBuilderImpl) OnStart(startup ComponentStartup) ComponentManagerBuilder {
+	c.startup = startup
+	return c
+}
+
+func (c *ComponentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
+	c.workers = append(c.workers, worker)
+	return c
+}
+
+func (c *ComponentManagerBuilderImpl) Build() *ComponentManager {
+	return &ComponentManager{
+		started: make(chan struct{}),
+		ready:   make(chan struct{}),
+		startup: c.startup,
+		workers: c.workers,
+	}
+}
+
+var _ Component = (*ComponentManager)(nil)
+
+type ComponentManager struct {
+	started chan struct{}
+	ready   chan struct{}
+	done    sync.WaitGroup
+
+	startOnce sync.Once
+	startup   func(context.Context) error
+	workers   []ComponentWorker
+}
+
+func (c *ComponentManager) Start(ctx irrecoverable.SignalerContext) {
+	c.startOnce.Do(func() {
+		go func() {
+			defer close(c.started)
+
+			if err := c.startup(ctx); err != nil {
+				ctx.Throw(err)
+			}
+			close(c.ready)
+
+			c.done.Add(len(c.workers))
+			for _, worker := range c.workers {
+				go func() {
+					defer c.done.Done()
+					worker(ctx)
+				}()
+			}
+		}()
+	})
+}
+
+func (c *ComponentManager) Ready() <-chan struct{} {
+	return c.ready
+}
+
+func (c *ComponentManager) Done() <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		<-c.started
+		c.done.Wait()
+		close(done)
+	}()
+	return done
 }
