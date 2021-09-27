@@ -88,7 +88,7 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 		return fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
 	}
 	if !ok {
-		return signature.ErrInvalidFormat
+		return signature.NewErrInvalidFormat("signature from %s is invalid", signerID)
 	}
 	return nil
 }

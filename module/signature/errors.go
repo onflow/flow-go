@@ -6,7 +6,6 @@ import (
 )
 
 var (
-	ErrInvalidFormat      = errors.New("invalid signature")
 	ErrInsufficientShares = errors.New("insufficient threshold signature shares")
 )
 
@@ -21,5 +20,19 @@ func newErrDuplicatedSigner(msg string, args ...interface{}) error {
 }
 
 func (e ErrDuplicatedSigner) Error() string {
+	return e.message
+}
+
+// ErrInvalidFormat is returned an invalid format or signature is detected
+type ErrInvalidFormat struct {
+	message string
+}
+
+// NewErrInvalidFormat constructs a new ErrInvalidFormat
+func NewErrInvalidFormat(msg string, args ...interface{}) error {
+	return &ErrInvalidFormat{message: fmt.Sprintf(msg, args...)}
+}
+
+func (e ErrInvalidFormat) Error() string {
 	return e.message
 }

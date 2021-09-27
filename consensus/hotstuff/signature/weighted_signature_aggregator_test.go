@@ -183,7 +183,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 
 	invalidInput := engine.NewInvalidInputError("some error")
 	duplicate := engine.NewDuplicatedEntryErrorf("some error")
-	invalidSig := signature.ErrInvalidFormat
+	invalidSig := signature.NewErrInvalidFormat("some error")
 
 	// Unhappy paths
 	t.Run("invalid signer ID", func(t *testing.T) {
