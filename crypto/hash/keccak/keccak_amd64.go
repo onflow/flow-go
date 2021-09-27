@@ -8,9 +8,10 @@
 package keccak
 
 import (
+	"golang.org/x/sys/cpu"
+
 	"github.com/onflow/flow-go/crypto/hash/internal/keccakAMD"
 	"github.com/onflow/flow-go/crypto/hash/internal/keccakAVX512"
-	"golang.org/x/sys/cpu"
 )
 
 func KeccakF1600(a *[25]uint64) {
