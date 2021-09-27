@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"math/bits"
 	"os"
 	"path"
 	"strings"
@@ -37,12 +38,15 @@ const pathSeparator = "\x1F"
 
 var storageReferenceEncodingStart = []byte{0xd8, cborTagStorageReference}
 
-var storageMigrationV6DecMode = func() cbor.DecMode {
+// maxInt is math.MaxInt32 or math.MaxInt64 depending on arch.
+const maxInt = 1<<(bits.UintSize-1) - 1
+
+var storageMigrationV5DecMode = func() cbor.DecMode {
 	decMode, err := cbor.DecOptions{
 		IntDec:           cbor.IntDecConvertNone,
-		MaxArrayElements: math.MaxInt32,
-		MaxMapPairs:      math.MaxInt32,
-		MaxNestedLevels:  256,
+		MaxArrayElements: maxInt,
+		MaxMapPairs:      maxInt,
+		MaxNestedLevels:  math.MaxInt16,
 	}.DecMode()
 	if err != nil {
 		panic(err)
@@ -81,13 +85,8 @@ func (e *encodingBaseStorage) Store(id atree.StorageID, value []byte) error {
 	// Add the encoded content to the payloads
 
 	payload := ledger.Payload{
-
-		Key: ledgerKeyFromStorageID(id),
-
-		Value: newInter.PrependMagic(
-			value,
-			newInter.CurrentEncodingVersion,
-		),
+		Key:   ledgerKeyFromStorageID(id),
+		Value: value,
 	}
 
 	e.ReencodedPayloads = append(e.ReencodedPayloads, &payload)
@@ -252,7 +251,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		migratedPayloads = append(migratedPayloads, *payload)
 	}
 
-	m.completeProgress(err)
+	m.completeProgress()
 
 	m.Log.Info().Msg("Re-encoding converted values complete")
 
@@ -291,7 +290,7 @@ func (m *StorageFormatV6Migration) clearProgress() {
 	}
 }
 
-func (m *StorageFormatV6Migration) completeProgress(err error) {
+func (m *StorageFormatV6Migration) completeProgress() {
 	if m.progress == nil {
 		return
 	}
@@ -300,7 +299,7 @@ func (m *StorageFormatV6Migration) completeProgress(err error) {
 		return
 	}
 
-	err = m.progress.Finish()
+	err := m.progress.Finish()
 	if err != nil {
 		panic(err)
 	}
@@ -382,7 +381,7 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 			continue
 		}
 
-		err := storageMigrationV6DecMode.Valid(value)
+		err := storageMigrationV5DecMode.Valid(value)
 		if err != nil {
 			continue
 		}
@@ -503,7 +502,7 @@ func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*led
 			)
 	}
 
-	err := storageMigrationV6DecMode.Valid(value)
+	err := storageMigrationV5DecMode.Valid(value)
 	if err != nil {
 		return &payload, nil
 	}
@@ -656,7 +655,7 @@ func (m *StorageFormatV6Migration) initOldInterpreter(payloads []ledger.Payload)
 					))
 				}
 
-				err = storageMigrationV6DecMode.Valid(content)
+				err = storageMigrationV5DecMode.Valid(content)
 				if err != nil {
 					panic(fmt.Errorf(
 						"invalid content for key: %s: %w\ncontent: %b",
