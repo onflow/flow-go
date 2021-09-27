@@ -61,6 +61,22 @@ func (d *sha3State) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
+// ComputeSHA3_256 computes the SHA3-256 digest of data
+// and copies the result to the result buffer.
+//
+// The function is not part of the Hasher API. It is a light API
+// that allows a simple computation of a hash and minimizes
+// heap allocations.
+func ComputeSHA3_256(result, data []byte) {
+	state := &sha3State{
+		rate:      rateSha3_256,
+		outputLen: HashLenSha3_256,
+	}
+	state.write(data)
+	state.padAndPermute()
+	copyOut(result, state)
+}
+
 // The functions below were copied and modified from golang.org/x/crypto/sha3.
 //
 // Copyright (c) 2009 The Go Authors. All rights reserved.

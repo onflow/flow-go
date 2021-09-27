@@ -163,8 +163,13 @@ func TestSha3(t *testing.T) {
 			rand.Read(value)
 			expected := sha3.Sum256(value)
 
+			// test hash computation using the hasher
 			hasher := NewSHA3_256()
 			h := hasher.ComputeHash(value)
+			assert.Equal(t, expected[:], []byte(h))
+
+			// test hash computation using the light api
+			ComputeSHA3_256(h, value)
 			assert.Equal(t, expected[:], []byte(h))
 		}
 	})
