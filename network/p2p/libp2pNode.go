@@ -1,4 +1,4 @@
-// Package libp2p encapsulates the libp2p library
+// Package p2p encapsulates the libp2p library
 package p2p
 
 import (
