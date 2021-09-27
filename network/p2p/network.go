@@ -87,6 +87,8 @@ func NewNetwork(
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
 
+	o.mw.SetOverlay(o)
+
 	// setup the message queue
 	// create priority queue
 	o.queue = queue.NewMessageQueue(o.ctx, queue.GetEventPriority, metrics)
@@ -100,10 +102,11 @@ func NewNetwork(
 // Ready returns a channel that will close when the network stack is ready.
 func (n *Network) Ready() <-chan struct{} {
 	n.lifecycleManager.OnStart(func() {
-		err := n.mw.Start(n)
-		if err != nil {
+		module.RunComponent(n.ctx, func() (module.Component, error) {
+			return n.mw, nil
+		}, func(err error, triggerRestart func()) {
 			n.logger.Fatal().Err(err).Msg("failed to start middleware")
-		}
+		})
 	})
 	return n.lifecycleManager.Started()
 }
@@ -111,7 +114,9 @@ func (n *Network) Ready() <-chan struct{} {
 // Done returns a channel that will close when shutdown is complete.
 func (n *Network) Done() <-chan struct{} {
 	n.cancel()
-	n.lifecycleManager.OnStop(n.mw.Stop)
+	n.lifecycleManager.OnStop(func() {
+		<-n.mw.Done()
+	})
 	return n.lifecycleManager.Stopped()
 }
 
