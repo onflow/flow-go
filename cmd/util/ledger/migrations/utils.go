@@ -45,15 +45,15 @@ func registerIDToKey(registerID flow.RegisterID) ledger.Key {
 	return newKey
 }
 
-type accountsBaseStorage struct {
+type accountsAtreeLedger struct {
 	accounts *fvmState.Accounts
 }
 
-func newAccountBasedBaseStorage(accounts *fvmState.Accounts) *accountsBaseStorage {
-	return &accountsBaseStorage{accounts: accounts}
+func newAccountsAtreeLedger(accounts *fvmState.Accounts) *accountsAtreeLedger {
+	return &accountsAtreeLedger{accounts: accounts}
 }
 
-func (a *accountsBaseStorage) GetValue(owner, key []byte) ([]byte, error) {
+func (a *accountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 	v, err := a.accounts.GetValue(
 		flow.BytesToAddress(owner),
 		string(key),
@@ -64,7 +64,7 @@ func (a *accountsBaseStorage) GetValue(owner, key []byte) ([]byte, error) {
 	return v, nil
 }
 
-func (a *accountsBaseStorage) SetValue(owner, key, value []byte) error {
+func (a *accountsAtreeLedger) SetValue(owner, key, value []byte) error {
 	err := a.accounts.SetValue(
 		flow.BytesToAddress(owner),
 		string(key),
@@ -76,7 +76,7 @@ func (a *accountsBaseStorage) SetValue(owner, key, value []byte) error {
 	return nil
 }
 
-func (a *accountsBaseStorage) ValueExists(owner, key []byte) (exists bool, err error) {
+func (a *accountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err error) {
 	v, err := a.GetValue(owner, key)
 	if err != nil {
 		return false, fmt.Errorf("checking value existence failed: %w", err)
@@ -86,7 +86,7 @@ func (a *accountsBaseStorage) ValueExists(owner, key []byte) (exists bool, err e
 }
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (a *accountsBaseStorage) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+func (a *accountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
 	v, err := a.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
