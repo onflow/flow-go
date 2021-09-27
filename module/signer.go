@@ -32,3 +32,12 @@ type ThresholdSigner interface {
 type ThresholdSignerStore interface {
 	GetThresholdSigner(view uint64) (ThresholdSigner, error)
 }
+
+// ThresholdSignerStoreV2 returns the threshold signer object by view
+// It returns:
+//  - (signer, true, nil) if DKG was completed in the epoch of the view
+//  - (nil, false, nil) if DKG was not completed in the epoch of the view
+//  - (nil, false, err) if there is any exception
+type ThresholdSignerStoreV2 interface {
+	GetThresholdSigner(view uint64) (ThresholdSigner, bool, error)
+}
