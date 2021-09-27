@@ -86,7 +86,8 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 	maxPubSubMsgSize int,
 	metrics module.NetworkMetrics,
 	pingInfoProvider PingInfoProvider,
-	dnsResolverTTL time.Duration) (LibP2PFactoryFunc, error) {
+	dnsResolverTTL time.Duration,
+	streamCompression bool) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
@@ -113,6 +114,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			SetResolver(resolver).
+			EnableStreamCompressor(streamCompression).
 			Build(ctx)
 	}, nil
 }
@@ -525,13 +527,13 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		break
 	}
 
+	if retries == maxAttempts {
+		return s, errs
+	}
+
 	s, err := n.compressedStream(s)
 	if err != nil {
 		return nil, fmt.Errorf("could not create compressed stream: %w", err)
-	}
-
-	if retries == maxAttempts {
-		return s, errs
 	}
 
 	return s, nil
@@ -693,6 +695,7 @@ func (n *Node) SetFlowProtocolStreamHandler(handler libp2pnet.StreamHandler) {
 		s, err := n.compressedStream(s)
 		if err != nil {
 			n.logger.Error().Err(err).Msg("could not create compressed stream")
+			return
 		}
 		handler(s)
 	})
@@ -704,6 +707,7 @@ func (n *Node) SetPingStreamHandler(handler libp2pnet.StreamHandler) {
 		s, err := n.compressedStream(s)
 		if err != nil {
 			n.logger.Error().Err(err).Msg("could not create compressed stream")
+			return
 		}
 		handler(s)
 	})
