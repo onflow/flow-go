@@ -116,11 +116,11 @@ func MakeID(entity interface{}) Identifier {
 }
 
 // PublicKeyToID creates an ID from a public key.
-func PublicKeyToID(pub crypto.PublicKey) (Identifier, error) {
-	b := pub.Encode()
-	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash(b)
-	return HashToID(hash), nil
+func PublicKeyToID(pk crypto.PublicKey) (Identifier, error) {
+	var id Identifier
+	pkBytes := pk.Encode()
+	hash.ComputeSHA3_256(id[:], pkBytes)
+	return id, nil
 }
 
 // GetIDs gets the IDs for a slice of entities.
@@ -157,14 +157,12 @@ func CheckMerkleRoot(root Identifier, ids ...Identifier) bool {
 }
 
 func ConcatSum(ids ...Identifier) Identifier {
-	var sum Identifier
 	hasher := hash.NewSHA3_256()
 	for _, id := range ids {
 		_, _ = hasher.Write(id[:])
 	}
 	hash := hasher.SumHash()
-	copy(sum[:], hash)
-	return sum
+	return HashToID(hash)
 }
 
 func CheckConcatSum(sum Identifier, fps ...Identifier) bool {

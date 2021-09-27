@@ -33,11 +33,10 @@ const defaultHashesNum = NodeMaxHeight + 1
 var defaultHashes [defaultHashesNum]hash.Hash
 
 func init() {
-	hasher := cryptoHash.NewSHA3_256()
 
 	// default value and default hash value for a default node
 	var defaultLeafHash hash.Hash
-	copy(defaultLeafHash[:], hasher.ComputeHash([]byte("default:")))
+	cryptoHash.ComputeSHA3_256(defaultLeafHash[:], []byte("default:"))
 
 	// Creates the Default hashes from base to level height
 	defaultHashes[0] = defaultLeafHash
