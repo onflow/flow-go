@@ -7,8 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 var ErrFatal = errors.New("fatal")
