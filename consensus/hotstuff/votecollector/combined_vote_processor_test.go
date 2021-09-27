@@ -23,9 +23,6 @@ func TestCombinedVoteProcessor(t *testing.T) {
 	suite.Run(t, new(CombinedVoteProcessorTestSuite))
 }
 
-// 1. if the proposal is invalid, it should return InvalidBlockError
-// 2. if the proposal is valid, then a vote processor should be created. The status of created processor is Verifying
-
 // CombinedVoteProcessorTestSuite is a test suite that holds mocked state for isolated testing of CombinedVoteProcessor.
 type CombinedVoteProcessorTestSuite struct {
 	suite.Suite
