@@ -103,7 +103,7 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels netwo
 // Returned identities should all subscribed to the specified `channel`.
 // Note: this method should not include identity of its executor.
 func (t *TopicBasedTopology) subsetChannel(ids flow.IdentityList, shouldHave flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
-	if _, ok := engine.ClusterChannel(channel); ok {
+	if engine.IsClusterChannel(channel) {
 		return t.clusterChannelHandler(ids, shouldHave)
 	}
 	return t.nonClusterChannelHandler(ids, shouldHave, channel)
@@ -198,7 +198,7 @@ func (t TopicBasedTopology) clusterChannelHandler(ids, shouldHave flow.IdentityL
 // nonClusterChannelHandler returns a connected graph fanout of peers from `ids` that subscribed to `channel`.
 // The returned sample contains `shouldHave` ones that also subscribed to `channel`.
 func (t TopicBasedTopology) nonClusterChannelHandler(ids, shouldHave flow.IdentityList, channel network.Channel) (flow.IdentityList, error) {
-	if _, ok := engine.ClusterChannel(channel); ok {
+	if engine.IsClusterChannel(channel) {
 		return nil, fmt.Errorf("could not handle cluster channel: %s", channel)
 	}
 
