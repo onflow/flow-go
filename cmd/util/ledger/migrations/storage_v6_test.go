@@ -1,6 +1,16 @@
 package migrations
 
 import (
+	"bytes"
+	"fmt"
+	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/cadence/runtime/sema"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
+	state2 "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -535,4 +545,168 @@ type innerStorageImpl struct {
 
 func (*innerStorageImpl) name() string {
 	return "inner implementation"
+}
+
+func TestContractValueRetrieval(t *testing.T) {
+
+	address := common.Address{1, 2}
+
+	const contractName = "Test"
+
+	contractValue := oldInter.NewCompositeValue(
+		utils.TestLocation,
+		contractName,
+		common.CompositeKindContract,
+		oldInter.NewStringValueOrderedMap(),
+		&address,
+	)
+
+	encodeContractValue, _, err := oldInter.EncodeValue(contractValue, nil, false, nil)
+	require.NoError(t, err)
+
+	encodeContractValue = oldInter.PrependMagic(encodeContractValue, oldInter.CurrentEncodingVersion)
+
+	contractNames := &bytes.Buffer{}
+	namesEncoder := cbor.NewEncoder(contractNames)
+	err = namesEncoder.Encode([]string{contractName})
+	require.NoError(t, err)
+
+	contractCode := `
+        pub contract Test {
+        }
+    `
+
+	contractValueKey := []ledger.KeyPart{
+		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartController, []byte{}),
+		ledger.NewKeyPart(state.KeyPartKey, []byte(fmt.Sprintf("contract\x1F%s", contractName))),
+	}
+
+	contractNamesKey := []ledger.KeyPart{
+		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartController, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartKey, []byte(state2.KeyContractNames)),
+	}
+
+	contractCodeKey := []ledger.KeyPart{
+		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartController, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartKey, []byte("code.Test")),
+	}
+
+	// old payloads
+	payloads := []ledger.Payload{
+		{
+			Key:   ledger.NewKey(contractValueKey),
+			Value: ledger.Value(encodeContractValue),
+		},
+		{
+			Key:   ledger.NewKey(contractNamesKey),
+			Value: ledger.Value(contractNames.Bytes()),
+		},
+		{
+			Key:   ledger.NewKey(contractCodeKey),
+			Value: ledger.Value(contractCode),
+		},
+	}
+
+	// Check whether the query works with old ledger
+	ledgerView := newView(payloads)
+
+	migration := &StorageFormatV6Migration{}
+	baseStorage := newEncodingBaseStorage()
+
+	migration.initPersistentSlabStorage(baseStorage)
+	migration.initNewInterpreter()
+	migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
+	migration.converter = NewValueConverter(migration)
+
+	// ----------- Before migration------------------------------------
+
+	stateHolder := state2.NewStateHolder(
+		state2.NewState(ledgerView),
+	)
+
+	txEnv := fvm.NewTransactionEnvironment(
+		fvm.NewContext(zerolog.Nop()),
+		fvm.NewVirtualMachine(
+			runtime.NewInterpreterRuntime(),
+		),
+		stateHolder,
+		programs.NewEmptyPrograms(),
+		flow.NewTransactionBody(),
+		0,
+		nil,
+	)
+
+	loc := common.AddressLocation{
+		Address: address,
+		Name:    contractName,
+	}
+
+	// Call a dummy function - only need to see the value can be found
+	_, err = invokeContractFunction(txEnv, "foo", loc)
+
+	// Decode error means value is found, but decode error due to old format.
+	assert.Contains(t, err.Error(), "unsupported decoded CBOR type: CBOR uint type")
+
+	// --------------- After migration ----------------------
+
+	migratedPayloads, err := migration.migrate(payloads)
+	require.NoError(t, err)
+	assert.Len(t, migratedPayloads, 3)
+
+	migratedLedgerView := newView(migratedPayloads)
+
+	migratedStateHolder := state2.NewStateHolder(
+		state2.NewState(migratedLedgerView),
+	)
+
+	migratedTxEnv := fvm.NewTransactionEnvironment(
+		fvm.NewContext(zerolog.Nop()),
+		fvm.NewVirtualMachine(
+			runtime.NewInterpreterRuntime(),
+		),
+		migratedStateHolder,
+		programs.NewEmptyPrograms(),
+		flow.NewTransactionBody(),
+		0,
+		nil,
+	)
+
+	// Call a dummy function - only need to see the value can be found
+	_, err = invokeContractFunction(migratedTxEnv, "foo", loc)
+	assert.NoError(t, err)
+}
+
+func invokeContractFunction(
+	env fvm.Enviornment,
+	funcName string,
+	location common.AddressLocation,
+) (val cadence.Value, err error) {
+	predeclaredValues := make([]runtime.ValueDeclaration, 0)
+
+	defer func() {
+		if r := recover(); r != nil {
+			switch typedR := r.(type) {
+			case error:
+				err = typedR
+			case string:
+				err = fmt.Errorf(typedR)
+			default:
+				panic(typedR)
+			}
+		}
+	}()
+
+	return env.VM().Runtime.InvokeContractFunction(
+		location,
+		funcName,
+		[]newInter.Value{},
+		[]sema.Type{},
+		runtime.Context{
+			Interface:         env,
+			PredeclaredValues: predeclaredValues,
+		},
+	)
 }
