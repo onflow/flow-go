@@ -203,6 +203,10 @@ func TestEncoding(t *testing.T) {
 		encodedValues := baseStorage.ReencodedPayloads
 		require.Len(t, encodedValues, 1)
 
+		for _, encValue := range encodedValues {
+			assert.False(t, newInter.HasMagic(encValue.Value))
+		}
+
 		storageId := atree.NewStorageID(
 			atree.Address(address),
 			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 1},
@@ -270,6 +274,10 @@ func TestEncoding(t *testing.T) {
 
 		encodedValues := baseStorage.ReencodedPayloads
 		require.Len(t, encodedValues, 1)
+
+		for _, encValue := range encodedValues {
+			assert.False(t, newInter.HasMagic(encValue.Value))
+		}
 
 		storageId := atree.NewStorageID(
 			atree.Address(address),
@@ -347,6 +355,10 @@ func TestEncoding(t *testing.T) {
 
 		encodedValues := baseStorage.ReencodedPayloads
 		require.Len(t, encodedValues, 3)
+
+		for _, encValue := range encodedValues {
+			assert.False(t, newInter.HasMagic(encValue.Value))
+		}
 
 		// Check composite value in storage
 
@@ -469,6 +481,8 @@ func TestPayloadsMigration(t *testing.T) {
 	migratedValue, err := migratedLedgerView.Get(string(owner.Bytes()), "", string(prefixedKey))
 	require.NoError(t, err)
 	require.NotEmpty(t, migratedValue)
+
+	assert.False(t, newInter.HasMagic(migratedValue))
 }
 
 // Test for the 'Store' method implementation of delegationStorage.

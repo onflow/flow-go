@@ -81,13 +81,8 @@ func (e *encodingBaseStorage) Store(id atree.StorageID, value []byte) error {
 	// Add the encoded content to the payloads
 
 	payload := ledger.Payload{
-
 		Key: ledgerKeyFromStorageID(id),
-
-		Value: newInter.PrependMagic(
-			value,
-			newInter.CurrentEncodingVersion,
-		),
+		Value: value,
 	}
 
 	e.ReencodedPayloads = append(e.ReencodedPayloads, &payload)
@@ -252,7 +247,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		migratedPayloads = append(migratedPayloads, *payload)
 	}
 
-	m.completeProgress(err)
+	m.completeProgress()
 
 	m.Log.Info().Msg("Re-encoding converted values complete")
 
@@ -291,7 +286,7 @@ func (m *StorageFormatV6Migration) clearProgress() {
 	}
 }
 
-func (m *StorageFormatV6Migration) completeProgress(err error) {
+func (m *StorageFormatV6Migration) completeProgress() {
 	if m.progress == nil {
 		return
 	}
@@ -300,7 +295,7 @@ func (m *StorageFormatV6Migration) completeProgress(err error) {
 		return
 	}
 
-	err = m.progress.Finish()
+	err := m.progress.Finish()
 	if err != nil {
 		panic(err)
 	}
