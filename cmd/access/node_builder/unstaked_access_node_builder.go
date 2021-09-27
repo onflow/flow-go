@@ -189,6 +189,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 			SetDHTOptions(dhtOptions...).
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
+			EnableStreamCompressor(true).
 			Build(ctx)
 		if err != nil {
 			return nil, err

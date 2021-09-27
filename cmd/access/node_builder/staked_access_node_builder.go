@@ -230,6 +230,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 			SetPubsubOptions(psOpts...).
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
+			EnableStreamCompressor(true).
 			Build(ctx)
 		if err != nil {
 			return nil, err
