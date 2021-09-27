@@ -241,6 +241,11 @@ func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *
 		return nil
 	}
 
+	// increase the gas limit temporarily, to make sure the transaction fee deduction doesn't hit the computation limit
+	txGasLimit := env.tx.GasLimit
+	env.tx.SetGasLimit(txGasLimit + DefaultGasLimit)
+	defer func() { env.tx.SetGasLimit(txGasLimit) }()
+
 	invocator := NewTransactionContractFunctionInvocator(
 		common.AddressLocation{
 			Address: common.BytesToAddress(env.ctx.Chain.ServiceAddress().Bytes()),
