@@ -1,16 +1,15 @@
-package migrations
+package reporters
 
 import (
 	"bufio"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 
 	"os"
-	"path"
 	"runtime"
 	"sync"
-	"time"
 
 	"github.com/rs/zerolog"
 
@@ -29,8 +28,8 @@ type BalanceReporter struct {
 	totalSupply uint64
 }
 
-func (r *BalanceReporter) filename() string {
-	return path.Join(r.OutputDir, fmt.Sprintf("balance_report_%d.json", int32(time.Now().Unix())))
+func (r *BalanceReporter) Name() string {
+	return "Balance Reporter"
 }
 
 type balanceDataPoint struct {
@@ -140,7 +139,7 @@ func (r *BalanceReporter) balanceReporterWorker(jobs chan ledger.Payload, wg *sy
 }
 
 func (r *BalanceReporter) handlePayload(p ledger.Payload, dataChan chan balanceDataPoint) error {
-	id, err := keyToRegisterID(p.Key)
+	id, err := migrations.KeyToRegisterID(p.Key)
 	if err != nil {
 		return err
 	}
@@ -152,7 +151,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, dataChan chan balanceD
 
 	value, version := interpreter.StripMagic(p.Value)
 
-	err = storageMigrationV5DecMode.Valid(value)
+	err = migrations.StorageMigrationV5DecMode.Valid(value)
 	if err != nil {
 		return nil
 	}

@@ -118,7 +118,7 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.brokenContracts = make(map[common.Address]map[string]bool)
 
-	m.view = newView(payloads)
+	m.view = NewView(payloads)
 
 	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
 
@@ -173,7 +173,7 @@ func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Pay
 		}
 	}
 
-	l := newView(filteredPayloads)
+	l := NewView(filteredPayloads)
 	st := state.NewState(l)
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
@@ -212,7 +212,7 @@ func (m StorageFormatV5Migration) checkStorageFormat(payload ledger.Payload) err
 	return nil
 }
 
-var storageMigrationV5DecMode = func() cbor.DecMode {
+var StorageMigrationV5DecMode = func() cbor.DecMode {
 	decMode, err := cbor.DecOptions{
 		IntDec:           cbor.IntDecConvertNone,
 		MaxArrayElements: math.MaxInt32,
@@ -451,7 +451,7 @@ func (m StorageFormatV5Migration) reencodePayload(
 			)
 	}
 
-	err := storageMigrationV5DecMode.Valid(value)
+	err := StorageMigrationV5DecMode.Valid(value)
 	if err != nil {
 		return &payload, nil
 	}

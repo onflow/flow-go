@@ -1,14 +1,10 @@
-package migrations
+package reporters
 
 import (
-	"bufio"
 	"fmt"
-	"os"
-	"path"
-	"time"
-
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm/state"
@@ -17,46 +13,46 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// iterates through registers keeping a map of register sizes
+// AccountReporter iterates through registers keeping a map of register sizes
 // reports on storage metrics
-type StorageReporter struct {
+type AccountReporter struct {
 	Log       zerolog.Logger
 	OutputDir string
+	RWF       ReportWriterFactory
 }
 
-func (r StorageReporter) filename() string {
-	return path.Join(r.OutputDir, fmt.Sprintf("storage_report_%d.csv", int32(time.Now().Unix())))
+var _ ledger.Reporter = &AccountReporter{}
+
+func (r *AccountReporter) Name() string {
+	return "Account Reporter"
 }
 
-func (r StorageReporter) Report(payload []ledger.Payload) error {
-	fn := r.filename()
-	r.Log.Info().Msgf("Running Storage Reporter. Saving output to %s.", fn)
+type accountRecord struct {
+	Address        string
+	StorageUsed    uint64
+	AccountBalance uint64
+	HasVault       bool
+	HasReceiver    bool
+	IsDapper       bool
+}
 
-	f, err := os.Create(fn)
-	if err != nil {
-		return err
-	}
+type contractRecord struct {
+	Address  string
+	Contract string
+}
 
-	defer func() {
-		err = f.Close()
-		if err != nil {
-			panic(err)
-		}
-	}()
+func (r *AccountReporter) Report(payload []ledger.Payload) error {
+	rwa := r.RWF.ReportWriter("account_report")
+	rwc := r.RWF.ReportWriter("contract_report")
+	defer rwa.Close()
 
-	writer := bufio.NewWriter(f)
-	defer func() {
-		err = writer.Flush()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	l := newView(payload)
+	l := migrations.NewView(payload)
 	st := state.NewState(l)
+	sth := state.NewStateHolder(st)
+	accounts := state.NewAccounts(sth)
 
 	for _, p := range payload {
-		id, err := keyToRegisterID(p.Key)
+		id, err := migrations.KeyToRegisterID(p.Key)
 		if err != nil {
 			return err
 		}
@@ -64,42 +60,30 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 			// not an address
 			continue
 		}
+
+		switch id.Key {
+		case state.KeyStorageUsed:
+			err = r.handleStorageUsed(id, p, st, rwa)
+		case state.KeyContractNames:
+			err = r.handleContractNames(id, accounts, rwc)
+		default:
+			continue
+		}
+
+		if err != nil {
+			return err
+		}
+
 		if id.Key != "storage_used" {
 			continue
 		}
-		address := flow.BytesToAddress([]byte(id.Owner))
-		u, _, err := utils.ReadUint64(p.Value)
-		if err != nil {
-			return err
-		}
-		balance, hasVault, err := r.balance(address, st)
-		if err != nil {
-			r.Log.Err(err).Msg("Cannot get account balance")
-			return err
-		}
-		dapper, err := r.isDapper(address, st)
-		if err != nil {
-			r.Log.Err(err).Msg("Cannot determine if this is a dapper account")
-			return err
-		}
-		hasReceiver, err := r.hasReceiver(address, st)
-		if err != nil {
-			r.Log.Err(err).Msg("Cannot determine if this account has a receiver")
-			return err
-		}
-		record := fmt.Sprintf("%s,%d,%d,%t,%t,%t\n", address.Hex(), u, balance, hasVault, hasReceiver, dapper)
-		_, err = writer.WriteString(record)
-		if err != nil {
-			return err
-		}
-	}
 
-	r.Log.Info().Msg("Storage Reporter Done.")
+	}
 
 	return nil
 }
 
-func (r StorageReporter) isDapper(address flow.Address, st *state.State) (bool, error) {
+func (r *AccountReporter) isDapper(address flow.Address, st *state.State) (bool, error) {
 	id := resourceId(address,
 		interpreter.PathValue{
 			Domain:     common.PathDomainPublic,
@@ -113,7 +97,7 @@ func (r StorageReporter) isDapper(address flow.Address, st *state.State) (bool, 
 	return len(receiver) != 0, nil
 }
 
-func (r StorageReporter) hasReceiver(address flow.Address, st *state.State) (bool, error) {
+func (r *AccountReporter) hasReceiver(address flow.Address, st *state.State) (bool, error) {
 	id := resourceId(address,
 		interpreter.PathValue{
 			Domain:     common.PathDomainPublic,
@@ -127,7 +111,7 @@ func (r StorageReporter) hasReceiver(address flow.Address, st *state.State) (boo
 	return len(receiver) != 0, nil
 }
 
-func (r StorageReporter) balance(address flow.Address, st *state.State) (balance uint64, hasBalance bool, err error) {
+func (r *AccountReporter) balance(address flow.Address, st *state.State) (balance uint64, hasBalance bool, err error) {
 	vaultId := resourceId(address,
 		interpreter.PathValue{
 			Domain:     common.PathDomainStorage,
@@ -179,6 +163,58 @@ func (r StorageReporter) balance(address flow.Address, st *state.State) (balance
 	}
 
 	return uint64(balanceValue), true, nil
+}
+
+func (r *AccountReporter) handleStorageUsed(id flow.RegisterID, p ledger.Payload, st *state.State, rwa ReportWriter) error {
+	address := flow.BytesToAddress([]byte(id.Owner))
+	u, _, err := utils.ReadUint64(p.Value)
+	if err != nil {
+		return err
+	}
+	balance, hasVault, err := r.balance(address, st)
+	if err != nil {
+		r.Log.Err(err).Msg("Cannot get account balance")
+		return err
+	}
+	dapper, err := r.isDapper(address, st)
+	if err != nil {
+		r.Log.Err(err).Msg("Cannot determine if this is a dapper account")
+		return err
+	}
+	hasReceiver, err := r.hasReceiver(address, st)
+	if err != nil {
+		r.Log.Err(err).Msg("Cannot determine if this account has a receiver")
+		return err
+	}
+
+	rwa.Write(accountRecord{
+		Address:        address.Hex(),
+		StorageUsed:    u,
+		AccountBalance: balance,
+		HasVault:       hasVault,
+		HasReceiver:    hasReceiver,
+		IsDapper:       dapper,
+	})
+
+	return nil
+}
+
+func (r *AccountReporter) handleContractNames(id flow.RegisterID, accounts *state.Accounts, rwc ReportWriter) error {
+	address := flow.BytesToAddress([]byte(id.Owner))
+	contracts, err := accounts.GetContractNames(address)
+	if err != nil {
+		return err
+	}
+	if len(contracts) == 0 {
+		return nil
+	}
+	for _, contract := range contracts {
+		rwc.Write(contractRecord{
+			Address:  address.Hex(),
+			Contract: contract,
+		})
+	}
+	return nil
 }
 
 func resourceId(address flow.Address, path interpreter.PathValue) flow.RegisterID {

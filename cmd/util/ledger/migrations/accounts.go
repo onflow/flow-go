@@ -11,7 +11,7 @@ import (
 )
 
 func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
-	l := newView(payloads)
+	l := NewView(payloads)
 	st := state.NewState(l)
 	sth := state.NewStateHolder(st)
 	a := state.NewAccounts(sth)
@@ -137,7 +137,7 @@ type view struct {
 	Ledger *led
 }
 
-func newView(payloads []ledger.Payload) *view {
+func NewView(payloads []ledger.Payload) *view {
 	return &view{
 		Ledger: newLed(payloads),
 	}
@@ -145,7 +145,7 @@ func newView(payloads []ledger.Payload) *view {
 
 func (v *view) NewChild() state.View {
 	payload := make([]ledger.Payload, 0)
-	ch := newView(payload)
+	ch := NewView(payload)
 	ch.Parent = v
 	return ch
 }

@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func keyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
+func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 	if len(key.KeyParts) != 3 ||
 		key.KeyParts[0].Type != state.KeyPartOwner ||
 		key.KeyParts[1].Type != state.KeyPartController ||

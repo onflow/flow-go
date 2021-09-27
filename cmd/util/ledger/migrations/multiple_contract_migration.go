@@ -99,7 +99,7 @@ func contractsRegister(contractsKey ledger.Key, contractNames []string) (ledger.
 const deferredValueOfContractValuePrefix = "contract\x1f"
 
 func migrateNonContractValue(p ledger.Payload, contractValueMappings map[string]string) ([]ledger.Payload, error) {
-	registerID, err := keyToRegisterID(p.Key)
+	registerID, err := KeyToRegisterID(p.Key)
 	if err != nil {
 		return nil, err
 	}
@@ -174,7 +174,7 @@ func migrateContractValues(payloads []ledger.Payload) ([]ledger.Payload, map[str
 	errors := make([]error, 0)
 
 	for _, p := range payloads {
-		registerID, err := keyToRegisterID(p.Key)
+		registerID, err := KeyToRegisterID(p.Key)
 		if err != nil {
 			// dont fail fast... try to collect errors so multiple errors can be addressed at once
 			errors = append(errors, err)
