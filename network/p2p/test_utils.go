@@ -23,6 +23,7 @@ func createNode(
 	libp2pNode, err := NewDefaultLibP2PNodeBuilder(nodeID, "0.0.0.0:0", networkKey).
 		SetRootBlockID(rootBlockID).
 		SetPubsubOptions(psOpts...).
+		EnableStreamCompressor(true).
 		Build(context.TODO())
 	require.NoError(t, err)
 

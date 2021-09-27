@@ -291,6 +291,7 @@ func generateLibP2PNode(t *testing.T,
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
 		SetLogger(logger).
+		EnableStreamCompressor(true).
 		Build(ctx)
 	require.NoError(t, err)
 

@@ -245,9 +245,9 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 			SetDHTOptions(AsServer(dhtServer)).
 			SetPingInfoProvider(pingInfoProvider).
 			SetResolver(resolver).
-			EnableStreamCompressor(true).
 			SetLogger(logger).
 			SetTopicValidation(false).
+			EnableStreamCompressor(true).
 			Build(suite.ctx)
 		require.NoError(suite.T(), err)
 
