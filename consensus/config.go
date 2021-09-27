@@ -5,6 +5,7 @@ import (
 )
 
 type ParticipantConfig struct {
+	StartupTime                time.Time     // the time when consensus participant enters first view
 	TimeoutInitial             time.Duration // the initial timeout for the pacemaker
 	TimeoutMinimum             time.Duration // the minimum timeout for the pacemaker
 	TimeoutAggregationFraction float64       // the percentage part of the timeout period reserved for vote aggregation
@@ -14,6 +15,12 @@ type ParticipantConfig struct {
 }
 
 type Option func(*ParticipantConfig)
+
+func WithStartupTime(time time.Time) Option {
+	return func(cfg *ParticipantConfig) {
+		cfg.StartupTime = time
+	}
+}
 
 func WithInitialTimeout(timeout time.Duration) Option {
 	return func(cfg *ParticipantConfig) {
