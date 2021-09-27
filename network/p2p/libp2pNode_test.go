@@ -279,6 +279,7 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
 func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
+	suite.T().Skip()
 
 	count := 2
 	ch := make(chan string, count)
@@ -465,6 +466,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 
 // TestStreamClosing tests 1-1 communication with streams closed using libp2p2 handler.FullClose
 func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
+	suite.T().Skip()
 
 	count := 10
 	ch := make(chan string, count)
