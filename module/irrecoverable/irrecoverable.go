@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"runtime"
 )
 
@@ -21,7 +22,7 @@ func NewSignaler(errors chan<- error) *Signaler {
 func (e *Signaler) Throw(err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			log.Default().Println(fmt.Errorf("unhandled irrecoverable: %w", err))
+			log.New(os.Stderr, "", log.LstdFlags).Println(fmt.Errorf("unhandled irrecoverable: %w", err))
 		}
 		runtime.Goexit()
 	}()
