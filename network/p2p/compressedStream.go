@@ -14,27 +14,26 @@ import (
 type compressedStream struct {
 	network.Stream
 
-	writeLock sync.Mutex
+	writeLock  sync.Mutex
+	compressor flownet.Compressor
 
 	r io.ReadCloser
 	w io.WriteCloser
 }
 
 func newCompressedStream(s network.Stream, compressor flownet.Compressor) (network.Stream, error) {
-	r, err := compressor.NewReader(s)
-	if err != nil {
-		return nil, fmt.Errorf("could not create compressor reader: %w", err)
-	}
-
 	w, err := compressor.NewWriter(s)
 	if err != nil {
 		return nil, fmt.Errorf("could not create compressor writer: %w", err)
 	}
 
-	return &compressedStream{
-		r: r,
-		w: w,
-	}, nil
+	c := &compressedStream{
+		Stream:     s,
+		w:          w,
+		compressor: compressor,
+	}
+
+	return c, nil
 }
 
 func (c *compressedStream) Write(b []byte) (int, error) {
@@ -45,10 +44,20 @@ func (c *compressedStream) Write(b []byte) (int, error) {
 	if err != nil {
 		return -1, fmt.Errorf("could not write on compressed writer: %w", err)
 	}
+
 	return n, nil
 }
 
 func (c *compressedStream) Read(b []byte) (int, error) {
+	if c.r == nil {
+		r, err := c.compressor.NewReader(c)
+		if err != nil {
+			return -1, fmt.Errorf("could not create compressor reader: %w", err)
+		}
+
+		c.r = r
+	}
+
 	n, err := c.r.Read(b)
 	if err != nil {
 		return -1, fmt.Errorf("could not write on compressed reader: %w", err)
@@ -60,5 +69,5 @@ func (c *compressedStream) Close() error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
-	return multierr.Combine(c.w.Close(), c.r.Close(), c.Stream.Close())
+	return multierr.Combine(c.w.Close(), c.Stream.Close())
 }
