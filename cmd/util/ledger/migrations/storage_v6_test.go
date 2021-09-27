@@ -610,8 +610,15 @@ func TestContractValueRetrieval(t *testing.T) {
 		},
 	}
 
-	// Check whether the query works with old ledger
-	ledgerView := newView(payloads)
+	// Before migration
+
+	// Call a dummy function - only need to see whether the value can be found.
+	_, err = invokeContractFunction(payloads, address, contractName, "foo")
+
+	// CBOR error means value is found, but the decoding fails due to old format.
+	assert.Contains(t, err.Error(), "unsupported decoded CBOR type: CBOR uint type")
+
+	// After migration
 
 	migration := &StorageFormatV6Migration{}
 	baseStorage := newEncodingBaseStorage()
@@ -621,7 +628,22 @@ func TestContractValueRetrieval(t *testing.T) {
 	migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 	migration.converter = NewValueConverter(migration)
 
-	// ----------- Before migration------------------------------------
+	migratedPayloads, err := migration.migrate(payloads)
+	require.NoError(t, err)
+	assert.Len(t, migratedPayloads, 3)
+
+	// Call a dummy function - only need to see whether the value can be found.
+	_, err = invokeContractFunction(migratedPayloads, address, contractName, "foo")
+	assert.NoError(t, err)
+}
+
+func invokeContractFunction(
+	payloads []ledger.Payload,
+	address common.Address,
+	contractName string,
+	funcName string,
+) (val cadence.Value, err error) {
+	ledgerView := newView(payloads)
 
 	stateHolder := state2.NewStateHolder(
 		state2.NewState(ledgerView),
@@ -639,51 +661,11 @@ func TestContractValueRetrieval(t *testing.T) {
 		nil,
 	)
 
-	loc := common.AddressLocation{
+	location := common.AddressLocation{
 		Address: address,
 		Name:    contractName,
 	}
 
-	// Call a dummy function - only need to see the value can be found
-	_, err = invokeContractFunction(txEnv, "foo", loc)
-
-	// Decode error means value is found, but decode error due to old format.
-	assert.Contains(t, err.Error(), "unsupported decoded CBOR type: CBOR uint type")
-
-	// --------------- After migration ----------------------
-
-	migratedPayloads, err := migration.migrate(payloads)
-	require.NoError(t, err)
-	assert.Len(t, migratedPayloads, 3)
-
-	migratedLedgerView := newView(migratedPayloads)
-
-	migratedStateHolder := state2.NewStateHolder(
-		state2.NewState(migratedLedgerView),
-	)
-
-	migratedTxEnv := fvm.NewTransactionEnvironment(
-		fvm.NewContext(zerolog.Nop()),
-		fvm.NewVirtualMachine(
-			runtime.NewInterpreterRuntime(),
-		),
-		migratedStateHolder,
-		programs.NewEmptyPrograms(),
-		flow.NewTransactionBody(),
-		0,
-		nil,
-	)
-
-	// Call a dummy function - only need to see the value can be found
-	_, err = invokeContractFunction(migratedTxEnv, "foo", loc)
-	assert.NoError(t, err)
-}
-
-func invokeContractFunction(
-	env fvm.Enviornment,
-	funcName string,
-	location common.AddressLocation,
-) (val cadence.Value, err error) {
 	predeclaredValues := make([]runtime.ValueDeclaration, 0)
 
 	defer func() {
@@ -699,13 +681,13 @@ func invokeContractFunction(
 		}
 	}()
 
-	return env.VM().Runtime.InvokeContractFunction(
+	return txEnv.VM().Runtime.InvokeContractFunction(
 		location,
 		funcName,
 		[]newInter.Value{},
 		[]sema.Type{},
 		runtime.Context{
-			Interface:         env,
+			Interface:         txEnv,
 			PredeclaredValues: predeclaredValues,
 		},
 	)
