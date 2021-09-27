@@ -21,6 +21,8 @@ func NewSignaler(errors chan<- error) *Signaler {
 // anywhere there's something connected to the error channel
 func (e *Signaler) Throw(err error) {
 	defer func() {
+		// If the error channel was already closed by a concurrent call to Throw, the call
+		// to close below will panic. We simply log the unhandled irrecoverable for now.
 		if r := recover(); r != nil {
 			log.New(os.Stderr, "", log.LstdFlags).Println(fmt.Errorf("unhandled irrecoverable: %w", err))
 		}
