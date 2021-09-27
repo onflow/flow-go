@@ -3,7 +3,10 @@ package migrations
 import (
 	"fmt"
 
+	"github.com/onflow/atree"
+
 	"github.com/onflow/flow-go/engine/execution/state"
+	fvmState "github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -40,4 +43,53 @@ func registerIDToKey(registerID flow.RegisterID) ledger.Key {
 		},
 	}
 	return newKey
+}
+
+type accountsBaseStorage struct {
+	accounts *fvmState.Accounts
+}
+
+func newAccountBasedBaseStorage(accounts *fvmState.Accounts) *accountsBaseStorage {
+	return &accountsBaseStorage{accounts: accounts}
+}
+
+func (a *accountsBaseStorage) GetValue(owner, key []byte) ([]byte, error) {
+	v, err := a.accounts.GetValue(
+		flow.BytesToAddress(owner),
+		string(key),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("getting value failed: %w", err)
+	}
+	return v, nil
+}
+
+func (a *accountsBaseStorage) SetValue(owner, key, value []byte) error {
+	err := a.accounts.SetValue(
+		flow.BytesToAddress(owner),
+		string(key),
+		value,
+	)
+	if err != nil {
+		return fmt.Errorf("setting value failed: %w", err)
+	}
+	return nil
+}
+
+func (a *accountsBaseStorage) ValueExists(owner, key []byte) (exists bool, err error) {
+	v, err := a.GetValue(owner, key)
+	if err != nil {
+		return false, fmt.Errorf("checking value existence failed: %w", err)
+	}
+
+	return len(v) > 0, nil
+}
+
+// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
+func (a *accountsBaseStorage) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	v, err := a.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+	if err != nil {
+		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
+	}
+	return v, nil
 }
