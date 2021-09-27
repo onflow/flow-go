@@ -17,7 +17,7 @@ import (
 // defaultVoteAggregatorWorkers number of workers to dispatch events for vote aggregators
 const defaultVoteAggregatorWorkers = 8
 
-// defaultVoteQueueCapacity maximum capacity of block votes queue
+// defaultVoteQueueCapacity maximum capacity of buffering unprocessed votes
 const defaultVoteQueueCapacity = 1000
 
 // VoteAggregator stores the votes and aggregates them into a QC when enough votes have been collected

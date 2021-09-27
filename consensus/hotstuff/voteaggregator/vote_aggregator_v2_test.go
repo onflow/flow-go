@@ -8,11 +8,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -88,9 +90,12 @@ func (s *VoteAggregatorV2TestSuite) TestAddVote_DeliveryOfQueuedVotes() {
 	view := uint64(1000)
 	clr := s.prepareMockedCollector(view)
 	votes := make([]*model.Vote, 10)
+	addVoteCalled := atomic.NewInt32(0)
 	for i := range votes {
 		votes[i] = unittest.VoteFixture(unittest.WithVoteView(view))
-		clr.On("AddVote", votes[i]).Once().Return(nil)
+		clr.On("AddVote", votes[i]).Run(func(args mock.Arguments) {
+			addVoteCalled.Add(1)
+		}).Once().Return(nil)
 	}
 
 	for _, vote := range votes {
@@ -98,7 +103,9 @@ func (s *VoteAggregatorV2TestSuite) TestAddVote_DeliveryOfQueuedVotes() {
 		require.NoError(s.T(), err)
 	}
 
-	time.Sleep(time.Millisecond * 100)
+	require.Eventually(s.T(), func() bool {
+		return int32(len(votes)) == addVoteCalled.Load()
+	}, time.Second, time.Millisecond*20)
 
 	clr.AssertExpectations(s.T())
 }
@@ -110,16 +117,20 @@ func (s *VoteAggregatorV2TestSuite) TestAddVote_StaleVote() {
 	s.collectors.On("PruneUpToView", view).Return(nil)
 	s.aggregator.PruneUpToView(view)
 
+	lengthObserver := func(int) {
+		require.Fail(s.T(), "stale vote has to be dropped")
+	}
+	var err error
+	s.aggregator.queuedVotes, err = fifoqueue.NewFifoQueue(fifoqueue.WithLengthObserver(lengthObserver))
+	require.NoError(s.T(), err)
+
 	// try adding votes with view lower than highest pruned
-	votes := 10
-	for i := 0; i < votes; i++ {
-		vote := unittest.VoteFixture(unittest.WithVoteView(view))
+	votes := uint64(10)
+	for i := uint64(0); i < votes; i++ {
+		vote := unittest.VoteFixture(unittest.WithVoteView(view - i))
 		err := s.aggregator.AddVote(vote)
 		require.NoError(s.T(), err)
 	}
-
-	time.Sleep(time.Millisecond * 100)
-	s.collectors.AssertNotCalled(s.T(), "GetOrCreateCollector")
 }
 
 // TestAddBlock_ValidProposal tests that happy path processing of valid proposal finishes without errors
@@ -238,14 +249,30 @@ func (s *VoteAggregatorV2TestSuite) TestInvalidBlock() {
 	}
 
 	clr := s.prepareMockedCollector(view)
+	var voteConsumerCallback hotstuff.VoteConsumer
 	clr.On("RegisterVoteConsumer", mock.Anything).Return(nil).Run(func(args mock.Arguments) {
-		callback := args.Get(0).(hotstuff.VoteConsumer)
+		voteConsumerCallback = args.Get(0).(hotstuff.VoteConsumer)
 		for _, vote := range consumedVotes {
-			callback(vote)
+			voteConsumerCallback(vote)
 		}
 	})
 
 	err := s.aggregator.InvalidBlock(proposal)
 	require.NoError(s.T(), err)
+
+	clr.On("AddVote", mock.Anything).Run(func(args mock.Arguments) {
+		voteConsumerCallback(args.Get(0).(*model.Vote))
+	}).Return(nil)
+
+	// generate more votes after notifying about invalid block
+	for i := 0; i < votes; i++ {
+		vote := unittest.VoteFixture(unittest.WithVoteView(view),
+			unittest.WithVoteBlockID(proposal.Block.BlockID))
+
+		// only votes for one of the proposals should be reported
+		s.notifier.On("OnVoteForInvalidBlockDetected", vote, proposal)
+		require.NoError(s.T(), s.aggregator.processQueuedVote(vote))
+	}
+
 	s.notifier.AssertExpectations(s.T())
 }
