@@ -240,7 +240,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 	builder.Component("follower core", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
-		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState)
+		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
 		// initialize the staking & beacon verifiers, signature joiner
 		staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -282,6 +282,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			conCache,
 			builder.FollowerCore,
 			builder.SyncCore,
+			node.Tracer,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -472,10 +473,13 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 
 			anb.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Results, node.Storage.Receipts, anb.TransactionMetrics,
 				anb.CollectionsToMarkFinalized, anb.CollectionsToMarkExecuted, anb.BlocksToMarkExecuted, anb.RpcEng)
+			if err != nil {
+				return nil, err
+			}
 			anb.RequestEng.WithHandle(anb.IngestEng.OnCollection)
 			anb.FinalizationDistributor.AddConsumer(anb.IngestEng)
 
-			return anb.IngestEng, err
+			return anb.IngestEng, nil
 		}).
 		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in

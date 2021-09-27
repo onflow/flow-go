@@ -2,6 +2,7 @@ package node_builder
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -28,22 +29,36 @@ type UnstakedAccessNodeBuilder struct {
 }
 
 func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
+	// the unstaked access node gets a version of the root snapshot file that does not contain any node addresses
+	// hence skip all the root snapshot validations that involved an identity address
+	anb.SkipNwAddressBasedValidations = true
 	return &UnstakedAccessNodeBuilder{
 		FlowAccessNodeBuilder: anb,
 	}
 }
 
-func (anb *UnstakedAccessNodeBuilder) initNodeInfo() {
+func (anb *UnstakedAccessNodeBuilder) initNodeInfo() error {
 	// use the networking key that has been passed in the config
 	networkingKey := anb.AccessNodeConfig.NetworkKey
 	pubKey, err := keyutils.LibP2PPublicKeyFromFlow(networkingKey.PublicKey())
-	anb.MustNot(err)
+	if err != nil {
+		return fmt.Errorf("could not load networking public key: %w", err)
+	}
+
 	peerID, err := peer.IDFromPublicKey(pubKey)
-	anb.MustNot(err)
+	if err != nil {
+		return fmt.Errorf("could not get peer ID from public key: %w", err)
+	}
+
 	anb.NodeID, err = p2p.NewUnstakedNetworkIDTranslator().GetFlowID(peerID)
-	anb.MustNot(err)
+	if err != nil {
+		return fmt.Errorf("could not get flow node ID: %w", err)
+	}
+
 	anb.NodeConfig.NetworkKey = networkingKey // copy the key to NodeConfig
 	anb.NodeConfig.StakingKey = nil           // no staking key for the unstaked node
+
+	return nil
 }
 
 func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
@@ -72,16 +87,22 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 	})
 }
 
-func (anb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
+func (anb *UnstakedAccessNodeBuilder) Initialize() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	anb.Cancel = cancel
 
-	anb.deriveBootstrapPeerIdentities()
+	if err := anb.deriveBootstrapPeerIdentities(); err != nil {
+		return err
+	}
 
-	anb.validateParams()
+	if err := anb.validateParams(); err != nil {
+		return err
+	}
 
-	anb.initNodeInfo()
+	if err := anb.initNodeInfo(); err != nil {
+		return err
+	}
 
 	anb.InitIDProviders()
 
@@ -93,38 +114,43 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	anb.PreInit(anb.initUnstakedLocal())
 
-	return anb
+	return nil
 }
 
 // deriveBootstrapPeerIdentities derives the Flow Identity of the bootstrap peers from the parameters.
 // These are the identities of the staked and unstaked ANs also acting as the DHT bootstrap server
-func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() {
+func (builder *FlowAccessNodeBuilder) deriveBootstrapPeerIdentities() error {
 	// if bootstrap identities already provided (as part of alternate initialization as a library the skip reading command
 	// line params)
 	if builder.bootstrapIdentities != nil {
-		return
+		return nil
 	}
 	ids, err := BootstrapIdentities(builder.bootstrapNodeAddresses, builder.bootstrapNodePublicKeys)
-	builder.MustNot(err)
+	if err != nil {
+		return fmt.Errorf("failed to derive bootstrap peer identities: %w", err)
+	}
 	builder.bootstrapIdentities = ids
+
+	return nil
 }
 
-func (anb *UnstakedAccessNodeBuilder) validateParams() {
+func (anb *UnstakedAccessNodeBuilder) validateParams() error {
 	if anb.BaseConfig.BindAddr == cmd.NotSet || anb.BaseConfig.BindAddr == "" {
-		anb.Logger.Fatal().Msg("bind address not specified")
+		return errors.New("bind address not specified")
 	}
 	if anb.AccessNodeConfig.NetworkKey == nil {
-		anb.Logger.Fatal().Msg("networking key not provided")
+		return errors.New("networking key not provided")
 	}
 	if len(anb.bootstrapIdentities) > 0 {
-		return
+		return nil
 	}
 	if len(anb.bootstrapNodeAddresses) == 0 {
-		anb.Logger.Fatal().Msg("no bootstrap node address provided")
+		return errors.New("no bootstrap node address provided")
 	}
 	if len(anb.bootstrapNodeAddresses) != len(anb.bootstrapNodePublicKeys) {
-		anb.Logger.Fatal().Msg("number of bootstrap node addresses and public keys should match")
+		return errors.New("number of bootstrap node addresses and public keys should match")
 	}
+	return nil
 }
 
 // initLibP2PFactory creates the LibP2P factory function for the given node ID and network key for the unstaked node.
@@ -145,19 +171,18 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	// seed the DHT with the boostrap identities
 	bootstrapPeersOpt, err := p2p.WithBootstrapPeers(builder.bootstrapIdentities)
-	builder.MustNot(err)
+	if err != nil {
+		return nil, err
+	}
 	dhtOptions = append(dhtOptions, bootstrapPeersOpt)
 
 	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
 
-	resolver, err := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
-	if err != nil {
-		return nil, fmt.Errorf("could not create dns resolver: %w", err)
-	}
+	resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 
 	return func() (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
-			SetRootBlockID(builder.RootBlock.ID().String()).
+			SetRootBlockID(builder.RootBlock.ID()).
 			SetConnectionManager(connManager).
 			// unlike the staked side of the network where currently all the node addresses are known upfront,
 			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
@@ -210,7 +235,9 @@ func (anb *UnstakedAccessNodeBuilder) enqueueMiddleware(ctx context.Context) {
 			unstakedNetworkMetrics := metrics.NewNoopCollector()
 
 			libP2PFactory, err := anb.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkKey)
-			anb.MustNot(err)
+			if err != nil {
+				return err
+			}
 
 			msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, unstakedNodeID)
 
@@ -238,16 +265,18 @@ func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Con
 
 		// topology is nil since its automatically managed by libp2p
 		network, err := anb.initNetwork(anb.Me, unstakedNetworkMetrics, anb.Middleware, nil)
-		anb.MustNot(err)
+		if err != nil {
+			return nil, err
+		}
 
-		anb.Network = converter.NewNetwork(network, engine.SyncCommittee, engine.UnstakedSyncCommittee)
+		anb.Network = converter.NewNetwork(network, engine.SyncCommittee, engine.PublicSyncCommittee)
 
 		anb.Logger.Info().Msgf("network will run on address: %s", anb.BindAddr)
 
 		idEvents := gadgets.NewIdentityDeltas(anb.Middleware.UpdateNodeAddresses)
 		anb.ProtocolEvents.AddConsumer(idEvents)
 
-		return anb.Network, err
+		return anb.Network, nil
 	})
 }
 
@@ -275,7 +304,7 @@ func (anb *UnstakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
-		anb.RootBlock.ID().String(),
+		anb.RootBlock.ID(),
 		p2p.DefaultUnicastTimeout,
 		false, // no connection gating for the unstaked nodes
 		anb.IDTranslator,

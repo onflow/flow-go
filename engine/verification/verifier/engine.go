@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
@@ -315,13 +315,14 @@ func (e *Engine) GenerateResultApproval(chunkIndex uint64,
 
 // verifiableChunkHandler acts as a wrapper around the verify method that captures its performance-related metrics
 func (e *Engine) verifiableChunkHandler(originID flow.Identifier, ch *verification.VerifiableChunkData) error {
-	ctx := context.Background()
-	if span, ok := e.tracer.GetSpan(ch.Result.ID(), trace.VERProcessExecutionResult); ok {
-		defer span.Finish()
-		childSpan := e.tracer.StartSpanFromParent(span, trace.VERVerVerifyWithMetrics)
-		ctx = opentracing.ContextWithSpan(ctx, childSpan)
-		defer childSpan.Finish()
+
+	span, ctx, isSampled := e.tracer.StartBlockSpan(context.Background(), ch.Chunk.BlockID, trace.VERVerVerifyWithMetrics)
+	if isSampled {
+		span.LogFields(log.String("result_id", ch.Result.ID().String()))
+		span.LogFields(log.Uint64("chunk_index", ch.Chunk.Index))
+		span.SetTag("origin_id", originID)
 	}
+	defer span.Finish()
 
 	// increments number of received verifiable chunks
 	// for sake of metrics
