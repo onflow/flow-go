@@ -194,36 +194,45 @@ func BenchmarkComputeHash(b *testing.B) {
 	rand.Read(m)
 
 	b.Run("SHA2_256", func(b *testing.B) {
-		alg := NewSHA2_256()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
+			alg := NewSHA2_256()
 			_ = alg.ComputeHash(m)
 		}
 		b.StopTimer()
 	})
 
 	b.Run("SHA2_384", func(b *testing.B) {
-		alg := NewSHA2_384()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
+			alg := NewSHA2_384()
 			_ = alg.ComputeHash(m)
 		}
 		b.StopTimer()
 	})
 
 	b.Run("SHA3_256", func(b *testing.B) {
-		alg := NewSHA3_256()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
+			alg := NewSHA3_256()
 			alg.ComputeHash(m)
 		}
 		b.StopTimer()
 	})
 
-	b.Run("SHA3_384", func(b *testing.B) {
-		alg := NewSHA3_384()
+	b.Run("SHA3_256_light", func(b *testing.B) {
+		h := make([]byte, HashLenSha3_256)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
+			ComputeSHA3_256(h, m)
+		}
+		b.StopTimer()
+	})
+
+	b.Run("SHA3_384", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			alg := NewSHA3_384()
 			_ = alg.ComputeHash(m)
 		}
 		b.StopTimer()
