@@ -1,6 +1,8 @@
 package module
 
 import (
+	"errors"
+
 	"github.com/onflow/flow-go/crypto"
 )
 
@@ -29,15 +31,16 @@ type ThresholdSigner interface {
 	Reconstruct(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error)
 }
 
-type ThresholdSignerStore interface {
-	GetThresholdSigner(view uint64) (ThresholdSigner, error)
-}
+var (
+	// DKGIncompleteError indicates that the node did not complete dkg at a certain view
+	DKGIncompleteError = errors.New("incomplete dkg")
+)
 
-// ThresholdSignerStoreV2 returns the threshold signer object by view
-// It returns:
-//  - (signer, true, nil) if DKG was completed in the epoch of the view
-//  - (nil, false, nil) if DKG was not completed in the epoch of the view
-//  - (nil, false, err) if there is any exception
-type ThresholdSignerStoreV2 interface {
-	GetThresholdSigner(view uint64) (ThresholdSigner, bool, error)
+// ThresholdSignerStore returns the threshold signer object by view
+type ThresholdSignerStore interface {
+	// It returns:
+	//  - (signer, nil) if DKG was completed in the epoch of the view
+	//  - (nil, DKGIncompleteError) if DKG was not completed in the epoch of the view
+	//  - (nil, error) if there is any exception
+	GetThresholdSigner(view uint64) (ThresholdSigner, error)
 }

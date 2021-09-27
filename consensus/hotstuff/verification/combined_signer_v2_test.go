@@ -1,6 +1,7 @@
 package verification
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -11,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/module"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -39,10 +41,9 @@ func TestDKGComplete(t *testing.T) {
 	beaconSigner := &modulemock.ThresholdSigner{}
 	beaconSigner.On("Sign", mock.Anything).Return(crypto.Signature([]byte{1, 2, 3}), nil).Once()
 
-	thresholdSignerStore := &modulemock.ThresholdSignerStoreV2{}
+	thresholdSignerStore := &modulemock.ThresholdSignerStore{}
 	// mock the case for DKG complete and has beacon signer
-	hasBeaconSigner := true
-	thresholdSignerStore.On("GetThresholdSigner", viewComplete).Return(beaconSigner, hasBeaconSigner, nil)
+	thresholdSignerStore.On("GetThresholdSigner", viewComplete).Return(beaconSigner, nil)
 
 	staking := &modulemock.AggregatingSigner{}
 	signer := NewCombinedSignerV2(committee, staking, thresholdVerifier, thresholdSignerStore, signerID)
@@ -80,8 +81,9 @@ func TestDKGInComplete(t *testing.T) {
 	thresholdVerifier := &modulemock.ThresholdVerifier{}
 
 	// mock the case for DKG was incomplete and doesn't have beacon signer
-	thresholdSignerStore := &modulemock.ThresholdSignerStoreV2{}
-	thresholdSignerStore.On("GetThresholdSigner", viewIncomplete).Return(nil, false, nil)
+	thresholdSignerStore := &modulemock.ThresholdSignerStore{}
+	thresholdSignerStore.On("GetThresholdSigner", viewIncomplete).Return(nil,
+		fmt.Errorf("dkg incomplete: %w", module.DKGIncompleteError))
 
 	staking := &modulemock.AggregatingSigner{}
 	staking.On("Sign", mock.Anything).Return(crypto.Signature([]byte{1, 2, 3}), nil).Once()

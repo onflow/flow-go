@@ -1,6 +1,7 @@
 package verification
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -22,7 +23,7 @@ import (
 // random beacon key it is available.
 type CombinedSignerV2 struct {
 	staking              module.AggregatingSigner
-	thresholdSignerStore module.ThresholdSignerStoreV2
+	thresholdSignerStore module.ThresholdSignerStore
 	signerID             flow.Identifier
 }
 
@@ -36,7 +37,7 @@ func NewCombinedSignerV2(
 	committee hotstuff.Committee,
 	staking module.AggregatingSigner,
 	thresholdVerifier module.ThresholdVerifier,
-	thresholdSignerStore module.ThresholdSignerStoreV2,
+	thresholdSignerStore module.ThresholdSignerStore,
 	signerID flow.Identifier) *CombinedSignerV2 {
 
 	sc := &CombinedSignerV2{
@@ -96,28 +97,27 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 	// create the message to be signed and generate signatures
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	beacon, hasBeaconSigner, err := c.thresholdSignerStore.GetThresholdSigner(block.View)
+	beacon, err := c.thresholdSignerStore.GetThresholdSigner(block.View)
 	if err != nil {
+		if errors.Is(err, module.DKGIncompleteError) {
+			// if the node didn't complete DKG, then using the staking key to sign the block as a
+			// fallback
+			stakingSig, err := c.staking.Sign(msg)
+			if err != nil {
+				return nil, fmt.Errorf("could not generate staking signature: %w", err)
+			}
+
+			return signature.EncodeSingleSig(hotstuff.SigTypeStaking, stakingSig), nil
+		}
 		return nil, fmt.Errorf("could not get threshold signer for view %d: %w", block.View, err)
 	}
 
 	// if the node is a DKG node and has completed DKG, then using the random beacon key
 	// to sign the block
-	if hasBeaconSigner {
-		beaconShare, err := beacon.Sign(msg)
-		if err != nil {
-			return nil, fmt.Errorf("could not generate beacon signature: %w", err)
-		}
-
-		return signature.EncodeSingleSig(hotstuff.SigTypeRandomBeacon, beaconShare), nil
-	}
-
-	// if the node didn't complete DKG, then using the staking key to sign the block as a
-	// fallback
-	stakingSig, err := c.staking.Sign(msg)
+	beaconShare, err := beacon.Sign(msg)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate staking signature: %w", err)
+		return nil, fmt.Errorf("could not generate beacon signature: %w", err)
 	}
 
-	return signature.EncodeSingleSig(hotstuff.SigTypeStaking, stakingSig), nil
+	return signature.EncodeSingleSig(hotstuff.SigTypeRandomBeacon, beaconShare), nil
 }
