@@ -147,7 +147,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 		"whether to enable libp2p stream compression")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
-
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
@@ -183,7 +182,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
 			pingProvider,
-			fnb.BaseConfig.DNSCacheTTL)
+			fnb.BaseConfig.DNSCacheTTL,
+			fnb.BaseConfig.LibP2PCompressionEnabled)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
