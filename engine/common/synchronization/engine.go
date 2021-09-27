@@ -286,14 +286,14 @@ func (e *Engine) processAvailableResponses() {
 
 // onSyncResponse processes a synchronization response.
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
-	e.log.Debug().Str("origin_id", originID.String()).Msg("received sync response")
+	e.log.Info().Str("origin_id", originID.String()).Msg("received sync response")
 	final := e.finalizedHeader.Get()
 	e.core.HandleHeight(final, res.Height)
 }
 
 // onBlockResponse processes a response containing a specifically requested block.
 func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.BlockResponse) {
-	e.log.Debug().Str("origin_id", originID.String()).Msg("received block response")
+	e.log.Info().Str("origin_id", originID.String()).Msg("received block response")
 	// process the blocks one by one
 	for _, block := range res.Blocks {
 		if !e.core.HandleBlock(block.Header) {
@@ -353,7 +353,7 @@ func (e *Engine) pollHeight() {
 		Nonce:  rand.Uint64(),
 		Height: head.Height,
 	}
-	e.log.Debug().
+	e.log.Info().
 		Uint64("height", req.Height).
 		Uint64("range_nonce", req.Nonce).
 		Msg("sending sync request")
@@ -380,7 +380,7 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Ra
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
 		}
-		e.log.Debug().
+		e.log.Info().
 			Uint64("range_from", req.FromHeight).
 			Uint64("range_to", req.ToHeight).
 			Uint64("range_nonce", req.Nonce).
@@ -399,7 +399,7 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Ra
 			errs = multierror.Append(errs, fmt.Errorf("could not submit batch request: %w", err))
 			continue
 		}
-		e.log.Debug().
+		e.log.Info().
 			Strs("block_ids", flow.IdentifierList(batch.BlockIDs).Strings()).
 			Uint64("range_nonce", req.Nonce).
 			Msg("batch requested")
