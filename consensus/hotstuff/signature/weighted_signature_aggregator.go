@@ -40,6 +40,15 @@ func NewWeightedSignatureAggregator(
 	dsTag string, // domain separation tag used by the signature
 ) (*WeightedSignatureAggregator, error) {
 
+	// build the internal map for a faster look-up
+	idToInfo := make(map[flow.Identifier]signerInfo)
+	for i, id := range ids {
+		idToInfo[id.NodeID] = signerInfo{
+			weight: id.Stake,
+			index:  i,
+		}
+	}
+
 	// build a low level crypto aggregator
 	publicKeys := make([]crypto.PublicKey, 0, len(ids))
 	for _, id := range ids {
@@ -54,17 +63,10 @@ func NewWeightedSignatureAggregator(
 	weightedAgg := &WeightedSignatureAggregator{
 		aggregator:   agg,
 		ids:          ids,
-		idToInfo:     make(map[flow.Identifier]signerInfo),
+		idToInfo:     idToInfo,
 		collectedIDs: make(map[flow.Identifier]struct{}),
 	}
 
-	// build the internal map for a faster look-up
-	for i, id := range ids {
-		weightedAgg.idToInfo[id.NodeID] = signerInfo{
-			weight: id.Stake,
-			index:  i,
-		}
-	}
 	return weightedAgg, nil
 }
 
@@ -112,15 +114,13 @@ func (w *WeightedSignatureAggregator) hasSignature(signerID flow.Identifier) boo
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
 
-	currentWeight := w.TotalWeight()
-
 	info, found := w.idToInfo[signerID]
 	if !found {
-		return currentWeight, engine.NewInvalidInputErrorf("couldn't find signerID %s in the map", signerID)
+		return w.TotalWeight(), engine.NewInvalidInputErrorf("couldn't find signerID %s in the map", signerID)
 	}
 
 	if w.hasSignature(signerID) {
-		return currentWeight, engine.NewDuplicatedEntryErrorf("SigneID %s was already added", signerID)
+		return w.TotalWeight(), engine.NewDuplicatedEntryErrorf("SigneID %s was already added", signerID)
 	}
 
 	// atomically update the signatures pool and the total weight
@@ -129,7 +129,7 @@ func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 
 	err := w.aggregator.TrustedAdd(info.index, sig)
 	if err != nil {
-		return currentWeight, fmt.Errorf("Trusted add has failed: %w", err)
+		return w.totalWeight, fmt.Errorf("Trusted add has failed: %w", err)
 	}
 
 	w.collectedIDs[signerID] = struct{}{}
