@@ -57,7 +57,7 @@ func NewAccountPublicKey(publicKey *runtime.PublicKey,
 	}, nil
 }
 
-func NewAccountKeyHandler(accounts *state.AccountsState) *AccountKeyHandler {
+func NewAccountKeyHandler(accounts *state.StatefulAccounts) *AccountKeyHandler {
 	return &AccountKeyHandler{
 		accounts: accounts,
 	}
