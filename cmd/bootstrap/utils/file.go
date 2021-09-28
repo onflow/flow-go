@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	io "github.com/onflow/flow-go/utils/io"
 )
@@ -47,30 +46,16 @@ func ReadRootBlock(rootBlockDataPath string) (*flow.Block, error) {
 	return &encodable, nil
 }
 
-func ReadDKGPubData(dkgDataPath string) (*inmem.EncodableDKG, error) {
+func ReadDKGData(dkgDataPath string) (*inmem.EncodableFullDKG, error) {
 	bytes, err := io.ReadFile(dkgDataPath)
 	if err != nil {
-		return nil, fmt.Errorf("could not read dkg pub data: %w", err)
+		return nil, fmt.Errorf("could not read dkg data: %w", err)
 	}
 
-	var encodable inmem.EncodableDKG
+	var encodable inmem.EncodableFullDKG
 	err = json.Unmarshal(bytes, &encodable)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal dkg pub data: %w", err)
-	}
-	return &encodable, nil
-}
-
-func ReadDKGParticipant(dkgParticipantPath string) (*dkg.DKGParticipantPriv, error) {
-	bytes, err := io.ReadFile(dkgParticipantPath)
-	if err != nil {
-		return nil, fmt.Errorf("could not read dkg participant: %w", err)
-	}
-
-	var encodable dkg.DKGParticipantPriv
-	err = json.Unmarshal(bytes, &encodable)
-	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal dkg participant: %w", err)
+		return nil, fmt.Errorf("could not unmarshal dkg data: %w", err)
 	}
 	return &encodable, nil
 }

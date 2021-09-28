@@ -7,12 +7,11 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 // constructRootQC constructs root QC based on root block, votes and dkg info
-func constructRootQC(block *flow.Block, votes []*model.Vote, internalNodes []bootstrap.NodeInfo, signer dkg.DKGParticipantPriv, dkgData inmem.EncodableDKG) *flow.QuorumCertificate {
-	participantData, err := run.GenerateQCSignerParticipantData(internalNodes, signer, dkgData)
+func constructRootQC(block *flow.Block, votes []*model.Vote, allNodes, internalNodes []bootstrap.NodeInfo, dkgData dkg.DKGData) *flow.QuorumCertificate {
+	participantData, err := run.GenerateQCParticipantData(allNodes, internalNodes, dkgData)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to generate QC participant data")
 	}

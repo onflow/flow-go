@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"encoding/hex"
-
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/model/dkg"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/model/flow"
@@ -17,7 +15,7 @@ func constructRootResultAndSeal(
 	participants flow.IdentityList,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
-	dkgData inmem.EncodableDKG,
+	dkgData dkg.DKGData,
 ) (*flow.ExecutionResult, *flow.Seal) {
 
 	stateCommitBytes, err := hex.DecodeString(rootCommit)
@@ -45,16 +43,11 @@ func constructRootResultAndSeal(
 		RandomSource:       getRandomSource(flagBootstrapRandomSeed),
 	}
 
-	dkgPubKeys := make([]crypto.PublicKey, 0)
-	for _, participant := range dkgData.Participants {
-		dkgPubKeys = append(dkgPubKeys, participant.KeyShare)
-	}
-
 	epochCommit := &flow.EpochCommit{
 		Counter:            flagEpochCounter,
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(clusterQCs),
-		DKGGroupKey:        dkgData.GroupKey,
-		DKGParticipantKeys: dkgPubKeys,
+		DKGGroupKey:        dkgData.PubGroupKey,
+		DKGParticipantKeys: dkgData.PubKeyShares,
 	}
 
 	result := run.GenerateRootResult(block, stateCommit, epochSetup, epochCommit)
