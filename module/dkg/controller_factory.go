@@ -17,10 +17,10 @@ import (
 // MessagingEngine, and the same client to communicate with the DKG
 // smart-contract.
 type ControllerFactory struct {
-	log               zerolog.Logger
-	me                module.Local
-	dkgContractClient module.DKGContractClient
-	tunnel            *BrokerTunnel
+	log                zerolog.Logger
+	me                 module.Local
+	dkgContractClients []module.DKGContractClient
+	tunnel             *BrokerTunnel
 }
 
 // NewControllerFactory creates a new factory that generates Controllers with
@@ -28,14 +28,14 @@ type ControllerFactory struct {
 func NewControllerFactory(
 	log zerolog.Logger,
 	me module.Local,
-	dkgContractClient module.DKGContractClient,
+	dkgContractClients []module.DKGContractClient,
 	tunnel *BrokerTunnel) *ControllerFactory {
 
 	return &ControllerFactory{
-		log:               log,
-		me:                me,
-		dkgContractClient: dkgContractClient,
-		tunnel:            tunnel,
+		log:                log,
+		me:                 me,
+		dkgContractClients: dkgContractClients,
+		tunnel:             tunnel,
 	}
 }
 
@@ -63,7 +63,7 @@ func (f *ControllerFactory) Create(
 		participants,
 		f.me,
 		myIndex,
-		f.dkgContractClient,
+		f.dkgContractClients,
 		f.tunnel,
 	)
 
