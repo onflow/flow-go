@@ -20,6 +20,7 @@ var (
 	PathNodeInfosPub          = filepath.Join(DirnamePublicBootstrap, "node-infos.pub.json")
 	PathPartnerNodeInfoPrefix = filepath.Join(DirnamePublicBootstrap, "node-info.pub.")
 	PathNodeInfoPub           = filepath.Join(DirnamePublicBootstrap, "node-info.pub.%v.json") // %v will be replaced by NodeID
+	DirnameRootBlockVotes     = filepath.Join(DirnamePublicBootstrap, "root-block-votes")
 
 	PathRootBlockData             = filepath.Join(DirnamePublicBootstrap, "root-block.json")
 	PathRootProtocolStateSnapshot = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
