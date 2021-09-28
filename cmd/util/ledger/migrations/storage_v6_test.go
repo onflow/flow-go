@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -700,11 +701,18 @@ func TestContractValueRetrieval(t *testing.T) {
 	//  - 1x slab storage register
 	require.Len(t, migratedPayloads, 6)
 
-	//assert.Equal(t, []byte("code.Test"), migratedPayloads[0].Key.KeyParts[2].Value)
-	//assert.Equal(t, []byte("contract_names"), migratedPayloads[1].Key.KeyParts[2].Value)
-	//assert.Equal(t, []byte("storage_used"), migratedPayloads[2].Key.KeyParts[2].Value)
-	//assert.Equal(t, []byte("storage_index"), migratedPayloads[3].Key.KeyParts[2].Value)
-	//assert.Equal(t, []byte("/slab/"+string([]byte{0, 0, 0, 0, 0, 0, 0, 1})), migratedPayloads[4].Key.KeyParts[2].Value)
+	sort.SliceStable(migratedPayloads, func(i, j int) bool {
+		a := migratedPayloads[i].Key.KeyParts[2].Value
+		b := migratedPayloads[j].Key.KeyParts[2].Value
+		return bytes.Compare(a, b) < 0
+	})
+
+	assert.Equal(t, []byte("/slab/"+string([]byte{0, 0, 0, 0, 0, 0, 0, 1})), migratedPayloads[0].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("code.Test"), migratedPayloads[1].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("contract\u001FTest"), migratedPayloads[2].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("contract_names"), migratedPayloads[3].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("storage_index"), migratedPayloads[4].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("storage_used"), migratedPayloads[5].Key.KeyParts[2].Value)
 
 	// Call a dummy function - only need to see whether the value can be found.
 	_, err = invokeContractFunction(migratedPayloads, address, contractName, "foo")
