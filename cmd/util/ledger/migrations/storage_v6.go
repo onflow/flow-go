@@ -411,19 +411,6 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 	return deferredValuePaths
 }
 
-func (m *StorageFormatV6Migration) checkStorageFormat(payload ledger.Payload) error {
-	if !bytes.HasPrefix(payload.Value, []byte{0x0, 0xca, 0xde}) {
-		return nil
-	}
-
-	_, version := newInter.StripMagic(payload.Value)
-	if version != newInter.CurrentEncodingVersion {
-		return fmt.Errorf("invalid version for key %s: %d", payload.Key.String(), version)
-	}
-
-	return nil
-}
-
 func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) error {
 	keyParts := payload.Key.KeyParts
 
