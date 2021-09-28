@@ -82,6 +82,9 @@ func pushVote(c *cobra.Command, args []string) {
 	}
 
 	local, err := local.New(identity, nodeInfo.StakingPrivKey.PrivateKey)
+	if err != nil {
+		log.Fatal().Err(err).Msg("creating local signer abstraction failed")
+	}
 
 	merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 	stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
