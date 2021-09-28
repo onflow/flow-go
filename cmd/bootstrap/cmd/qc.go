@@ -38,6 +38,7 @@ func constructRootVotes(block *flow.Block, allNodes, internalNodes []bootstrap.N
 	}
 
 	for _, vote := range votes {
-		writeJSON(fmt.Sprintf(bootstrap.PathNodeRootBlockVote, vote.SignerID), vote)
+		path := fmt.Sprintf(bootstrap.DirnameRootBlockVotes, bootstrap.FilenameRootBlockVotePrefix+vote.SignerID.String()+".json")
+		writeJSON(path, vote)
 	}
 }
