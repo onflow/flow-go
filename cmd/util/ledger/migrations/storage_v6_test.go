@@ -272,7 +272,7 @@ func TestEncoding(t *testing.T) {
 		require.Len(t, encodedValues, 3)
 
 		for _, encValue := range encodedValues {
-			assert.False(t, newInter.HasMagic(encValue.Value))
+			assert.False(t, oldInter.HasMagic(encValue.Value))
 		}
 
 		storageId := atree.NewStorageID(
@@ -359,7 +359,7 @@ func TestEncoding(t *testing.T) {
 		require.Len(t, encodedValues, 3)
 
 		for _, encValue := range encodedValues {
-			assert.False(t, newInter.HasMagic(encValue.Value))
+			assert.False(t, oldInter.HasMagic(encValue.Value))
 		}
 
 		storageId := atree.NewStorageID(
@@ -455,7 +455,7 @@ func TestEncoding(t *testing.T) {
 		require.Len(t, encodedValues, 5)
 
 		for _, encValue := range encodedValues {
-			assert.False(t, newInter.HasMagic(encValue.Value))
+			assert.False(t, oldInter.HasMagic(encValue.Value))
 		}
 
 		// Check composite value in storage
@@ -592,7 +592,7 @@ func TestPayloadsMigration(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEmpty(t, migratedValue)
 
-	assert.False(t, newInter.HasMagic(migratedValue))
+	assert.False(t, oldInter.HasMagic(migratedValue))
 }
 
 func TestContractValueRetrieval(t *testing.T) {
