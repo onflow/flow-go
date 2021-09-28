@@ -629,6 +629,7 @@ func TestContractValueRetrieval(t *testing.T) {
 
 	contractCode := `
         pub contract Test {
+            pub fun foo(): Int { return 42 }
         }
     `
 
@@ -720,8 +721,9 @@ func TestContractValueRetrieval(t *testing.T) {
 	assert.Equal(t, []byte("storage_used"), migratedPayloads[5].Key.KeyParts[2].Value)
 
 	// Call a dummy function - only need to see whether the value can be found.
-	_, err = invokeContractFunction(migratedPayloads, address, contractName, "foo")
-	assert.NoError(t, err)
+	result, err := invokeContractFunction(migratedPayloads, address, contractName, "foo")
+	require.NoError(t, err)
+	require.Equal(t, cadence.NewInt(42), result)
 }
 
 func invokeContractFunction(
