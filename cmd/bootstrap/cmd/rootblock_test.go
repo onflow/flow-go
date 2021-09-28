@@ -2,16 +2,18 @@ package cmd
 
 import (
 	"encoding/hex"
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
