@@ -1,18 +1,31 @@
 package migrations
 
 import (
+	"bytes"
+	"encoding/binary"
+	"fmt"
+	"sort"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
-	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/ledger"
 
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
+	fvmState "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	newInter "github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 
 	oldInter "github.com/onflow/cadence/v19/runtime/interpreter"
 	"github.com/onflow/cadence/v19/runtime/tests/utils"
@@ -37,12 +50,26 @@ func TestValueConversion(t *testing.T) {
 		address := &common.Address{1, 2}
 		oldArray.SetOwner(address)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
 
-		migration.initPersistentSlabStorage(baseStorage)
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
-		migration.initOldInterpreter([]ledger.Payload{})
+		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
 		newValue := converter.Convert(oldArray)
@@ -82,12 +109,26 @@ func TestValueConversion(t *testing.T) {
 		address := &common.Address{1, 2}
 		oldDictionary.SetOwner(address)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
 
-		migration.initPersistentSlabStorage(baseStorage)
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
-		migration.initOldInterpreter([]ledger.Payload{})
+		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
 		newValue := converter.Convert(oldDictionary)
@@ -136,12 +177,26 @@ func TestValueConversion(t *testing.T) {
 			&owner,
 		)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, owner.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
 
-		migration.initPersistentSlabStorage(baseStorage)
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
-		migration.initOldInterpreter([]ledger.Payload{})
+		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
 		newValue := converter.Convert(oldComposite)
@@ -184,15 +239,29 @@ func TestEncoding(t *testing.T) {
 		encoded, _, err := oldInter.EncodeValue(oldArray, nil, false, nil)
 		require.NoError(t, err)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		address := common.Address{1, 2}
 
-		migration.initPersistentSlabStorage(baseStorage)
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
+
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
 		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 		migration.converter = NewValueConverter(migration)
-
-		address := common.Address{1, 2}
 
 		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
 		assert.NoError(t, err)
@@ -200,8 +269,12 @@ func TestEncoding(t *testing.T) {
 		err = migration.storage.Commit()
 		assert.NoError(t, err)
 
-		encodedValues := baseStorage.ReencodedPayloads
-		require.Len(t, encodedValues, 1)
+		encodedValues := ledgerView.Payloads()
+		require.Len(t, encodedValues, 3)
+
+		for _, encValue := range encodedValues {
+			assert.False(t, oldInter.HasMagic(encValue.Value))
+		}
 
 		storageId := atree.NewStorageID(
 			atree.Address(address),
@@ -252,15 +325,30 @@ func TestEncoding(t *testing.T) {
 		encoded, _, err := oldInter.EncodeValue(oldDictionary, nil, false, nil)
 		require.NoError(t, err)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		address := common.Address{1, 2}
 
-		migration.initPersistentSlabStorage(baseStorage)
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
+
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
+		migration.initOldInterpreter(payloads)
 		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 		migration.converter = NewValueConverter(migration)
-
-		address := common.Address{1, 2}
 
 		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
 		assert.NoError(t, err)
@@ -268,8 +356,12 @@ func TestEncoding(t *testing.T) {
 		err = migration.storage.Commit()
 		assert.NoError(t, err)
 
-		encodedValues := baseStorage.ReencodedPayloads
-		require.Len(t, encodedValues, 1)
+		encodedValues := ledgerView.Payloads()
+		require.Len(t, encodedValues, 3)
+
+		for _, encValue := range encodedValues {
+			assert.False(t, oldInter.HasMagic(encValue.Value))
+		}
 
 		storageId := atree.NewStorageID(
 			atree.Address(address),
@@ -329,15 +421,30 @@ func TestEncoding(t *testing.T) {
 		encoded, _, err := oldInter.EncodeValue(oldComposite, nil, false, nil)
 		require.NoError(t, err)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		address := common.Address{1, 2}
 
-		migration.initPersistentSlabStorage(baseStorage)
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
+
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
+		migration.initOldInterpreter(payloads)
 		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 		migration.converter = NewValueConverter(migration)
-
-		address := common.Address{1, 2}
 
 		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
 		assert.NoError(t, err)
@@ -345,8 +452,12 @@ func TestEncoding(t *testing.T) {
 		err = migration.storage.Commit()
 		assert.NoError(t, err)
 
-		encodedValues := baseStorage.ReencodedPayloads
-		require.Len(t, encodedValues, 3)
+		encodedValues := ledgerView.Payloads()
+		require.Len(t, encodedValues, 5)
+
+		for _, encValue := range encodedValues {
+			assert.False(t, oldInter.HasMagic(encValue.Value))
+		}
 
 		// Check composite value in storage
 
@@ -438,6 +549,18 @@ func TestPayloadsMigration(t *testing.T) {
 
 	payloads := []ledger.Payload{
 		{
+			Key: ledger.NewKey([]ledger.KeyPart{
+				ledger.NewKeyPart(state.KeyPartOwner, owner.Bytes()),
+				ledger.NewKeyPart(state.KeyPartController, []byte{}),
+				ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+			}),
+			Value: ledger.Value(
+				uint64ToBinary(
+					uint64(0), // dummy value
+				),
+			),
+		},
+		{
 			Key:   ledger.NewKey(keyParts),
 			Value: ledger.Value(encoded),
 		},
@@ -457,7 +580,7 @@ func TestPayloadsMigration(t *testing.T) {
 	migratedPayloads, err := storageFormatV6Migration.migrate(payloads)
 	require.NoError(t, err)
 
-	assert.Len(t, migratedPayloads, 3)
+	assert.Len(t, migratedPayloads, 5)
 
 	// Check whether the query works with new ledger
 
@@ -469,56 +592,198 @@ func TestPayloadsMigration(t *testing.T) {
 	migratedValue, err := migratedLedgerView.Get(string(owner.Bytes()), "", string(prefixedKey))
 	require.NoError(t, err)
 	require.NotEmpty(t, migratedValue)
+
+	assert.False(t, oldInter.HasMagic(migratedValue))
 }
 
-// Test for the 'Store' method implementation of delegationStorage.
-// This ensures the 'Store' method of the overridden custom
-// base storage gets invoked.
-func TestDelegation(t *testing.T) {
+func TestContractValueRetrieval(t *testing.T) {
+
 	t.Parallel()
 
-	var s storageInterface = &delegator{}
+	address := common.Address{1, 2}
 
-	// s.name() must invoke the respective method from the
-	// overridden implementation. i.e: 'overrider.name()'
-	assert.Equal(t, "overrider", s.name())
+	const contractName = "Test"
+
+	location := common.AddressLocation{
+		Address: address,
+		Name:    contractName,
+	}
+
+	contractValue := oldInter.NewCompositeValue(
+		location,
+		contractName,
+		common.CompositeKindContract,
+		oldInter.NewStringValueOrderedMap(),
+		&address,
+	)
+
+	encodeContractValue, _, err := oldInter.EncodeValue(contractValue, nil, false, nil)
+	require.NoError(t, err)
+
+	encodeContractValue = oldInter.PrependMagic(encodeContractValue, oldInter.CurrentEncodingVersion)
+
+	contractNames := &bytes.Buffer{}
+	namesEncoder := cbor.NewEncoder(contractNames)
+	err = namesEncoder.Encode([]string{contractName})
+	require.NoError(t, err)
+
+	contractCode := `
+        pub contract Test {
+            pub fun foo(): Int { return 42 }
+        }
+    `
+
+	contractValueKey := []ledger.KeyPart{
+		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartController, []byte{}),
+		ledger.NewKeyPart(state.KeyPartKey, []byte(fmt.Sprintf("contract\x1F%s", contractName))),
+	}
+
+	contractNamesKey := []ledger.KeyPart{
+		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartController, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyContractNames)),
+	}
+
+	contractCodeKey := []ledger.KeyPart{
+		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartController, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartKey, []byte("code.Test")),
+	}
+
+	storageUsedKey := []ledger.KeyPart{
+		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartController, []byte{}),
+		ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+	}
+
+	// old payloads
+	payloads := []ledger.Payload{
+		{
+			Key:   ledger.NewKey(contractValueKey),
+			Value: ledger.Value(encodeContractValue),
+		},
+		{
+			Key:   ledger.NewKey(contractCodeKey),
+			Value: ledger.Value(contractCode),
+		},
+		{
+			Key:   ledger.NewKey(contractNamesKey),
+			Value: ledger.Value(contractNames.Bytes()),
+		},
+		{
+			Key: ledger.NewKey(storageUsedKey),
+			Value: ledger.Value(
+				uint64ToBinary(
+					uint64(
+						len(contractNamesKey) + len(contractCodeKey),
+					),
+				),
+			),
+		},
+	}
+
+	// Before migration
+
+	// Call a dummy function - only need to see whether the value can be found.
+	_, err = invokeContractFunction(payloads, address, contractName, "foo")
+
+	// CBOR error means value is found, but the decoding fails due to old format.
+	assert.Contains(t, err.Error(), "unsupported decoded CBOR type: CBOR uint type")
+
+	// After migration
+
+	migration := &StorageFormatV6Migration{}
+	migratedPayloads, err := migration.migrate(payloads)
+	require.NoError(t, err)
+
+	// Must contain total of 5 payloads:
+	//  - 4x FVM registers
+	//      - contract code
+	//      - contract_names
+	//      - storage_used
+	//      - storage_index
+	//  - 1x account storage register
+	//  - 1x slab storage register
+	require.Len(t, migratedPayloads, 6)
+
+	sort.SliceStable(migratedPayloads, func(i, j int) bool {
+		a := migratedPayloads[i].Key.KeyParts[2].Value
+		b := migratedPayloads[j].Key.KeyParts[2].Value
+		return bytes.Compare(a, b) < 0
+	})
+
+	assert.Equal(t, []byte("/slab/"+string([]byte{0, 0, 0, 0, 0, 0, 0, 1})), migratedPayloads[0].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("code.Test"), migratedPayloads[1].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("contract\u001FTest"), migratedPayloads[2].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("contract_names"), migratedPayloads[3].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("storage_index"), migratedPayloads[4].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("storage_used"), migratedPayloads[5].Key.KeyParts[2].Value)
+
+	// Call a dummy function - only need to see whether the value can be found.
+	result, err := invokeContractFunction(migratedPayloads, address, contractName, "foo")
+	require.NoError(t, err)
+	require.Equal(t, cadence.NewInt(42), result)
 }
 
-type storageInterface interface {
-	name() string
+func invokeContractFunction(
+	payloads []ledger.Payload,
+	address common.Address,
+	contractName string,
+	funcName string,
+) (val cadence.Value, err error) {
+	ledgerView := newView(payloads)
+
+	stateHolder := fvmState.NewStateHolder(
+		fvmState.NewState(ledgerView),
+	)
+
+	txEnv := fvm.NewTransactionEnvironment(
+		fvm.NewContext(zerolog.Nop()),
+		fvm.NewVirtualMachine(
+			runtime.NewInterpreterRuntime(),
+		),
+		stateHolder,
+		programs.NewEmptyPrograms(),
+		flow.NewTransactionBody(),
+		0,
+		nil,
+	)
+
+	location := common.AddressLocation{
+		Address: address,
+		Name:    contractName,
+	}
+
+	predeclaredValues := make([]runtime.ValueDeclaration, 0)
+
+	defer func() {
+		if r := recover(); r != nil {
+			switch typedR := r.(type) {
+			case error:
+				err = typedR
+			case string:
+				err = fmt.Errorf(typedR)
+			default:
+				panic(typedR)
+			}
+		}
+	}()
+
+	return txEnv.VM().Runtime.InvokeContractFunction(
+		location,
+		funcName,
+		[]newInter.Value{},
+		[]sema.Type{},
+		runtime.Context{
+			Interface:         txEnv,
+			PredeclaredValues: predeclaredValues,
+		},
+	)
 }
 
-var _ storageInterface = &overrider{}
-var _ storageInterface = &storageImpl{}
-var _ storageInterface = &innerStorageImpl{}
-var _ storageInterface = &delegator{}
-
-// delegator does not define method 'name'.
-// Instead, delegates to overrider and storageImpl,
-// where both have the same method.
-type delegator struct {
-	*overrider // overrides the inner implementation of storageImpl
-	*storageImpl
-}
-
-// overrider defines method 'name'
-type overrider struct {
-}
-
-func (*overrider) name() string {
-	return "overrider"
-}
-
-// storageImpl does not define method 'name',
-// but delegates to innerStorageImpl.
-type storageImpl struct {
-	*innerStorageImpl
-}
-
-// innerStorageImpl defines method 'name'
-type innerStorageImpl struct {
-}
-
-func (*innerStorageImpl) name() string {
-	return "inner implementation"
+func uint64ToBinary(integer uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, integer)
+	return b
 }
