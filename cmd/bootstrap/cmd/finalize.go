@@ -125,15 +125,12 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Str("seed", hex.EncodeToString(flagBootstrapRandomSeed)).Msg("deterministic bootstrapping random seed")
 	log.Info().Msg("")
 
-	// TODO: we already have all nodes generated from rootblock step, instead of assembling them again
-	//  we just need to read them. Fix this.
-
 	log.Info().Msg("collecting partner network and staking keys")
-	partnerNodes := assemblePartnerNodes()
+	partnerNodes := readPartnerNodeInfos()
 	log.Info().Msg("")
 
 	log.Info().Msg("generating internal private networking and staking keys")
-	internalNodes := assembleInternalNodes()
+	internalNodes := readInternalNodeInfos()
 	log.Info().Msg("")
 
 	log.Info().Msg("checking constraints on consensus/cluster nodes")
@@ -280,9 +277,9 @@ func readRootBlockVotes() []*hotstuff.Vote {
 	return votes
 }
 
-// assemblePartnerNodes returns a list of partner nodes after gathering stake
+// readPartnerNodeInfos returns a list of partner nodes after gathering stake
 // and public key information from configuration files
-func assemblePartnerNodes() []model.NodeInfo {
+func readPartnerNodeInfos() []model.NodeInfo {
 	partners := readPartnerNodes()
 	log.Info().Msgf("read %v partner node configuration files", len(partners))
 
@@ -337,9 +334,9 @@ func readPartnerNodes() []model.NodeInfoPub {
 	return partners
 }
 
-// assembleInternalNodes returns a list of internal nodes after collecting stakes
+// readInternalNodeInfos returns a list of internal nodes after collecting stakes
 // from configuration files
-func assembleInternalNodes() []model.NodeInfo {
+func readInternalNodeInfos() []model.NodeInfo {
 	privInternals := readInternalNodes()
 	log.Info().Msgf("read %v internal private node-info files", len(privInternals))
 
