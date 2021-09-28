@@ -191,14 +191,20 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
-	migratedPayloads := m.getFVMRegisters(payloads)
+	fvmPayloads, storagePayloads, slabPayloads := splitPayloads(payloads)
+	if len(slabPayloads) != 0 {
+		return nil, fmt.Errorf(
+			"slab storages are not empty: found %d",
+			len(slabPayloads),
+		)
+	}
 
-	l := newView(migratedPayloads)
-	st := state.NewState(l)
-	sth := state.NewStateHolder(st)
-	a := state.NewAccounts(sth)
+	v := newView(fvmPayloads)
+	st := state.NewState(v)
+	stateHolder := state.NewStateHolder(st)
+	accounts := state.NewAccounts(stateHolder)
 
-	baseStorage := atree.NewLedgerBaseStorage(newAccountBasedBaseStorage(a))
+	baseStorage := atree.NewLedgerBaseStorage(newAccountsAtreeLedger(accounts))
 	m.initPersistentSlabStorage(baseStorage)
 
 	m.initNewInterpreter()
@@ -214,7 +220,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.Log.Info().Msg("Converting payloads...")
 
-	for _, payload := range payloads {
+	for _, payload := range storagePayloads {
 		keyParts := payload.Key.KeyParts
 		rawOwner := keyParts[0].Value
 		rawKey := keyParts[2].Value
@@ -259,7 +265,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		m.Log.Warn().Msgf("values not migrated due to missing types: %d", m.missingTypeValues)
 	}
 
-	return l.Payloads(), nil
+	return v.Payloads(), nil
 }
 
 func (m *StorageFormatV6Migration) incrementProgress() {
@@ -1074,6 +1080,11 @@ func (c *ValueConverter) Convert(value oldInter.Value) (result newInter.Value) {
 
 	defer func() {
 		if r := recover(); r != nil {
+			c.migration.Log.Warn().Msgf(
+				"failed to convert value due to missing static type: owner: %s, value: %s",
+				value.GetOwner(),
+				value.String(),
+			)
 			c.migration.missingTypeValues += 1
 			result = nil
 		}

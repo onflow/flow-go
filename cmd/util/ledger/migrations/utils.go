@@ -51,12 +51,12 @@ func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storageP
 		if fvmState.IsFVMStateKey(
 			string(p.Key.KeyParts[0].Value),
 			string(p.Key.KeyParts[1].Value),
-			string(p.Key.KeyParts[3].Value),
+			string(p.Key.KeyParts[2].Value),
 		) {
 			fvmPayloads = append(fvmPayloads, p)
 			continue
 		}
-		if bytes.HasPrefix([]byte(p.Key.KeyParts[3].Value), []byte(atree.LedgerBaseStorageSlabPrefix)) {
+		if bytes.HasPrefix(p.Key.KeyParts[2].Value, []byte(atree.LedgerBaseStorageSlabPrefix)) {
 			slabPayloads = append(slabPayloads, p)
 			continue
 		}
