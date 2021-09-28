@@ -3,8 +3,9 @@ package epochs
 import (
 	"context"
 	"fmt"
-	"github.com/sethvargo/go-retry"
 	"time"
+
+	"github.com/sethvargo/go-retry"
 
 	"github.com/rs/zerolog"
 
@@ -27,11 +28,11 @@ const (
 // RootQCVoter is responsible for generating and submitting votes for the
 // root quorum certificate of the upcoming epoch for this node's cluster.
 type RootQCVoter struct {
-	log                     zerolog.Logger
-	me                      module.Local
-	signer                  hotstuff.Signer
-	state                   protocol.State
-	qcContractClients       []module.QCContractClient // priority ordered array of client to the QC aggregator smart contract
+	log                    zerolog.Logger
+	me                     module.Local
+	signer                 hotstuff.Signer
+	state                  protocol.State
+	qcContractClients      []module.QCContractClient // priority ordered array of client to the QC aggregator smart contract
 	activeQCContractClient int                       // index of the qc contract client that is currently in use
 
 	wait time.Duration // how long to sleep in between vote attempts
@@ -105,7 +106,7 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		attempts++
 
 		// retry with next fallback client every 2 attempts
-		if attempts % 2 == 0 {
+		if attempts%2 == 0 {
 			voter.updateActiveQcContractClient()
 		}
 
@@ -151,7 +152,7 @@ func (voter *RootQCVoter) qcContractClient() module.QCContractClient {
 
 func (voter *RootQCVoter) updateActiveQcContractClient() {
 	// if we have reached the end of our array start from beginning
-	if voter.activeQCContractClient == len(voter.qcContractClients) - 1 {
+	if voter.activeQCContractClient == len(voter.qcContractClients)-1 {
 		voter.activeQCContractClient = 0
 		return
 	}

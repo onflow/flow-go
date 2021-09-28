@@ -38,7 +38,7 @@ type Broker struct {
 	committee               flow.IdentityList          // IDs of DKG members
 	me                      module.Local               // used for signing bcast messages
 	myIndex                 int                        // index of this instance in the committee
-	dkgContractClients       []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
+	dkgContractClients      []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
 	activeDKGContractClient int                        // index of the dkg contract client that is currently in use
 	tunnel                  *BrokerTunnel              // channels through which the broker communicates with the network engine
 	privateMsgCh            chan messages.DKGMessage   // channel to forward incoming private messages to consumers
@@ -60,17 +60,17 @@ func NewBroker(
 	tunnel *BrokerTunnel) *Broker {
 
 	b := &Broker{
-		log:               log.With().Str("component", "broker").Str("dkg_instance_id", dkgInstanceID).Logger(),
-		unit:              engine.NewUnit(),
-		dkgInstanceID:     dkgInstanceID,
-		committee:         committee,
-		me:                me,
-		myIndex:           myIndex,
+		log:                log.With().Str("component", "broker").Str("dkg_instance_id", dkgInstanceID).Logger(),
+		unit:               engine.NewUnit(),
+		dkgInstanceID:      dkgInstanceID,
+		committee:          committee,
+		me:                 me,
+		myIndex:            myIndex,
 		dkgContractClients: dkgContractClients,
-		tunnel:            tunnel,
-		privateMsgCh:      make(chan messages.DKGMessage),
-		broadcastMsgCh:    make(chan messages.DKGMessage),
-		shutdownCh:        make(chan struct{}),
+		tunnel:             tunnel,
+		privateMsgCh:       make(chan messages.DKGMessage),
+		broadcastMsgCh:     make(chan messages.DKGMessage),
+		shutdownCh:         make(chan struct{}),
 	}
 
 	go b.listen()
@@ -85,7 +85,7 @@ func (b *Broker) dkgContractClient() module.DKGContractClient {
 
 func (b *Broker) updateActiveDKGContractClient() {
 	// if we have reached the end of our array start from beginning
-	if b.activeDKGContractClient == len(b.dkgContractClients) - 1 {
+	if b.activeDKGContractClient == len(b.dkgContractClients)-1 {
 		b.activeDKGContractClient = 0
 		return
 	}
@@ -152,7 +152,7 @@ func (b *Broker) Broadcast(data []byte) {
 				b.log.Error().Err(err).Msgf("error broadcasting, retrying (%x)", attempts)
 
 				// retry with next fallback client every 2 attempts
-				if attempts % 2 == 0 {
+				if attempts%2 == 0 {
 					b.updateActiveDKGContractClient()
 				}
 			}
