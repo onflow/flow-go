@@ -27,13 +27,9 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`read \d+ stakes for internal nodes` +
 	`checking constraints on consensus/cluster nodes` +
 	`assembling network and staking keys` +
-	`wrote file \S+/node-infos.pub.json` +
-	`running DKG for consensus nodes` +
-	`read \d+ node infos for DKG` +
-	`will run DKG` +
-	`finished running DKG` +
-	`.+/random-beacon.priv.json` +
-	`constructing root block` +
+	`reading root block data` +
+	`reading dkg pub data` +
+	`reading QC signer` +
 	`constructing root QC` +
 	`computing collection node clusters` +
 	`constructing root blocks for collection node clusters` +
@@ -53,6 +49,29 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 
 var finalizeHappyPathRegex = regexp.MustCompile(finalizeHappyPathLogs)
 
+// getFirstQCSignerPath picks first internal node as participant who will do the QC signing
+// node needs to have random beacon key and node info to be treated as internal.
+func getFirstQCSignerPath(t *testing.T, bootDir string) string {
+	privateFiles, err := filesInDir(filepath.Join(bootDir, model.DirPrivateRoot))
+	assert.NoError(t, err)
+
+	for _, privateDir := range privateFiles {
+		files, err := filesInDir(privateDir)
+		assert.NoError(t, err)
+
+		for _, f := range files {
+			// skip files that do not include random beacon key and node-info
+			if !strings.Contains(f, model.FilenameRandomBeaconPriv) && strings.Contains(f, model.PathPrivNodeInfoPrefix) {
+				continue
+			}
+			return f
+		}
+	}
+
+	assert.Fail(t, "no random beacon signer found")
+	return ""
+}
+
 func TestFinalize_HappyPath(t *testing.T) {
 	deterministicSeed := GenerateRandomSeed()
 	rootCommit := unittest.StateCommitmentFixture()
@@ -71,20 +90,23 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
+		flagRootChain = chainName
+		flagRootParent = hex.EncodeToString(rootParent[:])
+		flagRootHeight = rootHeight
+
+		// set deterministic bootstrapping seed
+		flagBootstrapRandomSeed = deterministicSeed
 
 		// rootBlock will generate DKG and place it into bootDir/public-root-information
 		rootBlock(nil, nil)
 
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
-		flagRootParent = hex.EncodeToString(rootParent[:])
-		flagRootChain = chainName
-		flagRootHeight = rootHeight
 		flagEpochCounter = epochCounter
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
 		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRandomBeaconPub)
 
-		// set deterministic bootstrapping seed
-		flagBootstrapRandomSeed = deterministicSeed
+		// pick participant as signer
+		flagSignerDKGDataPath = getFirstQCSignerPath(t, internalPrivDir)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -126,6 +148,15 @@ func TestFinalize_Deterministic(t *testing.T) {
 
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
+
+		// rootBlock will generate DKG and place it into bootDir/public-root-information
+		rootBlock(nil, nil)
+
+		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRandomBeaconPub)
+
+		// pick participant as signer
+		flagSignerDKGDataPath = getFirstQCSignerPath(t, internalPrivDir)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -188,6 +219,15 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
+
+		// rootBlock will generate DKG and place it into bootDir/public-root-information
+		rootBlock(nil, nil)
+
+		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRandomBeaconPub)
+
+		// pick participant as signer
+		flagSignerDKGDataPath = getFirstQCSignerPath(t, internalPrivDir)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)

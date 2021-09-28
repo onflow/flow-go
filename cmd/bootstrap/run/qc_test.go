@@ -2,6 +2,7 @@ package run
 
 import (
 	"crypto/rand"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -24,7 +25,7 @@ func TestGenerateRootQC(t *testing.T) {
 	block.Header.View = 3
 	block.Header.PayloadHash = block.Payload.Hash()
 
-	_, err := GenerateRootQC(&block, participantData)
+	_, err := GenerateRootQC(&block, votes, participantData)
 	require.NoError(t, err)
 }
 
