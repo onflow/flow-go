@@ -134,8 +134,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("checking constraints on consensus/cluster nodes")
-	checkConsensusConstraints(partnerNodes, internalNodes)
-	checkCollectionConstraints(partnerNodes, internalNodes)
+	checkConstraints(partnerNodes, internalNodes)
 	log.Info().Msg("")
 
 	log.Info().Msg("assembling network and staking keys")

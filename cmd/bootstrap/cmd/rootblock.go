@@ -85,7 +85,7 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("checking constraints on consensus nodes")
-	checkConsensusConstraints(partnerNodes, internalNodes)
+	checkConstraints(partnerNodes, internalNodes)
 	log.Info().Msg("")
 
 	log.Info().Msg("assembling network and staking keys")
