@@ -30,14 +30,14 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 	}
 
 	// check consensus committee Byzantine threshold
-	partnerCONCount := partners.Filter(filter.HasRole(flow.RoleConsensus)).Count()
-	internalCONCount := internals.Filter(filter.HasRole(flow.RoleConsensus)).Count()
-	if internalCONCount <= partnerCONCount*2 {
-		log.Fatal().Msgf(
-			"will not bootstrap configuration without Byzantine majority of consensus nodes: "+
-				"(partners=%d, internals=%d, min_internals=%d)",
-			partnerCONCount, internalCONCount, partnerCONCount*2+1)
-	}
+	//partnerCONCount := partners.Filter(filter.HasRole(flow.RoleConsensus)).Count()
+	//internalCONCount := internals.Filter(filter.HasRole(flow.RoleConsensus)).Count()
+	//if internalCONCount <= partnerCONCount*2 {
+	//	log.Fatal().Msgf(
+	//		"will not bootstrap configuration without Byzantine majority of consensus nodes: "+
+	//			"(partners=%d, internals=%d, min_internals=%d)",
+	//		partnerCONCount, internalCONCount, partnerCONCount*2+1)
+	//}
 
 	// check collection committee Byzantine threshold for each cluster
 	// for checking Byzantine constraints, the seed doesn't matter
