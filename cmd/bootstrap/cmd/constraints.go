@@ -6,24 +6,12 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
-// Checks constraints about the number of partner and internal nodes.
-// Internal nodes must comprise >2/3 of consensus committee.
-// Internal nodes must comprise >2/3 of each collector cluster.
-func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
-	ensureUniformNodeWeightsPerRole(partnerNodes, internalNodes)
-	checkCollectionConstraints(partnerNodes, internalNodes)
-}
-
 // ensureUniformNodeWeightsPerRole verifies that the following condition is satisfied for each role R:
 // * all node with role R must have the same weight
-func ensureUniformNodeWeightsPerRole(partnerNodes, internalNodes []model.NodeInfo) {
-	partners := model.ToIdentityList(partnerNodes)
-	internals := model.ToIdentityList(internalNodes)
-	all := append(partners, internals...)
-
+func ensureUniformNodeWeightsPerRole(allNodes flow.IdentityList) {
 	// ensure all nodes of the same role have equal stake/weight
 	for _, role := range flow.Roles() {
-		withRole := all.Filter(filter.HasRole(role))
+		withRole := allNodes.Filter(filter.HasRole(role))
 		expectedStake := withRole[0].Stake
 		for _, node := range withRole {
 			if node.Stake != expectedStake {
@@ -37,11 +25,16 @@ func ensureUniformNodeWeightsPerRole(partnerNodes, internalNodes []model.NodeInf
 }
 
 // Checks constraints about the number of partner and internal nodes.
-// Internal nodes must comprise >2/3 of consensus committee.
-// Internal nodes must comprise >2/3 of each collector cluster.
-func checkCollectionConstraints(partnerNodes, internalNodes []model.NodeInfo) {
+// * Internal nodes must comprise >2/3 of each collector cluster.
+// * for all roles R:
+//   all node with role R must have the same weight
+func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 	partners := model.ToIdentityList(partnerNodes)
 	internals := model.ToIdentityList(internalNodes)
+	all := append(partners, internals...)
+
+	ensureUniformNodeWeightsPerRole(all)
+
 	// check collection committee Byzantine threshold for each cluster
 	// for checking Byzantine constraints, the seed doesn't matter
 	_, clusters := constructClusterAssignment(partnerNodes, internalNodes, 0)
