@@ -30,8 +30,8 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`checking constraints on consensus/cluster nodes` +
 	`assembling network and staking keys` +
 	`reading root block data` +
-	`reading dkg pub data` +
-	`reading QC signer` +
+	`reading root block votes` +
+	`reading dkg data` +
 	`constructing root QC` +
 	`computing collection node clusters` +
 	`constructing root blocks for collection node clusters` +
@@ -152,6 +152,9 @@ func TestFinalize_Deterministic(t *testing.T) {
 
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
+		flagRootBlockVotesDir = filepath.Join(bootDir, "votes")
+		require.NoError(t, os.Mkdir(flagRootBlockVotesDir, os.ModePerm))
+		prepareRootBlockVotes(t, bootDir, flagRootBlockVotesDir)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -220,6 +223,9 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
+		flagRootBlockVotesDir = filepath.Join(bootDir, "votes")
+		require.NoError(t, os.Mkdir(flagRootBlockVotesDir, os.ModePerm))
+		prepareRootBlockVotes(t, bootDir, flagRootBlockVotesDir)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
