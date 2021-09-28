@@ -40,8 +40,8 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 
 // GenerateRootQC generates QC for root block, caller needs to provide votes for root QC and
 // participantData to build the QC.
-// NOTE: at the moment, we require private keys for one node because we we re-using the full business logic, which assumes that only consensus participants construct QCs, which also have produce votes. 
-// TODO: modularize QC construction code (and code to verify QC) to be instantiated without needing private keys. 
+// NOTE: at the moment, we require private keys for one node because we we re-using the full business logic, which assumes that only consensus participants construct QCs, which also have produce votes.
+// TODO: modularize QC construction code (and code to verify QC) to be instantiated without needing private keys.
 func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *ParticipantData) (*flow.QuorumCertificate, error) {
 	validators, signers, err := createValidators(participantData)
 	if err != nil {
