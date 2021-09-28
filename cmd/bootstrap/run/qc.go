@@ -39,6 +39,10 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 	return bootstrap.ToIdentityList(nodes)
 }
 
+// GenerateRootQC generates QC for root block, caller needs to provide votes for root QC and
+// participantData to build the QC.
+// NOTE: only one DKG private key is required to sign the QC, for all others entries we can
+// provide only identity info without private keys.
 func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *ParticipantData) (*flow.QuorumCertificate, error) {
 	validators, signers, err := createValidators(participantData)
 	if err != nil {
@@ -59,6 +63,7 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 	return qc, err
 }
 
+// GenerateRootBlockVotes generates votes for root block based on participantData
 func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData) ([]*model.Vote, error) {
 	_, signers, err := createValidators(participantData)
 	if err != nil {
@@ -186,6 +191,8 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 	return qcData, nil
 }
 
+// GenerateQCSignerParticipantData generates participant data for creating QC.
+// Caller needs to pass dkg participants that will be taking part in building QC.
 func GenerateQCSignerParticipantData(internalNodes []bootstrap.NodeInfo, dkgParticipant dkg.DKGParticipantPriv, dkgData inmem.EncodableDKG) (*ParticipantData, error) {
 	qcData := &ParticipantData{
 		Lookup:   make(map[flow.Identifier]flow.DKGParticipant),
