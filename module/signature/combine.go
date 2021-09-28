@@ -28,7 +28,7 @@ func NewCombiner(lengthSig1, lengthSig2 uint) *Combiner {
 // Returns ErrInvalidFormat if one of the input signature has an invalid length.
 func (c *Combiner) Join(sig1, sig2 crypto.Signature) ([]byte, error) {
 	if uint(len(sig1)) != c.lengthSig1 || uint(len(sig2)) != c.lengthSig2 {
-		return nil, NewErrInvalidFormat("invalid format")
+		return nil, ErrInvalidFormat
 	}
 
 	combined := make([]byte, 0, len(sig1)+len(sig2))
@@ -44,7 +44,7 @@ func (c *Combiner) Join(sig1, sig2 crypto.Signature) ([]byte, error) {
 func (c *Combiner) Split(combined []byte) (crypto.Signature, crypto.Signature, error) {
 
 	if uint(len(combined)) != c.lengthSig1+c.lengthSig2 {
-		return nil, nil, NewErrInvalidFormat("invalid length")
+		return nil, nil, ErrInvalidFormat
 	}
 
 	sig1 := combined[:c.lengthSig1]
