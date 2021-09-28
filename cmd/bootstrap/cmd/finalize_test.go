@@ -103,7 +103,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
 		flagEpochCounter = epochCounter
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
-		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRandomBeaconPub)
+		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRootDKGData)
 
 		// pick participant as signer
 		flagSignerDKGDataPath = getFirstQCSignerPath(t, internalPrivDir)
@@ -153,7 +153,7 @@ func TestFinalize_Deterministic(t *testing.T) {
 		rootBlock(nil, nil)
 
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
-		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRandomBeaconPub)
+		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRootDKGData)
 
 		// pick participant as signer
 		flagSignerDKGDataPath = getFirstQCSignerPath(t, internalPrivDir)
@@ -224,7 +224,7 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 		rootBlock(nil, nil)
 
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
-		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRandomBeaconPub)
+		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRootDKGData)
 
 		// pick participant as signer
 		flagSignerDKGDataPath = getFirstQCSignerPath(t, internalPrivDir)

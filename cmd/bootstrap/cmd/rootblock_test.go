@@ -30,7 +30,7 @@ const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`will run DKG` +
 	`finished running DKG` +
 	`.+/random-beacon.priv.json` +
-	`.+/random-beacon.pub.json` +
+	`wrote file \S+/root-dkg-data.priv.json` +
 	`constructing root block` +
 	`wrote file \S+/root-block.json` +
 	`constructing and writing votes` +
