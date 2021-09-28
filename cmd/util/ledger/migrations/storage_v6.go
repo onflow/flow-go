@@ -490,7 +490,10 @@ func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) error
 		string(rawController),
 		string(rawKey),
 	) {
-		return nil
+		return fmt.Errorf(
+			"invalid payload for conversion: %s",
+			payload.Key.String(),
+		)
 	}
 
 	value, version := oldInter.StripMagic(payload.Value)

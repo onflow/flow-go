@@ -2,27 +2,29 @@ package migrations
 
 import (
 	"bytes"
+	"encoding/binary"
 	"fmt"
-	"github.com/fxamacker/cbor/v2"
-	"github.com/onflow/cadence"
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/sema"
-	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/programs"
-	state2 "github.com/onflow/flow-go/fvm/state"
-	"github.com/onflow/flow-go/model/flow"
 	"testing"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
-	"github.com/onflow/flow-go/engine/execution/state"
-	"github.com/onflow/flow-go/ledger"
 
+	"github.com/onflow/flow-go/engine/execution/state"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
+	fvmState "github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger"
+	"github.com/onflow/flow-go/model/flow"
+
+	"github.com/onflow/cadence"
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	newInter "github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/sema"
 
 	oldInter "github.com/onflow/cadence/v19/runtime/interpreter"
 	"github.com/onflow/cadence/v19/runtime/tests/utils"
@@ -585,13 +587,19 @@ func TestContractValueRetrieval(t *testing.T) {
 	contractNamesKey := []ledger.KeyPart{
 		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
 		ledger.NewKeyPart(state.KeyPartController, address.Bytes()),
-		ledger.NewKeyPart(state.KeyPartKey, []byte(state2.KeyContractNames)),
+		ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyContractNames)),
 	}
 
 	contractCodeKey := []ledger.KeyPart{
 		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
 		ledger.NewKeyPart(state.KeyPartController, address.Bytes()),
 		ledger.NewKeyPart(state.KeyPartKey, []byte("code.Test")),
+	}
+
+	storageUsedKey := []ledger.KeyPart{
+		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartController, []byte{}),
+		ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 	}
 
 	// old payloads
@@ -601,12 +609,22 @@ func TestContractValueRetrieval(t *testing.T) {
 			Value: ledger.Value(encodeContractValue),
 		},
 		{
+			Key:   ledger.NewKey(contractCodeKey),
+			Value: ledger.Value(contractCode),
+		},
+		{
 			Key:   ledger.NewKey(contractNamesKey),
 			Value: ledger.Value(contractNames.Bytes()),
 		},
 		{
-			Key:   ledger.NewKey(contractCodeKey),
-			Value: ledger.Value(contractCode),
+			Key: ledger.NewKey(storageUsedKey),
+			Value: ledger.Value(
+				uint64ToBinary(
+					uint64(
+						len(contractNamesKey) + len(contractCodeKey),
+					),
+				),
+			),
 		},
 	}
 
@@ -630,7 +648,21 @@ func TestContractValueRetrieval(t *testing.T) {
 
 	migratedPayloads, err := migration.migrate(payloads)
 	require.NoError(t, err)
-	require.Len(t, migratedPayloads, 3)
+
+	// Must contain total of 5 payloads:
+	//  - 3 x fvm registers
+	//      - contract code
+	//      - contract_names
+	//      - storage_used
+	//  - 1 x storage_index
+	//  - 1 x cadence payload
+	require.Len(t, migratedPayloads, 5)
+
+	assert.Equal(t, []byte("code.Test"), migratedPayloads[0].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("contract_names"), migratedPayloads[1].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("storage_used"), migratedPayloads[2].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("storage_index"), migratedPayloads[3].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte("/slab/"+string([]byte{0, 0, 0, 0, 0, 0, 0, 1})), migratedPayloads[4].Key.KeyParts[2].Value)
 
 	// Call a dummy function - only need to see whether the value can be found.
 	_, err = invokeContractFunction(migratedPayloads, address, contractName, "foo")
@@ -645,8 +677,8 @@ func invokeContractFunction(
 ) (val cadence.Value, err error) {
 	ledgerView := newView(payloads)
 
-	stateHolder := state2.NewStateHolder(
-		state2.NewState(ledgerView),
+	stateHolder := fvmState.NewStateHolder(
+		fvmState.NewState(ledgerView),
 	)
 
 	txEnv := fvm.NewTransactionEnvironment(
@@ -691,4 +723,10 @@ func invokeContractFunction(
 			PredeclaredValues: predeclaredValues,
 		},
 	)
+}
+
+func uint64ToBinary(integer uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, integer)
+	return b
 }
