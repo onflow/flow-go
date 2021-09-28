@@ -63,7 +63,7 @@ func ReadDKGPubData(dkgDataPath string) (*inmem.EncodableDKG, error) {
 func ReadDKGParticipant(dkgParticipantPath string) (*dkg.DKGParticipantPriv, error) {
 	bytes, err := io.ReadFile(dkgParticipantPath)
 	if err != nil {
-		return nil, fmt.Errorf("could not dkg participant: %w", err)
+		return nil, fmt.Errorf("could not read dkg participant: %w", err)
 	}
 
 	var encodable dkg.DKGParticipantPriv

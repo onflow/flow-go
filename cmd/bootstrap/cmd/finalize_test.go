@@ -72,6 +72,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 
 		flagFastKG = true
 
+		// rootBlock will generate DKG and place it into bootDir/public-root-information
 		rootBlock(nil, nil)
 
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
@@ -79,6 +80,8 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagRootChain = chainName
 		flagRootHeight = rootHeight
 		flagEpochCounter = epochCounter
+		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRandomBeaconPub)
 
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
