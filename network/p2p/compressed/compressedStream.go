@@ -30,10 +30,14 @@ func WithStreamCompressor(comp flownet.Compressor) StreamOptFunc {
 	}
 }
 
-func NewCompressedStream(s network.Stream, ops ...StreamOptFunc) (network.Stream, error) {
+func NewCompressedStream(s network.Stream, opts ...StreamOptFunc) (network.Stream, error) {
 	c := &compressedStream{
 		Stream:     s,
 		compressor: compressor.GzipStreamCompressor{},
+	}
+
+	for _, opt := range opts {
+		opt(c)
 	}
 
 	w, err := c.compressor.NewWriter(s)
