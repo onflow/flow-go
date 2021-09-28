@@ -126,6 +126,9 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Str("seed", hex.EncodeToString(flagBootstrapRandomSeed)).Msg("deterministic bootstrapping random seed")
 	log.Info().Msg("")
 
+	// TODO: we already have all nodes generated from rootblock step, instead of assembling them again
+	//  we just need to read them. Fix this.
+
 	log.Info().Msg("collecting partner network and staking keys")
 	partnerNodes := assemblePartnerNodes()
 	log.Info().Msg("")
@@ -141,7 +144,6 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("assembling network and staking keys")
 	stakingNodes := mergeNodeInfos(internalNodes, partnerNodes)
-	writeJSON(model.PathNodeInfosPub, model.ToPublicNodeInfoList(stakingNodes))
 	log.Info().Msg("")
 
 	// create flow.IdentityList representation of participant set
@@ -163,6 +165,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("constructing root QC")
 	rootQC := constructRootQC(
 		block,
+		rootBlockData.Votes,
 		model.FilterByRole(internalNodes, flow.RoleConsensus),
 		signer,
 		dkgData,
@@ -185,6 +188,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	// if no root commit is specified, bootstrap an empty execution state
 	if flagRootCommit == "0000000000000000000000000000000000000000000000000000000000000000" {
 		generateEmptyExecutionState(
+			block.Header.ChainID,
 			getRandomSource(flagBootstrapRandomSeed),
 			assignments,
 			clusterQCs,
@@ -499,6 +503,7 @@ func loadRootProtocolSnapshot(path string) (*inmem.Snapshot, error) {
 // generateEmptyExecutionState generates a new empty execution state with the
 // given configuration. Sets the flagRootCommit variable for future reads.
 func generateEmptyExecutionState(
+	chainID flow.ChainID,
 	randomSource []byte,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
@@ -546,7 +551,7 @@ func generateEmptyExecutionState(
 	commit, err = run.GenerateExecutionState(
 		filepath.Join(flagOutdir, model.DirnameExecutionState),
 		serviceAccountPublicKey,
-		parseChainID(flagRootChain).Chain(),
+		chainID.Chain(),
 		fvm.WithInitialTokenSupply(cdcInitialTokenSupply),
 		fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
 		fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
