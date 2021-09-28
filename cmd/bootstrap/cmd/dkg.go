@@ -7,6 +7,8 @@ import (
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 func runDKG(nodes []model.NodeInfo) dkg.DKGData {
@@ -27,6 +29,16 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 	}
 	log.Info().Msgf("finished running DKG")
 
+	dkgParticipans := make(map[flow.Identifier]flow.DKGParticipant)
+
+	for i, pubKey := range dkgData.PubKeyShares {
+		nodeID := nodes[i].NodeID
+		dkgParticipans[nodeID] = flow.DKGParticipant{
+			Index:    uint(i),
+			KeyShare: pubKey,
+		}
+	}
+
 	for i, privKey := range dkgData.PrivKeyShares {
 		nodeID := nodes[i].NodeID
 
@@ -39,6 +51,13 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 
 		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), privParticpant)
 	}
+
+	writeJSON(model.PathRandomBeaconPub, inmem.EncodableDKG{
+		GroupKey: encodable.RandomBeaconPubKey{
+			PublicKey: dkgData.PubGroupKey,
+		},
+		Participants: dkgParticipans,
+	})
 
 	return dkgData
 }

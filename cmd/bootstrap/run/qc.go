@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 type Participant struct {
@@ -39,7 +40,6 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 }
 
 func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.QuorumCertificate, error) {
-
 	validators, signers, err := createValidators(participantData)
 	if err != nil {
 		return nil, err
@@ -193,4 +193,29 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 	qcData.GroupKey = dkgData.PubGroupKey
 
 	return qcData, nil
+}
+
+func GenerateQCSignerParticipantData(internalNodes []bootstrap.NodeInfo, dkgParticipant dkg.DKGParticipantPriv, dkgData inmem.EncodableDKG) (*ParticipantData, error) {
+	// find participant in set of internal nodes
+	for _, node := range internalNodes {
+		if node.NodeID != dkgParticipant.NodeID {
+			continue
+		}
+
+		qcData := &ParticipantData{
+			Lookup:   make(map[flow.Identifier]flow.DKGParticipant),
+			GroupKey: dkgData.GroupKey.PublicKey,
+		}
+
+		qcData.Lookup[node.NodeID] = dkgData.Participants[node.NodeID]
+
+		qcData.Participants = append(qcData.Participants, Participant{
+			NodeInfo:            node,
+			RandomBeaconPrivKey: dkgParticipant.RandomBeaconPrivKey.PrivateKey,
+		})
+
+		return qcData, nil
+	}
+
+	return nil, fmt.Errorf("could not find signer in set of internal nodes")
 }

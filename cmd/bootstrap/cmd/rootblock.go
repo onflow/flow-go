@@ -12,6 +12,14 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
+var (
+	flagFastKG        bool
+	flagRootChain     string
+	flagRootParent    string
+	flagRootHeight    uint64
+	flagRootTimestamp string
+)
+
 // rootBlockCmd represents the rootBlock command
 var rootBlockCmd = &cobra.Command{
 	Use:   "rootblock",

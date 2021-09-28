@@ -6,11 +6,12 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 // NOTE: allNodes must be in the same order as when generating the DKG
-func constructRootQC(block *flow.Block, allNodes, internalNodes []bootstrap.NodeInfo, dkgData dkg.DKGData) *flow.QuorumCertificate {
-	participantData, err := run.GenerateQCParticipantData(allNodes, internalNodes, dkgData)
+func constructRootQC(block *flow.Block, internalNodes []bootstrap.NodeInfo, signer dkg.DKGParticipantPriv, dkgData inmem.EncodableDKG) *flow.QuorumCertificate {
+	participantData, err := run.GenerateQCSignerParticipantData(internalNodes, signer, dkgData)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to generate QC participant data")
 	}
