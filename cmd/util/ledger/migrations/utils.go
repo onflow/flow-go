@@ -74,6 +74,8 @@ func newAccountsAtreeLedger(accounts *fvmState.Accounts) *accountsAtreeLedger {
 	return &accountsAtreeLedger{accounts: accounts}
 }
 
+var _ atree.Ledger = &accountsAtreeLedger{}
+
 func (a *accountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 	v, err := a.accounts.GetValue(
 		flow.BytesToAddress(owner),

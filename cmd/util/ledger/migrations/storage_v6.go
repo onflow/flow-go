@@ -53,35 +53,6 @@ var storageMigrationV5DecMode = func() cbor.DecMode {
 	return decMode
 }()
 
-// migrationStorage is the storage implementation to be used by the
-// new interpreter during value conversions. This is a delegation
-// object and does not define any operations.
-//
-type migrationStorage struct {
-	*atree.PersistentSlabStorage
-}
-
-var _ newInter.Storage = &migrationStorage{}
-var _ atree.SlabStorage = &migrationStorage{}
-
-func newMigrationStorage(persistentSlabStorage *atree.PersistentSlabStorage) *migrationStorage {
-	return &migrationStorage{
-		PersistentSlabStorage: persistentSlabStorage,
-	}
-}
-
-func (s *migrationStorage) ValueExists(_ *newInter.Interpreter, _ common.Address, _ string) bool {
-	panic("invalid call to unimplemented 'migrationStorage.ValueExists' method")
-}
-
-func (s *migrationStorage) ReadValue(_ *newInter.Interpreter, _ common.Address, _ string) newInter.OptionalValue {
-	panic("invalid call to unimplemented 'migrationStorage.ReadValue' method")
-}
-
-func (s *migrationStorage) WriteValue(_ *newInter.Interpreter, _ common.Address, _ string, _ newInter.OptionalValue) {
-	panic("invalid call to unimplemented 'migrationStorage.WriteValue' method")
-}
-
 type storagePath struct {
 	owner string
 	key   string
@@ -93,7 +64,7 @@ type StorageFormatV6Migration struct {
 	accounts   *state.Accounts
 	programs   *programs.Programs
 	reportFile *os.File
-	storage    *atree.PersistentSlabStorage
+	storage    *runtime.Storage
 	oldInter   *oldInter.Interpreter
 	newInter   *newInter.Interpreter
 	converter  *ValueConverter
@@ -271,14 +242,11 @@ func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
 	stateHolder := state.NewStateHolder(st)
 	accounts := state.NewAccounts(stateHolder)
 
-	baseStorage := atree.NewLedgerBaseStorage(newAccountsAtreeLedger(accounts))
-
-	m.storage = atree.NewPersistentSlabStorage(
-		baseStorage,
-		newInter.CBOREncMode,
-		newInter.CBORDecMode,
-		nil,
-		nil,
+	m.storage = runtime.NewStorage(
+		newAccountsAtreeLedger(accounts),
+		func(f func(), _ func(metrics runtime.Metrics, duration time.Duration)) {
+			f()
+		},
 	)
 }
 
@@ -495,7 +463,8 @@ func (m *StorageFormatV6Migration) decodeAndConvert(
 		return err
 	}
 
-	_ = m.converter.Convert(rootValue)
+	result := m.converter.Convert(rootValue)
+	m.storage.WriteValue(nil, owner, key, newInter.NewSomeValueNonCopying(result))
 
 	// Mark the payload as 'migrated'.
 	m.migratedPayloadPaths[path] = true
@@ -507,6 +476,7 @@ func (m *StorageFormatV6Migration) initNewInterpreter() {
 	inter, err := newInter.NewInterpreter(
 		nil,
 		nil,
+		newInter.WithStorage(m.storage),
 		newInter.WithImportLocationHandler(
 			func(inter *newInter.Interpreter, location common.Location) newInter.Import {
 				program, err := m.loadProgram(location)
@@ -532,8 +502,6 @@ func (m *StorageFormatV6Migration) initNewInterpreter() {
 			err,
 		))
 	}
-
-	inter.Storage = newMigrationStorage(m.storage)
 
 	m.newInter = inter
 }
