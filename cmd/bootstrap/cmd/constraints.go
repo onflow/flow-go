@@ -9,7 +9,14 @@ import (
 // Checks constraints about the number of partner and internal nodes.
 // Internal nodes must comprise >2/3 of consensus committee.
 // Internal nodes must comprise >2/3 of each collector cluster.
-func checkConsensusConstraints(partnerNodes, internalNodes []model.NodeInfo) {
+func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
+	ensureUniformNodeWeightsPerRole(partnerNodes, internalNodes)
+	checkCollectionConstraints(partnerNodes, internalNodes)
+}
+
+// ensureUniformNodeWeightsPerRole verifies that the following condition is satisfied for each role R:
+// * all node with role R must have the same weight
+func ensureUniformNodeWeightsPerRole(partnerNodes, internalNodes []model.NodeInfo) {
 	partners := model.ToIdentityList(partnerNodes)
 	internals := model.ToIdentityList(internalNodes)
 	all := append(partners, internals...)
@@ -27,17 +34,6 @@ func checkConsensusConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 			}
 		}
 	}
-
-	// check consensus committee Byzantine threshold
-	//partnerCONCount := partners.Filter(filter.HasRole(flow.RoleConsensus)).Count()
-	//internalCONCount := internals.Filter(filter.HasRole(flow.RoleConsensus)).Count()
-	//if internalCONCount <= partnerCONCount*2 {
-	//	log.Fatal().Msgf(
-	//		"will not bootstrap configuration without Byzantine majority of consensus nodes: "+
-	//			"(partners=%d, internals=%d, min_internals=%d)",
-	//		partnerCONCount, internalCONCount, partnerCONCount*2+1)
-	//}
-
 }
 
 // Checks constraints about the number of partner and internal nodes.
