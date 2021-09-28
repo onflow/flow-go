@@ -72,6 +72,8 @@ func TestFinalize_HappyPath(t *testing.T) {
 
 		flagFastKG = true
 
+		rootBlock(nil, nil)
+
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
 		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootChain = chainName

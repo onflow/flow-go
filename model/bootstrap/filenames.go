@@ -23,11 +23,12 @@ var (
 
 	PathRootBlockData             = filepath.Join(DirnamePublicBootstrap, "root-block-data.json")
 	PathRootProtocolStateSnapshot = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
+	PathRandomBeaconPub           = filepath.Join(DirnamePublicBootstrap, "random-beacon.pub.json")
 
+	// private genesis information
 	FilenameWALRootCheckpoint = "root.checkpoint"
 	PathRootCheckpoint        = filepath.Join(DirnameExecutionState, FilenameWALRootCheckpoint) // only available on an execution node
 
-	// private genesis information
 	DirPrivateRoot                   = "private-root-information"
 	FilenameRandomBeaconPriv         = "random-beacon.priv.json"
 	PathPrivNodeInfoPrefix           = "node-info.priv."
