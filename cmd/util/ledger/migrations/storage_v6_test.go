@@ -630,7 +630,7 @@ func TestContractValueRetrieval(t *testing.T) {
 
 	migratedPayloads, err := migration.migrate(payloads)
 	require.NoError(t, err)
-	assert.Len(t, migratedPayloads, 3)
+	require.Len(t, migratedPayloads, 3)
 
 	// Call a dummy function - only need to see whether the value can be found.
 	_, err = invokeContractFunction(migratedPayloads, address, contractName, "foo")

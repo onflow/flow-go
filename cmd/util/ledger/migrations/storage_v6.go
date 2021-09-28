@@ -191,7 +191,14 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
-	baseStorage := newEncodingBaseStorage()
+	migratedPayloads := m.getFVMRegisters(payloads)
+
+	l := newView(migratedPayloads)
+	st := state.NewState(l)
+	sth := state.NewStateHolder(st)
+	a := state.NewAccounts(sth)
+
+	baseStorage := atree.NewLedgerBaseStorage(newAccountBasedBaseStorage(a))
 	m.initPersistentSlabStorage(baseStorage)
 
 	m.initNewInterpreter()
@@ -207,27 +214,20 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.Log.Info().Msg("Converting payloads...")
 
-	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
-
 	for _, payload := range payloads {
 		keyParts := payload.Key.KeyParts
 		rawOwner := keyParts[0].Value
 		rawKey := keyParts[2].Value
 
-		result := m.migratePayload(payload)
+		err := m.reencodePayload(payload)
 
-		if result.err != nil {
+		if err != nil {
 			return nil, fmt.Errorf(
 				"failed to migrate key: %q (owner: %x): %w",
 				rawKey,
 				rawOwner,
-				result.err,
+				err,
 			)
-		} else if result.payload != nil {
-			migratedPayloads = append(migratedPayloads, *result.payload)
-		} else {
-			// Both nil means, value is decoded and converted.
-			// Do the encoding at once at the end.
 		}
 
 		m.incrementProgress()
@@ -245,12 +245,6 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		return nil, fmt.Errorf("failed to migrate payloads: %w", err)
 	}
 
-	// Add the encoded new values to the payloads
-
-	for _, payload := range baseStorage.ReencodedPayloads {
-		migratedPayloads = append(migratedPayloads, *payload)
-	}
-
 	m.completeProgress()
 
 	m.Log.Info().Msg("Re-encoding converted values complete")
@@ -265,7 +259,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		m.Log.Warn().Msgf("values not migrated due to missing types: %d", m.missingTypeValues)
 	}
 
-	return migratedPayloads, nil
+	return l.Payloads(), nil
 }
 
 func (m *StorageFormatV6Migration) incrementProgress() {
@@ -316,7 +310,7 @@ func (m *StorageFormatV6Migration) addProgress(progress int) {
 	}
 }
 
-func (m *StorageFormatV6Migration) initPersistentSlabStorage(encodingStorage *encodingBaseStorage) {
+func (m *StorageFormatV6Migration) initPersistentSlabStorage(baseStorage atree.BaseStorage) {
 	encMode, err := cbor.EncOptions{}.EncMode()
 	if err != nil {
 		panic(err)
@@ -328,7 +322,7 @@ func (m *StorageFormatV6Migration) initPersistentSlabStorage(encodingStorage *en
 	}
 
 	m.storage = atree.NewPersistentSlabStorage(
-		encodingStorage,
+		baseStorage,
 		encMode,
 		decMode,
 	)
@@ -352,6 +346,27 @@ func (m *StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Pa
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
 	return accounts
+}
+
+func (m *StorageFormatV6Migration) getFVMRegisters(payloads []ledger.Payload) []ledger.Payload {
+	var fvmPayloads []ledger.Payload
+
+	for _, payload := range payloads {
+		keyParts := payload.Key.KeyParts
+		rawOwner := keyParts[0].Value
+		rawController := keyParts[1].Value
+		rawKey := keyParts[2].Value
+
+		if state.IsFVMStateKey(
+			string(rawOwner),
+			string(rawController),
+			string(rawKey),
+		) {
+			fvmPayloads = append(fvmPayloads, payload)
+		}
+	}
+
+	return fvmPayloads
 }
 
 func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) map[storagePath]bool {
@@ -442,25 +457,6 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 	return deferredValuePaths
 }
 
-func (m *StorageFormatV6Migration) migratePayload(payload ledger.Payload) storageFormatV6MigrationResult {
-	migratedPayload, err := m.reencodePayload(payload)
-
-	result := storageFormatV6MigrationResult{
-		key: payload.Key,
-	}
-
-	if err != nil {
-		result.err = err
-	} else if migratedPayload != nil {
-		if err := m.checkStorageFormat(*migratedPayload); err != nil {
-			panic(fmt.Errorf("%w: key = %s", err, payload.Key.String()))
-		}
-		result.payload = migratedPayload
-	}
-
-	return result
-}
-
 func (m *StorageFormatV6Migration) checkStorageFormat(payload ledger.Payload) error {
 	if !bytes.HasPrefix(payload.Value, []byte{0x0, 0xca, 0xde}) {
 		return nil
@@ -474,7 +470,7 @@ func (m *StorageFormatV6Migration) checkStorageFormat(payload ledger.Payload) er
 	return nil
 }
 
-func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*ledger.Payload, error) {
+func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) error {
 	keyParts := payload.Key.KeyParts
 
 	rawOwner := keyParts[0].Value
@@ -488,23 +484,22 @@ func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*led
 		string(rawController),
 		string(rawKey),
 	) {
-		return &payload, nil
+		return nil
 	}
 
 	value, version := oldInter.StripMagic(payload.Value)
 
 	if version != oldInter.CurrentEncodingVersion {
-		return nil,
-			fmt.Errorf(
-				"invalid storage format version for key: %s: %d",
-				rawKey,
-				version,
-			)
+		return fmt.Errorf(
+			"invalid storage format version for key: %s: %d",
+			rawKey,
+			version,
+		)
 	}
 
 	err := storageMigrationV5DecMode.Valid(value)
 	if err != nil {
-		return &payload, nil
+		return err
 	}
 
 	err = m.decodeAndConvert(
@@ -515,16 +510,15 @@ func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*led
 	)
 
 	if err != nil {
-		return nil,
-			fmt.Errorf(
-				"failed to decode and convert key: %s: %w\n\nvalue:\n%s\n\n%s",
-				rawKey, err,
-				hex.Dump(value),
-				cborMeLink(value),
-			)
+		return fmt.Errorf(
+			"failed to decode and convert key: %s: %w\n\nvalue:\n%s\n\n%s",
+			rawKey, err,
+			hex.Dump(value),
+			cborMeLink(value),
+		)
 	}
 
-	return nil, nil
+	return nil
 }
 
 // Decode the value and cache it to be migrated later.
