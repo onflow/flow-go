@@ -51,19 +51,19 @@ type Accounts interface {
 	SetAccountFrozen(address flow.Address, frozen bool) error
 }
 
-var _ Accounts = &AccountsState{}
+var _ Accounts = &StatefulAccounts{}
 
-type AccountsState struct {
+type StatefulAccounts struct {
 	stateHolder *StateHolder
 }
 
-func NewAccounts(stateHolder *StateHolder) *AccountsState {
-	return &AccountsState{
+func NewAccounts(stateHolder *StateHolder) *StatefulAccounts {
+	return &StatefulAccounts{
 		stateHolder: stateHolder,
 	}
 }
 
-func (a *AccountsState) AllocateStorageIndex(address flow.Address) (uint64, error) {
+func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (uint64, error) {
 	var index uint64
 	indexBytes, err := a.getValue(address, false, KeyStorageIndex)
 	if err != nil {
@@ -91,7 +91,7 @@ func (a *AccountsState) AllocateStorageIndex(address flow.Address) (uint64, erro
 	return index, nil
 }
 
-func (a *AccountsState) Get(address flow.Address) (*flow.Account, error) {
+func (a *StatefulAccounts) Get(address flow.Address) (*flow.Account, error) {
 	var ok bool
 	var err error
 
@@ -131,7 +131,7 @@ func (a *AccountsState) Get(address flow.Address) (*flow.Account, error) {
 	}, nil
 }
 
-func (a *AccountsState) Exists(address flow.Address) (bool, error) {
+func (a *StatefulAccounts) Exists(address flow.Address) (bool, error) {
 	exists, err := a.getValue(address, false, KeyExists)
 	if err != nil {
 		return false, err
@@ -145,7 +145,7 @@ func (a *AccountsState) Exists(address flow.Address) (bool, error) {
 }
 
 // Create account sets all required registers on an address.
-func (a *AccountsState) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Address) error {
+func (a *StatefulAccounts) Create(publicKeys []flow.AccountPublicKey, newAddress flow.Address) error {
 	exists, err := a.Exists(newAddress)
 	if err != nil {
 		return err
@@ -168,7 +168,7 @@ func (a *AccountsState) Create(publicKeys []flow.AccountPublicKey, newAddress fl
 	return a.SetAllPublicKeys(newAddress, publicKeys)
 }
 
-func (a *AccountsState) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
+func (a *StatefulAccounts) GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error) {
 	publicKey, err := a.getValue(address, true, keyPublicKey(keyIndex))
 	if err != nil {
 		return flow.AccountPublicKey{}, err
@@ -186,7 +186,7 @@ func (a *AccountsState) GetPublicKey(address flow.Address, keyIndex uint64) (flo
 	return decodedPublicKey, nil
 }
 
-func (a *AccountsState) GetPublicKeyCount(address flow.Address) (uint64, error) {
+func (a *StatefulAccounts) GetPublicKeyCount(address flow.Address) (uint64, error) {
 	countBytes, err := a.getValue(address, true, KeyPublicKeyCount)
 	if err != nil {
 		return 0, err
@@ -203,13 +203,13 @@ func (a *AccountsState) GetPublicKeyCount(address flow.Address) (uint64, error) 
 	return countInt.Uint64(), nil
 }
 
-func (a *AccountsState) setPublicKeyCount(address flow.Address, count uint64) error {
+func (a *StatefulAccounts) setPublicKeyCount(address flow.Address, count uint64) error {
 	newCount := new(big.Int).SetUint64(count)
 
 	return a.setValue(address, true, KeyPublicKeyCount, newCount.Bytes())
 }
 
-func (a *AccountsState) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
+func (a *StatefulAccounts) GetPublicKeys(address flow.Address) (publicKeys []flow.AccountPublicKey, err error) {
 	count, err := a.GetPublicKeyCount(address)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get public key count of account: %w", err)
@@ -228,7 +228,7 @@ func (a *AccountsState) GetPublicKeys(address flow.Address) (publicKeys []flow.A
 	return publicKeys, nil
 }
 
-func (a *AccountsState) SetPublicKey(
+func (a *StatefulAccounts) SetPublicKey(
 	address flow.Address,
 	keyIndex uint64,
 	publicKey flow.AccountPublicKey,
@@ -250,7 +250,7 @@ func (a *AccountsState) SetPublicKey(
 	return encodedPublicKey, err
 }
 
-func (a *AccountsState) SetAllPublicKeys(address flow.Address, publicKeys []flow.AccountPublicKey) error {
+func (a *StatefulAccounts) SetAllPublicKeys(address flow.Address, publicKeys []flow.AccountPublicKey) error {
 	for i, publicKey := range publicKeys {
 		_, err := a.SetPublicKey(address, uint64(i), publicKey)
 		if err != nil {
@@ -263,7 +263,7 @@ func (a *AccountsState) SetAllPublicKeys(address flow.Address, publicKeys []flow
 	return a.setPublicKeyCount(address, count)
 }
 
-func (a *AccountsState) AppendPublicKey(address flow.Address, publicKey flow.AccountPublicKey) error {
+func (a *StatefulAccounts) AppendPublicKey(address flow.Address, publicKey flow.AccountPublicKey) error {
 
 	if !IsValidAccountKeyHashAlgo(publicKey.HashAlgo) {
 		return errors.NewValueErrorf(publicKey.HashAlgo.String(), "hashing algorithm type not found")
@@ -308,7 +308,7 @@ func ContractKey(contractName string) string {
 	return fmt.Sprintf("%s.%s", KeyCode, contractName)
 }
 
-func (a *AccountsState) getContract(contractName string, address flow.Address) ([]byte, error) {
+func (a *StatefulAccounts) getContract(contractName string, address flow.Address) ([]byte, error) {
 
 	contract, err := a.getValue(address,
 		true,
@@ -320,7 +320,7 @@ func (a *AccountsState) getContract(contractName string, address flow.Address) (
 	return contract, nil
 }
 
-func (a *AccountsState) setContract(contractName string, address flow.Address, contract []byte) error {
+func (a *StatefulAccounts) setContract(contractName string, address flow.Address, contract []byte) error {
 	ok, err := a.Exists(address)
 	if err != nil {
 		return err
@@ -349,7 +349,7 @@ func (a *AccountsState) setContract(contractName string, address flow.Address, c
 	return nil
 }
 
-func (a *AccountsState) setContractNames(contractNames contractNames, address flow.Address) error {
+func (a *StatefulAccounts) setContractNames(contractNames contractNames, address flow.Address) error {
 	ok, err := a.Exists(address)
 	if err != nil {
 		return err
@@ -382,7 +382,7 @@ func (a *AccountsState) setContractNames(contractNames contractNames, address fl
 }
 
 // GetStorageUsed returns the amount of storage used in bytes by this account
-func (a *AccountsState) GetStorageUsed(address flow.Address) (uint64, error) {
+func (a *StatefulAccounts) GetStorageUsed(address flow.Address) (uint64, error) {
 	storageUsedRegister, err := a.getValue(address, false, KeyStorageUsed)
 	if err != nil {
 		return 0, err
@@ -399,16 +399,16 @@ func (a *AccountsState) GetStorageUsed(address flow.Address) (uint64, error) {
 	return storageUsed, nil
 }
 
-func (a *AccountsState) setStorageUsed(address flow.Address, used uint64) error {
+func (a *StatefulAccounts) setStorageUsed(address flow.Address, used uint64) error {
 	usedBinary := uint64ToBinary(used)
 	return a.setValue(address, false, KeyStorageUsed, usedBinary)
 }
 
-func (a *AccountsState) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {
+func (a *StatefulAccounts) GetValue(address flow.Address, key string) (flow.RegisterValue, error) {
 	return a.getValue(address, false, key)
 }
 
-func (a *AccountsState) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
+func (a *StatefulAccounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
 	if isController {
 		return a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 	}
@@ -416,11 +416,11 @@ func (a *AccountsState) getValue(address flow.Address, isController bool, key st
 }
 
 // SetValue sets a value in address' storage
-func (a *AccountsState) SetValue(address flow.Address, key string, value flow.RegisterValue) error {
+func (a *StatefulAccounts) SetValue(address flow.Address, key string, value flow.RegisterValue) error {
 	return a.setValue(address, false, key, value)
 }
 
-func (a *AccountsState) setValue(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
+func (a *StatefulAccounts) setValue(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
 	err := a.updateRegisterSizeChange(address, isController, key, value)
 	if err != nil {
 		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", key, address, err)
@@ -432,7 +432,7 @@ func (a *AccountsState) setValue(address flow.Address, isController bool, key st
 	return a.stateHolder.State().Set(string(address.Bytes()), "", key, value)
 }
 
-func (a *AccountsState) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
+func (a *StatefulAccounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
 	if key == KeyStorageUsed {
 		// size of this register is always uint64StorageSize
 		// don't double check this to save time and prevent recursion
@@ -491,7 +491,7 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 
 // TODO replace with touch
 // TODO handle errors
-func (a *AccountsState) touch(address flow.Address, isController bool, key string) {
+func (a *StatefulAccounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
 		_, _ = a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
 		return
@@ -499,7 +499,7 @@ func (a *AccountsState) touch(address flow.Address, isController bool, key strin
 	_, _ = a.stateHolder.State().Get(string(address.Bytes()), "", key)
 }
 
-func (a *AccountsState) TouchContract(contractName string, address flow.Address) {
+func (a *StatefulAccounts) TouchContract(contractName string, address flow.Address) {
 	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		panic(err)
@@ -512,11 +512,11 @@ func (a *AccountsState) TouchContract(contractName string, address flow.Address)
 }
 
 // GetContractNames gets a sorted list of names of contracts deployed on an address
-func (a *AccountsState) GetContractNames(address flow.Address) ([]string, error) {
+func (a *StatefulAccounts) GetContractNames(address flow.Address) ([]string, error) {
 	return a.getContractNames(address)
 }
 
-func (a *AccountsState) getContractNames(address flow.Address) (contractNames, error) {
+func (a *StatefulAccounts) getContractNames(address flow.Address) (contractNames, error) {
 	// TODO return fatal error if can't fetch
 	encContractNames, err := a.getValue(address, true, KeyContractNames)
 	if err != nil {
@@ -534,7 +534,7 @@ func (a *AccountsState) getContractNames(address flow.Address) (contractNames, e
 	return identifiers, nil
 }
 
-func (a *AccountsState) GetContract(contractName string, address flow.Address) ([]byte, error) {
+func (a *StatefulAccounts) GetContract(contractName string, address flow.Address) ([]byte, error) {
 	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		return nil, err
@@ -545,7 +545,7 @@ func (a *AccountsState) GetContract(contractName string, address flow.Address) (
 	return a.getContract(contractName, address)
 }
 
-func (a *AccountsState) SetContract(contractName string, address flow.Address, contract []byte) error {
+func (a *StatefulAccounts) SetContract(contractName string, address flow.Address, contract []byte) error {
 	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		return err
@@ -558,7 +558,7 @@ func (a *AccountsState) SetContract(contractName string, address flow.Address, c
 	return a.setContractNames(contractNames, address)
 }
 
-func (a *AccountsState) DeleteContract(contractName string, address flow.Address) error {
+func (a *StatefulAccounts) DeleteContract(contractName string, address flow.Address) error {
 	contractNames, err := a.getContractNames(address)
 	if err != nil {
 		return err
@@ -600,7 +600,7 @@ func readUint64(input []byte) (value uint64, rest []byte, err error) {
 	return binary.BigEndian.Uint64(input[:8]), input[8:], nil
 }
 
-func (a *AccountsState) GetAccountFrozen(address flow.Address) (bool, error) {
+func (a *StatefulAccounts) GetAccountFrozen(address flow.Address) (bool, error) {
 	frozen, err := a.getValue(address, false, KeyAccountFrozen)
 	if err != nil {
 		return false, err
@@ -613,7 +613,7 @@ func (a *AccountsState) GetAccountFrozen(address flow.Address) (bool, error) {
 	return frozen[0] != AccountNotFrozenValue, nil
 }
 
-func (a *AccountsState) SetAccountFrozen(address flow.Address, frozen bool) error {
+func (a *StatefulAccounts) SetAccountFrozen(address flow.Address, frozen bool) error {
 
 	val := make([]byte, 1) //zero value for byte is 0
 	if frozen {
@@ -624,7 +624,7 @@ func (a *AccountsState) SetAccountFrozen(address flow.Address, frozen bool) erro
 }
 
 // handy function to error out if account is frozen
-func (a *AccountsState) CheckAccountNotFrozen(address flow.Address) error {
+func (a *StatefulAccounts) CheckAccountNotFrozen(address flow.Address) error {
 	frozen, err := a.GetAccountFrozen(address)
 	if err != nil {
 		return fmt.Errorf("cannot check account freeze status: %w", err)
