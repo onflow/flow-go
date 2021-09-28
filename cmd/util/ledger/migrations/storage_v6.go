@@ -53,27 +53,33 @@ var storageMigrationV5DecMode = func() cbor.DecMode {
 	return decMode
 }()
 
-// delegationStorage is the storage implementation to be used by the
+// migrationStorage is the storage implementation to be used by the
 // new interpreter during value conversions. This is a delegation
 // object and does not define any operations.
 //
-type delegationStorage struct {
-	// Overrides the InMemoryStorage's storage operations (i.e: BasicSlabStorage)
-	// using a PersistentSlabStorage.
+type migrationStorage struct {
 	*atree.PersistentSlabStorage
-
-	*newInter.InMemoryStorage
 }
 
-var _ newInter.Storage = &delegationStorage{}
-var _ atree.SlabStorage = &delegationStorage{}
+var _ newInter.Storage = &migrationStorage{}
+var _ atree.SlabStorage = &migrationStorage{}
 
-func newDelegationStorage(persistentSlabStorage *atree.PersistentSlabStorage) delegationStorage {
-	inMemStorage := newInter.NewInMemoryStorage()
-	return delegationStorage{
+func newDelegationStorage(persistentSlabStorage *atree.PersistentSlabStorage) *migrationStorage {
+	return &migrationStorage{
 		PersistentSlabStorage: persistentSlabStorage,
-		InMemoryStorage:       &inMemStorage,
 	}
+}
+
+func (s *migrationStorage) ValueExists(_ *newInter.Interpreter, _ common.Address, _ string) bool {
+	panic("invalid call to unimplemented 'migrationStorage.ValueExists' method")
+}
+
+func (s *migrationStorage) ReadValue(_ *newInter.Interpreter, _ common.Address, _ string) newInter.OptionalValue {
+	panic("invalid call to unimplemented 'migrationStorage.ReadValue' method")
+}
+
+func (s *migrationStorage) WriteValue(_ *newInter.Interpreter, _ common.Address, _ string, _ newInter.OptionalValue) {
+	panic("invalid call to unimplemented 'migrationStorage.WriteValue' method")
 }
 
 type storagePath struct {
