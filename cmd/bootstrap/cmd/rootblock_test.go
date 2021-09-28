@@ -2,18 +2,16 @@ package cmd
 
 import (
 	"encoding/hex"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
-
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
-
-	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
@@ -34,9 +32,9 @@ const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`.+/random-beacon.priv.json` +
 	`.+/random-beacon.pub.json` +
 	`constructing root block` +
-	`constructing votes` +
-	`wrote file \S+/root-block-data.json` +
-	"Done - Created root block data"
+	`wrote file \S+/root-block.json` +
+	`constructing and writing votes` +
+	`wrote file \S+/root-block-vote.json`
 
 var rootBlockHappyPathRegex = regexp.MustCompile(rootBlockHappyPathLogs)
 
@@ -113,7 +111,7 @@ func TestRootBlock_Deterministic(t *testing.T) {
 		assert.FileExists(t, rootBlockDataPath)
 
 		// read snapshot
-		firstRootBlockData, err := utils.ReadRootBlockData(rootBlockDataPath)
+		firstRootBlockData, err := utils.ReadRootBlock(rootBlockDataPath)
 		require.NoError(t, err)
 
 		// delete snapshot file
@@ -128,7 +126,7 @@ func TestRootBlock_Deterministic(t *testing.T) {
 		assert.FileExists(t, rootBlockDataPath)
 
 		// read snapshot
-		secondRootBlockData, err := utils.ReadRootBlockData(rootBlockDataPath)
+		secondRootBlockData, err := utils.ReadRootBlock(rootBlockDataPath)
 		require.NoError(t, err)
 
 		assert.Equal(t, firstRootBlockData, secondRootBlockData)
