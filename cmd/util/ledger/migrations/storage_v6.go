@@ -64,7 +64,7 @@ type migrationStorage struct {
 var _ newInter.Storage = &migrationStorage{}
 var _ atree.SlabStorage = &migrationStorage{}
 
-func newDelegationStorage(persistentSlabStorage *atree.PersistentSlabStorage) *migrationStorage {
+func newMigrationStorage(persistentSlabStorage *atree.PersistentSlabStorage) *migrationStorage {
 	return &migrationStorage{
 		PersistentSlabStorage: persistentSlabStorage,
 	}
@@ -554,7 +554,7 @@ func (m *StorageFormatV6Migration) initNewInterpreter() {
 		))
 	}
 
-	inter.Storage = newDelegationStorage(m.storage)
+	inter.Storage = newMigrationStorage(m.storage)
 
 	m.newInter = inter
 }
