@@ -1,4 +1,4 @@
-package p2p
+package compressed
 
 import (
 	"fmt"
@@ -9,6 +9,7 @@ import (
 	"go.uber.org/multierr"
 
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/compressor"
 )
 
 type compressedStream struct {
@@ -21,17 +22,26 @@ type compressedStream struct {
 	w io.WriteCloser
 }
 
-func newCompressedStream(s network.Stream, compressor flownet.Compressor) (network.Stream, error) {
-	w, err := compressor.NewWriter(s)
+type StreamOptFunc func(*compressedStream)
+
+func WithStreamCompressor(comp flownet.Compressor) StreamOptFunc {
+	return func(stream *compressedStream) {
+		stream.compressor = comp
+	}
+}
+
+func NewCompressedStream(s network.Stream, ops ...StreamOptFunc) (network.Stream, error) {
+	c := &compressedStream{
+		Stream:     s,
+		compressor: compressor.GzipStreamCompressor{},
+	}
+
+	w, err := c.compressor.NewWriter(s)
 	if err != nil {
 		return nil, fmt.Errorf("could not create compressor writer: %w", err)
 	}
 
-	c := &compressedStream{
-		Stream:     s,
-		w:          w,
-		compressor: compressor,
-	}
+	c.w = w
 
 	return c, nil
 }
