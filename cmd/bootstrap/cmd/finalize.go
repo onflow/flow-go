@@ -156,7 +156,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	votes := readRootBlockVotes()
 	log.Info().Msg("")
 
-	log.Info().Msg("reading dkg pub data")
+	log.Info().Msg("reading dkg data")
 	dkgData := readDKGData()
 	log.Info().Msg("")
 
