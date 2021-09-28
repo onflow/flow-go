@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"fmt"
+	"path/filepath"
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -38,7 +38,7 @@ func constructRootVotes(block *flow.Block, allNodes, internalNodes []bootstrap.N
 	}
 
 	for _, vote := range votes {
-		path := fmt.Sprintf(bootstrap.DirnameRootBlockVotes, bootstrap.FilenameRootBlockVotePrefix+vote.SignerID.String()+".json")
+		path := filepath.Join(bootstrap.DirnameRootBlockVotes, bootstrap.FilenameRootBlockVotePrefix+vote.SignerID.String()+".json")
 		writeJSON(path, vote)
 	}
 }
