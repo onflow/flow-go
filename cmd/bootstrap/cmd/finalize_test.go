@@ -49,29 +49,6 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 
 var finalizeHappyPathRegex = regexp.MustCompile(finalizeHappyPathLogs)
 
-// getFirstQCSignerPath picks first internal node as participant who will do the QC signing
-// node needs to have random beacon key and node info to be treated as internal.
-func getFirstQCSignerPath(t *testing.T, bootDir string) string {
-	privateFiles, err := filesInDir(filepath.Join(bootDir, model.DirPrivateRoot))
-	assert.NoError(t, err)
-
-	for _, privateDir := range privateFiles {
-		files, err := filesInDir(privateDir)
-		assert.NoError(t, err)
-
-		for _, f := range files {
-			// skip files that do not include random beacon key and node-info
-			if !strings.Contains(f, model.FilenameRandomBeaconPriv) && strings.Contains(f, model.PathPrivNodeInfoPrefix) {
-				continue
-			}
-			return f
-		}
-	}
-
-	assert.Fail(t, "no random beacon signer found")
-	return ""
-}
-
 func TestFinalize_HappyPath(t *testing.T) {
 	deterministicSeed := GenerateRandomSeed()
 	rootCommit := unittest.StateCommitmentFixture()
@@ -103,10 +80,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagRootCommit = hex.EncodeToString(rootCommit[:])
 		flagEpochCounter = epochCounter
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
-		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRootDKGData)
-
-		// pick participant as signer
-		flagSignerDKGDataPath = getFirstQCSignerPath(t, internalPrivDir)
+		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -149,14 +123,11 @@ func TestFinalize_Deterministic(t *testing.T) {
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
 
-		// rootBlock will generate DKG and place it into bootDir/public-root-information
+		// rootBlock will generate DKG and place it into model.PathRootDKGData
 		rootBlock(nil, nil)
 
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
-		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRootDKGData)
-
-		// pick participant as signer
-		flagSignerDKGDataPath = getFirstQCSignerPath(t, internalPrivDir)
+		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -224,10 +195,7 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 		rootBlock(nil, nil)
 
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
-		flagDKGPubDataPath = filepath.Join(bootDir, model.PathRootDKGData)
-
-		// pick participant as signer
-		flagSignerDKGDataPath = getFirstQCSignerPath(t, internalPrivDir)
+		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)

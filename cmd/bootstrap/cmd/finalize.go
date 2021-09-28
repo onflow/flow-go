@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"path/filepath"
 	"strings"
 
@@ -14,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
@@ -32,9 +32,9 @@ var (
 	flagCollectionClusters          uint
 	flagPartnerNodeInfoDir          string
 	flagPartnerStakes               string
-	flagDKGPubDataPath              string
-	flagSignerDKGDataPath           string
+	flagDKGDataPath                 string
 	flagRootBlock                   string
+	flagRootBlockVotesDir           string
 	flagRootCommit                  string
 	flagServiceAccountPublicKeyJSON string
 	flagGenesisTokenSupply          string
@@ -75,20 +75,18 @@ func addFinalizeCmdFlags() {
 		" in the JSON file: Role, Address, NodeID, NetworkPubKey, StakingPubKey)")
 	finalizeCmd.Flags().StringVar(&flagPartnerStakes, "partner-stakes", "", "path to a JSON file containing "+
 		"a map from partner node's NodeID to their stake")
-	finalizeCmd.Flags().StringVar(&flagDKGPubDataPath, "dkg-data", "", "path to a JSON file containing public data as output from DKG process")
-	finalizeCmd.Flags().StringVar(&flagSignerDKGDataPath, "signer-dkg-data", "",
-		"path to a JSON file containing private DKG data of node that will sign the QC")
+	finalizeCmd.Flags().StringVar(&flagDKGDataPath, "dkg-data", "", "path to a JSON file containing data as output from DKG process")
 
 	cmd.MarkFlagRequired(finalizeCmd, "config")
 	cmd.MarkFlagRequired(finalizeCmd, "internal-priv-dir")
 	cmd.MarkFlagRequired(finalizeCmd, "partner-dir")
 	cmd.MarkFlagRequired(finalizeCmd, "partner-stakes")
 	cmd.MarkFlagRequired(finalizeCmd, "dkg-data")
-	cmd.MarkFlagRequired(finalizeCmd, "signer-dkg-data")
 
 	// required parameters for generation of root block, root execution result and root block seal
 	finalizeCmd.Flags().StringVar(&flagRootBlock, "root-block", "",
 		"path to a JSON file containing root block and votes")
+	finalizeCmd.Flags().StringVar(&flagRootBlockVotesDir, "root-block-votes-dir", "", "path to directory with votes for root block")
 	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
 	finalizeCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "epoch counter for the epoch beginning with the root block")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
@@ -96,6 +94,7 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
+	cmd.MarkFlagRequired(finalizeCmd, "root-block-votes-dir")
 	cmd.MarkFlagRequired(finalizeCmd, "root-commit")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-counter")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-length")
@@ -153,20 +152,20 @@ func finalize(cmd *cobra.Command, args []string) {
 	block := readRootBlock()
 	log.Info().Msg("")
 
-	log.Info().Msg("reading dkg pub data")
-	dkgData := readDKGPubData()
+	log.Info().Msg("reading root block votes")
+	votes := readRootBlockVotes()
 	log.Info().Msg("")
 
-	log.Info().Msg("reading QC signer")
-	signer := readQCSigner()
+	log.Info().Msg("reading dkg pub data")
+	dkgData := readDKGData()
 	log.Info().Msg("")
 
 	log.Info().Msg("constructing root QC")
 	rootQC := constructRootQC(
 		block,
-		nil,
+		votes,
+		model.FilterByRole(stakingNodes, flow.RoleConsensus),
 		model.FilterByRole(internalNodes, flow.RoleConsensus),
-		signer,
 		dkgData,
 	)
 	log.Info().Msg("")
@@ -258,6 +257,27 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg(fmt.Sprintf("created keys for %d %s nodes", roleCounts[flow.RoleAccess], flow.RoleAccess.String()))
 
 	log.Info().Msg("🌊 🏄 🤙 Done – ready to flow!")
+}
+
+// readRootBlockVotes reads votes for root block
+func readRootBlockVotes() []*hotstuff.Vote {
+	var votes []*hotstuff.Vote
+	files, err := filesInDir(flagRootBlockVotesDir)
+	if err != nil {
+		log.Fatal().Err(err).Msg("could not read root block votes")
+	}
+	for _, f := range files {
+		// skip files that do not include node-infos
+		if !strings.Contains(f, model.FilenameRootBlockVotePrefix) {
+			continue
+		}
+
+		// read file and append to partners
+		var p hotstuff.Vote
+		readJSON(f, &p)
+		votes = append(votes, &p)
+	}
+	return votes
 }
 
 // assemblePartnerNodes returns a list of partner nodes after gathering stake
@@ -440,20 +460,27 @@ func readRootBlock() *flow.Block {
 	return rootBlock
 }
 
-func readDKGPubData() inmem.EncodableDKG {
-	dkgData, err := utils.ReadDKGPubData(flagDKGPubDataPath)
+func readDKGData() dkg.DKGData {
+	encodableDKG, err := utils.ReadDKGData(flagDKGDataPath)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read DKG data")
 	}
-	return *dkgData
-}
 
-func readQCSigner() dkg.DKGParticipantPriv {
-	participant, err := utils.ReadDKGParticipant(flagSignerDKGDataPath)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not read signer DKG data")
+	dkgData := dkg.DKGData{
+		PrivKeyShares: nil,
+		PubGroupKey:   encodableDKG.GroupKey,
+		PubKeyShares:  nil,
 	}
-	return *participant
+
+	for _, pubKey := range encodableDKG.PubKeyShares {
+		dkgData.PubKeyShares = append(dkgData.PubKeyShares, pubKey.PublicKey)
+	}
+
+	for _, privKey := range encodableDKG.PrivKeyShares {
+		dkgData.PrivKeyShares = append(dkgData.PrivKeyShares, privKey.PrivateKey)
+	}
+
+	return dkgData
 }
 
 // Validation utility methods ------------------------------------------------
@@ -506,7 +533,7 @@ func generateEmptyExecutionState(
 	randomSource []byte,
 	assignments flow.AssignmentList,
 	clusterQCs []*flow.QuorumCertificate,
-	dkg inmem.EncodableDKG,
+	dkgData dkg.DKGData,
 	identities flow.IdentityList,
 ) (commit flow.StateCommitment) {
 
@@ -527,11 +554,6 @@ func generateEmptyExecutionState(
 		log.Fatal().Err(err).Msg("invalid random source")
 	}
 
-	dkgPubKeys := make([]crypto.PublicKey, 0)
-	for _, participant := range dkg.Participants {
-		dkgPubKeys = append(dkgPubKeys, participant.KeyShare)
-	}
-
 	epochConfig := epochs.EpochConfig{
 		EpochTokenPayout:             cadence.UFix64(0),
 		RewardCut:                    cadence.UFix64(0),
@@ -544,7 +566,7 @@ func generateEmptyExecutionState(
 		RandomSource:                 cdcRandomSource,
 		CollectorClusters:            assignments,
 		ClusterQCs:                   clusterQCs,
-		DKGPubKeys:                   dkgPubKeys,
+		DKGPubKeys:                   dkgData.PubKeyShares,
 	}
 
 	commit, err = run.GenerateExecutionState(
