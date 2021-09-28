@@ -241,7 +241,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		// test Verify
 		err := aggregator.Verify(ids[0].NodeID, sigs[0])
 		require.Error(t, err)
-		assert.IsType(t, invalidSig, err)
+		assert.True(t, errors.Is(err, invalidSig))
 
 		// add signatures for aggregation including corrupt sigs[0]
 		expectedWeight := uint64(0)
