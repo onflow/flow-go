@@ -23,7 +23,6 @@ var (
 
 	PathRootBlockData             = filepath.Join(DirnamePublicBootstrap, "root-block.json")
 	PathRootProtocolStateSnapshot = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
-	PathRandomBeaconPub           = filepath.Join(DirnamePublicBootstrap, "random-beacon.pub.json")
 
 	FilenameWALRootCheckpoint = "root.checkpoint"
 	PathRootCheckpoint        = filepath.Join(DirnameExecutionState, FilenameWALRootCheckpoint) // only available on an execution node
@@ -32,6 +31,7 @@ var (
 	DirPrivateRoot                   = "private-root-information"
 	FilenameRandomBeaconPriv         = "random-beacon.priv.json"
 	PathPrivNodeInfoPrefix           = "node-info.priv."
+	PathRootDKGData                  = filepath.Join(DirPrivateRoot, "root-dkg-data.priv.json")
 	PathNodeInfoPriv                 = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-info.priv.json")                 // %v will be replaced by NodeID
 	PathNodeMachineAccountPrivateKey = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-machine-account-key.priv.json")  // %v will be replaced by NodeID
 	PathNodeMachineAccountInfoPriv   = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-machine-account-info.priv.json") // %v will be replaced by NodeID
