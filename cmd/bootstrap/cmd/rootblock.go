@@ -77,11 +77,11 @@ func rootBlock(cmd *cobra.Command, args []string) {
 	log.Info().Msg("")
 
 	log.Info().Msg("collecting partner network and staking keys")
-	partnerNodes := assemblePartnerNodes()
+	partnerNodes := readPartnerNodeInfos()
 	log.Info().Msg("")
 
 	log.Info().Msg("generating internal private networking and staking keys")
-	internalNodes := assembleInternalNodes()
+	internalNodes := readInternalNodeInfos()
 	log.Info().Msg("")
 
 	log.Info().Msg("checking constraints on consensus nodes")
