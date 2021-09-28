@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 	"path/filepath"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
@@ -32,16 +33,16 @@ func ReadRootProtocolSnapshot(bootDir string) (*inmem.Snapshot, error) {
 	return snapshot, nil
 }
 
-func ReadRootBlockData(rootBlockDataPath string) (*inmem.EncodableRootBlockData, error) {
+func ReadRootBlock(rootBlockDataPath string) (*flow.Block, error) {
 	bytes, err := io.ReadFile(rootBlockDataPath)
 	if err != nil {
-		return nil, fmt.Errorf("could not read root block data: %w", err)
+		return nil, fmt.Errorf("could not read root block: %w", err)
 	}
 
-	var encodable inmem.EncodableRootBlockData
+	var encodable flow.Block
 	err = json.Unmarshal(bytes, &encodable)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal root block data: %w", err)
+		return nil, fmt.Errorf("could not unmarshal root block: %w", err)
 	}
 	return &encodable, nil
 }

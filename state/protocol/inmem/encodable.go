@@ -1,7 +1,6 @@
 package inmem
 
 import (
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -54,10 +53,4 @@ type EncodableCluster struct {
 	Members   flow.IdentityList
 	RootBlock *cluster.Block
 	RootQC    *flow.QuorumCertificate
-}
-
-// EncodableRootBlockData is the encoding format for root block and []*model.Block
-type EncodableRootBlockData struct {
-	Block *flow.Block
-	Votes []*model.Vote
 }
