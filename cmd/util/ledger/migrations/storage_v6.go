@@ -273,20 +273,12 @@ func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
 
 	baseStorage := atree.NewLedgerBaseStorage(newAccountsAtreeLedger(accounts))
 
-	encMode, err := cbor.EncOptions{}.EncMode()
-	if err != nil {
-		panic(err)
-	}
-
-	decMode, err := cbor.DecOptions{}.DecMode()
-	if err != nil {
-		panic(err)
-	}
-
 	m.storage = atree.NewPersistentSlabStorage(
 		baseStorage,
-		encMode,
-		decMode,
+		newInter.CBOREncMode,
+		newInter.CBORDecMode,
+		nil,
+		nil,
 	)
 }
 
@@ -1092,7 +1084,7 @@ func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInte
 
 	arrayStaticType := ConvertStaticType(value.StaticType()).(newInter.ArrayStaticType)
 
-	c.result = newInter.NewArrayValueWithAddress(
+	c.result = newInter.NewArrayValue(
 		c.newInter,
 		arrayStaticType,
 		*value.Owner,
