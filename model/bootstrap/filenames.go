@@ -31,6 +31,7 @@ var (
 	DirPrivateRoot                   = "private-root-information"
 	FilenameRandomBeaconPriv         = "random-beacon.priv.json"
 	PathPrivNodeInfoPrefix           = "node-info.priv."
+	FilenameRootBlockVotePrefix      = "root-block-vote."
 	PathRootDKGData                  = filepath.Join(DirPrivateRoot, "root-dkg-data.priv.json")
 	PathNodeInfoPriv                 = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-info.priv.json")                 // %v will be replaced by NodeID
 	PathNodeMachineAccountPrivateKey = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-machine-account-key.priv.json")  // %v will be replaced by NodeID

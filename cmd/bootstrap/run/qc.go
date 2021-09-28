@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 type Participant struct {
@@ -187,37 +186,6 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 
 	qcData.Lookup = participantLookup
 	qcData.GroupKey = dkgData.PubGroupKey
-
-	return qcData, nil
-}
-
-// GenerateQCSignerParticipantData generates participant data for creating QC.
-// Caller needs to pass dkg participants that will be taking part in building QC.
-func GenerateQCSignerParticipantData(internalNodes []bootstrap.NodeInfo, dkgParticipant dkg.DKGParticipantPriv, dkgData inmem.EncodableDKG) (*ParticipantData, error) {
-	qcData := &ParticipantData{
-		Lookup:   make(map[flow.Identifier]flow.DKGParticipant),
-		GroupKey: dkgData.GroupKey.PublicKey,
-	}
-
-	for _, node := range internalNodes {
-
-		var randomBeaconKey crypto.PrivateKey
-		// find participant in set of internal nodes
-		if node.NodeID == dkgParticipant.NodeID {
-			// if we found our signer, set random beacon key, otherwise it will be empty
-			randomBeaconKey = dkgParticipant.RandomBeaconPrivKey.PrivateKey
-		}
-
-		// copy all participants to lookup table
-		for key, value := range dkgData.Participants {
-			qcData.Lookup[key] = value
-		}
-
-		qcData.Participants = append(qcData.Participants, Participant{
-			NodeInfo:            node,
-			RandomBeaconPrivKey: randomBeaconKey,
-		})
-	}
 
 	return qcData, nil
 }
