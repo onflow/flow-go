@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	mgr "github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	vld "github.com/onflow/flow-go/cmd/util/ledger/validators"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -25,6 +26,7 @@ func extractExecutionState(
 	targetHash flow.StateCommitment,
 	outputDir string,
 	log zerolog.Logger,
+	chain flow.Chain,
 	migrate bool,
 	report bool,
 ) error {
@@ -57,6 +59,7 @@ func extractExecutionState(
 
 	migrations := []ledger.Migration{}
 	reporters := []ledger.Reporter{}
+	validators := []ledger.Validator{}
 
 	if migrate {
 		storageFormatV6Migration := mgr.StorageFormatV6Migration{
@@ -74,6 +77,12 @@ func extractExecutionState(
 			storageFormatV6Migration.Migrate,
 			storageUsedUpdateMigration.Migrate,
 		}
+
+		// only add validators if migration is on
+		validators = []ledger.Validator{
+			vld.NewAccountBalanceValidator(log, chain),
+		}
+
 	}
 	if report {
 		reporters = []ledger.Reporter{
@@ -95,6 +104,7 @@ func extractExecutionState(
 		ledger.State(targetHash),
 		migrations,
 		reporters,
+		validators,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,

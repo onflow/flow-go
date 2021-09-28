@@ -239,6 +239,7 @@ func (l *Ledger) ExportCheckpointAt(
 	state ledger.State,
 	migrations []ledger.Migration,
 	reporters []ledger.Reporter,
+	validators []ledger.Validator,
 	targetPathFinderVersion uint8,
 	outputDir, outputFile string,
 ) (ledger.State, error) {
@@ -275,6 +276,15 @@ func (l *Ledger) ExportCheckpointAt(
 	payloads := t.AllPayloads()
 	payloadSize := len(payloads)
 
+	// setup validators
+	for i, validator := range validators {
+		l.logger.Info().Msgf("setup validator %d", i)
+		err = validator.Setup(payloads)
+		if err != nil {
+			return ledger.State(hash.DummyHash), err
+		}
+	}
+
 	// migrate payloads
 	for i, migrate := range migrations {
 		l.logger.Info().Msgf("migration %d is underway", i)
@@ -299,6 +309,18 @@ func (l *Ledger) ExportCheckpointAt(
 		l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("migration %d is done", i)
 
 		payloadSize = newPayloadSize
+	}
+
+	// run validators
+	for i, validator := range validators {
+		l.logger.Info().Msgf("running validator %d", i)
+		isValid, err := validator.Validate(payloads)
+		if err != nil {
+			return ledger.State(hash.DummyHash), err
+		}
+		if !isValid {
+			return ledger.State(hash.DummyHash), fmt.Errorf("validator %d returned false", i)
+		}
 	}
 
 	// run reporters

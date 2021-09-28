@@ -64,6 +64,7 @@ func TestExtractExecutionState(t *testing.T) {
 				unittest.StateCommitmentFixture(),
 				outdir,
 				zerolog.Nop(),
+				flow.Emulator.Chain(),
 				false,
 				false,
 			)
