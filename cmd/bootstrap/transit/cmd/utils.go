@@ -24,6 +24,7 @@ var (
 	FilenameTransitKeyPub      = "transit-key.pub.%v"
 	FilenameTransitKeyPriv     = "transit-key.priv.%v"
 	FilenameRandomBeaconCipher = bootstrap.FilenameRandomBeaconPriv + ".%v.enc"
+	FilenameRootBlockVote      = "root-block-vote.json.%v"
 
 	// default files to upload for all role type
 	filesToUpload = []string{
