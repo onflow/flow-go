@@ -32,6 +32,7 @@ const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`will run DKG` +
 	`finished running DKG` +
 	`.+/random-beacon.priv.json` +
+	`.+/random-beacon.pub.json` +
 	`constructing root block` +
 	`constructing votes` +
 	`wrote file \S+/root-block-data.json` +
@@ -71,8 +72,8 @@ func TestRootBlock_HappyPath(t *testing.T) {
 		hook.logs.Reset()
 
 		// check if root protocol snapshot exists
-		snapshotPath := filepath.Join(bootDir, model.PathRootBlockData)
-		assert.FileExists(t, snapshotPath)
+		rootBlockDataPath := filepath.Join(bootDir, model.PathRootBlockData)
+		assert.FileExists(t, rootBlockDataPath)
 	})
 }
 
@@ -108,15 +109,15 @@ func TestRootBlock_Deterministic(t *testing.T) {
 		hook.logs.Reset()
 
 		// check if root protocol snapshot exists
-		snapshotPath := filepath.Join(bootDir, model.PathRootBlockData)
-		assert.FileExists(t, snapshotPath)
+		rootBlockDataPath := filepath.Join(bootDir, model.PathRootBlockData)
+		assert.FileExists(t, rootBlockDataPath)
 
 		// read snapshot
-		firstRootBlockData, err := utils.ReadRootBlockData(bootDir)
+		firstRootBlockData, err := utils.ReadRootBlockData(rootBlockDataPath)
 		require.NoError(t, err)
 
 		// delete snapshot file
-		err = os.Remove(snapshotPath)
+		err = os.Remove(rootBlockDataPath)
 		require.NoError(t, err)
 
 		rootBlock(nil, nil)
@@ -124,10 +125,10 @@ func TestRootBlock_Deterministic(t *testing.T) {
 		hook.logs.Reset()
 
 		// check if root protocol snapshot exists
-		assert.FileExists(t, snapshotPath)
+		assert.FileExists(t, rootBlockDataPath)
 
 		// read snapshot
-		secondRootBlockData, err := utils.ReadRootBlockData(bootDir)
+		secondRootBlockData, err := utils.ReadRootBlockData(rootBlockDataPath)
 		require.NoError(t, err)
 
 		assert.Equal(t, firstRootBlockData, secondRootBlockData)
