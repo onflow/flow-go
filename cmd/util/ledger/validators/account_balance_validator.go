@@ -7,6 +7,8 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
+
+	// oldFvm "github.com/onflow/flow-go/v21/fvm"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
@@ -52,15 +54,26 @@ func (v *AccountBalanceValidator) Setup(oldPayloads []ledger.Payload) error {
 		fvm.WithChain(v.chain),
 	)
 
+	for i := uint64(0); i < v.numberOfAccounts; i++ {
+		add, err := v.chain.AddressAtIndex(i)
+		if err != nil {
+			return err
+		}
+		v.addresses <- add
+	}
+
 	workerCount := runtime.NumCPU()
 	wg := &sync.WaitGroup{}
 
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
-		worker := newWorker(wg, fvmContext, mainView.NewChild(), v.logger)
+		// TODO switch to old runtime
+		vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+		worker := newWorker(wg, vm, fvmContext, mainView.NewChild(), v.logger)
 		go worker.Collect(v.addresses, v.balances)
 	}
 
+	close(v.addresses)
 	wg.Wait()
 	return nil
 }
@@ -88,20 +101,20 @@ func (v *AccountBalanceValidator) Validate(newPayloads []ledger.Payload) (isVali
 
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
-		worker := newWorker(wg, fvmContext, mainView.NewChild(), v.logger)
+		// new runtime
+		rt := fvm.NewInterpreterRuntime()
+		worker := newWorker(wg, fvm.NewVirtualMachine(rt), fvmContext, mainView.NewChild(), v.logger)
 		go worker.CollectAndVerify(v.balances, notVerified)
 	}
+	//
 
+	close(v.balances)
 	wg.Wait()
+	close(notVerified)
 
 	if len(notVerified) != 0 {
-		// TODO print them
-		// if ac := range notVerified {
-		// 	v.logger.Err().Msgf("balance for account %s doesn't match the one before migration", ac.String())
-		// }
 		return false, fmt.Errorf("some balances doesn't match")
 	}
-
 	return true, nil
 }
 
@@ -116,11 +129,11 @@ type worker struct {
 }
 
 func newWorker(wg *sync.WaitGroup,
+	vm *fvm.VirtualMachine,
 	ctx fvm.Context,
 	view state.View,
 	logger zerolog.Logger,
 ) *worker {
-	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
 	prog := programs.NewEmptyPrograms()
 	script := []byte(fmt.Sprintf(`
 				import FungibleToken from 0x%s
@@ -153,19 +166,26 @@ func (w *worker) Collect(addresses chan flow.Address, balances chan accountBalan
 			w.logger.Err(err).Msgf("Error collecting balance for account %s", add.String())
 		}
 		balances <- accountBalance{account: add, balance: balance}
+		// for debugging
+		w.logger.Info().Msgf("collected balance for %s (%d)", add.String(), balance)
 	}
 	w.wg.Done()
 }
 
 func (w *worker) CollectAndVerify(balances chan accountBalance, notVerified chan flow.Address) {
 	for b := range balances {
-		balance, err := w.collectBalance(b.account)
-		if err != nil {
-			w.logger.Err(err).Msgf("Error collecting balance for account %s", b.account.String())
-		}
+
+		balance, _ := w.collectBalance(b.account)
+		// TODO log errors to a file
+		// if err != nil {
+		// 	w.logger.Warn(err).Msgf("Error collecting balance for account %s", b.account.String())
+		// }
 		if balance != b.balance {
+			w.logger.Warn().Msgf("balance for account %s doesn't match the one before migration (before: %d, after: %d)", b.account.String(), b.balance, balance)
 			notVerified <- b.account
 		}
+		// for debugging
+		w.logger.Info().Msgf("collected and verified balance for %s (%d)", b.account.String(), balance)
 	}
 	w.wg.Done()
 }
@@ -179,5 +199,13 @@ func (w *worker) collectBalance(address flow.Address) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return script.Value.ToGoValue().(uint64), nil
+
+	if script.Err == nil {
+		if script.Value != nil {
+			return script.Value.ToGoValue().(uint64), nil
+		}
+		// account might not have flow token receiver
+		return 0, nil
+	}
+	return 0, script.Err
 }
