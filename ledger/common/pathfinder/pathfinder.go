@@ -35,7 +35,7 @@ func KeyToPath(key ledger.Key, version uint8) (ledger.Path, error) {
 		}
 	case 1:
 		{
-			hash := make([]byte, hash.HashLenSha3_256)
+			h := make([]byte, hash.HashLenSha3_256)
 			hash.ComputeSHA3_256(h, key.CanonicalForm())
 			path, err := ledger.ToPath(h)
 			if err != nil {
