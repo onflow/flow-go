@@ -6,12 +6,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/observable"
 )
 
 type Compactor struct {
 	checkpointer *Checkpointer
+	logger       zerolog.Logger
 	stopc        chan struct{}
 	lm           *lifecycle.LifecycleManager
 	sync.Mutex
@@ -21,12 +24,13 @@ type Compactor struct {
 	checkpointsToKeep  uint
 }
 
-func NewCompactor(checkpointer *Checkpointer, interval time.Duration, checkpointDistance uint, checkpointsToKeep uint) *Compactor {
+func NewCompactor(checkpointer *Checkpointer, interval time.Duration, checkpointDistance uint, checkpointsToKeep uint, logger zerolog.Logger) *Compactor {
 	if checkpointDistance < 1 {
 		checkpointDistance = 1
 	}
 	return &Compactor{
 		checkpointer:       checkpointer,
+		logger:             logger,
 		stopc:              make(chan struct{}),
 		observers:          make(map[observable.Observer]struct{}),
 		lm:                 lifecycle.NewLifecycleManager(),
@@ -105,16 +109,13 @@ func (c *Compactor) createCheckpoints() (int, error) {
 		return -1, fmt.Errorf("cannot get latest checkpoint: %w", err)
 	}
 
-	fmt.Printf("creating a checkpoint from segment %d to segment %d\n", from, to)
-
 	// we only return a positive value if the latest checkpoint index has changed
 	newLatestCheckpoint := -1
 	// more then one segment means we can checkpoint safely up to `to`-1
 	// presumably last segment is being written to
 	if to-from > int(c.checkpointDistance) {
 		checkpointNumber := to - 1
-		fmt.Printf("checkpointing to %d\n", checkpointNumber)
-
+		c.logger.Info().Msgf("creating a checkpoint from segment %d to segment %d\n", from, checkpointNumber)
 		err = c.checkpointer.Checkpoint(checkpointNumber, func() (io.WriteCloser, error) {
 			return c.checkpointer.CheckpointWriter(checkpointNumber)
 		})
