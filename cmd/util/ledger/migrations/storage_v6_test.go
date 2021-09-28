@@ -604,8 +604,13 @@ func TestContractValueRetrieval(t *testing.T) {
 
 	const contractName = "Test"
 
+	location := common.AddressLocation{
+		Address: address,
+		Name:    contractName,
+	}
+
 	contractValue := oldInter.NewCompositeValue(
-		utils.TestLocation,
+		location,
 		contractName,
 		common.CompositeKindContract,
 		oldInter.NewStringValueOrderedMap(),
