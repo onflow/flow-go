@@ -39,22 +39,13 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 	return bootstrap.ToIdentityList(nodes)
 }
 
-func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.QuorumCertificate, error) {
+func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *ParticipantData) (*flow.QuorumCertificate, error) {
 	validators, signers, err := createValidators(participantData)
 	if err != nil {
 		return nil, err
 	}
 
 	hotBlock := model.GenesisBlockFromFlow(block.Header)
-
-	votes := make([]*model.Vote, 0, len(signers))
-	for _, signer := range signers {
-		vote, err := signer.CreateVote(hotBlock)
-		if err != nil {
-			return nil, err
-		}
-		votes = append(votes, vote)
-	}
 
 	// manually aggregate sigs
 	qc, err := signers[0].CreateQC(votes)
@@ -196,26 +187,30 @@ func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkg
 }
 
 func GenerateQCSignerParticipantData(internalNodes []bootstrap.NodeInfo, dkgParticipant dkg.DKGParticipantPriv, dkgData inmem.EncodableDKG) (*ParticipantData, error) {
-	// find participant in set of internal nodes
+	qcData := &ParticipantData{
+		Lookup:   make(map[flow.Identifier]flow.DKGParticipant),
+		GroupKey: dkgData.GroupKey.PublicKey,
+	}
+
 	for _, node := range internalNodes {
-		if node.NodeID != dkgParticipant.NodeID {
-			continue
+
+		var randomBeaconKey crypto.PrivateKey
+		// find participant in set of internal nodes
+		if node.NodeID == dkgParticipant.NodeID {
+			// if we found our signer, set random beacon key, otherwise it will be empty
+			randomBeaconKey = dkgParticipant.RandomBeaconPrivKey.PrivateKey
 		}
 
-		qcData := &ParticipantData{
-			Lookup:   make(map[flow.Identifier]flow.DKGParticipant),
-			GroupKey: dkgData.GroupKey.PublicKey,
+		// copy all participants to lookup table
+		for key, value := range dkgData.Participants {
+			qcData.Lookup[key] = value
 		}
-
-		qcData.Lookup[node.NodeID] = dkgData.Participants[node.NodeID]
 
 		qcData.Participants = append(qcData.Participants, Participant{
 			NodeInfo:            node,
-			RandomBeaconPrivKey: dkgParticipant.RandomBeaconPrivKey.PrivateKey,
+			RandomBeaconPrivKey: randomBeaconKey,
 		})
-
-		return qcData, nil
 	}
 
-	return nil, fmt.Errorf("could not find signer in set of internal nodes")
+	return qcData, nil
 }

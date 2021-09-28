@@ -10,13 +10,13 @@ import (
 )
 
 // NOTE: allNodes must be in the same order as when generating the DKG
-func constructRootQC(block *flow.Block, internalNodes []bootstrap.NodeInfo, signer dkg.DKGParticipantPriv, dkgData inmem.EncodableDKG) *flow.QuorumCertificate {
+func constructRootQC(block *flow.Block, votes []*model.Vote, internalNodes []bootstrap.NodeInfo, signer dkg.DKGParticipantPriv, dkgData inmem.EncodableDKG) *flow.QuorumCertificate {
 	participantData, err := run.GenerateQCSignerParticipantData(internalNodes, signer, dkgData)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to generate QC participant data")
 	}
 
-	qc, err := run.GenerateRootQC(block, participantData)
+	qc, err := run.GenerateRootQC(block, votes, participantData)
 	if err != nil {
 		log.Fatal().Err(err).Msg("generating root QC failed")
 	}
