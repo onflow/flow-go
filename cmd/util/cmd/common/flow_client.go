@@ -2,16 +2,17 @@ package common
 
 import (
 	"fmt"
+
+	"google.golang.org/grpc"
+
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/grpcutils"
-	"google.golang.org/grpc"
 )
 
 const DefaultAccessNodeIDSMinimum = 2
-
 
 type FlowClientOpt struct {
 	AccessAddress    string

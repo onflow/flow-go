@@ -83,7 +83,6 @@ func (suite *Suite) SetupTest() {
 	suite.epoch.On("Clustering").Return(suite.clustering, nil)
 	suite.signer.On("CreateVote", mock.Anything).Return(unittest.VoteFixture(), nil)
 
-
 	suite.voter = epochs.NewRootQCVoter(log, suite.local, suite.signer, suite.state, []flowmodule.QCContractClient{suite.client})
 }
 
