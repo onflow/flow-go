@@ -16,7 +16,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/schollz/progressbar/v3"
 
-	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -54,46 +53,6 @@ var storageMigrationV5DecMode = func() cbor.DecMode {
 	return decMode
 }()
 
-type storageFormatV6MigrationResult struct {
-	key     ledger.Key
-	payload *ledger.Payload
-	err     error
-}
-
-// Base storage to be used by the persistent slab storage.
-//
-type encodingBaseStorage struct {
-	*atree.InMemBaseStorage
-	ReencodedPayloads []*ledger.Payload
-}
-
-var _ atree.BaseStorage = &encodingBaseStorage{}
-
-func newEncodingBaseStorage() *encodingBaseStorage {
-	return &encodingBaseStorage{
-		InMemBaseStorage:  atree.NewInMemBaseStorage(),
-		ReencodedPayloads: make([]*ledger.Payload, 0),
-	}
-}
-
-func (e *encodingBaseStorage) Store(id atree.StorageID, value []byte) error {
-	err := e.InMemBaseStorage.Store(id, value)
-	if err != nil {
-		return err
-	}
-
-	// Add the encoded content to the payloads
-
-	payload := ledger.Payload{
-		Key:   ledgerKeyFromStorageID(id),
-		Value: value,
-	}
-
-	e.ReencodedPayloads = append(e.ReencodedPayloads, &payload)
-
-	return nil
-}
-
 // delegationStorage is the storage implementation to be used by the
 // new interpreter during value conversions. This is a delegation
 // object and does not define any operations.
@@ -115,16 +74,6 @@ func newDelegationStorage(persistentSlabStorage *atree.PersistentSlabStorage) de
 		PersistentSlabStorage: persistentSlabStorage,
 		InMemoryStorage:       &inMemStorage,
 	}
-}
-
-func ledgerKeyFromStorageID(id atree.StorageID) ledger.Key {
-	prefixedKey := []byte(atree.LedgerBaseStorageSlabPrefix + string(id.Index[:]))
-
-	return ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(execState.KeyPartOwner, id.Address[:]),
-		ledger.NewKeyPart(execState.KeyPartController, []byte{}),
-		ledger.NewKeyPart(execState.KeyPartKey, prefixedKey),
-	})
 }
 
 type storagePath struct {
@@ -199,13 +148,8 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		)
 	}
 
-	v := newView(fvmPayloads)
-	st := state.NewState(v)
-	stateHolder := state.NewStateHolder(st)
-	accounts := state.NewAccounts(stateHolder)
-
-	baseStorage := atree.NewLedgerBaseStorage(newAccountsAtreeLedger(accounts))
-	m.initPersistentSlabStorage(baseStorage)
+	ledgerView := newView(fvmPayloads)
+	m.initPersistentSlabStorage(ledgerView)
 
 	m.initNewInterpreter()
 	m.initOldInterpreter(payloads)
@@ -265,7 +209,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		m.Log.Warn().Msgf("values not migrated due to missing types: %d", m.missingTypeValues)
 	}
 
-	return v.Payloads(), nil
+	return ledgerView.Payloads(), nil
 }
 
 func (m *StorageFormatV6Migration) incrementProgress() {
@@ -316,7 +260,13 @@ func (m *StorageFormatV6Migration) addProgress(progress int) {
 	}
 }
 
-func (m *StorageFormatV6Migration) initPersistentSlabStorage(baseStorage atree.BaseStorage) {
+func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
+	st := state.NewState(v)
+	stateHolder := state.NewStateHolder(st)
+	accounts := state.NewAccounts(stateHolder)
+
+	baseStorage := atree.NewLedgerBaseStorage(newAccountsAtreeLedger(accounts))
+
 	encMode, err := cbor.EncOptions{}.EncMode()
 	if err != nil {
 		panic(err)
@@ -1058,7 +1008,6 @@ func cborMeLink(value []byte) string {
 //
 type ValueConverter struct {
 	result    newInter.Value
-	storage   atree.SlabStorage
 	newInter  *newInter.Interpreter
 	oldInter  *oldInter.Interpreter
 	migration *StorageFormatV6Migration
@@ -1071,7 +1020,6 @@ func NewValueConverter(
 ) *ValueConverter {
 	return &ValueConverter{
 		migration: migration,
-		storage:   migration.storage,
 		newInter:  migration.newInter,
 		oldInter:  migration.oldInter,
 	}

@@ -49,12 +49,26 @@ func TestValueConversion(t *testing.T) {
 		address := &common.Address{1, 2}
 		oldArray.SetOwner(address)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
 
-		migration.initPersistentSlabStorage(baseStorage)
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
-		migration.initOldInterpreter([]ledger.Payload{})
+		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
 		newValue := converter.Convert(oldArray)
@@ -94,12 +108,26 @@ func TestValueConversion(t *testing.T) {
 		address := &common.Address{1, 2}
 		oldDictionary.SetOwner(address)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
 
-		migration.initPersistentSlabStorage(baseStorage)
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
-		migration.initOldInterpreter([]ledger.Payload{})
+		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
 		newValue := converter.Convert(oldDictionary)
@@ -148,12 +176,26 @@ func TestValueConversion(t *testing.T) {
 			&owner,
 		)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, owner.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
 
-		migration.initPersistentSlabStorage(baseStorage)
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
-		migration.initOldInterpreter([]ledger.Payload{})
+		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
 		newValue := converter.Convert(oldComposite)
@@ -196,15 +238,29 @@ func TestEncoding(t *testing.T) {
 		encoded, _, err := oldInter.EncodeValue(oldArray, nil, false, nil)
 		require.NoError(t, err)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		address := common.Address{1, 2}
 
-		migration.initPersistentSlabStorage(baseStorage)
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
+
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
 		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 		migration.converter = NewValueConverter(migration)
-
-		address := common.Address{1, 2}
 
 		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
 		assert.NoError(t, err)
@@ -212,8 +268,8 @@ func TestEncoding(t *testing.T) {
 		err = migration.storage.Commit()
 		assert.NoError(t, err)
 
-		encodedValues := baseStorage.ReencodedPayloads
-		require.Len(t, encodedValues, 1)
+		encodedValues := ledgerView.Payloads()
+		require.Len(t, encodedValues, 3)
 
 		for _, encValue := range encodedValues {
 			assert.False(t, newInter.HasMagic(encValue.Value))
@@ -268,15 +324,30 @@ func TestEncoding(t *testing.T) {
 		encoded, _, err := oldInter.EncodeValue(oldDictionary, nil, false, nil)
 		require.NoError(t, err)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		address := common.Address{1, 2}
 
-		migration.initPersistentSlabStorage(baseStorage)
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
+
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
+		migration.initOldInterpreter(payloads)
 		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 		migration.converter = NewValueConverter(migration)
-
-		address := common.Address{1, 2}
 
 		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
 		assert.NoError(t, err)
@@ -284,8 +355,8 @@ func TestEncoding(t *testing.T) {
 		err = migration.storage.Commit()
 		assert.NoError(t, err)
 
-		encodedValues := baseStorage.ReencodedPayloads
-		require.Len(t, encodedValues, 1)
+		encodedValues := ledgerView.Payloads()
+		require.Len(t, encodedValues, 3)
 
 		for _, encValue := range encodedValues {
 			assert.False(t, newInter.HasMagic(encValue.Value))
@@ -349,15 +420,30 @@ func TestEncoding(t *testing.T) {
 		encoded, _, err := oldInter.EncodeValue(oldComposite, nil, false, nil)
 		require.NoError(t, err)
 
-		migration := &StorageFormatV6Migration{}
-		baseStorage := newEncodingBaseStorage()
+		address := common.Address{1, 2}
 
-		migration.initPersistentSlabStorage(baseStorage)
+		payloads := []ledger.Payload{
+			{
+				Key: ledger.NewKey([]ledger.KeyPart{
+					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartController, []byte{}),
+					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+				}),
+				Value: ledger.Value(
+					uint64ToBinary(
+						uint64(0), // dummy value
+					),
+				),
+			},
+		}
+		ledgerView := newView(payloads)
+
+		migration := &StorageFormatV6Migration{}
+		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
+		migration.initOldInterpreter(payloads)
 		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
 		migration.converter = NewValueConverter(migration)
-
-		address := common.Address{1, 2}
 
 		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
 		assert.NoError(t, err)
@@ -365,8 +451,8 @@ func TestEncoding(t *testing.T) {
 		err = migration.storage.Commit()
 		assert.NoError(t, err)
 
-		encodedValues := baseStorage.ReencodedPayloads
-		require.Len(t, encodedValues, 3)
+		encodedValues := ledgerView.Payloads()
+		require.Len(t, encodedValues, 5)
 
 		for _, encValue := range encodedValues {
 			assert.False(t, newInter.HasMagic(encValue.Value))
@@ -462,6 +548,18 @@ func TestPayloadsMigration(t *testing.T) {
 
 	payloads := []ledger.Payload{
 		{
+			Key: ledger.NewKey([]ledger.KeyPart{
+				ledger.NewKeyPart(state.KeyPartOwner, owner.Bytes()),
+				ledger.NewKeyPart(state.KeyPartController, []byte{}),
+				ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
+			}),
+			Value: ledger.Value(
+				uint64ToBinary(
+					uint64(0), // dummy value
+				),
+			),
+		},
+		{
 			Key:   ledger.NewKey(keyParts),
 			Value: ledger.Value(encoded),
 		},
@@ -481,7 +579,7 @@ func TestPayloadsMigration(t *testing.T) {
 	migratedPayloads, err := storageFormatV6Migration.migrate(payloads)
 	require.NoError(t, err)
 
-	assert.Len(t, migratedPayloads, 3)
+	assert.Len(t, migratedPayloads, 5)
 
 	// Check whether the query works with new ledger
 
@@ -550,6 +648,7 @@ func (*innerStorageImpl) name() string {
 }
 
 func TestContractValueRetrieval(t *testing.T) {
+	t.Parallel()
 
 	address := common.Address{1, 2}
 
@@ -639,22 +738,15 @@ func TestContractValueRetrieval(t *testing.T) {
 	// After migration
 
 	migration := &StorageFormatV6Migration{}
-	baseStorage := newEncodingBaseStorage()
-
-	migration.initPersistentSlabStorage(baseStorage)
-	migration.initNewInterpreter()
-	migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
-	migration.converter = NewValueConverter(migration)
-
 	migratedPayloads, err := migration.migrate(payloads)
 	require.NoError(t, err)
 
 	// Must contain total of 5 payloads:
-	//  - 3 x fvm registers
+	//  - 4 x fvm registers
 	//      - contract code
 	//      - contract_names
 	//      - storage_used
-	//  - 1 x storage_index
+	//      - storage_index
 	//  - 1 x cadence payload
 	require.Len(t, migratedPayloads, 5)
 
