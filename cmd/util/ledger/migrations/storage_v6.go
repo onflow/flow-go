@@ -1204,7 +1204,7 @@ func getValue(
 		}
 	}()
 
-	value = dictionary.Get(inter, nil, key)
+	value = dictionary.Get(inter, oldInter.ReturnEmptyLocationRange, key)
 
 	if someValue, ok := value.(*oldInter.SomeValue); ok {
 		value = someValue.Value
