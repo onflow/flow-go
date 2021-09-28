@@ -595,58 +595,6 @@ func TestPayloadsMigration(t *testing.T) {
 	assert.False(t, newInter.HasMagic(migratedValue))
 }
 
-// Test for the 'Store' method implementation of delegationStorage.
-// This ensures the 'Store' method of the overridden custom
-// base storage gets invoked.
-func TestDelegation(t *testing.T) {
-	t.Parallel()
-
-	var s storageInterface = &delegator{}
-
-	// s.name() must invoke the respective method from the
-	// overridden implementation. i.e: 'overrider.name()'
-	assert.Equal(t, "overrider", s.name())
-}
-
-type storageInterface interface {
-	name() string
-}
-
-var _ storageInterface = &overrider{}
-var _ storageInterface = &storageImpl{}
-var _ storageInterface = &innerStorageImpl{}
-var _ storageInterface = &delegator{}
-
-// delegator does not define method 'name'.
-// Instead, delegates to overrider and storageImpl,
-// where both have the same method.
-type delegator struct {
-	*overrider // overrides the inner implementation of storageImpl
-	*storageImpl
-}
-
-// overrider defines method 'name'
-type overrider struct {
-}
-
-func (*overrider) name() string {
-	return "overrider"
-}
-
-// storageImpl does not define method 'name',
-// but delegates to innerStorageImpl.
-type storageImpl struct {
-	*innerStorageImpl
-}
-
-// innerStorageImpl defines method 'name'
-type innerStorageImpl struct {
-}
-
-func (*innerStorageImpl) name() string {
-	return "inner implementation"
-}
-
 func TestContractValueRetrieval(t *testing.T) {
 	t.Parallel()
 
