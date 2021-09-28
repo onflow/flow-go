@@ -1,4 +1,4 @@
-package compressedStream
+package compressed
 
 import (
 	"bufio"
