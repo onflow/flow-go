@@ -3,11 +3,11 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"path/filepath"
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	io "github.com/onflow/flow-go/utils/io"
 )

@@ -3,7 +3,6 @@ package cmd
 import (
 	"encoding/hex"
 	"fmt"
-	"github.com/onflow/flow-go/utils/io"
 	"os"
 	"regexp"
 
@@ -16,6 +15,7 @@ import (
 
 	utils "github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
