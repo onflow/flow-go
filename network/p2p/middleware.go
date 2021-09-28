@@ -27,14 +27,6 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-type communicationMode int
-
-const (
-	NoOp communicationMode = iota
-	OneToOne
-	OneToK
-)
-
 const (
 	_  = iota
 	kb = 1 << (10 * iota)
