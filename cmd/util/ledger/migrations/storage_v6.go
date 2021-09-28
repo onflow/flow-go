@@ -1294,29 +1294,35 @@ func ConvertStaticType(staticType oldInter.StaticType) newInter.StaticType {
 	switch typ := staticType.(type) {
 	case oldInter.CompositeStaticType:
 		return newInter.NewCompositeStaticType(typ.Location, typ.QualifiedIdentifier)
+
 	case oldInter.InterfaceStaticType:
 		return newInter.InterfaceStaticType{
 			Location:            typ.Location,
 			QualifiedIdentifier: typ.QualifiedIdentifier,
 		}
+
 	case oldInter.VariableSizedStaticType:
 		return newInter.VariableSizedStaticType{
 			Type: ConvertStaticType(typ.Type),
 		}
+
 	case oldInter.ConstantSizedStaticType:
 		return newInter.ConstantSizedStaticType{
 			Type: ConvertStaticType(typ.Type),
 			Size: typ.Size,
 		}
+
 	case oldInter.DictionaryStaticType:
 		return newInter.DictionaryStaticType{
 			KeyType:   ConvertStaticType(typ.KeyType),
 			ValueType: ConvertStaticType(typ.ValueType),
 		}
+
 	case oldInter.OptionalStaticType:
 		return newInter.OptionalStaticType{
 			Type: ConvertStaticType(typ.Type),
 		}
+
 	case *oldInter.RestrictedStaticType:
 		restrictions := make([]newInter.InterfaceStaticType, 0, len(typ.Restrictions))
 		for _, oldInterfaceType := range typ.Restrictions {
@@ -1328,23 +1334,27 @@ func ConvertStaticType(staticType oldInter.StaticType) newInter.StaticType {
 			Type:         ConvertStaticType(typ.Type),
 			Restrictions: restrictions,
 		}
+
 	case oldInter.ReferenceStaticType:
 		return newInter.ReferenceStaticType{
 			Authorized: typ.Authorized,
 			Type:       ConvertStaticType(typ.Type),
 		}
+
 	case oldInter.CapabilityStaticType:
-		var burrowType newInter.StaticType
+		var borrowType newInter.StaticType
 
 		if typ.BorrowType != nil {
-			burrowType = ConvertStaticType(typ.BorrowType)
+			borrowType = ConvertStaticType(typ.BorrowType)
 		}
 
 		return newInter.CapabilityStaticType{
-			BorrowType: burrowType,
+			BorrowType: borrowType,
 		}
+
 	case oldInter.PrimitiveStaticType:
 		return ConvertPrimitiveStaticType(typ)
+
 	default:
 		panic(fmt.Errorf("cannot covert static type: %s", staticType))
 	}
@@ -1436,7 +1446,7 @@ func ConvertPrimitiveStaticType(staticType oldInter.PrimitiveStaticType) newInte
 	case oldInter.PrimitiveStaticTypeUInt256:
 		return newInter.PrimitiveStaticTypeUInt256
 
-	// Word *
+	// Word*
 
 	case oldInter.PrimitiveStaticTypeWord8:
 		return newInter.PrimitiveStaticTypeWord8
