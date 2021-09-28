@@ -150,8 +150,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	participants := model.ToIdentityList(stakingNodes).Sort(order.Canonical)
 
 	log.Info().Msg("reading root block data")
-	rootBlockData := readRootBlockData()
-	block := rootBlockData.Block
+	block := readRootBlock()
 	log.Info().Msg("")
 
 	log.Info().Msg("reading dkg pub data")
@@ -165,7 +164,7 @@ func finalize(cmd *cobra.Command, args []string) {
 	log.Info().Msg("constructing root QC")
 	rootQC := constructRootQC(
 		block,
-		rootBlockData.Votes,
+		nil,
 		model.FilterByRole(internalNodes, flow.RoleConsensus),
 		signer,
 		dkgData,
@@ -431,14 +430,14 @@ func mergeNodeInfos(internalNodes, partnerNodes []model.NodeInfo) []model.NodeIn
 	return nodes
 }
 
-// readRootBlockData reads root block data from disc, this file needs to be prepared with
+// readRootBlock reads root block data from disc, this file needs to be prepared with
 // rootblock command
-func readRootBlockData() *inmem.EncodableRootBlockData {
-	rootBlockData, err := utils.ReadRootBlockData(flagRootBlock)
+func readRootBlock() *flow.Block {
+	rootBlock, err := utils.ReadRootBlock(flagRootBlock)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read root block data")
 	}
-	return rootBlockData
+	return rootBlock
 }
 
 func readDKGPubData() inmem.EncodableDKG {

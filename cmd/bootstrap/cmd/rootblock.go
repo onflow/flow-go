@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
 var (
@@ -100,21 +99,15 @@ func rootBlock(cmd *cobra.Command, args []string) {
 
 	log.Info().Msg("constructing root block")
 	block := constructRootBlock(flagRootChain, flagRootParent, flagRootHeight, flagRootTimestamp)
+	writeJSON(model.PathRootBlockData, block)
 	log.Info().Msg("")
 
-	log.Info().Msg("constructing votes")
-	votes := constructRootVotes(
+	log.Info().Msg("constructing and writing votes")
+	constructRootVotes(
 		block,
 		model.FilterByRole(stakingNodes, flow.RoleConsensus),
 		model.FilterByRole(internalNodes, flow.RoleConsensus),
 		dkgData,
 	)
 	log.Info().Msg("")
-
-	writeJSON(model.PathRootBlockData, inmem.EncodableRootBlockData{
-		Block: block,
-		Votes: votes,
-	})
-	log.Info().Msg("")
-	log.Info().Msg("Done - Created root block data")
 }
