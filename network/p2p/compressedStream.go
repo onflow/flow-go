@@ -40,19 +40,14 @@ func (c *compressedStream) Write(b []byte) (int, error) {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
-	n, err := c.w.Write(b)
-	if err != nil {
-		return -1, fmt.Errorf("could not write on compressed writer: %w", err)
-	}
-
-	return n, nil
+	return c.w.Write(b)
 }
 
 func (c *compressedStream) Read(b []byte) (int, error) {
 	if c.r == nil {
-		r, err := c.compressor.NewReader(c)
+		r, err := c.compressor.NewReader(c.Stream)
 		if err != nil {
-			return -1, fmt.Errorf("could not create compressor reader: %w", err)
+			return 0, fmt.Errorf("could not create compressor reader: %w", err)
 		}
 
 		c.r = r
@@ -60,7 +55,7 @@ func (c *compressedStream) Read(b []byte) (int, error) {
 
 	n, err := c.r.Read(b)
 	if err != nil {
-		return -1, fmt.Errorf("could not write on compressed reader: %w", err)
+		c.r.Close()
 	}
 	return n, nil
 }
