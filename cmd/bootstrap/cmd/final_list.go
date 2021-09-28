@@ -51,7 +51,8 @@ func finalList(cmd *cobra.Command, args []string) {
 	flowNodes := assembleInternalNodesWithoutStake()
 
 	log.Info().Msg("checking constraints on consensus/cluster nodes")
-	checkConstraints(partnerNodes, flowNodes)
+	checkConsensusConstraints(partnerNodes, flowNodes)
+	checkCollectionConstraints(partnerNodes, flowNodes)
 
 	log.Info().Msgf("reading staking contract node information: %s", flagStakingNodesPath)
 	stakingNodes := readStakingContractDetails()

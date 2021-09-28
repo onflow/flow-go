@@ -68,6 +68,25 @@ func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.
 	return qc, err
 }
 
+func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData) ([]*model.Vote, error) {
+	_, signers, err := createValidators(participantData)
+	if err != nil {
+		return nil, err
+	}
+
+	hotBlock := model.GenesisBlockFromFlow(block.Header)
+
+	votes := make([]*model.Vote, 0, len(signers))
+	for _, signer := range signers {
+		vote, err := signer.CreateVote(hotBlock)
+		if err != nil {
+			return nil, err
+		}
+		votes = append(votes, vote)
+	}
+	return votes, nil
+}
+
 func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
 	n := len(participantData.Participants)
 	identities := participantData.Identities()

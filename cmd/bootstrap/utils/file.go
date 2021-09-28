@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
 
@@ -28,4 +29,21 @@ func ReadRootProtocolSnapshot(bootDir string) (*inmem.Snapshot, error) {
 	}
 
 	return snapshot, nil
+}
+
+func ReadRootBlockData(bootDir string) (*inmem.EncodableRootBlockData, error) {
+	rootBlockDataPath := filepath.Join(bootDir, model.PathRootBlockData)
+
+	// read snapshot file bytes
+	bytes, err := io.ReadFile(rootBlockDataPath)
+	if err != nil {
+		return nil, fmt.Errorf("could not read snapshot: %w", err)
+	}
+
+	var encodable inmem.EncodableRootBlockData
+	err = json.Unmarshal(bytes, &encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not unmarshal snapshot data retreived from access node: %w", err)
+	}
+	return &encodable, nil
 }

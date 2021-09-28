@@ -9,8 +9,7 @@ import (
 // Checks constraints about the number of partner and internal nodes.
 // Internal nodes must comprise >2/3 of consensus committee.
 // Internal nodes must comprise >2/3 of each collector cluster.
-func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
-
+func checkConsensusConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 	partners := model.ToIdentityList(partnerNodes)
 	internals := model.ToIdentityList(internalNodes)
 	all := append(partners, internals...)
@@ -39,6 +38,14 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 	//		partnerCONCount, internalCONCount, partnerCONCount*2+1)
 	//}
 
+}
+
+// Checks constraints about the number of partner and internal nodes.
+// Internal nodes must comprise >2/3 of consensus committee.
+// Internal nodes must comprise >2/3 of each collector cluster.
+func checkCollectionConstraints(partnerNodes, internalNodes []model.NodeInfo) {
+	partners := model.ToIdentityList(partnerNodes)
+	internals := model.ToIdentityList(internalNodes)
 	// check collection committee Byzantine threshold for each cluster
 	// for checking Byzantine constraints, the seed doesn't matter
 	_, clusters := constructClusterAssignment(partnerNodes, internalNodes, 0)
