@@ -3,16 +3,14 @@ package compressor
 import (
 	"compress/gzip"
 	"io"
-
-	"github.com/libp2p/go-libp2p-core/network"
 )
 
 type GzipStreamCompressor struct{}
 
-func (g GzipStreamCompressor) NewReader(s network.Stream) (io.ReadCloser, error) {
-	return gzip.NewReader(s)
+func (g GzipStreamCompressor) NewReader(r io.Reader) (io.ReadCloser, error) {
+	return gzip.NewReader(r)
 }
 
-func (g GzipStreamCompressor) NewWriter(s network.Stream) (io.WriteCloser, error) {
-	return gzip.NewWriter(s), nil
+func (g GzipStreamCompressor) NewWriter(w io.Writer) (io.WriteCloser, error) {
+	return gzip.NewWriter(w), nil
 }
