@@ -9,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/state/protocol/inmem"
 )
 
-// NOTE: allNodes must be in the same order as when generating the DKG
+// constructRootQC constructs root QC based on root block, votes and dkg info
 func constructRootQC(block *flow.Block, votes []*model.Vote, internalNodes []bootstrap.NodeInfo, signer dkg.DKGParticipantPriv, dkgData inmem.EncodableDKG) *flow.QuorumCertificate {
 	participantData, err := run.GenerateQCSignerParticipantData(internalNodes, signer, dkgData)
 	if err != nil {
