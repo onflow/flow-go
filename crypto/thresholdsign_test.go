@@ -55,14 +55,14 @@ func testStatefulThresholdSignatureSimpleKeyGen(t *testing.T) {
 		require.NoError(t, err)
 		err = ts.SetKeys(skShares[index], pkGroup, pkShares)
 		require.NoError(t, err)
-		ts.SetMessageToSign(messageToSign)
+		ts.SetMessage(message)
 		// commit a non staged share
 		err = ts.CommitShare()
 		assert.Error(t, err)
 		// create (t+1) signatures of the first randomly chosen signers
 		for j := 0; j < threshold+1; j++ {
 			i := signers[j]
-			share, err := skShares[i].Sign(messageToSign, kmac)
+			share, err := skShares[i].Sign(message, kmac)
 			require.NoError(t, err)
 			verif, err := ts.VerifyAndStageShare(i, share)
 			assert.NoError(t, err)
@@ -77,7 +77,7 @@ func testStatefulThresholdSignatureSimpleKeyGen(t *testing.T) {
 		// verify and commit when threshold is reached
 		if threshold+1 < n {
 			i := signers[threshold+1]
-			share, err := skShares[i].Sign(messageToSign, kmac)
+			share, err := skShares[i].Sign(message, kmac)
 			require.NoError(t, err)
 			verif, err := ts.VerifyAndStageShare(i, share)
 			assert.NoError(t, err)
@@ -89,7 +89,7 @@ func testStatefulThresholdSignatureSimpleKeyGen(t *testing.T) {
 		}
 		// verify an existing share
 		i := signers[0]
-		share, err := skShares[i].Sign(messageToSign, kmac)
+		share, err := skShares[i].Sign(message, kmac)
 		require.NoError(t, err)
 		verif, err := ts.VerifyAndStageShare(i, share)
 		assert.NoError(t, err)
@@ -294,7 +294,7 @@ func testStatelessThresholdSignatureFeldmanVSS(t *testing.T) {
 	sync.Wait()
 }
 
-var messageToSign = []byte{1, 2, 3}
+var message = []byte{1, 2, 3}
 
 // This is a testing function
 // It simulates processing incoming messages by a node during DKG
@@ -338,7 +338,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 				require.NoError(t, err)
 				err = proc.ts.SetKeys(sk, groupPK, nodesPK)
 				require.NoError(t, err)
-				proc.ts.SetMessageToSign(messageToSign)
+				proc.ts.SetMessage(message)
 				// needed to test the statless api
 				proc.keys = &statelessKeys{sk, groupPK, nodesPK}
 			}
@@ -401,7 +401,7 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 	n := proc.dkg.Size()
 	// Sign a share and broadcast it
 	kmac := NewBLSKMAC(thresholdSignatureTag)
-	ownSignShare, _ := proc.keys.currentPrivateKey.Sign(messageToSign, kmac)
+	ownSignShare, _ := proc.keys.currentPrivateKey.Sign(message, kmac)
 	// the local valid signature shares
 	signShares := make([]Signature, 0, n)
 	signers := make([]int, 0, n)
@@ -414,7 +414,7 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 		select {
 		case newMsg := <-proc.chans[proc.current]:
 			log.Debugf("%d Receiving TS from %d:", proc.current, newMsg.orig)
-			verif, err := proc.keys.publicKeyShares[newMsg.orig].Verify(newMsg.data, messageToSign, kmac)
+			verif, err := proc.keys.publicKeyShares[newMsg.orig].Verify(newMsg.data, message, kmac)
 			require.NoError(t, err)
 			assert.True(t, verif,
 				"the signature share sent from %d to %d is not correct", newMsg.orig,
@@ -439,7 +439,7 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 				// Reconstruct the threshold signature
 				thresholdSignature, err := ReconstructThresholdSignature(n, optimalThreshold(n), signShares, signers)
 				assert.NoError(t, err)
-				verif, err = proc.keys.groupPublicKey.Verify(thresholdSignature, messageToSign, kmac)
+				verif, err = proc.keys.groupPublicKey.Verify(thresholdSignature, message, kmac)
 				require.NoError(t, err)
 				assert.True(t, verif, "the threshold signature is not correct")
 				if verif {
@@ -484,9 +484,9 @@ func testStatelessThresholdSignatureSimpleKeyGen(t *testing.T) {
 		// create (t+1) signatures of the first randomly chosen signers
 		for j := 0; j < threshold+1; j++ {
 			i := signers[j]
-			share, err := skShares[i].Sign(messageToSign, kmac)
+			share, err := skShares[i].Sign(message, kmac)
 			require.NoError(t, err)
-			verif, err := pkShares[i].Verify(share, messageToSign, kmac)
+			verif, err := pkShares[i].Verify(share, message, kmac)
 			require.NoError(t, err)
 			assert.True(t, verif, "signature share is not valid")
 			if verif {
@@ -496,7 +496,7 @@ func testStatelessThresholdSignatureSimpleKeyGen(t *testing.T) {
 		// reconstruct and test the threshold signature
 		thresholdSignature, err := ReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 		require.NoError(t, err)
-		verif, err := pkGroup.Verify(thresholdSignature, messageToSign, kmac)
+		verif, err := pkGroup.Verify(thresholdSignature, message, kmac)
 		require.NoError(t, err)
 		assert.True(t, verif, "signature share is not valid")
 

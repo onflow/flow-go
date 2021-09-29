@@ -24,16 +24,15 @@ import (
 // Although the API allows using arbitrary values of (t),
 // the threshold signature scheme is secure in the presence of up to (t)
 // malicious participants when (t < n/2).
-// In Flow, the input threshold value (t) is set to
-// t = floor((n-1)/2) to optimize for unforgeability and robustness.
+// In order to optimize equally for unforgeability and robustness,
+// the input threshold value (t) should be set to t = floor((n-1)/2).
 
 // The package offers two api:
 // - stateful api where a structure holds all information
 //  of the threshold signature protocols and is recommended
 //  to be used for safety and to reduce protocol inconsistencies.
-// - stateless api where only a to reconstruct the signature
-// is provided. Verifying and storing the signature shares
-// has to be done outside of the library.
+// - stateless api with signature reconstruction. Verifying and storing
+// the signature shares has to be managed outside of the library.
 
 // thresholdSigner is part of the stateful api
 // It holds the data needed for threshold signaures
@@ -45,20 +44,21 @@ type thresholdSigner struct {
 	threshold int
 	// the index of the current node
 	currentIndex int
-	// the current node private key (a DKG output)
+	// the current node private key (a threshold KG output)
 	currentPrivateKey PrivateKey
-	// the group public key (a DKG output)
+	// the group public key (a threshold KG output)
 	groupPublicKey PublicKey
-	// the group public key shares (a DKG output)
+	// the group public key shares (a threshold KG output)
 	publicKeyShares []PublicKey
 	// the hasher to be used for all signatures
 	hashAlgo hash.Hasher
 	// the message to be signed. Siganture shares and the threshold signature
-	// are verified using this message
-	messageToSign []byte
+	// are verified against this message
+	message []byte
 	// the valid signature shares received from other nodes
-	shares []byte // simulates an array of Signatures
-	// (or a matrix of by bytes) to accommodate a cgo constraint
+	// simulates an array of Signatures (or a matrix of bytes)
+	// to accommodate a cgo constraint
+	shares []byte
 	// the list of signers corresponding to the list of shares
 	signers []index
 	// the threshold signature. It is equal to nil if less than (t+1) shares are
@@ -137,11 +137,11 @@ func (s *thresholdSigner) SetKeys(currentPrivateKey PrivateKey,
 	return nil
 }
 
-// SetMessageToSign sets the next message to be signed.
+// SetMessage sets the next message to be signed.
 // All signatures shares of a different message are ignored
-func (s *thresholdSigner) SetMessageToSign(message []byte) {
+func (s *thresholdSigner) SetMessage(message []byte) {
 	s.ClearShares()
-	s.messageToSign = message
+	s.message = message
 }
 
 // SignShare generates a signature share using the current private key share
@@ -150,7 +150,7 @@ func (s *thresholdSigner) SignShare() (Signature, error) {
 		return nil, errors.New("the private key of the current node is not set")
 	}
 	// sign
-	share, err := s.currentPrivateKey.Sign(s.messageToSign, s.hashAlgo)
+	share, err := s.currentPrivateKey.Sign(s.message, s.hashAlgo)
 	if err != nil {
 		if IsInvalidInputsError(err) {
 			newInvalidInputsError("share signature failed: %s", err)
@@ -177,7 +177,7 @@ func (s *thresholdSigner) verifyShare(share Signature, signerIndex index) (bool,
 		return false, errors.New("the node public keys are not set")
 	}
 
-	return s.publicKeyShares[signerIndex].Verify(share, s.messageToSign, s.hashAlgo)
+	return s.publicKeyShares[signerIndex].Verify(share, s.message, s.hashAlgo)
 }
 
 // VerifyThresholdSignature verifies a threshold signature using the group public key
@@ -185,7 +185,7 @@ func (s *thresholdSigner) VerifyThresholdSignature(thresholdSignature Signature)
 	if s.groupPublicKey == nil {
 		return false, errors.New("the group public key is not set")
 	}
-	return s.groupPublicKey.Verify(thresholdSignature, s.messageToSign, s.hashAlgo)
+	return s.groupPublicKey.Verify(thresholdSignature, s.message, s.hashAlgo)
 }
 
 // ClearShares clears the shares and signers lists
