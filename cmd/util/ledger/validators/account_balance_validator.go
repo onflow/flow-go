@@ -7,9 +7,10 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	oldCommon "github.com/onflow/cadence/runtime/common"
-	oldInterpreter "github.com/onflow/cadence/runtime/interpreter"
+	oldCadence "github.com/onflow/cadence/v19"
+	oldjsoncdc "github.com/onflow/cadence/v19/encoding/json"
 	oldRuntime "github.com/onflow/cadence/v19/runtime"
+	oldInterpreter "github.com/onflow/cadence/v19/runtime/interpreter"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
@@ -252,7 +253,7 @@ func (c *oldVersionCollector) CollectBalances(addresses chan uint64, balances ch
 			},
 			oldRuntime.Context{
 				Interface: c.env,
-				Location:  oldCommon.ScriptLocation("LOCATION"),
+				Location:  oldRuntime.ScriptLocation("LOCATION"),
 			},
 		)
 
@@ -299,7 +300,7 @@ func (i *oldInter) SetProgram(location oldRuntime.Location, program *oldInterpre
 	i.programs[location] = program
 	return nil
 }
-func (i *oldInter) GetProgram(location oldCommon.Location) (*oldInterpreter.Program, error) {
+func (i *oldInter) GetProgram(location oldRuntime.Location) (*oldInterpreter.Program, error) {
 	return i.programs[location], nil
 }
 func (i *oldInter) GetCode(_ oldRuntime.Location) ([]byte, error) { return nil, nil }
@@ -349,7 +350,7 @@ func (i *oldInter) GetSigningAccounts() ([]oldRuntime.Address, error) {
 func (i *oldInter) ProgramLog(_ string) error {
 	return nil
 }
-func (i *oldInter) EmitEvent(_ cadence.Event) error {
+func (i *oldInter) EmitEvent(_ oldCadence.Event) error {
 	return nil
 }
 func (i *oldInter) GenerateUUID() (uint64, error) {
@@ -361,8 +362,8 @@ func (i *oldInter) GetComputationLimit() uint64 {
 func (i *oldInter) SetComputationUsed(uint64) error {
 	return nil
 }
-func (i *oldInter) DecodeArgument(_ []byte, _ cadence.Type) (cadence.Value, error) {
-	return nil, nil
+func (i *oldInter) DecodeArgument(input []byte, _ oldCadence.Type) (oldCadence.Value, error) {
+	return oldjsoncdc.Decode(input)
 }
 func (i *oldInter) GetCurrentBlockHeight() (uint64, error) {
 	return 0, nil
