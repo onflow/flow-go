@@ -1,12 +1,14 @@
 package handler
 
 import (
+	errors2 "errors"
 	"testing"
 	"unicode/utf8"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -44,6 +46,9 @@ func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
 
 	err = akh.AddEncodedAccountKey(runtime.Address(address), encodedPublicKey)
 	require.Error(t, err)
+
+	err = errors2.Unwrap(err)
+	require.IsType(t, &errors.ValueError{}, err)
 
 	errorString := err.Error()
 	assert.True(t, utf8.ValidString(errorString))
