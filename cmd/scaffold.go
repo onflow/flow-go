@@ -481,6 +481,7 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 
 	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
 	// attempt to read an encryption key for the secrets DB from the canonical path
+	// TODO enforce encryption in an upcoming spork https://github.com/dapperlabs/flow-go/issues/5893
 	encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.NodeID)
 	if errors.Is(err, os.ErrNotExist) {
 		fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
