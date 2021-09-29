@@ -85,7 +85,7 @@ func addFinalizeCmdFlags() {
 
 	// required parameters for generation of root block, root execution result and root block seal
 	finalizeCmd.Flags().StringVar(&flagRootBlock, "root-block", "",
-		"path to a JSON file containing root block and votes")
+		"path to a JSON file containing root block")
 	finalizeCmd.Flags().StringVar(&flagRootBlockVotesDir, "root-block-votes-dir", "", "path to directory with votes for root block")
 	finalizeCmd.Flags().StringVar(&flagRootCommit, "root-commit", "0000000000000000000000000000000000000000000000000000000000000000", "state commitment of root execution state")
 	finalizeCmd.Flags().Uint64Var(&flagEpochCounter, "epoch-counter", 0, "epoch counter for the epoch beginning with the root block")
