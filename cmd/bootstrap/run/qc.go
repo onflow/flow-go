@@ -88,6 +88,9 @@ func createValidators(participantData *ParticipantData, identities flow.Identity
 
 	fmt.Println("len(participants)", len(participantData.Participants))
 	fmt.Println("len(identities)", len(identities))
+	for _, id := range identities {
+		fmt.Println(id.NodeID, id.Address, id.StakingPubKey.String())
+	}
 
 	groupSize := uint(len(participantData.Participants))
 	if groupSize < uint(n) {
