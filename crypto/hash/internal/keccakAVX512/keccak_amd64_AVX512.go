@@ -7,13 +7,19 @@
 
 package keccakAVX512
 
-/*
 // check if the amd64 machine supports AVX512 instructions at build time and call
 // an assembly function using AVX512 if so.
+
+/*
+#cgo CFLAGS: -march=native
+
+#include <stdio.h>
 #if (defined __AVX512F__)
 	void keccakF1600_AVX512(unsigned long* state);
 #else
-	void keccakF1600_AVX512(unsigned long* state) {};
+	void keccakF1600_AVX512(unsigned long* state) {
+		printf("ERROR: the package is misconfigured\n");
+	};
 #endif
 */
 import "C"
