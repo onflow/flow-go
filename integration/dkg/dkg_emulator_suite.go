@@ -436,6 +436,12 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 		controllerFactoryLogger = zerolog.New(os.Stdout).Hook(hook)
 	}
 
+	// create a config with no delays for tests
+	config := dkg.ControllerConfig{
+		BaseStartDelay:                0,
+		BaseHandleFirstBroadcastDelay: 0,
+	}
+
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -448,6 +454,7 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 			core.Me,
 			node.dkgContractClient,
 			brokerTunnel,
+			config,
 		),
 		viewsObserver,
 	)
