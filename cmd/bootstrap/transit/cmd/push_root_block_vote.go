@@ -110,13 +110,13 @@ func pushVote(c *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not load private node info")
 	}
 
-	voteFile := fmt.Sprintf(FilenameRootBlockVote, nodeID)
+	voteFile := fmt.Sprintf(bootstrap.PathNodeRootBlockVote, nodeID)
 
 	if err = io.WriteJSON(filepath.Join(flagBootDir, voteFile), vote); err != nil {
 		log.Fatal().Err(err).Msg("could not write vote to file")
 	}
 
-	destination := filepath.Join(flagToken, voteFile)
+	destination := filepath.Join(flagToken, fmt.Sprintf(bootstrap.FilenameRootBlockVote, nodeID))
 	source := filepath.Join(flagBootDir, voteFile)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)

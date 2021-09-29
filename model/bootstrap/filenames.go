@@ -39,4 +39,5 @@ var (
 	PathNodeMachineAccountInfoPriv   = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-machine-account-info.priv.json") // %v will be replaced by NodeID
 	PathRandomBeaconPriv             = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameRandomBeaconPriv)              // %v will be replaced by NodeID
 	PathNodeRootBlockVote            = filepath.Join(DirPrivateRoot, "private-node-info_%v", "root-block-vote.json")
+	FilenameRootBlockVote            = FilenameRootBlockVotePrefix + "%v.json"
 )
