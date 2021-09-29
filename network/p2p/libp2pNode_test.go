@@ -465,6 +465,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 
 // TestStreamClosing tests 1-1 communication with streams closed using libp2p2 handler.FullClose
 func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
+	suite.T().Skip("QUARANTINED as FLAKY: closing network.Stream.Close() often errors in handler function, thereby failing this test")
 
 	count := 10
 	ch := make(chan string, count)

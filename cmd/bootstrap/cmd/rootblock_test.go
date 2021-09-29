@@ -36,7 +36,7 @@ const rootBlockHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`constructing root block` +
 	`wrote file \S+/root-block.json` +
 	`constructing and writing votes` +
-	`wrote file \S+/root-block-vote.json`
+	`wrote file \S+/root-block-vote.\S+.json`
 
 var rootBlockHappyPathRegex = regexp.MustCompile(rootBlockHappyPathLogs)
 
