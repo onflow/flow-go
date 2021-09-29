@@ -20,7 +20,9 @@ var (
 	PathNodeInfosPub          = filepath.Join(DirnamePublicBootstrap, "node-infos.pub.json")
 	PathPartnerNodeInfoPrefix = filepath.Join(DirnamePublicBootstrap, "node-info.pub.")
 	PathNodeInfoPub           = filepath.Join(DirnamePublicBootstrap, "node-info.pub.%v.json") // %v will be replaced by NodeID
+	DirnameRootBlockVotes     = filepath.Join(DirnamePublicBootstrap, "root-block-votes")
 
+	PathRootBlockData             = filepath.Join(DirnamePublicBootstrap, "root-block.json")
 	PathRootProtocolStateSnapshot = filepath.Join(DirnamePublicBootstrap, "root-protocol-state-snapshot.json")
 
 	FilenameWALRootCheckpoint = "root.checkpoint"
@@ -30,8 +32,11 @@ var (
 	DirPrivateRoot                   = "private-root-information"
 	FilenameRandomBeaconPriv         = "random-beacon.priv.json"
 	PathPrivNodeInfoPrefix           = "node-info.priv."
+	FilenameRootBlockVotePrefix      = "root-block-vote."
+	PathRootDKGData                  = filepath.Join(DirPrivateRoot, "root-dkg-data.priv.json")
 	PathNodeInfoPriv                 = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-info.priv.json")                 // %v will be replaced by NodeID
 	PathNodeMachineAccountPrivateKey = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-machine-account-key.priv.json")  // %v will be replaced by NodeID
 	PathNodeMachineAccountInfoPriv   = filepath.Join(DirPrivateRoot, "private-node-info_%v", "node-machine-account-info.priv.json") // %v will be replaced by NodeID
 	PathRandomBeaconPriv             = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameRandomBeaconPriv)              // %v will be replaced by NodeID
+	PathNodeRootBlockVote            = filepath.Join(DirPrivateRoot, "private-node-info_%v", "root-block-vote.json")
 )
