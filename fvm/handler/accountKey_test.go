@@ -7,11 +7,12 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestAddEncodedAccountKey_error_handling_produces_valid_utf8(t *testing.T) {
