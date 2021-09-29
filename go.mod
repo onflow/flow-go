@@ -42,8 +42,8 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/atree v0.0.0-20210928205029-aa2f8ef7ca5f
-	github.com/onflow/cadence v0.20.0-beta4
+	github.com/onflow/atree v0.1.0-beta1
+	github.com/onflow/cadence v0.20.0-beta5
 	github.com/onflow/cadence/v19 v19.0.0-00010101000000-000000000000
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
