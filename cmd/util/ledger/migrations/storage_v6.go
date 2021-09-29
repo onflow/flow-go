@@ -1223,7 +1223,7 @@ func getValue(
 		}
 	}()
 
-	value = dictionary.Get(inter, nil, key)
+	value = dictionary.Get(inter, oldInter.ReturnEmptyLocationRange, key)
 
 	if someValue, ok := value.(*oldInter.SomeValue); ok {
 		value = someValue.Value
@@ -1271,15 +1271,15 @@ func (c *ValueConverter) VisitCapabilityValue(_ *oldInter.Interpreter, value old
 	address := c.Convert(value.Address).(newInter.AddressValue)
 	pathValue := c.Convert(value.Path).(newInter.PathValue)
 
-	var burrowType newInter.StaticType
+	var borrowType newInter.StaticType
 	if value.BorrowType != nil {
-		burrowType = ConvertStaticType(value.BorrowType)
+		borrowType = ConvertStaticType(value.BorrowType)
 	}
 
 	c.result = &newInter.CapabilityValue{
 		Address:    address,
 		Path:       pathValue,
-		BorrowType: burrowType,
+		BorrowType: borrowType,
 	}
 }
 
