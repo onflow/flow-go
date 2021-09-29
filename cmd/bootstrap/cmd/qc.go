@@ -12,12 +12,14 @@ import (
 
 // constructRootQC constructs root QC based on root block, votes and dkg info
 func constructRootQC(block *flow.Block, votes []*model.Vote, allNodes, internalNodes []bootstrap.NodeInfo, dkgData dkg.DKGData) *flow.QuorumCertificate {
+
+	identities := bootstrap.ToIdentityList(allNodes)
 	participantData, err := run.GenerateQCParticipantData(allNodes, internalNodes, dkgData)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to generate QC participant data")
 	}
 
-	qc, err := run.GenerateRootQC(block, votes, participantData)
+	qc, err := run.GenerateRootQC(block, votes, participantData, identities)
 	if err != nil {
 		log.Fatal().Err(err).Msg("generating root QC failed")
 	}
