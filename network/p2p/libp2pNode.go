@@ -31,6 +31,7 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/dns"
@@ -65,7 +66,9 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 	me flow.Identifier,
 	address string,
 	flowKey fcrypto.PrivateKey,
-	rootBlockID string,
+	rootBlockID flow.Identifier,
+	chainID flow.ChainID,
+	idProvider id.IdentityProvider,
 	maxPubSubMsgSize int,
 	metrics module.NetworkMetrics,
 	pingInfoProvider PingInfoProvider,
@@ -77,12 +80,22 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 
 	resolver := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
 
+	psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
+
+	if chainID != flow.Localnet {
+		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
+			return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(
+				h.ID(), rootBlockID, idProvider,
+			)), nil
+		})
+	}
+
 	return func() (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
 			SetRootBlockID(rootBlockID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
-			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
+			SetPubsubOptions(psOpts...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			SetResolver(resolver).
@@ -91,7 +104,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 }
 
 type NodeBuilder interface {
-	SetRootBlockID(string) NodeBuilder
+	SetRootBlockID(flow.Identifier) NodeBuilder
 	SetConnectionManager(TagLessConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
 	SetPubsubOptions(...PubsubOption) NodeBuilder
@@ -105,7 +118,7 @@ type NodeBuilder interface {
 
 type DefaultLibP2PNodeBuilder struct {
 	id               flow.Identifier
-	rootBlockID      string
+	rootBlockID      *flow.Identifier
 	logger           zerolog.Logger
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
@@ -141,8 +154,8 @@ func (builder *DefaultLibP2PNodeBuilder) SetTopicValidation(enabled bool) NodeBu
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId string) NodeBuilder {
-	builder.rootBlockID = rootBlockId
+func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId flow.Identifier) NodeBuilder {
+	builder.rootBlockID = &rootBlockId
 	return builder
 }
 
@@ -193,10 +206,10 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, errors.New("unable to create libp2p pubsub: factory function not provided")
 	}
 
-	if builder.rootBlockID == "" {
+	if builder.rootBlockID == nil {
 		return nil, errors.New("root block ID must be provided")
 	}
-	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
+	node.flowLibP2PProtocolID = generateFlowProtocolID(*builder.rootBlockID)
 
 	var opts []config.Option
 
@@ -209,11 +222,6 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		opts = append(opts, libp2p.ConnectionManager(builder.connMngr))
 		node.connMgr = builder.connMngr
 	}
-
-	if builder.rootBlockID == "" {
-		return nil, errors.New("root block ID must be provided")
-	}
-	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
 
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
@@ -250,7 +258,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 
 	if builder.pingInfoProvider != nil {
-		pingLibP2PProtocolID := generatePingProtcolID(builder.rootBlockID)
+		pingLibP2PProtocolID := generatePingProtcolID(*builder.rootBlockID)
 		pingService := NewPingService(libp2pHost, pingLibP2PProtocolID, builder.pingInfoProvider, node.logger)
 		node.pingService = pingService
 	}
@@ -433,7 +441,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 	for ; retries < maxAttempts; retries++ {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("context done before stream could be created (retry attempt: %d", retries)
+			return nil, fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", retries, errs)
 		default:
 		}
 
