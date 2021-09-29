@@ -306,7 +306,7 @@ func (c *Controller) doBackgroundWork() {
 				c.once.Do(func() {
 					isFirstMessage = true
 					delay := c.preHandleFirstBroadcastDelay()
-					c.log.Debug().Msgf("sleeping for %s before processing first phase 1 broadcast message", delay)
+					c.log.Info().Msgf("sleeping for %s before processing first phase 1 broadcast message", delay)
 					time.Sleep(delay)
 				})
 
