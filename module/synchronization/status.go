@@ -35,6 +35,18 @@ func (s *Status) WasReceived() bool {
 	return !s.Received.IsZero()
 }
 
+func (s *Status) StatusString() string {
+	if s.WasReceived() {
+		return "Received"
+	} else if s.WasRequested() {
+		return "Requested"
+	} else if s.WasQueued() {
+		return "Queued"
+	} else {
+		return "Unknown"
+	}
+}
+
 func NewQueuedStatus() *Status {
 	return &Status{
 		Queued: time.Now(),
