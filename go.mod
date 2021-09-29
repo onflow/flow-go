@@ -50,6 +50,7 @@ require (
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.18.0
+	github.com/onflow/flow-go/v21 v21.0.0-00010101000000-000000000000 // indirect
 	github.com/onflow/flow/protobuf/go/flow v0.2.2
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pelletier/go-toml v1.9.4 // indirect
@@ -89,3 +90,5 @@ replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 replace github.com/onflow/flow-go/crypto => ./crypto
 
 replace github.com/onflow/cadence/v19 => github.com/onflow/cadence v0.19.0
+
+replace github.com/onflow/flow-go/v21 => github.com/onflow/flow-go v0.21.7

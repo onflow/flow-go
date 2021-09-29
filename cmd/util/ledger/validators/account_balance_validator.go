@@ -9,7 +9,6 @@ import (
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 
 	oldFvm "github.com/onflow/flow-go/v21/fvm"
-	oldState "github.com/onflow/flow-go/v21/fvm/"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/fvm"
@@ -106,7 +105,7 @@ type oldVersionCollector struct {
 	logger zerolog.Logger
 	vm     *oldFvm.VirtualMachine
 	ctx    oldFvm.Context
-	view   oldState.View
+	view   state.View
 	prog   *programs.Programs
 	script []byte
 }
@@ -114,7 +113,7 @@ type oldVersionCollector struct {
 func newOldVersionCollector(wg *sync.WaitGroup,
 	logger zerolog.Logger,
 	chain flow.Chain,
-	view oldState.View) *oldVersionCollector {
+	view state.View) *oldVersionCollector {
 	vm := oldFvm.NewVirtualMachine(oldFvm.NewInterpreterRuntime())
 	ctx := oldFvm.NewContext(zerolog.Nop(), oldFvm.WithChain(chain))
 	prog := programs.NewEmptyPrograms()
