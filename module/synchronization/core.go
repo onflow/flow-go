@@ -204,12 +204,14 @@ func (c *Core) getRequestStatus(height uint64, blockID flow.Identifier) *Status 
 	heightStatus := c.heights[height]
 	idStatus := c.blockIDs[blockID]
 
-	if heightStatus.WasQueued() {
-		return heightStatus
-	}
 	if idStatus.WasQueued() {
 		return idStatus
 	}
+	// Only return the height status if there is no matching status for the ID
+	if heightStatus.WasQueued() {
+		return heightStatus
+	}
+
 	return nil
 }
 
