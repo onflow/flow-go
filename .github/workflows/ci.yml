@@ -34,9 +34,6 @@ jobs:
       with:
         scandir: './crypto'
         ignore: 'relic'
-    - name: Setup tmate session
-      if: ${{ failure() }}
-      uses: mxschmitt/action-tmate@v3
   unit-test:
     name: Unit Tests
     strategy:
