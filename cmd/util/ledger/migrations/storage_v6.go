@@ -73,11 +73,11 @@ type StorageFormatV6Migration struct {
 	deferredValuePaths   map[storagePath]bool
 	progress             *progressbar.ProgressBar
 	emptyDeferredValues  int
-	missingTypeValues    int
+	skippedValues        int
 }
 
 func (m *StorageFormatV6Migration) filename() string {
-	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.csv", int32(time.Now().Unix())))
+	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.txt", int32(time.Now().Unix())))
 }
 
 func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.Payload, error) {
@@ -181,9 +181,9 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		m.Log.Warn().Msgf("empty deferred values found: %d", m.emptyDeferredValues)
 	}
 
-	if m.missingTypeValues > 0 {
+	if m.skippedValues > 0 {
 		m.clearProgress()
-		m.Log.Warn().Msgf("values not migrated due to missing types: %d", m.missingTypeValues)
+		m.Log.Warn().Msgf("values not migrated: %d", m.skippedValues)
 	}
 
 	return ledgerView.Payloads(), nil
@@ -238,7 +238,10 @@ func (m *StorageFormatV6Migration) addProgress(progress int) {
 }
 
 func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
-	st := state.NewState(v)
+	st := state.NewState(
+		v,
+		state.WithMaxInteractionSizeAllowed(math.MaxUint64),
+	)
 	stateHolder := state.NewStateHolder(st)
 	accounts := state.NewAccounts(stateHolder)
 
@@ -983,34 +986,41 @@ func (c *ValueConverter) Convert(value oldInter.Value) (result newInter.Value) {
 	c.result = nil
 
 	defer func() {
-		if r := recover(); r != nil {
-			if _, ok := r.(newInter.TypeLoadingError); ok {
-				c.migration.clearProgress()
-				c.migration.Log.Debug().Msgf(
-					"skipped migrating value due to missing static type: owner: %s, value: %s",
-					value.GetOwner(),
-					value.String(),
-				)
-				c.migration.missingTypeValues += 1
-			} else {
-				err := r.(error)
-				if strings.Contains(err.Error(), "expected `StoragePath`, got `Path`") {
-					c.migration.clearProgress()
-					c.migration.Log.Warn().Msgf(
-						"skipped migrating value due to broken contract: %s",
-						err.(runtime.Error).Unwrap().(*runtime.ParsingCheckingError).Location,
-					)
-				} else {
-					c.migration.clearProgress()
-					c.migration.Log.Warn().Msgf(
-						"failed to convert value: %s",
-						err.Error(),
-					)
-				}
-			}
-
-			result = nil
+		r := recover()
+		if r == nil {
+			return
 		}
+
+		if _, ok := r.(newInter.TypeLoadingError); ok {
+			c.migration.reportFile.WriteString(
+				fmt.Sprintf(
+					"skipped migrating value due to missing static type: owner: %x, type: %s\n",
+					value.GetOwner(),
+					value.StaticType(),
+				),
+			)
+		} else {
+			err := r.(error)
+			if strings.Contains(err.Error(), "expected `StoragePath`, got `Path`") {
+				c.migration.reportFile.WriteString(
+					fmt.Sprintf(
+						"skipped migrating value due to broken contract type: %s\n",
+						err.(runtime.Error).Unwrap().(*runtime.ParsingCheckingError).Location,
+					),
+				)
+			} else {
+				c.migration.reportFile.WriteString(
+					fmt.Sprintf(
+						"skipped migrating value: owner: %x, cause: %s\n",
+						value.GetOwner(),
+						err.Error(),
+					),
+				)
+			}
+		}
+
+		c.migration.skippedValues += 1
+		result = nil
 
 		c.result = prevResult
 	}()
