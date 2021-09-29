@@ -965,6 +965,8 @@ func (c *ValueConverter) Convert(value oldInter.Value) (result newInter.Value) {
 	c.result = nil
 
 	defer func() {
+		c.result = prevResult
+
 		r := recover()
 		if r == nil {
 			return
@@ -1000,8 +1002,6 @@ func (c *ValueConverter) Convert(value oldInter.Value) (result newInter.Value) {
 
 		c.migration.skippedValues += 1
 		result = nil
-
-		c.result = prevResult
 	}()
 
 	value.Accept(c.oldInter, c)
