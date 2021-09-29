@@ -140,7 +140,7 @@ func (r *StorageReporter) hasReceiver(address flow.Address, st *state.State) (bo
 	return len(receiver) != 0, nil
 }
 
-func (r *StorageReporter) balance(address flow.Address, st *state.State) (balance uint64, hasBalance bool, err error) {
+func (r *StorageReporter) balance(address flow.Address, st *state.State) (balance uint64, hasVault bool, err error) {
 	vaultId := resourceId(address,
 		interpreter.PathValue{
 			Domain:     common.PathDomainStorage,
@@ -173,6 +173,9 @@ func (r *StorageReporter) balance(address flow.Address, st *state.State) (balanc
 	decoder := interpreter.CBORDecMode.NewByteStreamDecoder(vaultResource)
 
 	storable, err := interpreter.DecodeStorable(decoder, atree.StorageIDUndefined)
+	if err != nil {
+		return 0, false, fmt.Errorf("could not decode storable at %s: %w", address, err)
+	}
 	storedValue, err := storable.StoredValue(r.slabStorage)
 	value := interpreter.MustConvertStoredValue(storedValue)
 	if err != nil {
