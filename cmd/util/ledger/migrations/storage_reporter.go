@@ -173,21 +173,21 @@ func (r *StorageReporter) balance(address flow.Address, st *state.State) (balanc
 	decoder := interpreter.CBORDecMode.NewByteStreamDecoder(vaultResource)
 
 	storable, err := interpreter.DecodeStorable(decoder, atree.StorageIDUndefined)
-	if err != nil {
+	if err != nil || storable == nil {
 		return 0, false, fmt.Errorf("could not decode storable at %s: %w", address, err)
 	}
 	storedValue, err := storable.StoredValue(r.slabStorage)
 	value := interpreter.MustConvertStoredValue(storedValue)
-	if err != nil {
+	if err != nil || value == nil {
 		return 0, false, fmt.Errorf("could not decode resource at %s: %w", address, err)
 	}
 	composite, ok := value.(*interpreter.CompositeValue)
-	if !ok {
+	if !ok || composite == nil {
 		return 0, false, fmt.Errorf("could not decode composite at %s: %w", address, err)
 	}
 	balanceField := composite.GetField(nil, nil, "balance")
 	balanceValue, ok := balanceField.(interpreter.UFix64Value)
-	if !ok {
+	if !ok || balanceField == nil{
 		return 0, false, fmt.Errorf("could not decode resource at %s: %w", address, err)
 	}
 
