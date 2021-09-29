@@ -179,11 +179,14 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
-			fnb.RootBlock.ID().String(),
+			fnb.RootBlock.ID(),
+			fnb.RootChainID,
+			fnb.IdentityProvider,
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
 			pingProvider,
-			fnb.BaseConfig.DNSCacheTTL)
+			fnb.BaseConfig.DNSCacheTTL,
+			fnb.BaseConfig.NodeRole)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
@@ -205,7 +208,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
-			fnb.RootBlock.ID().String(),
+			fnb.RootBlock.ID(),
 			fnb.BaseConfig.UnicastMessageTimeout,
 			true,
 			fnb.IDTranslator,
@@ -481,6 +484,7 @@ func (fnb *FlowNodeBuilder) initSecretsDB() {
 
 	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
 	// attempt to read an encryption key for the secrets DB from the canonical path
+	// TODO enforce encryption in an upcoming spork https://github.com/dapperlabs/flow-go/issues/5893
 	encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.NodeID)
 	if errors.Is(err, os.ErrNotExist) {
 		fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
