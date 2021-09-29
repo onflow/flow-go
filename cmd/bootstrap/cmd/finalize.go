@@ -303,8 +303,8 @@ func readPartnerNodeInfos() []model.NodeInfo {
 			partner.Role,
 			partner.Address,
 			stake,
-			networkPubKey,
-			stakingPubKey,
+			networkPubKey.PublicKey,
+			stakingPubKey.PublicKey,
 		)
 		nodes = append(nodes, node)
 	}

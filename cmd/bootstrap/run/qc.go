@@ -42,8 +42,9 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 // participantData to build the QC.
 // NOTE: at the moment, we require private keys for one node because we we re-using the full business logic, which assumes that only consensus participants construct QCs, which also have produce votes.
 // TODO: modularize QC construction code (and code to verify QC) to be instantiated without needing private keys.
-func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *ParticipantData) (*flow.QuorumCertificate, error) {
-	validators, signers, err := createValidators(participantData)
+func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *ParticipantData, identities flow.IdentityList) (*flow.QuorumCertificate, error) {
+
+	validators, signers, err := createValidators(participantData, identities)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +65,7 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 
 // GenerateRootBlockVotes generates votes for root block based on participantData
 func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData) ([]*model.Vote, error) {
-	_, signers, err := createValidators(participantData)
+	_, signers, err := createValidators(participantData, participantData.Identities())
 	if err != nil {
 		return nil, err
 	}
@@ -82,9 +83,14 @@ func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData)
 	return votes, nil
 }
 
-func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
+func createValidators(participantData *ParticipantData, identities flow.IdentityList) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
 	n := len(participantData.Participants)
-	identities := participantData.Identities()
+
+	fmt.Println("len(participants)", len(participantData.Participants))
+	fmt.Println("len(identities)", len(identities))
+	for _, id := range identities {
+		fmt.Println(id.NodeID, id.Address, id.StakingPubKey.String())
+	}
 
 	groupSize := uint(len(participantData.Participants))
 	if groupSize < uint(n) {
