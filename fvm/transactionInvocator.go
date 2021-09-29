@@ -269,30 +269,33 @@ func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *
 	return nil
 }
 
+var setAccountFrozenFunctionType = &sema.FunctionType{
+	Parameters: []*sema.Parameter{
+		{
+			Label:          sema.ArgumentLabelNotRequired,
+			Identifier:     "account",
+			TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
+		},
+		{
+			Label:          sema.ArgumentLabelNotRequired,
+			Identifier:     "frozen",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
+		},
+	},
+	ReturnTypeAnnotation: &sema.TypeAnnotation{
+		Type: sema.VoidType,
+	},
+}
+
 func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
 	if ctx.AccountFreezeAvailable {
 		// TODO return the errors instead of panicing
+
 		setAccountFrozen := runtime.ValueDeclaration{
-			Name: "setAccountFrozen",
-			Type: &sema.FunctionType{
-				Parameters: []*sema.Parameter{
-					{
-						Label:          sema.ArgumentLabelNotRequired,
-						Identifier:     "account",
-						TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
-					},
-					{
-						Label:          sema.ArgumentLabelNotRequired,
-						Identifier:     "frozen",
-						TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
-					},
-				},
-				ReturnTypeAnnotation: &sema.TypeAnnotation{
-					Type: sema.VoidType,
-				},
-			},
+			Name:           "setAccountFrozen",
+			Type:           setAccountFrozenFunctionType,
 			Kind:           common.DeclarationKindFunction,
 			IsConstant:     true,
 			ArgumentLabels: nil,
@@ -316,6 +319,7 @@ func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclara
 
 					return interpreter.VoidValue{}
 				},
+				setAccountFrozenFunctionType,
 			),
 		}
 
