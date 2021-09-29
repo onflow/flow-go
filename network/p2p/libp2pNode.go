@@ -31,10 +31,12 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
 )
 
@@ -64,19 +66,29 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 	me flow.Identifier,
 	address string,
 	flowKey fcrypto.PrivateKey,
-	rootBlockID string,
+	rootBlockID flow.Identifier,
+	chainID flow.ChainID,
+	idProvider id.IdentityProvider,
 	maxPubSubMsgSize int,
 	metrics module.NetworkMetrics,
 	pingInfoProvider PingInfoProvider,
-	dnsResolverTTL time.Duration) (LibP2PFactoryFunc, error) {
+	dnsResolverTTL time.Duration,
+	role string) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
 	connGater := NewConnGater(log)
 
-	resolver, err := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
-	if err != nil {
-		return nil, fmt.Errorf("could not create dns resolver: %w", err)
+	resolver := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
+
+	psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
+
+	if role != "ghost" {
+		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
+			return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(
+				h.ID(), rootBlockID, idProvider,
+			)), nil
+		})
 	}
 
 	return func() (*Node, error) {
@@ -84,7 +96,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 			SetRootBlockID(rootBlockID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
-			SetPubsubOptions(DefaultPubsubOptions(maxPubSubMsgSize)...).
+			SetPubsubOptions(psOpts...).
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			SetResolver(resolver).
@@ -93,29 +105,31 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 }
 
 type NodeBuilder interface {
-	SetRootBlockID(string) NodeBuilder
+	SetRootBlockID(flow.Identifier) NodeBuilder
 	SetConnectionManager(TagLessConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
 	SetPubsubOptions(...PubsubOption) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
 	SetDHTOptions(...dht.Option) NodeBuilder
+	SetTopicValidation(bool) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
-	SetResolver(resolver *madns.Resolver) NodeBuilder
+	SetResolver(*dns.Resolver) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
 type DefaultLibP2PNodeBuilder struct {
 	id               flow.Identifier
-	rootBlockID      string
+	rootBlockID      *flow.Identifier
 	logger           zerolog.Logger
 	connGater        *ConnGater
 	connMngr         TagLessConnManager
 	pingInfoProvider PingInfoProvider
-	resolver         *madns.Resolver
+	resolver         *dns.Resolver
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
 	dhtOpts          []dht.Option
+	topicValidation  bool
 }
 
 func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcrypto.PrivateKey) NodeBuilder {
@@ -127,6 +141,7 @@ func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcr
 		hostMaker: func(ctx context.Context, opts ...config.Option) (host.Host, error) {
 			return DefaultLibP2PHost(ctx, address, flowKey, opts...)
 		},
+		topicValidation: true,
 	}
 }
 
@@ -135,8 +150,13 @@ func (builder *DefaultLibP2PNodeBuilder) SetDHTOptions(opts ...dht.Option) NodeB
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId string) NodeBuilder {
-	builder.rootBlockID = rootBlockId
+func (builder *DefaultLibP2PNodeBuilder) SetTopicValidation(enabled bool) NodeBuilder {
+	builder.topicValidation = enabled
+	return builder
+}
+
+func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId flow.Identifier) NodeBuilder {
+	builder.rootBlockID = &rootBlockId
 	return builder
 }
 
@@ -165,17 +185,18 @@ func (builder *DefaultLibP2PNodeBuilder) SetLogger(logger zerolog.Logger) NodeBu
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *madns.Resolver) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *dns.Resolver) NodeBuilder {
 	builder.resolver = resolver
 	return builder
 }
 
 func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	node := &Node{
-		id:     builder.id,
-		topics: make(map[flownet.Topic]*pubsub.Topic),
-		subs:   make(map[flownet.Topic]*pubsub.Subscription),
-		logger: builder.logger,
+		id:              builder.id,
+		topics:          make(map[flownet.Topic]*pubsub.Topic),
+		subs:            make(map[flownet.Topic]*pubsub.Subscription),
+		logger:          builder.logger,
+		topicValidation: builder.topicValidation,
 	}
 
 	if builder.hostMaker == nil {
@@ -186,10 +207,10 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, errors.New("unable to create libp2p pubsub: factory function not provided")
 	}
 
-	if builder.rootBlockID == "" {
+	if builder.rootBlockID == nil {
 		return nil, errors.New("root block ID must be provided")
 	}
-	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
+	node.flowLibP2PProtocolID = generateFlowProtocolID(*builder.rootBlockID)
 
 	var opts []config.Option
 
@@ -203,17 +224,23 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		node.connMgr = builder.connMngr
 	}
 
-	if builder.rootBlockID == "" {
-		return nil, errors.New("root block ID must be provided")
-	}
-	node.flowLibP2PProtocolID = generateFlowProtocolID(builder.rootBlockID)
-
 	if builder.pingInfoProvider != nil {
 		opts = append(opts, libp2p.Ping(true))
 	}
 
 	if builder.resolver != nil { // sets DNS resolver
-		opts = append(opts, libp2p.MultiaddrResolver(builder.resolver))
+		libp2pResolver, err := madns.NewResolver(madns.WithDefaultResolver(builder.resolver))
+		if err != nil {
+			return nil, fmt.Errorf("could not create libp2p resolver: %w", err)
+		}
+
+		select {
+		case <-builder.resolver.Ready():
+		case <-time.After(30 * time.Second):
+			return nil, fmt.Errorf("could not start resolver on time")
+		}
+
+		opts = append(opts, libp2p.MultiaddrResolver(libp2pResolver))
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -232,7 +259,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 
 	if builder.pingInfoProvider != nil {
-		pingLibP2PProtocolID := generatePingProtcolID(builder.rootBlockID)
+		pingLibP2PProtocolID := generatePingProtcolID(*builder.rootBlockID)
 		pingService := NewPingService(libp2pHost, pingLibP2PProtocolID, builder.pingInfoProvider, node.logger)
 		node.pingService = pingService
 	}
@@ -277,12 +304,14 @@ type Node struct {
 	subs                 map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
+	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
 	pingService          *PingService
 	connMgr              TagLessConnManager
 	dht                  *dht.IpfsDHT
+	topicValidation      bool
 }
 
-// Stop stops the libp2p node.
+// Stop terminates the libp2p node.
 func (n *Node) Stop() (chan struct{}, error) {
 	var result error
 	done := make(chan struct{})
@@ -334,6 +363,12 @@ func (n *Node) Stop() (chan struct{}, error) {
 				addrs = len(n.host.Network().ListenAddresses())
 			}
 		}
+
+		if n.resolver != nil {
+			// non-nil resolver means a non-default one, so it must be stopped.
+			n.resolver.Done()
+		}
+
 		n.logger.Debug().
 			Hex("node_id", logging.ID(n.id)).
 			Msg("libp2p node stopped successfully")
@@ -407,7 +442,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 	for ; retries < maxAttempts; retries++ {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("context done before stream could be created (retry attempt: %d", retries)
+			return nil, fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", retries, errs)
 		default:
 		}
 
@@ -474,22 +509,19 @@ func (n *Node) GetIPPort() (string, string, error) {
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ...pubsub.ValidatorEx) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ...validator.MessageValidator) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
-
-	if len(validators) > 1 {
-		return nil, errors.New("only one topic validator is allowed")
-	}
 
 	// Check if the topic has been already created and is in the cache
 	n.pubSub.GetTopics()
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		if len(validators) > 0 {
+		if n.topicValidation {
+			topic_validator := validator.TopicValidator(validators...)
 			if err := n.pubSub.RegisterTopicValidator(
-				topic.String(), validators[0], pubsub.WithValidatorInline(true),
+				topic.String(), topic_validator, pubsub.WithValidatorInline(true),
 			); err != nil {
 				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
 				return nil, fmt.Errorf("failed to register topic validator: %w", err)
@@ -498,11 +530,12 @@ func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ..
 
 		tp, err = n.pubSub.Join(topic.String())
 		if err != nil {
-			if len(validators) > 0 {
+			if n.topicValidation {
 				if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
 					n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
 				}
 			}
+
 			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
 		}
 
@@ -542,8 +575,10 @@ func (n *Node) UnSubscribe(topic flownet.Topic) error {
 		return err
 	}
 
-	if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
-		n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
+	if n.topicValidation {
+		if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
+			n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
+		}
 	}
 
 	// attempt to close the topic
