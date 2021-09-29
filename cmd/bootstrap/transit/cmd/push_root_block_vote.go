@@ -93,7 +93,7 @@ func pushVote(c *cobra.Command, args []string) {
 	beaconStore := signature.NewSingleSignerStore(beaconSigner)
 	signer := verification.NewCombinedSigner(nil, stakingSigner, beaconVerifier, merger, beaconStore, nodeID)
 
-	path = filepath.Join(flagBootDir, bootstrap.DirnamePublicBootstrap, bootstrap.FilenameRootBlock)
+	path = filepath.Join(flagBootDir, bootstrap.PathRootBlockData)
 	data, err = io.ReadFile(path)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read root block file")
