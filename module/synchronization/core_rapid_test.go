@@ -57,7 +57,9 @@ func (r *rapidSync) RequestByID(t *rapid.T) {
 // HandleByID is an action that provides a block header to the sync engine
 func (r *rapidSync) HandleByID(t *rapid.T) {
 	b := rapid.SampledFrom(r.store).Draw(t, "id_handling").(flow.Header)
-	r.core.HandleBlock(&b)
+	success := r.core.HandleBlock(&b)
+	assert.True(t, success || r.idRequests[b.ID()] == 0)
+
 	// we decrease the pending requests iff we have already requested this block
 	// and we have not received it since
 	if r.idRequests[b.ID()] == 1 {
