@@ -984,12 +984,31 @@ func (c *ValueConverter) Convert(value oldInter.Value) (result newInter.Value) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			c.migration.Log.Warn().Msgf(
-				"failed to convert value due to missing static type: owner: %s, value: %s",
-				value.GetOwner(),
-				value.String(),
-			)
-			c.migration.missingTypeValues += 1
+			if _, ok := r.(newInter.TypeLoadingError); ok {
+				c.migration.clearProgress()
+				c.migration.Log.Debug().Msgf(
+					"skipped migrating value due to missing static type: owner: %s, value: %s",
+					value.GetOwner(),
+					value.String(),
+				)
+				c.migration.missingTypeValues += 1
+			} else {
+				err := r.(error)
+				if strings.Contains(err.Error(), "expected `StoragePath`, got `Path`") {
+					c.migration.clearProgress()
+					c.migration.Log.Warn().Msgf(
+						"skipped migrating value due to broken contract: %s",
+						err.(runtime.Error).Unwrap().(*runtime.ParsingCheckingError).Location,
+					)
+				} else {
+					c.migration.clearProgress()
+					c.migration.Log.Warn().Msgf(
+						"failed to convert value: %s",
+						err.Error(),
+					)
+				}
+			}
+
 			result = nil
 		}
 
