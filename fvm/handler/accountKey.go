@@ -245,8 +245,9 @@ func (h *AccountKeyHandler) GetAccountKey(address runtime.Address, keyIndex int)
 
 // AddEncodedAccountKey adds an encoded public key to an existing account.
 //
-// This function returns an error if the specified account does not exist or
-// if the key insertion fails.
+// This function returns following error
+// * NewAccountNotFoundError - if the specified account does not exist
+// * ValueError - if the provided encodedPublicKey is not valid public key
 func (e *AccountKeyHandler) AddEncodedAccountKey(address runtime.Address, encodedPublicKey []byte) (err error) {
 	accountAddress := flow.Address(address)
 
