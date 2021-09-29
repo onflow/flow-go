@@ -62,7 +62,7 @@ func prepareRootBlockVotes(t *testing.T, bootDir, votesDir string) {
 			if !strings.Contains(f, model.FilenameRootBlockVotePrefix) {
 				continue
 			}
-			dstFile := filepath.Join(votesDir, fmt.Sprintf("%s%d.json", model.FilenameRootBlockVotePrefix, voteIndex))
+			dstFile := filepath.Join(votesDir, fmt.Sprintf(model.FilenameRootBlockVote, voteIndex))
 			err := io.Copy(f, dstFile)
 			require.NoError(t, err)
 			voteIndex++
