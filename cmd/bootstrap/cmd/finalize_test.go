@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/hex"
-	"fmt"
 	"os"
 	"regexp"
 
@@ -15,7 +14,6 @@ import (
 
 	utils "github.com/onflow/flow-go/cmd/bootstrap/utils"
 	model "github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -51,25 +49,6 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 
 var finalizeHappyPathRegex = regexp.MustCompile(finalizeHappyPathLogs)
 
-func prepareRootBlockVotes(t *testing.T, bootDir, votesDir string) {
-	files, err := filesInDir(filepath.Join(bootDir, model.DirPrivateRoot))
-	require.NoError(t, err)
-	voteIndex := 0
-	for _, privateDir := range files {
-		files, err := filesInDir(privateDir)
-		require.NoError(t, err)
-		for _, f := range files {
-			if !strings.Contains(f, model.FilenameRootBlockVotePrefix) {
-				continue
-			}
-			dstFile := filepath.Join(votesDir, fmt.Sprintf("%s%d.json", model.FilenameRootBlockVotePrefix, voteIndex))
-			err := io.Copy(f, dstFile)
-			require.NoError(t, err)
-			voteIndex++
-		}
-	}
-}
-
 func TestFinalize_HappyPath(t *testing.T) {
 	deterministicSeed := GenerateRandomSeed()
 	rootCommit := unittest.StateCommitmentFixture()
@@ -102,9 +81,7 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagEpochCounter = epochCounter
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
-		flagRootBlockVotesDir = filepath.Join(bootDir, "votes")
-		require.NoError(t, os.Mkdir(flagRootBlockVotesDir, os.ModePerm))
-		prepareRootBlockVotes(t, bootDir, flagRootBlockVotesDir)
+		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -152,9 +129,7 @@ func TestFinalize_Deterministic(t *testing.T) {
 
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
-		flagRootBlockVotesDir = filepath.Join(bootDir, "votes")
-		require.NoError(t, os.Mkdir(flagRootBlockVotesDir, os.ModePerm))
-		prepareRootBlockVotes(t, bootDir, flagRootBlockVotesDir)
+		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -223,9 +198,7 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 
 		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
 		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
-		flagRootBlockVotesDir = filepath.Join(bootDir, "votes")
-		require.NoError(t, os.Mkdir(flagRootBlockVotesDir, os.ModePerm))
-		prepareRootBlockVotes(t, bootDir, flagRootBlockVotesDir)
+		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
