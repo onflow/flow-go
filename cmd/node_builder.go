@@ -112,6 +112,8 @@ type BaseConfig struct {
 	NodeRole              string
 	timeout               time.Duration
 	datadir               string
+	secretsdir            string
+	secretsDBEnabled      bool
 	level                 string
 	metricsPort           uint
 	BootstrapDir          string
@@ -143,6 +145,7 @@ type NodeConfig struct {
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
+	SecretsDB         *badger.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
@@ -171,6 +174,7 @@ type NodeConfig struct {
 func DefaultBaseConfig() *BaseConfig {
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
+
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
 		adminAddr:             NotSet,
@@ -181,6 +185,8 @@ func DefaultBaseConfig() *BaseConfig {
 		BootstrapDir:          "bootstrap",
 		timeout:               1 * time.Minute,
 		datadir:               datadir,
+		secretsdir:            NotSet,
+		secretsDBEnabled:      true,
 		level:                 "info",
 		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,

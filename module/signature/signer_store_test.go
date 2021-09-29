@@ -28,9 +28,10 @@ func TestGetThresholdSignerWithNilPrivateKey(t *testing.T) {
 	epochLookup := new(modmocks.EpochLookup)
 	epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(epoch, nil)
 
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+	unittest.RunWithTypedBadgerDB(t, storage.InitSecret, func(db *badger.DB) {
 
-		dkgKeys := storage.NewDKGKeys(metrics.NewNoopCollector(), db)
+		dkgKeys, err := storage.NewDKGKeys(metrics.NewNoopCollector(), db)
+		assert.NoError(t, err)
 		signerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeys)
 
 		signer, err := signerStore.GetThresholdSigner(uint64(1))
