@@ -8,9 +8,10 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/fvm/errors"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
