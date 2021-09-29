@@ -7,5 +7,6 @@ var (
 	flagAccessAddress string
 	flagNodeRole      string
 
-	flagWrapID string // wrap ID
+	flagWrapID   string // wrap ID
+	flagVoteFile string
 )

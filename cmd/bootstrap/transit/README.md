@@ -61,7 +61,8 @@ The transit script has two commands which are only used by consensus nodes:
 
 ```shell
 $ transit pull-root-block -t ${server-token} -d ${bootstrap-dir}
-$ transit push-root-block-vote -t ${server-token} -d ${bootstrap-dir}
+$ transit generate-root-block-vote -t ${server-token} -d ${bootstrap-dir}
+$ transit push-root-block-vote -t ${server-token} -d ${bootstrap-dir} -v ${vote-file}
 ```
 
 ### Pull Root Block and Random Beacon Key
@@ -71,9 +72,13 @@ Running `transit pull-root-block` will perform the following actions:
 1. Fetch the root block for the upcoming spork and write it to `<bootstrap-dir>/public-root-information/root-block.json`
 2. Fetch the random beacon key `random-beacon.priv.json.<id>.enc` and decrypt it using the transit keys
 
-### Sign Root Block and Upload Vote
+### Sign Root Block
 
-After the root block and random beacon key have been fetched, running `transit push-root-block-vote` will:
+After the root block and random beacon key have been fetched, running `transit generate-root-block-vote` will:
 
 1. Create a combined signature over the root block using the node's private staking key and private random beacon key.
-2. Upload the resulting vote to the server.
+2. Store the resulting vote to the file `<bootstrap-dir>/private-root-information/private-node-info_<node_id>/root-block-vote.json`
+
+### Upload Vote
+
+Once a vote has been generated, running `transit push-root-block-vote` will upload the vote file to the server.

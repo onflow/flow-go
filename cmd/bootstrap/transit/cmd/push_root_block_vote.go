@@ -2,30 +2,20 @@ package cmd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"path/filepath"
 	"time"
 
 	"github.com/spf13/cobra"
 
-	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/gcs"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/dkg"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/local"
-	"github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/utils/io"
 )
 
 var pushVoteCmd = &cobra.Command{
 	Use:   "push-root-block-vote",
-	Short: "Generate and push root block vote",
+	Short: "Push root block vote",
 	Run:   pushVote,
 }
 
@@ -35,13 +25,14 @@ func init() {
 }
 
 func addPushVoteCmdFlags() {
+	defaultVoteFilePath := fmt.Sprintf(bootstrap.PathNodeRootBlockVote, "<node_id>")
 	pushVoteCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
+	pushVoteCmd.Flags().StringVarP(&flagVoteFile, "vote-file", "v", "", fmt.Sprintf("path under bootstrap directory of the vote file to upload (default: %s)", defaultVoteFilePath))
+
 	_ = pushVoteCmd.MarkFlagRequired("token")
 }
 
 func pushVote(c *cobra.Command, args []string) {
-	log.Info().Msg("generating root block vote")
-
 	nodeIDString, err := readNodeID()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not read node ID")
@@ -52,72 +43,15 @@ func pushVote(c *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not parse node ID")
 	}
 
-	nodeInfo, err := cmd.LoadPrivateNodeInfo(flagBootDir, nodeID)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not load private node info")
-	}
-
-	// load DKG private key
-	path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
-	data, err := io.ReadFile(filepath.Join(flagBootDir, path))
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not read DKG private key file")
-	}
-
-	var priv dkg.DKGParticipantPriv
-	err = json.Unmarshal(data, &priv)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not unmarshal DKG private key data")
-	}
-
-	randomBeaconPrivKey := priv.RandomBeaconPrivKey.PrivateKey
-	stakingPrivKey := nodeInfo.StakingPrivKey.PrivateKey
-	identity := &flow.Identity{
-		NodeID:        nodeID,
-		Address:       nodeInfo.Address,
-		Role:          nodeInfo.Role,
-		Stake:         1000,
-		StakingPubKey: stakingPrivKey.PublicKey(),
-		NetworkPubKey: nodeInfo.NetworkPrivKey.PrivateKey.PublicKey(),
-	}
-
-	local, err := local.New(identity, nodeInfo.StakingPrivKey.PrivateKey)
-	if err != nil {
-		log.Fatal().Err(err).Msg("creating local signer abstraction failed")
-	}
-
-	merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-	stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
-	beaconVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-	beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, randomBeaconPrivKey)
-	beaconStore := signature.NewSingleSignerStore(beaconSigner)
-	signer := verification.NewCombinedSigner(nil, stakingSigner, beaconVerifier, merger, beaconStore, nodeID)
-
-	path = filepath.Join(flagBootDir, bootstrap.PathRootBlockData)
-	data, err = io.ReadFile(path)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not read root block file")
-	}
-
-	var rootBlock flow.Block
-	err = json.Unmarshal(data, &rootBlock)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not unmarshal root block data")
-	}
-
-	vote, err := signer.CreateVote(model.GenesisBlockFromFlow(rootBlock.Header))
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not load private node info")
-	}
-
-	voteFile := fmt.Sprintf(bootstrap.PathNodeRootBlockVote, nodeID)
-
-	if err = io.WriteJSON(filepath.Join(flagBootDir, voteFile), vote); err != nil {
-		log.Fatal().Err(err).Msg("could not write vote to file")
+	voteFile := flagVoteFile
+	if voteFile == "" {
+		voteFile = fmt.Sprintf(bootstrap.PathNodeRootBlockVote, nodeID)
 	}
 
 	destination := filepath.Join(flagToken, fmt.Sprintf(bootstrap.FilenameRootBlockVote, nodeID))
 	source := filepath.Join(flagBootDir, voteFile)
+
+	log.Info().Msg("pushing root block vote")
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*30)
 	defer cancel()
