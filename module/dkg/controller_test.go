@@ -349,10 +349,28 @@ func TestDelay(t *testing.T) {
 		dkgSize := 100
 		minDelay := time.Duration(0)
 		// m=b*n^2
-		maxDelay := int64(baseDelay) * int64(dkgSize) * int64(dkgSize)
+		expectedMaxDelay := time.Duration(int64(baseDelay) * int64(dkgSize) * int64(dkgSize))
+
+		maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)
+		assert.Equal(t, expectedMaxDelay, maxDelay)
 
 		delay := computePreprocessingDelay(baseDelay, dkgSize)
 		assert.LessOrEqual(t, minDelay, delay)
-		assert.GreaterOrEqual(t, maxDelay, delay)
+		assert.GreaterOrEqual(t, expectedMaxDelay, delay)
+	})
+
+	t.Run("should return values in expected range for defaults", func(t *testing.T) {
+		baseDelay := DefaultBaseHandleFirstBroadcastDelay
+		dkgSize := 150
+		minDelay := time.Duration(0)
+		// m=b*n^2
+		expectedMaxDelay := time.Duration(int64(baseDelay) * int64(dkgSize) * int64(dkgSize))
+
+		maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)
+		assert.Equal(t, expectedMaxDelay, maxDelay)
+
+		delay := computePreprocessingDelay(baseDelay, dkgSize)
+		assert.LessOrEqual(t, minDelay, delay)
+		assert.GreaterOrEqual(t, expectedMaxDelay, delay)
 	})
 }

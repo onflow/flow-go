@@ -445,6 +445,18 @@ func (c *Controller) preHandleFirstBroadcastDelay() time.Duration {
 // * n is the size of the DKG committee
 //
 func computePreprocessingDelay(baseDelay time.Duration, dkgSize int) time.Duration {
+
+	maxDelay := computePreprocessingDelayMax(baseDelay, dkgSize)
+	if maxDelay <= 0 {
+		return 0
+	}
+	// select delay from [0,m)
+	delay := time.Duration(rand.Int63n(maxDelay.Nanoseconds()))
+	return delay
+}
+
+// computePreprocessingDelayMax computes the maximum dely for computePreprocessingDelay.
+func computePreprocessingDelayMax(baseDelay time.Duration, dkgSize int) time.Duration {
 	// sanity checks
 	if baseDelay < 0 {
 		baseDelay = 0
@@ -458,7 +470,5 @@ func computePreprocessingDelay(baseDelay time.Duration, dkgSize int) time.Durati
 	if maxDelay <= 0 {
 		return 0
 	}
-	// select delay from [0,m)
-	delay := time.Duration(rand.Int63n(maxDelay.Nanoseconds()))
-	return delay
+	return maxDelay
 }
