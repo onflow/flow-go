@@ -3,11 +3,11 @@ package migrations
 import (
 	"bufio"
 	"fmt"
+	"github.com/onflow/cadence/runtime"
 	"os"
 	"path"
 	"time"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
 	"github.com/rs/zerolog"
 
@@ -58,23 +58,14 @@ func (r *StorageReporter) Report(payload []ledger.Payload) error {
 
 	l := newView(payload)
 	st := state.NewState(l)
+	stateHolder := state.NewStateHolder(st)
+	accounts := state.NewAccounts(stateHolder)
 
-	encodingStorage := newEncodingBaseStorage()
-
-	encMode, err := cbor.EncOptions{}.EncMode()
-	if err != nil {
-		panic(err)
-	}
-
-	decMode, err := cbor.DecOptions{}.DecMode()
-	if err != nil {
-		panic(err)
-	}
-
-	r.slabStorage = atree.NewPersistentSlabStorage(
-		encodingStorage,
-		encMode,
-		decMode,
+	r.slabStorage = runtime.NewStorage(
+		newAccountsAtreeLedger(accounts),
+		func(f func(), _ func(metrics runtime.Metrics, duration time.Duration)) {
+			f()
+		},
 	)
 
 	for _, p := range payload {
