@@ -30,9 +30,10 @@ func populatedBlockStore(t *rapid.T) []flow.Header {
 }
 
 type rapidSync struct {
-	store      []flow.Header
-	core       *Core
-	idRequests map[flow.Identifier]int // pushdown automaton to track ID requests
+	store          []flow.Header
+	core           *Core
+	idRequests     map[flow.Identifier]int // pushdown automaton to track ID requests
+	heightRequests map[uint64]int          // pushdown automaton to track height requests
 }
 
 // Init is an action for initializing a rapidSync instance.
@@ -44,6 +45,7 @@ func (r *rapidSync) Init(t *rapid.T) {
 
 	r.store = populatedBlockStore(t)
 	r.idRequests = make(map[flow.Identifier]int)
+	r.heightRequests = make(map[uint64]int)
 }
 
 // RequestByID is an action that requests a block by its ID.
@@ -52,6 +54,16 @@ func (r *rapidSync) RequestByID(t *rapid.T) {
 	r.core.RequestBlock(b.ID())
 	// Re-queueing by ID should always succeed
 	r.idRequests[b.ID()] = 1
+	// Re-qeueuing by ID "forgets" a past height request
+	r.heightRequests[b.Height] = 0
+}
+
+// RequestByHeight is an action that requests a specific height
+func (r *rapidSync) RequestByHeight(t *rapid.T) {
+	b := rapid.SampledFrom(r.store).Draw(t, "id_request").(flow.Header)
+	r.core.RequestHeight(b.Height)
+	// Re-queueing by height should always succeed
+	r.heightRequests[b.Height] = 1
 }
 
 // HandleByID is an action that provides a block header to the sync engine
@@ -65,6 +77,8 @@ func (r *rapidSync) HandleByID(t *rapid.T) {
 	if r.idRequests[b.ID()] == 1 {
 		r.idRequests[b.ID()] = 0
 	}
+	// we eagerly remove height requests
+	r.heightRequests[b.Height] = 0
 }
 
 // Check runs after every action and verifies that all required invariants hold.
@@ -83,6 +97,21 @@ func (r *rapidSync) Check(t *rapid.T) {
 		} else {
 			t.Fatalf("incorrect management of idRequests in the tests")
 		}
+	}
+	heights, blockIDs := r.core.getRequestableItems()
+	// the queueing logic queues intervals, while our r.heightRequests only queues specific requests
+	var activeHeights []uint64
+	for k, v := range r.heightRequests {
+		if v == 1 {
+			activeHeights = append(activeHeights, k)
+		}
+	}
+	assert.Subset(t, heights, activeHeights, "sync engine's height request tracking lost heights")
+
+	for _, bID := range blockIDs {
+		v, ok := r.idRequests[bID]
+		require.True(t, ok)
+		assert.Equal(t, 1, v, "blockID %v is supposed to be pending but is not", bID)
 	}
 }
 
