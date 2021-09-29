@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/libp2p/go-libp2p-core/host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
@@ -67,7 +69,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 	})
 }
 
-func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
+func (builder *StakedAccessNodeBuilder) Initialize() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	builder.Cancel = cancel
@@ -84,11 +86,13 @@ func (builder *StakedAccessNodeBuilder) Initialize() cmd.NodeBuilder {
 
 	builder.EnqueueMetricsServerInit()
 
-	builder.RegisterBadgerMetrics()
+	if err := builder.RegisterBadgerMetrics(); err != nil {
+		return err
+	}
 
 	builder.EnqueueTracer()
 
-	return builder
+	return nil
 }
 
 func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
@@ -100,11 +104,11 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 
 		anb.
 			Component("unstaked sync request proxy", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				proxyEngine = splitter.New(node.Logger, engine.UnstakedSyncCommittee)
+				proxyEngine = splitter.New(node.Logger, engine.PublicSyncCommittee)
 
 				// register the proxy engine with the unstaked network
 				var err error
-				unstakedNetworkConduit, err = node.Network.Register(engine.UnstakedSyncCommittee, proxyEngine)
+				unstakedNetworkConduit, err = node.Network.Register(engine.PublicSyncCommittee, proxyEngine)
 				if err != nil {
 					return nil, fmt.Errorf("could not register unstaked sync request proxy: %w", err)
 				}
@@ -208,19 +212,22 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
 
-	resolver, err := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
-	if err != nil {
-		return nil, fmt.Errorf("could not create dns resolver: %w", err)
-	}
+	resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 
 	return func() (*p2p.Node, error) {
+		psOpts := p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)
+		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
+			return pubsub.WithSubscriptionFilter(p2p.NewRoleBasedFilter(
+				h.ID(), builder.RootBlock.ID(), builder.IdentityProvider,
+			)), nil
+		})
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
-			SetRootBlockID(builder.RootBlock.ID().String()).
+			SetRootBlockID(builder.RootBlock.ID()).
 			// no connection gater
 			SetConnectionManager(connManager).
 			// act as a DHT server
 			SetDHTOptions(dhtOptions...).
-			SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
+			SetPubsubOptions(psOpts...).
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
 			Build(ctx)
@@ -247,7 +254,7 @@ func (builder *StakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
-		builder.RootBlock.ID().String(),
+		builder.RootBlock.ID(),
 		p2p.DefaultUnicastTimeout,
 		false, // no connection gating to allow unstaked nodes to connect
 		builder.IDTranslator,

@@ -87,13 +87,13 @@ func (m *MetricsHandler) ValueDecoded(duration time.Duration) {
 // NoopMetricsReporter is a MetricReporter that does nothing.
 type NoopMetricsReporter struct{}
 
-// TransactionParsed is a noop
+// RuntimeTransactionParsed is a noop
 func (NoopMetricsReporter) RuntimeTransactionParsed(time.Duration) {}
 
-// TransactionChecked is a noop
+// RuntimeTransactionChecked is a noop
 func (NoopMetricsReporter) RuntimeTransactionChecked(time.Duration) {}
 
-// TransactionInterpreted is a noop
+// RuntimeTransactionInterpreted is a noop
 func (NoopMetricsReporter) RuntimeTransactionInterpreted(time.Duration) {}
 
 // RuntimeSetNumberOfAccounts is a noop

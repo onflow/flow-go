@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
@@ -73,7 +74,6 @@ type Storage struct {
 	Setups       storage.EpochSetups
 	Commits      storage.EpochCommits
 	Statuses     storage.EpochStatuses
-	DKGKeys      storage.DKGKeys
 }
 
 type namedModuleFunc struct {
@@ -121,7 +121,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultConfig.nodeIDHex, "identity of our node")
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
-	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the protocol state")
+	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
+	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
 	fnb.flags.DurationVar(&fnb.BaseConfig.PeerUpdateInterval, "peerupdate-interval", defaultConfig.PeerUpdateInterval, "how often to refresh the peer connections for the node")
 	fnb.flags.DurationVar(&fnb.BaseConfig.UnicastMessageTimeout, "unicast-timeout", defaultConfig.UnicastMessageTimeout, "how long a unicast transmission can take to complete")
@@ -177,11 +178,14 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
-			fnb.RootBlock.ID().String(),
+			fnb.RootBlock.ID(),
+			fnb.RootChainID,
+			fnb.IdentityProvider,
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
 			pingProvider,
-			fnb.BaseConfig.DNSCacheTTL)
+			fnb.BaseConfig.DNSCacheTTL,
+			fnb.BaseConfig.NodeRole)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
@@ -203,7 +207,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
-			fnb.RootBlock.ID().String(),
+			fnb.RootBlock.ID(),
 			fnb.BaseConfig.UnicastMessageTimeout,
 			true,
 			fnb.IDTranslator,
@@ -290,8 +294,8 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
 	})
 }
 
-func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() {
-	metrics.RegisterBadgerMetrics()
+func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
+	return metrics.RegisterBadgerMetrics()
 }
 
 func (fnb *FlowNodeBuilder) EnqueueTracer() {
@@ -455,9 +459,43 @@ func (fnb *FlowNodeBuilder) initDB() {
 		WithValueLogFileSize(128 << 23).
 		WithValueLogMaxEntries(100000) // Default is 1000000
 
-	db, err := badger.Open(opts)
-	fnb.MustNot(err).Msg("could not open key-value store")
-	fnb.DB = db
+	publicDB, err := bstorage.InitPublic(opts)
+	fnb.MustNot(err).Msg("could not open public db")
+	fnb.DB = publicDB
+}
+
+func (fnb *FlowNodeBuilder) initSecretsDB() {
+
+	// if the secrets DB is disabled (only applicable for Consensus Follower,
+	// which makes use of this same logic), skip this initialization
+	if !fnb.BaseConfig.secretsDBEnabled {
+		return
+	}
+
+	if fnb.BaseConfig.secretsdir == NotSet {
+		fnb.Logger.Fatal().Msgf("missing required flag '--secretsdir'")
+	}
+
+	err := os.MkdirAll(fnb.BaseConfig.secretsdir, 0700)
+	fnb.MustNot(err).Str("dir", fnb.BaseConfig.secretsdir).Msg("could not create secrets db dir")
+
+	log := sutil.NewLogger(fnb.Logger)
+
+	opts := badger.DefaultOptions(fnb.BaseConfig.secretsdir).WithLogger(log)
+	// attempt to read an encryption key for the secrets DB from the canonical path
+	// TODO enforce encryption in an upcoming spork https://github.com/dapperlabs/flow-go/issues/5893
+	encryptionKey, err := loadSecretsEncryptionKey(fnb.BootstrapDir, fnb.NodeID)
+	if errors.Is(err, os.ErrNotExist) {
+		fnb.Logger.Warn().Msg("starting with secrets database encryption disabled")
+	} else if err != nil {
+		fnb.Logger.Fatal().Err(err).Msg("failed to read secrets db encryption key")
+	} else {
+		opts = opts.WithEncryptionKey(encryptionKey)
+	}
+
+	secretsDB, err := bstorage.InitSecret(opts)
+	fnb.MustNot(err).Msg("could not open secrets db")
+	fnb.SecretsDB = secretsDB
 }
 
 func (fnb *FlowNodeBuilder) initStorage() {
@@ -483,7 +521,6 @@ func (fnb *FlowNodeBuilder) initStorage() {
 	setups := bstorage.NewEpochSetups(fnb.Metrics.Cache, fnb.DB)
 	commits := bstorage.NewEpochCommits(fnb.Metrics.Cache, fnb.DB)
 	statuses := bstorage.NewEpochStatuses(fnb.Metrics.Cache, fnb.DB)
-	dkgKeys := bstorage.NewDKGKeys(fnb.Metrics.Cache, fnb.DB)
 
 	fnb.Storage = Storage{
 		Headers:      headers,
@@ -499,7 +536,6 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Setups:       setups,
 		Commits:      commits,
 		Statuses:     statuses,
-		DKGKeys:      dkgKeys,
 	}
 }
 
@@ -804,6 +840,12 @@ func WithDataDir(dataDir string) Option {
 	}
 }
 
+func WithSecretsDBEnabled(enabled bool) Option {
+	return func(config *BaseConfig) {
+		config.secretsDBEnabled = enabled
+	}
+}
+
 func WithMetricsEnabled(enabled bool) Option {
 	return func(config *BaseConfig) {
 		config.metricsEnabled = enabled
@@ -844,7 +886,7 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 	return builder
 }
 
-func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
+func (fnb *FlowNodeBuilder) Initialize() error {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	fnb.Cancel = cancel
@@ -855,7 +897,9 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.ParseAndPrintFlags()
 
-	fnb.extraFlagsValidation()
+	if err := fnb.extraFlagsValidation(); err != nil {
+		return err
+	}
 
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
@@ -864,7 +908,9 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()
-		fnb.RegisterBadgerMetrics()
+		if err := fnb.RegisterBadgerMetrics(); err != nil {
+			return err
+		}
 	}
 
 	if fnb.adminAddr != NotSet {
@@ -877,7 +923,7 @@ func (fnb *FlowNodeBuilder) Initialize() NodeBuilder {
 
 	fnb.EnqueueTracer()
 
-	return fnb
+	return nil
 }
 
 // Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
@@ -930,6 +976,7 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 		fnb.initProfiler()
 
 		fnb.initDB()
+		fnb.initSecretsDB()
 
 		fnb.initMetrics()
 
@@ -995,20 +1042,22 @@ func (fnb *FlowNodeBuilder) closeDatabase() {
 	}
 }
 
-func (fnb *FlowNodeBuilder) extraFlagsValidation() {
+func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 	if fnb.extraFlagCheck != nil {
 		err := fnb.extraFlagCheck()
 		if err != nil {
-			fnb.Logger.Fatal().Err(err).Msg("invalid flags")
+			return fmt.Errorf("invalid flags: %w", err)
 		}
 	}
+	return nil
 }
 
 // loadRootProtocolSnapshot loads the root protocol snapshot from disk
 func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
-	data, err := io.ReadFile(filepath.Join(dir, bootstrap.PathRootProtocolStateSnapshot))
+	path := filepath.Join(dir, bootstrap.PathRootProtocolStateSnapshot)
+	data, err := io.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not read root snapshot (path=%s): %w", path, err)
 	}
 
 	var snapshot inmem.EncodableSnapshot
@@ -1022,11 +1071,23 @@ func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
 func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
-	data, err := io.ReadFile(filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID)))
+	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID))
+	data, err := io.ReadFile(path)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not read private node info (path=%s): %w", path, err)
 	}
 	var info bootstrap.NodeInfoPriv
 	err = json.Unmarshal(data, &info)
 	return &info, err
+}
+
+// loadSecretsEncryptionKey loads the encryption key for the secrets database.
+// If the file does not exist, returns os.ErrNotExist.
+func loadSecretsEncryptionKey(dir string, myID flow.Identifier) ([]byte, error) {
+	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathSecretsEncryptionKey, myID))
+	data, err := io.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("could not read secrets db encryption key (path=%s): %w", path, err)
+	}
+	return data, nil
 }
