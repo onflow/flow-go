@@ -16,6 +16,8 @@ type Network interface {
 	// The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
 	// On a single node, only one engine can be subscribed to a channel at any given time.
 	Register(channel network.Channel, engine network.Engine) (network.Conduit, error)
+
+	RegisterEntityExchange(channel network.Channel, store network.EntityStore) (network.EntityExchange, error)
 }
 
 type ReadyDoneAwareNetwork interface {

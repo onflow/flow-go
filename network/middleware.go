@@ -8,6 +8,8 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/peer"
 
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
@@ -61,21 +63,36 @@ type Middleware interface {
 }
 
 type EntityExchange interface {
-	// TODO: make this Startable and ReadyDoneAware
+	module.Startable
 	EntityExchangeFetcher
 	GetSession(ctx context.Context) EntityExchangeFetcher
 	HasEntity(entity flow.Entity)
 }
 
 type EntityExchangeFetcher interface {
-	GetEntities(ctx context.Context, cb func(entity flow.Entity), ids ...flow.Identifier)
+	GetEntities(ids ...flow.Identifier) EntitiesPromise
 }
 
-type EntityExchangeMiddleware interface {
-	Middleware
-	EntityExchange
-	// TODO:
-	// can add more methods here, e.g to access underlying blockstore
+type EntitiesPromise interface {
+	ForEach(cb func(flow.Entity)) EntitiesPromise
+	Send(ctx context.Context) error
+}
+
+type EntityStore interface {
+	// Create returns a `flow.Entity` with an underlying type so that we can
+	// properly decode entities transmitted over the network.
+	Create() flow.Entity
+	Encoder() encoding.Encoder
+	Hasher() hash.Hasher
+
+	Delete(hash flow.Identifier) error
+	Has(hash flow.Identifier) (bool, error)
+	Get(hash flow.Identifier) (flow.Entity, error)
+	GetSize(hash flow.Identifier) (int, error)
+	Put(entity flow.Entity) error
+	PutMany(entities []flow.Entity) error
+	AllIdentifiers(ctx context.Context) (<-chan flow.Identifier, error)
+	HashOnRead(enabled bool)
 }
 
 // Overlay represents the interface that middleware uses to interact with the
