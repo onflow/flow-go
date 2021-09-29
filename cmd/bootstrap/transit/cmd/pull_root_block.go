@@ -24,8 +24,8 @@ func init() {
 }
 
 func addPullRootBlockCmdFlags() {
-	pullCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
-	_ = pullCmd.MarkFlagRequired("token")
+	pullRootBlockCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
+	_ = pullRootBlockCmd.MarkFlagRequired("token")
 }
 
 func pullRootBlock(c *cobra.Command, args []string) {

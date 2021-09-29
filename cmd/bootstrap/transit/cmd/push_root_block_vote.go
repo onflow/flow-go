@@ -35,8 +35,8 @@ func init() {
 }
 
 func addPushVoteCmdFlags() {
-	pullRootBlockCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
-	_ = pullRootBlockCmd.MarkFlagRequired("token")
+	pushVoteCmd.Flags().StringVarP(&flagToken, "token", "t", "", "token provided by the Flow team to access the Transit server")
+	_ = pushVoteCmd.MarkFlagRequired("token")
 }
 
 func pushVote(c *cobra.Command, args []string) {
