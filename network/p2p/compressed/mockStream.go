@@ -1,40 +1,51 @@
 package compressed
 
 import (
-	"bufio"
+	"bytes"
+	"io"
 	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/protocol"
 )
 
 type mockStream struct {
-	network.Stream
-	r bufio.Reader
-	w bufio.Writer
+	pw *io.PipeWriter
+	pr *io.PipeReader
 }
 
 func newMockStream() *mockStream {
+	pr, pw := io.Pipe()
 	return &mockStream{
-		r: bufio.Reader{},
-		w: bufio.Writer{},
+		pw: pw,
+		pr: pr,
 	}
 }
 
-func (m *mockStream) Read(p []byte) (n int, err error) {
-	return m.r.Read(p)
+func (m *mockStream) Read(p []byte) (int, error) {
+	n, err := io.Copy(bytes.NewBuffer(p), m.pr)
+	return int(n), err
 }
 
-func (m *mockStream) Write(p []byte) (n int, err error) {
-	return m.w.Write(p)
+func (m *mockStream) Write(p []byte) (int, error) {
+	go func() {
+		_, _ = io.Copy(m.pw, bytes.NewBuffer(p))
+	}()
+
+	return len(p), nil
 }
 
 func (m *mockStream) Close() error {
-	return nil
+	return multierror.Append(m.CloseRead(), m.CloseWrite())
 }
 
 func (m *mockStream) CloseRead() error {
-	return nil
+	return m.pr.Close()
+}
+
+func (m *mockStream) CloseWrite() error {
+	return m.pw.Close()
 }
 
 func (m *mockStream) Reset() error {
