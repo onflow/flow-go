@@ -27,7 +27,7 @@ func TestGenerateRootQC(t *testing.T) {
 	votes, err := GenerateRootBlockVotes(&block, participantData)
 	require.NoError(t, err)
 
-	_, err = GenerateRootQC(&block, votes, participantData)
+	_, err = GenerateRootQC(&block, votes, participantData, participantData.Identities())
 	require.NoError(t, err)
 }
 
