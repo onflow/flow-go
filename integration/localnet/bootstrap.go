@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/plus3it/gorecurcopy"
@@ -153,7 +154,8 @@ func main() {
 
 	fmt.Println("Node bootstrapping data generated...")
 
-	var secureAccessNodeID string
+	// gather access node IDS for LN/SN nodes
+	var accessNodeIDS strings.Builder
 	for i, c := range containers {
 		fmt.Printf("%d: %s", i+1, c.Identity().String())
 		if c.Unstaked {
@@ -161,13 +163,15 @@ func main() {
 		}
 
 		if c.Role == flow.RoleAccess && !c.Unstaked {
-			secureAccessNodeID = c.NodeID.String()
+			accessNodeIDS.WriteString(fmt.Sprintf("%s,", c.NodeID.String()))
 		}
 
 		fmt.Println()
 	}
 
-	services := prepareServices(containers, secureAccessNodeID)
+	// remove extra comma at the end of string
+	anIDS := accessNodeIDS.String()[:accessNodeIDS.Len()-1]
+	services := prepareServices(containers, anIDS)
 
 	err = writeDockerComposeConfig(services)
 	if err != nil {
@@ -251,7 +255,7 @@ type Build struct {
 	Target     string
 }
 
-func prepareServices(containers []testnet.ContainerConfig, secureAccessNodeID string) Services {
+func prepareServices(containers []testnet.ContainerConfig, secureAccessNodeIDS string) Services {
 	services := make(Services)
 
 	var (
@@ -268,16 +272,14 @@ func prepareServices(containers []testnet.ContainerConfig, secureAccessNodeID st
 			services[container.ContainerName] = prepareConsensusService(
 				container,
 				numConsensus,
-				"access_1:9001",
-				secureAccessNodeID,
+				secureAccessNodeIDS,
 			)
 			numConsensus++
 		case flow.RoleCollection:
 			services[container.ContainerName] = prepareCollectionService(
 				container,
 				numCollection,
-				"access_1:9001",
-				secureAccessNodeID,
+				secureAccessNodeIDS,
 			)
 			numCollection++
 		case flow.RoleExecution:
@@ -370,7 +372,8 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 	return service
 }
 
-func prepareConsensusService(container testnet.ContainerConfig, i int, accessAddress, secureAccessNodeID string) Service {
+// NOTE: accessNodeIDS is a comma separated list of access node IDS
+func prepareConsensusService(container testnet.ContainerConfig, i int, accessNodeIDS string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + consensusDelay
@@ -381,9 +384,8 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, accessAdd
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--chunk-alpha=1"),
 		fmt.Sprintf("--emergency-sealing-active=false"),
-		fmt.Sprintf("--access-address=%s", accessAddress),
 		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprintf("--secure-access-node-id=%s", secureAccessNodeID),
+		fmt.Sprintf("--access-node-ids=%v", accessNodeIDS),
 	)
 
 	return service
@@ -400,7 +402,8 @@ func prepareVerificationService(container testnet.ContainerConfig, i int) Servic
 	return service
 }
 
-func prepareCollectionService(container testnet.ContainerConfig, i int, accessAddress, secureAccessNodeID string) Service {
+// NOTE: accessNodeIDS is a comma separated list of access node IDS
+func prepareCollectionService(container testnet.ContainerConfig, i int, accessNodeIDS string) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + collectionDelay
@@ -410,9 +413,8 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, accessAd
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
-		fmt.Sprintf("--access-address=%s", accessAddress),
 		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprintf("--secure-access-node-id=%s", secureAccessNodeID),
+		fmt.Sprintf("--access-node-ids=%v", accessNodeIDS),
 	)
 
 	return service

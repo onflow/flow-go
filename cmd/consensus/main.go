@@ -371,21 +371,7 @@ func main() {
 				return fmt.Errorf("invalid flag --access-node-ids atleast %x IDs must be provided", common.DefaultAccessNodeIDSMinimum)
 			}
 
-			flowClientOpts = make([]*common.FlowClientOpt, len(accessNodeIDS))
-			for i, id := range accessNodeIDS {
-				accessAddress, networkingPubKey, err := common.GetAccessNodeInfo(id, node.State.Sealed())
-				if err != nil {
-					return fmt.Errorf("failed to get networking info from protocol state for access node ID (%x): %s %w", i, id, err)
-				}
-
-				opt, err := common.NewFlowClientOpt(accessAddress, networkingPubKey, insecureAccessAPI)
-				if err != nil {
-					return fmt.Errorf("failed to get flow client connection option for access node ID (%x): %s %w", i, id, err)
-				}
-
-				flowClientOpts = append(flowClientOpts, opt)
-			}
-
+			flowClientOpts, err = common.PrepareFlowClientOpts(accessNodeIDS, insecureAccessAPI, node.State.Sealed())
 			return nil
 		}).
 		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -817,7 +803,7 @@ func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 
 // createDKGContractClients creates an array dkgContractClient that is sorted by retry fallback priority
 func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*common.FlowClientOpt) ([]module.DKGContractClient, error) {
-	dkgClients := make([]module.DKGContractClient, len(flowClientOpts))
+	dkgClients := make([]module.DKGContractClient, 0)
 
 	for _, opt := range flowClientOpts {
 		flowClient, err := common.FlowClient(opt)

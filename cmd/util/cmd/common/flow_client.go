@@ -2,8 +2,8 @@ package common
 
 import (
 	"fmt"
-
 	"google.golang.org/grpc"
+	"strings"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go/model/flow"
@@ -12,7 +12,11 @@ import (
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
-const DefaultAccessNodeIDSMinimum = 2
+const (
+	DefaultAccessNodeIDSMinimum = 2
+	DefaultAccessAPIPort = "9000"
+	DefaultAccessAPISecurePort = "9001"
+)
 
 type FlowClientOpt struct {
 	AccessAddress    string
@@ -75,25 +79,43 @@ func insecureFlowClient(accessAddress string) (*client.Client, error) {
 	return flowClient, nil
 }
 
-// GetAccessNodeInfo will get access node info from protocol state snapshot and return connection info
-func GetAccessNodeInfo(accessNodeID string, snapshot protocol.Snapshot) (accessAddress, networkingPubKey string, err error) {
-	nodeID, err := flow.HexStringToIdentifier(accessNodeID)
-	if err != nil {
-		return "", "", fmt.Errorf("could not get flow identifer from secured access node id: %s", accessNodeID)
+// PrepareFlowClientOpts will assemble connection options for the flow client for each access node id
+func PrepareFlowClientOpts(accessNodeIDS []string, insecureAccessAPI bool, snapshot protocol.Snapshot) ([]*FlowClientOpt, error) {
+	flowClientOpts := make([]*FlowClientOpt, 0)
+	for i, id := range accessNodeIDS {
+		nodeID, err := flow.HexStringToIdentifier(id)
+		if err != nil {
+			return nil, fmt.Errorf("could not get flow identifer from secured access node id: %s", id)
+		}
+
+		identities, err := snapshot.Identities(filter.HasNodeID(nodeID))
+		if err != nil {
+			return nil, fmt.Errorf("could not get identity of secure access node: %s", id)
+		}
+
+		if len(identities) < 1 {
+			return nil, fmt.Errorf("could not find identity of secure access node: %s", id)
+		}
+
+		// remove gossip port from access address and add respective secure or insecure port
+		var accessAddress strings.Builder
+		accessAddress.WriteString(strings.Split(identities[0].Address, ":")[0])
+
+		if insecureAccessAPI {
+			accessAddress.WriteString(fmt.Sprintf(":%s", DefaultAccessAPIPort))
+		} else {
+			accessAddress.WriteString(fmt.Sprintf(":%s", DefaultAccessAPISecurePort))
+		}
+
+		// remove the 0x prefix from network public keys
+		networkingPubKey := identities[0].NetworkPubKey.String()[2:]
+
+		opt, err := NewFlowClientOpt(accessAddress.String(), networkingPubKey, insecureAccessAPI)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get flow client connection option for access node ID (%x): %s %w", i, id, err)
+		}
+
+		flowClientOpts = append(flowClientOpts, opt)
 	}
-
-	identities, err := snapshot.Identities(filter.HasNodeID(nodeID))
-	if err != nil {
-		return "", "", fmt.Errorf("could not get identity of secure access node: %s", accessNodeID)
-	}
-
-	if len(identities) < 1 {
-		return "", "", fmt.Errorf("could not find identity of secure access node: %s", accessNodeID)
-	}
-
-	accessAddress = identities[0].Address
-	// remove the 0x prefix from network public keys
-	networkingPubKey = identities[0].NetworkPubKey.String()[2:]
-
-	return
+	return flowClientOpts, nil
 }
