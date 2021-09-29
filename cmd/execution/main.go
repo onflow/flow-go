@@ -274,7 +274,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
-			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep)
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep, node.Logger.With().Str("subcomponent", "checkpointer").Logger())
 
 			return compactor, nil
 		}).
