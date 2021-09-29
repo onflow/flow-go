@@ -972,12 +972,12 @@ func (c *ValueConverter) Convert(value oldInter.Value) (result newInter.Value) {
 			return
 		}
 
-		if _, ok := r.(newInter.TypeLoadingError); ok {
+		if typeError, ok := r.(newInter.TypeLoadingError); ok {
 			c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value due to missing static type: owner: %x, type: %s\n",
 					value.GetOwner(),
-					value.StaticType(),
+					typeError.TypeID,
 				),
 			)
 		} else {
