@@ -273,27 +273,6 @@ func (m *StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Pa
 	return accounts
 }
 
-func (m *StorageFormatV6Migration) getFVMRegisters(payloads []ledger.Payload) []ledger.Payload {
-	var fvmPayloads []ledger.Payload
-
-	for _, payload := range payloads {
-		keyParts := payload.Key.KeyParts
-		rawOwner := keyParts[0].Value
-		rawController := keyParts[1].Value
-		rawKey := keyParts[2].Value
-
-		if state.IsFVMStateKey(
-			string(rawOwner),
-			string(rawController),
-			string(rawKey),
-		) {
-			fvmPayloads = append(fvmPayloads, payload)
-		}
-	}
-
-	return fvmPayloads
-}
-
 func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) map[storagePath]bool {
 	m.clearProgress()
 	m.Log.Info().Msgf("Collecting deferred keys...")
