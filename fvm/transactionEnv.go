@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
@@ -239,12 +240,8 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 }
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (uint64, error) {
-	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
-	if err != nil {
-		return 0, fmt.Errorf("storage address allocation failed: %w", err)
-	}
-	return v, nil
+func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	return 0, errors.NewOperationNotSupportedError("AllocateStorageIndex")
 }
 
 func (e *TransactionEnv) GetStorageUsed(address common.Address) (value uint64, err error) {

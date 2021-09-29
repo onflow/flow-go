@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
@@ -661,70 +662,18 @@ func (e *ScriptEnv) ImplementationDebugLog(message string) error {
 }
 
 func (e *ScriptEnv) ProgramParsed(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceParseProgram, duration,
-			[]opentracing.LogRecord{
-				{Timestamp: time.Now(),
-					Fields: []traceLog.Field{traceLog.String("location", locStr)},
-				},
-			},
-		)
-	}
-	e.metrics.ProgramParsed(location, duration)
 }
 
 func (e *ScriptEnv) ProgramChecked(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceCheckProgram, duration,
-			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", locStr)},
-			},
-			},
-		)
-	}
-	e.metrics.ProgramChecked(location, duration)
 }
 
 func (e *ScriptEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
-	if e.isTraceable() {
-		locStr := ""
-		if location != nil {
-			locStr = location.String()
-		}
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceInterpretProgram, duration,
-			[]opentracing.LogRecord{{Timestamp: time.Now(),
-				Fields: []traceLog.Field{traceLog.String("location", locStr)},
-			},
-			},
-		)
-	}
-	e.metrics.ProgramInterpreted(location, duration)
 }
 
 func (e *ScriptEnv) ValueEncoded(duration time.Duration) {
-	if e.isTraceable() {
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceEncodeValue, duration,
-			[]opentracing.LogRecord{},
-		)
-	}
-	e.metrics.ValueEncoded(duration)
 }
 
 func (e *ScriptEnv) ValueDecoded(duration time.Duration) {
-	if e.isTraceable() {
-		e.ctx.Tracer.RecordSpanFromParent(e.traceSpan, trace.FVMCadenceDecodeValue, duration,
-			[]opentracing.LogRecord{},
-		)
-	}
-	e.metrics.ValueDecoded(duration)
 }
 
 // Commit commits changes and return a list of updated keys
@@ -738,6 +687,6 @@ func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
 }
 
 // AllocateStorageIndex is not implemented in this enviornment
-func (e *ScriptEnv) AllocateStorageIndex(_ []byte) (uint64, error) {
+func (e *ScriptEnv) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
 	return 0, errors.NewOperationNotSupportedError("AllocateStorageIndex")
 }

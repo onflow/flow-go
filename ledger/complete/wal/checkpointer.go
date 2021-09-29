@@ -3,6 +3,7 @@ package wal
 import (
 	"bufio"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -366,6 +367,7 @@ func ReadCheckpoint(r io.Reader) (*flattener.FlattenedForest, error) {
 	// TODO version ?
 	for i := uint16(0); i < triesCount; i++ {
 		storableTrie, err := flattener.ReadStorableTrie(reader)
+		fmt.Printf(">>>> loading trie from checkpoint with root hash %s \n", hex.EncodeToString(storableTrie.RootHash))
 		if err != nil {
 			return nil, fmt.Errorf("cannot read storable trie %d: %w", i, err)
 		}

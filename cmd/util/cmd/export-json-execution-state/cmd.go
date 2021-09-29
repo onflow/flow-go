@@ -45,7 +45,7 @@ func init() {
 	Cmd.Flags().StringVar(&flagStateCommitment, "state-commitment", "",
 		"State commitment (hex-encoded, 64 characters)")
 
-	Cmd.Flags().BoolVar(&flagGzip, "gzip", true,
+	Cmd.Flags().BoolVar(&flagGzip, "gzip", false,
 		"Write GZip-encoded")
 }
 

@@ -373,6 +373,7 @@ func (b *BootstrapProcedure) deployIDTableStaking(
 	contract := contracts.FlowIDTableStaking(
 		fungibleToken.HexWithPrefix(),
 		flowToken.HexWithPrefix(),
+		true,
 		true)
 
 	txError, err := b.vm.invokeMetaTransaction(
