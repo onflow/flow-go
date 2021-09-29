@@ -81,10 +81,10 @@ func extractExecutionState(
 				Log:       log,
 				OutputDir: outputDir,
 			},
-			// mgr.StorageReporter{
-			// 	Log:       log,
-			// 	OutputDir: outputDir,
-			// },
+			&mgr.StorageReporter{
+				Log:       log,
+				OutputDir: outputDir,
+			},
 			// &mgr.BalanceReporter{
 			// 	Log:       log,
 			// 	OutputDir: outputDir,

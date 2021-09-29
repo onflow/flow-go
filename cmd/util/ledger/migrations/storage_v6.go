@@ -238,7 +238,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	// Encode the new values by calling `storage.Commit()`
 
 	m.Log.Info().Msg("Re-encoding converted values...")
-//	m.incrementProgress()
+	m.incrementProgress()
 
 	err := m.storage.Commit()
 	if err != nil {
