@@ -110,7 +110,6 @@ type BaseConfig struct {
 	adminClientCAs        string
 	BindAddr              string
 	NodeRole              string
-	timeout               time.Duration
 	datadir               string
 	secretsdir            string
 	secretsDBEnabled      bool
@@ -183,7 +182,6 @@ func DefaultBaseConfig() *BaseConfig {
 		adminClientCAs:        NotSet,
 		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
-		timeout:               1 * time.Minute,
 		datadir:               datadir,
 		secretsdir:            NotSet,
 		secretsDBEnabled:      true,
