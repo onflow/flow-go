@@ -87,7 +87,7 @@ func (pm *PeerManager) Ready() <-chan struct{} {
 	pm.unit.Launch(pm.updateLoop)
 
 	// makes sure that peer update request is invoked once before returning
-	pm.peerRequestQ <- struct{}{}
+	pm.RequestPeerUpdate()
 
 	// also starts running it periodically
 	//
