@@ -29,10 +29,12 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/dns"
@@ -230,7 +232,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		net, err := p2p.NewNetwork(fnb.Logger,
 			codec,
 			fnb.Me,
-			fnb.Middleware,
+			func() (network.Middleware, error) { return fnb.Middleware, nil },
 			p2p.DefaultCacheSize,
 			topologyCache,
 			subscriptionManager,
@@ -249,7 +251,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		})
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
-		return net, err
+		return net, nil
 	})
 }
 
@@ -286,9 +288,10 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
 		}
 
 		command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.adminAddr, opts...)
-		if err := command_runner.Start(ctx); err != nil {
-			return nil, err
-		}
+		// TODO: update command_runner to be startable now
+		// if err := command_runner.Start(ctx); err != nil {
+		// 	return nil, err
+		// }
 
 		return command_runner, nil
 	})
@@ -723,7 +726,7 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
 	}
 }
 
-func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
+func (fnb *FlowNodeBuilder) handleComponent(ctx irrecoverable.SignalerContext, v namedComponentFunc) {
 
 	log := fnb.Logger.With().Str("component", v.name).Logger()
 
@@ -732,6 +735,13 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
 		log.Fatal().Err(err).Msg("component initialization failed")
 	} else {
 		log.Info().Msg("component initialization complete")
+	}
+
+	component, ok := readyAware.(module.Component)
+	if ok {
+		if err := component.Start(ctx); err != nil {
+			log.Fatal().Err(err).Msg("component startup failed")
+		}
 	}
 
 	select {
@@ -999,9 +1009,20 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 			fnb.handleModule(f)
 		}
 
+		errChan := make(chan error)
+		signalerCtx := irrecoverable.WithSignaler(context.TODO(), irrecoverable.NewSignaler(errChan))
+
+		// TODO: implement proper error handling
+		go func() {
+			err, ok := <-errChan
+			if ok {
+				fnb.Logger.Fatal().Err(err).Msg("component encountered irrecoverable error")
+			}
+		}()
+
 		// initialize all components
 		for _, f := range fnb.components {
-			fnb.handleComponent(f)
+			fnb.handleComponent(signalerCtx, f)
 		}
 	})
 	return fnb.lm.Started()
