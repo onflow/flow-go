@@ -33,8 +33,8 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	flownet "github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/compressed"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -70,7 +70,7 @@ func WithoutCompression(s libp2pnet.Stream) (libp2pnet.Stream, error) {
 
 // WithGzipCompression creates and returns a gzip-compressed stream out of input stream.
 func WithGzipCompression(s libp2pnet.Stream) (libp2pnet.Stream, error) {
-	return newCompressedStream(s, compressor.GzipStreamCompressor{})
+	return compressed.NewCompressedStream(s)
 }
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
