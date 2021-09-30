@@ -1148,11 +1148,11 @@ func (c *ValueConverter) VisitWord64Value(_ *oldInter.Interpreter, value oldInte
 }
 
 func (c *ValueConverter) VisitFix64Value(_ *oldInter.Interpreter, value oldInter.Fix64Value) {
-	c.result = newInter.NewFix64ValueWithInteger(int64(value.ToInt()))
+	c.result = newInter.Fix64Value(value)
 }
 
 func (c *ValueConverter) VisitUFix64Value(_ *oldInter.Interpreter, value oldInter.UFix64Value) {
-	c.result = newInter.NewUFix64ValueWithInteger(uint64(value.ToInt()))
+	c.result = newInter.UFix64Value(value)
 }
 
 func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *oldInter.CompositeValue) bool {
