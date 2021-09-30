@@ -1004,15 +1004,15 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 
 		ctx, cancel := context.WithCancel(context.TODO())
 		fnb.Cancel = cancel
-		errChan := make(chan error)
-		signalerCtx := irrecoverable.WithSignaler(ctx, irrecoverable.NewSignaler(errChan))
+		signaler := irrecoverable.NewSignaler()
+		signalerCtx := irrecoverable.WithSignaler(ctx, signaler)
 
 		// TODO: implement proper error handling
 		go func() {
 			select {
-			case err := <-errChan:
+			case err := <-signaler.Error():
 				fnb.Logger.Fatal().Err(err).Msg("component encountered irrecoverable error")
-			case <-signalerCtx.Done():
+			case <-ctx.Done():
 			}
 		}()
 
