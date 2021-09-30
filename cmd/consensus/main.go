@@ -63,7 +63,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -91,6 +90,8 @@ func main() {
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
 		dkgControllerConfig                    dkgmodule.ControllerConfig
+		startupTimeString                      string
+		startupTime                            time.Time
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
@@ -118,48 +119,70 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
+		dkgKeyStore             *bstorage.DKGKeys
 	)
 
-	cmd.FlowNode(flow.RoleConsensus.String()).
-		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
-			flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
-			flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
-			// the default value is able to buffer as many seals as would be generated over ~12 hours. In case it
-			// ever gets full, the node will simply crash instead of employing complex ejection logic.
-			flags.UintVar(&sealLimit, "seal-limit", 44200, "maximum number of block seals in the memory pool")
-			flags.UintVar(&pendingReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
-			flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
-			flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
-			flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
-			flags.UintVar(&maxGuaranteePerBlock, "max-guarantee-per-block", 100, "the maximum number of collection guarantees to be included in a block")
-			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
-			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
-			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
-			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
-			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
-			flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
-			flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
-			flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
-			flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
-			flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
-			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
-			flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
-			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
-			flags.DurationVar(&dkgControllerConfig.BaseStartDelay, "dkg-controller-base-start-delay", dkgmodule.DefaultBaseStartDelay, "used to define the range for jitter prior to DKG start (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
-			flags.DurationVar(&dkgControllerConfig.BaseHandleBroadcastDelay, "dkg-controller-base-handle-broadcast-delay", dkgmodule.DefaultBaseHandleBroadcastDelay, "used to define the range for jitter prior to DKG handling broadcast messages (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
+	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
+	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
+		flags.UintVar(&guaranteeLimit, "guarantee-limit", 1000, "maximum number of guarantees in the memory pool")
+		flags.UintVar(&resultLimit, "result-limit", 10000, "maximum number of execution results in the memory pool")
+		flags.UintVar(&approvalLimit, "approval-limit", 1000, "maximum number of result approvals in the memory pool")
+		// the default value is able to buffer as many seals as would be generated over ~12 hours. In case it
+		// ever gets full, the node will simply crash instead of employing complex ejection logic.
+		flags.UintVar(&sealLimit, "seal-limit", 44200, "maximum number of block seals in the memory pool")
+		flags.UintVar(&pendingReceiptsLimit, "pending-receipts-limit", 10000, "maximum number of pending receipts in the mempool")
+		flags.DurationVar(&minInterval, "min-interval", time.Millisecond, "the minimum amount of time between two blocks")
+		flags.DurationVar(&maxInterval, "max-interval", 90*time.Second, "the maximum amount of time between two blocks")
+		flags.UintVar(&maxSealPerBlock, "max-seal-per-block", 100, "the maximum number of seals to be included in a block")
+		flags.UintVar(&maxGuaranteePerBlock, "max-guarantee-per-block", 100, "the maximum number of collection guarantees to be included in a block")
+		flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second, "the initial timeout for the hotstuff pacemaker")
+		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond, "the lower timeout bound for the hotstuff pacemaker")
+		flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor", timeout.DefaultConfig.TimeoutIncrease, "multiplicative increase of timeout value in case of time out event")
+		flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor", timeout.DefaultConfig.TimeoutDecrease, "multiplicative decrease of timeout value in case of progress")
+		flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction", 0.6, "additional fraction of replica timeout that the primary will wait for votes")
+		flags.DurationVar(&blockRateDelay, "block-rate-delay", 500*time.Millisecond, "the delay to broadcast block proposal in order to control block production rate")
+		flags.UintVar(&chunkAlpha, "chunk-alpha", chmodule.DefaultChunkAssignmentAlpha, "number of verifiers that should be assigned to each chunk")
+		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
+		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
+		flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
+		flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
+		flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
+		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
+		flags.DurationVar(&dkgControllerConfig.BaseStartDelay, "dkg-controller-base-start-delay", dkgmodule.DefaultBaseStartDelay, "used to define the range for jitter prior to DKG start (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
+		flags.DurationVar(&dkgControllerConfig.BaseHandleFirstBroadcastDelay, "dkg-controller-base-handle-first-broadcast-delay", dkgmodule.DefaultBaseHandleFirstBroadcastDelay, "used to define the range for jitter prior to DKG handling the first broadcast messages (eg. 50ms) - the base value is scaled quadratically with the # of DKG participants")
+		flags.DurationVar(&dkgControllerConfig.HandleSubsequentBroadcastDelay, "dkg-controller-handle-subsequent-broadcast-delay", dkgmodule.DefaultHandleSubsequentBroadcastDelay, "used to define the constant delay introduced prior to DKG handling subsequent broadcast messages (eg. 2s)")
+		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 2006-01-02T15:04:05Z07:00)")
+	})
+
+	if err = nodeBuilder.Initialize(); err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	nodeBuilder.
+		ValidateFlags(func() error {
+			if startupTimeString != cmd.NotSet {
+				t, err := time.Parse(time.RFC3339, startupTimeString)
+				if err != nil {
+					return fmt.Errorf("invalid start-time value: %w", err)
+				}
+				startupTime = t
+			}
+			return nil
 		}).
-		Initialize().
 		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
+		}).
+		Module("dkg key storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			dkgKeyStore, err = bstorage.NewDKGKeys(node.Metrics.Cache, node.SecretsDB)
+			return err
 		}).
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 
 			// We need to ensure `requiredApprovalsForSealVerification <= requiredApprovalsForSealConstruction <= chunkAlpha`
@@ -250,7 +273,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			err = node.Storage.DKGKeys.InsertMyDKGPrivateInfo(epochCounter, privateDKGData)
+			err = dkgKeyStore.InsertMyDKGPrivateInfo(epochCounter, privateDKGData)
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}
@@ -268,7 +291,7 @@ func main() {
 					if err != nil {
 						return err
 					}
-					_, err = node.Storage.DKGKeys.RetrieveMyDKGPrivateInfo(counter)
+					_, err = dkgKeyStore.RetrieveMyDKGPrivateInfo(counter)
 					if err != nil {
 						return err
 					}
@@ -523,7 +546,7 @@ func main() {
 				proposals,
 				syncCore)
 			if err != nil {
-				return nil, fmt.Errorf("coult not initialize compliance core: %w", err)
+				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
 			}
 
 			// initialize the compliance engine
@@ -592,7 +615,7 @@ func main() {
 
 			epochLookup := epochs.NewEpochLookup(node.State)
 
-			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, node.Storage.DKGKeys)
+			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeyStore)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.SignerVerifier
@@ -626,6 +649,19 @@ func main() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}
 
+			opts := []consensus.Option{
+				consensus.WithInitialTimeout(hotstuffTimeout),
+				consensus.WithMinTimeout(hotstuffMinTimeout),
+				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
+				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+				consensus.WithBlockRateDelay(blockRateDelay),
+			}
+
+			if !startupTime.IsZero() {
+				opts = append(opts, consensus.WithStartupTime(startupTime))
+			}
+
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
@@ -642,12 +678,7 @@ func main() {
 				node.RootQC,
 				finalized,
 				pending,
-				consensus.WithInitialTimeout(hotstuffTimeout),
-				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
-				consensus.WithBlockRateDelay(blockRateDelay),
+				opts...,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
@@ -712,10 +743,6 @@ func main() {
 			viewsObserver := gadgets.NewViews()
 			node.ProtocolEvents.AddConsumer(viewsObserver)
 
-			// keyDB is used to store the private key resulting from the node's
-			// participation in the DKG run
-			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
-
 			// construct DKG contract client
 			dkgContractClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
 			if err != nil {
@@ -728,7 +755,7 @@ func main() {
 				node.Logger,
 				node.Me,
 				node.State,
-				keyDB,
+				dkgKeyStore,
 				dkgmodule.NewControllerFactory(
 					node.Logger,
 					node.Me,

@@ -86,8 +86,8 @@ func (f FakePublicKey) Equals(key crypto.PublicKey) bool { return false }
 
 type FakeAccounts struct{}
 
-func (f FakeAccounts) Exists(address flow.Address) (bool, error) { return true, nil }
-
+func (f FakeAccounts) Exists(address flow.Address) (bool, error)                     { return true, nil }
+func (f FakeAccounts) Get(address flow.Address) (*flow.Account, error)               { return &flow.Account{}, nil }
 func (f FakeAccounts) GetPublicKeyCount(_ flow.Address) (uint64, error)              { return 0, nil }
 func (f FakeAccounts) AppendPublicKey(_ flow.Address, _ flow.AccountPublicKey) error { return nil }
 func (f FakeAccounts) GetPublicKey(_ flow.Address, _ uint64) (flow.AccountPublicKey, error) {

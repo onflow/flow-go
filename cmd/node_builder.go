@@ -41,7 +41,7 @@ type NodeBuilder interface {
 	ParseAndPrintFlags()
 
 	// Initialize performs all the initialization needed at the very start of a node
-	Initialize() NodeBuilder
+	Initialize() error
 
 	// PrintBuildVersionDetails prints the node software build version
 	PrintBuildVersionDetails()
@@ -92,7 +92,7 @@ type NodeBuilder interface {
 	PostInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder
 
 	// RegisterBadgerMetrics registers all badger related metrics
-	RegisterBadgerMetrics()
+	RegisterBadgerMetrics() error
 
 	// ValidateFlags is an extra method called after parsing flags, intended for extra check of flag validity
 	// for example where certain combinations aren't allowed
@@ -110,8 +110,9 @@ type BaseConfig struct {
 	adminClientCAs        string
 	BindAddr              string
 	NodeRole              string
-	timeout               time.Duration
 	datadir               string
+	secretsdir            string
+	secretsDBEnabled      bool
 	level                 string
 	metricsPort           uint
 	BootstrapDir          string
@@ -143,6 +144,7 @@ type NodeConfig struct {
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
+	SecretsDB         *badger.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
@@ -171,6 +173,7 @@ type NodeConfig struct {
 func DefaultBaseConfig() *BaseConfig {
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
+
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
 		adminAddr:             NotSet,
@@ -179,8 +182,9 @@ func DefaultBaseConfig() *BaseConfig {
 		adminClientCAs:        NotSet,
 		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
-		timeout:               1 * time.Minute,
 		datadir:               datadir,
+		secretsdir:            NotSet,
+		secretsDBEnabled:      true,
 		level:                 "info",
 		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,

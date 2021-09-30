@@ -31,7 +31,7 @@ type ContractHandler struct {
 	lock sync.Mutex
 }
 
-func NewContractHandler(accounts *state.AccountsState,
+func NewContractHandler(accounts state.Accounts,
 	restrictedDeploymentEnabled bool,
 	authorizedAccounts AuthorizedAccountsForContractDeploymentFunc) *ContractHandler {
 	return &ContractHandler{
