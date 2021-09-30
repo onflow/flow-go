@@ -74,7 +74,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 		go adp.reportAccountData(addressIndexes)
 	}
 
-	for i := uint64(0); i < gen.AddressCount(); i++ {
+	for i := uint64(1); i <= gen.AddressCount(); i++ {
 		addressIndexes <- i
 	}
 	close(addressIndexes)
