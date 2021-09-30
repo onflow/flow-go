@@ -40,5 +40,4 @@ func TestRoundTrip(t *testing.T) {
 
 	unittest.RequireReturnsBefore(t, writeWG.Wait, 1*time.Second, "timeout for writing on stream")
 	unittest.RequireReturnsBefore(t, readWG.Wait, 1*time.Second, "timeout for reading from stream")
-
 }

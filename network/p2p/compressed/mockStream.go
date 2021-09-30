@@ -1,7 +1,7 @@
 package compressed
 
 import (
-	"bytes"
+	"fmt"
 	"io"
 	"time"
 
@@ -24,13 +24,14 @@ func newMockStream() *mockStream {
 }
 
 func (m *mockStream) Read(p []byte) (int, error) {
-	n, err := io.Copy(bytes.NewBuffer(p), m.pr)
-	return int(n), err
+	n, err := m.pr.Read(p)
+	fmt.Println("read: ", n, p)
+	return n, err
 }
 
 func (m *mockStream) Write(p []byte) (int, error) {
 	go func() {
-		_, _ = io.Copy(m.pw, bytes.NewBuffer(p))
+		_, _ = m.pw.Write(p)
 	}()
 
 	return len(p), nil
