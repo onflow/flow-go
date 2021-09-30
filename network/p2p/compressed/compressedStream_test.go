@@ -15,19 +15,19 @@ import (
 // and (2) data is compressed when written.
 func TestRoundTrip(t *testing.T) {
 	text := "hello world, hello world!"
+	byteLen := len([]byte(text))
 
-	// _, sa, _, sb := newCompressedStreamPair(t)
-	sa, sb := newStreamPair()
+	mca, _, mcb, _ := newCompressedStreamPair(t)
 
 	writeWG := sync.WaitGroup{}
 	writeWG.Add(1)
 	go func() {
 		defer writeWG.Done()
 
-		n, err := sa.Write([]byte(text))
+		n, err := mca.Write([]byte(text))
 		require.NoError(t, err)
+
 		require.Equal(t, n, len(text))
-		require.NoError(t, sa.pw.Close())
 	}()
 
 	readWG := sync.WaitGroup{}
@@ -35,8 +35,11 @@ func TestRoundTrip(t *testing.T) {
 	go func() {
 		defer readWG.Done()
 
-		b, err := io.ReadAll(sb)
+		b := make([]byte, byteLen)
+		n, err := mcb.Read(b)
 		require.NoError(t, err)
+
+		require.Equal(t, n, byteLen)
 		require.Equal(t, b, []byte(text))
 	}()
 
