@@ -1009,9 +1009,10 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 
 		// TODO: implement proper error handling
 		go func() {
-			err, ok := <-errChan
-			if ok {
+			select {
+			case err := <-errChan:
 				fnb.Logger.Fatal().Err(err).Msg("component encountered irrecoverable error")
+			case <-signalerCtx.Done():
 			}
 		}()
 

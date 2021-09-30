@@ -134,7 +134,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		node := libP2PNodes[i]
 
 		// libp2p node factory for this instance of middleware
-		factory := func() (*p2p.Node, error) {
+		factory := func(ctx context.Context) (*p2p.Node, error) {
 			return node, nil
 		}
 
@@ -201,7 +201,7 @@ func GenerateNetworks(t *testing.T,
 			log,
 			cbor.NewCodec(),
 			me,
-			mws[i],
+			func() (network.Middleware, error) { return mws[i], nil },
 			csize,
 			tops[i],
 			sms[i],
@@ -272,7 +272,7 @@ func generateLibP2PNode(t *testing.T,
 	pingInfoProvider.On("SoftwareVersion").Return("test")
 	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
 
-	ctx := context.Background()
+	ctx := context.TODO()
 	var connGater *p2p.ConnGater = nil
 	if connGating {
 		connGater = p2p.NewConnGater(logger)
