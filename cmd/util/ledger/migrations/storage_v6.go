@@ -25,10 +25,12 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	newInter "github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	oldInter "github.com/onflow/cadence/v19/runtime/interpreter"
 )
 
+// cborTagStorageReference is a duplicate of the same from cadence v0.19.0
 const cborTagStorageReference = 202
 
 // \x1F = Information Separator One
@@ -40,6 +42,7 @@ var storageReferenceEncodingStart = []byte{0xd8, cborTagStorageReference}
 // maxInt is math.MaxInt32 or math.MaxInt64 depending on arch.
 const maxInt = 1<<(bits.UintSize-1) - 1
 
+// storageMigrationV5DecMode is a duplicate of decMode from cadence v0.19.0
 var storageMigrationV5DecMode = func() cbor.DecMode {
 	decMode, err := cbor.DecOptions{
 		IntDec:           cbor.IntDecConvertNone,
@@ -449,18 +452,32 @@ func (m *StorageFormatV6Migration) initNewInterpreter() {
 		newInter.WithStorage(m.storage),
 		newInter.WithImportLocationHandler(
 			func(inter *newInter.Interpreter, location common.Location) newInter.Import {
-				program, err := m.loadProgram(location)
-				if err != nil {
-					panic(err)
-				}
+				switch location {
+				case stdlib.CryptoChecker.Location:
+					program := newInter.ProgramFromChecker(stdlib.CryptoChecker)
+					subInterpreter, err := inter.NewSubInterpreter(program, location)
+					if err != nil {
+						panic(err)
+					}
 
-				subInter, err := inter.NewSubInterpreter(program, location)
-				if err != nil {
-					panic(err)
-				}
+					return newInter.InterpreterImport{
+						Interpreter: subInterpreter,
+					}
 
-				return newInter.InterpreterImport{
-					Interpreter: subInter,
+				default:
+					program, err := m.loadProgram(location)
+					if err != nil {
+						panic(err)
+					}
+
+					subInter, err := inter.NewSubInterpreter(program, location)
+					if err != nil {
+						panic(err)
+					}
+
+					return newInter.InterpreterImport{
+						Interpreter: subInter,
+					}
 				}
 			},
 		),
@@ -627,7 +644,7 @@ func (m *StorageFormatV6Migration) loadProgram(
 	if !ok {
 		return nil, fmt.Errorf(
 			"cannot load program for unsupported non-address location: %s",
-			addressLocation,
+			location,
 		)
 	}
 
