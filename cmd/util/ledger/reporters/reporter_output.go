@@ -16,21 +16,21 @@ type ReportWriterFactory interface {
 }
 
 type ReportFileWriterFactory struct {
-	fileSuffix string
+	fileSuffix int32
 	outputDir  string
 	log        zerolog.Logger
 }
 
 func NewReportFileWriterFactory(outputDir string, log zerolog.Logger) ReportWriterFactory {
 	return &ReportFileWriterFactory{
-		fileSuffix: string(int32(time.Now().Unix())),
+		fileSuffix: int32(time.Now().Unix()),
 		outputDir:  outputDir,
 		log:        log,
 	}
 }
 
 func (r *ReportFileWriterFactory) filename(dataNamespace string) string {
-	return path.Join(r.outputDir, fmt.Sprintf("%s_%s.json", dataNamespace, r.fileSuffix))
+	return path.Join(r.outputDir, fmt.Sprintf("%s_%d.json", dataNamespace, r.fileSuffix))
 }
 
 func (r *ReportFileWriterFactory) ReportWriter(dataNamespace string) ReportWriter {
@@ -63,6 +63,7 @@ var _ ReportWriter = &ReportFileWriter{}
 
 type ReportFileWriter struct {
 	f          *os.File
+	fileName   string
 	wg         *sync.WaitGroup
 	writeChan  chan interface{}
 	writer     *bufio.Writer
@@ -104,6 +105,7 @@ func NewReportFileWriter(fileName string, log zerolog.Logger) ReportWriter {
 
 	fw := &ReportFileWriter{
 		f:          f,
+		fileName:   fileName,
 		writer:     writer,
 		log:        log,
 		firstWrite: true,
@@ -156,7 +158,6 @@ func (r *ReportFileWriter) write(dataPoint interface{}) {
 }
 
 func (r *ReportFileWriter) Close() {
-
 	close(r.writeChan)
 	r.wg.Wait()
 
@@ -176,4 +177,6 @@ func (r *ReportFileWriter) Close() {
 		r.log.Error().Err(err).Msg("Error closing report file")
 		panic(err)
 	}
+
+	r.log.Info().Str("filename", r.fileName).Msg("Created report file")
 }

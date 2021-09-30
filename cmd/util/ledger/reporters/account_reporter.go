@@ -2,30 +2,29 @@ package reporters
 
 import (
 	"fmt"
-	"github.com/onflow/atree"
-	"github.com/onflow/cadence/runtime"
-	"github.com/schollz/progressbar/v3"
-	"time"
-
+	"github.com/onflow/cadence"
+	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/fvm"
+	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/rs/zerolog"
+	"github.com/schollz/progressbar/v3"
+	goRuntime "runtime"
+	"sync"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
-	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // AccountReporter iterates through registers keeping a map of register sizes
 // reports on storage metrics
 type AccountReporter struct {
-	Log      zerolog.Logger
-	RWF      ReportWriterFactory
-	Chain    flow.Chain
-	storage  *runtime.Storage
-	progress *progressbar.ProgressBar
+	Log   zerolog.Logger
+	RWF   ReportWriterFactory
+	Chain flow.Chain
 }
 
 var _ ledger.Reporter = &AccountReporter{}
@@ -57,49 +56,46 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	l := migrations.NewView(payload)
 	st := state.NewState(l)
 	sth := state.NewStateHolder(st)
-	accounts := state.NewAccounts(sth)
-
 	gen := state.NewStateBoundAddressGenerator(sth, r.Chain)
 
-	r.progress = progressbar.Default(2*int64(gen.AddressCount()), "Processing:")
+	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 
-	r.storage = runtime.NewStorage(
-		migrations.NewAccountsAtreeLedger(accounts),
-		func(f func(), _ func(metrics runtime.Metrics, duration time.Duration)) {
-			f()
-		},
-	)
+	addressIndexes := make(chan uint64)
+	contractDataIndexes := make(chan uint64, 100)
+	accountDataIndexes := make(chan uint64, 100)
+	wg := &sync.WaitGroup{}
 
-	for _, p := range payload {
-		id, err := migrations.KeyToRegisterID(p.Key)
-		if err != nil {
-			return err
-		}
-		if len([]byte(id.Owner)) != flow.AddressLength {
-			// not an address
-			continue
-		}
-
-		switch id.Key {
-		case state.KeyStorageUsed:
-			err = r.handleStorageUsed(id, p, st, rwa)
-		case state.KeyContractNames:
-			err = r.handleContractNames(id, accounts, rwc)
-		default:
-			continue
-		}
-
-		if err != nil {
-			return err
-		}
-
-		if id.Key != "storage_used" {
-			continue
-		}
-
+	workerCount := goRuntime.NumCPU() / 2
+	if workerCount == 0 {
+		workerCount = 1
 	}
 
-	err := r.progress.Finish()
+	// split to two channels
+	wg.Add(1)
+	go func() {
+		for index := range addressIndexes {
+			contractDataIndexes <- index
+			accountDataIndexes <- index
+		}
+		close(contractDataIndexes)
+		close(accountDataIndexes)
+		wg.Done()
+	}()
+
+	for i := 0; i < workerCount; i++ {
+		adp := newAccountDataProcessor(wg, r.Log, progress, rwa, rwc, r.Chain, l)
+		wg.Add(1)
+		go adp.reportAccountData(accountDataIndexes)
+	}
+
+	for i := uint64(0); i < gen.AddressCount(); i++ {
+		addressIndexes <- i
+	}
+	close(addressIndexes)
+
+	wg.Wait()
+
+	err := progress.Finish()
 	if err != nil {
 		panic(err)
 	}
@@ -107,149 +103,201 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	return nil
 }
 
-func (r *AccountReporter) isDapper(address flow.Address, st *state.State) (bool, error) {
+type balanceProcessor struct {
+	vm     *fvm.VirtualMachine
+	ctx    fvm.Context
+	view   state.View
+	prog   *programs.Programs
+	script []byte
+
+	accounts state.Accounts
+	st       *state.State
+
+	rwa      ReportWriter
+	rwc      ReportWriter
+	progress *progressbar.ProgressBar
+	wg       *sync.WaitGroup
+	logger   zerolog.Logger
+}
+
+func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, progress *progressbar.ProgressBar, rwa ReportWriter, rwc ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
+
+	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
+	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
+	prog := programs.NewEmptyPrograms()
+	script := []byte(fmt.Sprintf(`
+				import FungibleToken from 0x%s
+				import FlowToken from 0x%s
+
+				pub fun main(account: Address): UFix64 {
+					let acct = getAccount(account)
+					let vaultRef = acct.getCapability(/public/flowTokenBalance)
+						.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
+						?? panic("Could not borrow Balance reference to the Vault")
+
+					return vaultRef.balance
+				}
+			`, fvm.FungibleTokenAddress(ctx.Chain), fvm.FlowTokenAddress(ctx.Chain)))
+
+	v := view.NewChild()
+	st := state.NewState(v)
+	sth := state.NewStateHolder(st)
+	accounts := state.NewAccounts(sth)
+
+	return &balanceProcessor{
+		wg:       wg,
+		logger:   logger,
+		vm:       vm,
+		ctx:      ctx,
+		view:     v,
+		accounts: accounts,
+		st:       st,
+		prog:     prog,
+		rwa:      rwa,
+		rwc:      rwc,
+		progress: progress,
+		script:   script}
+}
+
+func (c *balanceProcessor) reportAccountData(addressIndexes chan<- uint64) {
+	for indx := range addressIndexes {
+
+		address, err := c.ctx.Chain.AddressAtIndex(indx)
+		if err != nil {
+			c.logger.
+				Err(err).
+				Uint64("index", indx).
+				Msgf("Error getting address")
+			continue
+		}
+
+		u, err := c.storageUsed(address)
+		if err != nil {
+			c.logger.
+				Err(err).
+				Uint64("index", indx).
+				Str("address", address.String()).
+				Msgf("Error getting storage used for account")
+			continue
+		}
+
+		balance, hasVault, err := c.balance(address)
+		if err != nil {
+			c.logger.
+				Err(err).
+				Uint64("index", indx).
+				Str("address", address.String()).
+				Msgf("Error getting balance for account")
+			continue
+		}
+
+		dapper, err := c.isDapper(address)
+		if err != nil {
+			c.logger.
+				Err(err).
+				Uint64("index", indx).
+				Str("address", address.String()).
+				Msgf("Error determining if account is dapper account")
+			continue
+		}
+
+		hasReceiver, err := c.hasReceiver(address)
+		if err != nil {
+			c.logger.
+				Err(err).
+				Uint64("index", indx).
+				Str("address", address.String()).
+				Msgf("Error checking if account has a receiver")
+			continue
+		}
+
+		c.rwa.Write(accountRecord{
+			Address:        address.Hex(),
+			StorageUsed:    u,
+			AccountBalance: balance,
+			HasVault:       hasVault,
+			HasReceiver:    hasReceiver,
+			IsDapper:       dapper,
+		})
+
+		contracts, err := c.accounts.GetContractNames(address)
+		if err != nil {
+			c.logger.
+				Err(err).
+				Uint64("index", indx).
+				Str("address", address.String()).
+				Msgf("Error getting account contract names")
+			continue
+		}
+		if len(contracts) == 0 {
+			continue
+		}
+		for _, contract := range contracts {
+			c.rwc.Write(contractRecord{
+				Address:  address.Hex(),
+				Contract: contract,
+			})
+		}
+
+		err = c.progress.Add(1)
+		if err != nil {
+			panic(err)
+		}
+	}
+	c.wg.Done()
+}
+
+func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
+	script := fvm.Script(c.script).WithArguments(
+		jsoncdc.MustEncode(cadence.NewAddress(address)),
+	)
+
+	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	if err != nil {
+		return 0, false, err
+	}
+
+	var balance uint64
+	var hasVault bool
+	if script.Err == nil && script.Value != nil {
+		balance = script.Value.ToGoValue().(uint64)
+		hasVault = true
+	} else {
+		hasVault = false
+	}
+	return balance, hasVault, nil
+}
+
+func (c *balanceProcessor) storageUsed(address flow.Address) (uint64, error) {
+	return c.accounts.GetStorageUsed(address)
+}
+
+func (c *balanceProcessor) isDapper(address flow.Address) (bool, error) {
 	id := resourceId(address,
 		interpreter.PathValue{
 			Domain:     common.PathDomainPublic,
 			Identifier: "dapperUtilityCoinReceiver",
 		})
 
-	receiver, err := st.Get(id.Owner, id.Controller, id.Key)
+	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key)
 	if err != nil {
 		return false, fmt.Errorf("could not load dapper receiver at %s: %w", address, err)
 	}
 	return len(receiver) != 0, nil
 }
 
-func (r *AccountReporter) hasReceiver(address flow.Address, st *state.State) (bool, error) {
+func (c *balanceProcessor) hasReceiver(address flow.Address) (bool, error) {
 	id := resourceId(address,
 		interpreter.PathValue{
 			Domain:     common.PathDomainPublic,
 			Identifier: "flowTokenReceiver",
 		})
 
-	receiver, err := st.Get(id.Owner, id.Controller, id.Key)
+	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key)
 	if err != nil {
 		return false, fmt.Errorf("could not load receiver at %s: %w", address, err)
 	}
 	return len(receiver) != 0, nil
-}
-
-func (r *AccountReporter) balance(address flow.Address, st *state.State) (balance uint64, hasBalance bool, err error) {
-	vaultId := resourceId(address,
-		interpreter.PathValue{
-			Domain:     common.PathDomainStorage,
-			Identifier: "flowTokenVault",
-		})
-
-	balanceId := resourceId(address,
-		interpreter.PathValue{
-			Domain:     common.PathDomainPublic,
-			Identifier: "flowTokenBalance",
-		})
-
-	balanceCapability, err := st.Get(balanceId.Owner, balanceId.Controller, balanceId.Key)
-	if err != nil {
-		return 0, false, fmt.Errorf("could not load capability at %s: %w", address, err)
-	}
-
-	vaultResource, err := st.Get(vaultId.Owner, vaultId.Controller, vaultId.Key)
-	if err != nil {
-		return 0, false, fmt.Errorf("could not load resource at %s: %w", address, err)
-	}
-
-	if len(vaultResource) == 0 {
-		return 0, false, nil
-	}
-
-	if len(balanceCapability) == 0 {
-		r.Log.Warn().Str("Account", address.HexWithPrefix()).Msgf("Address has a vault, but not a balance capability")
-	}
-
-	decoder := interpreter.CBORDecMode.NewByteStreamDecoder(vaultResource)
-
-	storable, err := interpreter.DecodeStorable(decoder, atree.StorageIDUndefined)
-	if err != nil || storable == nil {
-		return 0, false, fmt.Errorf("could not decode storable at %s: %w", address, err)
-	}
-	storedValue, err := storable.StoredValue(r.storage)
-	value := interpreter.MustConvertStoredValue(storedValue)
-	if err != nil || value == nil {
-		return 0, false, fmt.Errorf("could not decode resource at %s: %w", address, err)
-	}
-	composite, ok := value.(*interpreter.CompositeValue)
-	if !ok || composite == nil {
-		return 0, false, fmt.Errorf("could not decode composite at %s: %w", address, err)
-	}
-	balanceField := composite.GetField("balance")
-	balanceValue, ok := balanceField.(interpreter.UFix64Value)
-	if !ok || balanceField == nil {
-		return 0, false, fmt.Errorf("could not decode resource at %s: %w", address, err)
-	}
-
-	return uint64(balanceValue), true, nil
-}
-
-func (r *AccountReporter) handleStorageUsed(id flow.RegisterID, p ledger.Payload, st *state.State, rwa ReportWriter) error {
-	address := flow.BytesToAddress([]byte(id.Owner))
-	u, _, err := utils.ReadUint64(p.Value)
-	if err != nil {
-		return err
-	}
-	balance, hasVault, err := r.balance(address, st)
-	if err != nil {
-		r.Log.Err(err).Msg("Cannot get account balance")
-		return err
-	}
-	dapper, err := r.isDapper(address, st)
-	if err != nil {
-		r.Log.Err(err).Msg("Cannot determine if this is a dapper account")
-		return err
-	}
-	hasReceiver, err := r.hasReceiver(address, st)
-	if err != nil {
-		r.Log.Err(err).Msg("Cannot determine if this account has a receiver")
-		return err
-	}
-
-	rwa.Write(accountRecord{
-		Address:        address.Hex(),
-		StorageUsed:    u,
-		AccountBalance: balance,
-		HasVault:       hasVault,
-		HasReceiver:    hasReceiver,
-		IsDapper:       dapper,
-	})
-
-	err = r.progress.Add(1)
-	if err != nil {
-		panic(err)
-	}
-
-	return nil
-}
-
-func (r *AccountReporter) handleContractNames(id flow.RegisterID, accounts state.Accounts, rwc ReportWriter) error {
-	address := flow.BytesToAddress([]byte(id.Owner))
-	contracts, err := accounts.GetContractNames(address)
-	if err != nil {
-		return err
-	}
-	if len(contracts) == 0 {
-		return nil
-	}
-	for _, contract := range contracts {
-		rwc.Write(contractRecord{
-			Address:  address.Hex(),
-			Contract: contract,
-		})
-	}
-
-	err = r.progress.Add(1)
-	if err != nil {
-		panic(err)
-	}
-	return nil
 }
 
 func resourceId(address flow.Address, path interpreter.PathValue) flow.RegisterID {
