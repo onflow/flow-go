@@ -1286,7 +1286,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
-				assert.Equal(t, cadence.UFix64(9999_3560), script.Value)
+				assert.Equal(t, cadence.UFix64(9999_3930), script.Value)
 			}),
 	)
 
