@@ -8,5 +8,10 @@ import (
 // a byte slice at network layer.
 type Compressor interface {
 	NewReader(io.Reader) (io.ReadCloser, error)
-	NewWriter(io.Writer) (io.WriteCloser, error)
+	NewWriter(io.Writer) (WriteCloseFlusher, error)
+}
+
+type WriteCloseFlusher interface {
+	io.WriteCloser
+	Flush() error
 }
