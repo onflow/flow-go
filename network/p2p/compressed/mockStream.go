@@ -1,7 +1,6 @@
 package compressed
 
 import (
-	"fmt"
 	"io"
 	"time"
 
@@ -15,8 +14,7 @@ type mockStream struct {
 	pr *io.PipeReader
 }
 
-func newMockStream() *mockStream {
-	pr, pw := io.Pipe()
+func newMockStream(pw *io.PipeWriter, pr *io.PipeReader) *mockStream {
 	return &mockStream{
 		pw: pw,
 		pr: pr,
@@ -25,7 +23,6 @@ func newMockStream() *mockStream {
 
 func (m *mockStream) Read(p []byte) (int, error) {
 	n, err := m.pr.Read(p)
-	fmt.Println("read: ", n, p)
 	return n, err
 }
 
