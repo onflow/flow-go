@@ -210,6 +210,10 @@ func main() {
 			}
 
 			flowClientOpts, err = common.PrepareFlowClientOpts(accessNodeIDS, insecureAccessAPI, node.State.Sealed())
+			if err != nil {
+				return fmt.Errorf("failed to prepare flow client connection options for each access node id %w", err)
+			}
+
 			return nil
 		}).
 		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
