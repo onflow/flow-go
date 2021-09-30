@@ -140,6 +140,10 @@ func (r *ReportFileWriter) write(dataPoint interface{}) {
 	// delimit the json records with commas
 	if !r.firstWrite {
 		_, err = r.writer.WriteRune(',')
+		if err != nil {
+			r.log.Warn().Err(err).Msg("Error Writing json to file")
+			r.faulty = true
+		}
 	} else {
 		r.firstWrite = false
 	}
