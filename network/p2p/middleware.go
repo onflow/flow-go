@@ -5,6 +5,7 @@ package p2p
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -245,6 +246,10 @@ func (m *Middleware) SetOverlay(ov network.Overlay) {
 
 // start will start the middleware.
 func (m *Middleware) start(ctx context.Context) error {
+	if m.ov == nil {
+		return errors.New("overlay must be configured by calling SetOverlay before middleware can be started")
+	}
+
 	libP2PNode, err := m.libP2PNodeFactory()
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
