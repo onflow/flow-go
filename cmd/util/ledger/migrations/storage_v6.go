@@ -688,6 +688,9 @@ func (m *StorageFormatV6Migration) updateBrokenContracts(payloads []ledger.Paylo
 		case ownerHex == "1864ff317a35af46" && strings.HasSuffix(key, "FlowIDTableStaking"):
 			payloads[index].Value = []byte(knownContract_1864ff317a35af46_FlowIDTableStaking)
 			m.Log.Info().Msg("contract updated: 1864ff317a35af46.FlowIDTableStaking")
+		case ownerHex == "ab273f724a1625df" && strings.HasSuffix(key, "MultiMessageBoard"):
+			payloads[index].Value = []byte(knownContract_ab273f724a1625df_MultiMessageBoard)
+			m.Log.Info().Msg("contract updated: ab273f724a1625df.MultiMessageBoard")
 		}
 	}
 }
@@ -979,7 +982,6 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 				),
 			)
 		case newInter.ContainerMutationError:
-			fmt.Println(fmt.Sprintf("%w", err))
 			c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: %s, owner: %s\n",
@@ -3642,6 +3644,100 @@ pub contract MessageBoard {
     self.adminStoragePath = /storage/admin
     self.posts = []
     self.account.save(<-create Admin(), to: self.adminStoragePath)
+  }
+}
+`
+
+//nolint:gosimple
+const knownContract_ab273f724a1625df_MultiMessageBoard = `
+pub contract MultiMessageBoard {
+  // The path to the Admin object in this contract's storage
+  pub let AdminStoragePath: StoragePath
+
+  // Maximum allowed message length
+  pub var maxMessageLength: Int
+
+  // Maximum allowed messages on a board
+  pub var maxMessageCount: Int
+
+  pub struct Post {
+    pub let timestamp: UFix64
+    pub let message: String
+    pub let from: Address
+
+    init(timestamp: UFix64, message: String, from: Address) {
+      self.timestamp = timestamp
+      self.message = message
+      self.from = from
+    }
+  }
+
+  // Records "maxMessageCount" latest messages
+  pub var posts: [[Post]]
+
+  // Emitted when a post is made
+  pub event Posted(timestamp: UFix64, message: String, from: Address, boardID: Int)
+
+  pub fun post(message: String, sender: AuthAccount, boardID: Int) {
+    pre {
+      message.length <= self.maxMessageLength: "Message too long"
+      boardID < self.posts.length: "Invalid board ID"
+    }
+
+    let from = sender.address
+    let post = Post(timestamp: getCurrentBlock().timestamp, message: message, from: from)
+    self.posts[boardID].append(post)
+
+    // Keeps only the latest "maxMessageCount" messages on the board
+    if (self.posts[boardID].length > self.maxMessageCount) {
+      self.posts[boardID].removeFirst()
+    }
+
+    emit Posted(timestamp: getCurrentBlock().timestamp, message: message, from: from, boardID: boardID)
+  }
+
+  // Check current messages
+  pub fun getPosts(boardID: Int): [Post] {
+    pre {
+      boardID < self.posts.length: "Invalid board ID"
+    }
+
+    return self.posts[boardID]
+  }
+
+  pub resource Admin {
+    // Removes the specified post
+    pub fun deletePost(boardID: Int, index: Int) {
+      MultiMessageBoard.posts[boardID].remove(at: index)
+    }
+
+    // Create a message board
+    pub fun createBoard() {
+      MultiMessageBoard.posts.append([])
+    }
+
+    // Remove a message board
+    pub fun removeBoard(boardID: Int) {
+      MultiMessageBoard.posts.remove(at: boardID)
+    }
+
+    pub fun updateMaxMessageLength(maxMessageLength: Int) {
+      MultiMessageBoard.maxMessageLength = maxMessageLength
+    }
+
+    pub fun updateMaxMessageCount(maxMessageCount: Int) {
+      MultiMessageBoard.maxMessageCount = maxMessageCount
+    }
+  }
+
+  init() {
+    self.AdminStoragePath = /storage/multiMessageBoardAdmin
+    self.posts = []
+    self.maxMessageLength = 140
+    self.maxMessageCount = 100
+    
+    // Store an Admin object in this contract's account storage
+    self.account.save(<-create Admin(), to: self.AdminStoragePath)
   }
 }
 `
