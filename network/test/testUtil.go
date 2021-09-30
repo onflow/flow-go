@@ -214,25 +214,23 @@ func GenerateNetworks(t *testing.T,
 		nets = append(nets, net)
 	}
 
-	errChan := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
-	netCtx := irrecoverable.WithSignaler(ctx, irrecoverable.NewSignaler(errChan))
+	signaler := irrecoverable.NewSignaler()
+	netCtx := irrecoverable.WithSignaler(ctx, signaler)
 
 	// if dryrun then don't actually start the network
 	if !dryRunMode {
 		go func() {
-			for {
-				select {
-				case err := <-errChan:
-					t.Error("networks encountered fatal error", err)
-				case <-netCtx.Done():
-					return
-				}
+			select {
+			case err := <-signaler.Error():
+				t.Error("networks encountered fatal error", err)
+			case <-ctx.Done():
+				return
 			}
 		}()
 
 		for _, net := range nets {
-			net.Start(netCtx)
+			require.NoError(t, net.Start(netCtx))
 			<-net.Ready()
 		}
 	}

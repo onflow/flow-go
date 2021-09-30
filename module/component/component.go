@@ -43,7 +43,7 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 	var component Component
 	var cancel context.CancelFunc
 	var done <-chan struct{}
-	var irrecoverables chan error
+	var irrecoverableErr <-chan error
 
 	start := func() (err error) {
 		component, err = componentFactory()
@@ -56,9 +56,9 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 		runCtx, cancel = context.WithCancel(ctx)
 
 		// signaler used for irrecoverables
-		var signalingCtx irrecoverable.SignalerContext
-		irrecoverables = make(chan error)
-		signalingCtx = irrecoverable.WithSignaler(runCtx, irrecoverable.NewSignaler(irrecoverables))
+		signaler := irrecoverable.NewSignaler()
+		signalingCtx := irrecoverable.WithSignaler(runCtx, signaler)
+		irrecoverableErr = signaler.Error()
 
 		// the component must be started in a separate goroutine in case an irrecoverable error
 		// is thrown during the call to Start, which terminates the calling goroutine
@@ -115,7 +115,7 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case err := <-irrecoverables:
+		case err := <-irrecoverableErr:
 			if canceled := shutdownAndWaitForRestart(err); canceled != nil {
 				return canceled
 			}
@@ -193,6 +193,7 @@ func (c *ComponentManagerBuilderImpl) Build() *ComponentManager {
 		ready:       make(chan struct{}),
 		startup:     c.startup,
 		workers:     c.workers,
+		components:  c.components,
 	}
 }
 
@@ -217,29 +218,40 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) (err erro
 	if c.started.CAS(false, true) {
 		defer close(c.startupDone)
 
-		startupCtx, cancel := context.WithCancel(parent)
+		ctx, cancel := context.WithCancel(parent)
 		_ = cancel // pacify vet lostcancel check: startupCtx is always canceled through its parent
 		defer func() {
 			if err != nil {
 				cancel()
 			}
 		}()
-		c.shutdownSignal = startupCtx.Done()
+		c.shutdownSignal = ctx.Done()
 
-		if err = c.startup(startupCtx); err != nil {
+		if err = c.startup(ctx); err != nil {
 			return
 		}
+
+		signaler := irrecoverable.NewSignaler()
+		startupCtx := irrecoverable.WithSignaler(ctx, signaler)
+
+		go func() {
+			select {
+			case err := <-signaler.Error():
+				cancel()
+
+				// we propagate the error directly to the parent because a failure
+				// in a critical sub-component is considered irrecoverable
+				parent.Throw(err)
+			case <-ctx.Done():
+				// TODO: should we instead wait for parent.Done() or c.Done()?
+			}
+		}()
 
 		var componentGroup errgroup.Group
 		for _, component := range c.components {
 			component := component
 			componentGroup.Go(func() error {
-				// NOTE: we can perform a type assertion here because the parent context is
-				// embedded in startupCtx
-				// the context passed to component.Start therefore uses the same Signaler as
-				// the parent context, which is intended because a failure in a critical
-				// sub-component is considered irrecoverable
-				if err := component.Start(startupCtx.(irrecoverable.SignalerContext)); err != nil {
+				if err := component.Start(startupCtx); err != nil {
 					defer cancel() // cancel startup for all other components
 					return err
 				}
@@ -248,6 +260,7 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) (err erro
 		}
 
 		if err = componentGroup.Wait(); err != nil {
+			// TODO: should we wait for c.Done() before returning?
 			return
 		}
 
@@ -257,7 +270,7 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) (err erro
 		for _, worker := range c.workers {
 			go func(w ComponentWorker) {
 				defer c.done.Done()
-				w(parent)
+				w(startupCtx)
 			}(worker)
 		}
 

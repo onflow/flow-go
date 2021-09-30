@@ -113,18 +113,16 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		m.ov = append(m.ov, m.createOverlay())
 	}
 
-	errChan := make(chan error)
 	ctx, cancel := context.WithCancel(context.Background())
 	m.mwCancel = cancel
-	m.mwCtx = irrecoverable.WithSignaler(ctx, irrecoverable.NewSignaler(errChan))
+	signaler := irrecoverable.NewSignaler()
+	m.mwCtx = irrecoverable.WithSignaler(ctx, signaler)
 	go func() {
-		for {
-			select {
-			case err := <-errChan:
-				m.T().Error("middlewares encountered fatal error", err)
-			case <-m.mwCtx.Done():
-				return
-			}
+		select {
+		case err := <-signaler.Error():
+			m.T().Error("middlewares encountered fatal error", err)
+		case <-m.mwCtx.Done():
+			return
 		}
 	}()
 
