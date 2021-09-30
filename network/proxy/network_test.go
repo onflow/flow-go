@@ -25,11 +25,11 @@ func getEvent() interface{} {
 
 type Suite struct {
 	suite.Suite
-	net          module.Network
+	net          network.Network
 	targetNodeID flow.Identifier
 	proxyNet     *proxy.ProxyNetwork
 	con          *mocknetwork.Conduit
-	engine       module.Engine
+	engine       network.Engine
 }
 
 func TestProxyNetwork(t *testing.T) {
@@ -37,12 +37,12 @@ func TestProxyNetwork(t *testing.T) {
 }
 
 func (suite *Suite) SetupTest() {
-	net := new(mockmodule.Network)
+	net := new(mocknetwork.Network)
 	suite.net = net
 	suite.con = new(mocknetwork.Conduit)
 	suite.targetNodeID = unittest.IdentifierFixture()
 	suite.proxyNet = proxy.NewProxyNetwork(suite.net, suite.targetNodeID)
-	suite.engine = new(mockmodule.Engine)
+	suite.engine = new(mocknetwork.Engine
 
 	net.On("Register", mock.AnythingOfType("network.Channel"), mock.Anything).Return(suite.con, nil)
 }

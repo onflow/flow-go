@@ -36,7 +36,7 @@ type ClusterSwitchoverTestCase struct {
 	hub        *stub.Hub                 // mock network hub
 	root       protocol.Snapshot         // shared root snapshot
 	nodes      []testmock.CollectionNode // collection nodes
-	sn         *mockmodule.Engine        // fake consensus node engine for receiving guarantees
+	sn         *mocknetwork.Engine       // fake consensus node engine for receiving guarantees
 	builder    *unittest.EpochBuilder    // utility for building epochs
 
 	// epoch counter -> cluster index -> transaction IDs
@@ -78,7 +78,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		tc.identities.Filter(filter.HasRole(flow.RoleConsensus))[0],
 		tc.root,
 	)
-	tc.sn = new(mockmodule.Engine)
+	tc.sn = new(mocknetwork.Engine
 	_, err := consensus.Net.Register(engine.ReceiveGuarantees, tc.sn)
 	require.NoError(tc.T(), err)
 
@@ -136,7 +136,7 @@ func (tc *ClusterSwitchoverTestCase) StartNodes() {
 	for _, node := range tc.nodes {
 		nodes = append(nodes, node)
 	}
-	unittest.RequireCloseBefore(tc.T(), lifecycle.AllReady(nodes...), time.Second, "could not start nodes")
+	unittest.RequireCloseBefore(tc.T(), module.AllReady(nodes...), time.Second, "could not start nodes")
 
 	// start continuous delivery for all nodes
 	for _, node := range tc.nodes {
@@ -149,7 +149,7 @@ func (tc *ClusterSwitchoverTestCase) StopNodes() {
 	for _, node := range tc.nodes {
 		nodes = append(nodes, node)
 	}
-	unittest.RequireCloseBefore(tc.T(), lifecycle.AllDone(nodes...), time.Second, "could not stop nodes")
+	unittest.RequireCloseBefore(tc.T(), module.AllDone(nodes...), time.Second, "could not stop nodes")
 }
 
 func (tc *ClusterSwitchoverTestCase) RootBlock() *flow.Header {

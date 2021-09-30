@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/follower"
+	"github.com/onflow/flow-go/engine/common/splitter/network"
 	"github.com/onflow/flow-go/model/flow"
 	metrics "github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
@@ -25,7 +26,7 @@ import (
 type Suite struct {
 	suite.Suite
 
-	net      *module.Network
+	net      *network.Network
 	con      *mocknetwork.Conduit
 	me       *module.Local
 	cleaner  *storage.Cleaner
@@ -42,7 +43,7 @@ type Suite struct {
 
 func (suite *Suite) SetupTest() {
 
-	suite.net = new(module.Network)
+	suite.net = new(network.Network)
 	suite.con = new(mocknetwork.Conduit)
 	suite.me = new(module.Local)
 	suite.cleaner = new(storage.Cleaner)

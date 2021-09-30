@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -71,7 +72,7 @@ func (suite *Suite) SetupTest() {
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
 
-	net := new(module.Network)
+	net := new(network.Network)
 	conduit := new(mocknetwork.Conduit)
 	net.On("Register", engine.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).

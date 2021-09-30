@@ -3,6 +3,7 @@ package module
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var ErrFatal = errors.New("fatal")
@@ -193,16 +195,12 @@ func TestRunComponentStartError(t *testing.T) {
 		return NewStartErroringComponent(), nil
 	}
 
-	called := false
 	onError := func(err error, triggerRestart func()) {
-		called = true
-		require.ErrorIs(t, err, ErrFatal)
-		cancel()
+		require.FailNow(t, "error handler should never be called")
 	}
 
 	err := RunComponent(ctx, componentFactory, onError)
-	require.ErrorIs(t, err, context.Canceled)
-	require.True(t, called)
+	require.ErrorIs(t, err, ErrFatal)
 }
 func TestRunComponentStartupError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -267,4 +265,60 @@ func TestRunComponentConcurrentError(t *testing.T) {
 	err := RunComponent(ctx, componentFactory, onError)
 	require.ErrorIs(t, err, context.Canceled)
 	require.Equal(t, 2, fatals)
+}
+
+// TestAllReady tests that AllReady closes its returned Ready channel only once
+// all input ReadyDone instances close their Ready channel.
+func TestAllReady(t *testing.T) {
+	cases := []int{0, 1, 100}
+	for _, n := range cases {
+		t.Run(fmt.Sprintf("n=%d", n), func(t *testing.T) {
+			testAllReady(n, t)
+		})
+	}
+}
+
+// TestAllDone tests that AllDone closes its returned Done channel only once
+// all input ReadyDone instances close their Done channel.
+func TestAllDone(t *testing.T) {
+	cases := []int{0, 1, 100}
+	for _, n := range cases {
+		t.Run(fmt.Sprintf("n=%d", n), func(t *testing.T) {
+			testAllDone(n, t)
+		})
+	}
+}
+
+func testAllDone(n int, t *testing.T) {
+
+	components := make([]realmodule.ReadyDoneAware, n)
+	for i := 0; i < n; i++ {
+		components[i] = new(module.ReadyDoneAware)
+		unittest.ReadyDoneify(components[i])
+	}
+
+	unittest.AssertClosesBefore(t, lifecycle.AllReady(components...), time.Second)
+
+	for _, component := range components {
+		mock := component.(*module.ReadyDoneAware)
+		mock.AssertCalled(t, "Ready")
+		mock.AssertNotCalled(t, "Done")
+	}
+}
+
+func testAllReady(n int, t *testing.T) {
+
+	components := make([]realmodule.ReadyDoneAware, n)
+	for i := 0; i < n; i++ {
+		components[i] = new(module.ReadyDoneAware)
+		unittest.ReadyDoneify(components[i])
+	}
+
+	unittest.AssertClosesBefore(t, module.AllDone(components...), time.Second)
+
+	for _, component := range components {
+		mock := component.(*module.ReadyDoneAware)
+		mock.AssertCalled(t, "Done")
+		mock.AssertNotCalled(t, "Ready")
+	}
 }

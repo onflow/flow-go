@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/observable"
@@ -348,7 +347,7 @@ func stopNetworks(t *testing.T, nets []*p2p.Network, duration time.Duration) {
 		comps = append(comps, net)
 	}
 
-	unittest.RequireCloseBefore(t, lifecycle.AllDone(comps...), duration,
+	unittest.RequireCloseBefore(t, module.AllDone(comps...), duration,
 		"could not stop the networks")
 }
 

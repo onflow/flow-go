@@ -12,6 +12,7 @@ import (
 	msg "github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module/dkg"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -20,7 +21,7 @@ import (
 func createTestEngine(t *testing.T) *MessagingEngine {
 	// setup mock conduit
 	conduit := &mocknetwork.Conduit{}
-	network := new(module.Network)
+	network := new(network.Network)
 	network.On("Register", mock.Anything, mock.Anything).
 		Return(conduit, nil).
 		Once()

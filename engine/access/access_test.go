@@ -31,6 +31,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/badger"
@@ -45,7 +46,7 @@ type Suite struct {
 	snapshot   *protocol.Snapshot
 	epochQuery *protocol.EpochQuery
 	log        zerolog.Logger
-	net        *module.Network
+	net        *network.Network
 	request    *module.Requester
 	collClient *accessmock.AccessAPIClient
 	execClient *accessmock.ExecutionAPIClient
@@ -63,7 +64,7 @@ func TestAccess(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
-	suite.net = new(module.Network)
+	suite.net = new(network.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 

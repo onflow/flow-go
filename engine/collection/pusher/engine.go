@@ -38,7 +38,7 @@ type Engine struct {
 	recipientCount uint // number of consensus nodes to push to
 }
 
-func New(log zerolog.Logger, net module.Network, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
+func New(log zerolog.Logger, net network.Network, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
 	e := &Engine{
 		unit:           engine.NewUnit(),
 		log:            log.With().Str("engine", "pusher").Logger(),

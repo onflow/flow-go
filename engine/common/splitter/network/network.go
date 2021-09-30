@@ -46,7 +46,7 @@ func NewNetwork(
 // engines will be notified with incoming messages on the channel.
 // The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
 func (n *Network) Register(channel network.Channel, e network.Engine) (network.Conduit, error) {
-	engine, ok := e.(module.Engine)
+	engine, ok := e.(network.Engine
 
 	if !ok {
 		return nil, errors.New("engine does not have the correct type")

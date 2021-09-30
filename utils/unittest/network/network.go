@@ -80,13 +80,13 @@ func (n *Network) OnPublish(publishFunc NetworkPublishFunc) *Network {
 
 // Engine represents a mock engine. The implementation is not concurrency-safe.
 type Engine struct {
-	mockmodule.Engine
+	mocknetwork.Engine
 }
 
 // NewEngine returns a new mock engine.
 func NewEngine() *Engine {
 	return &Engine{
-		mockmodule.Engine{},
+		mocknetwork.Engine},
 	}
 }
 
