@@ -204,7 +204,7 @@ func TestValueConversion(t *testing.T) {
 		assert.IsType(t, &newInter.CompositeValue{}, newValue)
 		composite := newValue.(*newInter.CompositeValue)
 
-		fieldValue := composite.GetField(nil, nil, "foo")
+		fieldValue := composite.GetField("foo")
 
 		assert.IsType(t, &newInter.DictionaryValue{}, fieldValue)
 		dictionary := fieldValue.(*newInter.DictionaryValue)
@@ -475,7 +475,7 @@ func TestEncoding(t *testing.T) {
 		assert.IsType(t, &newInter.CompositeValue{}, storedValue)
 		composite := storedValue.(*newInter.CompositeValue)
 
-		fieldValue := composite.GetField(nil, nil, "foo")
+		fieldValue := composite.GetField("foo")
 
 		assert.IsType(t, &newInter.DictionaryValue{}, fieldValue)
 		dictionary := fieldValue.(*newInter.DictionaryValue)

@@ -3,7 +3,9 @@
 package mock
 
 import (
+	atree "github.com/onflow/atree"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,14 +15,16 @@ type Accounts struct {
 }
 
 // AllocateStorageIndex provides a mock function with given fields: address
-func (_m *Accounts) AllocateStorageIndex(address flow.Address) (uint64, error) {
+func (_m *Accounts) AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error) {
 	ret := _m.Called(address)
 
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func(flow.Address) uint64); ok {
+	var r0 atree.StorageIndex
+	if rf, ok := ret.Get(0).(func(flow.Address) atree.StorageIndex); ok {
 		r0 = rf(address)
 	} else {
-		r0 = ret.Get(0).(uint64)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(atree.StorageIndex)
+		}
 	}
 
 	var r1 error
