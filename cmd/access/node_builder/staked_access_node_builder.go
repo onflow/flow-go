@@ -186,7 +186,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.C
 		builder.ProtocolEvents.AddConsumer(idEvents)
 
 		node.Logger.Info().Msgf("network will run on address: %s", builder.BindAddr)
-		return builder.Network, err
+		return builder.Network, nil
 	})
 }
 
