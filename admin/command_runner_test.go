@@ -67,8 +67,8 @@ func (suite *CommandRunnerSuite) TearDownTest() {
 func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption) {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
-	errChan := make(chan error)
-	signalerCtx := irrecoverable.WithSignaler(ctx, irrecoverable.NewSignaler(errChan))
+	signaler := irrecoverable.NewSignaler()
+	signalerCtx := irrecoverable.WithSignaler(ctx, signaler)
 
 	logger := zerolog.New(zerolog.NewConsoleWriter())
 	suite.runner = suite.bootstrapper.Bootstrap(logger, suite.httpAddress, opts...)
@@ -79,7 +79,7 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 		select {
 		case <-ctx.Done():
 			return
-		case err := <-errChan:
+		case err := <-signaler.Error():
 			suite.Fail("encountered unexpected error", err)
 		}
 	}()
