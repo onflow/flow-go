@@ -57,89 +57,215 @@ func testCentralizedStatefulAPI(t *testing.T) {
 		index := mrand.Intn(n)
 		ts, err := NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
 		require.NoError(t, err)
-		// check EnoughShares
-		enough := ts.EnoughShares()
-		assert.False(t, enough)
-		var wg sync.WaitGroup
-		// create (t) signatures of the first randomly chosen signers
-		// ( 1 signature short of the threshold)
-		for j := 0; j < threshold; j++ {
-			wg.Add(1)
-			// test thread safety
-			go func(j int) {
-				defer wg.Done()
-				i := signers[j]
-				share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
-				require.NoError(t, err)
-				// VerifyShare
-				verif, err := ts.VerifyShare(i, share)
-				assert.NoError(t, err)
-				assert.True(t, verif, "signature should be valid")
-				// check HasSignature is false
-				ok := ts.HasShare(i)
-				assert.False(t, ok)
-				// TrustedAdd
-				enough, err := ts.TrustedAdd(i, share)
-				assert.NoError(t, err)
-				assert.False(t, enough)
-				// check HasSignature is true
-				ok = ts.HasShare(i)
-				assert.True(t, verif)
-				// check EnoughSignature
-				assert.False(t, ts.EnoughShares(), "threshold shouldn't be reached")
-			}(j)
-		}
-		wg.Wait()
-		// add the last required signature to get (t+1) shares
-		i := signers[threshold]
-		share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
-		require.NoError(t, err)
-		verif, enough, err := ts.VerifyAndAdd(i, share)
-		assert.NoError(t, err)
-		assert.True(t, verif)
-		assert.True(t, enough)
-		// check EnoughSignature
-		assert.True(t, ts.EnoughShares())
 
-		// add a share when threshold is reached
-		if threshold+1 < n {
-			i := signers[threshold+1]
+		t.Run("happy path", func(t *testing.T) {
+			// check EnoughShares
+			enough := ts.EnoughShares()
+			assert.False(t, enough)
+			var wg sync.WaitGroup
+			// create (t) signatures of the first randomly chosen signers
+			// ( 1 signature short of the threshold)
+			for j := 0; j < threshold; j++ {
+				wg.Add(1)
+				// test thread safety
+				go func(j int) {
+					defer wg.Done()
+					i := signers[j]
+					share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
+					require.NoError(t, err)
+					// VerifyShare
+					verif, err := ts.VerifyShare(i, share)
+					assert.NoError(t, err)
+					assert.True(t, verif, "signature should be valid")
+					// check HasSignature is false
+					ok, err := ts.HasShare(i)
+					assert.NoError(t, err)
+					assert.False(t, ok)
+					// TrustedAdd
+					enough, err := ts.TrustedAdd(i, share)
+					assert.NoError(t, err)
+					assert.False(t, enough)
+					// check HasSignature is true
+					ok, err = ts.HasShare(i)
+					assert.NoError(t, err)
+					assert.True(t, verif)
+					// check EnoughSignature
+					assert.False(t, ts.EnoughShares(), "threshold shouldn't be reached")
+				}(j)
+			}
+			wg.Wait()
+			// add the last required signature to get (t+1) shares
+			i := signers[threshold]
 			share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
-			// Trusted Add
-			enough, err := ts.TrustedAdd(i, share)
-			assert.NoError(t, err)
-			assert.True(t, enough)
-			// VerifyAndAdd
 			verif, enough, err := ts.VerifyAndAdd(i, share)
 			assert.NoError(t, err)
 			assert.True(t, verif)
 			assert.True(t, enough)
-		}
+			// check EnoughSignature
+			assert.True(t, ts.EnoughShares())
 
-		// Add an existing share
-		i = signers[0]
-		share, err = skShares[i].Sign(thresholdSignatureMessage, kmac)
-		require.NoError(t, err)
-		// VerifyAndAdd
-		verif, enough, err = ts.VerifyAndAdd(i, share)
-		assert.Error(t, err)
-		assert.False(t, IsInvalidInputsError(err))
-		assert.False(t, verif)
-		assert.False(t, enough)
-		// TrustedAdd
-		enough, err = ts.TrustedAdd(i, share)
-		assert.Error(t, err)
-		assert.False(t, IsInvalidInputsError(err))
-		assert.False(t, enough)
+			// add a share when threshold is reached
+			if threshold+1 < n {
+				i := signers[threshold+1]
+				share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
+				require.NoError(t, err)
+				// Trusted Add
+				enough, err := ts.TrustedAdd(i, share)
+				assert.NoError(t, err)
+				assert.True(t, enough)
+				// VerifyAndAdd
+				verif, enough, err := ts.VerifyAndAdd(i, share)
+				assert.NoError(t, err)
+				assert.True(t, verif)
+				assert.True(t, enough)
+			}
+		})
 
-		// reconstruct the threshold signature
-		thresholdsignature, err := ts.ThresholdSignature()
-		require.NoError(t, err)
-		// VerifyThresholdSignature
-		verif, err = ts.VerifyThresholdSignature(thresholdsignature)
-		require.NoError(t, err)
-		assert.True(t, verif)
+		t.Run("duplicate signer", func(t *testing.T) {
+			// Add an existing share
+			i := signers[0]
+			share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
+			require.NoError(t, err)
+			// VerifyAndAdd
+			verif, enough, err := ts.VerifyAndAdd(i, share)
+			assert.Error(t, err)
+			assert.False(t, IsInvalidInputsError(err))
+			assert.False(t, verif)
+			assert.False(t, enough)
+			// TrustedAdd
+			enough, err = ts.TrustedAdd(i, share)
+			assert.Error(t, err)
+			assert.False(t, IsInvalidInputsError(err))
+			assert.False(t, enough)
+
+			// reconstruct the threshold signature
+			thresholdsignature, err := ts.ThresholdSignature()
+			require.NoError(t, err)
+			// VerifyThresholdSignature
+			verif, err = ts.VerifyThresholdSignature(thresholdsignature)
+			require.NoError(t, err)
+			assert.True(t, verif)
+		})
+
+		t.Run("Invalid index", func(t *testing.T) {
+			share, err := skShares[0].Sign(thresholdSignatureMessage, kmac)
+			require.NoError(t, err)
+			// invalid index
+			invalidIndex := len(pkShares) + 1
+			// VerifShare
+			verif, err := ts.VerifyShare(invalidIndex, share)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.False(t, verif)
+			// TrustedAdd
+			enough, err := ts.TrustedAdd(invalidIndex, share)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.False(t, enough)
+			// VerifyAndAdd
+			verif, enough, err = ts.VerifyAndAdd(invalidIndex, share)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.False(t, verif)
+			assert.False(t, enough)
+			// HasShare
+			verif, err = ts.HasShare(invalidIndex)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.False(t, verif)
+		})
+
+		t.Run("invalid signature", func(t *testing.T) {
+			ts, err := NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			require.NoError(t, err)
+			share, err := skShares[index].Sign(thresholdSignatureMessage, kmac)
+			require.NoError(t, err)
+
+			// alter signature - signature is not a valid point
+			share[4] ^= 1
+			// VerifShare
+			verif, err := ts.VerifyShare(index, share)
+			assert.NoError(t, err)
+			assert.False(t, verif)
+			// VerifyAndAdd
+			verif, enough, err := ts.VerifyAndAdd(index, share)
+			assert.NoError(t, err)
+			assert.False(t, verif)
+			assert.False(t, enough)
+			// check share was not added
+			verif, err = ts.HasShare(index)
+			assert.NoError(t, err)
+			assert.False(t, verif)
+			// restore share
+			share[4] ^= 1
+
+			// valid curve point but invalid signature
+			otherIndex := (index + 1) % len(pkShares) // otherIndex is different than index
+			// VerifShare
+			verif, err = ts.VerifyShare(otherIndex, share)
+			assert.NoError(t, err)
+			assert.False(t, verif)
+			// VerifyAndAdd
+			verif, enough, err = ts.VerifyAndAdd(otherIndex, share)
+			assert.NoError(t, err)
+			assert.False(t, verif)
+			assert.False(t, enough)
+			// check share was not added
+			verif, err = ts.HasShare(otherIndex)
+			assert.NoError(t, err)
+			assert.False(t, verif)
+		})
+
+		t.Run("constructor errors", func(t *testing.T) {
+			// invalid keys size
+			pkSharesInvalid := make([]PublicKey, ThresholdSignMaxSize+1)
+			ts, err := NewThresholdSigner(pkGroup, pkSharesInvalid, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.Nil(t, ts)
+			// non BLS key share
+			seed := make([]byte, KeyGenSeedMinLenECDSAP256)
+			_, err = rand.Read(seed)
+			require.NoError(t, err)
+			sk, err := GeneratePrivateKey(ECDSAP256, seed)
+			require.NoError(t, err)
+			tmp := pkShares[0]
+			pkShares[0] = sk.PublicKey()
+			ts, err = NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.Nil(t, ts)
+			pkShares[0] = tmp // restore valid keys
+			// non BLS group key
+			ts, err = NewThresholdSigner(sk.PublicKey(), pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.Nil(t, ts)
+			// invalid current index
+			ts, err = NewThresholdSigner(pkGroup, pkShares, threshold, len(pkShares)+1, skShares[index], thresholdSignatureMessage, kmac)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.Nil(t, ts)
+			// invalid threshold
+			ts, err = NewThresholdSigner(pkGroup, pkShares, len(pkShares)+1, index, skShares[index], thresholdSignatureMessage, kmac)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.Nil(t, ts)
+			// invalid threshold
+			ts, err = NewThresholdSigner(pkGroup, pkShares, len(pkShares)+1, index, skShares[index], thresholdSignatureMessage, kmac)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.Nil(t, ts)
+			// inconsistent private and public key
+			indexSwap := (index + 1) % len(pkShares) // indexSwap is different than index
+			pkShares[index], pkShares[indexSwap] = pkShares[indexSwap], pkShares[index]
+			ts, err = NewThresholdSigner(pkGroup, pkShares, len(pkShares)+1, index, skShares[index], thresholdSignatureMessage, kmac)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.Nil(t, ts)
+			pkShares[index], pkShares[indexSwap] = pkShares[indexSwap], pkShares[index] // restore keys
+		})
 	}
 }
 

@@ -215,14 +215,18 @@ func (s *thresholdSigner) enoughShares() bool {
 
 // HasShare checks whether the internal map contains the share of the given index.
 // This function is thread safe
-func (s *thresholdSigner) HasShare(orig int) bool {
+func (s *thresholdSigner) HasShare(orig int) (bool, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
-	return s.hasShare(index(orig))
+	if err := s.validIndex(index(orig)); err != nil {
+		return false, err
+	}
+
+	return s.hasShare(index(orig)), nil
 }
 
-// non thread safe version of HasShare
+// non thread safe version of HasShare, and assumes input is valid
 func (s *thresholdSigner) hasShare(orig index) bool {
 	_, ok := s.shares[orig]
 	return ok
