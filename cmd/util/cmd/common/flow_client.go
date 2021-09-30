@@ -2,8 +2,9 @@ package common
 
 import (
 	"fmt"
-	"google.golang.org/grpc"
 	"strings"
+
+	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go/model/flow"
@@ -14,8 +15,8 @@ import (
 
 const (
 	DefaultAccessNodeIDSMinimum = 2
-	DefaultAccessAPIPort = "9000"
-	DefaultAccessAPISecurePort = "9001"
+	DefaultAccessAPIPort        = "9000"
+	DefaultAccessAPISecurePort  = "9001"
 )
 
 type FlowClientOpt struct {
@@ -123,7 +124,7 @@ func PrepareFlowClientOpts(accessNodeIDS []string, insecureAccessAPI bool, snaps
 
 // ConvertAccessAddrFromState takes raw network address from the protocol state in the for of [DNS/IP]:PORT, removes the port and applies the appropriate
 // port number depending on the insecureAccessAPI arg.
-func ConvertAccessAddrFromState(address string, insecureAccessAPI bool) string  {
+func ConvertAccessAddrFromState(address string, insecureAccessAPI bool) string {
 	// remove gossip port from access address and add respective secure or insecure port
 	var accessAddress strings.Builder
 	accessAddress.WriteString(strings.Split(address, ":")[0])
