@@ -66,6 +66,19 @@ func (r *rapidSync) RequestByHeight(t *rapid.T) {
 	r.heightRequests[b.Height] = 1
 }
 
+// HandleHeight is an action that requests a heights
+// upon receiving an argument beyond a certain tolerance
+func (r *rapidSync) HandleHeight(t *rapid.T) {
+	b := rapid.SampledFrom(r.store).Draw(t, "id_request").(flow.Header)
+	incr := rapid.IntRange(0, (int)(DefaultConfig().Tolerance)+1).Draw(t, "height increment").(int)
+	requestHeight := (uint64)(incr) + b.Height
+	r.core.HandleHeight(&b, requestHeight)
+	// Re-queueing by height should always succeed if beyond tolerance
+	if requestHeight > b.Height+(uint64)(DefaultConfig().Tolerance) {
+		r.heightRequests[requestHeight] = 1
+	}
+}
+
 // HandleByID is an action that provides a block header to the sync engine
 func (r *rapidSync) HandleByID(t *rapid.T) {
 	b := rapid.SampledFrom(r.store).Draw(t, "id_handling").(flow.Header)
