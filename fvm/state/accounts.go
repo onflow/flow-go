@@ -33,6 +33,7 @@ func keyPublicKey(index uint64) string {
 
 type Accounts interface {
 	Exists(address flow.Address) (bool, error)
+	Get(address flow.Address) (*flow.Account, error)
 	GetPublicKeyCount(address flow.Address) (uint64, error)
 	AppendPublicKey(address flow.Address, key flow.AccountPublicKey) error
 	GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error)
@@ -56,7 +57,7 @@ type StatefulAccounts struct {
 	stateHolder *StateHolder
 }
 
-func NewAccounts(stateHolder *StateHolder) Accounts {
+func NewAccounts(stateHolder *StateHolder) *StatefulAccounts {
 	return &StatefulAccounts{
 		stateHolder: stateHolder,
 	}
