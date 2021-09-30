@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -49,8 +50,16 @@ type Network struct {
 	queue            network.MessageQueue
 	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
 	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
+	registerRequests chan *registerRequest
 	*module.ComponentManager
 }
+
+type registerRequest struct {
+	channel  network.Channel
+	respChan chan *Conduit
+}
+
+var ErrNetworkShutdown = errors.New("network has already shutdown")
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
@@ -60,7 +69,7 @@ func NewNetwork(
 	log zerolog.Logger,
 	codec network.Codec,
 	me module.Local,
-	mwFactory func() network.Middleware, error,
+	mwFactory func() (network.Middleware, error),
 	csize int,
 	top network.Topology,
 	sm network.SubscriptionManager,
@@ -89,6 +98,7 @@ func NewNetwork(
 		subMngr:          sm,
 		lifecycleManager: lifecycle.NewLifecycleManager(),
 		identityProvider: identityProvider,
+		registerRequests: make(chan *registerRequest),
 	}
 
 	o.mw.SetOverlay(o)
@@ -103,9 +113,37 @@ func NewNetwork(
 			queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
 
 			return nil
-		}).AddComponent(o.mw).AddWorker(func(ctx irrecoverable.SignalerContext) {
-		o.mw
-	}).Build()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext) {
+			for {
+				select {
+				case req := <-o.registerRequests:
+					// TODO: remove ctx field from Conduit
+
+					// create a cancellable child context
+					ctx, cancel := context.WithCancel(ctx)
+
+					// create the conduit
+					conduit := &Conduit{
+						ctx:       ctx,
+						cancel:    cancel,
+						channel:   req.channel,
+						publish:   o.publish,
+						unicast:   o.unicast,
+						multicast: o.multicast,
+						close:     o.unregister,
+					}
+
+					select {
+					case <-ctx.Done():
+						return
+					case req.respChan <- conduit:
+					}
+				case <-ctx.Done():
+					return
+				}
+			}
+		}).AddComponent(o.mw).Build()
 
 	return o, nil
 }
@@ -114,6 +152,12 @@ func NewNetwork(
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
 func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return nil, ErrNetworkShutdown
+	default:
+	}
+
 	if !channels.Exists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
@@ -127,21 +171,23 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 		Str("channel_id", channel.String()).
 		Msg("channel successfully registered")
 
-	// create a cancellable child context
-	ctx, cancel := context.WithCancel(n.ctx)
+	respChan := make(chan *Conduit)
 
-	// create the conduit
-	conduit := &Conduit{
-		ctx:       ctx,
-		cancel:    cancel,
-		channel:   channel,
-		publish:   n.publish,
-		unicast:   n.unicast,
-		multicast: n.multicast,
-		close:     n.unregister,
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return nil, ErrNetworkShutdown
+	case n.registerRequests <- &registerRequest{
+		channel:  channel,
+		respChan: respChan,
+	}:
 	}
 
-	return conduit, nil
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return nil, ErrNetworkShutdown
+	case conduit := <-respChan:
+		return conduit, nil
+	}
 }
 
 // unregister unregisters the engine for the specified channel. The engine will no longer be able to send or

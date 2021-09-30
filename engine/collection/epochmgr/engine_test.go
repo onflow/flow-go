@@ -31,8 +31,8 @@ import (
 // mockComponents is a container for the mocked version of epoch components.
 type mockComponents struct {
 	state    *cluster.State
-	prop     *module.Engine
-	sync     *module.Engine
+	prop     *network.Engine
+	sync     *network.Engine
 	hotstuff *module.HotStuff
 }
 
@@ -40,8 +40,8 @@ func newMockComponents() *mockComponents {
 
 	components := &mockComponents{
 		state:    new(cluster.State),
-		prop:     new(module.Engine),
-		sync:     new(module.Engine),
+		prop:     new(network.Engine,
+		sync:     new(network.Engine,
 		hotstuff: new(module.HotStuff),
 	}
 	unittest.ReadyDoneify(components.prop)
@@ -103,8 +103,8 @@ func (suite *Suite) SetupTest() {
 		}).
 		Return(
 			func(epoch realprotocol.Epoch) realcluster.State { return suite.ComponentsForEpoch(epoch).state },
-			func(epoch realprotocol.Epoch) realmodule.Engine { return suite.ComponentsForEpoch(epoch).prop },
-			func(epoch realprotocol.Epoch) realmodule.Engine { return suite.ComponentsForEpoch(epoch).sync },
+			func(epoch realprotocol.Epoch) network.Engine{ return suite.ComponentsForEpoch(epoch).prop },
+			func(epoch realprotocol.Epoch) network.Engine{ return suite.ComponentsForEpoch(epoch).sync },
 			func(epoch realprotocol.Epoch) realmodule.HotStuff { return suite.ComponentsForEpoch(epoch).hotstuff },
 			func(epoch realprotocol.Epoch) error { return nil },
 		)

@@ -307,10 +307,6 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
 		}
 
 		command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.adminAddr, opts...)
-		// TODO: update command_runner to be startable now
-		// if err := command_runner.Start(ctx); err != nil {
-		// 	return nil, err
-		// }
 
 		return command_runner, nil
 	})

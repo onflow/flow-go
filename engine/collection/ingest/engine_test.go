@@ -67,7 +67,7 @@ func (suite *Suite) SetupTest() {
 	log := zerolog.New(ioutil.Discard)
 	metrics := metrics.NewNoopCollector()
 
-	net := new(module.Network)
+	net := new(network.Network)
 	suite.conduit = new(mocknetwork.Conduit)
 	net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil).Once()
 

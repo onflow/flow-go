@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -34,7 +35,7 @@ type ComplianceSuite struct {
 	myID       flow.Identifier
 	cluster    flow.IdentityList
 	me         *module.Local
-	net        *module.Network
+	net        *network.Network
 	payloads   *storage.ClusterPayloads
 	protoState *protocol.MutableState
 	con        *mocknetwork.Conduit
@@ -118,7 +119,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	cs.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
 	// set up network module mock
-	cs.net = &module.Network{}
+	cs.net = &network.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
 		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
 			return cs.con

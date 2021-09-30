@@ -70,7 +70,6 @@ var _ network.Middleware = (*Middleware)(nil)
 type Middleware struct {
 	sync.Mutex
 	ctx                        context.Context
-	cancel                     context.CancelFunc
 	log                        zerolog.Logger
 	ov                         network.Overlay
 	wg                         *sync.WaitGroup
@@ -130,7 +129,6 @@ func NewMiddleware(
 	idTranslator IDTranslator,
 	opts ...MiddlewareOption,
 ) *Middleware {
-	ctx, cancel := context.WithCancel(context.Background())
 
 	if unicastMessageTimeout <= 0 {
 		unicastMessageTimeout = DefaultUnicastTimeout
@@ -138,8 +136,6 @@ func NewMiddleware(
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		ctx:                   ctx,
-		cancel:                cancel,
 		log:                   log,
 		wg:                    &sync.WaitGroup{},
 		me:                    flowID,
@@ -157,11 +153,13 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	m.ComponentManager = module.NewComponentManagerBuilder().OnStart(func(ctx context.Context) error {
-		return m.start(ctx)
+	mw.ComponentManager = module.NewComponentManagerBuilder().OnStart(func(ctx context.Context) error {
+		// TODO: refactor to avoid storing ctx altogether
+		mw.ctx = ctx
+		return mw.start(ctx)
 	}).AddWorker(func(ctx irrecoverable.SignalerContext) {
 		<-ctx.Done()
-		m.stop()
+		mw.stop()
 	}).Build()
 
 	return mw
@@ -304,9 +302,6 @@ func (m *Middleware) stop() {
 		<-done
 		m.log.Debug().Msg("libp2p node successfully stopped")
 	}
-
-	// cancel the context (this also signals any lingering libp2p go routines to exit)
-	m.cancel()
 
 	// wait for the readConnection and readSubscription routines to stop
 	m.wg.Wait()

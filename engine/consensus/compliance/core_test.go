@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protint "github.com/onflow/flow-go/state/protocol"
@@ -55,7 +56,7 @@ type ComplianceCoreSuite struct {
 	state    *protocol.MutableState
 	snapshot *protocol.Snapshot
 	con      *mocknetwork.Conduit
-	net      *module.Network
+	net      *network.Network
 	prov     *mocknetwork.Engine
 	pending  *module.PendingBlockBuffer
 	hotstuff *module.HotStuff
@@ -179,7 +180,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
 	// set up network module mock
-	cs.net = &module.Network{}
+	cs.net = &network.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
 		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
 			return cs.con
