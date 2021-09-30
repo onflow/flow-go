@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	splitternetwork "github.com/onflow/flow-go/engine/common/splitter/network"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -31,7 +30,7 @@ type Suite struct {
 }
 
 func (suite *Suite) SetupTest() {
-	net := new(mockmodule.Network)
+	net := new(mocknetwork.Network)
 	suite.con = new(mocknetwork.Conduit)
 	suite.engines = make(map[network.Channel]network.Engine)
 

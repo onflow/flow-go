@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/vmihailenco/msgpack"
 
-	"github.com/onflow/flow-go/engine/common/splitter/network"
 	module "github.com/onflow/flow-go/module/mock"
 
 	"github.com/onflow/flow-go/engine"
@@ -445,7 +444,7 @@ func TestOriginValidation(t *testing.T) {
 		EntityIDs: []flow.Identifier{wanted.ID()},
 	}
 
-	network := &network.Network{}
+	network := &mocknetwork.Network{}
 	network.On("Register", mock.Anything, mock.Anything).Return(nil, nil)
 
 	e, err := New(
