@@ -26,7 +26,7 @@ type BootstrapProcedure struct {
 	ctx       Context
 	sth       *state.StateHolder
 	programs  *programs.Programs
-	accounts  *state.Accounts
+	accounts  state.Accounts
 	rootBlock *flow.Header
 
 	// genesis parameters
