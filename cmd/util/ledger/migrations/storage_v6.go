@@ -61,7 +61,7 @@ type storagePath struct {
 type StorageFormatV6Migration struct {
 	Log        zerolog.Logger
 	OutputDir  string
-	accounts   *state.Accounts
+	accounts   state.Accounts
 	programs   *programs.Programs
 	reportFile *os.File
 	storage    *runtime.Storage
@@ -73,11 +73,11 @@ type StorageFormatV6Migration struct {
 	deferredValuePaths   map[storagePath]bool
 	progress             *progressbar.ProgressBar
 	emptyDeferredValues  int
-	missingTypeValues    int
+	skippedValues        int
 }
 
 func (m *StorageFormatV6Migration) filename() string {
-	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.csv", int32(time.Now().Unix())))
+	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.txt", int32(time.Now().Unix())))
 }
 
 func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.Payload, error) {
@@ -181,9 +181,9 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		m.Log.Warn().Msgf("empty deferred values found: %d", m.emptyDeferredValues)
 	}
 
-	if m.missingTypeValues > 0 {
+	if m.skippedValues > 0 {
 		m.clearProgress()
-		m.Log.Warn().Msgf("values not migrated due to missing types: %d", m.missingTypeValues)
+		m.Log.Warn().Msgf("values not migrated: %d", m.skippedValues)
 	}
 
 	return ledgerView.Payloads(), nil
@@ -238,7 +238,10 @@ func (m *StorageFormatV6Migration) addProgress(progress int) {
 }
 
 func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
-	st := state.NewState(v)
+	st := state.NewState(
+		v,
+		state.WithMaxInteractionSizeAllowed(math.MaxUint64),
+	)
 	stateHolder := state.NewStateHolder(st)
 	accounts := state.NewAccounts(stateHolder)
 
@@ -250,7 +253,7 @@ func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
 	)
 }
 
-func (m *StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
+func (m *StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Payload) state.Accounts {
 	var filteredPayloads []ledger.Payload
 
 	for _, payload := range payloads {
@@ -716,7 +719,7 @@ func (m *StorageFormatV6Migration) updateBrokenContracts(payloads []ledger.Paylo
 // migrationRuntimeInterface
 
 type migrationRuntimeInterface struct {
-	accounts *state.Accounts
+	accounts state.Accounts
 	programs *programs.Programs
 }
 
@@ -983,17 +986,60 @@ func (c *ValueConverter) Convert(value oldInter.Value) (result newInter.Value) {
 	c.result = nil
 
 	defer func() {
-		if r := recover(); r != nil {
-			c.migration.Log.Warn().Msgf(
-				"failed to convert value due to missing static type: owner: %s, value: %s",
-				value.GetOwner(),
-				value.String(),
-			)
-			c.migration.missingTypeValues += 1
-			result = nil
+		c.result = prevResult
+
+		r := recover()
+		if r == nil {
+			return
 		}
 
-		c.result = prevResult
+		switch err := r.(type) {
+		case newInter.TypeLoadingError:
+			c.migration.reportFile.WriteString(
+				fmt.Sprintf(
+					"skipped migrating value: missing static type: %s, owner: %s\n",
+					err.TypeID,
+					value.GetOwner(),
+				),
+			)
+		case newInter.ContainerMutationError:
+			c.migration.reportFile.WriteString(
+				fmt.Sprintf(
+					"skipped migrating value: %s, owner: %s\n",
+					value.GetOwner(),
+					err.Error(),
+				),
+			)
+		case runtime.Error:
+			if parsingCheckingErr, ok := err.Unwrap().(*runtime.ParsingCheckingError); ok {
+				c.migration.reportFile.WriteString(
+					fmt.Sprintf(
+						"skipped migrating value: broken contract type: %s, cause: %s\n",
+						parsingCheckingErr.Location,
+						parsingCheckingErr.Error(),
+					),
+				)
+			} else {
+				c.migration.reportFile.WriteString(
+					fmt.Sprintf(
+						"skipped migrating value: cause: %s\n",
+						err.Error(),
+					),
+				)
+			}
+		case newInter.Error:
+			c.migration.reportFile.WriteString(
+				fmt.Sprintf(
+					"skipped migrating value: cause: %s\n",
+					err.Error(),
+				),
+			)
+		default:
+			panic(err)
+		}
+
+		c.migration.skippedValues += 1
+		result = nil
 	}()
 
 	value.Accept(c.oldInter, c)
@@ -1028,12 +1074,12 @@ func (c *ValueConverter) VisitStringValue(_ *oldInter.Interpreter, value *oldInt
 }
 
 func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInter.ArrayValue) bool {
-	newElements := make([]newInter.Value, value.Count())
+	newElements := make([]newInter.Value, 0)
 
-	for index, element := range value.Elements() {
+	for _, element := range value.Elements() {
 		newElement := c.Convert(element)
 		if newElement != nil {
-			newElements[index] = newElement
+			newElements = append(newElements, newElement)
 		}
 	}
 

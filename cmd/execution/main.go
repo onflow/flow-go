@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
@@ -105,9 +106,11 @@ func main() {
 		blockDataUploader             uploader.Uploader
 		blockDataUploaderMaxRetry     uint64 = 5
 		blockdataUploaderRetryTimeout        = 1 * time.Second
+		atreeValidationEnabled        bool
 	)
 
-	cmd.FlowNode(flow.RoleExecution.String()).
+	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
+	nodeBuilder.
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			homedir, _ := os.UserHomeDir()
 			datadir := filepath.Join(homedir, ".flow", "execution")
@@ -134,6 +137,7 @@ func main() {
 			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
 			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to GCP Bucket")
 			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
+			flags.BoolVar(&atreeValidationEnabled, "atree-validation", false, "validates all atree values after mutations")
 		}).
 		ValidateFlags(func() error {
 			if enableBlockDataUpload {
@@ -142,8 +146,13 @@ func main() {
 				}
 			}
 			return nil
-		}).
-		Initialize().
+		})
+
+	if err = nodeBuilder.Initialize(); err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	nodeBuilder.
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -268,7 +277,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
-			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep)
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep, node.Logger.With().Str("subcomponent", "checkpointer").Logger())
 
 			return compactor, nil
 		}).
@@ -281,7 +290,9 @@ func main() {
 
 			extralog.ExtraLogDumpPath = extraLogPath
 
-			rt := fvm.NewInterpreterRuntime()
+			rt := fvm.NewInterpreterRuntime(
+				runtime.WithAtreeValidationEnabled(atreeValidationEnabled),
+			)
 
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)

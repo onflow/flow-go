@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	message "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/lifecycle"
@@ -35,7 +35,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var rootBlockID = unittest.IdentifierFixture().String()
+var rootBlockID = unittest.IdentifierFixture()
 
 const DryRun = true
 
@@ -222,7 +222,7 @@ func GenerateNetworks(t *testing.T,
 	return nets
 }
 
-// returns nodeIDs, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
+// GenerateIDsAndMiddlewares returns nodeIDs, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
@@ -281,8 +281,7 @@ func generateLibP2PNode(t *testing.T,
 	connManager := NewTagWatchingConnManager(logger, idProvider, noopMetrics)
 
 	// dns resolver
-	resolver, err := dns.NewResolver(noopMetrics)
-	require.NoError(t, err)
+	resolver := dns.NewResolver(noopMetrics)
 
 	libP2PNode, err := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
 		SetRootBlockID(rootBlockID).
