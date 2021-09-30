@@ -61,8 +61,6 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	progress := progressbar.Default(int64(gen.AddressCount()), "Processing:")
 
 	addressIndexes := make(chan uint64)
-	contractDataIndexes := make(chan uint64, 100)
-	accountDataIndexes := make(chan uint64, 100)
 	wg := &sync.WaitGroup{}
 
 	workerCount := goRuntime.NumCPU() / 2
@@ -70,22 +68,10 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 		workerCount = 1
 	}
 
-	// split to two channels
-	wg.Add(1)
-	go func() {
-		for index := range addressIndexes {
-			contractDataIndexes <- index
-			accountDataIndexes <- index
-		}
-		close(contractDataIndexes)
-		close(accountDataIndexes)
-		wg.Done()
-	}()
-
 	for i := 0; i < workerCount; i++ {
 		adp := newAccountDataProcessor(wg, r.Log, progress, rwa, rwc, r.Chain, l)
 		wg.Add(1)
-		go adp.reportAccountData(accountDataIndexes)
+		go adp.reportAccountData(addressIndexes)
 	}
 
 	for i := uint64(0); i < gen.AddressCount(); i++ {
@@ -159,7 +145,7 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, progress
 		script:   script}
 }
 
-func (c *balanceProcessor) reportAccountData(addressIndexes chan<- uint64) {
+func (c *balanceProcessor) reportAccountData(addressIndexes <-chan uint64) {
 	for indx := range addressIndexes {
 
 		address, err := c.ctx.Chain.AddressAtIndex(indx)
