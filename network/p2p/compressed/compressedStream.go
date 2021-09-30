@@ -19,7 +19,7 @@ type compressedStream struct {
 	compressor flownet.Compressor
 
 	r io.ReadCloser
-	w io.WriteCloser
+	w flownet.WriteCloseFlusher
 }
 
 type StreamOptFunc func(*compressedStream)
@@ -30,7 +30,7 @@ func WithStreamCompressor(comp flownet.Compressor) StreamOptFunc {
 	}
 }
 
-func NewCompressedStream(s network.Stream, opts ...StreamOptFunc) (network.Stream, error) {
+func NewCompressedStream(s network.Stream, opts ...StreamOptFunc) (*compressedStream, error) {
 	c := &compressedStream{
 		Stream:     s,
 		compressor: compressor.GzipStreamCompressor{},
@@ -54,7 +54,8 @@ func (c *compressedStream) Write(b []byte) (int, error) {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
-	return c.w.Write(b)
+	n, err := c.w.Write(b)
+	return n, multierr.Combine(err, c.w.Flush())
 }
 
 func (c *compressedStream) Read(b []byte) (int, error) {
