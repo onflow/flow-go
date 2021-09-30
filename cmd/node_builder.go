@@ -50,7 +50,7 @@ type NodeBuilder interface {
 	InitIDProviders()
 
 	// EnqueueNetworkInit enqueues the default network component with the given context
-	EnqueueNetworkInit(ctx context.Context)
+	EnqueueNetworkInit()
 
 	// EnqueueMetricsServerInit enqueues the metrics component
 	EnqueueMetricsServerInit()

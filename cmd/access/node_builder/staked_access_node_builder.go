@@ -70,18 +70,14 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 }
 
 func (builder *StakedAccessNodeBuilder) Initialize() error {
-
-	ctx, cancel := context.WithCancel(context.Background())
-	builder.Cancel = cancel
-
 	builder.InitIDProviders()
 
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
 	if builder.supportsUnstakedFollower {
-		builder.enqueueUnstakedNetworkInit(ctx)
+		builder.enqueueUnstakedNetworkInit()
 	} else {
 		// otherwise, enqueue the regular network
-		builder.EnqueueNetworkInit(ctx)
+		builder.EnqueueNetworkInit()
 	}
 
 	builder.EnqueueMetricsServerInit()
@@ -156,7 +152,7 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 }
 
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
-func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Context) {
+func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 

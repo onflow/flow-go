@@ -262,7 +262,7 @@ func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
+func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 	fnb.Component("admin server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 		var opts []admin.CommandRunnerOption
 
@@ -893,10 +893,6 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 }
 
 func (fnb *FlowNodeBuilder) Initialize() error {
-
-	ctx, cancel := context.WithCancel(context.Background())
-	fnb.Cancel = cancel
-
 	fnb.PrintBuildVersionDetails()
 
 	fnb.BaseFlags()
@@ -910,7 +906,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
 
-	fnb.EnqueueNetworkInit(ctx)
+	fnb.EnqueueNetworkInit()
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()
@@ -924,7 +920,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 			!(fnb.adminCert != NotSet && fnb.adminKey != NotSet && fnb.adminClientCAs != NotSet) {
 			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
 		}
-		fnb.EnqueueAdminServerInit(ctx)
+		fnb.EnqueueAdminServerInit()
 	}
 
 	fnb.EnqueueTracer()
@@ -1005,8 +1001,10 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 			fnb.handleModule(f)
 		}
 
+		ctx, cancel := context.WithCancel(context.TODO())
+		fnb.Cancel = cancel
 		errChan := make(chan error)
-		signalerCtx := irrecoverable.WithSignaler(context.TODO(), irrecoverable.NewSignaler(errChan))
+		signalerCtx := irrecoverable.WithSignaler(ctx, irrecoverable.NewSignaler(errChan))
 
 		// TODO: implement proper error handling
 		go func() {
