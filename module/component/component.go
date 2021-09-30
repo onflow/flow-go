@@ -2,7 +2,6 @@ package component
 
 import (
 	"context"
-	"errors"
 	"sync"
 
 	"go.uber.org/atomic"
@@ -12,8 +11,6 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 )
-
-var ErrMultipleStartup = errors.New("component may only be started once")
 
 type Component interface {
 	module.Startable
@@ -60,15 +57,7 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 		signalingCtx := irrecoverable.WithSignaler(runCtx, signaler)
 		irrecoverableErr = signaler.Error()
 
-		// the component must be started in a separate goroutine in case an irrecoverable error
-		// is thrown during the call to Start, which terminates the calling goroutine
-		startDone := make(chan struct{})
-		go func() {
-			defer close(startDone)
-			err = component.Start(signalingCtx)
-		}()
-		<-startDone
-		if err != nil {
+		if err = component.Start(signalingCtx); err != nil {
 			cancel()
 			return
 		}
@@ -142,7 +131,7 @@ type ComponentManagerBuilder interface {
 	AddWorker(ComponentWorker) ComponentManagerBuilder
 
 	// AddComponent adds a new sub-component for the ComponentManager.
-	// This should be used for critical sub-components whose failure should be
+	// This should be used for critical sub-components whose failure would be
 	// considered irrecoverable. For non-critical sub-components, consider using
 	// RunComponent instead.
 	AddComponent(Component) ComponentManagerBuilder
@@ -277,7 +266,7 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) (err erro
 		return
 	}
 
-	return ErrMultipleStartup
+	return module.ErrMultipleStartup
 }
 
 // Ready returns a channel which is closed once the startup routine has completed successfully.

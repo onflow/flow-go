@@ -88,10 +88,6 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 }
 
 func (anb *UnstakedAccessNodeBuilder) Initialize() error {
-
-	ctx, cancel := context.WithCancel(context.Background())
-	anb.Cancel = cancel
-
 	if err := anb.deriveBootstrapPeerIdentities(); err != nil {
 		return err
 	}
@@ -106,9 +102,9 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() error {
 
 	anb.InitIDProviders()
 
-	anb.enqueueMiddleware(ctx)
+	anb.enqueueMiddleware()
 
-	anb.enqueueUnstakedNetworkInit(ctx)
+	anb.enqueueUnstakedNetworkInit()
 
 	anb.enqueueConnectWithStakedAN()
 
@@ -218,7 +214,7 @@ func (anb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.NodeB
 
 // enqueueMiddleware enqueues the creation of the network middleware
 // this needs to be done before sync engine participants module
-func (anb *UnstakedAccessNodeBuilder) enqueueMiddleware(ctx context.Context) {
+func (anb *UnstakedAccessNodeBuilder) enqueueMiddleware() {
 	anb.
 		Module("network middleware", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) error {
 
@@ -253,7 +249,7 @@ func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
 }
 
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
-func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit(ctx context.Context) {
+func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 	anb.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
