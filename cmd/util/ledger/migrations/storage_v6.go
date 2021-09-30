@@ -452,32 +452,24 @@ func (m *StorageFormatV6Migration) initNewInterpreter() {
 		newInter.WithStorage(m.storage),
 		newInter.WithImportLocationHandler(
 			func(inter *newInter.Interpreter, location common.Location) newInter.Import {
-				switch location {
-				case stdlib.CryptoChecker.Location:
-					program := newInter.ProgramFromChecker(stdlib.CryptoChecker)
-					subInterpreter, err := inter.NewSubInterpreter(program, location)
+				var program *newInter.Program
+				if location == stdlib.CryptoChecker.Location {
+					program = newInter.ProgramFromChecker(stdlib.CryptoChecker)
+				} else {
+					var err error
+					program, err = m.loadProgram(location)
 					if err != nil {
 						panic(err)
 					}
+				}
 
-					return newInter.InterpreterImport{
-						Interpreter: subInterpreter,
-					}
+				subInterpreter, err := inter.NewSubInterpreter(program, location)
+				if err != nil {
+					panic(err)
+				}
 
-				default:
-					program, err := m.loadProgram(location)
-					if err != nil {
-						panic(err)
-					}
-
-					subInter, err := inter.NewSubInterpreter(program, location)
-					if err != nil {
-						panic(err)
-					}
-
-					return newInter.InterpreterImport{
-						Interpreter: subInter,
-					}
+				return newInter.InterpreterImport{
+					Interpreter: subInterpreter,
 				}
 			},
 		),
@@ -987,6 +979,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 				),
 			)
 		case newInter.ContainerMutationError:
+			fmt.Println(fmt.Sprintf("%w", err))
 			c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: %s, owner: %s\n",
@@ -1227,7 +1220,6 @@ func compositeTypeLocation(location common.Location) common.Location {
 		case "fcceff21d9532b58",
 			"17341c7824b030be",
 			"f79ee844bfa76528":
-			// TODO: verify the new address
 			address, err := hex.DecodeString("8c5244250369a9ce")
 			if err != nil {
 				panic(err)
