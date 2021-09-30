@@ -58,7 +58,7 @@ type StatefulAccounts struct {
 	stateHolder *StateHolder
 }
 
-func NewAccounts(stateHolder *StateHolder) *StatefulAccounts {
+func NewAccounts(stateHolder *StateHolder) Accounts {
 	return &StatefulAccounts{
 		stateHolder: stateHolder,
 	}
