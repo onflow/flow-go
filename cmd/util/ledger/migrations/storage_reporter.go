@@ -185,9 +185,9 @@ func (r *StorageReporter) balance(address flow.Address, st *state.State) (balanc
 	if !ok || composite == nil {
 		return 0, false, fmt.Errorf("could not decode composite at %s: %w", address, err)
 	}
-	balanceField := composite.GetField(nil, nil, "balance")
+	balanceField := composite.GetField("balance")
 	balanceValue, ok := balanceField.(interpreter.UFix64Value)
-	if !ok || balanceField == nil{
+	if !ok || balanceField == nil {
 		return 0, false, fmt.Errorf("could not decode resource at %s: %w", address, err)
 	}
 

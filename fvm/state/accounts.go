@@ -414,7 +414,7 @@ func (a *StatefulAccounts) getValue(address flow.Address, isController bool, key
 }
 
 // SetValue sets a value in address' storage
-func (a *StatefulAccounts) SetValue(address flow.Address, key string, value flow.RegisterValue) error {
+func (a *StatefulAccounts) SetValue(address flow.Address, key string, value []byte) error {
 	return a.setValue(address, false, key, value)
 }
 
