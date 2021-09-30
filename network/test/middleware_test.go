@@ -118,10 +118,13 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	m.mwCancel = cancel
 	m.mwCtx = irrecoverable.WithSignaler(ctx, irrecoverable.NewSignaler(errChan))
 	go func() {
-		select {
-		case err := <-errChan:
-			m.FailNow("middlewares encountered fatal error", err)
-		case <-m.mwCtx.Done():
+		for {
+			select {
+			case err := <-errChan:
+				m.T().Error("middlewares encountered fatal error", err)
+			case <-m.mwCtx.Done():
+				return
+			}
 		}
 	}()
 
