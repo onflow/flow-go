@@ -2,7 +2,6 @@ package tracker
 
 import (
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -33,18 +32,11 @@ func (r *SealingRecord) ApprovalsMissing(chunksWithMissingApprovals map[uint64]f
 	sufficientApprovals := len(chunksWithMissingApprovals) == 0
 	r.entries["sufficient_approvals_for_sealing"] = sufficientApprovals
 	if !sufficientApprovals {
-		chunksInfo := make([]map[string]interface{}, 0, len(chunksWithMissingApprovals))
+		indices := make([]string, 0, len(chunksWithMissingApprovals))
 		for i, list := range chunksWithMissingApprovals {
-			chunk := make(map[string]interface{})
-			chunk["chunk_index"] = i
-			chunk["missing_approvals_from_verifiers"] = list
-			chunksInfo = append(chunksInfo, chunk)
+			indices = append(indices, fmt.Sprintf("chunk_index: %v, verifier_ids: %v", i, list))
 		}
-		bytes, err := json.Marshal(r)
-		if err != nil {
-			bytes = []byte("failed to marshal data about chunks with missing approvals")
-		}
-		r.entries["chunks_with_insufficient_approvals"] = string(bytes)
+		r.entries["chunks_with_insufficient_approvals"] = indices
 	}
 }
 
