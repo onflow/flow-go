@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/observable"
@@ -168,7 +169,7 @@ func GenerateNetworks(t *testing.T,
 	csize int,
 	tops []network.Topology,
 	sms []network.SubscriptionManager,
-	dryRunMode bool) []*p2p.Network {
+	dryRunMode bool) ([]*p2p.Network, context.CancelFunc) {
 	count := len(ids)
 	nets := make([]*p2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -213,13 +214,29 @@ func GenerateNetworks(t *testing.T,
 		nets = append(nets, net)
 	}
 
+	errChan := make(chan error)
+	ctx, cancel := context.WithCancel(context.Background())
+	netCtx := irrecoverable.WithSignaler(ctx, irrecoverable.NewSignaler(errChan))
+
 	// if dryrun then don't actually start the network
 	if !dryRunMode {
+		go func() {
+			for {
+				select {
+				case err := <-errChan:
+					t.Error("networks encountered fatal error", err)
+				case <-netCtx.Done():
+					return
+				}
+			}
+		}()
+
 		for _, net := range nets {
+			net.Start(netCtx)
 			<-net.Ready()
 		}
 	}
-	return nets
+	return nets, cancel
 }
 
 // GenerateIDsAndMiddlewares returns nodeIDs, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
@@ -238,12 +255,12 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []network.Topology,
-	dryRun bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network, []observable.Observable) {
+	dryRun bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network, []observable.Observable, context.CancelFunc) {
 
 	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, dryRun, log, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
-	return ids, mws, networks, observables
+	networks, netCancel := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
+	return ids, mws, networks, observables, netCancel
 }
 
 // GenerateEngines generates MeshEngines for the given networks
@@ -342,6 +359,7 @@ func GenerateSubscriptionManagers(t *testing.T, mws []*p2p.Middleware) []network
 // stopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
 // duration.
 func stopNetworks(t *testing.T, nets []*p2p.Network, duration time.Duration) {
+
 	// casts nets instances into ReadyDoneAware components
 	comps := make([]module.ReadyDoneAware, 0, len(nets))
 	for _, net := range nets {
