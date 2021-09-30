@@ -27,11 +27,7 @@ func (m *mockStream) Read(p []byte) (int, error) {
 }
 
 func (m *mockStream) Write(p []byte) (int, error) {
-	go func() {
-		_, _ = m.pw.Write(p)
-	}()
-
-	return len(p), nil
+	return m.pw.Write(p)
 }
 
 func (m *mockStream) Close() error {
