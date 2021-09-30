@@ -21,6 +21,7 @@ import (
 var _ network.BlockExchange = (*BlockExchange)(nil)
 var _ network.BlockExchangeFetcher = (*BlockExchangeSession)(nil)
 var _ network.BlocksPromise = (*BlocksPromise)(nil)
+var _ network.BlocksRequest = (*BlocksRequest)(nil)
 
 type BlockExchange struct {
 	bstore    blockstore.Blockstore
@@ -28,7 +29,7 @@ type BlockExchange struct {
 	bs        *bitswap.Bitswap
 }
 
-func NewEntityExchange(
+func NewBlockExchange(
 	ctx context.Context,
 	host host.Host,
 	r routing.ContentRouting,
@@ -81,16 +82,22 @@ func (s *BlockExchangeSession) GetBlocks(cids ...cid.Cid) network.BlocksPromise 
 }
 
 type BlocksPromise struct {
+	blocks func(context.Context) (<-chan blocks.Block, error)
+}
+
+func (p *BlocksPromise) ForEach(cb func(blocks.Block)) network.BlocksRequest {
+	return &BlocksRequest{
+		forEach: cb,
+		blocks:  p.blocks,
+	}
+}
+
+type BlocksRequest struct {
 	forEach func(blocks.Block)
 	blocks  func(context.Context) (<-chan blocks.Block, error)
 }
 
-func (p *BlocksPromise) ForEach(cb func(blocks.Block)) network.BlocksPromise {
-	p.forEach = cb
-	return p
-}
-
-func (p *BlocksPromise) Send(ctx context.Context) error {
+func (p *BlocksRequest) Send(ctx context.Context) error {
 	cb := p.forEach
 
 	if cb == nil {

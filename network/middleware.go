@@ -62,18 +62,33 @@ type Middleware interface {
 	UpdateNodeAddresses()
 }
 
+// BlockExchange represents a block exchange, which is an abstraction over an underlying
+// Bitswap network.
 type BlockExchange interface {
 	BlockExchangeFetcher
+
+	// GetSession returns a session for requesting related blocks
 	GetSession(ctx context.Context) BlockExchangeFetcher
+
+	// HasBlock notifies the BlockExchange about the existence of a new block.
+	// This may notify peers on the Bitswap network.
 	HasBlock(block blocks.Block) error
 }
 
+// BlockExchangeFetcher is an interface for requesting blocks from a BlockExchange.
 type BlockExchangeFetcher interface {
+	// GetBlocks creates a
 	GetBlocks(cids ...cid.Cid) BlocksPromise
 }
 
 type BlocksPromise interface {
-	ForEach(cb func(blocks.Block)) BlocksPromise
+	// ForEach is used to register a callback to handle received blocks
+	ForEach(cb func(blocks.Block)) BlocksRequest
+}
+
+// BlocksPromise represents a request for blocks on the Bitswap network.
+type BlocksRequest interface {
+	// Send initiates the request
 	Send(ctx context.Context) error
 }
 

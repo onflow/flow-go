@@ -19,6 +19,8 @@ type Network interface {
 	// On a single node, only one engine can be subscribed to a channel at any given time.
 	Register(channel network.Channel, engine network.Engine) (network.Conduit, error)
 
+	// RegisterBlockExchange registers a BlockExchange network on the given channel.
+	// The returned BlockExchange can be used to request blocks from the network.
 	RegisterBlockExchange(channel network.Channel, store blockstore.Blockstore) (network.BlockExchange, error)
 }
 

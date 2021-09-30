@@ -2,11 +2,13 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 	"time"
 
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 
@@ -51,6 +53,8 @@ type Network struct {
 	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
 	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
 }
+
+var _ module.Network = (*Network)(nil)
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
@@ -152,6 +156,21 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 	}
 
 	return conduit, nil
+}
+
+// RegisterBlockExchange registers a BlockExchange network on the given channel.
+// The returned BlockExchange can be used to request blocks from the network.
+func (n *Network) RegisterBlockExchange(channel network.Channel, bstore blockstore.Blockstore) (network.BlockExchange, error) {
+	// TODO: this is a hack, we should not rely on knowing the underlying implementation
+	mw, ok := n.mw.(*Middleware)
+	if !ok {
+		return nil, errors.New("middleware was of unexpected type")
+	}
+	if mw.libP2PNode.dht == nil {
+		return nil, errors.New("block exchange is disabled because content routing is not configured")
+	}
+
+	return NewBlockExchange(n.ctx, mw.libP2PNode.host, mw.libP2PNode.dht, channel.String(), bstore), nil
 }
 
 // unregister unregisters the engine for the specified channel. The engine will no longer be able to send or
