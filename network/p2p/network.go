@@ -198,7 +198,8 @@ func (n *Network) processNetworkMessage(senderID flow.Identifier, message *messa
 			Logger()
 
 		// drops duplicate message
-		log.Debug().
+		// TODO: was DEBUG level log, now temporarily enable to find duplicated message sender
+		log.Info().
 			Str("channel", message.ChannelID).
 			Msg("dropping message due to duplication")
 
