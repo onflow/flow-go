@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	realcluster "github.com/onflow/flow-go/state/cluster"
 	cluster "github.com/onflow/flow-go/state/cluster/mock"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
@@ -32,8 +33,8 @@ import (
 // mockComponents is a container for the mocked version of epoch components.
 type mockComponents struct {
 	state    *cluster.State
-	prop     *network.Engine
-	sync     *network.Engine
+	prop     *mocknetwork.Engine
+	sync     *mocknetwork.Engine
 	hotstuff *module.HotStuff
 }
 
@@ -41,8 +42,8 @@ func newMockComponents() *mockComponents {
 
 	components := &mockComponents{
 		state:    new(cluster.State),
-		prop:     new(network.Engine),
-		sync:     new(network.Engine),
+		prop:     new(mocknetwork.Engine),
+		sync:     new(mocknetwork.Engine),
 		hotstuff: new(module.HotStuff),
 	}
 	unittest.ReadyDoneify(components.prop)

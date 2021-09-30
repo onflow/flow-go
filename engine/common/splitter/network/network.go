@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 
 	splitterEngine "github.com/onflow/flow-go/engine/common/splitter"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network"
 )
@@ -20,7 +19,7 @@ import (
 // splitter engine. As a result, multiple engines can register with the splitter network on
 // the same channel and will each receive all events on that channel.
 type Network struct {
-	module.ReadyDoneAwareNetwork
+	network.Network
 	mu        sync.RWMutex
 	log       zerolog.Logger
 	splitters map[network.Channel]*splitterEngine.Engine // stores splitters for each channel
@@ -30,15 +29,15 @@ type Network struct {
 
 // NewNetwork returns a new splitter network.
 func NewNetwork(
-	net module.ReadyDoneAwareNetwork,
+	net network.Network,
 	log zerolog.Logger,
 ) *Network {
 	return &Network{
-		ReadyDoneAwareNetwork: net,
-		splitters:             make(map[network.Channel]*splitterEngine.Engine),
-		conduits:              make(map[network.Channel]network.Conduit),
-		log:                   log,
-		lm:                    lifecycle.NewLifecycleManager(),
+		Network:   net,
+		splitters: make(map[network.Channel]*splitterEngine.Engine),
+		conduits:  make(map[network.Channel]network.Conduit),
+		log:       log,
+		lm:        lifecycle.NewLifecycleManager(),
 	}
 }
 
@@ -46,7 +45,7 @@ func NewNetwork(
 // engines will be notified with incoming messages on the channel.
 // The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
 func (n *Network) Register(channel network.Channel, e network.Engine) (network.Conduit, error) {
-	engine, ok := e.(network.Engine
+	engine, ok := e.(network.Engine)
 
 	if !ok {
 		return nil, errors.New("engine does not have the correct type")
@@ -79,7 +78,7 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 
 	if !channelRegistered {
 		var err error
-		conduit, err = n.ReadyDoneAwareNetwork.Register(channel, splitter)
+		conduit, err = n.Network.Register(channel, splitter)
 
 		if err != nil {
 			// undo previous steps
@@ -100,7 +99,7 @@ func (n *Network) Register(channel network.Channel, e network.Engine) (network.C
 // has started.
 func (n *Network) Ready() <-chan struct{} {
 	n.lm.OnStart(func() {
-		<-n.ReadyDoneAwareNetwork.Ready()
+		<-n.Network.Ready()
 	})
 	return n.lm.Started()
 }
@@ -109,7 +108,7 @@ func (n *Network) Ready() <-chan struct{} {
 // For the splitter network, this is true once the wrapped network has stopped.
 func (n *Network) Done() <-chan struct{} {
 	n.lm.OnStop(func() {
-		<-n.ReadyDoneAwareNetwork.Done()
+		<-n.Network.Done()
 	})
 	return n.lm.Stopped()
 }
