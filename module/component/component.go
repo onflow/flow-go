@@ -1,18 +1,23 @@
-package module
+package component
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"go.uber.org/atomic"
 	"golang.org/x/sync/errgroup"
 
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 )
 
+var ErrMultipleStartup = errors.New("component may only be started once")
+
 type Component interface {
-	Startable
-	ReadyDoneAware
+	module.Startable
+	module.ReadyDoneAware
 }
 
 type ComponentFactory func() (Component, error)
@@ -273,11 +278,11 @@ func (c *ComponentManager) Done() <-chan struct{} {
 		<-c.startupDone
 
 		// wait for sub-components to shutdown
-		components := make([]ReadyDoneAware, len(c.components))
+		components := make([]module.ReadyDoneAware, len(c.components))
 		for i, component := range c.components {
-			components[i] = component.(ReadyDoneAware)
+			components[i] = component.(module.ReadyDoneAware)
 		}
-		<-AllDone(components...)
+		<-util.AllDone(components...)
 
 		// wait for worker routines to finish
 		c.done.Wait()

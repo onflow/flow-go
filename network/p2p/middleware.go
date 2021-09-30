@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -86,7 +87,7 @@ type Middleware struct {
 	idTranslator               IDTranslator
 	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
-	*module.ComponentManager
+	*component.ComponentManager
 }
 
 type MiddlewareOption func(*Middleware)
@@ -153,7 +154,7 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	mw.ComponentManager = module.NewComponentManagerBuilder().OnStart(func(ctx context.Context) error {
+	mw.ComponentManager = component.NewComponentManagerBuilder().OnStart(func(ctx context.Context) error {
 		// TODO: refactor to avoid storing ctx altogether
 		mw.ctx = ctx
 		return mw.start(ctx)
@@ -248,7 +249,7 @@ func (m *Middleware) start(ctx context.Context) error {
 		return errors.New("overlay must be configured by calling SetOverlay before middleware can be started")
 	}
 
-	libP2PNode, err := m.libP2PNodeFactory()
+	libP2PNode, err := m.libP2PNodeFactory(ctx)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}

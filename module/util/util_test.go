@@ -1,4 +1,4 @@
-package module
+package util_test
 
 import (
 	"fmt"
@@ -7,6 +7,7 @@ import (
 
 	realmodule "github.com/onflow/flow-go/module"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -40,7 +41,7 @@ func testAllDone(n int, t *testing.T) {
 		unittest.ReadyDoneify(components[i])
 	}
 
-	unittest.AssertClosesBefore(t, AllReady(components...), time.Second)
+	unittest.AssertClosesBefore(t, util.AllReady(components...), time.Second)
 
 	for _, component := range components {
 		mock := component.(*module.ReadyDoneAware)
@@ -57,7 +58,7 @@ func testAllReady(n int, t *testing.T) {
 		unittest.ReadyDoneify(components[i])
 	}
 
-	unittest.AssertClosesBefore(t, module.AllDone(components...), time.Second)
+	unittest.AssertClosesBefore(t, util.AllDone(components...), time.Second)
 
 	for _, component := range components {
 		mock := component.(*module.ReadyDoneAware)

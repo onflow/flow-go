@@ -156,12 +156,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
 	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-		libP2PFactory, err := builder.initLibP2PFactory(ctx,
-			builder.NodeID,
-			builder.NodeConfig.NetworkKey)
-		if err != nil {
-			return nil, err
-		}
+		libP2PFactory := builder.initLibP2PFactory(builder.NodeID, builder.NodeConfig.NetworkKey)
 
 		msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, builder.NodeID)
 
@@ -194,9 +189,7 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 // 		The passed in private key as the libp2p key
 //		No connection gater
 // 		Default Flow libp2p pubsub options
-func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
-	nodeID flow.Identifier,
-	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
+func (builder *StakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier, networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 
 	// The staked nodes act as the DHT servers
 	dhtOptions := []dht.Option{p2p.AsServer(true)}
@@ -210,7 +203,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 
-	return func() (*p2p.Node, error) {
+	return func(ctx context.Context) (*p2p.Node, error) {
 		psOpts := p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)
 		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
 			return pubsub.WithSubscriptionFilter(p2p.NewRoleBasedFilter(
@@ -232,7 +225,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 		}
 		builder.LibP2PNode = libp2pNode
 		return builder.LibP2PNode, nil
-	}, nil
+	}
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update

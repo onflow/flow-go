@@ -7,8 +7,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/proxy"
@@ -42,7 +40,7 @@ func (suite *Suite) SetupTest() {
 	suite.con = new(mocknetwork.Conduit)
 	suite.targetNodeID = unittest.IdentifierFixture()
 	suite.proxyNet = proxy.NewProxyNetwork(suite.net, suite.targetNodeID)
-	suite.engine = new(mocknetwork.Engine
+	suite.engine = new(mocknetwork.Engine)
 
 	net.On("Register", mock.AnythingOfType("network.Channel"), mock.Anything).Return(suite.con, nil)
 }

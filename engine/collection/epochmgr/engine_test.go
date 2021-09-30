@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	realcluster "github.com/onflow/flow-go/state/cluster"
 	cluster "github.com/onflow/flow-go/state/cluster/mock"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
@@ -40,8 +41,8 @@ func newMockComponents() *mockComponents {
 
 	components := &mockComponents{
 		state:    new(cluster.State),
-		prop:     new(network.Engine,
-		sync:     new(network.Engine,
+		prop:     new(network.Engine),
+		sync:     new(network.Engine),
 		hotstuff: new(module.HotStuff),
 	}
 	unittest.ReadyDoneify(components.prop)
@@ -103,8 +104,8 @@ func (suite *Suite) SetupTest() {
 		}).
 		Return(
 			func(epoch realprotocol.Epoch) realcluster.State { return suite.ComponentsForEpoch(epoch).state },
-			func(epoch realprotocol.Epoch) network.Engine{ return suite.ComponentsForEpoch(epoch).prop },
-			func(epoch realprotocol.Epoch) network.Engine{ return suite.ComponentsForEpoch(epoch).sync },
+			func(epoch realprotocol.Epoch) network.Engine { return suite.ComponentsForEpoch(epoch).prop },
+			func(epoch realprotocol.Epoch) network.Engine { return suite.ComponentsForEpoch(epoch).sync },
 			func(epoch realprotocol.Epoch) realmodule.HotStuff { return suite.ComponentsForEpoch(epoch).hotstuff },
 			func(epoch realprotocol.Epoch) error { return nil },
 		)

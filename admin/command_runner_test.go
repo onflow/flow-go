@@ -28,6 +28,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	pb "github.com/onflow/flow-go/admin/admin"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 type CommandRunnerSuite struct {
@@ -62,17 +63,19 @@ func (suite *CommandRunnerSuite) TearDownTest() {
 func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption) {
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
+	errChan := make(chan error)
+	signalerCtx := irrecoverable.WithSignaler(ctx, irrecoverable.NewSignaler(errChan))
 
 	logger := zerolog.New(zerolog.NewConsoleWriter())
 	suite.runner = suite.bootstrapper.Bootstrap(logger, suite.httpAddress, opts...)
-	err := suite.runner.Start(ctx)
+	err := suite.runner.Start(signalerCtx)
 	suite.NoError(err)
 	<-suite.runner.Ready()
 	go func() {
 		select {
 		case <-ctx.Done():
 			return
-		case err := <-suite.runner.Errors():
+		case err := <-errChan:
 			suite.Fail("encountered unexpected error", err)
 		}
 	}()

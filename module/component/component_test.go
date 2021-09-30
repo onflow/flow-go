@@ -1,9 +1,8 @@
-package module
+package component
 
 import (
 	"context"
 	"errors"
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -11,7 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 var ErrFatal = errors.New("fatal")
