@@ -2,6 +2,7 @@ package validators
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"runtime"
 	"sync"
 
@@ -23,10 +24,6 @@ import (
 type accountBalance struct {
 	addressIndex uint64
 	balance      uint64
-}
-
-type balanceCollector interface {
-	CollectBalances(addressIndices chan uint64, balances chan accountBalance)
 }
 
 type newVersionCollector struct {
@@ -120,7 +117,7 @@ func NewAccountBalanceValidator(logger zerolog.Logger, chain flow.Chain) *Accoun
 
 func (v *AccountBalanceValidator) Setup(oldPayloads []ledger.Payload) error {
 
-	mainView := newView(oldPayloads)
+	mainView := migrations.NewView(oldPayloads)
 	st := state.NewState(mainView)
 	sth := state.NewStateHolder(st)
 	gen := state.NewStateBoundAddressGenerator(sth, v.chain)
@@ -155,7 +152,7 @@ func (v *AccountBalanceValidator) Setup(oldPayloads []ledger.Payload) error {
 
 func (v *AccountBalanceValidator) Validate(newPayloads []ledger.Payload) (isValid bool, err error) {
 
-	mainView := newView(newPayloads)
+	mainView := migrations.NewView(newPayloads)
 	st := state.NewState(mainView)
 	sth := state.NewStateHolder(st)
 

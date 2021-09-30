@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func keyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
+func KeyToRegisterID(key ledger.Key) (flow.RegisterID, error) {
 	if len(key.KeyParts) != 3 ||
 		key.KeyParts[0].Type != state.KeyPartOwner ||
 		key.KeyParts[1].Type != state.KeyPartController ||
@@ -66,17 +66,17 @@ func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storageP
 	return
 }
 
-type accountsAtreeLedger struct {
+type AccountsAtreeLedger struct {
 	accounts fvmState.Accounts
 }
 
-func newAccountsAtreeLedger(accounts fvmState.Accounts) *accountsAtreeLedger {
-	return &accountsAtreeLedger{accounts: accounts}
+func NewAccountsAtreeLedger(accounts fvmState.Accounts) *AccountsAtreeLedger {
+	return &AccountsAtreeLedger{accounts: accounts}
 }
 
-var _ atree.Ledger = &accountsAtreeLedger{}
+var _ atree.Ledger = &AccountsAtreeLedger{}
 
-func (a *accountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
+func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 	v, err := a.accounts.GetValue(
 		flow.BytesToAddress(owner),
 		string(key),
@@ -87,7 +87,7 @@ func (a *accountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 	return v, nil
 }
 
-func (a *accountsAtreeLedger) SetValue(owner, key, value []byte) error {
+func (a *AccountsAtreeLedger) SetValue(owner, key, value []byte) error {
 	err := a.accounts.SetValue(
 		flow.BytesToAddress(owner),
 		string(key),
@@ -99,7 +99,7 @@ func (a *accountsAtreeLedger) SetValue(owner, key, value []byte) error {
 	return nil
 }
 
-func (a *accountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err error) {
+func (a *AccountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err error) {
 	v, err := a.GetValue(owner, key)
 	if err != nil {
 		return false, fmt.Errorf("checking value existence failed: %w", err)
@@ -109,7 +109,7 @@ func (a *accountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err e
 }
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (a *accountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
 	v, err := a.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)

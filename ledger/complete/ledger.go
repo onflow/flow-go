@@ -324,13 +324,22 @@ func (l *Ledger) ExportCheckpointAt(
 	}
 
 	// run reporters
-	for i, reporter := range reporters {
+	for _, reporter := range reporters {
+		l.logger.Info().
+			Str("name", reporter.Name()).
+			Msg("starting reporter")
+
 		start := time.Now()
 		err = reporter.Report(payloads)
 		elapsed := time.Since(start)
-		l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("reporter %d is done", i)
+
+		l.logger.Info().
+			Str("timeTaken", elapsed.String()).
+			Str("name", reporter.Name()).
+			Msg("reporter done")
 		if err != nil {
-			return ledger.State(hash.DummyHash), fmt.Errorf("error running reporter (%d): %w", i, err)
+			return ledger.State(hash.DummyHash),
+				fmt.Errorf("error running reporter (%s): %w", reporter.Name(), err)
 		}
 	}
 

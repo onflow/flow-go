@@ -3,6 +3,8 @@ package extract
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
+
 	"github.com/rs/zerolog"
 
 	mgr "github.com/onflow/flow-go/cmd/util/ledger/migrations"
@@ -58,7 +60,7 @@ func extractExecutionState(
 	}
 
 	migrations := []ledger.Migration{}
-	reporters := []ledger.Reporter{}
+	rs := []ledger.Reporter{}
 	validators := []ledger.Validator{}
 
 	if migrate {
@@ -85,10 +87,11 @@ func extractExecutionState(
 
 	}
 	if report {
-		reporters = []ledger.Reporter{
-			mgr.ContractReporter{
+		rs = []ledger.Reporter{
+			&reporters.AccountReporter{
 				Log:       log,
 				OutputDir: outputDir,
+				Chain:     chain,
 			},
 			// mgr.StorageReporter{
 			// 	Log:       log,
@@ -103,7 +106,7 @@ func extractExecutionState(
 	newState, err := led.ExportCheckpointAt(
 		ledger.State(targetHash),
 		migrations,
-		reporters,
+		rs,
 		validators,
 		complete.DefaultPathFinderVersion,
 		outputDir,
