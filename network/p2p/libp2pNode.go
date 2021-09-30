@@ -87,7 +87,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 	metrics module.NetworkMetrics,
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
-	role string) (LibP2PFactoryFunc, error) {
+	role string,
 	streamCompression bool) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)

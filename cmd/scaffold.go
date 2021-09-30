@@ -185,7 +185,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			fnb.Metrics.Network,
 			pingProvider,
 			fnb.BaseConfig.DNSCacheTTL,
-			fnb.BaseConfig.NodeRole)
+			fnb.BaseConfig.NodeRole,
 			fnb.BaseConfig.LibP2PCompressionEnabled)
 
 		if err != nil {
