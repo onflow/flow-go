@@ -87,6 +87,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 	metrics module.NetworkMetrics,
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
+	role string) (LibP2PFactoryFunc, error) {
 	streamCompression bool) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
@@ -97,7 +98,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 
 	psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
 
-	if chainID != flow.Localnet {
+	if role != "ghost" {
 		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
 			return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(
 				h.ID(), rootBlockID, idProvider,
