@@ -72,12 +72,19 @@ func (c *compressedStream) Read(b []byte) (int, error) {
 	if err != nil {
 		c.r.Close()
 	}
-	return n, nil
+	return n, err
 }
 
 func (c *compressedStream) Close() error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
-	return multierr.Combine(c.w.Close(), c.Stream.Close())
+	if err := c.w.Close(); err != nil {
+		return err
+	}
+	if err := c.Stream.Close(); err != nil {
+		return err
+	}
+
+	return nil
 }
