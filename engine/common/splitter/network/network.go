@@ -44,13 +44,7 @@ func NewNetwork(
 // Register will subscribe the given engine with the spitter on the given channel, and all registered
 // engines will be notified with incoming messages on the channel.
 // The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
-func (n *Network) Register(channel network.Channel, e network.Engine) (network.Conduit, error) {
-	engine, ok := e.(network.Engine)
-
-	if !ok {
-		return nil, errors.New("engine does not have the correct type")
-	}
-
+func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 
