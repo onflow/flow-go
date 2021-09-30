@@ -156,7 +156,12 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	mw.buildComponentManager()
+	m.ComponentManager = module.NewComponentManagerBuilder().OnStart(func(ctx context.Context) error {
+		return m.start(ctx)
+	}).AddWorker(func(ctx irrecoverable.SignalerContext) {
+		<-ctx.Done()
+		m.stop()
+	}).Build()
 
 	return mw
 }
@@ -236,15 +241,6 @@ func (m *Middleware) UpdateNodeAddresses() {
 
 func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
-}
-
-func (m *Middleware) buildComponentManager() {
-	m.ComponentManager = module.NewComponentManagerBuilder().OnStart(func(ctx context.Context) error {
-		return m.start(ctx)
-	}).AddWorker(func(ctx irrecoverable.SignalerContext) {
-		<-ctx.Done()
-		m.stop()
-	}).Build()
 }
 
 // start will start the middleware.
