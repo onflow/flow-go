@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	synccore "github.com/onflow/flow-go/module/synchronization"
-	"github.com/onflow/flow-go/network"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	clusterint "github.com/onflow/flow-go/state/cluster"
@@ -42,7 +41,7 @@ type SyncSuite struct {
 	head         *flow.Header
 	heights      map[uint64]*clustermodel.Block
 	blockIDs     map[flow.Identifier]*clustermodel.Block
-	net          *network.Network
+	net          *mocknetwork.Network
 	con          *mocknetwork.Conduit
 	me           *module.Local
 	state        *cluster.State
@@ -72,7 +71,7 @@ func (ss *SyncSuite) SetupTest() {
 	clusterID := header.ChainID
 
 	// set up the network module mock
-	ss.net = &network.Network{}
+	ss.net = &mocknetwork.Network{}
 	ss.net.On("Register", engine.ChannelSyncCluster(clusterID), mock.Anything).Return(
 		func(network netint.Channel, engine netint.Engine) netint.Conduit {
 			return ss.con
