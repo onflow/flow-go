@@ -17,11 +17,11 @@ import (
 
 func TestThresholdSignature(t *testing.T) {
 	// stateless API
-	//t.Run("centralized_stateless_keygen", testCentralizedStatelessAPI)
+	t.Run("centralized_stateless_keygen", testCentralizedStatelessAPI)
 	// stateful API
 	t.Run("centralized_stateful_keygen", testCentralizedStatefulAPI)
-	//t.Run("distributed_stateful_feldmanVSS_keygen", testDistributedStatefulAPI_FeldmanVSS)
-	//t.Run("distributed_stateful_jointFeldman_keygen", testDistributedStatefulAPI_JointFeldman) // Flow Random beacon case
+	t.Run("distributed_stateful_feldmanVSS_keygen", testDistributedStatefulAPI_FeldmanVSS)
+	t.Run("distributed_stateful_jointFeldman_keygen", testDistributedStatefulAPI_JointFeldman) // Flow Random beacon case
 }
 
 const thresholdSignatureTag = "random tag"
@@ -53,12 +53,13 @@ func testCentralizedStatefulAPI(t *testing.T) {
 		mrand.Shuffle(n, func(i, j int) {
 			signers[i], signers[j] = signers[j], signers[i]
 		})
-		// create the stateful threshold signer
-		index := mrand.Intn(n)
-		ts, err := NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
-		require.NoError(t, err)
 
 		t.Run("happy path", func(t *testing.T) {
+			// create the stateful threshold signer
+			index := mrand.Intn(n)
+			ts, err := NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			require.NoError(t, err)
+
 			// check EnoughShares
 			enough := ts.EnoughShares()
 			assert.False(t, enough)
@@ -120,13 +121,31 @@ func testCentralizedStatefulAPI(t *testing.T) {
 				assert.True(t, verif)
 				assert.True(t, enough)
 			}
+			// reconstruct the threshold signature
+			thresholdsignature, err := ts.ThresholdSignature()
+			require.NoError(t, err)
+			// VerifyThresholdSignature
+			verif, err = ts.VerifyThresholdSignature(thresholdsignature)
+			require.NoError(t, err)
+			assert.True(t, verif)
 		})
 
 		t.Run("duplicate signer", func(t *testing.T) {
-			// Add an existing share
-			i := signers[0]
+			// create the stateful threshold signer
+			index := mrand.Intn(n)
+			ts, err := NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			require.NoError(t, err)
+
+			// Create a share and add it
+			i := 0
 			share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
+			enough, err := ts.TrustedAdd(i, share)
+			assert.NoError(t, err)
+			assert.False(t, enough)
+
+			// Add an existing share
+
 			// VerifyAndAdd
 			verif, enough, err := ts.VerifyAndAdd(i, share)
 			assert.Error(t, err)
@@ -138,17 +157,14 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			assert.Error(t, err)
 			assert.False(t, IsInvalidInputsError(err))
 			assert.False(t, enough)
-
-			// reconstruct the threshold signature
-			thresholdsignature, err := ts.ThresholdSignature()
-			require.NoError(t, err)
-			// VerifyThresholdSignature
-			verif, err = ts.VerifyThresholdSignature(thresholdsignature)
-			require.NoError(t, err)
-			assert.True(t, verif)
 		})
 
 		t.Run("Invalid index", func(t *testing.T) {
+			// create the stateful threshold signer
+			index := mrand.Intn(n)
+			ts, err := NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			require.NoError(t, err)
+
 			share, err := skShares[0].Sign(thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
 			// invalid index
@@ -177,6 +193,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 		})
 
 		t.Run("invalid signature", func(t *testing.T) {
+			index := mrand.Intn(n)
 			ts, err := NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
 			share, err := skShares[index].Sign(thresholdSignatureMessage, kmac)
@@ -219,6 +236,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 		t.Run("constructor errors", func(t *testing.T) {
 			// invalid keys size
+			index := mrand.Intn(n)
 			pkSharesInvalid := make([]PublicKey, ThresholdSignMaxSize+1)
 			ts, err := NewThresholdSigner(pkGroup, pkSharesInvalid, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
 			assert.Error(t, err)
@@ -610,7 +628,7 @@ func testCentralizedStatelessAPI(t *testing.T) {
 			signers[randomDuplicate] = signers[0]
 			thresholdSignature, err = ReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 			assert.Error(t, err)
-			assert.IsType(t, expectedError, err)
+			assert.True(t, IsInvalidInputsError(err))
 		}
 	}
 }
