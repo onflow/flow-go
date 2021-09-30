@@ -4,15 +4,16 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"math"
 	"sort"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm"
@@ -34,6 +35,198 @@ import (
 func TestValueConversion(t *testing.T) {
 
 	t.Parallel()
+
+	t.Run("Primitive", func(t *testing.T) {
+		t.Parallel()
+
+		type conversionPair struct {
+			oldValue         oldInter.Value
+			expectedNewValue newInter.Value
+		}
+
+		conversions := []conversionPair{
+			{
+				oldValue:         oldInter.NewIntValueFromInt64(math.MaxInt64),
+				expectedNewValue: newInter.NewIntValueFromInt64(math.MaxInt64),
+			},
+			{
+				oldValue:         oldInter.NewIntValueFromInt64(math.MinInt64),
+				expectedNewValue: newInter.NewIntValueFromInt64(math.MinInt64),
+			},
+			{
+				oldValue:         oldInter.Int8Value(45),
+				expectedNewValue: newInter.Int8Value(45),
+			},
+			{
+				oldValue:         oldInter.Int16Value(45),
+				expectedNewValue: newInter.Int16Value(45),
+			},
+			{
+				oldValue:         oldInter.Int32Value(45),
+				expectedNewValue: newInter.Int32Value(45),
+			},
+			{
+				oldValue:         oldInter.Int64Value(45),
+				expectedNewValue: newInter.Int64Value(45),
+			},
+			{
+				oldValue:         oldInter.NewInt128ValueFromInt64(math.MaxInt64),
+				expectedNewValue: newInter.NewInt128ValueFromInt64(math.MaxInt64),
+			},
+			{
+				oldValue:         oldInter.NewInt128ValueFromInt64(math.MinInt64),
+				expectedNewValue: newInter.NewInt128ValueFromInt64(math.MinInt64),
+			},
+			{
+				oldValue:         oldInter.NewInt256ValueFromInt64(math.MaxInt64),
+				expectedNewValue: newInter.NewInt256ValueFromInt64(math.MaxInt64),
+			},
+			{
+				oldValue:         oldInter.NewInt256ValueFromInt64(math.MinInt64),
+				expectedNewValue: newInter.NewInt256ValueFromInt64(math.MinInt64),
+			},
+			{
+				oldValue:         oldInter.NewUIntValueFromUint64(math.MaxUint64),
+				expectedNewValue: newInter.NewUIntValueFromUint64(math.MaxUint64),
+			},
+			{
+				oldValue:         oldInter.NewUIntValueFromUint64(456),
+				expectedNewValue: newInter.NewUIntValueFromUint64(456),
+			},
+			{
+				oldValue:         oldInter.UInt8Value(45),
+				expectedNewValue: newInter.UInt8Value(45),
+			},
+			{
+				oldValue:         oldInter.UInt16Value(45),
+				expectedNewValue: newInter.UInt16Value(45),
+			},
+			{
+				oldValue:         oldInter.UInt32Value(45),
+				expectedNewValue: newInter.UInt32Value(45),
+			},
+			{
+				oldValue:         oldInter.UInt64Value(45),
+				expectedNewValue: newInter.UInt64Value(45),
+			},
+			{
+				oldValue:         oldInter.NewUInt128ValueFromUint64(math.MaxUint64),
+				expectedNewValue: newInter.NewUInt128ValueFromUint64(math.MaxUint64),
+			},
+			{
+				oldValue:         oldInter.NewUInt256ValueFromUint64(math.MaxUint64),
+				expectedNewValue: newInter.NewUInt256ValueFromUint64(math.MaxUint64),
+			},
+			{
+				oldValue:         oldInter.Word8Value(45),
+				expectedNewValue: newInter.Word8Value(45),
+			},
+			{
+				oldValue:         oldInter.Word16Value(45),
+				expectedNewValue: newInter.Word16Value(45),
+			},
+			{
+				oldValue:         oldInter.Word32Value(45),
+				expectedNewValue: newInter.Word32Value(45),
+			},
+			{
+				oldValue:         oldInter.Word64Value(45),
+				expectedNewValue: newInter.Word64Value(45),
+			},
+			{
+				oldValue:         oldInter.Fix64Value(math.MaxInt64),
+				expectedNewValue: newInter.Fix64Value(math.MaxInt64),
+			},
+			{
+				oldValue:         oldInter.Fix64Value(math.MinInt64),
+				expectedNewValue: newInter.Fix64Value(math.MinInt64),
+			},
+			{
+				oldValue:         oldInter.UFix64Value(math.MaxInt64),
+				expectedNewValue: newInter.UFix64Value(math.MaxInt64),
+			},
+			{
+				oldValue:         oldInter.UFix64Value(0),
+				expectedNewValue: newInter.UFix64Value(0),
+			},
+			{
+				oldValue:         oldInter.NilValue{},
+				expectedNewValue: newInter.NilValue{},
+			},
+			{
+				oldValue:         oldInter.VoidValue{},
+				expectedNewValue: newInter.VoidValue{},
+			},
+			{
+				oldValue:         oldInter.NewSomeValueOwningNonCopying(oldInter.NewStringValue("foo")),
+				expectedNewValue: newInter.NewSomeValueNonCopying(newInter.NewStringValue("foo")),
+			},
+			{
+				oldValue:         oldInter.AddressValue{1, 2},
+				expectedNewValue: newInter.AddressValue{1, 2},
+			},
+			{
+				oldValue: oldInter.PathValue{
+					Domain:     common.PathDomainStorage,
+					Identifier: "some/storage",
+				},
+				expectedNewValue: newInter.PathValue{
+					Domain:     common.PathDomainStorage,
+					Identifier: "some/storage",
+				},
+			},
+			{
+				oldValue: oldInter.CapabilityValue{
+					Address: oldInter.AddressValue{1, 2},
+					Path: oldInter.PathValue{
+						Domain:     common.PathDomainPublic,
+						Identifier: "some/path",
+					},
+					BorrowType: oldInter.PrimitiveStaticTypeFix64,
+				},
+				expectedNewValue: &newInter.CapabilityValue{
+					Address: newInter.AddressValue{1, 2},
+					Path: newInter.PathValue{
+						Domain:     common.PathDomainPublic,
+						Identifier: "some/path",
+					},
+					BorrowType: newInter.PrimitiveStaticTypeFix64,
+				},
+			},
+			{
+				oldValue: oldInter.LinkValue{
+					TargetPath: oldInter.PathValue{
+						Domain:     common.PathDomainPrivate,
+						Identifier: "some/path",
+					},
+					Type: oldInter.PrimitiveStaticTypeSignedInteger,
+				},
+				expectedNewValue: newInter.LinkValue{
+					TargetPath: newInter.PathValue{
+						Domain:     common.PathDomainPrivate,
+						Identifier: "some/path",
+					},
+					Type: newInter.PrimitiveStaticTypeSignedInteger,
+				},
+			},
+			{
+				oldValue: oldInter.TypeValue{
+					Type: oldInter.PrimitiveStaticTypeSignedInteger,
+				},
+				expectedNewValue: newInter.TypeValue{
+					Type: newInter.PrimitiveStaticTypeSignedInteger,
+				},
+			},
+		}
+
+		migration := &StorageFormatV6Migration{}
+		converter := NewValueConverter(migration)
+
+		for _, conversion := range conversions {
+			newValue := converter.Convert(conversion.oldValue)
+			assert.Equal(t, conversion.expectedNewValue, newValue)
+		}
+	})
 
 	t.Run("Array", func(t *testing.T) {
 		t.Parallel()
@@ -216,6 +409,59 @@ func TestValueConversion(t *testing.T) {
 		value, ok = dictionary.Get(nil, nil, newInter.NewStringValue("key2"))
 		require.True(t, ok)
 		assert.Equal(t, newInter.BoolValue(true), value)
+	})
+
+	t.Run("Negative", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("nonstorable", func(t *testing.T) {
+			t.Parallel()
+
+			type conversionPair struct {
+				oldValue         oldInter.Value
+				expectedNewValue newInter.Value
+			}
+
+			conversions := []conversionPair{
+				{
+					oldValue:         oldInter.BoundFunctionValue{},
+					expectedNewValue: newInter.BoundFunctionValue{},
+				},
+				{
+					oldValue:         &oldInter.InterpretedFunctionValue{},
+					expectedNewValue: &newInter.InterpretedFunctionValue{},
+				},
+				{
+					oldValue: oldInter.NewHostFunctionValue(
+						func(invocation oldInter.Invocation) oldInter.Value {
+							return oldInter.NilValue{}
+						},
+					),
+					expectedNewValue: newInter.NewHostFunctionValue(
+						func(invocation newInter.Invocation) newInter.Value {
+							return newInter.NilValue{}
+						},
+						nil,
+					),
+				},
+			}
+
+			migration := &StorageFormatV6Migration{}
+			converter := NewValueConverter(migration)
+
+			check := func(oldValue oldInter.Value) {
+				defer func() {
+					r := recover()
+					require.NotNil(t, r)
+					assert.Equal(t, "value not storable", r)
+				}()
+				_ = converter.Convert(oldValue)
+			}
+
+			for _, conversion := range conversions {
+				check(conversion.oldValue)
+			}
+		})
 	})
 }
 
