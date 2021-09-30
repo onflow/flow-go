@@ -23,6 +23,7 @@ func TestRoundTrip(t *testing.T) {
 	writeWG.Add(1)
 	go func() {
 		defer writeWG.Done()
+
 		n, err := sa.Write([]byte(text))
 		require.NoError(t, err)
 		require.Equal(t, n, len(text))
@@ -33,6 +34,7 @@ func TestRoundTrip(t *testing.T) {
 	readWG.Add(1)
 	go func() {
 		defer readWG.Done()
+
 		b, err := io.ReadAll(sb)
 		require.NoError(t, err)
 		require.Equal(t, b, []byte(text))
