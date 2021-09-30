@@ -46,7 +46,7 @@ type Accounts interface {
 	CheckAccountNotFrozen(address flow.Address) error
 	GetStorageUsed(address flow.Address) (uint64, error)
 	SetValue(address flow.Address, key string, value []byte) error
-	AllocateStorageIndex(address flow.Address) (uint64, error)
+	AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error)
 	SetAccountFrozen(address flow.Address, frozen bool) error
 }
 
@@ -62,8 +62,7 @@ func NewAccounts(stateHolder *StateHolder) *StatefulAccounts {
 	}
 }
 
-func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (uint64, error) {
-	var index uint64
+func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error) {
 	indexBytes, err := a.getValue(address, false, KeyStorageIndex)
 	if err != nil {
 		return 0, err
