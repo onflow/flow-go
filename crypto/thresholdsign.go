@@ -111,6 +111,12 @@ func NewThresholdSigner(
 		return nil, fmt.Errorf("the private key of node %d is not a BLS key", currentIndex)
 	}
 
+	// check the private key, index and corresponding public key are consistent
+	currentPublicKey := sharePublicKeys[currentIndex]
+	if !currentPrivateKey.PublicKey().Equals(currentPublicKey) {
+		return nil, newInvalidInputsError("private key is not matching public key at index %d", currentIndex)
+	}
+
 	// internal list of valid signature shares
 	shares := make(map[index]Signature)
 
@@ -128,28 +134,19 @@ func NewThresholdSigner(
 	}, nil
 }
 
-// SignShare generates a signature share using the current private key share
+// SignShare generates a signature share using the current private key share.
+//
+// The function does not add the share to the internal pool of shares and do
+// not update the internal state.
 // This function is thread safe
 func (s *thresholdSigner) SignShare() (Signature, error) {
 
-	// sign
 	share, err := s.currentPrivateKey.Sign(s.message, s.hashAlgo)
 	if err != nil {
 		if IsInvalidInputsError(err) {
 			newInvalidInputsError("share signing failed: %s", err)
 		}
 		return nil, fmt.Errorf("share signing failed: %w", err)
-	}
-	// add the node's own signature
-	valid, err := s.TrustedAdd(s.currentIndex, share)
-	if err != nil {
-		if IsInvalidInputsError(err) {
-			return nil, newInvalidInputsError("share signature failed: %s", err)
-		}
-		return nil, fmt.Errorf("share signature failed: %w", err)
-	}
-	if !valid {
-		return nil, fmt.Errorf("the current node %d private and public keys do not match", s.currentIndex)
 	}
 	return share, nil
 }
@@ -176,9 +173,9 @@ func (s *thresholdSigner) validIndex(orig index) error {
 // If any error is returned, the returned bool is false.
 // If no error is returned, the bool represents the validity of the signature.
 // The function is thread-safe.
-func (s *thresholdSigner) VerifyShare(share Signature, orig index) (bool, error) {
+func (s *thresholdSigner) VerifyShare(orig int, share Signature) (bool, error) {
 	// validate index
-	if err := s.validIndex(orig); err != nil {
+	if err := s.validIndex(index(orig)); err != nil {
 		return false, err
 	}
 
@@ -237,11 +234,10 @@ func (s *thresholdSigner) hasShare(orig index) bool {
 //
 // The share is only added if the signer index is valid and has not been
 // added yet. Moreover, the share is added only if not enough shares were collected.
-// Thee function returns:
-//  - (true, nil) if enough signature shares were already collected
-//  - (false, nil) if not enough shares were collected
-//  - (false, error) if there was an exception adding the share
-// This function is thread safe
+// The function returns:
+//  - (true, nil) if enough signature shares were already collected and no error occured
+//  - (false, nil) if not enough shares were collected and no error occured
+//  - (false, error) if index is invalid (InvalidInputsError) or already added (other error)
 func (s *thresholdSigner) TrustedAdd(orig int, share Signature) (bool, error) {
 
 	// validate index
@@ -252,11 +248,15 @@ func (s *thresholdSigner) TrustedAdd(orig int, share Signature) (bool, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
+	if s.hasShare(index(orig)) {
+		return false, fmt.Errorf("share for %d was already added", orig)
+	}
+
 	enough := s.enoughShares()
-	if !enough && !s.hasShare(index(orig)) {
+	if !enough {
 		s.shares[index(orig)] = share
 	}
-	return enough, nil
+	return s.enoughShares(), nil
 }
 
 // VerifyAndAdd verifies a signature share (look at `VerifyShare`),
@@ -267,13 +267,26 @@ func (s *thresholdSigner) TrustedAdd(orig int, share Signature) (bool, error) {
 // Thee function returns 3 outputs:
 //  - First boolean output is true if the share is valid and no error is returned, and false otherwise.
 //  - Second boolean output is true if enough shares were collected and no error is returned, and false otherwise.
-//  - error is IsInvalidInputsError if an input is invalid, and a random error if an exception occured.
+//  - error is IsInvalidInputsError if input index is invalid, and a random error if an exception occured.
 //    (an invalid signature is not considered an invalid input, look at `VerifyShare` for details)
 // This function is thread safe
 func (s *thresholdSigner) VerifyAndAdd(orig int, share Signature) (bool, bool, error) {
 
-	// verify the share (includes validating the index)
-	verif, err := s.VerifyShare(share, index(orig))
+	// validate index
+	if err := s.validIndex(index(orig)); err != nil {
+		return false, false, err
+	}
+
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	// check share is new
+	if s.hasShare(index(orig)) {
+		return false, false, fmt.Errorf("share for %d was already added", orig)
+	}
+
+	// verify the share
+	verif, err := s.publicKeyShares[index(orig)].Verify(share, s.message, s.hashAlgo)
 	if err != nil {
 		if IsInvalidInputsError(err) {
 			return false, false, newInvalidInputsError(
@@ -282,14 +295,11 @@ func (s *thresholdSigner) VerifyAndAdd(orig int, share Signature) (bool, bool, e
 		return false, false, fmt.Errorf("verification of share failed: %w", err)
 	}
 
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	enough := s.enoughShares()
-	if verif && !enough && !s.hasShare(index(orig)) {
+	if verif && !enough {
 		s.shares[index(orig)] = share
 	}
-	return verif, enough, nil
+	return verif, s.enoughShares(), nil
 }
 
 // ThresholdSignature returns the threshold signature if the threshold was reached.
@@ -453,9 +463,9 @@ func EnoughShares(threshold int, sharesNumber int) (bool, error) {
 	return sharesNumber > threshold, nil
 }
 
-// ThresholdSignKeyGen is a key generation for a BLS-based
+// ThresholdKeyGen is a key generation for a BLS-based
 // threshold signature scheme with a trusted dealer.
-func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
+func ThresholdKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	[]PublicKey, PublicKey, error) {
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
 		return nil, nil, nil, newInvalidInputsError(
