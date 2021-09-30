@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
@@ -48,7 +47,7 @@ func Example() {
 
 	// run the component. this is a blocking call, and will return with an error if the
 	// first startup or any subsequent restart attempts fails or the context is canceled
-	err := module.RunComponent(ctx, componentFactory, onError)
+	err := component.RunComponent(ctx, componentFactory, onError)
 	if err != nil {
 		fmt.Printf("Error returned from RunComponent: %v\n", err)
 	}
@@ -80,7 +79,7 @@ func NewExampleComponent(id int) *ExampleComponent {
 
 // start the component and register its shutdown handler
 // this component will throw an error after 20ms to demonstrate the error handling
-func (c *ExampleComponent) Start(ctx irrecoverable.SignalerContext) {
+func (c *ExampleComponent) Start(ctx irrecoverable.SignalerContext) error {
 	c.printMsg("Starting up")
 
 	// do some setup...
@@ -116,6 +115,8 @@ func (c *ExampleComponent) Start(ctx irrecoverable.SignalerContext) {
 	}()
 
 	close(c.started)
+
+	return nil
 }
 
 // simply return the Started channel
