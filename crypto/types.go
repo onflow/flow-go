@@ -123,6 +123,7 @@ func (e InvalidInputsError) Error() string {
 }
 
 // IsInvalidInputsError checks if the input error is of a InvalidInputsError type
+// TODO: switch to errors.As
 func IsInvalidInputsError(err error) bool {
 	_, ok := err.(*InvalidInputsError)
 	return ok

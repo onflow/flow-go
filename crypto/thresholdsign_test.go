@@ -15,20 +15,21 @@ import (
 )
 
 func TestThresholdSignature(t *testing.T) {
-	t.Run("stateful_simple_keygen", testStatefulThresholdSignatureSimpleKeyGen)
-	t.Run("stateful_signature_feldmanVSS_keygen", testStatefulThresholdSignatureFeldmanVSS)
-	t.Run("stateful_signature_jointFeldman_keygen", testStatefulThresholdSignatureJointFeldman)
-	t.Run("stateless_simple_keygen", testStatelessThresholdSignatureSimpleKeyGen)
-	t.Run("stateless_signature_feldmanVSS_keygen", testStatelessThresholdSignatureFeldmanVSS)
+	// stateless API
+	t.Run("centralized_stateless_keygen", testCentralizedStatelessAPI)
+	// stateful API
+	t.Run("centralized_stateful_keygen", testCentralizedStatefulAPI)
+	t.Run("distributed_stateful_feldmanVSS_keygen", testDistributedStatefulAPI_FeldmanVSS)
+	t.Run("distributed_stateful_jointFeldman_keygen", testDistributedStatefulAPI_JointFeldman) // Flow Random beacon case
 }
 
 const thresholdSignatureTag = "Threshold Signatures"
 
-// simple single-threaded test of the stateful threshold signature using the simple key generation.
+// simple centralized test of the stateful threshold signature using the simple key generation.
 // The test generates keys for a threshold signatures scheme, uses the keys to sign shares,
 // tests VerifyAndStageShare and CommitShare apis,
 // and reconstruct the threshold signatures using (t+1) random shares.
-func testStatefulThresholdSignatureSimpleKeyGen(t *testing.T) {
+func testCentralizedStatefulAPI(t *testing.T) {
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		// generate threshold keys
@@ -50,7 +51,7 @@ func testStatefulThresholdSignatureSimpleKeyGen(t *testing.T) {
 			signers[i], signers[j] = signers[j], signers[i]
 		})
 		// create the stateful threshold signer
-		index := 0
+		index := mrand.Intn(n)
 		ts, err := NewThresholdSigner(n, threshold, index, kmac)
 		require.NoError(t, err)
 		err = ts.SetKeys(skShares[index], pkGroup, pkShares)
@@ -108,13 +109,13 @@ func testStatefulThresholdSignatureSimpleKeyGen(t *testing.T) {
 
 // Testing Threshold Signature stateful api
 // keys are generated using simple Feldman VSS
-func testStatefulThresholdSignatureFeldmanVSS(t *testing.T) {
+func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
 	gt = t
 	// number of nodes to test
 	n := 5
-	lead := 0
+	lead := mrand.Intn(n) // random leader
 	var sync sync.WaitGroup
 	chans := make([]chan *message, n)
 	processors := make([]testDKGProcessor, 0, n)
@@ -167,7 +168,7 @@ func testStatefulThresholdSignatureFeldmanVSS(t *testing.T) {
 
 // Testing Threshold Signature stateful api
 // keys are generated using Joint-Feldman
-func testStatefulThresholdSignatureJointFeldman(t *testing.T) {
+func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
 	gt = t
@@ -235,65 +236,6 @@ func testStatefulThresholdSignatureJointFeldman(t *testing.T) {
 	}
 }
 
-// Testing Threshold Signature statless api
-// keys are generated using simple Feldman VSS
-func testStatelessThresholdSignatureFeldmanVSS(t *testing.T) {
-	log.SetLevel(log.ErrorLevel)
-	log.Info("DKG starts")
-	gt = t
-	// number of nodes to test
-	n := 5
-	lead := 0
-	var sync sync.WaitGroup
-	chans := make([]chan *message, n)
-	processors := make([]testDKGProcessor, 0, n)
-
-	// create n processors for all nodes
-	for current := 0; current < n; current++ {
-		processors = append(processors, testDKGProcessor{
-			current:  current,
-			chans:    chans,
-			protocol: dkgType,
-		})
-		// create DKG in all nodes
-		var err error
-		processors[current].dkg, err = NewFeldmanVSS(n, optimalThreshold(n),
-			current, &processors[current], lead)
-		require.NoError(t, err)
-	}
-
-	// create the node (buffered) communication channels
-	for i := 0; i < n; i++ {
-		chans[i] = make(chan *message, 2*n)
-	}
-	// start DKG in all nodes
-	seed := make([]byte, SeedMinLenDKG)
-	read, err := rand.Read(seed)
-	require.Equal(t, read, SeedMinLenDKG)
-	require.NoError(t, err)
-	sync.Add(n)
-	for current := 0; current < n; current++ {
-		err := processors[current].dkg.Start(seed)
-		require.NoError(t, err)
-		go tsDkgRunChan(&processors[current], &sync, t, 2)
-	}
-
-	// synchronize the main thread to end DKG
-	sync.Wait()
-	for i := 1; i < n; i++ {
-		assert.True(t, processors[i].pk.Equals(processors[0].pk), "2 group public keys are mismatching")
-	}
-
-	// Start TS
-	log.Info("TS starts")
-	sync.Add(n)
-	for i := 0; i < n; i++ {
-		go tsStatelessRunChan(&processors[i], &sync, t)
-	}
-	// synchronize the main thread to end TS
-	sync.Wait()
-}
-
 var message = []byte{1, 2, 3}
 
 // This is a testing function
@@ -313,7 +255,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 				require.Nil(t, err)
 			}
 
-		// if timeout, finalize DKG and sign the share
+		// if timeout, finalize DKG and create the threshold signer
 		case <-time.After(200 * time.Millisecond):
 			switch phase {
 			case 0:
@@ -334,11 +276,8 @@ func tsDkgRunChan(proc *testDKGProcessor,
 				proc.pk = groupPK
 				n := proc.dkg.Size()
 				kmac := NewBLSKMAC(thresholdSignatureTag)
-				proc.ts, err = NewThresholdSigner(n, optimalThreshold(n), proc.current, kmac)
+				proc.ts, err = NewThresholdSigner(groupPK, nodesPK, optimalThreshold(n), proc.current, sk, message, kmac)
 				require.NoError(t, err)
-				err = proc.ts.SetKeys(sk, groupPK, nodesPK)
-				require.NoError(t, err)
-				proc.ts.SetMessage(message)
 				// needed to test the statless api
 				proc.keys = &statelessKeys{sk, groupPK, nodesPK}
 			}
@@ -352,7 +291,8 @@ func tsDkgRunChan(proc *testDKGProcessor,
 // It simulates processing incoming messages by a node during TS
 func tsRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
 	// Sign a share and broadcast it
-	sighShare, _ := proc.ts.SignShare()
+	sighShare, err := proc.ts.SignShare()
+	require.NoError(t, err)
 	proc.protocol = tsType
 	proc.Broadcast(sighShare)
 	for {
@@ -456,10 +396,10 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 	}
 }
 
-// simple single-threaded test of threshold signature using the simple key generation.
+// simple centralized test of threshold signature using the simple key generation.
 // The test generates keys for a threshold signatures scheme, uses the keys to sign shares,
 // and reconstruct the threshold signatures using (t+1) random shares.
-func testStatelessThresholdSignatureSimpleKeyGen(t *testing.T) {
+func testCentralizedStatelessAPI(t *testing.T) {
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		// generate threshold keys
