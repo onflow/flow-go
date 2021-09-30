@@ -111,8 +111,8 @@ func (i *TransactionInvocator) Process(
 
 			// reset error part of proc
 			// Warning right now the tx requires retry logic doesn't change
-			// anything on state but we might want to revert the state changes (or not commiting)
-			// if we decided to expand it furthur.
+			// anything on state but we might want to revert the state changes (or not committing)
+			// if we decided to expand it further.
 			proc.Err = nil
 			proc.Logs = make([]string, 0)
 			proc.Events = make([]flow.Event, 0)

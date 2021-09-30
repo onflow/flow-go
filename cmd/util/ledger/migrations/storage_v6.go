@@ -61,7 +61,7 @@ type storagePath struct {
 type StorageFormatV6Migration struct {
 	Log        zerolog.Logger
 	OutputDir  string
-	accounts   *state.Accounts
+	accounts   state.Accounts
 	programs   *programs.Programs
 	reportFile *os.File
 	storage    *runtime.Storage
@@ -253,7 +253,7 @@ func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
 	)
 }
 
-func (m *StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
+func (m *StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Payload) state.Accounts {
 	var filteredPayloads []ledger.Payload
 
 	for _, payload := range payloads {
@@ -698,7 +698,7 @@ func (m *StorageFormatV6Migration) updateBrokenContracts(payloads []ledger.Paylo
 // migrationRuntimeInterface
 
 type migrationRuntimeInterface struct {
-	accounts *state.Accounts
+	accounts state.Accounts
 	programs *programs.Programs
 }
 
@@ -972,32 +972,49 @@ func (c *ValueConverter) Convert(value oldInter.Value) (result newInter.Value) {
 			return
 		}
 
-		if _, ok := r.(newInter.TypeLoadingError); ok {
+		switch err := r.(type) {
+		case newInter.TypeLoadingError:
 			c.migration.reportFile.WriteString(
 				fmt.Sprintf(
-					"skipped migrating value due to missing static type: owner: %x, type: %s\n",
+					"skipped migrating value: missing static type: %s, owner: %s\n",
+					err.TypeID,
 					value.GetOwner(),
-					value.StaticType(),
 				),
 			)
-		} else {
-			err := r.(error)
-			if strings.Contains(err.Error(), "expected `StoragePath`, got `Path`") {
+		case newInter.ContainerMutationError:
+			c.migration.reportFile.WriteString(
+				fmt.Sprintf(
+					"skipped migrating value: %s, owner: %s\n",
+					value.GetOwner(),
+					err.Error(),
+				),
+			)
+		case runtime.Error:
+			if parsingCheckingErr, ok := err.Unwrap().(*runtime.ParsingCheckingError); ok {
 				c.migration.reportFile.WriteString(
 					fmt.Sprintf(
-						"skipped migrating value due to broken contract type: %s\n",
-						err.(runtime.Error).Unwrap().(*runtime.ParsingCheckingError).Location,
+						"skipped migrating value: broken contract type: %s, cause: %s\n",
+						parsingCheckingErr.Location,
+						parsingCheckingErr.Error(),
 					),
 				)
 			} else {
 				c.migration.reportFile.WriteString(
 					fmt.Sprintf(
-						"skipped migrating value: owner: %x, cause: %s\n",
-						value.GetOwner(),
+						"skipped migrating value: cause: %s\n",
 						err.Error(),
 					),
 				)
 			}
+		case newInter.Error:
+			c.migration.reportFile.WriteString(
+				fmt.Sprintf(
+					"skipped migrating value: cause: %s\n",
+					err.Error(),
+				),
+			)
+		default:
+			panic(err)
 		}
 
 		c.migration.skippedValues += 1
@@ -1036,12 +1053,12 @@ func (c *ValueConverter) VisitStringValue(_ *oldInter.Interpreter, value *oldInt
 }
 
 func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInter.ArrayValue) bool {
-	newElements := make([]newInter.Value, value.Count())
+	newElements := make([]newInter.Value, 0)
 
-	for index, element := range value.Elements() {
+	for _, element := range value.Elements() {
 		newElement := c.Convert(element)
 		if newElement != nil {
-			newElements[index] = newElement
+			newElements = append(newElements, newElement)
 		}
 	}
 
