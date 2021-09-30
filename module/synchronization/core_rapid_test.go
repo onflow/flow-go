@@ -23,7 +23,8 @@ const NUM_BLOCKS int = 100
 func populatedBlockStore(t *rapid.T) []flow.Header {
 	store := []flow.Header{unittest.BlockHeaderFixture()}
 	for i := 1; i < NUM_BLOCKS; i++ {
-		b := rapid.OneOf(rapid.Just(unittest.BlockHeaderFixture()), rapid.SampledFrom(store)).Draw(t, "parent").(flow.Header)
+		// we sample from the store 2/3 times to get deeper trees
+		b := rapid.OneOf(rapid.Just(unittest.BlockHeaderFixture()), rapid.SampledFrom(store), rapid.SampledFrom(store)).Draw(t, "parent").(flow.Header)
 		store = append(store, unittest.BlockHeaderWithParentFixture(&b))
 	}
 	return store
@@ -32,8 +33,8 @@ func populatedBlockStore(t *rapid.T) []flow.Header {
 type rapidSync struct {
 	store          []flow.Header
 	core           *Core
-	idRequests     map[flow.Identifier]int // pushdown automaton to track ID requests
-	heightRequests map[uint64]int          // pushdown automaton to track height requests
+	idRequests     map[flow.Identifier]int // depth 1 pushdown automaton to track ID requests
+	heightRequests map[uint64]int          // depth 1 pushdown automaton to track height requests
 }
 
 // Init is an action for initializing a rapidSync instance.
@@ -60,7 +61,7 @@ func (r *rapidSync) RequestByID(t *rapid.T) {
 
 // RequestByHeight is an action that requests a specific height
 func (r *rapidSync) RequestByHeight(t *rapid.T) {
-	b := rapid.SampledFrom(r.store).Draw(t, "id_request").(flow.Header)
+	b := rapid.SampledFrom(r.store).Draw(t, "height_request").(flow.Header)
 	r.core.RequestHeight(b.Height)
 	// Re-queueing by height should always succeed
 	r.heightRequests[b.Height] = 1
@@ -69,13 +70,15 @@ func (r *rapidSync) RequestByHeight(t *rapid.T) {
 // HandleHeight is an action that requests a heights
 // upon receiving an argument beyond a certain tolerance
 func (r *rapidSync) HandleHeight(t *rapid.T) {
-	b := rapid.SampledFrom(r.store).Draw(t, "id_request").(flow.Header)
+	b := rapid.SampledFrom(r.store).Draw(t, "height_hint_request").(flow.Header)
 	incr := rapid.IntRange(0, (int)(DefaultConfig().Tolerance)+1).Draw(t, "height increment").(int)
-	requestHeight := (uint64)(incr) + b.Height
+	requestHeight := b.Height + (uint64)(incr)
 	r.core.HandleHeight(&b, requestHeight)
 	// Re-queueing by height should always succeed if beyond tolerance
-	if requestHeight > b.Height+(uint64)(DefaultConfig().Tolerance) {
-		r.heightRequests[requestHeight] = 1
+	if (uint)(incr) > DefaultConfig().Tolerance {
+		for h := b.Height + 1; h <= requestHeight; h++ {
+			r.heightRequests[h] = 1
+		}
 	}
 }
 
@@ -90,35 +93,78 @@ func (r *rapidSync) HandleByID(t *rapid.T) {
 	if r.idRequests[b.ID()] == 1 {
 		r.idRequests[b.ID()] = 0
 	}
-	// we eagerly remove height requests
+	// we eagerly remove height requests for blocks we receive
 	r.heightRequests[b.Height] = 0
 }
 
 // Check runs after every action and verifies that all required invariants hold.
 func (r *rapidSync) Check(t *rapid.T) {
-	for k, v := range r.idRequests {
-		if v == 1 {
-			s, ok := r.core.blockIDs[k]
-			require.True(t, ok)
-			assert.True(t, s.WasQueued(), "ID %v was expected to be Queued and is %v", k, s.StatusString())
-		} else if v == 0 {
-			s, ok := r.core.blockIDs[k]
-			// if a block is known with 0 pendings, it's because it was received
+	// we collect the received blocks as determined above
+	var receivedBlocks []flow.Header
+	// we also collect the pending blocks
+	var activeBlocks []flow.Header
+
+	// we check the validity of our pushdown automaton for ID requests and populate activeBlocks / receivedBlocks
+	for id, count := range r.idRequests {
+		s, foundID := r.core.blockIDs[id]
+
+		block, foundBlock := findHeader(r.store, func(h flow.Header) bool {
+			return h.ID() == id
+		})
+		require.True(t, foundBlock, "incorrect management of idRequests in the tests: all added IDs are supposed to be from the store")
+
+		if count == 1 {
+			require.True(t, foundID, "ID %v is supposed to be known, but isn't", id)
+
+			assert.True(t, s.WasQueued(), "ID %v was expected to be Queued and is %v", id, s.StatusString())
+			assert.False(t, s.WasReceived(), "ID %v was expected to be Queued and is %v", id, s.StatusString())
+			activeBlocks = append(activeBlocks, *block)
+		} else if count == 0 {
+			if foundID {
+				// if a block is known with 0 pendings, it's because it was received
+				assert.True(t, s.WasReceived(), "ID %v was expected to be Received and is %v", id, s.StatusString())
+			}
+			receivedBlocks = append(receivedBlocks, *block)
+		} else {
+			t.Fatalf("incorrect management of idRequests in the tests (0 <= count <= 1)")
+		}
+	}
+
+	// we collect still-active heights
+	var activeHeights []uint64
+
+	for h, count := range r.heightRequests {
+		s, ok := r.core.heights[h]
+		if count == 1 {
+			require.True(t, ok, "Height %x is supposed to be known, but isn't", h)
+			assert.True(t, s.WasQueued(), "Height %x was expected to be Queued and is %v", h, s.StatusString())
+			assert.False(t, s.WasReceived(), "Height %x was expected to be Queued and is %v", h, s.StatusString())
+			activeHeights = append(activeHeights, h)
+
+		} else if count == 0 {
+			// if a height is known with 0 pendings, it's because:
+			// - it was received
+			// - or because a block at this height was (blockAtHeightWasReceived)
+			// - or because a request for a block at that height made us "forget" the prior height reception (clobberedByID)
 			if ok {
-				assert.True(t, s.WasReceived(), "ID %v was expected to be Received and is %v", k, s.StatusString())
+				wasReceived := s.WasReceived()
+				_, blockAtHeightWasReceived := findHeader(receivedBlocks, func(header flow.Header) bool {
+					return header.Height == h
+				})
+				_, clobberedByID := findHeader(activeBlocks, func(header flow.Header) bool {
+					return header.Height == h
+				})
+				heightWasCanceled := wasReceived || blockAtHeightWasReceived || clobberedByID
+
+				assert.True(t, heightWasCanceled, "Height %x was expected to be Received (or filled through a same-height block) and is %v", h, s.StatusString())
 			}
 		} else {
-			t.Fatalf("incorrect management of idRequests in the tests")
+			t.Fatalf("incorrect management of heightRequests in the tests (0 <= count <= 1)")
 		}
 	}
+
 	heights, blockIDs := r.core.getRequestableItems()
 	// the queueing logic queues intervals, while our r.heightRequests only queues specific requests
-	var activeHeights []uint64
-	for k, v := range r.heightRequests {
-		if v == 1 {
-			activeHeights = append(activeHeights, k)
-		}
-	}
 	assert.Subset(t, heights, activeHeights, "sync engine's height request tracking lost heights")
 
 	for _, bID := range blockIDs {
@@ -130,4 +176,14 @@ func (r *rapidSync) Check(t *rapid.T) {
 
 func TestRapidSync(t *testing.T) {
 	rapid.Check(t, rapid.Run(&rapidSync{}))
+}
+
+// utility functions
+func findHeader(store []flow.Header, predicate func(flow.Header) bool) (*flow.Header, bool) {
+	for _, b := range store {
+		if predicate(b) {
+			return &b, true
+		}
+	}
+	return nil, false
 }
