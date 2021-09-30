@@ -60,29 +60,36 @@ func testCentralizedStatefulAPI(t *testing.T) {
 		// check EnoughShares
 		enough := ts.EnoughShares()
 		assert.False(t, enough)
+		var wg sync.WaitGroup
 		// create (t) signatures of the first randomly chosen signers
 		// ( 1 signature short of the threshold)
 		for j := 0; j < threshold; j++ {
-			i := signers[j]
-			share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
-			require.NoError(t, err)
-			// VerifyShare
-			verif, err := ts.VerifyShare(i, share)
-			assert.NoError(t, err)
-			assert.True(t, verif, "signature should be valid")
-			// check HasSignature is false
-			ok := ts.HasShare(i)
-			assert.False(t, ok)
-			// TrustedAdd
-			enough, err := ts.TrustedAdd(i, share)
-			assert.NoError(t, err)
-			assert.False(t, enough)
-			// check HasSignature is true
-			ok = ts.HasShare(i)
-			assert.True(t, verif)
-			// check EnoughSignature
-			assert.False(t, ts.EnoughShares(), "threshold shouldn't be reached")
+			wg.Add(1)
+			// test thread safety
+			go func(j int) {
+				defer wg.Done()
+				i := signers[j]
+				share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
+				require.NoError(t, err)
+				// VerifyShare
+				verif, err := ts.VerifyShare(i, share)
+				assert.NoError(t, err)
+				assert.True(t, verif, "signature should be valid")
+				// check HasSignature is false
+				ok := ts.HasShare(i)
+				assert.False(t, ok)
+				// TrustedAdd
+				enough, err := ts.TrustedAdd(i, share)
+				assert.NoError(t, err)
+				assert.False(t, enough)
+				// check HasSignature is true
+				ok = ts.HasShare(i)
+				assert.True(t, verif)
+				// check EnoughSignature
+				assert.False(t, ts.EnoughShares(), "threshold shouldn't be reached")
+			}(j)
 		}
+		wg.Wait()
 		// add the last required signature to get (t+1) shares
 		i := signers[threshold]
 		share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
