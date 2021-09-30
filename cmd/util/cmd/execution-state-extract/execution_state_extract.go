@@ -8,7 +8,6 @@ import (
 	"github.com/rs/zerolog"
 
 	mgr "github.com/onflow/flow-go/cmd/util/ledger/migrations"
-	vld "github.com/onflow/flow-go/cmd/util/ledger/validators"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -82,16 +81,16 @@ func extractExecutionState(
 
 		// only add validators if migration is on
 		validators = []ledger.Validator{
-			vld.NewAccountBalanceValidator(log, chain),
+			//vld.NewAccountBalanceValidator(log, chain),
 		}
 
 	}
 	if report {
 		rs = []ledger.Reporter{
 			&reporters.AccountReporter{
-				Log:       log,
-				OutputDir: outputDir,
-				Chain:     chain,
+				Log:   log,
+				Chain: chain,
+				RWF:   reporters.NewReportFileWriterFactory(outputDir, log),
 			},
 			// mgr.StorageReporter{
 			// 	Log:       log,
