@@ -3,6 +3,8 @@
 package module
 
 import (
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+
 	"github.com/onflow/flow-go/network"
 )
 
@@ -17,7 +19,7 @@ type Network interface {
 	// On a single node, only one engine can be subscribed to a channel at any given time.
 	Register(channel network.Channel, engine network.Engine) (network.Conduit, error)
 
-	RegisterEntityExchange(channel network.Channel, store network.EntityStore) (network.EntityExchange, error)
+	RegisterBlockExchange(channel network.Channel, store blockstore.Blockstore) (network.BlockExchange, error)
 }
 
 type ReadyDoneAwareNetwork interface {
