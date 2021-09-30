@@ -14,18 +14,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dapperlabs/testingdock"
 	"github.com/docker/docker/api/types/container"
 	dockerclient "github.com/docker/docker/client"
+	"github.com/onflow/cadence"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/dapperlabs/testingdock"
-
-	"github.com/onflow/cadence"
-
 	"github.com/onflow/flow-go-sdk/crypto"
-
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	consensus_follower "github.com/onflow/flow-go/follower"
@@ -54,8 +51,12 @@ const (
 	// DefaultBootstrapDir is the default directory for bootstrap files
 	DefaultBootstrapDir = "/bootstrap"
 
+	// DefaultFlowDataDir is the root of all database storage
+	DefaultFlowDataDir = "/data"
 	// DefaultFlowDBDir is the default directory for the node database.
-	DefaultFlowDBDir = "/flowdb"
+	DefaultFlowDBDir = "/data/protocol"
+	// DefaultFlowSecretsDBDir is the default directory for secrets database.
+	DefaultFlowSecretsDBDir = "/data/secrets"
 	// DefaultExecutionRootDir is the default directory for the execution node
 	// state database.
 	DefaultExecutionRootDir = "/exedb"
@@ -489,7 +490,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 	// create a directory for the follower database
 	dataDir := filepath.Join(tmpdir, DefaultFlowDBDir)
-	err = os.Mkdir(dataDir, 0700)
+	err = os.MkdirAll(dataDir, 0700)
 	require.NoError(t, err)
 
 	// create a follower-specific directory for the bootstrap files
@@ -557,6 +558,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("--nodeid=%s", nodeConf.NodeID.String()),
 				fmt.Sprintf("--bootstrapdir=%s", DefaultBootstrapDir),
 				fmt.Sprintf("--datadir=%s", DefaultFlowDBDir),
+				fmt.Sprintf("--secretsdir=%s", DefaultFlowSecretsDBDir),
 				fmt.Sprintf("--loglevel=%s", nodeConf.LogLevel.String()),
 			}, nodeConf.AdditionalFlags...),
 		},
@@ -580,8 +582,8 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	}
 
 	// create a directory for the node database
-	flowDBDir := filepath.Join(tmpdir, DefaultFlowDBDir)
-	err = os.Mkdir(flowDBDir, 0700)
+	flowDataDir := filepath.Join(tmpdir, DefaultFlowDataDir)
+	err = os.Mkdir(flowDataDir, 0700)
 	require.NoError(t, err)
 
 	// create a directory for the bootstrap files
@@ -601,7 +603,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	// https://github.com/fsouza/go-dockerclient/issues/132#issuecomment-50694902
 	opts.HostConfig.Binds = append(
 		opts.HostConfig.Binds,
-		fmt.Sprintf("%s:%s:rw", flowDBDir, DefaultFlowDBDir),
+		fmt.Sprintf("%s:%s:rw", flowDataDir, DefaultFlowDataDir),
 		fmt.Sprintf("%s:%s:ro", nodeBootstrapDir, DefaultBootstrapDir),
 	)
 
@@ -819,15 +821,23 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 
 	// write staking and machine account private key files
-	writeFile := func(relativePath string, val interface{}) error {
+	writeJSONFile := func(relativePath string, val interface{}) error {
 		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
 	}
-	err = utils.WriteStakingNetworkingKeyFiles(allNodeInfos, writeFile)
-
+	writeFile := func(relativePath string, data []byte) error {
+		return WriteFile(filepath.Join(bootstrapDir, relativePath), data)
+	}
+	err = utils.WriteStakingNetworkingKeyFiles(allNodeInfos, writeJSONFile)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to write private key files: %w", err)
 	}
-	err = utils.WriteMachineAccountFiles(chainID, stakedNodeInfos, writeFile)
+
+	err = utils.WriteSecretsDBEncryptionKeyFiles(allNodeInfos, writeFile)
+	if err != nil {
+		return nil, nil, nil, nil, fmt.Errorf("failed to write secrets db key files: %w", err)
+	}
+
+	err = utils.WriteMachineAccountFiles(chainID, stakedNodeInfos, writeJSONFile)
 	if err != nil {
 		return nil, nil, nil, nil, fmt.Errorf("failed to write machine account files: %w", err)
 	}

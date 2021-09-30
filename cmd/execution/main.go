@@ -109,7 +109,8 @@ func main() {
 		atreeValidationEnabled        bool
 	)
 
-	cmd.FlowNode(flow.RoleExecution.String()).
+	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
+	nodeBuilder.
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			homedir, _ := os.UserHomeDir()
 			datadir := filepath.Join(homedir, ".flow", "execution")
@@ -145,8 +146,13 @@ func main() {
 				}
 			}
 			return nil
-		}).
-		Initialize().
+		})
+
+	if err = nodeBuilder.Initialize(); err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	nodeBuilder.
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -271,7 +277,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
-			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep)
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep, node.Logger.With().Str("subcomponent", "checkpointer").Logger())
 
 			return compactor, nil
 		}).

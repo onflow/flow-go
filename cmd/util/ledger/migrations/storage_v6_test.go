@@ -204,7 +204,7 @@ func TestValueConversion(t *testing.T) {
 		assert.IsType(t, &newInter.CompositeValue{}, newValue)
 		composite := newValue.(*newInter.CompositeValue)
 
-		fieldValue := composite.GetField(nil, nil, "foo")
+		fieldValue := composite.GetField("foo")
 
 		assert.IsType(t, &newInter.DictionaryValue{}, fieldValue)
 		dictionary := fieldValue.(*newInter.DictionaryValue)
@@ -270,7 +270,7 @@ func TestEncoding(t *testing.T) {
 		assert.NoError(t, err)
 
 		encodedValues := ledgerView.Payloads()
-		require.Len(t, encodedValues, 3)
+		require.Len(t, encodedValues, 4)
 
 		for _, encValue := range encodedValues {
 			assert.False(t, oldInter.HasMagic(encValue.Value))
@@ -357,7 +357,7 @@ func TestEncoding(t *testing.T) {
 		assert.NoError(t, err)
 
 		encodedValues := ledgerView.Payloads()
-		require.Len(t, encodedValues, 3)
+		require.Len(t, encodedValues, 4)
 
 		for _, encValue := range encodedValues {
 			assert.False(t, oldInter.HasMagic(encValue.Value))
@@ -453,7 +453,7 @@ func TestEncoding(t *testing.T) {
 		assert.NoError(t, err)
 
 		encodedValues := ledgerView.Payloads()
-		require.Len(t, encodedValues, 5)
+		require.Len(t, encodedValues, 6)
 
 		for _, encValue := range encodedValues {
 			assert.False(t, oldInter.HasMagic(encValue.Value))
@@ -475,7 +475,7 @@ func TestEncoding(t *testing.T) {
 		assert.IsType(t, &newInter.CompositeValue{}, storedValue)
 		composite := storedValue.(*newInter.CompositeValue)
 
-		fieldValue := composite.GetField(nil, nil, "foo")
+		fieldValue := composite.GetField("foo")
 
 		assert.IsType(t, &newInter.DictionaryValue{}, fieldValue)
 		dictionary := fieldValue.(*newInter.DictionaryValue)
@@ -580,7 +580,7 @@ func TestPayloadsMigration(t *testing.T) {
 	migratedPayloads, err := storageFormatV6Migration.migrate(payloads)
 	require.NoError(t, err)
 
-	assert.Len(t, migratedPayloads, 5)
+	assert.Len(t, migratedPayloads, 6)
 
 	// Check whether the query works with new ledger
 
@@ -713,7 +713,7 @@ func TestContractValueRetrieval(t *testing.T) {
 		return bytes.Compare(a, b) < 0
 	})
 
-	assert.Equal(t, []byte("/slab/"+string([]byte{0, 0, 0, 0, 0, 0, 0, 1})), migratedPayloads[0].Key.KeyParts[2].Value)
+	assert.Equal(t, []byte(atree.LedgerBaseStorageSlabPrefix+string([]byte{0, 0, 0, 0, 0, 0, 0, 1})), migratedPayloads[0].Key.KeyParts[2].Value)
 	assert.Equal(t, []byte("code.Test"), migratedPayloads[1].Key.KeyParts[2].Value)
 	assert.Equal(t, []byte("contract\u001FTest"), migratedPayloads[2].Key.KeyParts[2].Value)
 	assert.Equal(t, []byte("contract_names"), migratedPayloads[3].Key.KeyParts[2].Value)

@@ -67,10 +67,10 @@ func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storageP
 }
 
 type accountsAtreeLedger struct {
-	accounts *fvmState.Accounts
+	accounts fvmState.Accounts
 }
 
-func newAccountsAtreeLedger(accounts *fvmState.Accounts) *accountsAtreeLedger {
+func newAccountsAtreeLedger(accounts fvmState.Accounts) *accountsAtreeLedger {
 	return &accountsAtreeLedger{accounts: accounts}
 }
 

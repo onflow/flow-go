@@ -55,9 +55,10 @@ import (
 // StateFixture is a test helper struct that encapsulates a flow protocol state
 // as well as all of its backend dependencies.
 type StateFixture struct {
-	DB             *badger.DB
-	Storage        *storage.All
 	DBDir          string
+	PublicDB       *badger.DB
+	SecretsDB      *badger.DB
+	Storage        *storage.All
 	ProtocolEvents *events.Distributor
 	State          protocol.MutableState
 }
@@ -67,7 +68,8 @@ type GenericNode struct {
 	Log            zerolog.Logger
 	Metrics        *metrics.NoopCollector
 	Tracer         module.Tracer
-	DB             *badger.DB
+	PublicDB       *badger.DB
+	SecretsDB      *badger.DB
 	Headers        storage.Headers
 	Identities     storage.Identities
 	Guarantees     storage.Guarantees
@@ -84,7 +86,7 @@ type GenericNode struct {
 }
 
 func (g *GenericNode) Done() {
-	_ = g.DB.Close()
+	_ = g.PublicDB.Close()
 	_ = os.RemoveAll(g.DBDir)
 
 	<-g.Tracer.Done()
@@ -108,7 +110,7 @@ func RequireGenericNodesDoneBefore(t testing.TB, duration time.Duration, nodes .
 
 // CloseDB closes the badger database of the node
 func (g *GenericNode) CloseDB() error {
-	return g.DB.Close()
+	return g.PublicDB.Close()
 }
 
 // CollectionNode implements an in-process collection node for tests.
