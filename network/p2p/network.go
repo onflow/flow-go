@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
@@ -46,10 +47,9 @@ type Network struct {
 	metrics          module.NetworkMetrics
 	rcache           *RcvCache // used to deduplicate incoming messages
 	queue            network.MessageQueue
-	ctx              context.Context
-	cancel           context.CancelFunc
 	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
 	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
+	*module.ComponentManager
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -60,7 +60,7 @@ func NewNetwork(
 	log zerolog.Logger,
 	codec network.Codec,
 	me module.Local,
-	mw network.Middleware,
+	mwFactory func() network.Middleware, error,
 	csize int,
 	top network.Topology,
 	sm network.SubscriptionManager,
@@ -71,6 +71,11 @@ func NewNetwork(
 	rcache, err := newRcvCache(csize)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
+	}
+
+	mw, err := mwFactory()
+	if err != nil {
+		return nil, fmt.Errorf("could not create middleware: %w", err)
 	}
 
 	o := &Network{
@@ -85,39 +90,24 @@ func NewNetwork(
 		lifecycleManager: lifecycle.NewLifecycleManager(),
 		identityProvider: identityProvider,
 	}
-	o.ctx, o.cancel = context.WithCancel(context.Background())
 
 	o.mw.SetOverlay(o)
 
-	// setup the message queue
-	// create priority queue
-	o.queue = queue.NewMessageQueue(o.ctx, queue.GetEventPriority, metrics)
+	o.ComponentManager = module.NewComponentManagerBuilder().
+		OnStart(func(ctx context.Context) error {
+			// setup the message queue
+			// create priority queue
+			o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, metrics)
 
-	// create workers to read from the queue and call queueSubmitFunc
-	queue.CreateQueueWorkers(o.ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
+			// create workers to read from the queue and call queueSubmitFunc
+			queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
+
+			return nil
+		}).AddComponent(o.mw).AddWorker(func(ctx irrecoverable.SignalerContext) {
+		o.mw
+	}).Build()
 
 	return o, nil
-}
-
-// Ready returns a channel that will close when the network stack is ready.
-func (n *Network) Ready() <-chan struct{} {
-	n.lifecycleManager.OnStart(func() {
-		module.RunComponent(n.ctx, func() (module.Component, error) {
-			return n.mw, nil
-		}, func(err error, triggerRestart func()) {
-			n.logger.Fatal().Err(err).Msg("failed to start middleware")
-		})
-	})
-	return n.lifecycleManager.Started()
-}
-
-// Done returns a channel that will close when shutdown is complete.
-func (n *Network) Done() <-chan struct{} {
-	n.cancel()
-	n.lifecycleManager.OnStop(func() {
-		<-n.mw.Done()
-	})
-	return n.lifecycleManager.Stopped()
 }
 
 // Register will register the given engine with the given unique engine engineID,
