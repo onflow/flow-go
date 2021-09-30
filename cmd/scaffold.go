@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/lifecycle"
@@ -151,7 +152,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 }
 
-func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
+func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component("network", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 
 		codec := cborcodec.NewCodec()
@@ -175,7 +176,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			},
 		}
 
-		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(ctx,
+		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
 			fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
 			myAddr,
@@ -733,7 +734,7 @@ func (fnb *FlowNodeBuilder) handleComponent(ctx irrecoverable.SignalerContext, v
 		log.Info().Msg("component initialization complete")
 	}
 
-	component, ok := readyAware.(module.Component)
+	component, ok := readyAware.(component.Component)
 	if ok {
 		if err := component.Start(ctx); err != nil {
 			log.Fatal().Err(err).Msg("component startup failed")

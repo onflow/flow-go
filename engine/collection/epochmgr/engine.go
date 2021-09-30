@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/epochs"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
@@ -37,12 +38,12 @@ type EpochComponents struct {
 
 // Ready starts all epoch components.
 func (ec *EpochComponents) Ready() <-chan struct{} {
-	return module.AllReady(ec.prop, ec.sync, ec.hotstuff)
+	return util.AllReady(ec.prop, ec.sync, ec.hotstuff)
 }
 
 // Done stops all epoch components.
 func (ec *EpochComponents) Done() <-chan struct{} {
-	return module.AllDone(ec.prop, ec.sync, ec.hotstuff)
+	return util.AllDone(ec.prop, ec.sync, ec.hotstuff)
 }
 
 // Engine is the epoch manager, which coordinates the lifecycle of other modules
@@ -120,7 +121,7 @@ func (e *Engine) Ready() <-chan struct{} {
 		for _, epoch := range e.epochs {
 			epochs = append(epochs, epoch)
 		}
-		<-module.AllReady(epochs...)
+		<-util.AllReady(epochs...)
 	}, func() {
 		// check the current phase on startup, in case we are in setup phase
 		// and haven't yet voted for the next root QC
@@ -144,7 +145,7 @@ func (e *Engine) Done() <-chan struct{} {
 		for _, epoch := range e.epochs {
 			epochs = append(epochs, epoch)
 		}
-		<-module.AllDone(epochs...)
+		<-util.AllDone(epochs...)
 	})
 }
 

@@ -18,11 +18,11 @@ import (
 	"google.golang.org/grpc/status"
 
 	pb "github.com/onflow/flow-go/admin/admin"
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-var _ module.Component = (*CommandRunner)(nil)
+var _ component.Component = (*CommandRunner)(nil)
 
 const (
 	CommandRunnerMaxQueueLength  = 128

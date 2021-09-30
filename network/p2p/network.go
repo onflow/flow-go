@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/lifecycle"
@@ -51,7 +52,7 @@ type Network struct {
 	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
 	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
 	registerRequests chan *registerRequest
-	*module.ComponentManager
+	*component.ComponentManager
 }
 
 type registerRequest struct {
@@ -103,7 +104,7 @@ func NewNetwork(
 
 	o.mw.SetOverlay(o)
 
-	o.ComponentManager = module.NewComponentManagerBuilder().
+	o.ComponentManager = component.NewComponentManagerBuilder().
 		OnStart(func(ctx context.Context) error {
 			// setup the message queue
 			// create priority queue

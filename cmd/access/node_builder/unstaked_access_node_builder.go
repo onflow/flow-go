@@ -162,9 +162,7 @@ func (anb *UnstakedAccessNodeBuilder) validateParams() error {
 //		No connection gater
 // 		No connection manager
 // 		Default libp2p pubsub options
-func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
-	nodeID flow.Identifier,
-	networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
+func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier, networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
 
 	// the unstaked nodes act as the DHT clients
 	dhtOptions := []dht.Option{p2p.AsServer(false)}
@@ -180,7 +178,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 
 	resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 
-	return func() (*p2p.Node, error) {
+	return func(ctx context.Context) (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
 			SetRootBlockID(builder.RootBlock.ID()).
 			SetConnectionManager(connManager).
@@ -234,7 +232,7 @@ func (anb *UnstakedAccessNodeBuilder) enqueueMiddleware(ctx context.Context) {
 			// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
 			unstakedNetworkMetrics := metrics.NewNoopCollector()
 
-			libP2PFactory, err := anb.initLibP2PFactory(ctx, unstakedNodeID, unstakedNetworkKey)
+			libP2PFactory, err := anb.initLibP2PFactory(unstakedNodeID, unstakedNetworkKey)
 			if err != nil {
 				return err
 			}

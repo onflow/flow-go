@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
@@ -18,10 +19,10 @@ func Example() {
 	// a context is mandatory in order to call RunComponent
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// module.ComponentFactory encapsulates all of the component building logic
+	// component.ComponentFactory encapsulates all of the component building logic
 	// required before running Start()
 	starts := 0
-	componentFactory := func() (module.Component, error) {
+	componentFactory := func() (component.Component, error) {
 		starts++
 		return NewExampleComponent(starts), nil
 	}

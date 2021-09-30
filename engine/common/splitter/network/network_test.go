@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	splitternetwork "github.com/onflow/flow-go/engine/common/splitter/network"
-	"github.com/onflow/flow-go/module"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -34,11 +33,11 @@ type Suite struct {
 func (suite *Suite) SetupTest() {
 	net := new(mockmodule.ReadyDoneAwareNetwork)
 	suite.con = new(mocknetwork.Conduit)
-	suite.engines = make(map[network.Channel]network.Engine
+	suite.engines = make(map[network.Channel]network.Engine)
 
 	net.On("Register", mock.AnythingOfType("network.Channel"), mock.Anything).Run(func(args mock.Arguments) {
 		channel, _ := args.Get(0).(network.Channel)
-		engine, ok := args.Get(1).(network.Engine
+		engine, ok := args.Get(1).(network.Engine)
 		suite.Assert().True(ok)
 		suite.engines[channel] = engine
 	}).Return(suite.con, nil)
@@ -61,9 +60,9 @@ func (suite *Suite) TestHappyPath() {
 	chan2 := network.Channel("test-chan-2")
 	chan3 := network.Channel("test-chan-3")
 
-	engine1 := new(mocknetwork.Engine
-	engine2 := new(mocknetwork.Engine
-	engine3 := new(mocknetwork.Engine
+	engine1 := new(mocknetwork.Engine)
+	engine2 := new(mocknetwork.Engine)
+	engine3 := new(mocknetwork.Engine)
 
 	con, err := suite.net.Register(chan1, engine1)
 	suite.Assert().Nil(err)
