@@ -97,6 +97,10 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 
 	shutdownAndWaitForRestart := func(err error) error {
 		// shutdown the component
+		// we need to first check if the context is canceled, because
+		// if it was canceled during startup then the context's error
+		// may have been thrown by ComponentManager, and it doesn't
+		// make sense to pass this error to the error handler
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -144,13 +148,23 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 	}
 }
 
+// ComponentWorker represents a worker routine of a component
 type ComponentWorker func(ctx irrecoverable.SignalerContext)
+
+// ComponentStartup implements a startup routine for a component
+// This is where a component should perform any necessary startup
+// tasks before worker routines are launched.
 type ComponentStartup func(context.Context) error
 
+// ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
+	// OnStart sets the startup routine for the ComponentManager
 	OnStart(ComponentStartup) ComponentManagerBuilder
+
+	// AddWorker adds a worker routine for the ComponentManager
 	AddWorker(ComponentWorker) ComponentManagerBuilder
-	// AddComponent(Component) ComponentManagerBuilder
+
+	// Build builds and returns a new ComponentManager instance
 	Build() *ComponentManager
 }
 
@@ -159,9 +173,17 @@ type ComponentManagerBuilderImpl struct {
 	workers []ComponentWorker
 }
 
-func NewComponentManagerBuilder() *ComponentManagerBuilderImpl {
+// NewComponentManagerBuilder returns a new ComponentManagerBuilder
+func NewComponentManagerBuilder() ComponentManagerBuilder {
 	return &ComponentManagerBuilderImpl{
-		startup: func(_ context.Context) error { return nil },
+		startup: func(ctx context.Context) error {
+			select {
+			case <-ctx.Done():
+				return ctx.Err()
+			default:
+				return nil
+			}
+		},
 	}
 }
 
@@ -186,6 +208,7 @@ func (c *ComponentManagerBuilderImpl) Build() *ComponentManager {
 
 var _ Component = (*ComponentManager)(nil)
 
+// ComponentManager is used to manage worker routines of a Component
 type ComponentManager struct {
 	started chan struct{}
 	ready   chan struct{}
@@ -196,34 +219,45 @@ type ComponentManager struct {
 	workers   []ComponentWorker
 }
 
+// Start initiates the ComponentManager. It will first run the startup routine if one
+// was set, and then launch all worker routines. If an error occurs during startup,
+// it will be thrown with the provided SignalerContext.
 func (c *ComponentManager) Start(ctx irrecoverable.SignalerContext) {
 	c.startOnce.Do(func() {
 		go func() {
 			defer close(c.started)
 
 			if err := c.startup(ctx); err != nil {
+				// if startup fails, we should shut down the component immediately
 				ctx.Throw(err)
 			}
 			close(c.ready)
 
 			c.done.Add(len(c.workers))
 			for _, worker := range c.workers {
-				go func() {
+				go func(w ComponentWorker) {
 					defer c.done.Done()
-					worker(ctx)
-				}()
+					w(ctx)
+				}(worker)
 			}
 		}()
 	})
 }
 
+// Ready returns a channel which is closed once the startup routine has completed successfully.
+// If an error occurs during startup, the returned channel willl never close.
 func (c *ComponentManager) Ready() <-chan struct{} {
 	return c.ready
 }
 
+// Done returns a channel which is closed once the component has shut down. This includes the
+// scenario where an error is encountered during startup.
 func (c *ComponentManager) Done() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
+		// we must first wait for startup to be triggered, otherwise calling
+		// Done before startup has completed will result in the returned
+		// channel being closed immediately
 		<-c.started
 		c.done.Wait()
 		close(done)
