@@ -463,7 +463,7 @@ type testDKGProcessor struct {
 	protocol int
 
 	// only used when testing the threshold signature stateful api
-	ts   *thresholdSigner
+	ts   *thresholdSignatureParticipant
 	keys *statelessKeys
 }
 

@@ -56,8 +56,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 		t.Run("happy path", func(t *testing.T) {
 			// create the stateful threshold signer
-			index := mrand.Intn(n)
-			ts, err := NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			ts, err := NewBLSThresholdSignatureFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
 
 			// check EnoughShares
@@ -132,8 +131,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 		t.Run("duplicate signer", func(t *testing.T) {
 			// create the stateful threshold signer
-			index := mrand.Intn(n)
-			ts, err := NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			ts, err := NewBLSThresholdSignatureFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
 
 			// Create a share and add it
@@ -161,8 +159,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 		t.Run("Invalid index", func(t *testing.T) {
 			// create the stateful threshold signer
-			index := mrand.Intn(n)
-			ts, err := NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			ts, err := NewBLSThresholdSignatureFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
 
 			share, err := skShares[0].Sign(thresholdSignatureMessage, kmac)
@@ -194,7 +191,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 		t.Run("invalid signature", func(t *testing.T) {
 			index := mrand.Intn(n)
-			ts, err := NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			ts, err := NewBLSThresholdSignatureFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
 			share, err := skShares[index].Sign(thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
@@ -238,50 +235,50 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			// invalid keys size
 			index := mrand.Intn(n)
 			pkSharesInvalid := make([]PublicKey, ThresholdSignMaxSize+1)
-			ts, err := NewThresholdSigner(pkGroup, pkSharesInvalid, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			tsFollower, err := NewBLSThresholdSignatureFollower(pkGroup, pkSharesInvalid, threshold, thresholdSignatureMessage, kmac)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
-			assert.Nil(t, ts)
+			assert.Nil(t, tsFollower)
 			// non BLS key share
 			seed := make([]byte, KeyGenSeedMinLenECDSAP256)
 			_, err = rand.Read(seed)
 			require.NoError(t, err)
-			sk, err := GeneratePrivateKey(ECDSAP256, seed)
+			skEcdsa, err := GeneratePrivateKey(ECDSAP256, seed)
 			require.NoError(t, err)
 			tmp := pkShares[0]
-			pkShares[0] = sk.PublicKey()
-			ts, err = NewThresholdSigner(pkGroup, pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			pkShares[0] = skEcdsa.PublicKey()
+			tsFollower, err = NewBLSThresholdSignatureFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage, kmac)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
-			assert.Nil(t, ts)
+			assert.Nil(t, tsFollower)
 			pkShares[0] = tmp // restore valid keys
 			// non BLS group key
-			ts, err = NewThresholdSigner(sk.PublicKey(), pkShares, threshold, index, skShares[index], thresholdSignatureMessage, kmac)
+			tsFollower, err = NewBLSThresholdSignatureFollower(skEcdsa.PublicKey(), pkShares, threshold, thresholdSignatureMessage, kmac)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
-			assert.Nil(t, ts)
+			assert.Nil(t, tsFollower)
+			// non BLS private key
+			tsParticipant, err := NewBLSThresholdSignatureParticipant(pkGroup, pkShares, threshold, index, skEcdsa, thresholdSignatureMessage, kmac)
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.Nil(t, tsParticipant)
 			// invalid current index
-			ts, err = NewThresholdSigner(pkGroup, pkShares, threshold, len(pkShares)+1, skShares[index], thresholdSignatureMessage, kmac)
+			tsParticipant, err = NewBLSThresholdSignatureParticipant(pkGroup, pkShares, threshold, len(pkShares)+1, skShares[index], thresholdSignatureMessage, kmac)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
-			assert.Nil(t, ts)
+			assert.Nil(t, tsParticipant)
 			// invalid threshold
-			ts, err = NewThresholdSigner(pkGroup, pkShares, len(pkShares)+1, index, skShares[index], thresholdSignatureMessage, kmac)
+			tsFollower, err = NewBLSThresholdSignatureFollower(pkGroup, pkShares, len(pkShares)+1, thresholdSignatureMessage, kmac)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
-			assert.Nil(t, ts)
-			// invalid threshold
-			ts, err = NewThresholdSigner(pkGroup, pkShares, len(pkShares)+1, index, skShares[index], thresholdSignatureMessage, kmac)
-			assert.Error(t, err)
-			assert.True(t, IsInvalidInputsError(err))
-			assert.Nil(t, ts)
+			assert.Nil(t, tsFollower)
 			// inconsistent private and public key
 			indexSwap := (index + 1) % len(pkShares) // indexSwap is different than index
 			pkShares[index], pkShares[indexSwap] = pkShares[indexSwap], pkShares[index]
-			ts, err = NewThresholdSigner(pkGroup, pkShares, len(pkShares)+1, index, skShares[index], thresholdSignatureMessage, kmac)
+			tsParticipant, err = NewBLSThresholdSignatureParticipant(pkGroup, pkShares, len(pkShares)+1, index, skShares[index], thresholdSignatureMessage, kmac)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
-			assert.Nil(t, ts)
+			assert.Nil(t, tsParticipant)
 			pkShares[index], pkShares[indexSwap] = pkShares[indexSwap], pkShares[index] // restore keys
 		})
 	}
@@ -454,7 +451,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 				proc.pk = groupPK
 				n := proc.dkg.Size()
 				kmac := NewBLSKMAC(thresholdSignatureTag)
-				proc.ts, err = NewThresholdSigner(groupPK, nodesPK, optimalThreshold(n), proc.current, sk, thresholdSignatureMessage, kmac)
+				proc.ts, err = NewBLSThresholdSignatureParticipant(groupPK, nodesPK, optimalThreshold(n), proc.current, sk, thresholdSignatureMessage, kmac)
 				require.NoError(t, err)
 				// needed to test the statless api
 				proc.keys = &statelessKeys{sk, groupPK, nodesPK}
