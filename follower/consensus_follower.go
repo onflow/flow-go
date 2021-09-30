@@ -100,6 +100,7 @@ func getAccessNodeOptions(config *Config) []access.Option {
 func getBaseOptions(config *Config) []cmd.Option {
 	options := []cmd.Option{
 		cmd.WithMetricsEnabled(false),
+		cmd.WithSecretsDBEnabled(false),
 	}
 	if config.bootstrapDir != "" {
 		options = append(options, cmd.WithBootstrapDir(config.bootstrapDir))
@@ -120,14 +121,16 @@ func getBaseOptions(config *Config) []cmd.Option {
 	return options
 }
 
-func buildAccessNode(accessNodeOptions []access.Option) *access.UnstakedAccessNodeBuilder {
+func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessNodeBuilder, error) {
 	anb := access.FlowAccessNode(accessNodeOptions...)
 	nodeBuilder := access.NewUnstakedAccessNodeBuilder(anb)
 
-	nodeBuilder.Initialize()
+	if err := nodeBuilder.Initialize(); err != nil {
+		return nil, err
+	}
 	nodeBuilder.BuildConsensusFollower()
 
-	return nodeBuilder
+	return nodeBuilder, nil
 }
 
 type ConsensusFollowerImpl struct {
@@ -155,8 +158,11 @@ func NewConsensusFollower(
 	}
 
 	accessNodeOptions := getAccessNodeOptions(config)
+	anb, err := buildAccessNode(accessNodeOptions)
+	if err != nil {
+		return nil, err
+	}
 
-	anb := buildAccessNode(accessNodeOptions)
 	consensusFollower := &ConsensusFollowerImpl{NodeBuilder: anb}
 	anb.BaseConfig.NodeRole = "consensus_follower"
 

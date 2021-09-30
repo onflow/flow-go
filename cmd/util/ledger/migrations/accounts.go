@@ -106,7 +106,7 @@ func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error
 	return l.Payloads(), nil
 }
 
-func appendKeyForAccount(accounts *state.Accounts, addressInHex string, encodedKeyInHex string) error {
+func appendKeyForAccount(accounts state.Accounts, addressInHex string, encodedKeyInHex string) error {
 	address := flow.HexToAddress(addressInHex)
 	ok, err := accounts.Exists(address)
 	if err != nil {
