@@ -814,6 +814,7 @@ func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstra
 			return nil, fmt.Errorf("failed to create flow client for dkg contract client with options: %s %w", flowClientOpts, err)
 		}
 
+		node.Logger.Info().Msgf("created dkg contract client with opts: %s", opt.String())
 		dkgClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create dkg contract client with flow client options: %s %w", flowClientOpts, err)
