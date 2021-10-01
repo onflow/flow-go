@@ -20,18 +20,18 @@ const (
 	DefaultAccessAPISecurePort  = "9001"
 )
 
-type FlowClientOpt struct {
+type FlowClientConfig struct {
 	AccessAddress    string
 	AccessNodePubKey string
 	Insecure         bool
 }
 
-func (f *FlowClientOpt) String() string {
+func (f *FlowClientConfig) String() string {
 	return fmt.Sprintf("AccessAddress: %s, AccessNodePubKey: %s, Insecure: %v", f.AccessAddress, f.AccessNodePubKey, f.Insecure)
 }
 
-// NewFlowClientOpt returns *FlowClientOpt
-func NewFlowClientOpt(accessAddress, accessApiNodePubKey string, insecure bool) (*FlowClientOpt, error) {
+// NewFlowClientConfig returns *FlowClientConfig
+func NewFlowClientConfig(accessAddress, accessApiNodePubKey string, insecure bool) (*FlowClientConfig, error) {
 	if accessAddress == "" {
 		return nil, fmt.Errorf("failed to create  flow client connection option invalid access address: %s", accessAddress)
 	}
@@ -42,11 +42,11 @@ func NewFlowClientOpt(accessAddress, accessApiNodePubKey string, insecure bool) 
 		}
 	}
 
-	return &FlowClientOpt{accessAddress, accessApiNodePubKey, insecure}, nil
+	return &FlowClientConfig{accessAddress, accessApiNodePubKey, insecure}, nil
 }
 
-// FlowClient will return a secure or insecure flow client depending on *FlowClientOpt.Insecure
-func FlowClient(opt *FlowClientOpt) (*client.Client, error) {
+// FlowClient will return a secure or insecure flow client depending on *FlowClientConfig.Insecure
+func FlowClient(opt *FlowClientConfig) (*client.Client, error) {
 	if opt.Insecure {
 		return insecureFlowClient(opt.AccessAddress)
 	}
@@ -81,9 +81,9 @@ func insecureFlowClient(accessAddress string) (*client.Client, error) {
 	return flowClient, nil
 }
 
-// PrepareFlowClientOpts will assemble connection options for the flow client for each access node id
-func PrepareFlowClientOpts(accessNodeIDS []string, insecureAccessAPI bool, snapshot protocol.Snapshot) ([]*FlowClientOpt, error) {
-	flowClientOpts := make([]*FlowClientOpt, 0)
+// FlowClientConfigs will assemble connection options for the flow client for each access node id
+func FlowClientConfigs(accessNodeIDS []string, insecureAccessAPI bool, snapshot protocol.Snapshot) ([]*FlowClientConfig, error) {
+	flowClientOpts := make([]*FlowClientConfig, 0)
 
 	// convert all IDS to flow.Identifier type, fail early if ID is invalid
 	anIDS := make([]flow.Identifier, 0)
@@ -107,14 +107,14 @@ func PrepareFlowClientOpts(accessNodeIDS []string, insecureAccessAPI bool, snaps
 		return nil, fmt.Errorf("failed to get identity for all the access node IDs provided: %v, got %v", accessNodeIDS, identities.NodeIDs())
 	}
 
-	// build a FlowClientOpt for each access node identity, these will be used to manage multiple flow client connections
+	// build a FlowClientConfig for each access node identity, these will be used to manage multiple flow client connections
 	for i, identity := range identities {
-		accessAddress := ConvertAccessAddrFromState(identity.Address, insecureAccessAPI)
+		accessAddress := convertAccessAddrFromState(identity.Address, insecureAccessAPI)
 
 		// remove the 0x prefix from network public keys
 		networkingPubKey := identity.NetworkPubKey.String()[2:]
 
-		opt, err := NewFlowClientOpt(accessAddress, networkingPubKey, insecureAccessAPI)
+		opt, err := NewFlowClientConfig(accessAddress, networkingPubKey, insecureAccessAPI)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get flow client connection option for access node ID (%d): %s %w", i, identity, err)
 		}
@@ -124,9 +124,9 @@ func PrepareFlowClientOpts(accessNodeIDS []string, insecureAccessAPI bool, snaps
 	return flowClientOpts, nil
 }
 
-// ConvertAccessAddrFromState takes raw network address from the protocol state in the for of [DNS/IP]:PORT, removes the port and applies the appropriate
+// convertAccessAddrFromState takes raw network address from the protocol state in the for of [DNS/IP]:PORT, removes the port and applies the appropriate
 // port number depending on the insecureAccessAPI arg.
-func ConvertAccessAddrFromState(address string, insecureAccessAPI bool) string {
+func convertAccessAddrFromState(address string, insecureAccessAPI bool) string {
 	// remove gossip port from access address and add respective secure or insecure port
 	var accessAddress strings.Builder
 	accessAddress.WriteString(strings.Split(address, ":")[0])
