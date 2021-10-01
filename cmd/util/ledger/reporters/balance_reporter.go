@@ -77,6 +77,7 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	go func() {
 		for m := range momentsChan {
 			if m.Moments > 0 {
+				r.Log.Info().Msg("test")
 				addressMoments[m.Address] += m.Moments
 			}
 		}
