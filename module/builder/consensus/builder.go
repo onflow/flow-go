@@ -4,7 +4,9 @@ package consensus
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -25,20 +27,24 @@ import (
 // Builder is the builder for consensus block payloads. Upon providing a payload
 // hash, it also memorizes which entities were included into the payload.
 type Builder struct {
-	metrics    module.MempoolMetrics
-	tracer     module.Tracer
-	db         *badger.DB
-	state      protocol.MutableState
-	seals      storage.Seals
-	headers    storage.Headers
-	index      storage.Index
-	blocks     storage.Blocks
-	resultsDB  storage.ExecutionResults
-	receiptsDB storage.ExecutionReceipts
-	guarPool   mempool.Guarantees
-	sealPool   mempool.IncorporatedResultSeals
-	recPool    mempool.ExecutionTree
-	cfg        Config
+	metrics      module.MempoolMetrics
+	receipts     []flow.Identifier
+	receiptIndex int
+	idblocks     []flow.Identifier
+	blockIndex   int
+	tracer       module.Tracer
+	db           *badger.DB
+	state        protocol.MutableState
+	seals        storage.Seals
+	headers      storage.Headers
+	index        storage.Index
+	blocks       storage.Blocks
+	resultsDB    storage.ExecutionResults
+	receiptsDB   storage.ExecutionReceipts
+	guarPool     mempool.Guarantees
+	sealPool     mempool.IncorporatedResultSeals
+	recPool      mempool.ExecutionTree
+	cfg          Config
 }
 
 // NewBuilder creates a new block builder.
@@ -241,6 +247,70 @@ func (b *Builder) repopulateExecutionTree() error {
 	return nil
 }
 
+func compareIdentifiers(a flow.Identifier, b flow.Identifier) (bool, bool) {
+	// retrieve the first 8 bytes, as slices for the encoding
+	num1 := a[:]
+	num2 := b[:]
+	first := binary.BigEndian.Uint64(num1)
+	second := binary.BigEndian.Uint64(num2)
+
+	// compare the second set of 8 bytes in the 32-byte Identifier
+	if first == second {
+		num1 = a[8:]
+		num2 = b[8:]
+		first = binary.BigEndian.Uint64(num1)
+		second = binary.BigEndian.Uint64(num2)
+
+		if first == second {
+			num1 = a[16:]
+			num2 = b[16:]
+			first = binary.BigEndian.Uint64(num1)
+			second = binary.BigEndian.Uint64(num2)
+
+			if first == second {
+				num1 = a[24:]
+				num2 = b[24:]
+				first = binary.BigEndian.Uint64(num1)
+				second = binary.BigEndian.Uint64(num2)
+
+				if first == second {
+					return true, false
+				}
+
+				return false, first < second
+			}
+			return false, first < second
+		}
+		return false, first < second
+	}
+	return false, first < second
+}
+
+func Search(arr []flow.Identifier, n flow.Identifier, arrayLen int) bool {
+	i := 0
+
+	for {
+		h := int(uint(i+arrayLen) >> 1) // avoid overflow when computing h
+
+		bEqual, bLess := compareIdentifiers(n, arr[h])
+
+		if bLess {
+			i = h + 1
+		} else if !bEqual {
+			// set the arrayLen to be half what it was
+			arrayLen = h
+		} else {
+			// found
+			return true
+		}
+
+		if i >= arrayLen {
+			// not found
+			return false
+		}
+	}
+}
+
 // getInsertableGuarantees returns the list of CollectionGuarantees that should
 // be inserted in the next payload. It looks in the collection mempool and
 // applies the following filters:
@@ -278,18 +348,23 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		limit = rootHeight
 	}
 
-	// blockLookup keeps track of the blocks from limit to parent
-	blockLookup := make(map[flow.Identifier]struct{})
+	// make a slice to track of the blocks
+	// keeps track of the blocks from limit to parent
+	b.idblocks = make([]flow.Identifier, uint(b.cfg.expiry))
+	b.blockIndex = 0
 
 	// receiptLookup keeps track of the receipts contained in blocks between
 	// limit and parent
-	receiptLookup := make(map[flow.Identifier]struct{})
+	b.receipts = make([]flow.Identifier, uint(b.cfg.expiry))
+	b.receiptIndex = 0
 
 	// loop through the fork backwards, from parent to limit (inclusive),
 	// and keep track of blocks and collections visited on the way
 	forkScanner := func(header *flow.Header) error {
 		ancestorID := header.ID()
-		blockLookup[ancestorID] = struct{}{}
+
+		b.idblocks[b.blockIndex] = ancestorID
+		b.blockIndex++
 
 		index, err := b.index.ByBlockID(ancestorID)
 		if err != nil {
@@ -297,18 +372,34 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		}
 
 		for _, collID := range index.CollectionIDs {
-			receiptLookup[collID] = struct{}{}
+			b.receipts[b.receiptIndex] = collID
+			b.receiptIndex++
 		}
 
 		return nil
 	}
+
 	err = fork.TraverseBackward(b.headers, parentID, forkScanner, fork.IncludingHeight(limit))
 	if err != nil {
 		return nil, fmt.Errorf("internal error building set of CollectionGuarantees on fork: %w", err)
 	}
 
+	// sort the blocks and receipts slices, for searching later
+	sort.Slice(b.idblocks, func(p, q int) bool {
+		_, bLess := compareIdentifiers(b.idblocks[p], b.idblocks[q])
+		return bLess
+	})
+
+	sort.Slice(b.receipts, func(p, q int) bool {
+		_, bLess := compareIdentifiers(b.receipts[p], b.receipts[q])
+		return bLess
+	})
+
 	// go through mempool and collect valid collections
 	var guarantees []*flow.CollectionGuarantee
+	lenReceipts := len(b.receipts)
+	lenBlocks := len(b.idblocks)
+
 	for _, guarantee := range b.guarPool.All() {
 		// add at most <maxGuaranteeCount> number of collection guarantees in a new block proposal
 		// in order to prevent the block payload from being too big or computationally heavy for the
@@ -320,14 +411,13 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		collID := guarantee.ID()
 
 		// skip collections that are already included in a block on the fork
-		_, duplicated := receiptLookup[collID]
-		if duplicated {
+
+		if Search(b.receipts, collID, lenReceipts) {
 			continue
 		}
 
 		// skip collections for blocks that are not within the limit
-		_, ok := blockLookup[guarantee.ReferenceBlockID]
-		if !ok {
+		if !Search(b.idblocks, guarantee.ReferenceBlockID, lenBlocks) {
 			continue
 		}
 
