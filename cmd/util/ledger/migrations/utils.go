@@ -67,17 +67,17 @@ func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storageP
 }
 
 type AccountsAtreeLedger struct {
-	accounts fvmState.Accounts
+	Accounts fvmState.Accounts
 }
 
 func NewAccountsAtreeLedger(accounts fvmState.Accounts) *AccountsAtreeLedger {
-	return &AccountsAtreeLedger{accounts: accounts}
+	return &AccountsAtreeLedger{Accounts: accounts}
 }
 
 var _ atree.Ledger = &AccountsAtreeLedger{}
 
 func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
-	v, err := a.accounts.GetValue(
+	v, err := a.Accounts.GetValue(
 		flow.BytesToAddress(owner),
 		string(key),
 	)
@@ -88,7 +88,7 @@ func (a *AccountsAtreeLedger) GetValue(owner, key []byte) ([]byte, error) {
 }
 
 func (a *AccountsAtreeLedger) SetValue(owner, key, value []byte) error {
-	err := a.accounts.SetValue(
+	err := a.Accounts.SetValue(
 		flow.BytesToAddress(owner),
 		string(key),
 		value,
@@ -110,7 +110,7 @@ func (a *AccountsAtreeLedger) ValueExists(owner, key []byte) (exists bool, err e
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
 func (a *AccountsAtreeLedger) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	v, err := a.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+	v, err := a.Accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
 	}

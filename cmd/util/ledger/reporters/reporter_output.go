@@ -11,6 +11,7 @@ import (
 	"time"
 )
 
+// TODO janezp: we should be able to swithch the report writer to write to a database.
 type ReportWriterFactory interface {
 	ReportWriter(dataNamespace string) ReportWriter
 }

@@ -2,18 +2,20 @@ package reporters
 
 import (
 	"fmt"
+	goRuntime "runtime"
+	"sync"
+
+	"github.com/rs/zerolog"
+	"github.com/schollz/progressbar/v3"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/rs/zerolog"
-	"github.com/schollz/progressbar/v3"
-	goRuntime "runtime"
-	"sync"
-
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -34,17 +36,17 @@ func (r *AccountReporter) Name() string {
 }
 
 type accountRecord struct {
-	Address        string
-	StorageUsed    uint64
-	AccountBalance uint64
-	HasVault       bool
-	HasReceiver    bool
-	IsDapper       bool
+	Address        string `json:"address"`
+	StorageUsed    uint64 `json:"storageUsed"`
+	AccountBalance uint64 `json:"accountBalance"`
+	HasVault       bool   `json:"hasVault"`
+	HasReceiver    bool   `json:"hasReceiver"`
+	IsDapper       bool   `json:"isDapper"`
 }
 
 type contractRecord struct {
-	Address  string
-	Contract string
+	Address  string `json:"address"`
+	Contract string `json:"contract"`
 }
 
 func (r *AccountReporter) Report(payload []ledger.Payload) error {

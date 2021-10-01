@@ -2,6 +2,7 @@ package extract
 
 import (
 	"fmt"
+	vlds "github.com/onflow/flow-go/cmd/util/ledger/validators"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 
@@ -81,21 +82,23 @@ func extractExecutionState(
 
 		// only add validators if migration is on
 		validators = []ledger.Validator{
-			//vld.NewAccountBalanceValidator(log, chain),
+			vlds.NewAccountBalanceValidator(log, chain),
 		}
 
 	}
 	if report {
+		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
+
 		rs = []ledger.Reporter{
 			&reporters.AccountReporter{
 				Log:   log,
 				Chain: chain,
-				RWF:   reporters.NewReportFileWriterFactory(outputDir, log),
+				RWF:   reportFileWriterFactory,
 			},
-			// &mgr.BalanceReporter{
-			// 	Log:       log,
-			// 	OutputDir: outputDir,
-			// },
+			&reporters.BalanceReporter{
+				Log: log,
+				RWF: reportFileWriterFactory,
+			},
 		}
 	}
 	newState, err := led.ExportCheckpointAt(
