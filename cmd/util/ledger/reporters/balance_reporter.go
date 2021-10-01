@@ -2,6 +2,7 @@ package reporters
 
 import (
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -148,6 +149,11 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 	if state.IsFVMStateKey(id.Owner, id.Controller, id.Key) {
 		return
 	}
+	if strings.HasSuffix(id.Key, "\x24") {
+		// this is a slab index
+		return
+	}
+
 	owner := common.BytesToAddress([]byte(id.Owner))
 	decoder := interpreter.CBORDecMode.NewByteStreamDecoder(p.Value)
 
