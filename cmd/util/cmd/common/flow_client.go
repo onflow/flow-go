@@ -104,7 +104,7 @@ func FlowClientConfigs(accessNodeIDS []string, insecureAccessAPI bool, snapshot 
 
 	// make sure we have identities for all the access node IDs provided
 	if len(identities) != len(accessNodeIDS) {
-		return nil, fmt.Errorf("failed to get identity for all the access node IDs provided: %v, got %v", accessNodeIDS, identities.NodeIDs())
+		return nil, fmt.Errorf("failed to get %v distinct identities for all the access node IDs provided: %v, found %v", len(accessNodeIDS), accessNodeIDS, identities.NodeIDs())
 	}
 
 	// build a FlowClientConfig for each access node identity, these will be used to manage multiple flow client connections
@@ -112,7 +112,7 @@ func FlowClientConfigs(accessNodeIDS []string, insecureAccessAPI bool, snapshot 
 		accessAddress := convertAccessAddrFromState(identity.Address, insecureAccessAPI)
 
 		// remove the 0x prefix from network public keys
-		networkingPubKey := identity.NetworkPubKey.String()[2:]
+		networkingPubKey := strings.TrimPrefix(identity.NetworkPubKey.String(), "0x")
 
 		opt, err := NewFlowClientConfig(accessAddress, networkingPubKey, insecureAccessAPI)
 		if err != nil {

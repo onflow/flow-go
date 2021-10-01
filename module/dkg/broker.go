@@ -152,12 +152,12 @@ func (b *Broker) Broadcast(data []byte) {
 		err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
 			err := b.dkgContractClient().Broadcast(bcastMsg)
 			if err != nil {
-				b.log.Error().Err(err).Msgf("error broadcasting, retrying (%x)", attempts)
+				b.log.Error().Err(err).Msgf("error broadcasting, retrying (%d)", attempts)
 
 				// retry with next fallback client after 2 failed attempts
 				if attempts%2 == 0 {
-					b.log.Warn().Msgf("broadcast: retrying on attempt (%x) with fallback access node", attempts)
 					b.updateActiveDKGContractClient()
+					b.log.Warn().Msgf("broadcast: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.activeDKGContractClient)
 				}
 			}
 
@@ -220,8 +220,8 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 		attempts++
 		// retry with next fallback client after 2 failed attempts
 		if attempts%2 == 0 {
-			b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node", attempts)
 			b.updateActiveDKGContractClient()
+			b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.activeDKGContractClient)
 		}
 
 		msgs, err = b.dkgContractClient().ReadBroadcast(b.messageOffset, referenceBlock)
