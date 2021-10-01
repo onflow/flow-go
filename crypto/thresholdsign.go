@@ -3,7 +3,7 @@
 package crypto
 
 // #cgo CFLAGS: -g -Wall -std=c99
-// #include "thresholdsign_include.h"
+// #include "bls_thresholdsign_include.h"
 import "C"
 
 import (
@@ -12,6 +12,98 @@ import (
 
 	"github.com/onflow/flow-go/crypto/hash"
 )
+
+// A threshold signature scheme allows any subset of (t+1)
+// valid signature shares to reconstruct the threshold signature.
+// up to (t) shares do not reveal any information about the threshold
+// signature.
+// Although the API allows using arbitrary values of (t),
+// the threshold signature scheme is secure in the presence of up to (t)
+// malicious participants when (t < n/2).
+// In order to optimize equally for unforgeability and robustness,
+// the input threshold value (t) should be set to t = floor((n-1)/2).
+
+// ThresholdSignatureFollower is an instance of Threshold signature follower.
+// The interface only allows following the threshold signing protocol .
+type ThresholdSignatureFollower interface {
+	// VerifyShare verifies the input signature against the stored message and stored
+	// key at the input index.
+	//
+	// This function does not update the internal state.
+	// The function errors:
+	//  - InvalidInputsError if the index input is invalid
+	//  - other error if the execution failed
+	// The function does not return an error for any invalid signature.
+	// If any error is returned, the returned bool is false.
+	// If no error is returned, the bool represents the validity of the signature.
+	// The function is thread-safe.
+	VerifyShare(orig int, share Signature) (bool, error)
+	// VerifyThresholdSignature verifies the input signature against the stored
+	// message and stored group public key.
+	//
+	// This function does not update the internal state.
+	// The function errors if the execution failed.
+	// The function does not return an error for any invalid signature.
+	// If any error is returned, the returned bool is false.
+	// If no error is returned, the bool represents the validity of the signature.
+	// The function is thread-safe.
+	VerifyThresholdSignature(thresholdSignature Signature) (bool, error)
+	// EnoughShares checks whether there are enough shares to reconstruct a signature.
+	// The funstion returns true if and only if the number of shares have reached (threshold+1)
+	// shares.
+	//
+	// This function is thread safe
+	EnoughShares() bool
+	// TrustedAdd adds a signature share to the internal pool of shares
+	// without verifying the signature against the message and the participant's
+	// public key.
+	//
+	// The share is only added if the signer index is valid and has not been
+	// added yet. Moreover, the share is added only if not enough shares were collected.
+	// The function returns:
+	//  - (true, nil) if enough signature shares were already collected and no error occured
+	//  - (false, nil) if not enough shares were collected and no error occured
+	//  - (false, error) if index is invalid (InvalidInputsError) or already added (other error)
+	TrustedAdd(orig int, share Signature) (bool, error)
+	// VerifyAndAdd verifies a signature share (look at `VerifyShare`),
+	// and may or may not add the share to the local pool of shares.
+	//
+	// The share is only added if the signature is valid, the signer index is valid and has not been
+	// added yet. Moreover, the share is added only if not enough shares were collected.
+	// Thee function returns 3 outputs:
+	//  - First boolean output is true if the share is valid and no error is returned, and false otherwise.
+	//  - Second boolean output is true if enough shares were collected and no error is returned, and false otherwise.
+	//  - error is IsInvalidInputsError if input index is invalid, and a random error if an exception occured.
+	//    (an invalid signature is not considered an invalid input, look at `VerifyShare` for details)
+	// This function is thread safe
+	VerifyAndAdd(orig int, share Signature) (bool, bool, error)
+	// HasShare checks whether the internal map contains the share of the given index.
+	// This function is thread safe
+	HasShare(orig int) (bool, error)
+	// ThresholdSignature returns the threshold signature if the threshold was reached.
+	// The threshold signature is reconstructed if this was not done in a previous call.
+	//
+	// In the case of reconstructing the threshold signature, the function errors
+	// if not enough shares were collected and if any signature fails the deserialization.
+	// It also performs a final verification against the stored message and group public key
+	// and errors if the result is not valid. This is required for the function safety since
+	// `TrustedAdd` allows adding invalid signatures.
+	// The function is thread-safe.
+	ThresholdSignature() (Signature, error)
+}
+
+// ThresholdSignatureParticipant is an instance of Threshold signature Participant.
+// A participant is able to participate in a threshold signing protocol as well as following the
+// protocol.
+type ThresholdSignatureParticipant interface {
+	ThresholdSignatureFollower
+	// SignShare generates a signature share using the current private key share.
+	//
+	// The function does not add the share to the internal pool of shares and do
+	// not update the internal state.
+	// This function is thread safe
+	SignShare() (Signature, error)
+}
 
 // TODO: TO DELETE IN V2
 // ONLY HERE TO ALLOW V1 build and test
@@ -55,17 +147,17 @@ type thresholdSigner struct {
 // threshold is the threshold value, it must be in the range [MinimumThreshold..size-1]
 func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash.Hasher) (*thresholdSigner, error) {
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
-		return nil, newInvalidInputsError(
+		return nil, invalidInputsErrorf(
 			"size should be between %d and %d, got %d",
 			ThresholdSignMinSize, ThresholdSignMaxSize, size)
 	}
 	if currentIndex >= size || currentIndex < 0 {
-		return nil, newInvalidInputsError(
+		return nil, invalidInputsErrorf(
 			"The current index must be between 0 and %d, got %d",
 			size-1, currentIndex)
 	}
 	if threshold >= size || threshold < MinimumThreshold {
-		return nil, newInvalidInputsError(
+		return nil, invalidInputsErrorf(
 			"The threshold must be between %d and %d, got %d",
 			MinimumThreshold, size-1, threshold)
 	}
@@ -102,7 +194,7 @@ func (s *thresholdSigner) SetKeys(currentPrivateKey PrivateKey,
 	sharePublicKeys []PublicKey) error {
 
 	if len(sharePublicKeys) != s.size {
-		return newInvalidInputsError(
+		return invalidInputsErrorf(
 			"size of public key shares should be %d, but got %d",
 			s.size, len(sharePublicKeys))
 	}
@@ -132,7 +224,7 @@ func (s *thresholdSigner) SignShare() (Signature, error) {
 	share, err := s.currentPrivateKey.Sign(s.messageToSign, s.hashAlgo)
 	if err != nil {
 		if IsInvalidInputsError(err) {
-			newInvalidInputsError("share signature failed: %s", err)
+			invalidInputsErrorf("share signature failed: %s", err)
 		}
 		return nil, fmt.Errorf("share signature failed: %w", err)
 	}
@@ -140,7 +232,7 @@ func (s *thresholdSigner) SignShare() (Signature, error) {
 	valid, err := s.AddShare(s.currentIndex, share)
 	if err != nil {
 		if IsInvalidInputsError(err) {
-			return nil, newInvalidInputsError("share signature failed: %s", err)
+			return nil, invalidInputsErrorf("share signature failed: %s", err)
 		}
 		return nil, fmt.Errorf("share signature failed: %w", err)
 	}
@@ -197,7 +289,7 @@ func (s *thresholdSigner) AddShare(orig int, share Signature) (bool, error) {
 	verif, err := s.VerifyAndStageShare(orig, share)
 	if err != nil {
 		if IsInvalidInputsError(err) {
-			return false, newInvalidInputsError("add signature failed: %s", err)
+			return false, invalidInputsErrorf("add signature failed: %s", err)
 		}
 		return false, fmt.Errorf("add signature failed: %w", err)
 	}
@@ -206,7 +298,7 @@ func (s *thresholdSigner) AddShare(orig int, share Signature) (bool, error) {
 		err = s.CommitShare()
 		if err != nil {
 			if IsInvalidInputsError(err) {
-				return true, newInvalidInputsError("add signature failed: %s", err)
+				return true, invalidInputsErrorf("add signature failed: %s", err)
 			}
 			return true, fmt.Errorf("add signature failed: %w", err)
 		}
@@ -226,7 +318,7 @@ func (s *thresholdSigner) VerifyAndStageShare(orig int, share Signature) (bool, 
 	s.emptyStagedShare()
 
 	if orig >= s.size || orig < 0 {
-		return false, newInvalidInputsError(
+		return false, invalidInputsErrorf(
 			"origin input is invalid, should be positive less than %d, got %d",
 			s.size, orig)
 	}
@@ -234,7 +326,7 @@ func (s *thresholdSigner) VerifyAndStageShare(orig int, share Signature) (bool, 
 	verif, err := s.verifyShare(share, index(orig))
 	if err != nil {
 		if IsInvalidInputsError(err) {
-			return false, newInvalidInputsError(
+			return false, invalidInputsErrorf(
 				"verification of share failed: %s", err)
 		}
 		return false, fmt.Errorf("verification of share failed: %w", err)
@@ -302,7 +394,7 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	// sanity check
 	if len(s.shares) != len(s.signers)*signatureLengthBLSBLS12381 {
 		s.ClearShares()
-		return nil, newInvalidInputsError("The number of signature shares is not matching the number of signers")
+		return nil, invalidInputsErrorf("The number of signature shares is not matching the number of signers")
 	}
 	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 	// Lagrange Interpolate at point 0
@@ -312,7 +404,7 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 		(*C.uint8_t)(&s.signers[0]), (C.int)(len(s.signers)))
 	if result != valid {
 		if result == invalid { // sanity check, but shouldn't happen
-			return nil, newInvalidInputsError("a signature share is not valid")
+			return nil, invalidInputsErrorf("a signature share is not valid")
 		}
 		return nil, errors.New("reading signatures has failed")
 	}
@@ -321,7 +413,7 @@ func (s *thresholdSigner) reconstructThresholdSignature() (Signature, error) {
 	verif, err := s.VerifyThresholdSignature(thresholdSignature)
 	if err != nil {
 		if IsInvalidInputsError(err) {
-			return nil, newInvalidInputsError("verify threshold signature failed: %s", err)
+			return nil, invalidInputsErrorf("verify threshold signature failed: %s", err)
 		}
 		return nil, fmt.Errorf("verify threshold signature failed: %w", err)
 	}
@@ -352,25 +444,25 @@ func ReconstructThresholdSignature(size int, threshold int,
 	blsInstance.reInit()
 
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
-		return nil, newInvalidInputsError(
+		return nil, invalidInputsErrorf(
 			"size should be between %d and %d",
 			ThresholdSignMinSize,
 			ThresholdSignMaxSize)
 	}
 	if threshold >= size || threshold < MinimumThreshold {
-		return nil, newInvalidInputsError(
+		return nil, invalidInputsErrorf(
 			"The threshold must be between %d and %d, got %d",
 			MinimumThreshold, size-1,
 			threshold)
 	}
 
 	if len(shares) != len(signers) {
-		return nil, newInvalidInputsError(
+		return nil, invalidInputsErrorf(
 			"The number of signature shares is not matching the number of signers")
 	}
 
 	if len(shares) < threshold+1 {
-		return nil, newInvalidInputsError(
+		return nil, invalidInputsErrorf(
 			"The number of signatures does not reach the threshold")
 	}
 
@@ -384,12 +476,12 @@ func ReconstructThresholdSignature(size int, threshold int,
 		flatShares = append(flatShares, share...)
 		// check the index is valid
 		if signers[i] >= size || signers[i] < 0 {
-			return nil, newInvalidInputsError(
+			return nil, invalidInputsErrorf(
 				"signer index #%d is invalid", i)
 		}
 		// check the index is new
 		if _, isSeen := m[index(signers[i])]; isSeen {
-			return nil, newInvalidInputsError(
+			return nil, invalidInputsErrorf(
 				"%d is a duplicate signer", index(signers[i]))
 		}
 		m[index(signers[i])] = true
@@ -408,31 +500,19 @@ func ReconstructThresholdSignature(size int, threshold int,
 	return thresholdSignature, nil
 }
 
-// EnoughShares is a stateless function that takes the value of the threshold
-// and a shares number and returns true if the shares number is enough
-// to reconstruct a threshold signature.
-func EnoughShares(threshold int, sharesNumber int) (bool, error) {
-	if threshold < MinimumThreshold {
-		return false, newInvalidInputsError(
-			"The threshold can't be smaller than %d, got %d",
-			MinimumThreshold, threshold)
-	}
-	return sharesNumber > threshold, nil
-}
-
 // ThresholdSignKeyGen is a key generation for a BLS-based
 // threshold signature scheme with a trusted dealer.
 func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	[]PublicKey, PublicKey, error) {
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
-		return nil, nil, nil, newInvalidInputsError(
+		return nil, nil, nil, invalidInputsErrorf(
 			"size should be between %d and %d, got %d",
 			ThresholdSignMinSize,
 			ThresholdSignMaxSize,
 			size)
 	}
 	if threshold >= size || threshold < MinimumThreshold {
-		return nil, nil, nil, newInvalidInputsError(
+		return nil, nil, nil, invalidInputsErrorf(
 			"The threshold must be between %d and %d, got %d",
 			MinimumThreshold,
 			size-1,
@@ -450,7 +530,7 @@ func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	// seed relic
 	if err := seedRelic(seed); err != nil {
 		if IsInvalidInputsError(err) {
-			return nil, nil, nil, newInvalidInputsError(
+			return nil, nil, nil, invalidInputsErrorf(
 				"seeding relic failed: %s",
 				err)
 		}
