@@ -63,7 +63,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	"github.com/onflow/flow-go/storage"
-	"github.com/onflow/flow-go/storage/badger"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
 )
@@ -90,6 +89,9 @@ func main() {
 		requiredApprovalsForSealVerification   uint
 		requiredApprovalsForSealConstruction   uint
 		emergencySealing                       bool
+		dkgControllerConfig                    dkgmodule.ControllerConfig
+		startupTimeString                      string
+		startupTime                            time.Time
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
@@ -117,6 +119,7 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
+		dkgKeyStore             *bstorage.DKGKeys
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -145,6 +148,21 @@ func main() {
 		flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
 		flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
+		flags.DurationVar(&dkgControllerConfig.BaseStartDelay, "dkg-controller-base-start-delay", dkgmodule.DefaultBaseStartDelay, "used to define the range for jitter prior to DKG start (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
+		flags.DurationVar(&dkgControllerConfig.BaseHandleFirstBroadcastDelay, "dkg-controller-base-handle-first-broadcast-delay", dkgmodule.DefaultBaseHandleFirstBroadcastDelay, "used to define the range for jitter prior to DKG handling the first broadcast messages (eg. 50ms) - the base value is scaled quadratically with the # of DKG participants")
+		flags.DurationVar(&dkgControllerConfig.HandleSubsequentBroadcastDelay, "dkg-controller-handle-subsequent-broadcast-delay", dkgmodule.DefaultHandleSubsequentBroadcastDelay, "used to define the constant delay introduced prior to DKG handling subsequent broadcast messages (eg. 2s)")
+		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 1996-04-24T15:04:05-07:00)")
+	}).ValidateFlags(func() error {
+		nodeBuilder.Logger.Info().Str("startup_time_str", startupTimeString).Msg("got startup_time_str")
+		if startupTimeString != cmd.NotSet {
+			t, err := time.Parse(time.RFC3339, startupTimeString)
+			if err != nil {
+				return fmt.Errorf("invalid start-time value: %w", err)
+			}
+			startupTime = t
+			nodeBuilder.Logger.Info().Time("startup_time", startupTime).Msg("got startup_time")
+		}
+		return nil
 	})
 
 	if err = nodeBuilder.Initialize(); err != nil {
@@ -155,6 +173,10 @@ func main() {
 		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
+		}).
+		Module("dkg key storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			dkgKeyStore, err = bstorage.NewDKGKeys(node.Metrics.Cache, node.SecretsDB)
+			return err
 		}).
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
@@ -252,7 +274,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			err = node.Storage.DKGKeys.InsertMyDKGPrivateInfo(epochCounter, privateDKGData)
+			err = dkgKeyStore.InsertMyDKGPrivateInfo(epochCounter, privateDKGData)
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}
@@ -270,7 +292,7 @@ func main() {
 					if err != nil {
 						return err
 					}
-					_, err = node.Storage.DKGKeys.RetrieveMyDKGPrivateInfo(counter)
+					_, err = dkgKeyStore.RetrieveMyDKGPrivateInfo(counter)
 					if err != nil {
 						return err
 					}
@@ -594,7 +616,7 @@ func main() {
 
 			epochLookup := epochs.NewEpochLookup(node.State)
 
-			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, node.Storage.DKGKeys)
+			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeyStore)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.SignerVerifier
@@ -628,6 +650,19 @@ func main() {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}
 
+			opts := []consensus.Option{
+				consensus.WithInitialTimeout(hotstuffTimeout),
+				consensus.WithMinTimeout(hotstuffMinTimeout),
+				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
+				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+				consensus.WithBlockRateDelay(blockRateDelay),
+			}
+
+			if !startupTime.IsZero() {
+				opts = append(opts, consensus.WithStartupTime(startupTime))
+			}
+
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
@@ -644,12 +679,7 @@ func main() {
 				node.RootQC,
 				finalized,
 				pending,
-				consensus.WithInitialTimeout(hotstuffTimeout),
-				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
-				consensus.WithBlockRateDelay(blockRateDelay),
+				opts...,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
@@ -714,10 +744,6 @@ func main() {
 			viewsObserver := gadgets.NewViews()
 			node.ProtocolEvents.AddConsumer(viewsObserver)
 
-			// keyDB is used to store the private key resulting from the node's
-			// participation in the DKG run
-			keyDB := badger.NewDKGKeys(node.Metrics.Cache, node.DB)
-
 			// construct DKG contract client
 			dkgContractClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
 			if err != nil {
@@ -730,12 +756,13 @@ func main() {
 				node.Logger,
 				node.Me,
 				node.State,
-				keyDB,
+				dkgKeyStore,
 				dkgmodule.NewControllerFactory(
 					node.Logger,
 					node.Me,
 					dkgContractClient,
 					dkgBrokerTunnel,
+					dkgControllerConfig,
 				),
 				viewsObserver,
 			)

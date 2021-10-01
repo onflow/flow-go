@@ -67,6 +67,8 @@ func main() {
 		hotstuffTimeoutDecreaseFactor          float64
 		hotstuffTimeoutVoteAggregationFraction float64
 		blockRateDelay                         time.Duration
+		startupTimeString                      string
+		startupTime                            time.Time
 
 		followerState protocol.MutableState
 		ingestConf    ingest.Config
@@ -141,11 +143,21 @@ func main() {
 			"additional fraction of replica timeout that the primary will wait for votes")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
+		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g (e.g 1996-04-24T15:04:05-07:00))")
 
 		// epoch qc contract flags
 		flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
 		flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
+	}).ValidateFlags(func() error {
+		if startupTimeString != cmd.NotSet {
+			t, err := time.Parse(time.RFC3339, startupTimeString)
+			if err != nil {
+				return fmt.Errorf("invalid start-time value: %w", err)
+			}
+			startupTime = t
+		}
+		return nil
 	})
 
 	if err = nodeBuilder.Initialize(); err != nil {
@@ -433,6 +445,20 @@ func main() {
 				return metrics.NewHotstuffCollector(chainID)
 			}
 			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
+
+			opts := []consensus.Option{
+				consensus.WithBlockRateDelay(blockRateDelay),
+				consensus.WithInitialTimeout(hotstuffTimeout),
+				consensus.WithMinTimeout(hotstuffMinTimeout),
+				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
+				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+			}
+
+			if !startupTime.IsZero() {
+				opts = append(opts, consensus.WithStartupTime(startupTime))
+			}
+
 			hotstuffFactory, err := factories.NewHotStuffFactory(
 				node.Logger,
 				node.Me,
@@ -440,12 +466,7 @@ func main() {
 				node.DB,
 				node.State,
 				createMetrics,
-				consensus.WithBlockRateDelay(blockRateDelay),
-				consensus.WithInitialTimeout(hotstuffTimeout),
-				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+				opts...,
 			)
 			if err != nil {
 				return nil, err
