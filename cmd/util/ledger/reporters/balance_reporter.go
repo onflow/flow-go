@@ -27,7 +27,6 @@ type BalanceReporter struct {
 	RWF            ReportWriterFactory
 	rw             ReportWriter
 	progress       *progressbar.ProgressBar
-	rwts           ReportWriter
 	addressMoments map[string]int
 }
 
@@ -58,34 +57,18 @@ type moments struct {
 func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	r.rw = r.RWF.ReportWriter("balance_report")
 	defer r.rw.Close()
-	r.rwts = r.RWF.ReportWriter("top_shot_report")
-	defer r.rwts.Close()
-
-	addressMoments := make(map[string]int)
 
 	r.progress = progressbar.Default(int64(len(payload)), "Processing:")
 
 	l := migrations.NewView(payload)
 
 	wg := &sync.WaitGroup{}
-	momentsWG := &sync.WaitGroup{}
 	jobs := make(chan ledger.Payload)
-	momentsChan := make(chan moments)
 	workerCount := runtime.NumCPU()
-
-	momentsWG.Add(1)
-	go func() {
-		for m := range momentsChan {
-			if m.Moments > 0 {
-				addressMoments[m.Address] += m.Moments
-			}
-		}
-		momentsWG.Done()
-	}()
 
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
-		go r.balanceReporterWorker(l, jobs, momentsChan, wg)
+		go r.balanceReporterWorker(l, jobs, wg)
 	}
 
 	for _, p := range payload {
@@ -94,15 +77,6 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 
 	close(jobs)
 	wg.Wait()
-	close(momentsChan)
-	momentsWG.Wait()
-
-	for a, n := range addressMoments {
-		r.rwts.Write(moments{
-			Address: a,
-			Moments: n,
-		})
-	}
 
 	err := r.progress.Finish()
 	if err != nil {
@@ -115,7 +89,6 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 func (r *BalanceReporter) balanceReporterWorker(
 	l state.View,
 	jobs <-chan ledger.Payload,
-	momentsChan chan<- moments,
 	wg *sync.WaitGroup) {
 	st := state.NewState(l)
 	sth := state.NewStateHolder(st)
@@ -128,7 +101,7 @@ func (r *BalanceReporter) balanceReporterWorker(
 	)
 
 	for payload := range jobs {
-		r.handlePayload(payload, storage, momentsChan)
+		r.handlePayload(payload, storage)
 
 		err := r.progress.Add(1)
 		if err != nil {
@@ -139,7 +112,7 @@ func (r *BalanceReporter) balanceReporterWorker(
 	wg.Done()
 }
 
-func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntime.Storage, momentsChan chan<- moments) {
+func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntime.Storage) {
 	id, err := migrations.KeyToRegisterID(p.Key)
 	if err != nil {
 		panic(err)
@@ -191,8 +164,6 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 	lastComposite := "none"
 	firstComposite := ""
 
-	m := 0
-
 	balanceVisitor := &interpreter.EmptyVisitor{
 		CompositeValueVisitor: func(inter *interpreter.Interpreter, value *interpreter.CompositeValue) bool {
 			if firstComposite == "" {
@@ -217,13 +188,6 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 				return false
 			}
 
-			if strings.Contains(string(value.TypeID()), "TopShot") {
-				m += 1
-				r.Log.Info().Str("type", string(value.TypeID())).Msg("test")
-
-				return false
-			}
-
 			lastComposite = string(value.TypeID())
 			return true
 		},
@@ -240,9 +204,4 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 		return
 	}
 	cValue.Accept(inter, balanceVisitor)
-
-	momentsChan <- moments{
-		Address: owner.Hex(),
-		Moments: m,
-	}
 }

@@ -49,11 +49,18 @@ type contractRecord struct {
 	Contract string `json:"contract"`
 }
 
+type momentsRecord struct {
+	Address  string `json:"address"`
+	Contract int    `json:"moments"`
+}
+
 func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	rwa := r.RWF.ReportWriter("account_report")
 	rwc := r.RWF.ReportWriter("contract_report")
+	rwm := r.RWF.ReportWriter("moments_report")
 	defer rwa.Close()
 	defer rwc.Close()
+	defer rwm.Close()
 
 	l := migrations.NewView(payload)
 	st := state.NewState(l)
@@ -71,7 +78,7 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	}
 
 	for i := 0; i < workerCount; i++ {
-		adp := newAccountDataProcessor(wg, r.Log, rwa, rwc, r.Chain, l)
+		adp := newAccountDataProcessor(wg, r.Log, rwa, rwc, rwm, r.Chain, l)
 		wg.Add(1)
 		go adp.reportAccountData(addressIndexes)
 	}
@@ -97,11 +104,12 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 }
 
 type balanceProcessor struct {
-	vm     *fvm.VirtualMachine
-	ctx    fvm.Context
-	view   state.View
-	prog   *programs.Programs
-	script []byte
+	vm            *fvm.VirtualMachine
+	ctx           fvm.Context
+	view          state.View
+	prog          *programs.Programs
+	balanceScript []byte
+	momentsScript []byte
 
 	accounts state.Accounts
 	st       *state.State
@@ -110,14 +118,15 @@ type balanceProcessor struct {
 	rwc    ReportWriter
 	wg     *sync.WaitGroup
 	logger zerolog.Logger
+	rwm    ReportWriter
 }
 
-func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
+func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, rwm ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
 
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
 	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
 	prog := programs.NewEmptyPrograms()
-	script := []byte(fmt.Sprintf(`
+	balanceScript := []byte(fmt.Sprintf(`
 				import FungibleToken from 0x%s
 				import FlowToken from 0x%s
 
@@ -131,23 +140,37 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa Repo
 				}
 			`, fvm.FungibleTokenAddress(ctx.Chain), fvm.FlowTokenAddress(ctx.Chain)))
 
+	momentsScript := []byte(fmt.Sprintf(`
+			import TopShot from 0x0b2a3299cc857e29
+			
+			pub fun main(account: Address): Int {
+				let acct = getAccount(account)
+				let collectionRef = acct.getCapability(/public/MomentCollection)
+										.borrow<&{TopShot.MomentCollectionPublic}>()!
+
+				return collectionRef.getIDs().length
+			}
+			`))
+
 	v := view.NewChild()
 	st := state.NewState(v)
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
 
 	return &balanceProcessor{
-		wg:       wg,
-		logger:   logger,
-		vm:       vm,
-		ctx:      ctx,
-		view:     v,
-		accounts: accounts,
-		st:       st,
-		prog:     prog,
-		rwa:      rwa,
-		rwc:      rwc,
-		script:   script}
+		wg:            wg,
+		logger:        logger,
+		vm:            vm,
+		ctx:           ctx,
+		view:          v,
+		accounts:      accounts,
+		st:            st,
+		prog:          prog,
+		rwa:           rwa,
+		rwc:           rwc,
+		rwm:           rwm,
+		balanceScript: balanceScript,
+		momentsScript: momentsScript}
 }
 
 func (c *balanceProcessor) reportAccountData(addressIndexes <-chan uint64) {
@@ -191,6 +214,21 @@ func (c *balanceProcessor) reportAccountData(addressIndexes <-chan uint64) {
 				Msgf("Error determining if account is dapper account")
 			continue
 		}
+		if dapper {
+			m, err := c.moments(address)
+			if err != nil {
+				c.logger.
+					Err(err).
+					Uint64("index", indx).
+					Str("address", address.String()).
+					Msgf("Error getting moments for account")
+				continue
+			}
+			c.rwm.Write(moments{
+				Address: address.Hex(),
+				Moments: m,
+			})
+		}
 
 		hasReceiver, err := c.hasReceiver(address)
 		if err != nil {
@@ -229,12 +267,13 @@ func (c *balanceProcessor) reportAccountData(addressIndexes <-chan uint64) {
 				Contract: contract,
 			})
 		}
+
 	}
 	c.wg.Done()
 }
 
 func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
-	script := fvm.Script(c.script).WithArguments(
+	script := fvm.Script(c.balanceScript).WithArguments(
 		jsoncdc.MustEncode(cadence.NewAddress(address)),
 	)
 
@@ -252,6 +291,23 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 		hasVault = false
 	}
 	return balance, hasVault, nil
+}
+
+func (c *balanceProcessor) moments(address flow.Address) (int, error) {
+	script := fvm.Script(c.momentsScript).WithArguments(
+		jsoncdc.MustEncode(cadence.NewAddress(address)),
+	)
+
+	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	if err != nil {
+		return 0, err
+	}
+
+	var m int
+	if script.Err == nil && script.Value != nil {
+		m = script.Value.ToGoValue().(int)
+	}
+	return m, nil
 }
 
 func (c *balanceProcessor) storageUsed(address flow.Address) (uint64, error) {
