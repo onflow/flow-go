@@ -50,8 +50,8 @@ type balanceDataPoint struct {
 }
 
 type moments struct {
-	address string
-	number  int
+	Address string `json:"address"`
+	Moments int    `json:"moments"`
 }
 
 // Report creates a balance_report_*.json file that contains data on all FlowVaults in the state commitment.
@@ -87,8 +87,8 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	momentsWG.Add(1)
 	go func() {
 		for m := range momentsChan {
-			if m.number > 0 {
-				addressMoments[m.address] += m.number
+			if m.Moments > 0 {
+				addressMoments[m.Address] += m.Moments
 			}
 		}
 		momentsWG.Done()
@@ -107,6 +107,13 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	wg.Wait()
 	close(momentsChan)
 	momentsWG.Wait()
+
+	for a, n := range addressMoments {
+		r.rwts.Write(moments{
+			Address: a,
+			Moments: n,
+		})
+	}
 
 	err := r.progress.Finish()
 	if err != nil {
@@ -202,8 +209,8 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, momentsChan chan<- mom
 	cValue.Accept(inter, balanceVisitor)
 
 	momentsChan <- moments{
-		address: owner.Hex(),
-		number:  m,
+		Address: owner.Hex(),
+		Moments: m,
 	}
 
 	err = r.progress.Add(1)
