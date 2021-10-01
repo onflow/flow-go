@@ -142,7 +142,7 @@ func (suite *PeerManagerTestSuite) TestPeriodicPeerUpdate() {
 		}
 	}).Return(nil)
 
-	peerUpdateInterval := 5 * time.Millisecond
+	peerUpdateInterval := 10 * time.Millisecond
 	pm := NewPeerManager(suite.log, idProvider, connector, WithInterval(peerUpdateInterval))
 
 	unittest.RequireCloseBefore(suite.T(), pm.Ready(), 2*time.Second, "could not start peer manager")
