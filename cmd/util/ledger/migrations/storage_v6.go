@@ -695,6 +695,117 @@ func (m *StorageFormatV6Migration) updateBrokenContracts(payloads []ledger.Paylo
 	}
 }
 
+func (m StorageFormatV6Migration) getLocation(location common.Location) common.Location {
+	addressLocation, ok := location.(common.AddressLocation)
+	if !ok {
+		return location
+	}
+
+	// If any of the broken/missing types are found, update
+	// the referer to use the new version of the same type.
+	addressHex := addressLocation.Address.Hex()
+	switch addressLocation.Name {
+	case "FlowIDTableStaking":
+		switch addressHex {
+		case "e94f751ba094ef6a",
+			"ecda6c5746d5bdf0",
+			"f1a43bfd1354c9b8",
+			"16a5fe3b527633d4",
+			"76d9ea44cef09e20",
+			"9798362e92e5539a":
+			address, err := hex.DecodeString("9eca2b38b18b5dfe")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+	case "KittyItemsMarket", "KittyItems":
+		switch addressHex {
+		case "fcceff21d9532b58",
+			"17341c7824b030be",
+			"f79ee844bfa76528":
+			address, err := hex.DecodeString("8c5244250369a9ce")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+	case "DisruptNowBeta":
+		if addressHex == "45888dabccc5c376" {
+			address, err := hex.DecodeString("849832a65c0524b5")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+	case "NonFungibleToken":
+		if addressHex == "cd2fde7d198629e4" {
+			address, err := hex.DecodeString("c2f5b3fb0ad43ff1")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+	case "NonFungibleBeatoken":
+		if addressHex == "70239ed8e4c7367a" {
+			address, err := hex.DecodeString("14f7f8198e156fb0")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+	case "Auction", "Versus":
+		if addressHex == "1ff7e32d71183db0" {
+			// Use the existing one if any. Update otherwise.
+			code, err := m.accounts.GetContract(addressLocation.Name, flow.Address(addressLocation.Address))
+			if err == nil && len(code) != 0 {
+				break
+			}
+
+			location = common.AddressLocation{
+				Address: testnetAuctionContractAddress,
+				Name:    addressLocation.Name,
+			}
+		}
+
+	// mainnet
+	case "LockedTokens":
+		if addressHex == "31aed847945124fd" {
+			address, err := hex.DecodeString("8d0e87b65159ae63")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+	}
+
+	return location
+}
+
 // migrationRuntimeInterface
 
 type migrationRuntimeInterface struct {
@@ -972,9 +1083,10 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 			return
 		}
 
+		var writeErr error
 		switch err := r.(type) {
 		case newInter.TypeLoadingError:
-			c.migration.reportFile.WriteString(
+			_, writeErr = c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: missing static type: %s, owner: %s\n",
 					err.TypeID,
@@ -982,7 +1094,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 				),
 			)
 		case newInter.ContainerMutationError:
-			c.migration.reportFile.WriteString(
+			_, writeErr = c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: %s, owner: %s\n",
 					err.Error(),
@@ -991,7 +1103,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 			)
 		case runtime.Error:
 			if parsingCheckingErr, ok := err.Unwrap().(*runtime.ParsingCheckingError); ok {
-				c.migration.reportFile.WriteString(
+				_, writeErr = c.migration.reportFile.WriteString(
 					fmt.Sprintf(
 						"skipped migrating value: broken contract type: %s, cause: %s\n",
 						parsingCheckingErr.Location,
@@ -999,7 +1111,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 					),
 				)
 			} else {
-				c.migration.reportFile.WriteString(
+				_, writeErr = c.migration.reportFile.WriteString(
 					fmt.Sprintf(
 						"skipped migrating value: cause: %s\n",
 						err.Error(),
@@ -1007,7 +1119,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 				)
 			}
 		case newInter.Error:
-			c.migration.reportFile.WriteString(
+			_, writeErr = c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: cause: %s\n",
 					err.Error(),
@@ -1015,6 +1127,10 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 			)
 		default:
 			panic(err)
+		}
+
+		if writeErr != nil {
+			panic(writeErr)
 		}
 
 		c.migration.skippedValues += 1
@@ -1042,7 +1158,7 @@ func (c *ValueConverter) VisitValue(_ *oldInter.Interpreter, _ oldInter.Value) {
 
 func (c *ValueConverter) VisitTypeValue(_ *oldInter.Interpreter, value oldInter.TypeValue) {
 	c.result = newInter.TypeValue{
-		Type: ConvertStaticType(value.Type),
+		Type: c.convertStaticType(value.Type),
 	}
 }
 
@@ -1061,10 +1177,11 @@ func (c *ValueConverter) VisitStringValue(_ *oldInter.Interpreter, value *oldInt
 func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInter.ArrayValue) bool {
 	newElements := make([]newInter.Value, 0)
 
-	arrayStaticType := ConvertStaticType(value.StaticType()).(newInter.ArrayStaticType)
+	arrayStaticType := c.convertStaticType(value.StaticType()).(newInter.ArrayStaticType)
+	elementType := arrayStaticType.ElementType()
 
 	for _, element := range value.Elements() {
-		newElement := c.Convert(element, arrayStaticType.ElementType())
+		newElement := c.Convert(element, elementType)
 		if newElement != nil {
 			newElements = append(newElements, newElement)
 		}
@@ -1179,7 +1296,7 @@ func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *old
 
 	c.result = newInter.NewCompositeValue(
 		c.newInter,
-		compositeTypeLocation(value.Location()),
+		c.migration.getLocation(value.Location()),
 		value.QualifiedIdentifier(),
 		value.Kind(),
 		fields,
@@ -1190,104 +1307,8 @@ func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *old
 	return false
 }
 
-func compositeTypeLocation(location common.Location) common.Location {
-	addressLocation, ok := location.(common.AddressLocation)
-	if !ok {
-		return location
-	}
-
-	addressHex := addressLocation.Address.Hex()
-	switch {
-	case strings.HasPrefix(addressLocation.Name, "FlowIDTableStaking"):
-		switch addressHex {
-		case "e94f751ba094ef6a",
-			"ecda6c5746d5bdf0",
-			"f1a43bfd1354c9b8",
-			"16a5fe3b527633d4",
-			"76d9ea44cef09e20",
-			"9798362e92e5539a":
-			address, err := hex.DecodeString("9eca2b38b18b5dfe")
-			if err != nil {
-				panic(err)
-			}
-
-			location = common.AddressLocation{
-				Address: common.BytesToAddress(address),
-				Name:    addressLocation.Name,
-			}
-		}
-	case strings.HasPrefix(addressLocation.Name, "KittyItems"):
-		switch addressHex {
-		case "fcceff21d9532b58",
-			"17341c7824b030be",
-			"f79ee844bfa76528":
-			address, err := hex.DecodeString("8c5244250369a9ce")
-			if err != nil {
-				panic(err)
-			}
-
-			location = common.AddressLocation{
-				Address: common.BytesToAddress(address),
-				Name:    addressLocation.Name,
-			}
-		}
-	case addressLocation.Name == "DisruptNowBeta":
-		if addressHex == "45888dabccc5c376" {
-			address, err := hex.DecodeString("849832a65c0524b5")
-			if err != nil {
-				panic(err)
-			}
-
-			location = common.AddressLocation{
-				Address: common.BytesToAddress(address),
-				Name:    addressLocation.Name,
-			}
-		}
-	case addressLocation.Name == "NonFungibleToken":
-		if addressHex == "cd2fde7d198629e4" {
-			address, err := hex.DecodeString("c2f5b3fb0ad43ff1")
-			if err != nil {
-				panic(err)
-			}
-
-			location = common.AddressLocation{
-				Address: common.BytesToAddress(address),
-				Name:    addressLocation.Name,
-			}
-		}
-	case addressLocation.Name == "NonFungibleBeatoken":
-		if addressHex == "70239ed8e4c7367a" {
-			address, err := hex.DecodeString("14f7f8198e156fb0")
-			if err != nil {
-				panic(err)
-			}
-
-			location = common.AddressLocation{
-				Address: common.BytesToAddress(address),
-				Name:    addressLocation.Name,
-			}
-		}
-
-	// mainnet
-	case addressLocation.Name == "LockedTokens":
-		if addressHex == "31aed847945124fd" {
-			address, err := hex.DecodeString("8d0e87b65159ae63")
-			if err != nil {
-				panic(err)
-			}
-
-			location = common.AddressLocation{
-				Address: common.BytesToAddress(address),
-				Name:    addressLocation.Name,
-			}
-		}
-	}
-
-	return location
-}
-
 func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value *oldInter.DictionaryValue) bool {
-	staticType := ConvertStaticType(value.StaticType()).(newInter.DictionaryStaticType)
+	staticType := c.convertStaticType(value.StaticType()).(newInter.DictionaryStaticType)
 
 	keysAndValues := make([]newInter.Value, 0)
 
@@ -1381,7 +1402,7 @@ func (c *ValueConverter) VisitCapabilityValue(_ *oldInter.Interpreter, value old
 
 	var borrowType newInter.StaticType
 	if value.BorrowType != nil {
-		borrowType = ConvertStaticType(value.BorrowType)
+		borrowType = c.convertStaticType(value.BorrowType)
 	}
 
 	c.result = &newInter.CapabilityValue{
@@ -1395,7 +1416,7 @@ func (c *ValueConverter) VisitLinkValue(_ *oldInter.Interpreter, value oldInter.
 	targetPath := c.Convert(value.TargetPath, nil).(newInter.PathValue)
 	c.result = newInter.LinkValue{
 		TargetPath: targetPath,
-		Type:       ConvertStaticType(value.Type),
+		Type:       c.convertStaticType(value.Type),
 	}
 }
 
@@ -1426,72 +1447,86 @@ var testnetNonFungibleTokenContractAddress = func() common.Address {
 	return common.BytesToAddress(address)
 }()
 
-func ConvertStaticType(staticType oldInter.StaticType) newInter.StaticType {
+var testnetAuctionContractAddress = func() common.Address {
+	address, err := hex.DecodeString("99ca04281098b33d")
+	if err != nil {
+		panic(err)
+	}
+
+	return common.BytesToAddress(address)
+}()
+
+func (c *ValueConverter) convertStaticType(staticType oldInter.StaticType) newInter.StaticType {
 	switch typ := staticType.(type) {
 	case oldInter.CompositeStaticType:
-		location := compositeTypeLocation(typ.Location)
+		location := c.migration.getLocation(typ.Location)
 		return newInter.NewCompositeStaticType(location, typ.QualifiedIdentifier)
 
 	case oldInter.InterfaceStaticType:
-		// NonFungibleToken.NFT is a struct, but is stored as an interface type.
+		location := c.migration.getLocation(typ.Location)
+
+		// Following types are struct/resource, but is stored as an interface type.
 		// Rectify this by returning a composite static type.
-		if location, ok := typ.Location.(common.AddressLocation); ok {
+		if location, ok := location.(common.AddressLocation); ok {
 			if location.Address == testnetNonFungibleTokenContractAddress &&
 				typ.QualifiedIdentifier == "NonFungibleToken.NFT" {
+				return newInter.NewCompositeStaticType(location, typ.QualifiedIdentifier)
+			} else if location.Address == testnetAuctionContractAddress &&
+				typ.QualifiedIdentifier == "Auction.AuctionItem" {
 				return newInter.NewCompositeStaticType(location, typ.QualifiedIdentifier)
 			}
 		}
 
 		return newInter.InterfaceStaticType{
-			Location:            typ.Location,
+			Location:            location,
 			QualifiedIdentifier: typ.QualifiedIdentifier,
 		}
 
 	case oldInter.VariableSizedStaticType:
 		return newInter.VariableSizedStaticType{
-			Type: ConvertStaticType(typ.Type),
+			Type: c.convertStaticType(typ.Type),
 		}
 
 	case oldInter.ConstantSizedStaticType:
 		return newInter.ConstantSizedStaticType{
-			Type: ConvertStaticType(typ.Type),
+			Type: c.convertStaticType(typ.Type),
 			Size: typ.Size,
 		}
 
 	case oldInter.DictionaryStaticType:
 		return newInter.DictionaryStaticType{
-			KeyType:   ConvertStaticType(typ.KeyType),
-			ValueType: ConvertStaticType(typ.ValueType),
+			KeyType:   c.convertStaticType(typ.KeyType),
+			ValueType: c.convertStaticType(typ.ValueType),
 		}
 
 	case oldInter.OptionalStaticType:
 		return newInter.OptionalStaticType{
-			Type: ConvertStaticType(typ.Type),
+			Type: c.convertStaticType(typ.Type),
 		}
 
 	case *oldInter.RestrictedStaticType:
 		restrictions := make([]newInter.InterfaceStaticType, 0, len(typ.Restrictions))
 		for _, oldInterfaceType := range typ.Restrictions {
-			newInterfaceType := ConvertStaticType(oldInterfaceType).(newInter.InterfaceStaticType)
+			newInterfaceType := c.convertStaticType(oldInterfaceType).(newInter.InterfaceStaticType)
 			restrictions = append(restrictions, newInterfaceType)
 		}
 
 		return &newInter.RestrictedStaticType{
-			Type:         ConvertStaticType(typ.Type),
+			Type:         c.convertStaticType(typ.Type),
 			Restrictions: restrictions,
 		}
 
 	case oldInter.ReferenceStaticType:
 		return newInter.ReferenceStaticType{
 			Authorized: typ.Authorized,
-			Type:       ConvertStaticType(typ.Type),
+			Type:       c.convertStaticType(typ.Type),
 		}
 
 	case oldInter.CapabilityStaticType:
 		var borrowType newInter.StaticType
 
 		if typ.BorrowType != nil {
-			borrowType = ConvertStaticType(typ.BorrowType)
+			borrowType = c.convertStaticType(typ.BorrowType)
 		}
 
 		return newInter.CapabilityStaticType{
