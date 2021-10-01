@@ -77,7 +77,6 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	go func() {
 		for m := range momentsChan {
 			if m.Moments > 0 {
-				r.Log.Info().Msg("test")
 				addressMoments[m.Address] += m.Moments
 			}
 		}
@@ -220,6 +219,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 
 			if string(value.TypeID()) == "A.0b2a3299cc857e29.TopShot.NFT" {
 				m += 1
+				r.Log.Info().Msg("test")
 
 				return false
 			}
