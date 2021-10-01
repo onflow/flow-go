@@ -659,7 +659,6 @@ func main() {
 				consensus.WithBlockRateDelay(blockRateDelay),
 			}
 
-			node.Logger.Info().Bool("startup_time_is_zero", startupTime.IsZero()).Msg("is zero")
 			if !startupTime.IsZero() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
