@@ -1,7 +1,6 @@
 package reporters
 
 import (
-	"fmt"
 	"runtime"
 	"sync"
 	"time"
@@ -25,7 +24,6 @@ import (
 type BalanceReporter struct {
 	Log            zerolog.Logger
 	RWF            ReportWriterFactory
-	storage        *cadenceRuntime.Storage
 	rw             ReportWriter
 	progress       *progressbar.ProgressBar
 	rwts           ReportWriter
@@ -67,16 +65,6 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	r.progress = progressbar.Default(int64(len(payload)), "Processing:")
 
 	l := migrations.NewView(payload)
-	st := state.NewState(l)
-	sth := state.NewStateHolder(st)
-	accounts := state.NewAccounts(sth)
-
-	r.storage = cadenceRuntime.NewStorage(
-		&migrations.AccountsAtreeLedger{Accounts: accounts},
-		func(f func(), _ func(metrics cadenceRuntime.Metrics, duration time.Duration)) {
-			f()
-		},
-	)
 
 	wg := &sync.WaitGroup{}
 	momentsWG := &sync.WaitGroup{}
@@ -139,36 +127,45 @@ func (r *BalanceReporter) balanceReporterWorker(
 	)
 
 	for payload := range jobs {
-		err := r.handlePayload(payload, storage, momentsChan)
-		if err != nil {
-			r.Log.Err(err).Msg("Error handling payload")
-		}
+		r.handlePayload(payload, storage, momentsChan)
 	}
 
 	wg.Done()
 }
 
-func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntime.Storage, momentsChan chan<- moments) error {
+func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntime.Storage, momentsChan chan<- moments) {
 	id, err := migrations.KeyToRegisterID(p.Key)
 	if err != nil {
-		return err
+		panic(err)
 	}
 
 	// Ignore known payload keys that are not Cadence values
 	if state.IsFVMStateKey(id.Owner, id.Controller, id.Key) {
-		return nil
+		return
 	}
 	owner := common.BytesToAddress([]byte(id.Owner))
 	decoder := interpreter.CBORDecMode.NewByteStreamDecoder(p.Value)
 
 	storable, err := interpreter.DecodeStorable(decoder, atree.StorageIDUndefined)
 	if err != nil || storable == nil {
-		return fmt.Errorf("could not decode storable at %s: %w", owner.Hex(), err)
+		r.Log.
+			Error().
+			Err(err).
+			Str("owner", owner.Hex()).
+			Hex("storable", p.Value).
+			Msg("Could not decode storable")
+		return
 	}
 	storedValue, err := storable.StoredValue(storage)
 	cValue := interpreter.MustConvertStoredValue(storedValue)
 	if err != nil || cValue == nil {
-		return fmt.Errorf("could not decode value at %s: %w", owner.Hex(), err)
+		r.Log.
+			Error().
+			Err(err).
+			Str("owner", owner.Hex()).
+			Hex("storable", p.Value).
+			Msg("Could not decode value")
+		return
 	}
 
 	if id.Key == "contract\u001fFlowToken" {
@@ -218,7 +215,12 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 
 	inter, err := interpreter.NewInterpreter(nil, common.StringLocation("somewhere"))
 	if err != nil {
-		return err
+		r.Log.
+			Error().
+			Err(err).
+			Str("owner", owner.Hex()).
+			Msg("Could not create interpreter")
+		return
 	}
 	cValue.Accept(inter, balanceVisitor)
 
@@ -231,6 +233,4 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 	if err != nil {
 		panic(err)
 	}
-
-	return nil
 }
