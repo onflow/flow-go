@@ -118,19 +118,11 @@ jobs:
       run: make crypto/relic/build
     - name: Run tests
       if: github.actor != 'bors[bot]'
-      run: |
-        if ! (grep -q -e '^flags.*\badx\b' /proc/cpuinfo) 2>/dev/null; then
-            export CGO_CFLAGS="-D__BLST_PORTABLE__"
-        fi
-        make -C crypto cross-blst-test
+      run: make -C crypto cross-blst-test
     - name: Run tests (Bors)
       if: github.actor == 'bors[bot]'
       uses: nick-invision/retry@v2
       with:
         timeout_minutes: 25
         max_attempts: 2
-        command: |
-          if ! (grep -q -e '^flags.*\badx\b' /proc/cpuinfo) 2>/dev/null; then
-              export CGO_CFLAGS="-D__BLST_PORTABLE__"
-          fi
-          make -C crypto cross-blst-test
+        command: make -C crypto cross-blst-test
