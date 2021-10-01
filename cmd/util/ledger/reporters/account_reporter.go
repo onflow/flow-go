@@ -305,7 +305,7 @@ func (c *balanceProcessor) moments(address flow.Address) (int, error) {
 
 	var m int
 	if script.Err == nil && script.Value != nil {
-		m = script.Value.ToGoValue().(int)
+		m = script.Value.(cadence.Int).Int()
 	}
 	return m, nil
 }
