@@ -474,26 +474,20 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// at-least 2 full access nodes must be configure in your test suite
 	// in order to provide a secure GRPC connection for LN & SN nodes
-	var (
-		accessNodeIDS strings.Builder
-		anCount = 0
-	)
+	accessNodeIDS := make([]string, 0)
 	for _, n := range confs {
 		if n.Role == flow.RoleAccess && !n.Ghost {
-			accessNodeIDS.WriteString(fmt.Sprintf("%s,", n.NodeID.String()))
-			anCount++
+			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
 		}
 	}
-	require.True(t,  anCount > 1, "at-least 2 access node that is not a ghost must be configured for test suite")
+	require.True(t,  len(accessNodeIDS) > 1, "at-least 2 access node that is not a ghost must be configured for test suite")
 
 	// add each node to the network
 	for _, nodeConf := range confs {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
 
-		// string slice argument for LN/SN node --access-node-ids
-		// remove extra comma at the end of string
-		anIDS := accessNodeIDS.String()[:accessNodeIDS.Len()-1]
+		anIDS := strings.Join(accessNodeIDS, ",")
 
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 		if nodeConf.Role == flow.RoleConsensus || nodeConf.Role == flow.RoleCollection {

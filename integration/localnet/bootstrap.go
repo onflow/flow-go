@@ -155,7 +155,7 @@ func main() {
 	fmt.Println("Node bootstrapping data generated...")
 
 	// gather access node IDS for LN/SN nodes
-	var accessNodeIDS strings.Builder
+	accessNodeIDS := make([]string, 0)
 	for i, c := range containers {
 		fmt.Printf("%d: %s", i+1, c.Identity().String())
 		if c.Unstaked {
@@ -163,14 +163,13 @@ func main() {
 		}
 
 		if c.Role == flow.RoleAccess && !c.Unstaked {
-			accessNodeIDS.WriteString(fmt.Sprintf("%s,", c.NodeID.String()))
+			accessNodeIDS = append(accessNodeIDS, c.NodeID.String())
 		}
 
 		fmt.Println()
 	}
 
-	// remove extra comma at the end of string
-	anIDS := accessNodeIDS.String()[:accessNodeIDS.Len()-1]
+	anIDS := strings.Join(accessNodeIDS, ",")
 	services := prepareServices(containers, anIDS)
 
 	err = writeDockerComposeConfig(services)
@@ -385,7 +384,7 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, accessNod
 		fmt.Sprintf("--chunk-alpha=1"),
 		fmt.Sprintf("--emergency-sealing-active=false"),
 		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprintf("--access-node-ids=%v", accessNodeIDS),
+		fmt.Sprintf("--access-node-ids=%s", accessNodeIDS),
 	)
 
 	return service
@@ -414,7 +413,7 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, accessNo
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprintf("--access-node-ids=%v", accessNodeIDS),
+		fmt.Sprintf("--access-node-ids=%s", accessNodeIDS),
 	)
 
 	return service
