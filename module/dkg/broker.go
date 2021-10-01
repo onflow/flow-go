@@ -20,9 +20,12 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// retryMax is the maximum number of times the broker will attempt to broadcast
+// retryMaxPublish is the maximum number of times the broker will attempt to broadcast
 // a message or publish a result
-const retryMax = 8
+const retryMaxPublish = 8
+
+// retryMaxRead is the max number of times the broker will attempt to read messages
+const retryMaxRead = 3
 
 // retryMilliseconds is the number of milliseconds to wait between retries
 const retryMilliseconds = 1000 * time.Millisecond
@@ -143,7 +146,7 @@ func (b *Broker) Broadcast(data []byte) {
 		if err != nil {
 			b.log.Fatal().Err(err).Msg("create retry mechanism")
 		}
-		maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
+		maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
 
 		attempts := 1
 		err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
@@ -153,7 +156,7 @@ func (b *Broker) Broadcast(data []byte) {
 
 				// retry with next fallback client after 2 failed attempts
 				if attempts%2 == 0 {
-					b.log.Warn().Msgf("retrying on attempt (%x) with fallback access node", attempts)
+					b.log.Warn().Msgf("broadcast: retrying on attempt (%x) with fallback access node", attempts)
 					b.updateActiveDKGContractClient()
 				}
 			}
@@ -204,10 +207,37 @@ func (b *Broker) GetBroadcastMsgCh() <-chan messages.DKGMessage {
 func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	b.Lock()
 	defer b.Unlock()
-	msgs, err := b.dkgContractClient().ReadBroadcast(b.messageOffset, referenceBlock)
+
+	expRetry, err := retry.NewExponential(retryMilliseconds)
 	if err != nil {
-		return fmt.Errorf("could not read broadcast messages(offset: %d, ref: %v): %w", b.messageOffset, referenceBlock, err)
+		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
+	maxedExpRetry := retry.WithMaxRetries(retryMaxRead, expRetry)
+
+	var msgs []messages.BroadcastDKGMessage
+	attempts := 0
+	err = retry.Do(b.unit.Ctx(), maxedExpRetry, func(ctx context.Context) error {
+		attempts++
+		// retry with next fallback client after 2 failed attempts
+		if attempts%2 == 0 {
+			b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node", attempts)
+			b.updateActiveDKGContractClient()
+		}
+
+		msgs, err = b.dkgContractClient().ReadBroadcast(b.messageOffset, referenceBlock)
+		if err != nil {
+			err = fmt.Errorf("could not read broadcast messages(offset: %d, ref: %v): %w", b.messageOffset, referenceBlock, err)
+			return retry.RetryableError(err)
+		}
+		return nil
+	})
+	// Various network conditions can result in errors while reading DKG messages
+	// We will read any messages during the next poll because messageOffset is not increased
+	if err != nil {
+		b.log.Error().Err(err).Msg("failed to read messages")
+		return nil
+	}
+
 	for _, msg := range msgs {
 		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
@@ -231,9 +261,17 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
-	maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
+	maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
 
+	attempts := 0
 	err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
+		attempts++
+		// retry with next fallback client after 2 failed attempts
+		if attempts%2 == 0 {
+			b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node", attempts)
+			b.updateActiveDKGContractClient()
+		}
+
 		err := b.dkgContractClient().SubmitResult(pubKey, groupKeys)
 		if err != nil {
 			b.log.Error().Err(err).Msg("error submitting DKG result, retrying")
