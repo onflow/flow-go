@@ -189,7 +189,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, momentsChan chan<- mom
 
 				return false
 			}
-			
+
 			lastComposite = string(value.TypeID())
 			return true
 		},

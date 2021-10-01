@@ -2,8 +2,6 @@ package extract
 
 import (
 	"fmt"
-	vlds "github.com/onflow/flow-go/cmd/util/ledger/validators"
-
 	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 
 	"github.com/rs/zerolog"
@@ -82,7 +80,7 @@ func extractExecutionState(
 
 		// only add validators if migration is on
 		validators = []ledger.Validator{
-			vlds.NewAccountBalanceValidator(log, chain),
+			// vlds.NewAccountBalanceValidator(log, chain),
 		}
 
 	}
