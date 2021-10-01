@@ -149,7 +149,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 	if state.IsFVMStateKey(id.Owner, id.Controller, id.Key) {
 		return
 	}
-	if strings.HasSuffix(id.Key, "\x24") {
+	if strings.HasPrefix(id.Key, "\x24") {
 		// this is a slab index
 		return
 	}
