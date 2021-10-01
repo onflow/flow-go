@@ -84,6 +84,8 @@ func PeerManagerFactory(peerManagerOptions []Option, connectorOptions ...Connect
 
 // Ready kicks off the ambient periodic connection updates.
 func (pm *PeerManager) Ready() <-chan struct{} {
+	pm.unit.Launch(pm.updateLoop)
+
 	// makes sure that peer update request is invoked once before returning
 	pm.RequestPeerUpdate()
 
@@ -93,8 +95,6 @@ func (pm *PeerManager) Ready() <-chan struct{} {
 	// potentially expensive operation across the network
 	delay := time.Duration(mrand.Int63n(pm.peerUpdateInterval.Nanoseconds()))
 	pm.unit.LaunchPeriodically(pm.RequestPeerUpdate, pm.peerUpdateInterval, delay)
-
-	pm.unit.Launch(pm.updateLoop)
 
 	return pm.unit.Ready()
 }

@@ -142,12 +142,20 @@ func main() {
 			"additional fraction of replica timeout that the primary will wait for votes")
 		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
 			"the delay to broadcast block proposal in order to control block production rate")
-		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 2006-01-02T15:04:05Z07:00)")
+		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g (e.g 1996-04-24T15:04:05-07:00))")
 
 		// epoch qc contract flags
-		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
+		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, "array of access node ID's sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. minimum length 2")
-
+	}).ValidateFlags(func() error {
+		if startupTimeString != cmd.NotSet {
+			t, err := time.Parse(time.RFC3339, startupTimeString)
+			if err != nil {
+				return fmt.Errorf("invalid start-time value: %w", err)
+			}
+			startupTime = t
+		}
+		return nil
 	})
 
 	if err = nodeBuilder.Initialize(); err != nil {
@@ -155,16 +163,6 @@ func main() {
 	}
 
 	nodeBuilder.
-		ValidateFlags(func() error {
-			if startupTimeString != cmd.NotSet {
-				t, err := time.Parse(time.RFC3339, startupTimeString)
-				if err != nil {
-					return fmt.Errorf("invalid start-time value: %w", err)
-				}
-				startupTime = t
-			}
-			return nil
-		}).
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
