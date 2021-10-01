@@ -37,8 +37,11 @@ type RandomBeaconFollower interface {
 	EnoughShares() bool
 
 	// Reconstruct reconstructs the group signature.
-	// The reconstructed signature is verified against the overall group public key and the message agreed upon.
-	// This is a sanity check that is necessary since "TrustedAdd" allows adding non-verified signatures.
-	// Reconstruct returns an error if the reconstructed signature fails the sanity verification, or if not enough shares have been collected.
+	// The function errors if not enough shares were collected and if any signature
+	// fails the deserialization.
+	// It also performs a final verification against the stored message and group public key
+	// and errors (without sentinel) if the result is not valid. This is required for the function safety since
+	// `TrustedAdd` allows adding invalid signatures.
+	// The function is thread-safe and blocking.
 	Reconstruct() (crypto.Signature, error)
 }
