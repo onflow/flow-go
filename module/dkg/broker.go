@@ -151,9 +151,9 @@ func (b *Broker) Broadcast(data []byte) {
 			if err != nil {
 				b.log.Error().Err(err).Msgf("error broadcasting, retrying (%x)", attempts)
 
-				// retry with next fallback client every 2 attempts
+				// retry with next fallback client after 2 failed attempts
 				if attempts%2 == 0 {
-					b.log.Info().Msgf("retrying on attempt (%x) with fallback access node", attempts)
+					b.log.Warn().Msgf("retrying on attempt (%x) with fallback access node", attempts)
 					b.updateActiveDKGContractClient()
 				}
 			}

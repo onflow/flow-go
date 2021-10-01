@@ -98,16 +98,16 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 
 	expRetry, err := retry.NewExponential(retryMilliseconds)
 	if err != nil {
-		voter.log.Fatal().Err(err).Msg("create retry mechanism")
+		log.Fatal().Err(err).Msg("create retry mechanism")
 	}
 
 	attempts := 0
 	err = retry.Do(ctx, retry.WithJitterPercent(retryJitter, expRetry), func(ctx context.Context) error {
 		attempts++
 
-		// retry with next fallback client every 2 attempts
+		// retry with next fallback client after 2 failed attempts
 		if attempts%2 == 0 {
-			log.Info().Msgf("retrying on attempt (%x) with fallback access node", attempts)
+			log.Warn().Msgf("retrying on attempt (%d) with fallback access node", attempts)
 			voter.updateActiveQcContractClient()
 		}
 

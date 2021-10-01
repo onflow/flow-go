@@ -97,12 +97,12 @@ func PrepareFlowClientOpts(accessNodeIDS []string, insecureAccessAPI bool, snaps
 
 	identities, err := snapshot.Identities(filter.HasNodeID(anIDS...))
 	if err != nil {
-		return nil, fmt.Errorf("failed get identities access node IDs from snapshot: %v", accessNodeIDS)
+		return nil, fmt.Errorf("failed get identities access node identities (ids=%v) from snapshot: %w", accessNodeIDS, err)
 	}
 
 	// make sure we have identities for all the access node IDs provided
 	if len(identities) != len(accessNodeIDS) {
-		return nil, fmt.Errorf("failed to get identity for all the access node IDs provided: %v, got %s", accessNodeIDS, identities)
+		return nil, fmt.Errorf("failed to get identity for all the access node IDs provided: %v, got %v", accessNodeIDS, identities.NodeIDs())
 	}
 
 	// build a FlowClientOpt for each access node identity, these will be used to manage multiple flow client connections
@@ -114,7 +114,7 @@ func PrepareFlowClientOpts(accessNodeIDS []string, insecureAccessAPI bool, snaps
 
 		opt, err := NewFlowClientOpt(accessAddress, networkingPubKey, insecureAccessAPI)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get flow client connection option for access node ID (%x): %s %w", i, identity, err)
+			return nil, fmt.Errorf("failed to get flow client connection option for access node ID (%d): %s %w", i, identity, err)
 		}
 
 		flowClientOpts = append(flowClientOpts, opt)

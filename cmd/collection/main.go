@@ -204,7 +204,7 @@ func main() {
 		}).
 		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			if len(accessNodeIDS) < common.DefaultAccessNodeIDSMinimum {
-				return fmt.Errorf("invalid flag --access-node-ids atleast %x IDs must be provided", common.DefaultAccessNodeIDSMinimum)
+				return fmt.Errorf("invalid flag --access-node-ids atleast %d IDs must be provided", common.DefaultAccessNodeIDSMinimum)
 			}
 
 			flowClientOpts, err = common.PrepareFlowClientOpts(accessNodeIDS, insecureAccessAPI, node.State.Sealed())
