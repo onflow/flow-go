@@ -254,7 +254,7 @@ type Build struct {
 	Target     string
 }
 
-func prepareServices(containers []testnet.ContainerConfig, secureAccessNodeIDS string) Services {
+func prepareServices(containers []testnet.ContainerConfig, accessNodeIDS string) Services {
 	services := make(Services)
 
 	var (
@@ -271,14 +271,14 @@ func prepareServices(containers []testnet.ContainerConfig, secureAccessNodeIDS s
 			services[container.ContainerName] = prepareConsensusService(
 				container,
 				numConsensus,
-				secureAccessNodeIDS,
+				accessNodeIDS,
 			)
 			numConsensus++
 		case flow.RoleCollection:
 			services[container.ContainerName] = prepareCollectionService(
 				container,
 				numCollection,
-				secureAccessNodeIDS,
+				accessNodeIDS,
 			)
 			numCollection++
 		case flow.RoleExecution:

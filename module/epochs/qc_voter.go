@@ -107,8 +107,8 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 
 		// retry with next fallback client after 2 failed attempts
 		if attempts%2 == 0 {
-			log.Warn().Msgf("retrying on attempt (%d) with fallback access node", attempts)
 			voter.updateActiveQcContractClient()
+			log.Warn().Msgf("retrying on attempt (%d) with fallback access node at index (%d)", attempts, voter.activeQCContractClient)
 		}
 
 		// check that we're still in the setup phase, if we're not we can't
