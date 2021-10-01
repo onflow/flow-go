@@ -268,8 +268,8 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 		attempts++
 		// retry with next fallback client after 2 failed attempts
 		if attempts%2 == 0 {
-			b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node", attempts)
 			b.updateActiveDKGContractClient()
+			b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.activeDKGContractClient)
 		}
 
 		err := b.dkgContractClient().SubmitResult(pubKey, groupKeys)
