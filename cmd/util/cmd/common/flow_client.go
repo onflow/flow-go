@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
@@ -99,6 +100,7 @@ func PrepareFlowClientOpts(accessNodeIDS []string, insecureAccessAPI bool, snaps
 	if err != nil {
 		return nil, fmt.Errorf("failed get identities access node identities (ids=%v) from snapshot: %w", accessNodeIDS, err)
 	}
+	identities = identities.Sort(order.ByReferenceOrder(anIDS))
 
 	// make sure we have identities for all the access node IDs provided
 	if len(identities) != len(accessNodeIDS) {
