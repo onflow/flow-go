@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/hex"
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
@@ -17,7 +18,7 @@ import (
 // AccountKeyHandler handles all interaction
 // with account keys such as get/set/revoke
 type AccountKeyHandler struct {
-	accounts *state.Accounts
+	accounts state.Accounts
 }
 
 //  NewAccountPublicKey construct an account public key given a runtime public key.
@@ -57,7 +58,7 @@ func NewAccountPublicKey(publicKey *runtime.PublicKey,
 	}, nil
 }
 
-func NewAccountKeyHandler(accounts *state.Accounts) *AccountKeyHandler {
+func NewAccountKeyHandler(accounts *state.StatefulAccounts) *AccountKeyHandler {
 	return &AccountKeyHandler{
 		accounts: accounts,
 	}
@@ -244,8 +245,9 @@ func (h *AccountKeyHandler) GetAccountKey(address runtime.Address, keyIndex int)
 
 // AddEncodedAccountKey adds an encoded public key to an existing account.
 //
-// This function returns an error if the specified account does not exist or
-// if the key insertion fails.
+// This function returns following error
+// * NewAccountNotFoundError - if the specified account does not exist
+// * ValueError - if the provided encodedPublicKey is not valid public key
 func (e *AccountKeyHandler) AddEncodedAccountKey(address runtime.Address, encodedPublicKey []byte) (err error) {
 	accountAddress := flow.Address(address)
 
@@ -262,7 +264,8 @@ func (e *AccountKeyHandler) AddEncodedAccountKey(address runtime.Address, encode
 
 	publicKey, err = flow.DecodeRuntimeAccountPublicKey(encodedPublicKey, 0)
 	if err != nil {
-		err = errors.NewValueErrorf(string(encodedPublicKey), "invalid encoded public key value: %w", err)
+		hexEncodedPublicKey := hex.EncodeToString(encodedPublicKey)
+		err = errors.NewValueErrorf(hexEncodedPublicKey, "invalid encoded public key value: %w", err)
 		return fmt.Errorf("adding encoded account key failed: %w", err)
 	}
 

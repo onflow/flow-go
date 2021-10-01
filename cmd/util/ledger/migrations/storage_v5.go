@@ -39,7 +39,7 @@ type storageFormatV5MigrationResult struct {
 type StorageFormatV5Migration struct {
 	Log                 zerolog.Logger
 	OutputDir           string
-	accounts            *state.Accounts
+	accounts            state.Accounts
 	programs            *programs.Programs
 	brokenTypeIDs       map[common.TypeID]brokenTypeCause
 	reportFile          *os.File
@@ -142,7 +142,7 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 		} else if result.payload != nil {
 			migratedPayloads = append(migratedPayloads, *result.payload)
 		} else {
-			m.Log.Warn().Msgf("DELETED key %q (owner: %x)", rawKey, rawOwner)
+			m.Log.Debug().Msgf("DELETED key %q (owner: %x)", rawKey, rawOwner)
 			_, err := m.reportFile.WriteString(fmt.Sprintf("%x,%s,DELETED\n", rawOwner, string(rawKey)))
 			if err != nil {
 				panic(err)
@@ -160,7 +160,7 @@ func (m *StorageFormatV5Migration) Migrate(payloads []ledger.Payload) ([]ledger.
 	return migratedPayloads, nil
 }
 
-func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
+func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Payload) state.Accounts {
 	var filteredPayloads []ledger.Payload
 
 	for _, payload := range payloads {
@@ -286,7 +286,7 @@ func (m *StorageFormatV5Migration) cleanupBrokenContracts(payloads []ledger.Payl
 					continue
 				}
 
-				m.Log.Warn().Msgf(
+				m.Log.Debug().Msgf(
 					"REMOVED contract name '%s' from account: %s",
 					contractName,
 					address,
@@ -592,7 +592,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 		if compositeValue, ok := rootValue.(*interpreter.CompositeValue); ok {
 			if cause, ok := m.brokenTypeIDs[compositeValue.TypeID()]; ok {
 				if cause == brokenTypeCauseMissingCompositeType {
-					m.Log.Warn().
+					m.Log.Debug().
 						Str("owner", owner.String()).
 						Str("key", key).
 						Msgf(
@@ -629,7 +629,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 						return false
 					}
 
-					m.Log.Warn().
+					m.Log.Debug().
 						Str("key", key).
 						Str("owner", owner.String()).
 						Str("rootValue", rootValue.String()).
@@ -663,8 +663,8 @@ func (m StorageFormatV5Migration) reencodeValue(
 
 						if len(registerValue) == 0 {
 							m.Log.Warn().Msgf(
-								"missing deferred value: owner: %s key: %s",
-								string(deferredOwner),
+								"missing deferred value: owner: %x key: %s",
+								deferredOwner,
 								storagePath,
 							)
 						}
@@ -678,7 +678,7 @@ func (m StorageFormatV5Migration) reencodeValue(
 						return false
 					}
 
-					m.Log.Warn().
+					m.Log.Debug().
 						Str("key", key).
 						Str("owner", owner.String()).
 						Str("rootValue", rootValue.String()).
@@ -852,9 +852,9 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 				// If the program for the composite's type could not be parsed or checked,
 				// report it, prevent a re-parse and re-check, and continue inspecting other values
 
-				m.Log.Err(err).
+				m.Log.Debug().
 					Str("typeID", string(typeID)).
-					Msg("failed to parse and check program")
+					Msgf("failed to parse and check program: %s", err.Error())
 
 				m.brokenTypeIDs[typeID] = brokenTypeCauseParsingCheckingError
 
@@ -868,7 +868,7 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 				// If the composite type is missing,
 				// report it, prevent a re-parse and re-check, and continue inspecting other values
 
-				m.Log.Error().
+				m.Log.Warn().
 					Str("typeID", string(typeID)).
 					Msg("missing composite type")
 
@@ -886,7 +886,7 @@ func (m StorageFormatV5Migration) inferContainerStaticTypes(
 
 				member, ok := compositeType.Members.Get(fieldName)
 				if !ok {
-					m.Log.Warn().
+					m.Log.Debug().
 						Msgf("missing type for field: %s.%s", typeID, fieldName)
 
 					// TODO: OK?
@@ -1406,7 +1406,7 @@ func (m StorageFormatV5Migration) addDictionaryFieldType(
 		ValueType: valueType,
 	}
 
-	m.Log.Info().
+	m.Log.Debug().
 		Str("owner", owner.String()).
 		Str("key", key).
 		Msgf(
@@ -1435,7 +1435,7 @@ func (m StorageFormatV5Migration) addArrayFieldType(
 
 	arrayValue.Type = arrayType
 
-	m.Log.Info().
+	m.Log.Debug().
 		Str("owner", owner.String()).
 		Str("key", key).
 		Msgf(
@@ -1761,7 +1761,7 @@ func (m StorageFormatV5Migration) loadProgram(
 }
 
 type migrationRuntimeInterface struct {
-	accounts *state.Accounts
+	accounts state.Accounts
 	programs *programs.Programs
 }
 

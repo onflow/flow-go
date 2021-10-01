@@ -34,7 +34,7 @@ type ScriptEnv struct {
 	ctx           Context
 	sth           *state.StateHolder
 	vm            *VirtualMachine
-	accounts      *state.Accounts
+	accounts      state.Accounts
 	contracts     *handler.ContractHandler
 	programs      *handler.ProgramsHandler
 	accountKeys   *handler.AccountKeyHandler
