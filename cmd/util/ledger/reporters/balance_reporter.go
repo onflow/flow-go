@@ -217,9 +217,9 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 				return false
 			}
 
-			if string(value.TypeID()) == "A.0b2a3299cc857e29.TopShot.NFT" {
+			if strings.Contains(string(value.TypeID()), "TopShot") {
 				m += 1
-				r.Log.Info().Msg("test")
+				r.Log.Info().Str("type", string(value.TypeID())).Msg("test")
 
 				return false
 			}
