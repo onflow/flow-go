@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module/signature"
 )
@@ -54,10 +55,9 @@ func (r *randomBeaconFollower) Verify(signerIndex int, share crypto.Signature) e
 		if crypto.IsInvalidInputsError(err) {
 			// this erorr happens because of an invalid index
 			return engine.NewInvalidInputErrorf("Verify beacon signature from %d failed: %w", signerIndex, err)
-		}
-		else {
+		} else {
 			// other exceptions
-			return fmt.Errorf("Verify beacon signature from %d failed: %w", err)
+			return fmt.Errorf("Verify beacon signature from %d failed: %w", signerIndex, err)
 		}
 	}
 
@@ -80,9 +80,9 @@ func (r *randomBeaconFollower) Verify(signerIndex int, share crypto.Signature) e
 //      - other error if other exceptions
 // The function call is blocking.
 func (r *randomBeaconFollower) TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error) {
-	
+
 	// check index and duplication
-	ok, err := r.follower.HasShare(signerIndex, share)
+	ok, err := r.follower.HasShare(signerIndex)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
 			// means index is invalid
@@ -96,7 +96,7 @@ func (r *randomBeaconFollower) TrustedAdd(signerIndex int, share crypto.Signatur
 		// duplicate
 		return false, engine.NewDuplicatedEntryErrorf("signer %d was already added", signerIndex)
 	}
-	
+
 	// Trusted add to the crypto layer
 	enough, err := r.follower.TrustedAdd(signerIndex, share)
 	// sanity check for error, although error should be nil here
@@ -114,7 +114,7 @@ func (r *randomBeaconFollower) EnoughShares() bool {
 
 // Reconstruct reconstructs the group signature.
 //
-// The function errors if not enough shares were collected and if any signature 
+// The function errors if not enough shares were collected and if any signature
 // fails the deserialization.
 // It also performs a final verification against the stored message and group public key
 // and errors (without sentinel) if the result is not valid. This is required for the function safety since

@@ -1,10 +1,7 @@
 package hotstuff
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding"
 )
 
 // RandomBeaconFollower encapsulates all methods needed by a Hotstuff leader to validate the

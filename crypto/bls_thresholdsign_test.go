@@ -28,10 +28,7 @@ const thresholdSignatureTag = "random tag"
 
 var thresholdSignatureMessage = []byte("random message")
 
-// simple centralized test of the stateful threshold signature using the simple key generation.
-// The test generates keys for a threshold signatures scheme, uses the keys to sign shares,
-// tests VerifyAndStageShare and CommitShare apis,
-// and reconstruct the threshold signatures using (t+1) random shares.
+// centralized test of the stateful threshold signature using the threshold key generation.
 func testCentralizedStatefulAPI(t *testing.T) {
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
@@ -284,7 +281,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 	}
 }
 
-// Testing Threshold Signature stateful api
+// Distributed Threshold Signature stateful api test
 // keys are generated using simple Feldman VSS
 func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
@@ -343,7 +340,7 @@ func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 	sync.Wait()
 }
 
-// Testing Threshold Signature stateful api
+// Distributed  Threshold Signature stateful api test
 // keys are generated using Joint-Feldman
 func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
@@ -574,9 +571,7 @@ func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing
 	}
 }
 
-// simple centralized test of threshold signature using the simple key generation.
-// The test generates keys for a threshold signatures scheme, uses the keys to sign shares,
-// and reconstruct the threshold signatures using (t+1) random shares.
+// Centralized test of threshold signature protocol using the threshold key generation.
 func testCentralizedStatelessAPI(t *testing.T) {
 	n := 10
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
