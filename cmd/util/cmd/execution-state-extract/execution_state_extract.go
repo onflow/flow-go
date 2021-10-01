@@ -58,9 +58,9 @@ func extractExecutionState(
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
-	migrations := []ledger.Migration{}
-	rs := []ledger.Reporter{}
-	validators := []ledger.Validator{}
+	var migrations []ledger.Migration
+	var rs []ledger.Reporter
+	var validators []ledger.Validator
 
 	if migrate {
 		storageFormatV6Migration := mgr.StorageFormatV6Migration{
@@ -92,10 +92,6 @@ func extractExecutionState(
 				Chain: chain,
 				RWF:   reporters.NewReportFileWriterFactory(outputDir, log),
 			},
-			// mgr.StorageReporter{
-			// 	Log:       log,
-			// 	OutputDir: outputDir,
-			// },
 			// &mgr.BalanceReporter{
 			// 	Log:       log,
 			// 	OutputDir: outputDir,

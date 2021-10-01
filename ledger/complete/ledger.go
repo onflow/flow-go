@@ -253,6 +253,10 @@ func (l *Ledger) ExportCheckpointAt(
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
+		rh, _ := l.forest.MostRecentTouchedRootHash()
+		l.logger.Info().
+			Str("hash", rh.String()).
+			Msgf("Most recently touched root hash.")
 		return ledger.State(hash.DummyHash),
 			fmt.Errorf("cannot get try at the given state commitment: %w", err)
 	}
