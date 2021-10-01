@@ -89,7 +89,7 @@ func PrepareFlowClientOpts(accessNodeIDS []string, insecureAccessAPI bool, snaps
 	for _, anID := range accessNodeIDS {
 		id, err := flow.HexStringToIdentifier(anID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get flow identifer from secured access node id: %s", id)
+			return nil, fmt.Errorf("could not get flow identifer from secured access node id (%s): %w", id, err)
 		}
 
 		anIDS = append(anIDS, id)
