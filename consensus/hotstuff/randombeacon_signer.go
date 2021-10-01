@@ -4,9 +4,10 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
-// RandomBeaconSigner encapsulates all methods needed by a Hotstuff leader to validate the beacon votes and reconstruct a beacon signature.
+// RandomBeaconFollower encapsulates all methods needed by a Hotstuff leader to validate the
+// beacon votes and reconstruct a beacon signature.
 // The random beacon methods are based on a threshold signature scheme.
-type RandomBeaconSigner interface {
+type RandomBeaconFollower interface {
 	// Verify verifies the signature share under the signer's public key and the message agreed upon.
 	// It allows concurrent verification of the given signature.
 	// It returns nil if signature is valid,
@@ -27,9 +28,6 @@ type RandomBeaconSigner interface {
 	// EnoughShares indicates whether enough shares have been accumulated in order to reconstruct
 	// a group signature.
 	EnoughShares() bool
-
-	// SignShare produces a signature share with the internal participant's private key.
-	SignShare() (crypto.Signature, error)
 
 	// Reconstruct reconstructs the group signature.
 	// The reconstructed signature is verified against the overall group public key and the message agreed upon.
