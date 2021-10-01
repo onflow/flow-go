@@ -96,7 +96,7 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 
 	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
-		go r.balanceReporterWorker(jobs, wg, momentsChan)
+		go r.balanceReporterWorker(l, jobs, momentsChan, wg)
 	}
 
 	for _, p := range payload {
@@ -123,9 +123,23 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	return nil
 }
 
-func (r *BalanceReporter) balanceReporterWorker(jobs chan ledger.Payload, wg *sync.WaitGroup, momentsChan chan<- moments) {
+func (r *BalanceReporter) balanceReporterWorker(
+	l state.View,
+	jobs <-chan ledger.Payload,
+	momentsChan chan<- moments,
+	wg *sync.WaitGroup) {
+	st := state.NewState(l)
+	sth := state.NewStateHolder(st)
+	accounts := state.NewAccounts(sth)
+	storage := cadenceRuntime.NewStorage(
+		&migrations.AccountsAtreeLedger{Accounts: accounts},
+		func(f func(), _ func(metrics cadenceRuntime.Metrics, duration time.Duration)) {
+			f()
+		},
+	)
+
 	for payload := range jobs {
-		err := r.handlePayload(payload, momentsChan)
+		err := r.handlePayload(payload, storage, momentsChan)
 		if err != nil {
 			r.Log.Err(err).Msg("Error handling payload")
 		}
@@ -134,7 +148,7 @@ func (r *BalanceReporter) balanceReporterWorker(jobs chan ledger.Payload, wg *sy
 	wg.Done()
 }
 
-func (r *BalanceReporter) handlePayload(p ledger.Payload, momentsChan chan<- moments) error {
+func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntime.Storage, momentsChan chan<- moments) error {
 	id, err := migrations.KeyToRegisterID(p.Key)
 	if err != nil {
 		return err
@@ -151,7 +165,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, momentsChan chan<- mom
 	if err != nil || storable == nil {
 		return fmt.Errorf("could not decode storable at %s: %w", owner.Hex(), err)
 	}
-	storedValue, err := storable.StoredValue(r.storage)
+	storedValue, err := storable.StoredValue(storage)
 	cValue := interpreter.MustConvertStoredValue(storedValue)
 	if err != nil || cValue == nil {
 		return fmt.Errorf("could not decode value at %s: %w", owner.Hex(), err)
