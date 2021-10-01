@@ -30,7 +30,7 @@ type SignatureAggregatorSameMessage struct {
 	n                int                // number of participants indexed from 0 to n-1
 	publicKeys       []crypto.PublicKey // keys indexed from 0 to n-1, signer i is assigned to public key i
 	indexToSignature map[int]string     // signatures indexed by the signer index
-	cashedSignature  crypto.Signature   // cached aggrgeted signature
+	cachedSignature  crypto.Signature   // cached aggregated signature
 }
 
 // NewSignatureAggregatorSameMessage returns a new SignatureAggregatorSameMessage structure.
@@ -63,7 +63,7 @@ func NewSignatureAggregatorSameMessage(
 		n:                len(publicKeys),
 		publicKeys:       publicKeys,
 		indexToSignature: make(map[int]string),
-		cashedSignature:  nil,
+		cachedSignature:  nil,
 	}, nil
 }
 
@@ -107,10 +107,15 @@ func (s *SignatureAggregatorSameMessage) VerifyAndAdd(signer int, sig crypto.Sig
 	// signature is new
 	ok, err := s.publicKeys[signer].Verify(sig, s.message, s.hasher)
 	if ok {
-		s.cashedSignature = nil
-		s.indexToSignature[signer] = string(sig)
+		s.add(signer, sig)
 	}
 	return ok, err
+}
+
+// adds signature and assumes `signer` is valid
+func (s *SignatureAggregatorSameMessage) add(signer int, sig crypto.Signature) {
+	s.cachedSignature = nil
+	s.indexToSignature[signer] = string(sig)
 }
 
 // TrustedAdd adds a signature to the internal state without verifying it.
@@ -132,8 +137,7 @@ func (s *SignatureAggregatorSameMessage) TrustedAdd(signer int, sig crypto.Signa
 		return newErrDuplicatedSigner("signer %d was already added", signer)
 	}
 	// signature is new
-	s.cashedSignature = nil
-	s.indexToSignature[signer] = string(sig)
+	s.add(signer, sig)
 	return nil
 }
 
@@ -169,8 +173,8 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 	}
 
 	// check if signature was already computed
-	if s.cashedSignature != nil {
-		return indices, s.cashedSignature, nil
+	if s.cachedSignature != nil {
+		return indices, s.cachedSignature, nil
 	}
 
 	signatures := make([]crypto.Signature, 0, sharesNum)
@@ -189,7 +193,7 @@ func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, e
 	if !ok {
 		return nil, nil, errors.New("resulting BLS aggregated signatutre is invalid")
 	}
-	s.cashedSignature = aggregatedSignature
+	s.cachedSignature = aggregatedSignature
 	return indices, aggregatedSignature, nil
 }
 
