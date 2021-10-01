@@ -787,6 +787,13 @@ func (m StorageFormatV6Migration) getLocation(location common.Location) common.L
 				Name:    addressLocation.Name,
 			}
 		}
+	case "OpenEdition":
+		if addressHex == "85080f371da20cc1" {
+			location = common.AddressLocation{
+				Address: addressLocation.Address,
+				Name:    "OpenEditionV2",
+			}
+		}
 
 	// mainnet
 	case "LockedTokens":
@@ -1294,10 +1301,13 @@ func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *old
 		}
 	})
 
+	location := c.migration.getLocation(value.Location())
+	identifier := getIdentifier(value.QualifiedIdentifier(), location)
+
 	c.result = newInter.NewCompositeValue(
 		c.newInter,
-		c.migration.getLocation(value.Location()),
-		value.QualifiedIdentifier(),
+		location,
+		identifier,
 		value.Kind(),
 		fields,
 		*value.Owner,
@@ -1460,7 +1470,8 @@ func (c *ValueConverter) convertStaticType(staticType oldInter.StaticType) newIn
 	switch typ := staticType.(type) {
 	case oldInter.CompositeStaticType:
 		location := c.migration.getLocation(typ.Location)
-		return newInter.NewCompositeStaticType(location, typ.QualifiedIdentifier)
+		identifier := getIdentifier(typ.QualifiedIdentifier, location)
+		return newInter.NewCompositeStaticType(location, identifier)
 
 	case oldInter.InterfaceStaticType:
 		location := c.migration.getLocation(typ.Location)
@@ -1539,6 +1550,22 @@ func (c *ValueConverter) convertStaticType(staticType oldInter.StaticType) newIn
 	default:
 		panic(fmt.Errorf("cannot covert static type: %s", staticType))
 	}
+}
+
+func getIdentifier(identifier string, location common.Location) string {
+	addressLocation, ok := location.(common.AddressLocation)
+
+	if !ok {
+		return identifier
+	}
+
+	if addressLocation.Name == "OpenEditionV2" &&
+		addressLocation.Address.Hex() == "85080f371da20cc1" &&
+		identifier == "OpenEdition.OpenEditionItem" {
+		identifier = "OpenEditionV2.OpenEditionItem"
+	}
+
+	return identifier
 }
 
 func ConvertPrimitiveStaticType(staticType oldInter.PrimitiveStaticType) newInter.PrimitiveStaticType {
