@@ -110,7 +110,7 @@ func PrepareFlowClientOpts(accessNodeIDS []string, insecureAccessAPI bool, snaps
 		accessAddress := ConvertAccessAddrFromState(identity.Address, insecureAccessAPI)
 
 		// remove the 0x prefix from network public keys
-		networkingPubKey := identities[0].NetworkPubKey.String()[2:]
+		networkingPubKey := identity.NetworkPubKey.String()[2:]
 
 		opt, err := NewFlowClientOpt(accessAddress, networkingPubKey, insecureAccessAPI)
 		if err != nil {
