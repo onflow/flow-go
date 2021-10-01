@@ -1,10 +1,8 @@
 package signature
 
 import (
-	"bytes"
 	"crypto/rand"
 	"errors"
-	"sort"
 	"sync"
 	"testing"
 
@@ -19,30 +17,17 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func sortIdentities(ids []flow.Identity) []flow.Identity {
-	canonicalOrder := func(i, j int) bool {
-		return bytes.Compare(ids[i].NodeID[:], ids[j].NodeID[:]) < 0
-	}
-	sort.Slice(ids, canonicalOrder)
-	return ids
-}
-
-func sortIdentifiers(ids []flow.Identifier) []flow.Identifier {
-	canonicalOrder := func(i, j int) bool {
-		return bytes.Compare(ids[i][:], ids[j][:]) < 0
-	}
-	sort.Slice(ids, canonicalOrder)
-	return ids
-}
-
 func createAggregationData(t *testing.T, signersNumber int) (
-	hotstuff.WeightedSignatureAggregator, []flow.Identity, []crypto.Signature, []byte, string) {
+	hotstuff.WeightedSignatureAggregator,
+	[]flow.Identity,
+	[]crypto.Signature,
+	[]byte,
+	string) {
 	// create identities
 	ids := make([]flow.Identity, 0, signersNumber)
 	for i := 0; i < signersNumber; i++ {
 		ids = append(ids, *unittest.IdentityFixture())
 	}
-	ids = sortIdentities(ids)
 
 	// create message and tag
 	msgLen := 100
@@ -70,8 +55,11 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	return aggregator, ids, sigs, msg, tag
 }
 
-func verifyAggregate(signers []flow.Identifier, ids []flow.Identity, sig []byte,
-	msg []byte, tag string) (bool, error) {
+func verifyAggregate(signers []flow.Identifier,
+	ids []flow.Identity,
+	sig []byte,
+	msg []byte,
+	tag string) (bool, error) {
 	// query identity using identifier
 	// done linearly just for testing
 	getIdentity := func(signer flow.Identifier) *flow.Identity {
@@ -109,6 +97,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		// identity with empty key
 		_, err := NewWeightedSignatureAggregator([]flow.Identity{*signer}, msg, tag)
 		assert.Error(t, err)
+		assert.True(t, engine.IsInvalidInputError(err))
 		// wrong key types
 		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
 		_, err = rand.Read(seed)
@@ -118,15 +107,17 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		signer.StakingPubKey = sk.PublicKey()
 		_, err = NewWeightedSignatureAggregator([]flow.Identity{*signer}, msg, tag)
 		assert.Error(t, err)
+		assert.True(t, engine.IsInvalidInputError(err))
 		// empty signers
 		_, err = NewWeightedSignatureAggregator([]flow.Identity{}, msg, tag)
 		assert.Error(t, err)
+		assert.True(t, engine.IsInvalidInputError(err))
 	})
 
 	// Happy paths
 	t.Run("happy path and thread safety", func(t *testing.T) {
 		aggregator, ids, sigs, msg, tag := createAggregationData(t, signersNum)
-		// only add half of the signatures
+		// only add a subset of the signatures
 		subSet := signersNum / 2
 		expectedWeight := uint64(0)
 		var wg sync.WaitGroup
@@ -154,11 +145,11 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		// check signers
-		signers = sortIdentifiers(signers)
-		for i := 0; i < subSet; i++ {
-			index := i + subSet
-			assert.Equal(t, signers[i], ids[index].NodeID)
+		identifiers := make([]flow.Identifier, 0, signersNum-subSet)
+		for i := subSet; i < signersNum; i++ {
+			identifiers = append(identifiers, ids[i].NodeID)
 		}
+		assert.ElementsMatch(t, signers, identifiers)
 
 		// add remaining signatures in one thread in order to test the returned weight
 		for i, sig := range sigs[:subSet] {
@@ -175,13 +166,13 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		// check signers
-		signers = sortIdentifiers(signers)
+		identifiers = make([]flow.Identifier, 0, signersNum)
 		for i := 0; i < signersNum; i++ {
-			assert.Equal(t, signers[i], ids[i].NodeID)
+			identifiers = append(identifiers, ids[i].NodeID)
 		}
+		assert.ElementsMatch(t, signers, identifiers)
 	})
 
-	invalidInput := engine.NewInvalidInputError("some error")
 	duplicate := engine.NewDuplicatedEntryErrorf("some error")
 	invalidSig := signature.ErrInvalidFormat
 
@@ -193,13 +184,13 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 
 		err := aggregator.Verify(invalidId, sigs[0])
 		assert.Error(t, err)
-		assert.IsType(t, invalidInput, err)
+		assert.True(t, engine.IsInvalidInputError(err))
 
 		weight, err := aggregator.TrustedAdd(invalidId, sigs[0])
 		assert.Equal(t, uint64(0), weight)
 		assert.Equal(t, uint64(0), aggregator.TotalWeight())
 		assert.Error(t, err)
-		assert.IsType(t, invalidInput, err)
+		assert.True(t, engine.IsInvalidInputError(err))
 	})
 
 	t.Run("duplicate signature", func(t *testing.T) {
@@ -241,7 +232,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		// test Verify
 		err := aggregator.Verify(ids[0].NodeID, sigs[0])
 		require.Error(t, err)
-		assert.True(t, errors.Is(err, invalidSig))
+		assert.ErrorIs(t, err, invalidSig)
 
 		// add signatures for aggregation including corrupt sigs[0]
 		expectedWeight := uint64(0)
