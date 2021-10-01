@@ -73,17 +73,16 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	for i := 0; i < workerCount; i++ {
 		adp := newAccountDataProcessor(wg, r.Log, rwa, rwc, r.Chain, l)
 		wg.Add(1)
-		go func() {
-			adp.reportAccountData(addressIndexes)
-			err := progress.Add(1)
-			if err != nil {
-				panic(err)
-			}
-		}()
+		go adp.reportAccountData(addressIndexes)
 	}
 
 	for i := uint64(1); i <= gen.AddressCount(); i++ {
 		addressIndexes <- i
+
+		err := progress.Add(1)
+		if err != nil {
+			panic(err)
+		}
 	}
 	close(addressIndexes)
 

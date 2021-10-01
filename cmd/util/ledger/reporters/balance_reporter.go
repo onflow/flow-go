@@ -157,7 +157,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 			Error().
 			Err(err).
 			Str("owner", owner.Hex()).
-			Str("key", id.Key).
+			Hex("key", []byte(id.Key)).
 			Hex("storable", p.Value).
 			Msg("Could not decode storable")
 		return
@@ -169,7 +169,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 			Error().
 			Err(err).
 			Str("owner", owner.Hex()).
-			Str("key", id.Key).
+			Hex("key", []byte(id.Key)).
 			Hex("storable", p.Value).
 			Msg("Could not decode value")
 		return
@@ -226,7 +226,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 			Error().
 			Err(err).
 			Str("owner", owner.Hex()).
-			Str("key", id.Key).
+			Hex("key", []byte(id.Key)).
 			Msg("Could not create interpreter")
 		return
 	}
