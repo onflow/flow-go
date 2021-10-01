@@ -63,7 +63,7 @@ func (r *randomBeaconFollower) Verify(signerIndex int, share crypto.Signature) e
 
 	if !verif {
 		// invalid signature
-		return fmt.Errorf("invalid signature from %d: %w", signerIndex, signature.ErrInvalidFormat)
+		return fmt.Errorf("invalid beacon signature from %d: %w", signerIndex, signature.ErrInvalidFormat)
 	}
 	return nil
 }

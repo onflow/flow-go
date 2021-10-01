@@ -163,7 +163,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			require.NoError(t, err)
 			// invalid index
 			invalidIndex := len(pkShares) + 1
-			// VerifShare
+			// VerifyShare
 			verif, err := ts.VerifyShare(invalidIndex, share)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
@@ -195,7 +195,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 			// alter signature - signature is not a valid point
 			share[4] ^= 1
-			// VerifShare
+			// VerifyShare
 			verif, err := ts.VerifyShare(index, share)
 			assert.NoError(t, err)
 			assert.False(t, verif)
@@ -213,7 +213,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 			// valid curve point but invalid signature
 			otherIndex := (index + 1) % len(pkShares) // otherIndex is different than index
-			// VerifShare
+			// VerifyShare
 			verif, err = ts.VerifyShare(otherIndex, share)
 			assert.NoError(t, err)
 			assert.False(t, verif)
