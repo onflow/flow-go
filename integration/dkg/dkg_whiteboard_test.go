@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"os"
 	"testing"
@@ -147,7 +148,7 @@ func createNode(
 		dkg.NewControllerFactory(
 			controllerFactoryLogger,
 			core.Me,
-			NewWhiteboardClient(id.NodeID, whiteboard),
+			[]module.DKGContractClient{NewWhiteboardClient(id.NodeID, whiteboard)},
 			brokerTunnel,
 			config,
 		),
