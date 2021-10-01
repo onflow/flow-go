@@ -88,7 +88,7 @@ func main() {
 
 		// epoch qc contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientOpts     []*common.FlowClientOpt
+		flowClientOpts     []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 	)
@@ -209,7 +209,7 @@ func main() {
 				return fmt.Errorf("invalid flag --access-node-ids atleast %d IDs must be provided", common.DefaultAccessNodeIDSMinimum)
 			}
 
-			flowClientOpts, err = common.PrepareFlowClientOpts(accessNodeIDS, insecureAccessAPI, node.State.Sealed())
+			flowClientOpts, err = common.FlowClientConfigs(accessNodeIDS, insecureAccessAPI, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to prepare flow client connection options for each access node id %w", err)
 			}
@@ -535,7 +535,7 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 }
 
 // createQCContractClients creates priority ordered array of QCContractClient
-func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*common.FlowClientOpt) ([]module.QCContractClient, error) {
+func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*common.FlowClientConfig) ([]module.QCContractClient, error) {
 	qcClients := make([]module.QCContractClient, 0)
 
 	for _, opt := range flowClientOpts {
