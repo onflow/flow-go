@@ -20,8 +20,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const DefaultRecipientCount uint = 3
-
 // Engine is the collection pusher engine, which provides access to resources
 // held by the collection node.
 type Engine struct {
@@ -40,15 +38,14 @@ type Engine struct {
 
 func New(log zerolog.Logger, net module.Network, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
 	e := &Engine{
-		unit:           engine.NewUnit(),
-		log:            log.With().Str("engine", "pusher").Logger(),
-		engMetrics:     engMetrics,
-		colMetrics:     colMetrics,
-		me:             me,
-		state:          state,
-		collections:    collections,
-		transactions:   transactions,
-		recipientCount: DefaultRecipientCount,
+		unit:         engine.NewUnit(),
+		log:          log.With().Str("engine", "pusher").Logger(),
+		engMetrics:   engMetrics,
+		colMetrics:   colMetrics,
+		me:           me,
+		state:        state,
+		collections:  collections,
+		transactions: transactions,
 	}
 
 	conduit, err := net.Register(engine.PushGuarantees, e)
@@ -130,8 +127,7 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 	return e.SubmitCollectionGuarantee(&req.Guarantee)
 }
 
-// SubmitCollectionGuarantee submits the collection guarantee to all
-// consensus nodes.
+// SubmitCollectionGuarantee submits the collection guarantee to all consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
 
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
@@ -144,7 +140,7 @@ func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) 
 	// network usage significantly by implementing a simple retry mechanism here and
 	// only sending to a single consensus node.
 	// => https://github.com/dapperlabs/flow-go/issues/4358
-	err = e.conduit.Multicast(guarantee, e.recipientCount, consensusNodes.NodeIDs()...)
+	err = e.conduit.Publish(guarantee, consensusNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}
