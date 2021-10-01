@@ -71,9 +71,15 @@ func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	}
 
 	for i := 0; i < workerCount; i++ {
-		adp := newAccountDataProcessor(wg, r.Log, progress, rwa, rwc, r.Chain, l)
+		adp := newAccountDataProcessor(wg, r.Log, rwa, rwc, r.Chain, l)
 		wg.Add(1)
-		go adp.reportAccountData(addressIndexes)
+		go func() {
+			adp.reportAccountData(addressIndexes)
+			err := progress.Add(1)
+			if err != nil {
+				panic(err)
+			}
+		}()
 	}
 
 	for i := uint64(1); i <= gen.AddressCount(); i++ {
@@ -101,14 +107,13 @@ type balanceProcessor struct {
 	accounts state.Accounts
 	st       *state.State
 
-	rwa      ReportWriter
-	rwc      ReportWriter
-	progress *progressbar.ProgressBar
-	wg       *sync.WaitGroup
-	logger   zerolog.Logger
+	rwa    ReportWriter
+	rwc    ReportWriter
+	wg     *sync.WaitGroup
+	logger zerolog.Logger
 }
 
-func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, progress *progressbar.ProgressBar, rwa ReportWriter, rwc ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
+func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
 
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
 	ctx := fvm.NewContext(zerolog.Nop(), fvm.WithChain(chain))
@@ -143,7 +148,6 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, progress
 		prog:     prog,
 		rwa:      rwa,
 		rwc:      rwc,
-		progress: progress,
 		script:   script}
 }
 
@@ -225,11 +229,6 @@ func (c *balanceProcessor) reportAccountData(addressIndexes <-chan uint64) {
 				Address:  address.Hex(),
 				Contract: contract,
 			})
-		}
-
-		err = c.progress.Add(1)
-		if err != nil {
-			panic(err)
 		}
 	}
 	c.wg.Done()

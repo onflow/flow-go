@@ -128,6 +128,11 @@ func (r *BalanceReporter) balanceReporterWorker(
 
 	for payload := range jobs {
 		r.handlePayload(payload, storage, momentsChan)
+
+		err := r.progress.Add(1)
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	wg.Done()
@@ -152,6 +157,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 			Error().
 			Err(err).
 			Str("owner", owner.Hex()).
+			Str("key", id.Key).
 			Hex("storable", p.Value).
 			Msg("Could not decode storable")
 		return
@@ -163,6 +169,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 			Error().
 			Err(err).
 			Str("owner", owner.Hex()).
+			Str("key", id.Key).
 			Hex("storable", p.Value).
 			Msg("Could not decode value")
 		return
@@ -219,6 +226,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 			Error().
 			Err(err).
 			Str("owner", owner.Hex()).
+			Str("key", id.Key).
 			Msg("Could not create interpreter")
 		return
 	}
@@ -227,10 +235,5 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 	momentsChan <- moments{
 		Address: owner.Hex(),
 		Moments: m,
-	}
-
-	err = r.progress.Add(1)
-	if err != nil {
-		panic(err)
 	}
 }
