@@ -14,19 +14,22 @@ type RandomBeaconFollower interface {
 	// Verify verifies the signature share under the signer's public key and the message agreed upon.
 	// It allows concurrent verification of the given signature.
 	// It returns :
-	//  - nil if signature is valid,
-	//  - crypto.InvalidInputsError if the signature is invalid,
+	//  - engine.InvalidInputError if signerIndex is invalid
+	//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 	//  - other error if there is an exception.
+	// The function call is non-blocking
 	Verify(signerIndex int, share crypto.Signature) error
 
 	// TrustedAdd adds a share to the internal signature shares store.
-	// The operation is sequential.
 	// The function does not verify the signature is valid. It is the caller's responsibility
 	// to make sure the signature was previously verified.
 	// It returns:
 	//  - (true, nil) if the signature has been added, and enough shares have been collected.
 	//  - (false, nil) if the signature has been added, but not enough shares were collected.
 	//  - (false, error) if there is any exception adding the signature share.
+	//      - engine.InvalidInputError if signerIndex is invalid (not a consensus participant)
+	//  	- engine.DuplicatedEntryError if the signer has been already added
+	// The function call is blocking
 	TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error)
 
 	// EnoughShares indicates whether enough shares have been accumulated in order to reconstruct

@@ -186,7 +186,7 @@ func NewBLSThresholdSignatureParticipant(
 //
 // The function does not add the share to the internal pool of shares and do
 // not update the internal state.
-// This function is thread safe
+// This function is thread safe and non-blocking
 func (s *blsThresholdSignatureParticipant) SignShare() (Signature, error) {
 
 	share, err := s.currentPrivateKey.Sign(s.message, s.hasher)
@@ -217,7 +217,7 @@ func (s *blsThresholdSignatureFollower) validIndex(orig index) error {
 // The function does not return an error for any invalid signature.
 // If any error is returned, the returned bool is false.
 // If no error is returned, the bool represents the validity of the signature.
-// The function is thread-safe.
+// The function is thread-safe and non-blocking.
 func (s *blsThresholdSignatureFollower) VerifyShare(orig int, share Signature) (bool, error) {
 	// validate index
 	if err := s.validIndex(index(orig)); err != nil {
@@ -235,7 +235,7 @@ func (s *blsThresholdSignatureFollower) VerifyShare(orig int, share Signature) (
 // The function does not return an error for any invalid signature.
 // If any error is returned, the returned bool is false.
 // If no error is returned, the bool represents the validity of the signature.
-// The function is thread-safe.
+// The function is thread-safe and non-blocking only.
 func (s *blsThresholdSignatureFollower) VerifyThresholdSignature(thresholdSignature Signature) (bool, error) {
 	return s.groupPublicKey.Verify(thresholdSignature, s.message, s.hasher)
 }
@@ -244,7 +244,7 @@ func (s *blsThresholdSignatureFollower) VerifyThresholdSignature(thresholdSignat
 // The funstion returns true if and only if the number of shares have reached (threshold+1)
 // shares.
 //
-// This function is thread safe
+// This function is thread safe and write-blocking
 func (s *blsThresholdSignatureFollower) EnoughShares() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -259,7 +259,7 @@ func (s *blsThresholdSignatureFollower) enoughShares() bool {
 }
 
 // HasShare checks whether the internal map contains the share of the given index.
-// This function is thread safe
+// This function is thread safe and write-blocking
 func (s *blsThresholdSignatureFollower) HasShare(orig int) (bool, error) {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
@@ -287,6 +287,7 @@ func (s *blsThresholdSignatureFollower) hasShare(orig index) bool {
 //  - (true, nil) if enough signature shares were already collected and no error occured
 //  - (false, nil) if not enough shares were collected and no error occured
 //  - (false, error) if index is invalid (InvalidInputsError) or already added (other error)
+// This function is thread safe and blocking.
 func (s *blsThresholdSignatureFollower) TrustedAdd(orig int, share Signature) (bool, error) {
 
 	// validate index
@@ -318,7 +319,7 @@ func (s *blsThresholdSignatureFollower) TrustedAdd(orig int, share Signature) (b
 //  - Second boolean output is true if enough shares were collected and no error is returned, and false otherwise.
 //  - error is IsInvalidInputsError if input index is invalid, and a random error if an exception occured.
 //    (an invalid signature is not considered an invalid input, look at `VerifyShare` for details)
-// This function is thread safe
+// This function is thread safe and blocking.
 func (s *blsThresholdSignatureFollower) VerifyAndAdd(orig int, share Signature) (bool, bool, error) {
 
 	// validate index
@@ -355,16 +356,17 @@ func (s *blsThresholdSignatureFollower) VerifyAndAdd(orig int, share Signature) 
 // It also performs a final verification against the stored message and group public key
 // and errors if the result is not valid. This is required for the function safety since
 // `TrustedAdd` allows adding invalid signatures.
-// The function is thread-safe.
+// The function is thread-safe and blocking.
 func (s *blsThresholdSignatureFollower) ThresholdSignature() (Signature, error) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	// check cached thresholdSignature
 	if s.thresholdSignature != nil {
 		return s.thresholdSignature, nil
 	}
-	// reconstruct the threshold signature
-	s.lock.Lock()
-	defer s.lock.Unlock()
 
+	// reconstruct the threshold signature
 	if s.enoughShares() {
 		thresholdSignature, err := s.reconstructThresholdSignature()
 		if err != nil {
