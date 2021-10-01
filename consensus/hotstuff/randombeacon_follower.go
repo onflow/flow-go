@@ -1,7 +1,10 @@
 package hotstuff
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/encoding"
 )
 
 // RandomBeaconFollower encapsulates all methods needed by a Hotstuff leader to validate the
@@ -10,9 +13,10 @@ import (
 type RandomBeaconFollower interface {
 	// Verify verifies the signature share under the signer's public key and the message agreed upon.
 	// It allows concurrent verification of the given signature.
-	// It returns nil if signature is valid,
-	// crypto.InvalidInputsError if the signature is invalid,
-	// and other error if there is an exception.
+	// It returns :
+	//  - nil if signature is valid,
+	//  - crypto.InvalidInputsError if the signature is invalid,
+	//  - other error if there is an exception.
 	Verify(signerIndex int, share crypto.Signature) error
 
 	// TrustedAdd adds a share to the internal signature shares store.
@@ -20,9 +24,9 @@ type RandomBeaconFollower interface {
 	// The function does not verify the signature is valid. It is the caller's responsibility
 	// to make sure the signature was previously verified.
 	// It returns:
-	// (true, nil) if the signature has been added, and enough shares have been collected.
-	// (false, nil) if the signature has been added, but not enough shares were collected.
-	// (false, error) if there is any exception adding the signature share.
+	//  - (true, nil) if the signature has been added, and enough shares have been collected.
+	//  - (false, nil) if the signature has been added, but not enough shares were collected.
+	//  - (false, error) if there is any exception adding the signature share.
 	TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error)
 
 	// EnoughShares indicates whether enough shares have been accumulated in order to reconstruct
@@ -34,42 +38,4 @@ type RandomBeaconFollower interface {
 	// This is a sanity check that is necessary since "TrustedAdd" allows adding non-verified signatures.
 	// Reconstruct returns an error if the reconstructed signature fails the sanity verification, or if not enough shares have been collected.
 	Reconstruct() (crypto.Signature, error)
-}
-
-// This provides a mock implementation of RandomBeaconSigner in crypto/thresholdsign.go
-// TODO: remove when crypto/thresholdsign supports concurrent calls.
-type ThresholdSignerImpl struct {
-	// dependencies
-	msg             []byte
-	threshold       int
-	groupPublicKey  crypto.PublicKey
-	myIndex         int
-	myPrivateKey    crypto.PrivateKey
-	publicKeyShares []crypto.PublicKey
-
-	// state
-	haveEnoughShares   bool
-	signers            []int
-	thresholdSignature crypto.Signature
-}
-
-func NewThresholdSignerImpl(
-	msg []byte,
-	threshold int,
-	groupPublicKey crypto.PublicKey,
-	myIndex int,
-	myPrivateKey crypto.PrivateKey,
-	publicKeyShares []crypto.PublicKey) *ThresholdSignerImpl {
-	return &ThresholdSignerImpl{
-		msg:             msg,
-		threshold:       threshold,
-		groupPublicKey:  groupPublicKey,
-		myIndex:         myIndex,
-		myPrivateKey:    myPrivateKey,
-		publicKeyShares: publicKeyShares,
-
-		haveEnoughShares:   false,
-		signers:            nil,
-		thresholdSignature: nil,
-	}
 }
