@@ -80,6 +80,6 @@ func RemoveExecutionReceipt(blockID flow.Identifier, receipt *flow.ExecutionRece
 			return err
 		}
 
-		return remove(makePrefix(codeBlockExecutionReceipt, blockID))(txn)
+		return remove(makePrefix(codeExecutionResult, blockID))(txn)
 	}
 }

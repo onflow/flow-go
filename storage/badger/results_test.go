@@ -37,6 +37,15 @@ func TestResultStoreTwice(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
 		store := bstorage.NewExecutionResults(metrics, db)
+
+		result := unittest.ExecutionResultFixture()
+		blockID := unittest.IdentifierFixture()
+		err := store.Store(result)
+		require.NoError(t, err)
+
+		err = store.Index(blockID, result.ID())
+		require.NoError(t, err)
+
 		err = store.Store(result)
 		require.NoError(t, err)
 
@@ -46,7 +55,7 @@ func TestResultStoreTwice(t *testing.T) {
 }
 func TestResultsRemoveNonExist(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewExecutionResults(db)
+		store := bstorage.NewExecutionResults(metrics.NewNoopCollector(), db)
 
 		blockID := unittest.IdentifierFixture()
 		err := store.RemoveByBlockID(blockID)
@@ -56,7 +65,7 @@ func TestResultsRemoveNonExist(t *testing.T) {
 
 func TestResultsStoreRemove(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewExecutionResults(db)
+		store := bstorage.NewExecutionResults(metrics.NewNoopCollector(), db)
 
 		result := unittest.ExecutionResultFixture()
 		blockID := unittest.IdentifierFixture()
@@ -125,12 +134,6 @@ func TestResultStoreForceIndexOverridesMapping(t *testing.T) {
 		byBlockID, err := store.ByBlockID(blockID)
 
 		require.Equal(t, result2, byBlockID)
-		require.NoError(t, err)
-
-		err = store.Store(result)
-		require.NoError(t, err)
-
-		err = store.Index(blockID, result.ID())
 		require.NoError(t, err)
 	})
 }

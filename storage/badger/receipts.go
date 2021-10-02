@@ -154,7 +154,7 @@ func (r *ExecutionReceipts) ByBlockID(blockID flow.Identifier) (flow.ExecutionRe
 }
 
 func (r *ExecutionReceipts) RemoveByBlockID(blockID flow.Identifier) error {
-	receipt, err := r.ByBlockID(blockID)
+	receipts, err := r.ByBlockID(blockID)
 	if errors.Is(err, badger.ErrKeyNotFound) {
 		return nil
 	}
@@ -167,5 +167,11 @@ func (r *ExecutionReceipts) RemoveByBlockID(blockID flow.Identifier) error {
 		return fmt.Errorf("could not find receipt: %w", err)
 	}
 
-	return r.db.Update(operation.RemoveExecutionReceipt(blockID, receipt))
+	for _, receipt := range receipts {
+		err := r.db.Update(operation.RemoveExecutionReceipt(blockID, receipt))
+		if err != nil {
+			return fmt.Errorf("could not remove receipts for block %v: %w", blockID, err)
+		}
+	}
+	return nil
 }

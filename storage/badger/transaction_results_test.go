@@ -14,8 +14,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 func TestBatchStoringTransactionResults(t *testing.T) {
@@ -81,7 +79,7 @@ func TestKeyConversion(t *testing.T) {
 
 func TestRemoveNotExistTransactionResult(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewTransactionResults(db)
+		store := bstorage.NewTransactionResults(metrics.NewNoopCollector(), db, 1000)
 		blockID := unittest.IdentifierFixture()
 		require.NoError(t, store.RemoveByBlockID(blockID))
 	})
@@ -89,7 +87,7 @@ func TestRemoveNotExistTransactionResult(t *testing.T) {
 
 func TestRemoveTransactionResult(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		store := bstorage.NewTransactionResults(db)
+		store := bstorage.NewTransactionResults(metrics.NewNoopCollector(), db, 1000)
 
 		blockID := unittest.IdentifierFixture()
 		txResults := make([]flow.TransactionResult, 0)
@@ -97,11 +95,12 @@ func TestRemoveTransactionResult(t *testing.T) {
 			txID := unittest.IdentifierFixture()
 			expected := flow.TransactionResult{
 				TransactionID: txID,
-				ErrorMessage:  "a runtime error " + string(i),
+				ErrorMessage:  fmt.Sprintf("a runtime error %v", i),
 			}
 			txResults = append(txResults, expected)
 		}
-		err := store.BatchStore(blockID, txResults)
+		writeBatch := bstorage.NewBatch(db)
+		err := store.BatchStore(blockID, txResults, writeBatch)
 		require.Nil(t, err)
 
 		require.NoError(t, store.RemoveByBlockID(blockID), "remove for the first time should work, but didn't")

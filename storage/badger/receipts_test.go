@@ -149,8 +149,8 @@ func TestExecutionReceiptsStorage(t *testing.T) {
 
 func TestReceiptsRemoveNotExist(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		results := bstorage.NewExecutionResults(db)
-		store := bstorage.NewExecutionReceipts(db, results)
+		results := bstorage.NewExecutionResults(metrics.NewNoopCollector(), db)
+		store := bstorage.NewExecutionReceipts(metrics.NewNoopCollector(), db, results, 100)
 		blockID := unittest.IdentifierFixture()
 		require.NoError(t, store.RemoveByBlockID(blockID))
 	})
@@ -158,15 +158,12 @@ func TestReceiptsRemoveNotExist(t *testing.T) {
 
 func TestReceiptsRemove(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		results := bstorage.NewExecutionResults(db)
-		store := bstorage.NewExecutionReceipts(db, results)
+		results := bstorage.NewExecutionResults(metrics.NewNoopCollector(), db)
+		store := bstorage.NewExecutionReceipts(metrics.NewNoopCollector(), db, results, 100)
 
 		receipt := unittest.ExecutionReceiptFixture()
 		err := store.Store(receipt)
 		require.Nil(t, err)
-
-		// this is redundant, Store should be able to Index a receipt
-		require.NoError(t, store.Index(receipt.ExecutionResult.BlockID, receipt.ID()))
 
 		require.NoError(t, store.RemoveByBlockID(receipt.ExecutionResult.BlockID))
 
