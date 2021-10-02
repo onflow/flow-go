@@ -509,7 +509,7 @@ func (m *StorageFormatV6Migration) initOldInterpreter(payloads []ledger.Payload)
 					)
 				}
 
-				registerValue, err := storageView.Get(ownerStr, ownerStr, key)
+				registerValue, err := storageView.Get(ownerStr, "", key)
 				if err != nil {
 					panic(err)
 				}
