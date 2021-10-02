@@ -140,7 +140,10 @@ func main() {
 			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
 			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
 			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
+<<<<<<< HEAD
 			flags.BoolVar(&atreeValidationEnabled, "atree-validation", false, "validates all atree values after mutations")
+=======
+>>>>>>> master
 			flags.StringVar(&s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
 		}).
 		ValidateFlags(func() error {
@@ -230,6 +233,7 @@ func main() {
 				if err != nil {
 					return nil, fmt.Errorf("failed to load AWS configuration: %w", err)
 				}
+<<<<<<< HEAD
 
 				client := s3.NewFromConfig(config)
 				s3Uploader := uploader.NewS3Uploader(
@@ -247,6 +251,25 @@ func main() {
 				)
 				blockDataUploaders = append(blockDataUploaders, asyncUploader)
 
+=======
+
+				client := s3.NewFromConfig(config)
+				s3Uploader := uploader.NewS3Uploader(
+					ctx,
+					client,
+					s3BucketName,
+					logger,
+				)
+				asyncUploader := uploader.NewAsyncUploader(
+					s3Uploader,
+					blockdataUploaderRetryTimeout,
+					blockDataUploaderMaxRetry,
+					logger,
+					collector,
+				)
+				blockDataUploaders = append(blockDataUploaders, asyncUploader)
+
+>>>>>>> master
 				return asyncUploader, nil
 			}
 
