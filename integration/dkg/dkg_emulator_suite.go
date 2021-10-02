@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module"
 	"os"
 
 	"github.com/rs/zerolog"
@@ -452,7 +453,7 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 		dkg.NewControllerFactory(
 			controllerFactoryLogger,
 			core.Me,
-			node.dkgContractClient,
+			[]module.DKGContractClient{node.dkgContractClient},
 			brokerTunnel,
 			config,
 		),
