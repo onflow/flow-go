@@ -8,6 +8,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -863,10 +864,91 @@ func Test(t *testing.T) {
 	migration.initNewInterpreter()
 	migration.initOldInterpreter(payloads)
 
-	migratedPayloads, err := migration.Migrate(payloads)
+	nftAddress, err := common.HexToAddress("1d7e57aa55817448")
 	require.NoError(t, err)
 
-	for _, payload := range migratedPayloads {
-		fmt.Printf("%s\n", payload.String())
+	nftLocation := common.AddressLocation{
+		Address: nftAddress,
+		Name:    "NonFungibleToken",
+	}
+	nftType := &sema.CompositeType{
+		Location:   nftLocation,
+		Identifier: "NonFungibleToken.NFT",
+		Kind:       common.CompositeKindResource,
+	}
+
+	nftElaboration := sema.NewElaboration()
+	nftElaboration.CompositeTypes[nftType.ID()] = nftType
+
+	topshotAddress, err := common.HexToAddress("0b2a3299cc857e29")
+	require.NoError(t, err)
+
+	topshotLocation := common.AddressLocation{
+		Address: topshotAddress,
+		Name:    "TopShot",
+	}
+	topshotType := &sema.CompositeType{
+		Location:   topshotLocation,
+		Identifier: "TopShot.NFT",
+		Kind:       common.CompositeKindResource,
+		ImplicitTypeRequirementConformances: []*sema.CompositeType{
+			nftType,
+		},
+	}
+
+	topshotElaboration := sema.NewElaboration()
+	topshotElaboration.CompositeTypes[topshotType.ID()] = topshotType
+
+	migration.programs = programs.NewEmptyPrograms()
+	migration.programs.Set(
+		nftLocation,
+		&newInter.Program{
+			Program:     &ast.Program{},
+			Elaboration: nftElaboration,
+		},
+		nil,
+	)
+	migration.programs.Set(
+		topshotLocation,
+		&newInter.Program{
+			Program:     &ast.Program{},
+			Elaboration: topshotElaboration,
+		},
+		nil,
+	)
+
+	_, err = migration.Migrate(payloads)
+	require.NoError(t, err)
+
+	var result newInter.Value = migration.newInter.ReadStored(
+		common.BytesToAddress(owner),
+		"storage\u001FMomentCollection",
+	)
+
+	require.IsType(t, result, &newInter.SomeValue{})
+	result = result.(*newInter.SomeValue).Value
+
+	require.IsType(t, &newInter.CompositeValue{}, result)
+	composite := result.(*newInter.CompositeValue)
+
+	ownedNFTS := composite.GetField("ownedNFTs")
+	require.IsType(t, &newInter.DictionaryValue{}, ownedNFTS)
+	dictionary := ownedNFTS.(*newInter.DictionaryValue)
+
+	require.Equal(t, 9, dictionary.Count())
+
+	for _, id := range []newInter.UInt64Value{
+		15603598,
+		12750761,
+		8186472,
+		8362353,
+		9061281,
+		12037894,
+		9762650,
+		14247929,
+		12463494,
+	} {
+		result := dictionary.GetKey(migration.newInter, newInter.ReturnEmptyLocationRange, id)
+		require.NotNil(t, result)
 	}
 }

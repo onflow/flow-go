@@ -116,7 +116,9 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	m.accounts = m.getAccounts(payloads)
 	m.Log.Info().Msg("Loaded account contracts")
 
-	m.programs = programs.NewEmptyPrograms()
+	if m.programs == nil {
+		m.programs = programs.NewEmptyPrograms()
+	}
 
 	m.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
