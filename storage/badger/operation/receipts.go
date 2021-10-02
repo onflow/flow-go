@@ -1,6 +1,8 @@
 package operation
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -77,9 +79,9 @@ func RemoveExecutionReceipt(blockID flow.Identifier, receipt *flow.ExecutionRece
 		receiptID := receipt.ID()
 		err := remove(makePrefix(codeExecutionReceiptMeta, receiptID))(txn)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not remove receipt meta for receipt (%v): %w", receiptID, err)
 		}
 
-		return remove(makePrefix(codeExecutionResult, blockID))(txn)
+		return nil
 	}
 }

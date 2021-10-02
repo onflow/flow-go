@@ -2,6 +2,7 @@ package badger_test
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -167,7 +168,7 @@ func TestReceiptsRemove(t *testing.T) {
 
 		require.NoError(t, store.RemoveByBlockID(receipt.ExecutionResult.BlockID))
 
-		_, err = store.ByBlockID(receipt.ExecutionResult.BlockID)
-		require.True(t, errors.Is(err, storage.ErrNotFound))
+		result, err := store.ByBlockID(receipt.ExecutionResult.BlockID)
+		require.True(t, errors.Is(err, storage.ErrNotFound), fmt.Sprintf("result: %v", result))
 	})
 }

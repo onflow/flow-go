@@ -50,6 +50,10 @@ func RemoveExecutionResult(blockID flow.Identifier, result *flow.ExecutionResult
 		}
 
 		// remove result
-		return remove(makePrefix(codeExecutionResult, result.ID()))(txn)
+		err = remove(makePrefix(codeExecutionResult, result.ID()))(txn)
+		if err != nil {
+			return err
+		}
+		return nil
 	}
 }
