@@ -2,7 +2,7 @@ COLLECTION = 3
 CONSENSUS = 3
 EXECUTION = 2
 VERIFICATION = 1
-ACCESS = 1
+ACCESS = 2
 UNSTAKED_ACCESS = 0
 NCLUSTERS=1
 EPOCHLEN=10000   # 0 means use default
@@ -47,8 +47,8 @@ init-short-epochs:
 
 .PHONY: start
 start:
-	docker-compose -f docker-compose.metrics.yml up -d
-	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up --build -d
+	docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
+	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up --remove-orphans --build -d
 
 .PHONY: logs
 logs:

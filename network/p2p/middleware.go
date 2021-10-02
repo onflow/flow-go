@@ -74,7 +74,7 @@ type Middleware struct {
 	libP2PNodeFactory          LibP2PFactoryFunc
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
-	rootBlockID                string
+	rootBlockID                flow.Identifier
 	validators                 []network.MessageValidator
 	peerManagerFactory         PeerManagerFactoryFunc
 	peerManager                *PeerManager
@@ -119,7 +119,7 @@ func NewMiddleware(
 	libP2PNodeFactory LibP2PFactoryFunc,
 	flowID flow.Identifier,
 	metrics module.NetworkMetrics,
-	rootBlockID string,
+	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
 	connectionGating bool,
 	idTranslator IDTranslator,
@@ -232,16 +232,16 @@ func (m *Middleware) UpdateNodeAddresses() {
 func (m *Middleware) Start(ov network.Overlay) error {
 	m.ov = ov
 	libP2PNode, err := m.libP2PNodeFactory()
-
-	if m.idProvider == nil {
-		m.idProvider = NewPeerstoreIdentifierProvider(m.log, libP2PNode.host, m.idTranslator)
-	}
-
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}
+
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
+
+	if m.idProvider == nil {
+		m.idProvider = NewPeerstoreIdentifierProvider(m.log, m.libP2PNode.host, m.idTranslator)
+	}
 
 	m.UpdateNodeAddresses()
 
@@ -388,7 +388,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
 	var validators []psValidator.MessageValidator
-	if !engine.UnstakedChannels().Contains(channel) {
+	if !engine.PublicChannels().Contains(channel) {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
 		validators = append(validators, psValidator.StakedValidator(m.ov.Identity))
 	}
