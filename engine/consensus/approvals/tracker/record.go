@@ -40,7 +40,7 @@ func (r *SealingRecord) ApprovalsMissing(chunksWithMissingApprovals map[uint64]f
 			chunk["missing_approvals_from_verifiers"] = list
 			chunksInfo = append(chunksInfo, chunk)
 		}
-		bytes, err := json.Marshal(r)
+		bytes, err := json.Marshal(chunksInfo)
 		if err != nil {
 			bytes = []byte("failed to marshal data about chunks with missing approvals")
 		}
