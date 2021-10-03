@@ -190,7 +190,10 @@ func (c *ComponentManagerBuilderImpl) Build() *ComponentManager {
 
 var _ Component = (*ComponentManager)(nil)
 
-// ComponentManager is used to manage worker routines and sub-components of a Component
+// ComponentManager is used to manage worker routines and sub-components of a Component.
+// When a ComponentManager is started, it first runs the startup function if one is provided,
+// and then proceeds to start up any components that it contains. Once all components have
+// started up successfully, it then launches any worker routines.
 type ComponentManager struct {
 	started        *atomic.Bool
 	ready          chan struct{}
@@ -205,6 +208,7 @@ type ComponentManager struct {
 // Start initiates the ComponentManager. It will first run the startup routine if one
 // was set, and then start all sub-components and launch all worker routines.
 func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) (err error) {
+	// only start once
 	if c.started.CAS(false, true) {
 		ctx, cancel := context.WithCancel(parent)
 		_ = cancel // pacify vet lostcancel check: startupCtx is always canceled through its parent
