@@ -13,7 +13,6 @@ import (
 	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const CHANNEL_CLOSE_LATENCY_ALLOWANCE = 20 * time.Millisecond
@@ -728,9 +727,12 @@ func (st *stateTransition) String() string {
 type componentManagerMachine struct {
 	cm *ComponentManager
 
-	cancel             context.CancelFunc
-	checkSignalerError func() (error, bool)
-	checkStartError    func() (error, bool)
+	cancel                  context.CancelFunc
+	checkSignalerError      func() (error, bool)
+	checkStartError         func() (error, bool)
+	resetChannelReadTimeout func()
+	assertClosed            func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
+	assertNotClosed         func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
 
 	cancelGenerator     *rapid.Generator
 	drawStateTransition func(t *rapid.T) *stateTransition
@@ -878,6 +880,43 @@ func (c *componentManagerMachine) Init(t *rapid.T) {
 		close(startErrChan)
 	}()
 
+	var channelReadTimeout chan struct{}
+
+	c.resetChannelReadTimeout = func() {
+		channelReadTimeout = make(chan struct{})
+		ch := channelReadTimeout
+		go func() {
+			time.Sleep(CHANNEL_CLOSE_LATENCY_ALLOWANCE)
+			close(ch)
+		}()
+	}
+
+	c.assertClosed = func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{}) {
+		select {
+		case <-ch:
+			return
+		default:
+		}
+		select {
+		case <-channelReadTimeout:
+			assert.Fail(t, "channel is not closed", msgAndArgs...)
+		case <-ch:
+		}
+	}
+
+	c.assertNotClosed = func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{}) {
+		select {
+		case <-ch:
+			assert.Fail(t, "channel is closed", msgAndArgs...)
+		default:
+		}
+		select {
+		case <-ch:
+			assert.Fail(t, "channel is closed", msgAndArgs...)
+		case <-channelReadTimeout:
+		}
+	}
+
 	var signalerErr error
 	var signalerErrOk bool
 	c.checkSignalerError = func() (error, bool) {
@@ -927,7 +966,8 @@ func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 			t.Log("executing cancel transition\n")
 			c.cancel()
 			c.canceled = true
-			unittest.AssertClosesBefore(t, c.cm.ShutdownSignal(), CHANNEL_CLOSE_LATENCY_ALLOWANCE)
+			c.resetChannelReadTimeout()
+			c.assertClosed(t, c.cm.ShutdownSignal())
 		})
 	}
 
@@ -949,7 +989,8 @@ func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 				assert.NoError(t, c.startupError)
 				c.startupError = startupError
 				c.canceled = true
-				unittest.AssertClosesBefore(t, c.cm.ShutdownSignal(), CHANNEL_CLOSE_LATENCY_ALLOWANCE)
+				c.resetChannelReadTimeout()
+				c.assertClosed(t, c.cm.ShutdownSignal())
 			}
 		})
 	}
@@ -976,7 +1017,8 @@ func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 				assert.NotErrorIs(t, componentStartupErrors, componentStartupErr)
 				componentStartupErrors = multierror.Append(componentStartupErrors, componentStartupErr)
 				c.canceled = true
-				unittest.AssertClosesBefore(t, c.cm.ShutdownSignal(), CHANNEL_CLOSE_LATENCY_ALLOWANCE)
+				c.resetChannelReadTimeout()
+				c.assertClosed(t, c.cm.ShutdownSignal())
 			}
 
 			if (componentStateList{componentEncounteredFatal, componentReadyEncounteredFatal}).contains(endState) {
@@ -985,7 +1027,8 @@ func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 				assert.NotErrorIs(t, thrownErrors, thrownErr)
 				thrownErrors = multierror.Append(thrownErrors, thrownErr)
 				c.canceled = true
-				unittest.AssertClosesBefore(t, c.cm.ShutdownSignal(), CHANNEL_CLOSE_LATENCY_ALLOWANCE)
+				c.resetChannelReadTimeout()
+				c.assertClosed(t, c.cm.ShutdownSignal())
 			}
 		})
 	}
@@ -1006,7 +1049,8 @@ func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 				assert.NotErrorIs(t, thrownErrors, thrownErr)
 				thrownErrors = multierror.Append(thrownErrors, thrownErr)
 				c.canceled = true
-				unittest.AssertClosesBefore(t, c.cm.ShutdownSignal(), CHANNEL_CLOSE_LATENCY_ALLOWANCE)
+				c.resetChannelReadTimeout()
+				c.assertClosed(t, c.cm.ShutdownSignal())
 			}
 		})
 	}
