@@ -2,8 +2,9 @@ package dkg
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module"
 	"os"
+
+	"github.com/onflow/flow-go/module"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -309,7 +310,8 @@ func (s *DKGSuite) startDKGWithParticipants(accounts []*nodeAccount) {
 
 	// sanity check: verify that DKG was started with correct node IDs
 	result := s.executeScript(templates.GenerateGetConsensusNodesScript(s.env), nil)
-	assert.Equal(s.T(), cadence.NewArray(valueNodeIDs), result)
+	require.IsType(s.T(), cadence.Array{}, result)
+	assert.ElementsMatch(s.T(), valueNodeIDs, result.(cadence.Array).Values)
 }
 
 func (s *DKGSuite) claimDKGParticipant(node *node) {
