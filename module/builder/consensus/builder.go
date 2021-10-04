@@ -6,8 +6,11 @@ import (
 	"context"
 	"encoding/binary"
 	"fmt"
+	"reflect"
 	"sort"
+	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/opentracing/opentracing-go"
@@ -287,29 +290,32 @@ func compareIdentifiers(a flow.Identifier, b flow.Identifier) (bool, bool) {
 }
 
 func Search(arr []flow.Identifier, n flow.Identifier, arrayLen int) bool {
-	i := 0
+	l := 0
+	r := arrayLen - 1
 
 	for {
-		h := int(uint(i+arrayLen) >> 1) // avoid overflow when computing h
+		h := int(uint(l+r) >> 1) // avoid overflow when computing h
 
-		bEqual, bLess := compareIdentifiers(n, arr[h])
+		bEqual, bLess := compareIdentifiers(arr[h], n)
 
 		if bLess {
-			i = h + 1
+			l = h + 1
 		} else if !bEqual {
 			// set the arrayLen to be half what it was
-			arrayLen = h
+			r = h - 1
 		} else {
 			// found
 			return true
 		}
 
-		if i >= arrayLen {
+		if l > r {
 			// not found
 			return false
 		}
 	}
 }
+
+var mtx sync.Mutex
 
 // getInsertableGuarantees returns the list of CollectionGuarantees that should
 // be inserted in the next payload. It looks in the collection mempool and
@@ -348,6 +354,12 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		limit = rootHeight
 	}
 
+	mtx.Lock()
+
+	defer mtx.Unlock()
+
+	println("builder-debug\tthe cfg.expiry is ", b.cfg.expiry)
+
 	// make a slice to track of the blocks
 	// keeps track of the blocks from limit to parent
 	b.idblocks = make([]flow.Identifier, uint(b.cfg.expiry))
@@ -384,11 +396,26 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 		return nil, fmt.Errorf("internal error building set of CollectionGuarantees on fork: %w", err)
 	}
 
+	// before sorting, resize the slice to the actual size
+	(*reflect.SliceHeader)(unsafe.Pointer(&b.idblocks)).Len = b.blockIndex
+
+	(*reflect.SliceHeader)(unsafe.Pointer(&b.receipts)).Len = b.receiptIndex
+
 	// sort the blocks and receipts slices, for searching later
 	sort.Slice(b.idblocks, func(p, q int) bool {
 		_, bLess := compareIdentifiers(b.idblocks[p], b.idblocks[q])
 		return bLess
 	})
+	lenReceipts := len(b.receipts)
+	lenBlocks := len(b.idblocks)
+
+	println("builder-debug\tthere are ", lenBlocks, " blocks in the idblocks array")
+	println("builder-debug\tthere are ", lenReceipts, " blocks in the receipts array")
+	println("builder-debug\t  idblocks is sorted")
+
+	for blks := 0; blks < lenBlocks; blks++ {
+		println("builder-debug\telement #", blks, " contains ", b.idblocks[blks].String())
+	}
 
 	sort.Slice(b.receipts, func(p, q int) bool {
 		_, bLess := compareIdentifiers(b.receipts[p], b.receipts[q])
@@ -397,9 +424,6 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 
 	// go through mempool and collect valid collections
 	var guarantees []*flow.CollectionGuarantee
-	lenReceipts := len(b.receipts)
-	lenBlocks := len(b.idblocks)
-
 	for _, guarantee := range b.guarPool.All() {
 		// add at most <maxGuaranteeCount> number of collection guarantees in a new block proposal
 		// in order to prevent the block payload from being too big or computationally heavy for the
@@ -412,12 +436,17 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 
 		// skip collections that are already included in a block on the fork
 
+		println("builder-debug\tsearching for ", collID.String())
+
 		if Search(b.receipts, collID, lenReceipts) {
+			println("builder-debug\tfound a collection to skip")
 			continue
 		}
 
 		// skip collections for blocks that are not within the limit
+		println("builder-debug\tsearching for ", guarantee.ReferenceBlockID.String())
 		if !Search(b.idblocks, guarantee.ReferenceBlockID, lenBlocks) {
+			println("builder-debug\tblock not within limit")
 			continue
 		}
 
