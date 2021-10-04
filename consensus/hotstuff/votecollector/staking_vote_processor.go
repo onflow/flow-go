@@ -1,4 +1,3 @@
-//nolint
 package votecollector
 
 import (
@@ -14,27 +13,6 @@ import (
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
-// StakingVoteProcessorFactory generates StakingVoteProcessor instances
-func StakingVoteProcessorFactory(log zerolog.Logger, proposal *model.Proposal) (*StakingVoteProcessor, error) {
-	processor := &StakingVoteProcessor{
-		log:   log,
-		block: proposal.Block,
-		done:  *atomic.NewBool(false),
-	}
-	err := processor.Process(proposal.ProposerVote())
-	if err != nil {
-		if model.IsInvalidVoteError(err) {
-			return nil, model.InvalidBlockError{
-				BlockID: proposal.Block.BlockID,
-				View:    proposal.Block.View,
-				Err:     err,
-			}
-		}
-		return nil, fmt.Errorf("")
-	}
-	return processor, nil
-}
-
 // StakingVoteProcessor implements the hotstuff.VerifyingVoteProcessor interface.
 // It processes hotstuff votes from a collector cluster, where participants vote
 // in favour of a block by proving their staking key signature.
@@ -46,6 +24,25 @@ type StakingVoteProcessor struct {
 	onQCCreated      hotstuff.OnQCCreated
 	minRequiredStake uint64
 	done             atomic.Bool
+}
+
+// newStakingVoteProcessor is a helper function to perform object construction
+// no extra logic for validating proposal wasn't added
+func newStakingVoteProcessor(
+	log zerolog.Logger,
+	block *model.Block,
+	stakingSigAggtor hotstuff.WeightedSignatureAggregator,
+	onQCCreated hotstuff.OnQCCreated,
+	minRequiredStake uint64,
+) *StakingVoteProcessor {
+	return &StakingVoteProcessor{
+		log:              log,
+		block:            block,
+		stakingSigAggtor: stakingSigAggtor,
+		onQCCreated:      onQCCreated,
+		minRequiredStake: minRequiredStake,
+		done:             *atomic.NewBool(false),
+	}
 }
 
 func (p *StakingVoteProcessor) Block() *model.Block {

@@ -22,30 +22,55 @@ type VoteProcessorFactory struct {
 	base hotstuff.VoteProcessorFactory
 }
 
-// CombinedBaseVoteProcessorFactory implements a factory for creating CombinedVoteProcessor
-// holds needed dependencies to initialize CombinedVoteProcessor.
-type CombinedBaseVoteProcessorFactory struct {
+type voteProcessorFactoryBase struct {
 	log         zerolog.Logger
-	packer      hotstuff.Packer
 	committee   hotstuff.Committee
 	onQCCreated hotstuff.OnQCCreated
 }
 
-var _ hotstuff.VoteProcessorFactory = &CombinedBaseVoteProcessorFactory{}
+// combinedVoteProcessorFactoryBase implements a factory for creating CombinedVoteProcessor
+// holds needed dependencies to initialize CombinedVoteProcessor.
+type combinedVoteProcessorFactoryBase struct {
+	voteProcessorFactoryBase
+	packer hotstuff.Packer
+}
+
+// stakingVoteProcessorFactoryBase implements a factory for creating StakingVoteProcessor
+// holds needed dependencies to initialize StakingVoteProcessor.
+type stakingVoteProcessorFactoryBase struct {
+	voteProcessorFactoryBase
+}
+
+var _ hotstuff.VoteProcessorFactory = &combinedVoteProcessorFactoryBase{}
+var _ hotstuff.VoteProcessorFactory = &stakingVoteProcessorFactoryBase{}
 var _ hotstuff.VoteProcessorFactory = &VoteProcessorFactory{}
 
 func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, eventHandler hotstuff.EventHandlerV2) *VoteProcessorFactory {
 	return &VoteProcessorFactory{
-		base: &CombinedBaseVoteProcessorFactory{
-			log:       log,
-			committee: committee,
-			packer:    signature.NewConsensusSigDataPacker(committee),
-			onQCCreated: func(qc *flow.QuorumCertificate) {
-				err := eventHandler.OnQCConstructed(qc)
-				if err != nil {
-					log.Fatal().Err(err).Msgf("failed to submit constructed QC at view %d to event handler", qc.View)
-				}
-			},
+		base: &combinedVoteProcessorFactoryBase{
+			voteProcessorFactoryBase: newVoteProcessorFactoryBase(log, committee, eventHandler),
+			packer:                   signature.NewConsensusSigDataPacker(committee),
+		},
+	}
+}
+
+func NewStakingVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, eventHandler hotstuff.EventHandlerV2) *VoteProcessorFactory {
+	return &VoteProcessorFactory{
+		base: &stakingVoteProcessorFactoryBase{
+			voteProcessorFactoryBase: newVoteProcessorFactoryBase(log, committee, eventHandler),
+		},
+	}
+}
+
+func newVoteProcessorFactoryBase(log zerolog.Logger, committee hotstuff.Committee, eventHandler hotstuff.EventHandlerV2) voteProcessorFactoryBase {
+	return voteProcessorFactoryBase{
+		log:       log,
+		committee: committee,
+		onQCCreated: func(qc *flow.QuorumCertificate) {
+			err := eventHandler.OnQCConstructed(qc)
+			if err != nil {
+				log.Fatal().Err(err).Msgf("failed to submit constructed QC at view %d to event handler", qc.View)
+			}
 		},
 	}
 }
@@ -77,7 +102,7 @@ func (f *VoteProcessorFactory) Create(proposal *model.Proposal) (hotstuff.Verify
 
 // Create creates CombinedVoteProcessor for processing votes for current proposal.
 // Caller must treat all errors as exceptions
-func (f *CombinedBaseVoteProcessorFactory) Create(proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
+func (f *combinedVoteProcessorFactoryBase) Create(proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
 	allParticipants, err := f.committee.Identities(proposal.Block.BlockID, filter.Any)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
@@ -108,6 +133,34 @@ func (f *CombinedBaseVoteProcessorFactory) Create(proposal *model.Proposal) (hot
 		rbRector,
 		f.onQCCreated,
 		f.packer,
+		minRequiredStake,
+	)
+	return processor, nil
+}
+
+// Create creates StakingVoteProcessor for processing votes for current proposal.
+// Caller must treat all errors as exceptions
+func (f *stakingVoteProcessorFactoryBase) Create(proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
+	allParticipants, err := f.committee.Identities(proposal.Block.BlockID, filter.Any)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
+	}
+
+	// message that has to be verified against aggregated signature
+	msg := verification.MakeVoteMessage(proposal.Block.View, proposal.Block.BlockID)
+
+	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.CollectorVoteTag)
+	if err != nil {
+		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
+	}
+
+	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
+
+	processor := newStakingVoteProcessor(
+		f.log,
+		proposal.Block,
+		stakingSigAggtor,
+		f.onQCCreated,
 		minRequiredStake,
 	)
 	return processor, nil
