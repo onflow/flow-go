@@ -106,7 +106,7 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 		c.mu.Lock()
 		defer c.mu.Unlock()
 		for h := final.Height + 1; h <= height; h++ {
-			c.queueByHeight(h)
+			c.requeueHeight(h)
 		}
 	}
 }
@@ -129,6 +129,12 @@ func (c *Core) RequestHeight(height uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
+	c.requeueHeight(height)
+}
+
+// requeueHeight queues the given height, ignoring any previously received
+// blocks at that height
+func (c *Core) requeueHeight(height uint64) {
 	// if we already received this block, reset the status so we can re-queue
 	status := c.heights[height]
 	if status.WasReceived() {
