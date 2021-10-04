@@ -87,7 +87,7 @@ func main() {
 		err               error
 
 		// epoch qc contract client
-		machineAccountInfo *bootstrap.NodeMachineAccountInfo
+		// machineAccountInfo *bootstrap.NodeMachineAccountInfo
 		flowClientOpts     []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
@@ -198,10 +198,10 @@ func main() {
 			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
-			return err
-		}).
+		//Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		//	machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+		//	return err
+		//}).
 		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			if len(accessNodeIDS) < common.DefaultAccessNodeIDSMinimum {
 				return fmt.Errorf("invalid flag --access-node-ids atleast %d IDs must be provided", common.DefaultAccessNodeIDSMinimum)
@@ -214,22 +214,22 @@ func main() {
 
 			return nil
 		}).
-		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
-			flowClient, err := common.FlowClient(flowClientOpts[0])
-			if err != nil {
-				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientOpts[0].AccessAddress, err)
-			}
-
-			validator, err := epochs.NewMachineAccountConfigValidator(
-				node.Logger,
-				flowClient,
-				flow.RoleCollection,
-				*machineAccountInfo,
-			)
-
-			return validator, err
-		}).
+		//Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		//	//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
+		//	flowClient, err := common.FlowClient(flowClientOpts[0])
+		//	if err != nil {
+		//		return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientOpts[0].AccessAddress, err)
+		//	}
+		//
+		//	validator, err := epochs.NewMachineAccountConfigValidator(
+		//		node.Logger,
+		//		flowClient,
+		//		flow.RoleCollection,
+		//		*machineAccountInfo,
+		//	)
+		//
+		//	return validator, err
+		//}).
 		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
@@ -461,10 +461,11 @@ func main() {
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
 			// construct QC contract client
-			qcContractClients, err := createQCContractClients(node, machineAccountInfo, flowClientOpts)
-			if err != nil {
-				return nil, fmt.Errorf("could not create qc contract clients %w", err)
-			}
+			//qcContractClients, err := createQCContractClients(node, machineAccountInfo, flowClientOpts)
+			//if err != nil {
+			//	return nil, fmt.Errorf("could not create qc contract clients %w", err)
+			//}
+		    qcContractClients := []module.QCContractClient {epochs.NewMockQCContractClient(node.Logger)}
 
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,

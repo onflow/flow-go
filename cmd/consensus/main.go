@@ -94,8 +94,8 @@ func main() {
 		startupTime                            time.Time
 
 		// DKG contract client
-		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientOpts     []*common.FlowClientConfig
+		// machineAccountInfo *bootstrap.NodeMachineAccountInfo
+		// flowClientOpts     []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
@@ -362,37 +362,37 @@ func main() {
 			finalizationDistributor = pubsub.NewFinalizationDistributor()
 			return nil
 		}).
-		Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
-			return err
-		}).
-		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			if len(accessNodeIDS) < common.DefaultAccessNodeIDSMinimum {
-				return fmt.Errorf("invalid flag --access-node-ids atleast %d IDs must be provided", common.DefaultAccessNodeIDSMinimum)
-			}
-
-			flowClientOpts, err = common.FlowClientConfigs(accessNodeIDS, insecureAccessAPI, node.State.Sealed())
-			if err != nil {
-				return fmt.Errorf("failed to prepare flow client connection options for each access node id %w", err)
-			}
-
-			return nil
-		}).
-		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
-			flowClient, err := common.FlowClient(flowClientOpts[0])
-			if err != nil {
-				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientOpts[0].AccessAddress, err)
-			}
-
-			validator, err := epochs.NewMachineAccountConfigValidator(
-				node.Logger,
-				flowClient,
-				flow.RoleCollection,
-				*machineAccountInfo,
-			)
-			return validator, err
-		}).
+		//Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		//	machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+		//	return err
+		//}).
+		//Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		//	if len(accessNodeIDS) < common.DefaultAccessNodeIDSMinimum {
+		//		return fmt.Errorf("invalid flag --access-node-ids atleast %d IDs must be provided", common.DefaultAccessNodeIDSMinimum)
+		//	}
+		//
+		//	flowClientOpts, err = common.FlowClientConfigs(accessNodeIDS, insecureAccessAPI, node.State.Sealed())
+		//	if err != nil {
+		//		return fmt.Errorf("failed to prepare flow client connection options for each access node id %w", err)
+		//	}
+		//
+		//	return nil
+		//}).
+		//Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		//	//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
+		//	flowClient, err := common.FlowClient(flowClientOpts[0])
+		//	if err != nil {
+		//		return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientOpts[0].AccessAddress, err)
+		//	}
+		//
+		//	validator, err := epochs.NewMachineAccountConfigValidator(
+		//		node.Logger,
+		//		flowClient,
+		//		flow.RoleCollection,
+		//		*machineAccountInfo,
+		//	)
+		//	return validator, err
+		//}).
 		Component("sealing engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
@@ -730,10 +730,13 @@ func main() {
 			node.ProtocolEvents.AddConsumer(viewsObserver)
 
 			// construct DKG contract client
-			dkgContractClients, err := createDKGContractClients(node, machineAccountInfo, flowClientOpts)
-			if err != nil {
-				return nil, fmt.Errorf("could not create dkg contract client %w", err)
-			}
+			//dkgContractClients, err := createDKGContractClients(node, machineAccountInfo, flowClientOpts)
+			//if err != nil {
+			//	return nil, fmt.Errorf("could not create dkg contract client %w", err)
+			//}
+
+			// construct a mock DKG contract client
+			dkgContractClients := []module.DKGContractClient{dkgmodule.NewMockClient(node.Logger)}
 
 			// the reactor engine reacts to new views being finalized and drives the
 			// DKG protocol
