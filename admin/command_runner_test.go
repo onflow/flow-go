@@ -267,7 +267,11 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 	reqBody := bytes.NewBuffer([]byte(`{"commandName": "foo", "data": {"key": "value"}}`))
 	resp, err := http.Post(url, "application/json", reqBody)
 	suite.NoError(err)
-	defer resp.Body.Close()
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	suite.True(called)
 	suite.Equal("200 OK", resp.Status)
