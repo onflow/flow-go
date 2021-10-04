@@ -11,7 +11,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network/message"
 )
 
@@ -27,8 +27,9 @@ func (t Topic) String() string {
 // our direct neighbours on the network. It handles the creation & teardown of
 // connections, as well as reading & writing to/from the connections.
 type Middleware interface {
-	module.Component
+	component.Component
 
+	// SetOverlay sets the overlay used by the middleware. This must be called before the middleware can be Started.
 	SetOverlay(Overlay)
 
 	// Dispatch sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous

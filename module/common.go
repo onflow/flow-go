@@ -1,8 +1,7 @@
 package module
 
 import (
-	"context"
-	"sync"
+	"errors"
 
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
@@ -44,189 +43,14 @@ func (n *NoopReadDoneAware) Done() <-chan struct{} {
 	return done
 }
 
+var ErrMultipleStartup = errors.New("component may only be started once")
+
 // Startable provides an interface to start a component. Once started, the component
 // can be stopped by cancelling the given context.
 type Startable interface {
-	Start(irrecoverable.SignalerContext)
-}
-
-type Component interface {
-	Startable
-	ReadyDoneAware
-}
-
-type ComponentFactory func() (Component, error)
-
-// OnError reacts to an irrecoverable error
-// It is meant to inspect the error, determining its type and seeing if e.g. a restart or some other measure is suitable,
-// and optionally trigger the continuation provided by the caller (RunComponent), which defines what "a restart" means.
-// Instead of restarting the component, it could also:
-// - panic (in canary / benchmark)
-// - log in various Error channels and / or send telemetry ...
-type OnError = func(err error, triggerRestart func())
-
-func RunComponent(ctx context.Context, componentFactory ComponentFactory, handler OnError) error {
-	// reference to per-run signals for the component
-	var component Component
-	var cancel context.CancelFunc
-	var done <-chan struct{}
-	var irrecoverables chan error
-
-	start := func() (err error) {
-		component, err = componentFactory()
-		if err != nil {
-			return // failure to generate the component, should be handled out-of-band because a restart won't help
-		}
-
-		// context used to run the component
-		var runCtx context.Context
-		runCtx, cancel = context.WithCancel(ctx)
-
-		// signaler used for irrecoverables
-		var signalingCtx irrecoverable.SignalerContext
-		irrecoverables = make(chan error)
-		signalingCtx = irrecoverable.WithSignaler(runCtx, irrecoverable.NewSignaler(irrecoverables))
-
-		// the component must be started in a separate goroutine in case an irrecoverable error
-		// is thrown during the call to Start, which terminates the calling goroutine
-		go component.Start(signalingCtx)
-
-		done = component.Done()
-		return
-	}
-
-	shutdownAndWaitForRestart := func(err error) error {
-		// shutdown the component
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-			cancel()
-		}
-
-		// wait until it's done
-		// note that irrecoverables which are encountered during shutdown are ignored
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-done:
-		}
-
-		// send error to the handler programmed with a restart continuation
-		restartChan := make(chan struct{})
-		go handler(err, func() {
-			close(restartChan)
-		})
-
-		// wait for handler to trigger restart or abort
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-restartChan:
-		}
-
-		return nil
-	}
-
-	for {
-		if err := start(); err != nil {
-			return err // failure to start
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case err := <-irrecoverables:
-			if canceled := shutdownAndWaitForRestart(err); canceled != nil {
-				return canceled
-			}
-		}
-	}
-}
-
-type ComponentWorker func(ctx irrecoverable.SignalerContext)
-type ComponentStartup func(context.Context) error
-
-type ComponentManagerBuilder interface {
-	OnStart(ComponentStartup) ComponentManagerBuilder
-	AddWorker(ComponentWorker) ComponentManagerBuilder
-	// AddComponent(Component) ComponentManagerBuilder
-	Build() *ComponentManager
-}
-
-type ComponentManagerBuilderImpl struct {
-	startup ComponentStartup
-	workers []ComponentWorker
-}
-
-func NewComponentManagerBuilder() *ComponentManagerBuilderImpl {
-	return &ComponentManagerBuilderImpl{
-		startup: func(_ context.Context) error { return nil },
-	}
-}
-
-func (c *ComponentManagerBuilderImpl) OnStart(startup ComponentStartup) ComponentManagerBuilder {
-	c.startup = startup
-	return c
-}
-
-func (c *ComponentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
-	c.workers = append(c.workers, worker)
-	return c
-}
-
-func (c *ComponentManagerBuilderImpl) Build() *ComponentManager {
-	return &ComponentManager{
-		started: make(chan struct{}),
-		ready:   make(chan struct{}),
-		startup: c.startup,
-		workers: c.workers,
-	}
-}
-
-var _ Component = (*ComponentManager)(nil)
-
-type ComponentManager struct {
-	started chan struct{}
-	ready   chan struct{}
-	done    sync.WaitGroup
-
-	startOnce sync.Once
-	startup   func(context.Context) error
-	workers   []ComponentWorker
-}
-
-func (c *ComponentManager) Start(ctx irrecoverable.SignalerContext) {
-	c.startOnce.Do(func() {
-		go func() {
-			defer close(c.started)
-
-			if err := c.startup(ctx); err != nil {
-				ctx.Throw(err)
-			}
-			close(c.ready)
-
-			c.done.Add(len(c.workers))
-			for _, worker := range c.workers {
-				go func() {
-					defer c.done.Done()
-					worker(ctx)
-				}()
-			}
-		}()
-	})
-}
-
-func (c *ComponentManager) Ready() <-chan struct{} {
-	return c.ready
-}
-
-func (c *ComponentManager) Done() <-chan struct{} {
-	done := make(chan struct{})
-	go func() {
-		<-c.started
-		c.done.Wait()
-		close(done)
-	}()
-	return done
+	// Start starts the component. Any errors encountered during startup should be returned
+	// directly, whereas irrecoverable errors encountered while the component is running
+	// should be thrown with the given SignalerContext.
+	// This method should only be called once, and subsequent calls should return ErrMultipleStartup.
+	Start(irrecoverable.SignalerContext) error
 }

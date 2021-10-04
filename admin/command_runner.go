@@ -18,7 +18,11 @@ import (
 	"google.golang.org/grpc/status"
 
 	pb "github.com/onflow/flow-go/admin/admin"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
+
+var _ component.Component = (*CommandRunner)(nil)
 
 const (
 	CommandRunnerMaxQueueLength  = 128
@@ -63,7 +67,6 @@ func (r *CommandRunnerBootstrapper) Bootstrap(logger zerolog.Logger, bindAddress
 		httpAddress:      bindAddress,
 		logger:           logger.With().Str("admin", "command_runner").Logger(),
 		startupCompleted: make(chan struct{}),
-		errors:           make(chan error),
 	}
 
 	for _, opt := range opts {
@@ -98,8 +101,6 @@ type CommandRunner struct {
 	tlsConfig   *tls.Config
 	logger      zerolog.Logger
 
-	errors chan error
-
 	// wait for worker routines to be ready
 	workersStarted sync.WaitGroup
 
@@ -118,7 +119,7 @@ func (r *CommandRunner) getValidator(command string) CommandValidator {
 	return r.validators[command]
 }
 
-func (r *CommandRunner) Start(ctx context.Context) error {
+func (r *CommandRunner) Start(ctx irrecoverable.SignalerContext) error {
 	if err := r.runAdminServer(ctx); err != nil {
 		return fmt.Errorf("failed to start admin server: %w", err)
 	}
@@ -158,11 +159,7 @@ func (r *CommandRunner) Done() <-chan struct{} {
 	return done
 }
 
-func (r *CommandRunner) Errors() <-chan error {
-	return r.errors
-}
-
-func (r *CommandRunner) runAdminServer(ctx context.Context) error {
+func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error {
 	select {
 	case <-ctx.Done():
 		return ctx.Err()
@@ -187,7 +184,7 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 
 		if err := grpcServer.Serve(listener); err != nil {
 			r.logger.Err(err).Msg("gRPC server encountered fatal error")
-			r.errors <- err
+			ctx.Throw(err)
 		}
 	}()
 
@@ -222,7 +219,7 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			r.logger.Err(err).Msg("HTTP server encountered error")
-			r.errors <- err
+			ctx.Throw(err)
 		}
 	}()
 
@@ -244,7 +241,7 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 
 			if err := httpServer.Shutdown(shutdownCtx); err != nil {
 				r.logger.Err(err).Msg("failed to shutdown http server")
-				r.errors <- err
+				ctx.Throw(err)
 			}
 		}
 	}()

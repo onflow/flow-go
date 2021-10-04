@@ -59,7 +59,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	blocks storage.Blocks,
 	comp network.Engine,

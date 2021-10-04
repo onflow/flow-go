@@ -28,11 +28,14 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/dns"
@@ -149,7 +152,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 }
 
-func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
+func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component("network", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 
 		codec := cborcodec.NewCodec()
@@ -173,7 +176,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			},
 		}
 
-		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(ctx,
+		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
 			fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
 			myAddr,
@@ -230,7 +233,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		net, err := p2p.NewNetwork(fnb.Logger,
 			codec,
 			fnb.Me,
-			fnb.Middleware,
+			func() (network.Middleware, error) { return fnb.Middleware, nil },
 			p2p.DefaultCacheSize,
 			topologyCache,
 			subscriptionManager,
@@ -249,7 +252,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		})
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
-		return net, err
+		return net, nil
 	})
 }
 
@@ -260,7 +263,7 @@ func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
+func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 	fnb.Component("admin server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 		var opts []admin.CommandRunnerOption
 
@@ -286,9 +289,6 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
 		}
 
 		command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.adminAddr, opts...)
-		if err := command_runner.Start(ctx); err != nil {
-			return nil, err
-		}
 
 		return command_runner, nil
 	})
@@ -723,7 +723,7 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
 	}
 }
 
-func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
+func (fnb *FlowNodeBuilder) handleComponent(ctx irrecoverable.SignalerContext, v namedComponentFunc) {
 
 	log := fnb.Logger.With().Str("component", v.name).Logger()
 
@@ -732,6 +732,13 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
 		log.Fatal().Err(err).Msg("component initialization failed")
 	} else {
 		log.Info().Msg("component initialization complete")
+	}
+
+	component, ok := readyAware.(component.Component)
+	if ok {
+		if err := component.Start(ctx); err != nil {
+			log.Fatal().Err(err).Msg("component startup failed")
+		}
 	}
 
 	select {
@@ -887,10 +894,6 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 }
 
 func (fnb *FlowNodeBuilder) Initialize() error {
-
-	ctx, cancel := context.WithCancel(context.Background())
-	fnb.Cancel = cancel
-
 	fnb.PrintBuildVersionDetails()
 
 	fnb.BaseFlags()
@@ -904,7 +907,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
 
-	fnb.EnqueueNetworkInit(ctx)
+	fnb.EnqueueNetworkInit()
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()
@@ -918,7 +921,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 			!(fnb.adminCert != NotSet && fnb.adminKey != NotSet && fnb.adminClientCAs != NotSet) {
 			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
 		}
-		fnb.EnqueueAdminServerInit(ctx)
+		fnb.EnqueueAdminServerInit()
 	}
 
 	fnb.EnqueueTracer()
@@ -999,9 +1002,23 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 			fnb.handleModule(f)
 		}
 
+		ctx, cancel := context.WithCancel(context.TODO())
+		fnb.Cancel = cancel
+		signaler := irrecoverable.NewSignaler()
+		signalerCtx := irrecoverable.WithSignaler(ctx, signaler)
+
+		// TODO: implement proper error handling
+		go func() {
+			select {
+			case err := <-signaler.Error():
+				fnb.Logger.Fatal().Err(err).Msg("component encountered irrecoverable error")
+			case <-ctx.Done():
+			}
+		}()
+
 		// initialize all components
 		for _, f := range fnb.components {
-			fnb.handleComponent(f)
+			fnb.handleComponent(signalerCtx, f)
 		}
 	})
 	return fnb.lm.Started()

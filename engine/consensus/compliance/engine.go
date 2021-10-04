@@ -51,7 +51,7 @@ type Engine struct {
 
 func NewEngine(
 	log zerolog.Logger,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	prov network.Engine,
 	core *Core) (*Engine, error) {

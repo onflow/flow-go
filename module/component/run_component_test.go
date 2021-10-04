@@ -1,4 +1,4 @@
-package module
+package component
 
 import (
 	"context"
@@ -26,7 +26,7 @@ func NewStartupErroringComponent() *StartupErroringComponent {
 	}
 }
 
-func (c *StartupErroringComponent) Start(ctx irrecoverable.SignalerContext) {
+func (c *StartupErroringComponent) Start(ctx irrecoverable.SignalerContext) error {
 	go func() {
 		defer close(c.done)
 
@@ -38,7 +38,10 @@ func (c *StartupErroringComponent) Start(ctx irrecoverable.SignalerContext) {
 		// do work...
 		<-ctx.Done()
 	}()
+
+	return nil
 }
+
 func (c *StartupErroringComponent) Ready() <-chan struct{} {
 	return c.ready
 }
@@ -59,12 +62,13 @@ func NewStartErroringComponent() *StartErroringComponent {
 	}
 }
 
-func (c *StartErroringComponent) Start(ctx irrecoverable.SignalerContext) {
+func (c *StartErroringComponent) Start(ctx irrecoverable.SignalerContext) error {
 	defer close(c.done)
 
-	// throw fatal error synchronously during startup
-	ctx.Throw(ErrFatal)
+	// return fatal error synchronously during startup
+	return ErrFatal
 }
+
 func (c *StartErroringComponent) Ready() <-chan struct{} {
 	return c.ready
 }
@@ -85,7 +89,7 @@ func NewShutdownErroringComponent() *ShutdownErroringComponent {
 	}
 }
 
-func (c *ShutdownErroringComponent) Start(ctx irrecoverable.SignalerContext) {
+func (c *ShutdownErroringComponent) Start(ctx irrecoverable.SignalerContext) error {
 	c.ready.Add(2)
 	c.done.Add(2)
 
@@ -112,6 +116,8 @@ func (c *ShutdownErroringComponent) Start(ctx irrecoverable.SignalerContext) {
 	}()
 
 	close(c.started)
+
+	return nil
 }
 
 func (c *ShutdownErroringComponent) Ready() <-chan struct{} {
@@ -146,7 +152,7 @@ func NewConcurrentErroringComponent() *ConcurrentErroringComponent {
 	}
 }
 
-func (c *ConcurrentErroringComponent) Start(ctx irrecoverable.SignalerContext) {
+func (c *ConcurrentErroringComponent) Start(ctx irrecoverable.SignalerContext) error {
 	c.ready.Add(2)
 	c.done.Add(2)
 
@@ -164,6 +170,8 @@ func (c *ConcurrentErroringComponent) Start(ctx irrecoverable.SignalerContext) {
 	}
 
 	close(c.started)
+
+	return nil
 }
 
 func (c *ConcurrentErroringComponent) Ready() <-chan struct{} {
@@ -188,21 +196,18 @@ func (c *ConcurrentErroringComponent) Done() <-chan struct{} {
 
 func TestRunComponentStartError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	componentFactory := func() (Component, error) {
 		return NewStartErroringComponent(), nil
 	}
 
-	called := false
 	onError := func(err error, triggerRestart func()) {
-		called = true
-		require.ErrorIs(t, err, ErrFatal)
-		cancel()
+		require.FailNow(t, "error handler should never be called")
 	}
 
 	err := RunComponent(ctx, componentFactory, onError)
-	require.ErrorIs(t, err, context.Canceled)
-	require.True(t, called)
+	require.ErrorIs(t, err, ErrFatal)
 }
 func TestRunComponentStartupError(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())

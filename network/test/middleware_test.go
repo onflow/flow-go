@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -19,6 +20,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network/codec/cbor"
@@ -67,6 +69,9 @@ type MiddlewareTestSuite struct {
 	metrics   *metrics.NoopCollector // no-op performance monitoring simulation
 	logger    zerolog.Logger
 	providers []*UpdatableIDProvider
+
+	mwCancel context.CancelFunc
+	mwCtx    irrecoverable.SignalerContext
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -107,8 +112,23 @@ func (m *MiddlewareTestSuite) SetupTest() {
 	for i := 0; i < m.size; i++ {
 		m.ov = append(m.ov, m.createOverlay())
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	m.mwCancel = cancel
+	signaler := irrecoverable.NewSignaler()
+	m.mwCtx = irrecoverable.WithSignaler(ctx, signaler)
+	go func() {
+		select {
+		case err := <-signaler.Error():
+			m.T().Error("middlewares encountered fatal error", err)
+		case <-m.mwCtx.Done():
+			return
+		}
+	}()
+
 	for i, mw := range m.mws {
-		assert.NoError(m.T(), mw.Start(m.ov[i]))
+		mw.SetOverlay(m.ov[i])
+		assert.NoError(m.T(), mw.Start(m.mwCtx))
 		mw.UpdateAllowList()
 	}
 }
@@ -125,14 +145,14 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	newId := ids[0]
 	newMw := mws[0]
 	// newProvider := providers[0]
-	defer newMw.Stop()
 
 	overlay := m.createOverlay()
 	overlay.On("Receive",
 		m.ids[0].NodeID,
 		mock.AnythingOfType("*message.Message"),
 	).Return(nil)
-	assert.NoError(m.T(), newMw.Start(overlay))
+	newMw.SetOverlay(overlay)
+	assert.NoError(m.T(), newMw.Start(m.mwCtx))
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
@@ -510,10 +530,10 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 }
 
 func (m *MiddlewareTestSuite) stopMiddlewares() {
-	// start all the middlewares
+	m.mwCancel()
+
 	for i := 0; i < m.size; i++ {
-		// start the middleware
-		m.mws[i].Stop()
+		<-m.mws[i].Done()
 	}
 	m.mws = nil
 	m.ov = nil

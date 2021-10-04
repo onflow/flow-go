@@ -39,7 +39,7 @@ type MatchingEngineSuite struct {
 func (s *MatchingEngineSuite) SetupTest() {
 	metrics := metrics.NewNoopCollector()
 	me := &mockmodule.Local{}
-	net := &mockmodule.Network{}
+	net := &mocknetwork.Network{}
 	s.core = &mockconsensus.MatchingCore{}
 	s.index = &mockstorage.Index{}
 	s.receipts = &mockstorage.ExecutionReceipts{}

@@ -46,7 +46,7 @@ func New(
 	metrics module.EngineMetrics,
 	spans module.ConsensusMetrics,
 	mempool module.MempoolMetrics,
-	net module.Network,
+	net network.Network,
 	state protocol.State,
 	headers storage.Headers,
 	me module.Local,

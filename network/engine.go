@@ -3,6 +3,7 @@ package network
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // Engine represents an isolated process running across the peer-to-peer network
@@ -10,6 +11,7 @@ import (
 // the necessary interface to forward events to engines for processing.
 // TODO: DEPRECATED replace with MessageProcessor
 type Engine interface {
+	module.ReadyDoneAware
 
 	// SubmitLocal submits an event originating on the local node.
 	SubmitLocal(event interface{})
