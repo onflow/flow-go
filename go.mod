@@ -42,9 +42,9 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/cadence v0.19.1-0.20210920215340-75c54c6c01eb
-	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
+	github.com/onflow/cadence v0.19.1
+	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.7
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.7
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.21.3

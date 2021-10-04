@@ -263,11 +263,13 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 			len(seal.AggregatedApprovalSigs))
 	}
 
-	assignments, err := s.assigner.Assign(executionResult, incorporatedResult.IncorporatedBlockID)
-	if err != nil {
-		return fmt.Errorf("failed to retrieve verifier assignment for result %x incorporated in block %x: %w",
-			executionResult.ID(), incorporatedResult.IncorporatedBlockID, err)
-	}
+	// TEMPORARY HOT-FIX: reduces security but allows consensus nodes to catch up that are very far behind
+	//
+	//assignments, err := s.assigner.Assign(executionResult, incorporatedResult.IncorporatedBlockID)
+	//if err != nil {
+	//	return fmt.Errorf("failed to retrieve verifier assignment for result %x incorporated in block %x: %w",
+	//		executionResult.ID(), incorporatedResult.IncorporatedBlockID, err)
+	//}
 
 	// Check that each AggregatedSignature has enough valid signatures from
 	// verifiers that were assigned to the corresponding chunk.
@@ -300,12 +302,14 @@ func (s *sealValidator) validateSeal(seal *flow.Seal, incorporatedResult *flow.I
 			}
 		}
 
+		// TEMPORARY HOT-FIX: reduces security but allows consensus nodes to catch up that are very far behind
+		//
 		// only Verification Nodes that were assigned to the chunk are allowed to approve it
-		for _, signerId := range chunkSigs.SignerIDs {
-			if !assignments.HasVerifier(chunk, signerId) {
-				return engine.NewInvalidInputErrorf("invalid signer id at chunk: %d", chunk.Index)
-			}
-		}
+		//for _, signerId := range chunkSigs.SignerIDs {
+		//	if !assignments.HasVerifier(chunk, signerId) {
+		//		return engine.NewInvalidInputErrorf("invalid signer id at chunk: %d", chunk.Index)
+		//	}
+		//}
 
 		// Verification Nodes' approval signatures must be valid
 		err := s.verifySealSignature(chunkSigs, chunk, executionResultID)

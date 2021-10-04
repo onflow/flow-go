@@ -384,6 +384,7 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	sealsSuperset := make(map[uint64][]*flow.IncorporatedResultSeal) // map: executedBlock.Height -> candidate Seals
 	sealCollector := func(header *flow.Header) error {
 		blockID := header.ID()
+		// TEMPORARY implementation (unpolished)
 		if blockID == parentID {
 			// Important protocol edge case: There must be at least one block in between the block incorporating
 			// a result and the block sealing the result. This is because we need the Source of Randomness for
