@@ -146,7 +146,7 @@ func main() {
 
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
-		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node ID's sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. minimum length %d", common.DefaultAccessNodeIDSMinimum))
+		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node ID's sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
 			t, err := time.Parse(time.RFC3339, startupTimeString)
@@ -203,11 +203,24 @@ func main() {
 			return err
 		}).
 		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			if len(accessNodeIDS) < common.DefaultAccessNodeIDSMinimum {
-				return fmt.Errorf("invalid flag --access-node-ids atleast %d IDs must be provided", common.DefaultAccessNodeIDSMinimum)
+			var anIDS []flow.Identifier
+
+			// if * provided use all ids in protocol state by default
+			if accessNodeIDS[0] == "*" {
+				anIDS, err = common.DefaultAccessNodeIDS(node.State.Sealed())
+				if err != nil {
+					return fmt.Errorf("failed to get default access node ids %w", err)
+				}
+			} else if len(accessNodeIDS) < common.DefaultAccessNodeIDSMinimum {
+				return fmt.Errorf("invalid flag --access-node-ids expected atleast %d IDs got %d", common.DefaultAccessNodeIDSMinimum, len(accessNodeIDS))
+			} else {
+				anIDS, err = common.FlowIDFromHexString(accessNodeIDS...)
+				if err != nil {
+					return fmt.Errorf("failed to convert access node ID(s) into flow identifier(s) %w", err)
+				}
 			}
 
-			flowClientOpts, err = common.FlowClientConfigs(accessNodeIDS, insecureAccessAPI, node.State.Sealed())
+			flowClientOpts, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to prepare flow client connection options for each access node id %w", err)
 			}

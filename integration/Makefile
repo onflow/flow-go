@@ -17,7 +17,7 @@ ci-integration-test: access-tests common-tests execution-tests epoch-tests verif
 .PHONY: access-tests
 access-tests:
 	GO111MODULE=on go test -v -tags relic -count=1 ./tests/access
-
+ 
 .PHONY: collection-tests
 collection-tests:
 	GO111MODULE=on go test -v -tags relic -count=1 ./tests/collection
