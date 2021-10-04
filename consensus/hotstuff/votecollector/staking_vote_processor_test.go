@@ -2,17 +2,19 @@ package votecollector
 
 import (
 	"errors"
+	"sync"
+	"testing"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"sync"
-	"testing"
 )
 
 func TestStakingVoteProcessor(t *testing.T) {
