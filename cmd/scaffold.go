@@ -1072,7 +1072,7 @@ func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
-func LoadPrivateNodeInfo(bootstrapDir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
+func LoadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
 	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID))
 	data, err := io.ReadFile(path)
 	if err != nil {
