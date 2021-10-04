@@ -30,11 +30,11 @@ Moving forward, we will add a new `Startable` interface in addition to the exist
 // Startable provides an interface to start a component. Once started, the component
 // can be stopped by cancelling the given context.
 type Startable interface {
-    // Start starts the component. Any errors encountered during startup should be returned
-    // directly, whereas irrecoverable errors encountered while the component is running
-    // should be thrown with the given SignalerContext.
-    // This method should only be called once, and subsequent calls should return ErrMultipleStartup.
-    Start(irrecoverable.SignalerContext) error
+  // Start starts the component. Any errors encountered during startup should be returned
+  // directly, whereas irrecoverable errors encountered while the component is running
+  // should be thrown with the given SignalerContext.
+  // This method should only be called once, and subsequent calls should return ErrMultipleStartup.
+  Start(irrecoverable.SignalerContext) error
 }
 ```
 Components which implement this interface are passed in a `SignalerContext` upon startup, which they can use to propagate any irrecoverable errors they encounter up to their parent via `SignalerContext.Throw`. The parent can then choose to handle these errors however they like, including restarting the component, logging the error, propagating the error to their own parent, etc.
@@ -43,26 +43,26 @@ Components which implement this interface are passed in a `SignalerContext` upon
 // We define a constrained interface to provide a drop-in replacement for context.Context
 // including in interfaces that compose it.
 type SignalerContext interface {
-    context.Context
-    Throw(err error) // delegates to the signaler
+  context.Context
+  Throw(err error) // delegates to the signaler
 }
 
 // Signaler sends the error out.
 type Signaler struct {
-    errChan   chan error
-    errThrown *atomic.Bool
+  errChan   chan error
+  errThrown *atomic.Bool
 }
 
 func NewSignaler() *Signaler {
-    return &Signaler{
-        errChan:   make(chan error, 1),
-        errThrown: atomic.NewBool(false),
-    }
+  return &Signaler{
+    errChan:   make(chan error, 1),
+    errThrown: atomic.NewBool(false),
+  }
 }
 
 // Error returns the Signaler's error channel.
 func (s *Signaler) Error() <-chan error {
-    return s.errChan
+  return s.errChan
 }
 
 // Throw is a narrow drop-in replacement for panic, log.Fatal, log.Panic, etc
@@ -70,46 +70,46 @@ func (s *Signaler) Error() <-chan error {
 // the first error it is called with to the error channel, and there are various
 // options as to how subsequent errors can be handled.
 func (s *Signaler) Throw(err error) {
-    defer runtime.Goexit()
+  defer runtime.Goexit()
 
-    // We only propagate the first irrecoverable error to the parent
-    if s.errThrown.CAS(false, true) {
-        s.errChan <- err
-        close(s.errChan)
-    } else {
-        // Another thread, possibly from the same component, has already thrown
-        // an irrecoverable error to this Signaler. Any subsequent irrecoverable
-        // errors can either be logged or ignored, as the parent will already
-        // be taking steps to remediate the first error.
-    }
+  // We only propagate the first irrecoverable error to the parent
+  if s.errThrown.CAS(false, true) {
+    s.errChan <- err
+    close(s.errChan)
+  } else {
+    // Another thread, possibly from the same component, has already thrown
+    // an irrecoverable error to this Signaler. Any subsequent irrecoverable
+    // errors can either be logged or ignored, as the parent will already
+    // be taking steps to remediate the first error.
+  }
 }
 ```
 
 > For more details about `SignalerContext` and `ErrMultipleStartup`, see [#1275](https://github.com/onflow/flow-go/pull/1275) and [#1355](https://github.com/onflow/flow-go/pull/1355/).
 
-To start a child component, a parent can first create a `SignalerContext` from its own context to pass down to the child:
+To start a component, a `SignalerContext` must be created to start it with:
 
 ```golang
+// this is the context for the routine which manages the component
+var parentCtx context.Context
+
 ctx, cancel := context.WithCancel(parentCtx)
 signaler := irrecoverable.NewSignaler()
 signalerCtx irrecoverable.WithSignaler(ctx, signaler)
 
 go func() {
-  if err := childComponent.Start(signalerCtx); err != nil {
-    cancel()
-    // handle the error if necessary...
-  }
-}()
-
-go func() {
-  defer cancel()
-
   select {
-  case <-signaler.Error():
+  case err := <-signaler.Error():
+    cancel()
     // handle the error
   case <-parentCtx.Done():
     // canceled by parent
   }
+}
+
+if err := childComponent.Start(signalerCtx); err != nil {
+  cancel()
+  // handle the error if necessary...
 }
 ```
 
@@ -282,7 +282,7 @@ A component will now be started by passing a `SignalerContext` to its `Start` me
     if c.started.CAS(false, true) {
       // run startup function, start components, and launch worker routines
 
-      // more details in https://github.com/onflow/flow-go/pull/1355/
+      // more details and full implementation can be found in https://github.com/onflow/flow-go/pull/1355/
     }
 
     return module.ErrMultipleStartup
