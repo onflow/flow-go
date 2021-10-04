@@ -8,7 +8,7 @@ import (
 var (
 	// The Node ID file is used as a helper by the transit scripts
 	FilenameNodeID = "node-id"
-	PathNodeID     = filepath.Join(DirnamePublicBootstrap, FilenameNodeID) // %v will be replaced by NodeID
+	PathNodeID     = filepath.Join(DirnamePublicBootstrap, FilenameNodeID)
 
 	// execution state
 	DirnameExecutionState = "execution-state"
@@ -31,6 +31,7 @@ var (
 	// private genesis information
 	DirPrivateRoot                   = "private-root-information"
 	FilenameRandomBeaconPriv         = "random-beacon.priv.json"
+	FilenameSecretsEncryptionKey     = "secretsdb-key"
 	PathPrivNodeInfoPrefix           = "node-info.priv."
 	FilenameRootBlockVotePrefix      = "root-block-vote."
 	PathRootDKGData                  = filepath.Join(DirPrivateRoot, "root-dkg-data.priv.json")
@@ -40,4 +41,5 @@ var (
 	PathRandomBeaconPriv             = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameRandomBeaconPriv)              // %v will be replaced by NodeID
 	PathNodeRootBlockVote            = filepath.Join(DirPrivateRoot, "private-node-info_%v", "root-block-vote.json")
 	FilenameRootBlockVote            = FilenameRootBlockVotePrefix + "%v.json"
+	PathSecretsEncryptionKey         = filepath.Join(DirPrivateRoot, "private-node-info_%v", FilenameSecretsEncryptionKey) // %v will be replaced by NodeID
 )

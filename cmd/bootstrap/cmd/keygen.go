@@ -48,14 +48,26 @@ var keygenCmd = &cobra.Command{
 		log.Info().Msg("")
 
 		// write key files
-		writeFile := func(relativePath string, val interface{}) error {
+		writeJSONFile := func(relativePath string, val interface{}) error {
 			writeJSON(relativePath, val)
 			return nil
 		}
+		writeFile := func(relativePath string, data []byte) error {
+			writeText(relativePath, data)
+			return nil
+		}
+
 		log.Info().Msg("writing internal private key files")
-		err = utils.WriteStakingNetworkingKeyFiles(nodes, writeFile)
+		err = utils.WriteStakingNetworkingKeyFiles(nodes, writeJSONFile)
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to write internal private key files")
+		}
+		log.Info().Msg("")
+
+		log.Info().Msg("writing internal db encryption key files")
+		err = utils.WriteSecretsDBEncryptionKeyFiles(nodes, writeFile)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to write internal db encryption key files")
 		}
 		log.Info().Msg("")
 
@@ -65,7 +77,7 @@ var keygenCmd = &cobra.Command{
 		if flagDefaultMachineAccount {
 			chainID := parseChainID(flagRootChain)
 			log.Info().Msg("writing default machine account files")
-			err = utils.WriteMachineAccountFiles(chainID, nodes, writeFile)
+			err = utils.WriteMachineAccountFiles(chainID, nodes, writeJSONFile)
 			if err != nil {
 				log.Fatal().Err(err).Msg("failed to write machine account key files")
 			}
