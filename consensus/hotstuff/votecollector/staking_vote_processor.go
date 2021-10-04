@@ -45,14 +45,25 @@ func newStakingVoteProcessor(
 	}
 }
 
+// Block returns block that is part of proposal that we are processing votes for.
 func (p *StakingVoteProcessor) Block() *model.Block {
 	return p.block
 }
 
+// Status returns status of this vote processor, it's always verifying.
 func (p *StakingVoteProcessor) Status() hotstuff.VoteCollectorStatus {
 	return hotstuff.VoteCollectorStatusVerifying
 }
 
+// Process performs processing of single vote in concurrent safe way. This function is implemented to be
+// called by multiple goroutines at the same time. Supports processing of both staking and threshold signatures.
+// Design of this function is event driven, as soon as we collect enough weight to create a QC we will immediately do this
+// and submit it via callback for further processing.
+// Expected error returns during normal operations:
+// * VoteForIncompatibleBlockError - submitted vote for incompatible block
+// * VoteForIncompatibleViewError - submitted vote for incompatible view
+// * model.InvalidVoteError - submitted vote with invalid signature
+// All other errors should be treated as exceptions.
 func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
@@ -99,6 +110,9 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	return nil
 }
 
+// buildQC performs aggregation of signatures when we have collected enough weight
+// for building QC. This function is run only once by single worker.
+// Any error should be treated as exception.
 func (p *StakingVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
 	stakingSigners, aggregatedStakingSig, err := p.stakingSigAggtor.Aggregate()
 	if err != nil {
