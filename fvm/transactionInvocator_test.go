@@ -244,10 +244,8 @@ func TestSafetyCheck(t *testing.T) {
 								TargetType: sema.AnyType,
 							}, // some dummy error
 							&sema.ImportedProgramError{
-								Err: &sema.CheckerError{},
-								Location: common.AddressLocation{
-									Address: common.BytesToAddress([]byte{1, 2, 3, 4}),
-								},
+								Err:      &sema.CheckerError{},
+								Location: common.AddressLocation{Address: common.BytesToAddress([]byte{1, 2, 3, 4})},
 							},
 						},
 					},
