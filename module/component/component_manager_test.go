@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-const CHANNEL_CLOSE_LATENCY_ALLOWANCE = 50 * time.Millisecond
+const CHANNEL_CLOSE_LATENCY_ALLOWANCE = 20 * time.Millisecond
 
 func isClosed(c <-chan struct{}) bool {
 	select {
