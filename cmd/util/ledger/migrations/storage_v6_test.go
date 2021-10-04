@@ -72,7 +72,9 @@ func TestValueConversion(t *testing.T) {
 		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
-		newValue := converter.Convert(oldArray)
+		newValue := converter.Convert(oldArray, newInter.VariableSizedStaticType{
+			Type: newInter.PrimitiveStaticTypeAnyStruct,
+		})
 
 		assert.IsType(t, &newInter.ArrayValue{}, newValue)
 		array := newValue.(*newInter.ArrayValue)
@@ -131,7 +133,10 @@ func TestValueConversion(t *testing.T) {
 		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
-		newValue := converter.Convert(oldDictionary)
+		newValue := converter.Convert(oldDictionary, newInter.DictionaryStaticType{
+			KeyType:   newInter.PrimitiveStaticTypeString,
+			ValueType: newInter.PrimitiveStaticTypeAnyStruct,
+		})
 
 		assert.IsType(t, &newInter.DictionaryValue{}, newValue)
 		dictionary := newValue.(*newInter.DictionaryValue)
@@ -199,7 +204,10 @@ func TestValueConversion(t *testing.T) {
 		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
-		newValue := converter.Convert(oldComposite)
+		newValue := converter.Convert(oldComposite, newInter.NewCompositeStaticType(
+			utils.TestLocation,
+			"Test",
+		))
 
 		assert.IsType(t, &newInter.CompositeValue{}, newValue)
 		composite := newValue.(*newInter.CompositeValue)
