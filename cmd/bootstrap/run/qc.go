@@ -38,9 +38,34 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 	return bootstrap.ToIdentityList(nodes)
 }
 
-func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.QuorumCertificate, error) {
+// GenerateRootQC generates QC for root block, caller needs to provide votes for root QC and
+// participantData to build the QC.
+// NOTE: at the moment, we require private keys for one node because we we re-using the full business logic, which assumes that only consensus participants construct QCs, which also have produce votes.
+// TODO: modularize QC construction code (and code to verify QC) to be instantiated without needing private keys.
+func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *ParticipantData, identities flow.IdentityList) (*flow.QuorumCertificate, error) {
 
-	validators, signers, err := createValidators(participantData)
+	validators, signers, err := createValidators(participantData, identities)
+	if err != nil {
+		return nil, err
+	}
+
+	hotBlock := model.GenesisBlockFromFlow(block.Header)
+
+	// manually aggregate sigs
+	qc, err := signers[0].CreateQC(votes)
+	if err != nil {
+		return nil, err
+	}
+
+	// validate QC
+	err = validators[0].ValidateQC(qc, hotBlock)
+
+	return qc, err
+}
+
+// GenerateRootBlockVotes generates votes for root block based on participantData
+func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData) ([]*model.Vote, error) {
+	_, signers, err := createValidators(participantData, participantData.Identities())
 	if err != nil {
 		return nil, err
 	}
@@ -55,22 +80,17 @@ func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.
 		}
 		votes = append(votes, vote)
 	}
-
-	// manually aggregate sigs
-	qc, err := signers[0].CreateQC(votes)
-	if err != nil {
-		return nil, err
-	}
-
-	// validate QC
-	err = validators[0].ValidateQC(qc, hotBlock)
-
-	return qc, err
+	return votes, nil
 }
 
-func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
+func createValidators(participantData *ParticipantData, identities flow.IdentityList) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
 	n := len(participantData.Participants)
-	identities := participantData.Identities()
+
+	fmt.Println("len(participants)", len(participantData.Participants))
+	fmt.Println("len(identities)", len(identities))
+	for _, id := range identities {
+		fmt.Println(id.NodeID, id.Address, id.StakingPubKey.String())
+	}
 
 	groupSize := uint(len(participantData.Participants))
 	if groupSize < uint(n) {
