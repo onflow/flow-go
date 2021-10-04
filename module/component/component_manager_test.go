@@ -769,7 +769,7 @@ func (c *componentManagerMachine) Init(t *rapid.T) {
 
 	cmb := NewComponentManagerBuilder()
 
-	c.cancelGenerator = rapid.Float64Range(0, 100).Map(func(n float64) bool { return pCancel == 100 || n < pCancel })
+	c.cancelGenerator = rapid.Float64Range(0, 1).Map(func(n float64) bool { return pCancel == 1 || n < pCancel })
 	c.drawStateTransition = func(t *rapid.T) *stateTransition {
 		st := &stateTransition{}
 
@@ -1023,6 +1023,28 @@ func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 
 	c.updateStates()
 
+	t.Logf("end state: {\n"+
+		"\tcanceled=%v\n"+
+		"\tcomponentsStarted=%v\n"+
+		"\tworkersStarted=%v\n"+
+		"\tstartupError=%v\n"+
+		"\tcomponentStartupErrors=%v\n"+
+		"\tthrownErrors=%v\n"+
+		"\tstartupState=%v\n"+
+		"\tcomponentStates=%v\n"+
+		"\tworkerStates=%v\n"+
+		"}\n",
+		c.canceled,
+		c.componentsStarted,
+		c.workersStarted,
+		c.startupError,
+		c.componentStartupErrors,
+		c.thrownErrors,
+		c.startupState,
+		c.componentStates,
+		c.workerStates,
+	)
+
 }
 
 func (c *componentManagerMachine) Check(t *rapid.T) {
@@ -1190,7 +1212,7 @@ func (c *componentManagerMachine) Check(t *rapid.T) {
 
 func TestComponentManager(t *testing.T) {
 	// skip because this test takes too long
-	t.Skip()
+	// t.Skip()
 	rapid.Check(t, rapid.Run(&componentManagerMachine{}))
 }
 
