@@ -27,13 +27,9 @@ const finalizeHappyPathLogs = "^deterministic bootstrapping random seed" +
 	`read \d+ stakes for internal nodes` +
 	`checking constraints on consensus/cluster nodes` +
 	`assembling network and staking keys` +
-	`wrote file \S+/node-infos.pub.json` +
-	`running DKG for consensus nodes` +
-	`read \d+ node infos for DKG` +
-	`will run DKG` +
-	`finished running DKG` +
-	`.+/random-beacon.priv.json` +
-	`constructing root block` +
+	`reading root block data` +
+	`reading root block votes` +
+	`reading dkg data` +
 	`constructing root QC` +
 	`computing collection node clusters` +
 	`constructing root blocks for collection node clusters` +
@@ -71,15 +67,21 @@ func TestFinalize_HappyPath(t *testing.T) {
 		flagInternalNodePrivInfoDir = internalPrivDir
 
 		flagFastKG = true
-
-		flagRootCommit = hex.EncodeToString(rootCommit[:])
-		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootChain = chainName
+		flagRootParent = hex.EncodeToString(rootParent[:])
 		flagRootHeight = rootHeight
-		flagEpochCounter = epochCounter
 
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
+
+		// rootBlock will generate DKG and place it into bootDir/public-root-information
+		rootBlock(nil, nil)
+
+		flagRootCommit = hex.EncodeToString(rootCommit[:])
+		flagEpochCounter = epochCounter
+		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
+		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -121,6 +123,13 @@ func TestFinalize_Deterministic(t *testing.T) {
 
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
+
+		// rootBlock will generate DKG and place it into model.PathRootDKGData
+		rootBlock(nil, nil)
+
+		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
+		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)
@@ -183,6 +192,13 @@ func TestFinalize_SameSeedDifferentStateCommits(t *testing.T) {
 
 		// set deterministic bootstrapping seed
 		flagBootstrapRandomSeed = deterministicSeed
+
+		// rootBlock will generate DKG and place it into bootDir/public-root-information
+		rootBlock(nil, nil)
+
+		flagRootBlock = filepath.Join(bootDir, model.PathRootBlockData)
+		flagDKGDataPath = filepath.Join(bootDir, model.PathRootDKGData)
+		flagRootBlockVotesDir = filepath.Join(bootDir, model.DirnameRootBlockVotes)
 
 		hook := zeroLoggerHook{logs: &strings.Builder{}}
 		log = log.Hook(hook)

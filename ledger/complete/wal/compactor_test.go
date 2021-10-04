@@ -73,7 +73,7 @@ func Test_Compactor(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1) //keep only latest checkpoint
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1, zerolog.Nop()) //keep only latest checkpoint
 			co := CompactorObserver{fromBound: 9, done: make(chan struct{})}
 			compactor.Subscribe(&co)
 
@@ -249,7 +249,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2)
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2, zerolog.Nop())
 
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {

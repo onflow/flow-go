@@ -98,39 +98,3 @@ jobs:
         timeout_minutes: 15
         max_attempts: 2
         command: make ci-integration
-
-  cross-blst-test:
-    name: cross-testing internal BLS implementation with BLST
-    strategy:
-      fail-fast: false
-    runs-on: ubuntu-latest
-    steps:
-    - name: CPU information
-      run: |
-        lscpu
-    - name: Setup Go
-      uses: actions/setup-go@v2
-      with:
-        go-version: 1.16
-    - name: Checkout repo
-      uses: actions/checkout@v2
-    - name: Build relic
-      run: make crypto/relic/build
-    - name: Run tests
-      if: github.actor != 'bors[bot]'
-      run: |
-        if ! (grep -q -e '^flags.*\badx\b' /proc/cpuinfo) 2>/dev/null; then
-            export CGO_CFLAGS="-D__BLST_PORTABLE__"
-        fi
-        make -C crypto cross-blst-test
-    - name: Run tests (Bors)
-      if: github.actor == 'bors[bot]'
-      uses: nick-invision/retry@v2
-      with:
-        timeout_minutes: 25
-        max_attempts: 2
-        command: |
-          if ! (grep -q -e '^flags.*\badx\b' /proc/cpuinfo) 2>/dev/null; then
-              export CGO_CFLAGS="-D__BLST_PORTABLE__"
-          fi
-          make -C crypto cross-blst-test
