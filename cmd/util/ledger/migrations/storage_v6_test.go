@@ -3,10 +3,12 @@ package migrations
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
 	"sort"
 	"testing"
 
+	"github.com/onflow/cadence/runtime/ast"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,7 +55,7 @@ func TestValueConversion(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -72,9 +74,9 @@ func TestValueConversion(t *testing.T) {
 		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
-		newValue := converter.Convert(oldArray)
+		newValue := converter.Convert(oldArray, nil)
 
-		assert.IsType(t, &newInter.ArrayValue{}, newValue)
+		require.IsType(t, &newInter.ArrayValue{}, newValue)
 		array := newValue.(*newInter.ArrayValue)
 
 		assert.Equal(
@@ -112,7 +114,7 @@ func TestValueConversion(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -131,7 +133,7 @@ func TestValueConversion(t *testing.T) {
 		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
-		newValue := converter.Convert(oldDictionary)
+		newValue := converter.Convert(oldDictionary, nil)
 
 		assert.IsType(t, &newInter.DictionaryValue{}, newValue)
 		dictionary := newValue.(*newInter.DictionaryValue)
@@ -180,7 +182,7 @@ func TestValueConversion(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, owner.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, owner[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -199,7 +201,7 @@ func TestValueConversion(t *testing.T) {
 		migration.initOldInterpreter(payloads)
 
 		converter := NewValueConverter(migration)
-		newValue := converter.Convert(oldComposite)
+		newValue := converter.Convert(oldComposite, nil)
 
 		assert.IsType(t, &newInter.CompositeValue{}, newValue)
 		composite := newValue.(*newInter.CompositeValue)
@@ -244,7 +246,7 @@ func TestEncoding(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -330,7 +332,7 @@ func TestEncoding(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -426,7 +428,7 @@ func TestEncoding(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -542,7 +544,7 @@ func TestPayloadsMigration(t *testing.T) {
 	encoded = oldInter.PrependMagic(encoded, oldInter.CurrentEncodingVersion)
 
 	keyParts := []ledger.KeyPart{
-		ledger.NewKeyPart(state.KeyPartOwner, owner.Bytes()),
+		ledger.NewKeyPart(state.KeyPartOwner, owner[:]),
 		ledger.NewKeyPart(state.KeyPartController, []byte{}),
 		ledger.NewKeyPart(state.KeyPartKey, []byte("Test")),
 	}
@@ -550,7 +552,7 @@ func TestPayloadsMigration(t *testing.T) {
 	payloads := []ledger.Payload{
 		{
 			Key: ledger.NewKey([]ledger.KeyPart{
-				ledger.NewKeyPart(state.KeyPartOwner, owner.Bytes()),
+				ledger.NewKeyPart(state.KeyPartOwner, owner[:]),
 				ledger.NewKeyPart(state.KeyPartController, []byte{}),
 				ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 			}),
@@ -568,7 +570,7 @@ func TestPayloadsMigration(t *testing.T) {
 
 	// Check whether the query works with old ledger
 	ledgerView := newView(payloads)
-	value, err := ledgerView.Get(string(owner.Bytes()), "", "Test")
+	value, err := ledgerView.Get(string(owner[:]), "", "Test")
 	require.NoError(t, err)
 	assert.NotNil(t, value)
 
@@ -589,7 +591,7 @@ func TestPayloadsMigration(t *testing.T) {
 	key := []byte{0, 0, 0, 0, 0, 0, 0, 3}
 	prefixedKey := []byte(atree.LedgerBaseStorageSlabPrefix + string(key))
 
-	migratedValue, err := migratedLedgerView.Get(string(owner.Bytes()), "", string(prefixedKey))
+	migratedValue, err := migratedLedgerView.Get(string(owner[:]), "", string(prefixedKey))
 	require.NoError(t, err)
 	require.NotEmpty(t, migratedValue)
 
@@ -634,25 +636,25 @@ func TestContractValueRetrieval(t *testing.T) {
     `
 
 	contractValueKey := []ledger.KeyPart{
-		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 		ledger.NewKeyPart(state.KeyPartController, []byte{}),
 		ledger.NewKeyPart(state.KeyPartKey, []byte(fmt.Sprintf("contract\x1F%s", contractName))),
 	}
 
 	contractNamesKey := []ledger.KeyPart{
-		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
-		ledger.NewKeyPart(state.KeyPartController, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartOwner, address[:]),
+		ledger.NewKeyPart(state.KeyPartController, address[:]),
 		ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyContractNames)),
 	}
 
 	contractCodeKey := []ledger.KeyPart{
-		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
-		ledger.NewKeyPart(state.KeyPartController, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartOwner, address[:]),
+		ledger.NewKeyPart(state.KeyPartController, address[:]),
 		ledger.NewKeyPart(state.KeyPartKey, []byte("code.Test")),
 	}
 
 	storageUsedKey := []ledger.KeyPart{
-		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 		ledger.NewKeyPart(state.KeyPartController, []byte{}),
 		ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 	}
@@ -786,4 +788,167 @@ func uint64ToBinary(integer uint64) []byte {
 	b := make([]byte, 8)
 	binary.BigEndian.PutUint64(b, integer)
 	return b
+}
+
+func TestDeferredValues(t *testing.T) {
+
+	var payloads []ledger.Payload
+
+	owner, err := hex.DecodeString("000027b9a80c0152")
+	require.NoError(t, err)
+
+	data := map[string]string{
+		"public_key_9":                "f847b840dac22f8bdf651e21f10d5cc96ef8ca9a55bd28b56b117dda0877b3bce76ce7e04c4fe330c48e5c81f13f76c7dc1b86ab49a33d8b2498cbbed24459f7e1e918c50201808080",
+		"public\x1fflowTokenBalance":  "00cade0005d8cb82d8c882016e666c6f77546f6b656e5661756c74d8db82f4d8dc82d8d582d8c082481654653399040a6169466c6f77546f6b656e6f466c6f77546f6b656e2e5661756c7481d8d682d8c08248f233dcee88fe0abe6d46756e6769626c65546f6b656e7546756e6769626c65546f6b656e2e42616c616e6365",
+		"public_key_8":                "f847b840dac22f8bdf651e21f10d5cc96ef8ca9a55bd28b56b117dda0877b3bce76ce7e04c4fe330c48e5c81f13f76c7dc1b86ab49a33d8b2498cbbed24459f7e1e918c50201808080",
+		"storage\x1fMomentCollection": "00cade0005d88484d8c082480b2a3299cc857e2967546f7053686f7402846475756964d8a41a03487415696f776e65644e465473d88183d8d982d8d41830d8d582d8c082481d7e57aa55817448704e6f6e46756e6769626c65546f6b656e744e6f6e46756e6769626c65546f6b656e2e4e4654d88682d8d7d8d4183089d8a41a007f9971d8a41a00c28fa9d8a41a00d967f9d8a41a007cea68d8a41a008a43a1d8a41a0094f75ad8a41a00b7af06d8a41a00ee178ed8a41a00be2d868072546f7053686f742e436f6c6c656374696f6e",
+		"storage\x1fMomentCollection\x1fownedNFTs\x1fv\x1f14247929": "00cade0005d88484d8c082480b2a3299cc857e2967546f7053686f7402866475756964d8a41a025719bd626964d8a41a00d967f96464617461d88484d8c082480b2a3299cc857e2967546f7053686f740186657365744944d8a3181a66706c61794944d8a31904cd6c73657269616c4e756d626572d8a319732d72546f7053686f742e4d6f6d656e74446174616b546f7053686f742e4e4654",
+		"public\x1fMomentCollection":                                "00cade0005d8cb82d8c88201704d6f6d656e74436f6c6c656374696f6ed8db82f4d8dc82d8d40581d8d682d8c082480b2a3299cc857e2967546f7053686f74781e546f7053686f742e4d6f6d656e74436f6c6c656374696f6e5075626c6963",
+		"storage\x1fMomentCollection\x1fownedNFTs\x1fv\x1f9762650":  "00cade0005d88484d8c082480b2a3299cc857e2967546f7053686f7402866475756964d8a41a01df64e6626964d8a41a0094f75a6464617461d88484d8c082480b2a3299cc857e2967546f7053686f740186657365744944d8a3181a66706c61794944d8a31904136c73657269616c4e756d626572d8a319072572546f7053686f742e4d6f6d656e74446174616b546f7053686f742e4e4654",
+		"storage\x1fMomentCollection\x1fownedNFTs\x1fv\x1f15603598": "00cade0005d88484d8c082480b2a3299cc857e2967546f7053686f7402866475756964d8a41a02b37553626964d8a41a00ee178e6464617461d88484d8c082480b2a3299cc857e2967546f7053686f740186657365744944d8a3181a66706c61794944d8a31905796c73657269616c4e756d626572d8a31908e972546f7053686f742e4d6f6d656e74446174616b546f7053686f742e4e4654",
+		"public_key_10":                       "f847b840dac22f8bdf651e21f10d5cc96ef8ca9a55bd28b56b117dda0877b3bce76ce7e04c4fe330c48e5c81f13f76c7dc1b86ab49a33d8b2498cbbed24459f7e1e918c50201808080",
+		"storage\x1fprivateForwardingStorage": "00cade0005d88484d8c0824818eb4ee6b3c026d27818507269766174655265636569766572466f7277617264657202846475756964d8a41a0348741669726563697069656e74d8c983d8834627b9a80c0152d8c8820271666c6f77546f6b656e5265636569766572d8db82f4d8dc82d8d40581d8d682d8c08248f233dcee88fe0abe6d46756e6769626c65546f6b656e7646756e6769626c65546f6b656e2e52656365697665727822507269766174655265636569766572466f727761726465722e466f72776172646572",
+		"public_key_4":                        "f847b840dac22f8bdf651e21f10d5cc96ef8ca9a55bd28b56b117dda0877b3bce76ce7e04c4fe330c48e5c81f13f76c7dc1b86ab49a33d8b2498cbbed24459f7e1e918c50201808080",
+		"public_key_0":                        "f849b840dac22f8bdf651e21f10d5cc96ef8ca9a55bd28b56b117dda0877b3bce76ce7e04c4fe330c48e5c81f13f76c7dc1b86ab49a33d8b2498cbbed24459f7e1e918c502018203e88080",
+		"storage\x1fMomentCollection\x1fownedNFTs\x1fv\x1f12037894": "00cade0005d88484d8c082480b2a3299cc857e2967546f7053686f7402866475756964d8a41a0227ec79626964d8a41a00b7af066464617461d88484d8c082480b2a3299cc857e2967546f7053686f740186657365744944d8a3181a66706c61794944d8a319049a6c73657269616c4e756d626572d8a3197cca72546f7053686f742e4d6f6d656e74446174616b546f7053686f742e4e4654",
+		"storage\x1fdapperUtilityCoinReceiver":                      "00cade0005d88484d8c08248e544175ee0461c4b6f546f6b656e466f7277617264696e6702846475756964d8a41a0348741769726563697069656e74d8c983d88348ead892083b3e2c6cd8c8820378196461707065725574696c697479436f696e5265636569766572f67819546f6b656e466f7277617264696e672e466f72776172646572",
+		"public_key_5":                                              "f847b840dac22f8bdf651e21f10d5cc96ef8ca9a55bd28b56b117dda0877b3bce76ce7e04c4fe330c48e5c81f13f76c7dc1b86ab49a33d8b2498cbbed24459f7e1e918c50201808080",
+		"public\x1fprivateForwardingPublic":                         "00cade0005d8cb82d8c88201781870726976617465466f7277617264696e6753746f72616765d8db82f4d8d582d8c0824818eb4ee6b3c026d27818507269766174655265636569766572466f727761726465727822507269766174655265636569766572466f727761726465722e466f72776172646572",
+		"exists":                                                    "01",
+		"public\x1fdapperUtilityCoinReceiver":                       "00cade0005d8cb82d8c8820178196461707065725574696c697479436f696e5265636569766572d8db82f4d8dc82d8d582d8c08248ead892083b3e2c6c714461707065725574696c697479436f696e774461707065725574696c697479436f696e2e5661756c7481d8d682d8c08248f233dcee88fe0abe6d46756e6769626c65546f6b656e7646756e6769626c65546f6b656e2e5265636569766572",
+		"storage\x1fMomentCollection\x1fownedNFTs\x1fv\x1f8186472":  "00cade0005d88484d8c082480b2a3299cc857e2967546f7053686f7402866464617461d88484d8c082480b2a3299cc857e2967546f7053686f74018666706c61794944d8a31903b16c73657269616c4e756d626572d8a3190f9a657365744944d8a3181a72546f7053686f742e4d6f6d656e7444617461626964d8a41a007cea686475756964d8a41a019776ec6b546f7053686f742e4e4654",
+		"private\x1fflowTokenReceiver":                              "00cade0005d8cb82d8c882016e666c6f77546f6b656e5661756c74d8db82f4d8dc82d8d40581d8d682d8c08248f233dcee88fe0abe6d46756e6769626c65546f6b656e7646756e6769626c65546f6b656e2e5265636569766572",
+		"storage\x1fMomentCollection\x1fownedNFTs\x1fv\x1f9061281":  "00cade0005d88484d8c082480b2a3299cc857e2967546f7053686f7402866464617461d88484d8c082480b2a3299cc857e2967546f7053686f74018666706c61794944d8a31903e96c73657269616c4e756d626572d8a3194a6a657365744944d8a3181a72546f7053686f742e4d6f6d656e7444617461626964d8a41a008a43a16475756964d8a41a01b2beca6b546f7053686f742e4e4654",
+		"public_key_3":                                              "f847b840dac22f8bdf651e21f10d5cc96ef8ca9a55bd28b56b117dda0877b3bce76ce7e04c4fe330c48e5c81f13f76c7dc1b86ab49a33d8b2498cbbed24459f7e1e918c50201808080",
+		"public_key_7":                                              "f847b840dac22f8bdf651e21f10d5cc96ef8ca9a55bd28b56b117dda0877b3bce76ce7e04c4fe330c48e5c81f13f76c7dc1b86ab49a33d8b2498cbbed24459f7e1e918c50201808080",
+		"public_key_1":                                              "f847b840dac22f8bdf651e21f10d5cc96ef8ca9a55bd28b56b117dda0877b3bce76ce7e04c4fe330c48e5c81f13f76c7dc1b86ab49a33d8b2498cbbed24459f7e1e918c50201808080",
+		"storage\x1fMomentCollection\x1fownedNFTs\x1fv\x1f12750761": "00cade0005d88484d8c082480b2a3299cc857e2967546f7053686f7402866475756964d8a41a023f0e94626964d8a41a00c28fa96464617461d88484d8c082480b2a3299cc857e2967546f7053686f740186657365744944d8a3181a66706c61794944d8a31902786c73657269616c4e756d626572d8a3198d9872546f7053686f742e4d6f6d656e74446174616b546f7053686f742e4e4654",
+		"storage_used":                                              "0000000000001292",
+		"public_key_2":                                              "f847b840dac22f8bdf651e21f10d5cc96ef8ca9a55bd28b56b117dda0877b3bce76ce7e04c4fe330c48e5c81f13f76c7dc1b86ab49a33d8b2498cbbed24459f7e1e918c50201808080",
+		"storage\x1fflowTokenVault":                                 "00cade0005d88484d8c082481654653399040a6169466c6f77546f6b656e02846475756964d8a41a034874146762616c616e6365d8bc1a000186a06f466c6f77546f6b656e2e5661756c74",
+		"storage\x1fMomentCollection\x1fownedNFTs\x1fv\x1f8362353":  "00cade0005d88484d8c082480b2a3299cc857e2967546f7053686f7402866464617461d88484d8c082480b2a3299cc857e2967546f7053686f74018666706c61794944d8a31903b86c73657269616c4e756d626572d8a3192af8657365744944d8a3181a72546f7053686f742e4d6f6d656e7444617461626964d8a41a007f99716475756964d8a41a019a33b16b546f7053686f742e4e4654",
+		"public_key_count":                                          "0b",
+		"public_key_6":                                              "f847b840dac22f8bdf651e21f10d5cc96ef8ca9a55bd28b56b117dda0877b3bce76ce7e04c4fe330c48e5c81f13f76c7dc1b86ab49a33d8b2498cbbed24459f7e1e918c50201808080",
+		"storage\x1fMomentCollection\x1fownedNFTs\x1fv\x1f12463494": "00cade0005d88484d8c082480b2a3299cc857e2967546f7053686f7402866475756964d8a41a023a2c6c626964d8a41a00be2d866464617461d88484d8c082480b2a3299cc857e2967546f7053686f740186657365744944d8a3181a66706c61794944d8a31903bc6c73657269616c4e756d626572d8a319984572546f7053686f742e4d6f6d656e74446174616b546f7053686f742e4e4654",
+	}
+
+	for key, hexValue := range data {
+
+		value, err := hex.DecodeString(hexValue)
+		require.NoError(t, err)
+
+		var controller []byte
+
+		if key == fvmState.KeyPublicKeyCount ||
+			bytes.HasPrefix([]byte(key), []byte("public_key_")) ||
+			key == fvmState.KeyContractNames ||
+			bytes.HasPrefix([]byte(key), []byte(fvmState.KeyCode)) {
+
+			controller = owner
+		}
+
+		payloads = append(payloads, ledger.Payload{
+			Key: ledger.NewKey([]ledger.KeyPart{
+				ledger.NewKeyPart(state.KeyPartOwner, owner),
+				ledger.NewKeyPart(state.KeyPartController, controller),
+				ledger.NewKeyPart(state.KeyPartKey, []byte(key)),
+			}),
+			Value: value,
+		})
+	}
+
+	ledgerView := newView(payloads)
+
+	migration := &StorageFormatV6Migration{}
+	migration.initPersistentSlabStorage(ledgerView)
+	migration.initNewInterpreter()
+	migration.initOldInterpreter(payloads)
+
+	nftAddress, err := common.HexToAddress("1d7e57aa55817448")
+	require.NoError(t, err)
+
+	nftLocation := common.AddressLocation{
+		Address: nftAddress,
+		Name:    "NonFungibleToken",
+	}
+	nftType := &sema.CompositeType{
+		Location:   nftLocation,
+		Identifier: "NonFungibleToken.NFT",
+		Kind:       common.CompositeKindResource,
+	}
+
+	nftElaboration := sema.NewElaboration()
+	nftElaboration.CompositeTypes[nftType.ID()] = nftType
+
+	topshotAddress, err := common.HexToAddress("0b2a3299cc857e29")
+	require.NoError(t, err)
+
+	topshotLocation := common.AddressLocation{
+		Address: topshotAddress,
+		Name:    "TopShot",
+	}
+	topshotType := &sema.CompositeType{
+		Location:   topshotLocation,
+		Identifier: "TopShot.NFT",
+		Kind:       common.CompositeKindResource,
+		ImplicitTypeRequirementConformances: []*sema.CompositeType{
+			nftType,
+		},
+	}
+
+	topshotElaboration := sema.NewElaboration()
+	topshotElaboration.CompositeTypes[topshotType.ID()] = topshotType
+
+	migration.programs = programs.NewEmptyPrograms()
+	migration.programs.Set(
+		nftLocation,
+		&newInter.Program{
+			Program:     &ast.Program{},
+			Elaboration: nftElaboration,
+		},
+		nil,
+	)
+	migration.programs.Set(
+		topshotLocation,
+		&newInter.Program{
+			Program:     &ast.Program{},
+			Elaboration: topshotElaboration,
+		},
+		nil,
+	)
+
+	_, err = migration.Migrate(payloads)
+	require.NoError(t, err)
+
+	var result newInter.Value = migration.newInter.ReadStored(
+		common.BytesToAddress(owner),
+		"storage\u001FMomentCollection",
+	)
+
+	require.IsType(t, result, &newInter.SomeValue{})
+	result = result.(*newInter.SomeValue).Value
+
+	require.IsType(t, &newInter.CompositeValue{}, result)
+	composite := result.(*newInter.CompositeValue)
+
+	ownedNFTS := composite.GetField("ownedNFTs")
+	require.IsType(t, &newInter.DictionaryValue{}, ownedNFTS)
+	dictionary := ownedNFTS.(*newInter.DictionaryValue)
+
+	require.Equal(t, 9, dictionary.Count())
+
+	for _, id := range []newInter.UInt64Value{
+		15603598,
+		12750761,
+		8186472,
+		8362353,
+		9061281,
+		12037894,
+		9762650,
+		14247929,
+		12463494,
+	} {
+		result := dictionary.GetKey(migration.newInter, newInter.ReturnEmptyLocationRange, id)
+		require.NotNil(t, result)
+	}
 }
