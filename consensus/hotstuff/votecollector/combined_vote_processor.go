@@ -32,6 +32,8 @@ type CombinedVoteProcessor struct {
 	done             atomic.Bool
 }
 
+var _ hotstuff.VoteProcessor = &CombinedVoteProcessor{}
+
 // newCombinedVoteProcessor is a helper function to perform object construction
 // no extra logic for validating proposal wasn't added
 func newCombinedVoteProcessor(
@@ -57,14 +59,25 @@ func newCombinedVoteProcessor(
 	}
 }
 
+// Block returns block that is part of proposal that we are processing votes for.
 func (p *CombinedVoteProcessor) Block() *model.Block {
 	return p.block
 }
 
+// Status returns status of this vote processor, it's always verifying.
 func (p *CombinedVoteProcessor) Status() hotstuff.VoteCollectorStatus {
 	return hotstuff.VoteCollectorStatusVerifying
 }
 
+// Process performs processing of single vote in concurrent safe way. This function is implemented to be
+// called by multiple goroutines at the same time. Supports processing of both staking and threshold signatures.
+// Design of this function is event driven, as soon as we collect enough weight to create a QC we will immediately do this
+// and submit it via callback for further processing.
+// Expected error returns during normal operations:
+// * VoteForIncompatibleBlockError - submitted vote for incompatible block
+// * VoteForIncompatibleViewError - submitted vote for incompatible view
+// * model.InvalidVoteError - submitted vote with invalid signature
+// All other errors should be treated as exceptions.
 func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
@@ -125,7 +138,7 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		}
 
 	default:
-		return fmt.Errorf("invalid signature type %d: %w", sigType, msig.ErrInvalidFormat)
+		return model.NewInvalidVoteErrorf(vote, "invalid signature type %d: %w", sigType, msig.ErrInvalidFormat)
 	}
 
 	// checking of conditions for building QC are satisfied
@@ -156,6 +169,9 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 	return nil
 }
 
+// buildQC performs aggregation and reconstruction of signatures when we have collected enough weight
+// for building QC. This function is run only once by single worker.
+// Any error should be treated as exception.
 func (p *CombinedVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
 	stakingSigners, aggregatedStakingSig, err := p.stakingSigAggtor.Aggregate()
 	if err != nil {
