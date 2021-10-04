@@ -196,7 +196,7 @@ var _ Component = (*ComponentManager)(nil)
 // started up successfully, it then launches any worker routines.
 type ComponentManager struct {
 	started        *atomic.Bool
-	ready          chan struct{}
+	ready          <-chan struct{}
 	done           chan struct{}
 	shutdownSignal <-chan struct{}
 
@@ -278,6 +278,8 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) (err erro
 			return
 		}
 
+		c.ready = util.AllReady(components...)
+
 		var workersDone sync.WaitGroup
 		workersDone.Add(len(c.workers))
 		for _, worker := range c.workers {
@@ -298,21 +300,6 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) (err erro
 			close(c.done)
 		}()
 
-		// launch goroutine to close ready channel
-		go func() {
-			// wait for sub-components to be ready
-			components := make([]module.ReadyDoneAware, len(c.components))
-			for i, component := range c.components {
-				components[i] = component.(module.ReadyDoneAware)
-			}
-
-			select {
-			case <-util.AllReady(components...):
-				close(c.ready)
-			case <-c.done:
-			}
-		}()
-
 		return
 	}
 
@@ -320,7 +307,8 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) (err erro
 }
 
 // Ready returns a channel which is closed once the startup routine has completed successfully.
-// If an error occurs during startup, the returned channel will never close.
+// If an error occurs during startup, the returned channel will never close. If this is called
+// before startup has been initiated, a nil channel will be returned.
 func (c *ComponentManager) Ready() <-chan struct{} {
 	return c.ready
 }
