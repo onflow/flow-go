@@ -433,9 +433,9 @@ func (e *Engine) BlockFinalized(b *flow.Header) {
 	// purge chunk data packs
 	e.purgeChunkDataPacks(context.Background(), newBlock)
 
-	e.log.Info().Hex("block_id", blockID[:]).
+	e.log.Info().Hex("finalized_block", blockID[:]).
 		Uint64("height", b.Height).
-		Msg("handling block finalized")
+		Msg("handling block finalized - purged chunk data pack for sealed blocks")
 }
 
 func (e *Engine) purgeChunkDataPacks(ctx context.Context, block *flow.Block) {
@@ -444,7 +444,7 @@ func (e *Engine) purgeChunkDataPacks(ctx context.Context, block *flow.Block) {
 		err := e.execState.PurgeChunkDataPacksByBlockID(ctx, seal.BlockID)
 		// since this only purging operation its fine if it fails
 		if err != nil {
-			e.log.Warn().Msgf("failed to purge chunk data packs: %s", err.Error())
+			e.log.Warn().Msgf("failed to purge chunk data packs for sealed block %v at finalized height: %v: %s", seal.BlockID, block.Header.Height, err.Error())
 		}
 	}
 }
