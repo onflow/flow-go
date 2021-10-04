@@ -228,7 +228,7 @@ A component will now be started by passing a `SignalerContext` to its `Start` me
   }
   ```
 
-  > Note: this is now implemented in [#1275](https://github.com/onflow/flow-go/pull/1275), and an example can be found [here](https://github.com/onflow/flow-go/blob/8950da93264485fe5fcf51413d921d658e6c0db3/module/irrecoverable/irrecoverable_example_test.go)
+  > Note: this is now implemented in [#1275](https://github.com/onflow/flow-go/pull/1275), and an example can be found [here](https://github.com/onflow/flow-go/blob/8950da93264485fe5fcf51413d921d658e6c0db3/module/irrecoverable/irrecoverable_example_test.go).
 * We may be able to encapsulate a lot of the boilerplate code involved in handling startup / shutdown of child routines / sub-components into a single `ComponentManager` struct:
 
   ```golang
