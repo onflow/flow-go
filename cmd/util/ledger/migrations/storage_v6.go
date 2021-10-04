@@ -701,6 +701,8 @@ func (m StorageFormatV6Migration) getLocation(location common.Location) common.L
 		return location
 	}
 
+	newLocation := location
+
 	// If any of the broken/missing types are found, update
 	// the referer to use the new version of the same type.
 	addressHex := addressLocation.Address.Hex()
@@ -718,7 +720,7 @@ func (m StorageFormatV6Migration) getLocation(location common.Location) common.L
 				panic(err)
 			}
 
-			location = common.AddressLocation{
+			newLocation = common.AddressLocation{
 				Address: common.BytesToAddress(address),
 				Name:    addressLocation.Name,
 			}
@@ -733,7 +735,7 @@ func (m StorageFormatV6Migration) getLocation(location common.Location) common.L
 				panic(err)
 			}
 
-			location = common.AddressLocation{
+			newLocation = common.AddressLocation{
 				Address: common.BytesToAddress(address),
 				Name:    addressLocation.Name,
 			}
@@ -745,7 +747,7 @@ func (m StorageFormatV6Migration) getLocation(location common.Location) common.L
 				panic(err)
 			}
 
-			location = common.AddressLocation{
+			newLocation = common.AddressLocation{
 				Address: common.BytesToAddress(address),
 				Name:    addressLocation.Name,
 			}
@@ -757,7 +759,7 @@ func (m StorageFormatV6Migration) getLocation(location common.Location) common.L
 				panic(err)
 			}
 
-			location = common.AddressLocation{
+			newLocation = common.AddressLocation{
 				Address: common.BytesToAddress(address),
 				Name:    addressLocation.Name,
 			}
@@ -769,7 +771,7 @@ func (m StorageFormatV6Migration) getLocation(location common.Location) common.L
 				panic(err)
 			}
 
-			location = common.AddressLocation{
+			newLocation = common.AddressLocation{
 				Address: common.BytesToAddress(address),
 				Name:    addressLocation.Name,
 			}
@@ -782,14 +784,14 @@ func (m StorageFormatV6Migration) getLocation(location common.Location) common.L
 				break
 			}
 
-			location = common.AddressLocation{
+			newLocation = common.AddressLocation{
 				Address: testnetAuctionContractAddress,
 				Name:    addressLocation.Name,
 			}
 		}
 	case "OpenEdition":
 		if addressHex == "85080f371da20cc1" {
-			location = common.AddressLocation{
+			newLocation = common.AddressLocation{
 				Address: addressLocation.Address,
 				Name:    "OpenEditionV2",
 			}
@@ -803,14 +805,28 @@ func (m StorageFormatV6Migration) getLocation(location common.Location) common.L
 				panic(err)
 			}
 
-			location = common.AddressLocation{
+			newLocation = common.AddressLocation{
 				Address: common.BytesToAddress(address),
 				Name:    addressLocation.Name,
 			}
 		}
 	}
 
-	return location
+	if newLocation != location {
+		_, writeErr := m.reportFile.WriteString(
+			fmt.Sprintf(
+				"Updated type for value: from %s to %s\n",
+				location.ID(),
+				newLocation.ID(),
+			),
+		)
+
+		if writeErr != nil {
+			panic(writeErr)
+		}
+	}
+
+	return newLocation
 }
 
 // migrationRuntimeInterface
@@ -1100,6 +1116,11 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 					value.GetOwner(),
 				),
 			)
+			c.migration.Log.Warn().Msgf(
+				"skipped migrating value: missing static type: %s, owner: %s",
+				err.TypeID,
+				value.GetOwner(),
+			)
 		case newInter.ContainerMutationError:
 			_, writeErr = c.migration.reportFile.WriteString(
 				fmt.Sprintf(
@@ -1107,6 +1128,11 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 					err.Error(),
 					value.GetOwner(),
 				),
+			)
+			c.migration.Log.Warn().Msgf(
+				"skipped migrating value: %s, owner: %s\n",
+				err.Error(),
+				value.GetOwner(),
 			)
 		case runtime.Error:
 			if parsingCheckingErr, ok := err.Unwrap().(*runtime.ParsingCheckingError); ok {
@@ -1117,12 +1143,21 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 						parsingCheckingErr.Error(),
 					),
 				)
+				c.migration.Log.Warn().Msgf(
+					"skipped migrating value: broken contract type: %s, cause: %s\n",
+					parsingCheckingErr.Location,
+					parsingCheckingErr.Error(),
+				)
 			} else {
 				_, writeErr = c.migration.reportFile.WriteString(
 					fmt.Sprintf(
 						"skipped migrating value: cause: %s\n",
 						err.Error(),
 					),
+				)
+				c.migration.Log.Warn().Msgf(
+					"skipped migrating value: cause: %s\n",
+					err.Error(),
 				)
 			}
 		case newInter.Error:
@@ -1131,6 +1166,10 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 					"skipped migrating value: cause: %s\n",
 					err.Error(),
 				),
+			)
+			c.migration.Log.Warn().Msgf(
+				"skipped migrating value: cause: %s\n",
+				err.Error(),
 			)
 		default:
 			panic(err)
