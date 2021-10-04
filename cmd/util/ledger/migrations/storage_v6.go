@@ -1122,6 +1122,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 					value.GetOwner(),
 				),
 			)
+			c.migration.clearProgress()
 			c.migration.Log.Warn().Msgf(
 				"skipped migrating value: missing static type: %s, owner: %s",
 				err.TypeID,
@@ -1135,6 +1136,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 					value.GetOwner(),
 				),
 			)
+			c.migration.clearProgress()
 			c.migration.Log.Warn().Msgf(
 				"skipped migrating value: %s, owner: %s\n",
 				err.Error(),
@@ -1149,6 +1151,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 						parsingCheckingErr.Error(),
 					),
 				)
+				c.migration.clearProgress()
 				c.migration.Log.Warn().Msgf(
 					"skipped migrating value: broken contract type: %s, cause: %s\n",
 					parsingCheckingErr.Location,
@@ -1161,6 +1164,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 						err.Error(),
 					),
 				)
+				c.migration.clearProgress()
 				c.migration.Log.Warn().Msgf(
 					"skipped migrating value: cause: %s\n",
 					err.Error(),
@@ -1173,6 +1177,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 					err.Error(),
 				),
 			)
+			c.migration.clearProgress()
 			c.migration.Log.Warn().Msgf(
 				"skipped migrating value: cause: %s\n",
 				err.Error(),
