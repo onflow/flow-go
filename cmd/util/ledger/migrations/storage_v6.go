@@ -116,7 +116,9 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	m.accounts = m.getAccounts(payloads)
 	m.Log.Info().Msg("Loaded account contracts")
 
-	m.programs = programs.NewEmptyPrograms()
+	if m.programs == nil {
+		m.programs = programs.NewEmptyPrograms()
+	}
 
 	m.migratedPayloadPaths = make(map[storagePath]bool)
 
@@ -322,7 +324,7 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 						pathSeparator,
 					)
 
-					deferredOwner := dictionary.DeferredOwner().Bytes()
+					deferredOwner := dictionary.DeferredOwner()[:]
 
 					deferredValuePaths[storagePath{
 						owner: string(deferredOwner),
@@ -405,7 +407,7 @@ func (m *StorageFormatV6Migration) decodeAndConvert(
 ) (err error) {
 
 	path := storagePath{
-		owner: string(owner.Bytes()),
+		owner: string(owner[:]),
 		key:   key,
 	}
 
@@ -483,7 +485,7 @@ func (m *StorageFormatV6Migration) initOldInterpreter(payloads []ledger.Payload)
 		oldInter.WithStorageReadHandler(
 			func(inter *oldInter.Interpreter, owner common.Address, key string, deferred bool) oldInter.OptionalValue {
 
-				ownerStr := string(owner.Bytes())
+				ownerStr := string(owner[:])
 
 				if m.migratedPayloadPaths[storagePath{
 					owner: ownerStr,
@@ -1280,7 +1282,8 @@ func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value
 
 	keysAndValues := make([]newInter.Value, 0)
 
-	for _, key := range value.Keys().Elements() {
+	keys := value.Keys().Elements()
+	for _, key := range keys {
 		entryValue, err := getValue(inter, value, key)
 		if err != nil {
 			continue
