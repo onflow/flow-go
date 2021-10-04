@@ -55,7 +55,7 @@ func TestValueConversion(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -114,7 +114,7 @@ func TestValueConversion(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -182,7 +182,7 @@ func TestValueConversion(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, owner.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, owner[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -246,7 +246,7 @@ func TestEncoding(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -332,7 +332,7 @@ func TestEncoding(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -428,7 +428,7 @@ func TestEncoding(t *testing.T) {
 		payloads := []ledger.Payload{
 			{
 				Key: ledger.NewKey([]ledger.KeyPart{
-					ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+					ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 					ledger.NewKeyPart(state.KeyPartController, []byte{}),
 					ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 				}),
@@ -544,7 +544,7 @@ func TestPayloadsMigration(t *testing.T) {
 	encoded = oldInter.PrependMagic(encoded, oldInter.CurrentEncodingVersion)
 
 	keyParts := []ledger.KeyPart{
-		ledger.NewKeyPart(state.KeyPartOwner, owner.Bytes()),
+		ledger.NewKeyPart(state.KeyPartOwner, owner[:]),
 		ledger.NewKeyPart(state.KeyPartController, []byte{}),
 		ledger.NewKeyPart(state.KeyPartKey, []byte("Test")),
 	}
@@ -552,7 +552,7 @@ func TestPayloadsMigration(t *testing.T) {
 	payloads := []ledger.Payload{
 		{
 			Key: ledger.NewKey([]ledger.KeyPart{
-				ledger.NewKeyPart(state.KeyPartOwner, owner.Bytes()),
+				ledger.NewKeyPart(state.KeyPartOwner, owner[:]),
 				ledger.NewKeyPart(state.KeyPartController, []byte{}),
 				ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 			}),
@@ -570,7 +570,7 @@ func TestPayloadsMigration(t *testing.T) {
 
 	// Check whether the query works with old ledger
 	ledgerView := newView(payloads)
-	value, err := ledgerView.Get(string(owner.Bytes()), "", "Test")
+	value, err := ledgerView.Get(string(owner[:]), "", "Test")
 	require.NoError(t, err)
 	assert.NotNil(t, value)
 
@@ -591,7 +591,7 @@ func TestPayloadsMigration(t *testing.T) {
 	key := []byte{0, 0, 0, 0, 0, 0, 0, 3}
 	prefixedKey := []byte(atree.LedgerBaseStorageSlabPrefix + string(key))
 
-	migratedValue, err := migratedLedgerView.Get(string(owner.Bytes()), "", string(prefixedKey))
+	migratedValue, err := migratedLedgerView.Get(string(owner[:]), "", string(prefixedKey))
 	require.NoError(t, err)
 	require.NotEmpty(t, migratedValue)
 
@@ -636,25 +636,25 @@ func TestContractValueRetrieval(t *testing.T) {
     `
 
 	contractValueKey := []ledger.KeyPart{
-		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 		ledger.NewKeyPart(state.KeyPartController, []byte{}),
 		ledger.NewKeyPart(state.KeyPartKey, []byte(fmt.Sprintf("contract\x1F%s", contractName))),
 	}
 
 	contractNamesKey := []ledger.KeyPart{
-		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
-		ledger.NewKeyPart(state.KeyPartController, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartOwner, address[:]),
+		ledger.NewKeyPart(state.KeyPartController, address[:]),
 		ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyContractNames)),
 	}
 
 	contractCodeKey := []ledger.KeyPart{
-		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
-		ledger.NewKeyPart(state.KeyPartController, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartOwner, address[:]),
+		ledger.NewKeyPart(state.KeyPartController, address[:]),
 		ledger.NewKeyPart(state.KeyPartKey, []byte("code.Test")),
 	}
 
 	storageUsedKey := []ledger.KeyPart{
-		ledger.NewKeyPart(state.KeyPartOwner, address.Bytes()),
+		ledger.NewKeyPart(state.KeyPartOwner, address[:]),
 		ledger.NewKeyPart(state.KeyPartController, []byte{}),
 		ledger.NewKeyPart(state.KeyPartKey, []byte(fvmState.KeyStorageUsed)),
 	}
