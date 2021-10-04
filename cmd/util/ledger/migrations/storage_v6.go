@@ -184,10 +184,14 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		m.Log.Warn().Msgf("empty deferred values found: %d", m.emptyDeferredValues)
 	}
 
+	m.clearProgress()
+	var logEvent *zerolog.Event
 	if m.skippedValues > 0 {
-		m.clearProgress()
-		m.Log.Warn().Msgf("values not migrated: %d", m.skippedValues)
+		logEvent = m.Log.Warn()
+	} else {
+		logEvent = m.Log.Info()
 	}
+	logEvent.Msgf("values not migrated: %d", m.skippedValues)
 
 	return ledgerView.Payloads(), nil
 }
