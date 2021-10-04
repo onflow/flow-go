@@ -30,11 +30,11 @@ Moving forward, we will add a new `Startable` interface in addition to the exist
 // Startable provides an interface to start a component. Once started, the component
 // can be stopped by cancelling the given context.
 type Startable interface {
-  // Start starts the component. Any errors encountered during startup should be returned
-	// directly, whereas irrecoverable errors encountered while the component is running
-	// should be thrown with the given SignalerContext.
-	// This method should only be called once, and subsequent calls should return ErrMultipleStartup.
-  Start(irrecoverable.SignalerContext) error
+    // Start starts the component. Any errors encountered during startup should be returned
+    // directly, whereas irrecoverable errors encountered while the component is running
+    // should be thrown with the given SignalerContext.
+    // This method should only be called once, and subsequent calls should return ErrMultipleStartup.
+    Start(irrecoverable.SignalerContext) error
 }
 ```
 Components which implement this interface are passed in a `SignalerContext` upon startup, which they can use to propagate any irrecoverable errors they encounter up to their parent via `SignalerContext.Throw`. The parent can then choose to handle these errors however they like, including restarting the component, logging the error, propagating the error to their own parent, etc.
@@ -43,26 +43,26 @@ Components which implement this interface are passed in a `SignalerContext` upon
 // We define a constrained interface to provide a drop-in replacement for context.Context
 // including in interfaces that compose it.
 type SignalerContext interface {
-	context.Context
-	Throw(err error) // delegates to the signaler
+    context.Context
+    Throw(err error) // delegates to the signaler
 }
 
 // Signaler sends the error out.
 type Signaler struct {
-	errChan   chan error
-	errThrown *atomic.Bool
+    errChan   chan error
+    errThrown *atomic.Bool
 }
 
 func NewSignaler() *Signaler {
-	return &Signaler{
-		errChan:   make(chan error, 1),
-		errThrown: atomic.NewBool(false),
-	}
+    return &Signaler{
+        errChan:   make(chan error, 1),
+        errThrown: atomic.NewBool(false),
+    }
 }
 
 // Error returns the Signaler's error channel.
 func (s *Signaler) Error() <-chan error {
-	return s.errChan
+    return s.errChan
 }
 
 // Throw is a narrow drop-in replacement for panic, log.Fatal, log.Panic, etc
@@ -70,18 +70,18 @@ func (s *Signaler) Error() <-chan error {
 // the first error it is called with to the error channel, and there are various
 // options as to how subsequent errors can be handled.
 func (s *Signaler) Throw(err error) {
-	defer runtime.Goexit()
+    defer runtime.Goexit()
 
-  // We only propagate the first irrecoverable error to the parent
-	if s.errThrown.CAS(false, true) {
-		s.errChan <- err
-		close(s.errChan)
-	} else {
-		// Another thread, possibly from the same component, has already thrown
-    // an irrecoverable error to this Signaler. Any subsequent irrecoverable
-    // errors can either be logged or ignored, as the parent will already
-    // be taking steps to remediate the first error.
-	}
+    // We only propagate the first irrecoverable error to the parent
+    if s.errThrown.CAS(false, true) {
+        s.errChan <- err
+        close(s.errChan)
+    } else {
+        // Another thread, possibly from the same component, has already thrown
+        // an irrecoverable error to this Signaler. Any subsequent irrecoverable
+        // errors can either be logged or ignored, as the parent will already
+        // be taking steps to remediate the first error.
+    }
 }
 ```
 
@@ -192,97 +192,9 @@ A component will now be started by passing a `SignalerContext` to its `Start` me
   func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) (err error) {
     // only start once
     if c.started.CAS(false, true) {
-      ctx, cancel := context.WithCancel(parent)
-      _ = cancel // pacify vet lostcancel check: startupCtx is always canceled through its parent
-      defer func() {
-        if err != nil {
-          cancel()
-        }
-      }()
-      c.shutdownSignal = ctx.Done()
+      // run startup function, start components, and launch worker routines
 
-      if err = c.startup(ctx); err != nil {
-        defer close(c.done)
-        return
-      }
-
-      signaler := irrecoverable.NewSignaler()
-      startupCtx := irrecoverable.WithSignaler(ctx, signaler)
-
-      go func() {
-        select {
-        case err := <-signaler.Error():
-          cancel()
-
-          // we propagate the error directly to the parent because a failure in a
-          // worker routine or a critical sub-component is considered irrecoverable
-
-          // TODO: It may be useful to allow the user of the ComponentManager to wrap
-          // errors thrown from sub-components before propagating them to the parent,
-          // to provide context for the parent about which sub-component the error
-          // originates from. This way the parent error handler doesn't need to handle
-          // every irrecoverable error type that may be thrown from a sub-component.
-          parent.Throw(err)
-        case <-c.done:
-        }
-      }()
-
-      // TODO: We may eventually want to introduce a way for sub-component startup
-      // and the provided ComponentStartup to occur concurrently, or even make this
-      // the default.
-      // In the current usecases, sub-components may have dependencies that must be
-      // initialized in the provided ComponentStartup before they can be started,
-      // but these dependencies can be removed by refactoring the code.
-
-      var componentGroup errgroup.Group
-      for _, component := range c.components {
-        component := component
-        componentGroup.Go(func() error {
-          if err := component.Start(startupCtx); err != nil {
-            defer cancel() // cancel startup for all other components
-            return err
-          }
-          return nil
-        })
-      }
-
-      components := make([]module.ReadyDoneAware, len(c.components))
-      for i, component := range c.components {
-        components[i] = component.(module.ReadyDoneAware)
-      }
-      componentsDone := util.AllDone(components...)
-
-      if err = componentGroup.Wait(); err != nil {
-        // wait for sub-components to shutdown before returning
-        <-componentsDone
-
-        defer close(c.done)
-        return
-      }
-
-      c.ready = util.AllReady(components...)
-
-      var workersDone sync.WaitGroup
-      workersDone.Add(len(c.workers))
-      for _, worker := range c.workers {
-        go func(w ComponentWorker) {
-          defer workersDone.Done()
-          w(startupCtx)
-        }(worker)
-      }
-
-      // launch goroutine to close done channel
-      go func() {
-        // wait for sub-components to shutdown
-        <-componentsDone
-
-        // wait for worker routines to finish
-        workersDone.Wait()
-
-        close(c.done)
-      }()
-
-      return
+      // more details in https://github.com/onflow/flow-go/pull/1355/
     }
 
     return module.ErrMultipleStartup
