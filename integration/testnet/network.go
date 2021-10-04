@@ -881,7 +881,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	qc, err := run.GenerateRootQC(root, signerData)
+	votes, err := run.GenerateRootBlockVotes(root, signerData)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	qc, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
