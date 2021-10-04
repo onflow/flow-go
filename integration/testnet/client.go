@@ -273,7 +273,7 @@ func (c *Client) GetAccount(accountAddress sdk.Address) (*sdk.Account, error) {
 	ctx := context.Background()
 	account, err := c.client.GetAccount(ctx, accountAddress)
 	if err != nil {
-		return nil, fmt.Errorf("could not get service account: %w", err)
+		return nil, fmt.Errorf("could not get account: %w", err)
 	}
 
 	return account, nil
