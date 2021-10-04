@@ -243,12 +243,12 @@ func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *
 
 	invocator := NewTransactionContractFunctionInvocator(
 		common.AddressLocation{
-			Address: common.Address(env.ctx.Chain.ServiceAddress()),
+			Address: common.BytesToAddress(env.ctx.Chain.ServiceAddress().Bytes()),
 			Name:    flowServiceAccountContract,
 		},
 		deductFeesContractFunction,
 		[]interpreter.Value{
-			interpreter.NewAddressValue(common.Address(proc.Transaction.Payer)),
+			interpreter.NewAddressValue(common.BytesToAddress(proc.Transaction.Payer.Bytes())),
 		},
 		[]sema.Type{
 			sema.AuthAccountType,
