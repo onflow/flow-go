@@ -95,7 +95,7 @@ var parentCtx context.Context
 
 ctx, cancel := context.WithCancel(parentCtx)
 signaler := irrecoverable.NewSignaler()
-signalerCtx irrecoverable.WithSignaler(ctx, signaler)
+signalerCtx := irrecoverable.WithSignaler(ctx, signaler)
 
 go func() {
   select {
