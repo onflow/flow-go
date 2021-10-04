@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"context"
+	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"testing"
 
@@ -96,7 +97,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		state.On("Final").Return(snapshot)
 
 		// create QC voter object to be used for voting for the root QC contract
-		voter := epochs.NewRootQCVoter(zerolog.Logger{}, local, hotSigner, state, client)
+		voter := epochs.NewRootQCVoter(zerolog.Logger{}, local, hotSigner, state, []module.QCContractClient{client})
 
 		// create voter resource
 		s.CreateVoterResource(address, nodeID, stakingPrivKey.PublicKey(), signer)

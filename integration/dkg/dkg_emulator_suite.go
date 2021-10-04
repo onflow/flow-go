@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module"
 	"os"
 
 	"github.com/rs/zerolog"
@@ -407,7 +408,8 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 
 	// keyKeys is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgKeys := badger.NewDKGKeys(core.Metrics, core.DB)
+	dkgKeys, err := badger.NewDKGKeys(core.Metrics, core.SecretsDB)
+	s.Require().NoError(err)
 
 	// brokerTunnel is used to communicate between the messaging engine and the
 	// DKG broker/controller
@@ -437,8 +439,8 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 
 	// create a config with no delays for tests
 	config := dkg.ControllerConfig{
-		BaseStartDelay:           0,
-		BaseHandleBroadcastDelay: 0,
+		BaseStartDelay:                0,
+		BaseHandleFirstBroadcastDelay: 0,
 	}
 
 	// the reactor engine reacts to new views being finalized and drives the
@@ -451,7 +453,7 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 		dkg.NewControllerFactory(
 			controllerFactoryLogger,
 			core.Me,
-			node.dkgContractClient,
+			[]module.DKGContractClient{node.dkgContractClient},
 			brokerTunnel,
 			config,
 		),

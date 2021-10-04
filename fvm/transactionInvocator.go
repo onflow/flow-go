@@ -111,8 +111,8 @@ func (i *TransactionInvocator) Process(
 
 			// reset error part of proc
 			// Warning right now the tx requires retry logic doesn't change
-			// anything on state but we might want to revert the state changes (or not commiting)
-			// if we decided to expand it furthur.
+			// anything on state but we might want to revert the state changes (or not committing)
+			// if we decided to expand it further.
 			proc.Err = nil
 			proc.Logs = make([]string, 0)
 			proc.Events = make([]flow.Event, 0)
@@ -269,30 +269,33 @@ func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *
 	return nil
 }
 
+var setAccountFrozenFunctionType = &sema.FunctionType{
+	Parameters: []*sema.Parameter{
+		{
+			Label:          sema.ArgumentLabelNotRequired,
+			Identifier:     "account",
+			TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
+		},
+		{
+			Label:          sema.ArgumentLabelNotRequired,
+			Identifier:     "frozen",
+			TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
+		},
+	},
+	ReturnTypeAnnotation: &sema.TypeAnnotation{
+		Type: sema.VoidType,
+	},
+}
+
 func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
 	if ctx.AccountFreezeAvailable {
 		// TODO return the errors instead of panicing
+
 		setAccountFrozen := runtime.ValueDeclaration{
-			Name: "setAccountFrozen",
-			Type: &sema.FunctionType{
-				Parameters: []*sema.Parameter{
-					{
-						Label:          sema.ArgumentLabelNotRequired,
-						Identifier:     "account",
-						TypeAnnotation: sema.NewTypeAnnotation(&sema.AddressType{}),
-					},
-					{
-						Label:          sema.ArgumentLabelNotRequired,
-						Identifier:     "frozen",
-						TypeAnnotation: sema.NewTypeAnnotation(sema.BoolType),
-					},
-				},
-				ReturnTypeAnnotation: &sema.TypeAnnotation{
-					Type: sema.VoidType,
-				},
-			},
+			Name:           "setAccountFrozen",
+			Type:           setAccountFrozenFunctionType,
 			Kind:           common.DeclarationKindFunction,
 			IsConstant:     true,
 			ArgumentLabels: nil,
@@ -316,6 +319,7 @@ func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclara
 
 					return interpreter.VoidValue{}
 				},
+				setAccountFrozenFunctionType,
 			),
 		}
 

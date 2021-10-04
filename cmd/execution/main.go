@@ -9,6 +9,9 @@ import (
 	"path/filepath"
 	"time"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
@@ -102,12 +105,15 @@ func main() {
 		chdpDeliveryTimeout           uint
 		enableBlockDataUpload         bool
 		gcpBucketName                 string
-		blockDataUploader             uploader.Uploader
+		s3BucketName                  string
+		blockDataUploaders            []uploader.Uploader
 		blockDataUploaderMaxRetry     uint64 = 5
 		blockdataUploaderRetryTimeout        = 1 * time.Second
+		atreeValidationEnabled        bool
 	)
 
-	cmd.FlowNode(flow.RoleExecution.String()).
+	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
+	nodeBuilder.
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			homedir, _ := os.UserHomeDir()
 			datadir := filepath.Join(homedir, ".flow", "execution")
@@ -132,18 +138,25 @@ func main() {
 			flags.UintVar(&chdpQueryTimeout, "chunk-data-pack-query-timeout-sec", 10, "number of seconds to determine a chunk data pack query being slow")
 			flags.UintVar(&chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10, "number of seconds to determine a chunk data pack response delivery being slow")
 			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
-			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to GCP Bucket")
+			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
 			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
+			flags.BoolVar(&atreeValidationEnabled, "atree-validation", false, "validates all atree values after mutations")
+			flags.StringVar(&s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
 		}).
 		ValidateFlags(func() error {
 			if enableBlockDataUpload {
-				if gcpBucketName == "" {
-					return fmt.Errorf("invalid flag. gcp-bucket-name required when blockdata-uploader is enabled")
+				if gcpBucketName == "" && s3BucketName == "" {
+					return fmt.Errorf("invalid flag. gcp-bucket-name or s3-bucket-name required when blockdata-uploader is enabled")
 				}
 			}
 			return nil
-		}).
-		Initialize().
+		})
+
+	if err = nodeBuilder.Initialize(); err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	nodeBuilder.
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -178,10 +191,9 @@ func main() {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
 		}).
-		Component("Block data uploader", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			if enableBlockDataUpload {
-
-				logger := node.Logger.With().Str("component_name", "block_data_uploader").Logger()
+		Component("GCP block data uploader", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if enableBlockDataUpload && gcpBucketName != "" {
+				logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
 				gcpBucketUploader, err := uploader.NewGCPBucketUploader(
 					context.Background(),
 					gcpBucketName,
@@ -199,7 +211,7 @@ func main() {
 					collector,
 				)
 
-				blockDataUploader = asyncUploader
+				blockDataUploaders = append(blockDataUploaders, asyncUploader)
 
 				return asyncUploader, nil
 			}
@@ -208,7 +220,40 @@ func main() {
 			// It's functions will be once per startup/shutdown - non-measurable performance penalty
 			// blockDataUploader will stay nil and disable calling uploader at all
 			return &module.NoopReadDoneAware{}, nil
+		}).
+		Component("S3 block data uploader", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if enableBlockDataUpload && s3BucketName != "" {
+				logger := node.Logger.With().Str("component_name", "s3_block_data_uploader").Logger()
 
+				ctx := context.Background()
+				config, err := awsconfig.LoadDefaultConfig(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("failed to load AWS configuration: %w", err)
+				}
+
+				client := s3.NewFromConfig(config)
+				s3Uploader := uploader.NewS3Uploader(
+					ctx,
+					client,
+					s3BucketName,
+					logger,
+				)
+				asyncUploader := uploader.NewAsyncUploader(
+					s3Uploader,
+					blockdataUploaderRetryTimeout,
+					blockDataUploaderMaxRetry,
+					logger,
+					collector,
+				)
+				blockDataUploaders = append(blockDataUploaders, asyncUploader)
+
+				return asyncUploader, nil
+			}
+
+			// Since we don't have conditional component creation, we just use Noop one.
+			// It's functions will be once per startup/shutdown - non-measurable performance penalty
+			// blockDataUploader will stay nil and disable calling uploader at all
+			return &module.NoopReadDoneAware{}, nil
 		}).
 		Module("state deltas mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
@@ -268,7 +313,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
-			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep)
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep, node.Logger.With().Str("subcomponent", "checkpointer").Logger())
 
 			return compactor, nil
 		}).
@@ -281,7 +326,9 @@ func main() {
 
 			extralog.ExtraLogDumpPath = extraLogPath
 
-			rt := fvm.NewInterpreterRuntime()
+			rt := fvm.NewInterpreterRuntime(
+				runtime.WithAtreeValidationEnabled(atreeValidationEnabled),
+			)
 
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
@@ -298,7 +345,7 @@ func main() {
 				cadenceExecutionCache,
 				committer,
 				scriptLogThreshold,
-				blockDataUploader,
+				blockDataUploaders,
 			)
 			if err != nil {
 				return nil, err

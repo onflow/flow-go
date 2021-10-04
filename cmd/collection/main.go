@@ -67,6 +67,8 @@ func main() {
 		hotstuffTimeoutDecreaseFactor          float64
 		hotstuffTimeoutVoteAggregationFraction float64
 		blockRateDelay                         time.Duration
+		startupTimeString                      string
+		startupTime                            time.Time
 
 		followerState protocol.MutableState
 		ingestConf    ingest.Config
@@ -85,75 +87,88 @@ func main() {
 		err               error
 
 		// epoch qc contract client
-		accessAddress      string
-		secureAccessNodeID string
+		machineAccountInfo *bootstrap.NodeMachineAccountInfo
+		flowClientOpts     []*common.FlowClientConfig
 		insecureAccessAPI  bool
-		// machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClient         *client.Client
+		accessNodeIDS      []string
 	)
 
-	cmd.FlowNode(flow.RoleCollection.String()).
-		ExtraFlags(func(flags *pflag.FlagSet) {
-			flags.UintVar(&txLimit, "tx-limit", 50000,
-				"maximum number of transactions in the memory pool")
-			flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
-				"the address the ingress server listens on")
-			flags.BoolVar(&ingressConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
-				"whether to enable the rpc metrics")
-			flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
-				"maximum per-transaction computation limit (gas limit)")
-			flags.Uint64Var(&ingestConf.MaxTransactionByteSize, "ingest-max-tx-byte-size", flow.DefaultMaxTransactionByteSize,
-				"maximum per-transaction byte size")
-			flags.Uint64Var(&ingestConf.MaxCollectionByteSize, "ingest-max-col-byte-size", flow.DefaultMaxCollectionByteSize,
-				"maximum per-collection byte size")
-			flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
-				"whether we check that inbound transactions are parse-able")
-			flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
-				"expiry buffer for inbound transactions")
-			flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
-				"how many additional cluster members we propagate transactions to")
-			flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", 10_000_000,
-				"the maximum address index allowed in transactions")
-			flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
-				"expiry buffer for transactions in proposed collections")
-			flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", builder.DefaultMaxPayerTransactionRate, // no rate limiting
-				"rate limit for each payer (transactions/collection)")
-			flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
-				"set of payer addresses which are omitted from rate limiting")
-			flags.UintVar(&maxCollectionSize, "builder-max-collection-size", flow.DefaultMaxCollectionSize,
-				"maximum number of transactions in proposed collections")
-			flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", flow.DefaultMaxCollectionByteSize,
-				"maximum byte size of the proposed collection")
-			flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", flow.DefaultMaxCollectionTotalGas,
-				"maximum total amount of maxgas of transactions in proposed collections")
-			flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
-				"the initial timeout for the hotstuff pacemaker")
-			flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond,
-				"the lower timeout bound for the hotstuff pacemaker")
-			flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor",
-				timeout.DefaultConfig.TimeoutIncrease,
-				"multiplicative increase of timeout value in case of time out event")
-			flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor",
-				timeout.DefaultConfig.TimeoutDecrease,
-				"multiplicative decrease of timeout value in case of progress")
-			flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction",
-				timeout.DefaultConfig.VoteAggregationTimeoutFraction,
-				"additional fraction of replica timeout that the primary will wait for votes")
-			flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
-				"the delay to broadcast block proposal in order to control block production rate")
+	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
+	nodeBuilder.ExtraFlags(func(flags *pflag.FlagSet) {
+		flags.UintVar(&txLimit, "tx-limit", 50000,
+			"maximum number of transactions in the memory pool")
+		flags.StringVarP(&ingressConf.ListenAddr, "ingress-addr", "i", "localhost:9000",
+			"the address the ingress server listens on")
+		flags.BoolVar(&ingressConf.RpcMetricsEnabled, "rpc-metrics-enabled", false,
+			"whether to enable the rpc metrics")
+		flags.Uint64Var(&ingestConf.MaxGasLimit, "ingest-max-gas-limit", flow.DefaultMaxTransactionGasLimit,
+			"maximum per-transaction computation limit (gas limit)")
+		flags.Uint64Var(&ingestConf.MaxTransactionByteSize, "ingest-max-tx-byte-size", flow.DefaultMaxTransactionByteSize,
+			"maximum per-transaction byte size")
+		flags.Uint64Var(&ingestConf.MaxCollectionByteSize, "ingest-max-col-byte-size", flow.DefaultMaxCollectionByteSize,
+			"maximum per-collection byte size")
+		flags.BoolVar(&ingestConf.CheckScriptsParse, "ingest-check-scripts-parse", true,
+			"whether we check that inbound transactions are parse-able")
+		flags.UintVar(&ingestConf.ExpiryBuffer, "ingest-expiry-buffer", 30,
+			"expiry buffer for inbound transactions")
+		flags.UintVar(&ingestConf.PropagationRedundancy, "ingest-tx-propagation-redundancy", 10,
+			"how many additional cluster members we propagate transactions to")
+		flags.Uint64Var(&ingestConf.MaxAddressIndex, "ingest-max-address-index", 10_000_000,
+			"the maximum address index allowed in transactions")
+		flags.UintVar(&builderExpiryBuffer, "builder-expiry-buffer", builder.DefaultExpiryBuffer,
+			"expiry buffer for transactions in proposed collections")
+		flags.Float64Var(&builderPayerRateLimit, "builder-rate-limit", builder.DefaultMaxPayerTransactionRate, // no rate limiting
+			"rate limit for each payer (transactions/collection)")
+		flags.StringSliceVar(&builderUnlimitedPayers, "builder-unlimited-payers", []string{}, // no unlimited payers
+			"set of payer addresses which are omitted from rate limiting")
+		flags.UintVar(&maxCollectionSize, "builder-max-collection-size", flow.DefaultMaxCollectionSize,
+			"maximum number of transactions in proposed collections")
+		flags.Uint64Var(&maxCollectionByteSize, "builder-max-collection-byte-size", flow.DefaultMaxCollectionByteSize,
+			"maximum byte size of the proposed collection")
+		flags.Uint64Var(&maxCollectionTotalGas, "builder-max-collection-total-gas", flow.DefaultMaxCollectionTotalGas,
+			"maximum total amount of maxgas of transactions in proposed collections")
+		flags.DurationVar(&hotstuffTimeout, "hotstuff-timeout", 60*time.Second,
+			"the initial timeout for the hotstuff pacemaker")
+		flags.DurationVar(&hotstuffMinTimeout, "hotstuff-min-timeout", 2500*time.Millisecond,
+			"the lower timeout bound for the hotstuff pacemaker")
+		flags.Float64Var(&hotstuffTimeoutIncreaseFactor, "hotstuff-timeout-increase-factor",
+			timeout.DefaultConfig.TimeoutIncrease,
+			"multiplicative increase of timeout value in case of time out event")
+		flags.Float64Var(&hotstuffTimeoutDecreaseFactor, "hotstuff-timeout-decrease-factor",
+			timeout.DefaultConfig.TimeoutDecrease,
+			"multiplicative decrease of timeout value in case of progress")
+		flags.Float64Var(&hotstuffTimeoutVoteAggregationFraction, "hotstuff-timeout-vote-aggregation-fraction",
+			timeout.DefaultConfig.VoteAggregationTimeoutFraction,
+			"additional fraction of replica timeout that the primary will wait for votes")
+		flags.DurationVar(&blockRateDelay, "block-rate-delay", 250*time.Millisecond,
+			"the delay to broadcast block proposal in order to control block production rate")
+		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g (e.g 1996-04-24T15:04:05-07:00))")
 
-			// epoch qc contract flags
-			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
-			flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
-			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
-		}).
-		Initialize().
+		// epoch qc contract flags
+		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
+		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node ID's sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. minimum length %d", common.DefaultAccessNodeIDSMinimum))
+	}).ValidateFlags(func() error {
+		if startupTimeString != cmd.NotSet {
+			t, err := time.Parse(time.RFC3339, startupTimeString)
+			if err != nil {
+				return fmt.Errorf("invalid start-time value: %w", err)
+			}
+			startupTime = t
+		}
+		return nil
+	})
+
+	if err = nodeBuilder.Initialize(); err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	nodeBuilder.
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
 			if !ok {
-				return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+				return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 			}
 			followerState, err = badgerState.NewFollowerState(
 				state,
@@ -183,50 +198,38 @@ func main() {
 			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		//Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-		//	machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
-		//	return err
-		//}).
-		Module("sdk client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			if accessAddress == "" {
-				return fmt.Errorf("missing required flag --access-address")
-			}
-			// create flow client with correct GRPC configuration for QC contract client
-			if insecureAccessAPI {
-				flowClient, err = common.InsecureFlowClient(accessAddress)
-				return err
-			} else {
-				if secureAccessNodeID == "" {
-					return fmt.Errorf("invalid flag --secure-access-node-id required")
-				}
-
-				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
-				if err != nil {
-					return fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
-				}
-
-				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))
-				if err != nil {
-					return fmt.Errorf("could not get identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				if len(identities) < 1 {
-					return fmt.Errorf("could not find identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				flowClient, err = common.SecureFlowClient(accessAddress, identities[0].NetworkPubKey.String()[2:])
-				return err
-			}
+		Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
+			return err
 		}).
-		//Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-		//	validator, err := epochs.NewMachineAccountConfigValidator(
-		//		node.Logger,
-		//		flowClient,
-		//		flow.RoleCollection,
-		//		*machineAccountInfo,
-		//	)
-		//	return validator, err
-		//}).
+		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			if len(accessNodeIDS) < common.DefaultAccessNodeIDSMinimum {
+				return fmt.Errorf("invalid flag --access-node-ids atleast %d IDs must be provided", common.DefaultAccessNodeIDSMinimum)
+			}
+
+			flowClientOpts, err = common.FlowClientConfigs(accessNodeIDS, insecureAccessAPI, node.State.Sealed())
+			if err != nil {
+				return fmt.Errorf("failed to prepare flow client connection options for each access node id %w", err)
+			}
+
+			return nil
+		}).
+		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
+			flowClient, err := common.FlowClient(flowClientOpts[0])
+			if err != nil {
+				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientOpts[0].AccessAddress, err)
+			}
+
+			validator, err := epochs.NewMachineAccountConfigValidator(
+				node.Logger,
+				flowClient,
+				flow.RoleCollection,
+				*machineAccountInfo,
+			)
+
+			return validator, err
+		}).
 		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
@@ -428,6 +431,20 @@ func main() {
 				return metrics.NewHotstuffCollector(chainID)
 			}
 			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
+
+			opts := []consensus.Option{
+				consensus.WithBlockRateDelay(blockRateDelay),
+				consensus.WithInitialTimeout(hotstuffTimeout),
+				consensus.WithMinTimeout(hotstuffMinTimeout),
+				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
+				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+			}
+
+			if !startupTime.IsZero() {
+				opts = append(opts, consensus.WithStartupTime(startupTime))
+			}
+
 			hotstuffFactory, err := factories.NewHotStuffFactory(
 				node.Logger,
 				node.Me,
@@ -435,12 +452,7 @@ func main() {
 				node.DB,
 				node.State,
 				createMetrics,
-				consensus.WithBlockRateDelay(blockRateDelay),
-				consensus.WithInitialTimeout(hotstuffTimeout),
-				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+				opts...,
 			)
 			if err != nil {
 				return nil, err
@@ -449,18 +461,17 @@ func main() {
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
 			// construct QC contract client
-			//qcContractClient, err := createQCContractClient(node, machineAccountInfo, flowClient)
-			//if err != nil {
-			//	return nil, fmt.Errorf("could not create qc contract client %w", err)
-			//}
-			qcContractClient := epochs.NewMockQCContractClient(node.Logger)
+			qcContractClients, err := createQCContractClients(node, machineAccountInfo, flowClientOpts)
+			if err != nil {
+				return nil, fmt.Errorf("could not create qc contract clients %w", err)
+			}
 
 			rootQCVoter := epochs.NewRootQCVoter(
 				node.Logger,
 				node.Me,
 				signer,
 				node.State,
-				qcContractClient,
+				qcContractClients,
 			)
 
 			factory := factories.NewEpochComponentsFactory(
@@ -519,4 +530,24 @@ func createQCContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.
 	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), machineAccountInfo.Address, machineAccountInfo.KeyIndex, qcContractAddress, txSigner)
 
 	return qcContractClient, nil
+}
+
+// createQCContractClients creates priority ordered array of QCContractClient
+func createQCContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*common.FlowClientConfig) ([]module.QCContractClient, error) {
+	qcClients := make([]module.QCContractClient, 0)
+
+	for _, opt := range flowClientOpts {
+		flowClient, err := common.FlowClient(opt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create flow client for qc contract client with options: %s %w", flowClientOpts, err)
+		}
+
+		qcClient, err := createQCContractClient(node, machineAccountInfo, flowClient)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create qc contract client with flow client options: %s %w", flowClientOpts, err)
+		}
+
+		qcClients = append(qcClients, qcClient)
+	}
+	return qcClients, nil
 }

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math"
+	"math/bits"
 	"os"
 	"path"
 	"strings"
@@ -15,7 +16,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/schollz/progressbar/v3"
 
-	execState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
@@ -25,10 +25,12 @@ import (
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/common"
 	newInter "github.com/onflow/cadence/runtime/interpreter"
+	"github.com/onflow/cadence/runtime/stdlib"
 
 	oldInter "github.com/onflow/cadence/v19/runtime/interpreter"
 )
 
+// cborTagStorageReference is a duplicate of the same from cadence v0.19.0
 const cborTagStorageReference = 202
 
 // \x1F = Information Separator One
@@ -37,96 +39,22 @@ const pathSeparator = "\x1F"
 
 var storageReferenceEncodingStart = []byte{0xd8, cborTagStorageReference}
 
-var storageMigrationV6DecMode = func() cbor.DecMode {
+// maxInt is math.MaxInt32 or math.MaxInt64 depending on arch.
+const maxInt = 1<<(bits.UintSize-1) - 1
+
+// storageMigrationV5DecMode is a duplicate of decMode from cadence v0.19.0
+var storageMigrationV5DecMode = func() cbor.DecMode {
 	decMode, err := cbor.DecOptions{
 		IntDec:           cbor.IntDecConvertNone,
-		MaxArrayElements: math.MaxInt32,
-		MaxMapPairs:      math.MaxInt32,
-		MaxNestedLevels:  256,
+		MaxArrayElements: maxInt,
+		MaxMapPairs:      maxInt,
+		MaxNestedLevels:  math.MaxInt16,
 	}.DecMode()
 	if err != nil {
 		panic(err)
 	}
 	return decMode
 }()
-
-type storageFormatV6MigrationResult struct {
-	key     ledger.Key
-	payload *ledger.Payload
-	err     error
-}
-
-// Base storage to be used by the persistent slab storage.
-//
-type encodingBaseStorage struct {
-	*atree.InMemBaseStorage
-	ReencodedPayloads []*ledger.Payload
-}
-
-var _ atree.BaseStorage = &encodingBaseStorage{}
-
-func newEncodingBaseStorage() *encodingBaseStorage {
-	return &encodingBaseStorage{
-		InMemBaseStorage:  atree.NewInMemBaseStorage(),
-		ReencodedPayloads: make([]*ledger.Payload, 0),
-	}
-}
-
-func (e *encodingBaseStorage) Store(id atree.StorageID, value []byte) error {
-	err := e.InMemBaseStorage.Store(id, value)
-	if err != nil {
-		return err
-	}
-
-	// Add the encoded content to the payloads
-
-	payload := ledger.Payload{
-
-		Key: ledgerKeyFromStorageID(id),
-
-		Value: newInter.PrependMagic(
-			value,
-			newInter.CurrentEncodingVersion,
-		),
-	}
-
-	e.ReencodedPayloads = append(e.ReencodedPayloads, &payload)
-
-	return nil
-}
-
-// delegationStorage is the storage implementation to be used by the
-// new interpreter during value conversions. This is a delegation
-// object and does not define any operations.
-//
-type delegationStorage struct {
-	// Overrides the InMemoryStorage's storage operations (i.e: BasicSlabStorage)
-	// using a PersistentSlabStorage.
-	*atree.PersistentSlabStorage
-
-	*newInter.InMemoryStorage
-}
-
-var _ newInter.Storage = &delegationStorage{}
-var _ atree.SlabStorage = &delegationStorage{}
-
-func newDelegationStorage(persistentSlabStorage *atree.PersistentSlabStorage) delegationStorage {
-	inMemStorage := newInter.NewInMemoryStorage()
-	return delegationStorage{
-		PersistentSlabStorage: persistentSlabStorage,
-		InMemoryStorage:       &inMemStorage,
-	}
-}
-
-func ledgerKeyFromStorageID(id atree.StorageID) ledger.Key {
-	prefixedKey := []byte(atree.LedgerBaseStorageSlabPrefix + string(id.Index[:]))
-
-	return ledger.NewKey([]ledger.KeyPart{
-		ledger.NewKeyPart(execState.KeyPartOwner, id.Address[:]),
-		ledger.NewKeyPart(execState.KeyPartController, []byte{}),
-		ledger.NewKeyPart(execState.KeyPartKey, prefixedKey),
-	})
-}
 
 type storagePath struct {
 	owner string
@@ -136,10 +64,10 @@ type storagePath struct {
 type StorageFormatV6Migration struct {
 	Log        zerolog.Logger
 	OutputDir  string
-	accounts   *state.Accounts
+	accounts   state.Accounts
 	programs   *programs.Programs
 	reportFile *os.File
-	storage    *atree.PersistentSlabStorage
+	storage    *runtime.Storage
 	oldInter   *oldInter.Interpreter
 	newInter   *newInter.Interpreter
 	converter  *ValueConverter
@@ -148,11 +76,11 @@ type StorageFormatV6Migration struct {
 	deferredValuePaths   map[storagePath]bool
 	progress             *progressbar.ProgressBar
 	emptyDeferredValues  int
-	missingTypeValues    int
+	skippedValues        int
 }
 
 func (m *StorageFormatV6Migration) filename() string {
-	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.csv", int32(time.Now().Unix())))
+	return path.Join(m.OutputDir, fmt.Sprintf("migration_report_%d.txt", int32(time.Now().Unix())))
 }
 
 func (m *StorageFormatV6Migration) Migrate(payloads []ledger.Payload) ([]ledger.Payload, error) {
@@ -185,15 +113,23 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	m.Log.Info().Msg("Broken contracts updated")
 
 	m.Log.Info().Msg("Loading account contracts ...")
-	m.accounts = m.getContractsOnlyAccounts(payloads)
+	m.accounts = m.getAccounts(payloads)
 	m.Log.Info().Msg("Loaded account contracts")
 
 	m.programs = programs.NewEmptyPrograms()
 
 	m.migratedPayloadPaths = make(map[storagePath]bool, 0)
 
-	baseStorage := newEncodingBaseStorage()
-	m.initPersistentSlabStorage(baseStorage)
+	fvmPayloads, storagePayloads, slabPayloads := splitPayloads(payloads)
+	if len(slabPayloads) != 0 {
+		return nil, fmt.Errorf(
+			"slab storages are not empty: found %d",
+			len(slabPayloads),
+		)
+	}
+
+	ledgerView := newView(fvmPayloads)
+	m.initPersistentSlabStorage(ledgerView)
 
 	m.initNewInterpreter()
 	m.initOldInterpreter(payloads)
@@ -208,27 +144,20 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.Log.Info().Msg("Converting payloads...")
 
-	migratedPayloads := make([]ledger.Payload, 0, len(payloads))
-
-	for _, payload := range payloads {
+	for _, payload := range storagePayloads {
 		keyParts := payload.Key.KeyParts
 		rawOwner := keyParts[0].Value
 		rawKey := keyParts[2].Value
 
-		result := m.migratePayload(payload)
+		err := m.reencodePayload(payload)
 
-		if result.err != nil {
+		if err != nil {
 			return nil, fmt.Errorf(
 				"failed to migrate key: %q (owner: %x): %w",
 				rawKey,
 				rawOwner,
-				result.err,
+				err,
 			)
-		} else if result.payload != nil {
-			migratedPayloads = append(migratedPayloads, *result.payload)
-		} else {
-			// Both nil means, value is decoded and converted.
-			// Do the encoding at once at the end.
 		}
 
 		m.incrementProgress()
@@ -246,13 +175,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		return nil, fmt.Errorf("failed to migrate payloads: %w", err)
 	}
 
-	// Add the encoded new values to the payloads
-
-	for _, payload := range baseStorage.ReencodedPayloads {
-		migratedPayloads = append(migratedPayloads, *payload)
-	}
-
-	m.completeProgress(err)
+	m.completeProgress()
 
 	m.Log.Info().Msg("Re-encoding converted values complete")
 
@@ -261,12 +184,12 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		m.Log.Warn().Msgf("empty deferred values found: %d", m.emptyDeferredValues)
 	}
 
-	if m.missingTypeValues > 0 {
+	if m.skippedValues > 0 {
 		m.clearProgress()
-		m.Log.Warn().Msgf("values not migrated due to missing types: %d", m.missingTypeValues)
+		m.Log.Warn().Msgf("values not migrated: %d", m.skippedValues)
 	}
 
-	return migratedPayloads, nil
+	return ledgerView.Payloads(), nil
 }
 
 func (m *StorageFormatV6Migration) incrementProgress() {
@@ -291,7 +214,7 @@ func (m *StorageFormatV6Migration) clearProgress() {
 	}
 }
 
-func (m *StorageFormatV6Migration) completeProgress(err error) {
+func (m *StorageFormatV6Migration) completeProgress() {
 	if m.progress == nil {
 		return
 	}
@@ -300,7 +223,7 @@ func (m *StorageFormatV6Migration) completeProgress(err error) {
 		return
 	}
 
-	err = m.progress.Finish()
+	err := m.progress.Finish()
 	if err != nil {
 		panic(err)
 	}
@@ -317,38 +240,24 @@ func (m *StorageFormatV6Migration) addProgress(progress int) {
 	}
 }
 
-func (m *StorageFormatV6Migration) initPersistentSlabStorage(encodingStorage *encodingBaseStorage) {
-	encMode, err := cbor.EncOptions{}.EncMode()
-	if err != nil {
-		panic(err)
-	}
+func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
+	st := state.NewState(
+		v,
+		state.WithMaxInteractionSizeAllowed(math.MaxUint64),
+	)
+	stateHolder := state.NewStateHolder(st)
+	accounts := state.NewAccounts(stateHolder)
 
-	decMode, err := cbor.DecOptions{}.DecMode()
-	if err != nil {
-		panic(err)
-	}
-
-	m.storage = atree.NewPersistentSlabStorage(
-		encodingStorage,
-		encMode,
-		decMode,
+	m.storage = runtime.NewStorage(
+		newAccountsAtreeLedger(accounts),
+		func(f func(), _ func(metrics runtime.Metrics, duration time.Duration)) {
+			f()
+		},
 	)
 }
 
-func (m *StorageFormatV6Migration) getContractsOnlyAccounts(payloads []ledger.Payload) *state.Accounts {
-	var filteredPayloads []ledger.Payload
-
-	for _, payload := range payloads {
-		rawKey := string(payload.Key.KeyParts[2].Value)
-		if strings.HasPrefix(rawKey, "contract_names") ||
-			strings.HasPrefix(rawKey, "code.") ||
-			rawKey == "exists" {
-
-			filteredPayloads = append(filteredPayloads, payload)
-		}
-	}
-
-	l := newView(filteredPayloads)
+func (m *StorageFormatV6Migration) getAccounts(payloads []ledger.Payload) state.Accounts {
+	l := newView(payloads)
 	st := state.NewState(l)
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
@@ -382,7 +291,7 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 			continue
 		}
 
-		err := storageMigrationV6DecMode.Valid(value)
+		err := storageMigrationV5DecMode.Valid(value)
 		if err != nil {
 			continue
 		}
@@ -443,39 +352,7 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 	return deferredValuePaths
 }
 
-func (m *StorageFormatV6Migration) migratePayload(payload ledger.Payload) storageFormatV6MigrationResult {
-	migratedPayload, err := m.reencodePayload(payload)
-
-	result := storageFormatV6MigrationResult{
-		key: payload.Key,
-	}
-
-	if err != nil {
-		result.err = err
-	} else if migratedPayload != nil {
-		if err := m.checkStorageFormat(*migratedPayload); err != nil {
-			panic(fmt.Errorf("%w: key = %s", err, payload.Key.String()))
-		}
-		result.payload = migratedPayload
-	}
-
-	return result
-}
-
-func (m *StorageFormatV6Migration) checkStorageFormat(payload ledger.Payload) error {
-	if !bytes.HasPrefix(payload.Value, []byte{0x0, 0xca, 0xde}) {
-		return nil
-	}
-
-	_, version := newInter.StripMagic(payload.Value)
-	if version != newInter.CurrentEncodingVersion {
-		return fmt.Errorf("invalid version for key %s: %d", payload.Key.String(), version)
-	}
-
-	return nil
-}
-
-func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*ledger.Payload, error) {
+func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) error {
 	keyParts := payload.Key.KeyParts
 
 	rawOwner := keyParts[0].Value
@@ -489,23 +366,25 @@ func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*led
 		string(rawController),
 		string(rawKey),
 	) {
-		return &payload, nil
+		return fmt.Errorf(
+			"invalid payload for conversion: %s",
+			payload.Key.String(),
+		)
 	}
 
 	value, version := oldInter.StripMagic(payload.Value)
 
 	if version != oldInter.CurrentEncodingVersion {
-		return nil,
-			fmt.Errorf(
-				"invalid storage format version for key: %s: %d",
-				rawKey,
-				version,
-			)
+		return fmt.Errorf(
+			"invalid storage format version for key: %s: %d",
+			rawKey,
+			version,
+		)
 	}
 
-	err := storageMigrationV6DecMode.Valid(value)
+	err := storageMigrationV5DecMode.Valid(value)
 	if err != nil {
-		return &payload, nil
+		return err
 	}
 
 	err = m.decodeAndConvert(
@@ -516,16 +395,15 @@ func (m *StorageFormatV6Migration) reencodePayload(payload ledger.Payload) (*led
 	)
 
 	if err != nil {
-		return nil,
-			fmt.Errorf(
-				"failed to decode and convert key: %s: %w\n\nvalue:\n%s\n\n%s",
-				rawKey, err,
-				hex.Dump(value),
-				cborMeLink(value),
-			)
+		return fmt.Errorf(
+			"failed to decode and convert key: %s: %w\n\nvalue:\n%s\n\n%s",
+			rawKey, err,
+			hex.Dump(value),
+			cborMeLink(value),
+		)
 	}
 
-	return nil, nil
+	return nil
 }
 
 // Decode the value and cache it to be migrated later.
@@ -558,7 +436,8 @@ func (m *StorageFormatV6Migration) decodeAndConvert(
 		return err
 	}
 
-	_ = m.converter.Convert(rootValue)
+	result := m.converter.Convert(rootValue, nil)
+	m.storage.WriteValue(nil, owner, key, newInter.NewSomeValueNonCopying(result))
 
 	// Mark the payload as 'migrated'.
 	m.migratedPayloadPaths[path] = true
@@ -570,20 +449,27 @@ func (m *StorageFormatV6Migration) initNewInterpreter() {
 	inter, err := newInter.NewInterpreter(
 		nil,
 		nil,
+		newInter.WithStorage(m.storage),
 		newInter.WithImportLocationHandler(
 			func(inter *newInter.Interpreter, location common.Location) newInter.Import {
-				program, err := m.loadProgram(location)
-				if err != nil {
-					panic(err)
+				var program *newInter.Program
+				if location == stdlib.CryptoChecker.Location {
+					program = newInter.ProgramFromChecker(stdlib.CryptoChecker)
+				} else {
+					var err error
+					program, err = m.loadProgram(location)
+					if err != nil {
+						panic(err)
+					}
 				}
 
-				subInter, err := inter.NewSubInterpreter(program, location)
+				subInterpreter, err := inter.NewSubInterpreter(program, location)
 				if err != nil {
 					panic(err)
 				}
 
 				return newInter.InterpreterImport{
-					Interpreter: subInter,
+					Interpreter: subInterpreter,
 				}
 			},
 		),
@@ -595,8 +481,6 @@ func (m *StorageFormatV6Migration) initNewInterpreter() {
 			err,
 		))
 	}
-
-	inter.Storage = newDelegationStorage(m.storage)
 
 	m.newInter = inter
 }
@@ -656,7 +540,7 @@ func (m *StorageFormatV6Migration) initOldInterpreter(payloads []ledger.Payload)
 					))
 				}
 
-				err = storageMigrationV6DecMode.Valid(content)
+				err = storageMigrationV5DecMode.Valid(content)
 				if err != nil {
 					panic(fmt.Errorf(
 						"invalid content for key: %s: %w\ncontent: %b",
@@ -752,7 +636,7 @@ func (m *StorageFormatV6Migration) loadProgram(
 	if !ok {
 		return nil, fmt.Errorf(
 			"cannot load program for unsupported non-address location: %s",
-			addressLocation,
+			location,
 		)
 	}
 
@@ -804,6 +688,9 @@ func (m *StorageFormatV6Migration) updateBrokenContracts(payloads []ledger.Paylo
 		case ownerHex == "1864ff317a35af46" && strings.HasSuffix(key, "FlowIDTableStaking"):
 			payloads[index].Value = []byte(knownContract_1864ff317a35af46_FlowIDTableStaking)
 			m.Log.Info().Msg("contract updated: 1864ff317a35af46.FlowIDTableStaking")
+		case ownerHex == "ab273f724a1625df" && strings.HasSuffix(key, "MultiMessageBoard"):
+			payloads[index].Value = []byte(knownContract_ab273f724a1625df_MultiMessageBoard)
+			m.Log.Info().Msg("contract updated: ab273f724a1625df.MultiMessageBoard")
 		}
 	}
 }
@@ -811,7 +698,7 @@ func (m *StorageFormatV6Migration) updateBrokenContracts(payloads []ledger.Paylo
 // migrationRuntimeInterface
 
 type migrationRuntimeInterface struct {
-	accounts *state.Accounts
+	accounts state.Accounts
 	programs *programs.Programs
 }
 
@@ -1056,7 +943,6 @@ func cborMeLink(value []byte) string {
 //
 type ValueConverter struct {
 	result    newInter.Value
-	storage   atree.SlabStorage
 	newInter  *newInter.Interpreter
 	oldInter  *oldInter.Interpreter
 	migration *StorageFormatV6Migration
@@ -1069,23 +955,70 @@ func NewValueConverter(
 ) *ValueConverter {
 	return &ValueConverter{
 		migration: migration,
-		storage:   migration.storage,
 		newInter:  migration.newInter,
 		oldInter:  migration.oldInter,
 	}
 }
 
-func (c *ValueConverter) Convert(value oldInter.Value) (result newInter.Value) {
+func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.StaticType) (result newInter.Value) {
 	prevResult := c.result
 	c.result = nil
 
 	defer func() {
-		if r := recover(); r != nil {
-			c.migration.missingTypeValues += 1
-			result = nil
+		c.result = prevResult
+
+		r := recover()
+		if r == nil {
+			return
 		}
 
-		c.result = prevResult
+		switch err := r.(type) {
+		case newInter.TypeLoadingError:
+			c.migration.reportFile.WriteString(
+				fmt.Sprintf(
+					"skipped migrating value: missing static type: %s, owner: %s\n",
+					err.TypeID,
+					value.GetOwner(),
+				),
+			)
+		case newInter.ContainerMutationError:
+			c.migration.reportFile.WriteString(
+				fmt.Sprintf(
+					"skipped migrating value: %s, owner: %s\n",
+					err.Error(),
+					value.GetOwner(),
+				),
+			)
+		case runtime.Error:
+			if parsingCheckingErr, ok := err.Unwrap().(*runtime.ParsingCheckingError); ok {
+				c.migration.reportFile.WriteString(
+					fmt.Sprintf(
+						"skipped migrating value: broken contract type: %s, cause: %s\n",
+						parsingCheckingErr.Location,
+						parsingCheckingErr.Error(),
+					),
+				)
+			} else {
+				c.migration.reportFile.WriteString(
+					fmt.Sprintf(
+						"skipped migrating value: cause: %s\n",
+						err.Error(),
+					),
+				)
+			}
+		case newInter.Error:
+			c.migration.reportFile.WriteString(
+				fmt.Sprintf(
+					"skipped migrating value: cause: %s\n",
+					err.Error(),
+				),
+			)
+		default:
+			panic(err)
+		}
+
+		c.migration.skippedValues += 1
+		result = nil
 	}()
 
 	value.Accept(c.oldInter, c)
@@ -1094,6 +1027,12 @@ func (c *ValueConverter) Convert(value oldInter.Value) (result newInter.Value) {
 		panic("converted value is nil")
 	}
 
+	switch expectedType {
+	case newInter.PrimitiveStaticTypeUInt64:
+		if intValue, ok := c.result.(newInter.IntValue); ok {
+			c.result = newInter.ConvertUInt64(intValue)
+		}
+	}
 	return c.result
 }
 
@@ -1120,18 +1059,18 @@ func (c *ValueConverter) VisitStringValue(_ *oldInter.Interpreter, value *oldInt
 }
 
 func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInter.ArrayValue) bool {
-	newElements := make([]newInter.Value, value.Count())
-
-	for index, element := range value.Elements() {
-		newElement := c.Convert(element)
-		if newElement != nil {
-			newElements[index] = newElement
-		}
-	}
+	newElements := make([]newInter.Value, 0)
 
 	arrayStaticType := ConvertStaticType(value.StaticType()).(newInter.ArrayStaticType)
 
-	c.result = newInter.NewArrayValueWithAddress(
+	for _, element := range value.Elements() {
+		newElement := c.Convert(element, arrayStaticType.ElementType())
+		if newElement != nil {
+			newElements = append(newElements, newElement)
+		}
+	}
+
+	c.result = newInter.NewArrayValue(
 		c.newInter,
 		arrayStaticType,
 		*value.Owner,
@@ -1215,18 +1154,18 @@ func (c *ValueConverter) VisitWord64Value(_ *oldInter.Interpreter, value oldInte
 }
 
 func (c *ValueConverter) VisitFix64Value(_ *oldInter.Interpreter, value oldInter.Fix64Value) {
-	c.result = newInter.NewFix64ValueWithInteger(int64(value.ToInt()))
+	c.result = newInter.Fix64Value(value)
 }
 
 func (c *ValueConverter) VisitUFix64Value(_ *oldInter.Interpreter, value oldInter.UFix64Value) {
-	c.result = newInter.NewUFix64ValueWithInteger(uint64(value.ToInt()))
+	c.result = newInter.UFix64Value(value)
 }
 
 func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *oldInter.CompositeValue) bool {
 	fields := make([]newInter.CompositeField, 0)
 
 	value.Fields().Foreach(func(key string, fieldVal oldInter.Value) {
-		newValue := c.Convert(fieldVal)
+		newValue := c.Convert(fieldVal, nil)
 		if newValue != nil {
 			fields = append(
 				fields,
@@ -1240,7 +1179,7 @@ func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *old
 
 	c.result = newInter.NewCompositeValue(
 		c.newInter,
-		value.Location(),
+		compositeTypeLocation(value.Location()),
 		value.QualifiedIdentifier(),
 		value.Kind(),
 		fields,
@@ -1249,6 +1188,102 @@ func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *old
 
 	// Do not descent
 	return false
+}
+
+func compositeTypeLocation(location common.Location) common.Location {
+	addressLocation, ok := location.(common.AddressLocation)
+	if !ok {
+		return location
+	}
+
+	addressHex := addressLocation.Address.Hex()
+	switch {
+	case strings.HasPrefix(addressLocation.Name, "FlowIDTableStaking"):
+		switch addressHex {
+		case "e94f751ba094ef6a",
+			"ecda6c5746d5bdf0",
+			"f1a43bfd1354c9b8",
+			"16a5fe3b527633d4",
+			"76d9ea44cef09e20",
+			"9798362e92e5539a":
+			address, err := hex.DecodeString("9eca2b38b18b5dfe")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+	case strings.HasPrefix(addressLocation.Name, "KittyItems"):
+		switch addressHex {
+		case "fcceff21d9532b58",
+			"17341c7824b030be",
+			"f79ee844bfa76528":
+			address, err := hex.DecodeString("8c5244250369a9ce")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+	case addressLocation.Name == "DisruptNowBeta":
+		if addressHex == "45888dabccc5c376" {
+			address, err := hex.DecodeString("849832a65c0524b5")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+	case addressLocation.Name == "NonFungibleToken":
+		if addressHex == "cd2fde7d198629e4" {
+			address, err := hex.DecodeString("c2f5b3fb0ad43ff1")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+	case addressLocation.Name == "NonFungibleBeatoken":
+		if addressHex == "70239ed8e4c7367a" {
+			address, err := hex.DecodeString("14f7f8198e156fb0")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+
+	// mainnet
+	case addressLocation.Name == "LockedTokens":
+		if addressHex == "31aed847945124fd" {
+			address, err := hex.DecodeString("8d0e87b65159ae63")
+			if err != nil {
+				panic(err)
+			}
+
+			location = common.AddressLocation{
+				Address: common.BytesToAddress(address),
+				Name:    addressLocation.Name,
+			}
+		}
+	}
+
+	return location
 }
 
 func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value *oldInter.DictionaryValue) bool {
@@ -1262,9 +1297,9 @@ func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value
 			continue
 		}
 
-		newValue := c.Convert(entryValue)
+		newValue := c.Convert(entryValue, staticType.ValueType)
 		if newValue != nil {
-			keysAndValues = append(keysAndValues, c.Convert(key))
+			keysAndValues = append(keysAndValues, c.Convert(key, staticType.KeyType))
 			keysAndValues = append(keysAndValues, newValue)
 		}
 	}
@@ -1296,7 +1331,7 @@ func getValue(
 		}
 	}()
 
-	value = dictionary.Get(inter, nil, key)
+	value = dictionary.Get(inter, oldInter.ReturnEmptyLocationRange, key)
 
 	if someValue, ok := value.(*oldInter.SomeValue); ok {
 		value = someValue.Value
@@ -1310,7 +1345,7 @@ func (c *ValueConverter) VisitNilValue(_ *oldInter.Interpreter, _ oldInter.NilVa
 }
 
 func (c *ValueConverter) VisitSomeValue(_ *oldInter.Interpreter, value *oldInter.SomeValue) bool {
-	innerValue := c.Convert(value.Value)
+	innerValue := c.Convert(value.Value, nil)
 	if innerValue == nil {
 		panic("value cannot be nil")
 	}
@@ -1341,23 +1376,23 @@ func (c *ValueConverter) VisitPathValue(_ *oldInter.Interpreter, value oldInter.
 }
 
 func (c *ValueConverter) VisitCapabilityValue(_ *oldInter.Interpreter, value oldInter.CapabilityValue) {
-	address := c.Convert(value.Address).(newInter.AddressValue)
-	pathValue := c.Convert(value.Path).(newInter.PathValue)
+	address := c.Convert(value.Address, nil).(newInter.AddressValue)
+	pathValue := c.Convert(value.Path, nil).(newInter.PathValue)
 
-	var burrowType newInter.StaticType
+	var borrowType newInter.StaticType
 	if value.BorrowType != nil {
-		burrowType = ConvertStaticType(value.BorrowType)
+		borrowType = ConvertStaticType(value.BorrowType)
 	}
 
 	c.result = &newInter.CapabilityValue{
 		Address:    address,
 		Path:       pathValue,
-		BorrowType: burrowType,
+		BorrowType: borrowType,
 	}
 }
 
 func (c *ValueConverter) VisitLinkValue(_ *oldInter.Interpreter, value oldInter.LinkValue) {
-	targetPath := c.Convert(value.TargetPath).(newInter.PathValue)
+	targetPath := c.Convert(value.TargetPath, nil).(newInter.PathValue)
 	c.result = newInter.LinkValue{
 		TargetPath: targetPath,
 		Type:       ConvertStaticType(value.Type),
@@ -1382,33 +1417,58 @@ func (c *ValueConverter) VisitDeployedContractValue(_ *oldInter.Interpreter, _ o
 
 // Type conversions
 
+var testnetNonFungibleTokenContractAddress = func() common.Address {
+	address, err := hex.DecodeString("631e88ae7f1d7c20")
+	if err != nil {
+		panic(err)
+	}
+
+	return common.BytesToAddress(address)
+}()
+
 func ConvertStaticType(staticType oldInter.StaticType) newInter.StaticType {
 	switch typ := staticType.(type) {
 	case oldInter.CompositeStaticType:
-		return newInter.NewCompositeStaticType(typ.Location, typ.QualifiedIdentifier)
+		location := compositeTypeLocation(typ.Location)
+		return newInter.NewCompositeStaticType(location, typ.QualifiedIdentifier)
+
 	case oldInter.InterfaceStaticType:
+		// NonFungibleToken.NFT is a struct, but is stored as an interface type.
+		// Rectify this by returning a composite static type.
+		if location, ok := typ.Location.(common.AddressLocation); ok {
+			if location.Address == testnetNonFungibleTokenContractAddress &&
+				typ.QualifiedIdentifier == "NonFungibleToken.NFT" {
+				return newInter.NewCompositeStaticType(location, typ.QualifiedIdentifier)
+			}
+		}
+
 		return newInter.InterfaceStaticType{
 			Location:            typ.Location,
 			QualifiedIdentifier: typ.QualifiedIdentifier,
 		}
+
 	case oldInter.VariableSizedStaticType:
 		return newInter.VariableSizedStaticType{
 			Type: ConvertStaticType(typ.Type),
 		}
+
 	case oldInter.ConstantSizedStaticType:
 		return newInter.ConstantSizedStaticType{
 			Type: ConvertStaticType(typ.Type),
 			Size: typ.Size,
 		}
+
 	case oldInter.DictionaryStaticType:
 		return newInter.DictionaryStaticType{
 			KeyType:   ConvertStaticType(typ.KeyType),
 			ValueType: ConvertStaticType(typ.ValueType),
 		}
+
 	case oldInter.OptionalStaticType:
 		return newInter.OptionalStaticType{
 			Type: ConvertStaticType(typ.Type),
 		}
+
 	case *oldInter.RestrictedStaticType:
 		restrictions := make([]newInter.InterfaceStaticType, 0, len(typ.Restrictions))
 		for _, oldInterfaceType := range typ.Restrictions {
@@ -1420,23 +1480,27 @@ func ConvertStaticType(staticType oldInter.StaticType) newInter.StaticType {
 			Type:         ConvertStaticType(typ.Type),
 			Restrictions: restrictions,
 		}
+
 	case oldInter.ReferenceStaticType:
 		return newInter.ReferenceStaticType{
 			Authorized: typ.Authorized,
 			Type:       ConvertStaticType(typ.Type),
 		}
+
 	case oldInter.CapabilityStaticType:
-		var burrowType newInter.StaticType
+		var borrowType newInter.StaticType
 
 		if typ.BorrowType != nil {
-			burrowType = ConvertStaticType(typ.BorrowType)
+			borrowType = ConvertStaticType(typ.BorrowType)
 		}
 
 		return newInter.CapabilityStaticType{
-			BorrowType: burrowType,
+			BorrowType: borrowType,
 		}
+
 	case oldInter.PrimitiveStaticType:
 		return ConvertPrimitiveStaticType(typ)
+
 	default:
 		panic(fmt.Errorf("cannot covert static type: %s", staticType))
 	}
@@ -1528,7 +1592,7 @@ func ConvertPrimitiveStaticType(staticType oldInter.PrimitiveStaticType) newInte
 	case oldInter.PrimitiveStaticTypeUInt256:
 		return newInter.PrimitiveStaticTypeUInt256
 
-	// Word *
+	// Word*
 
 	case oldInter.PrimitiveStaticTypeWord8:
 		return newInter.PrimitiveStaticTypeWord8
@@ -3578,6 +3642,100 @@ pub contract MessageBoard {
     self.adminStoragePath = /storage/admin
     self.posts = []
     self.account.save(<-create Admin(), to: self.adminStoragePath)
+  }
+}
+`
+
+//nolint:gosimple
+const knownContract_ab273f724a1625df_MultiMessageBoard = `
+pub contract MultiMessageBoard {
+  // The path to the Admin object in this contract's storage
+  pub let AdminStoragePath: StoragePath
+
+  // Maximum allowed message length
+  pub var maxMessageLength: Int
+
+  // Maximum allowed messages on a board
+  pub var maxMessageCount: Int
+
+  pub struct Post {
+    pub let timestamp: UFix64
+    pub let message: String
+    pub let from: Address
+
+    init(timestamp: UFix64, message: String, from: Address) {
+      self.timestamp = timestamp
+      self.message = message
+      self.from = from
+    }
+  }
+
+  // Records "maxMessageCount" latest messages
+  pub var posts: [[Post]]
+
+  // Emitted when a post is made
+  pub event Posted(timestamp: UFix64, message: String, from: Address, boardID: Int)
+
+  pub fun post(message: String, sender: AuthAccount, boardID: Int) {
+    pre {
+      message.length <= self.maxMessageLength: "Message too long"
+      boardID < self.posts.length: "Invalid board ID"
+    }
+
+    let from = sender.address
+    let post = Post(timestamp: getCurrentBlock().timestamp, message: message, from: from)
+    self.posts[boardID].append(post)
+
+    // Keeps only the latest "maxMessageCount" messages on the board
+    if (self.posts[boardID].length > self.maxMessageCount) {
+      self.posts[boardID].removeFirst()
+    }
+
+    emit Posted(timestamp: getCurrentBlock().timestamp, message: message, from: from, boardID: boardID)
+  }
+
+  // Check current messages
+  pub fun getPosts(boardID: Int): [Post] {
+    pre {
+      boardID < self.posts.length: "Invalid board ID"
+    }
+
+    return self.posts[boardID]
+  }
+
+  pub resource Admin {
+    // Removes the specified post
+    pub fun deletePost(boardID: Int, index: Int) {
+      MultiMessageBoard.posts[boardID].remove(at: index)
+    }
+
+    // Create a message board
+    pub fun createBoard() {
+      MultiMessageBoard.posts.append([])
+    }
+
+    // Remove a message board
+    pub fun removeBoard(boardID: Int) {
+      MultiMessageBoard.posts.remove(at: boardID)
+    }
+
+    pub fun updateMaxMessageLength(maxMessageLength: Int) {
+      MultiMessageBoard.maxMessageLength = maxMessageLength
+    }
+
+    pub fun updateMaxMessageCount(maxMessageCount: Int) {
+      MultiMessageBoard.maxMessageCount = maxMessageCount
+    }
+  }
+
+  init() {
+    self.AdminStoragePath = /storage/multiMessageBoardAdmin
+    self.posts = []
+    self.maxMessageLength = 140
+    self.maxMessageCount = 100
+    
+    // Store an Admin object in this contract's account storage
+    self.account.save(<-create Admin(), to: self.AdminStoragePath)
   }
 }
 `
