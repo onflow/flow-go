@@ -140,7 +140,95 @@ A component will now be started by passing a `SignalerContext` to its `Start` me
 - This provides a clearer way of defining ownership of components, and hence may potentially eliminate the need to deal with concurrency-safety altogether. Whoever creates a component should be responsible for starting it, and therefore they should be the only one with access to its `Startable` interface. If each component only has a single parent that is capable of starting it, then we should never run into concurrency issues.
 
 ## Implementation (WIP)
+* Lifecycle management logic for components can be further abstracted into a `RunComponent` helper function:
 
+  ```golang
+  type ComponentFactory func() (Component, error)
+
+  // OnError reacts to an irrecoverable error
+  // It is meant to inspect the error, determining its type and seeing if e.g. a restart or some other measure is suitable,
+  // and optionally trigger the continuation provided by the caller (RunComponent), which defines what "a restart" means.
+  // Instead of restarting the component, it could also:
+  // - panic (in canary / benchmark)
+  // - log in various Error channels and / or send telemetry ...
+  type OnError = func(err error, triggerRestart func())
+
+  // RunComponent repeatedly starts components returned from the given ComponentFactory, shutting them
+  // down when they encounter irrecoverable errors and passing those errors to the given error handler.
+  // Any errors encountered during component startup are returned directly. If the given context is
+  // cancelled, it will wait for the current running component to shutdown before returning.
+  func RunComponent(ctx context.Context, componentFactory ComponentFactory, handler OnError) error {
+    // reference to per-run signals for the component
+    var component Component
+    var cancel context.CancelFunc
+    var done <-chan struct{}
+    var irrecoverableErr <-chan error
+
+    start := func() (err error) {
+      component, err = componentFactory()
+      if err != nil {
+        return // failure to generate the component, should be handled out-of-band because a restart won't help
+      }
+
+      // context used to run the component
+      var runCtx context.Context
+      runCtx, cancel = context.WithCancel(ctx)
+
+      // signaler used for irrecoverables
+      signaler := irrecoverable.NewSignaler()
+      signalingCtx := irrecoverable.WithSignaler(runCtx, signaler)
+      irrecoverableErr = signaler.Error()
+
+      if err = component.Start(signalingCtx); err != nil {
+        cancel()
+        return
+      }
+
+      done = component.Done()
+      return
+    }
+
+    shutdownAndWaitForRestart := func(err error) error {
+      // shutdown the component
+      cancel()
+
+      // wait until it's done
+      <-done
+
+      // send error to the handler programmed with a restart continuation
+      restartChan := make(chan struct{})
+      go handler(err, func() {
+        close(restartChan)
+      })
+
+      // wait for handler to trigger restart or abort
+      select {
+      case <-ctx.Done():
+        return ctx.Err()
+      case <-restartChan:
+      }
+
+      return nil
+    }
+
+    for {
+      if err := start(); err != nil {
+        return err // failure to start
+      }
+
+      select {
+      case <-done:
+        return ctx.Err()
+      case err := <-irrecoverableErr:
+        if canceled := shutdownAndWaitForRestart(err); canceled != nil {
+          return canceled
+        }
+      }
+    }
+  }
+  ```
+
+  > Note: this is now implemented in [#1275](https://github.com/onflow/flow-go/pull/1275), and an example can be found [here](https://github.com/onflow/flow-go/blob/8950da93264485fe5fcf51413d921d658e6c0db3/module/irrecoverable/irrecoverable_example_test.go)
 * We may be able to encapsulate a lot of the boilerplate code involved in handling startup / shutdown of child routines / sub-components into a single `ComponentManager` struct:
 
   ```golang
@@ -273,4 +361,4 @@ A component will now be started by passing a `SignalerContext` to its `Start` me
   }
   ```
 
-  > Note: this is now implemented in [#1275](https://github.com/onflow/flow-go/pull/1275)
+  > Note: this is now implemented in [#1355](https://github.com/onflow/flow-go/pull/1355)
