@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
-const CHANNEL_CLOSE_LATENCY_ALLOWANCE = 20 * time.Millisecond
+const CHANNEL_CLOSE_LATENCY_ALLOWANCE = 50 * time.Millisecond
 
 func isClosed(c <-chan struct{}) bool {
 	select {
@@ -763,7 +763,7 @@ func (c *componentManagerMachine) Init(t *rapid.T) {
 	hasStartup := rapid.Bool().Draw(t, "has_startup").(bool)
 	numWorkers := rapid.IntRange(0, 5).Draw(t, "num_workers").(int)
 	numComponents := rapid.IntRange(0, 5).Draw(t, "num_components").(int)
-	pCancel := rapid.Float64Range(0, 1).Draw(t, "p_cancel").(float64)
+	pCancel := rapid.Float64Range(0, 100).Draw(t, "p_cancel").(float64)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancel = cancel
@@ -773,7 +773,7 @@ func (c *componentManagerMachine) Init(t *rapid.T) {
 
 	cmb := NewComponentManagerBuilder()
 
-	c.cancelGenerator = rapid.Float64Range(0, 1).Map(func(n float64) bool { return pCancel == 1 || n < pCancel })
+	c.cancelGenerator = rapid.Float64Range(0, 100).Map(func(n float64) bool { return pCancel == 100 || n < pCancel })
 	c.drawStateTransition = func(t *rapid.T) *stateTransition {
 		st := &stateTransition{}
 
@@ -1137,10 +1137,9 @@ func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 
 func (c *componentManagerMachine) Check(t *rapid.T) {
 	c.resetChannelReadTimeout()
-	time.Sleep(CHANNEL_CLOSE_LATENCY_ALLOWANCE)
 
 	if c.canceled {
-		assert.True(t, isClosed(c.cm.ShutdownSignal()), "context canceled but component manager shutdown signal was not closed")
+		c.assertClosed(t, c.cm.ShutdownSignal(), "context canceled but component manager shutdown signal was not closed")
 	}
 
 	sState := c.startupState
@@ -1151,15 +1150,15 @@ func (c *componentManagerMachine) Check(t *rapid.T) {
 	case startupStarted:
 		fallthrough
 	case startupRunning:
-		assert.False(t, isClosed(c.cm.Done()), "component manager done channel closed before startup function completed")
+		c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before startup function completed")
 		c.assertNotReturned(t)
 		c.assertErrorNotThrown(t)
 	case startupCanceled:
 		fallthrough
 	case startupFailed:
 		c.assertErrorReturnedMatches(t, c.startupError, "error returned from component manager did not match the one returned from startup function")
-		assert.True(t, isClosed(c.cm.ShutdownSignal()), "startup failed but context was not canceled")
-		assert.True(t, isClosed(c.cm.Done()), "startup failed but component manager done channel not closed")
+		c.assertClosed(t, c.cm.ShutdownSignal(), "startup failed but context was not canceled")
+		c.assertClosed(t, c.cm.Done(), "startup failed but component manager done channel not closed")
 	case startupFinished:
 		startupSucceeded = true
 	default:
@@ -1208,35 +1207,35 @@ func (c *componentManagerMachine) Check(t *rapid.T) {
 		case componentStarted:
 			fallthrough
 		case componentStartingUp:
-			assert.False(t, isClosed(c.cm.Done()), "component manager done channel closed before component finished startup")
-			assert.False(t, isClosed(c.cm.Ready()), "component manager ready channel closed before component finished startup")
+			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before component finished startup")
+			c.assertNotClosed(t, c.cm.Ready(), "component manager ready channel closed before component finished startup")
 			c.assertNotReturned(t)
 		case componentStartupCanceled:
 			fallthrough
 		case componentStartupFailed:
-			assert.True(t, isClosed(c.cm.ShutdownSignal()), "component startup failed but context was not canceled")
-			assert.False(t, isClosed(c.cm.Ready()), "component manager ready channel closed despite component startup failure")
+			c.assertClosed(t, c.cm.ShutdownSignal(), "component startup failed but context was not canceled")
+			c.assertNotClosed(t, c.cm.Ready(), "component manager ready channel closed despite component startup failure")
 		case componentStartupFinished:
-			assert.False(t, isClosed(c.cm.Done()), "component manager done channel closed before component was done")
-			assert.False(t, isClosed(c.cm.Ready()), "component manager ready channel closed before component was ready")
+			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before component was done")
+			c.assertNotClosed(t, c.cm.Ready(), "component manager ready channel closed before component was ready")
 		case componentRunning:
-			assert.False(t, isClosed(c.cm.Done()), "component manager done channel closed while component still running")
+			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed while component still running")
 		case componentShuttingDown:
-			assert.True(t, isClosed(c.cm.ShutdownSignal()), "component shutting down but context was not canceled")
-			assert.False(t, isClosed(c.cm.Done()), "component manager done channel closed before component finished shutting down")
+			c.assertClosed(t, c.cm.ShutdownSignal(), "component shutting down but context was not canceled")
+			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before component finished shutting down")
 		case componentDone:
 			// component only reaches this state if it was canceled or it encountered a fatal error
-			assert.True(t, isClosed(c.cm.ShutdownSignal()), "component done but context was not canceled")
+			c.assertClosed(t, c.cm.ShutdownSignal(), "component done but context was not canceled")
 		case componentEncounteredFatal:
-			assert.True(t, isClosed(c.cm.ShutdownSignal()), "component encountered fatal but context was not canceled")
+			c.assertClosed(t, c.cm.ShutdownSignal(), "component encountered fatal but context was not canceled")
 		case componentReadyShuttingDown:
 			fallthrough
 		case componentReadyCanceled:
-			assert.True(t, isClosed(c.cm.ShutdownSignal()), "component was canceled before ready but context was not canceled")
-			assert.False(t, isClosed(c.cm.Ready()), "component manager ready channel closed but component was canceled before ready")
+			c.assertClosed(t, c.cm.ShutdownSignal(), "component was canceled before ready but context was not canceled")
+			c.assertNotClosed(t, c.cm.Ready(), "component manager ready channel closed but component was canceled before ready")
 		case componentReadyEncounteredFatal:
-			assert.True(t, isClosed(c.cm.ShutdownSignal()), "component encountered fatal before ready but context was not canceled")
-			assert.False(t, isClosed(c.cm.Ready()), "component manager ready channel closed but component encountered fatal before ready")
+			c.assertClosed(t, c.cm.ShutdownSignal(), "component encountered fatal before ready but context was not canceled")
+			c.assertNotClosed(t, c.cm.Ready(), "component manager ready channel closed but component encountered fatal before ready")
 		default:
 			assert.FailNow(t, "unexpected component state", cState)
 		}
@@ -1244,7 +1243,7 @@ func (c *componentManagerMachine) Check(t *rapid.T) {
 
 	if anyComponentStartupFailed && allComponentsDone {
 		c.assertErrorReturnedMatches(t, c.componentStartupErrors, "error returned from component manager did not match the one returned by startup")
-		assert.True(t, isClosed(c.cm.Done()), "startup failed but component manager done channel not closed")
+		c.assertClosed(t, c.cm.Done(), "startup failed but component manager done channel not closed")
 	}
 
 	if startupSucceeded && allComponentsStartupSucceeded {
@@ -1252,7 +1251,7 @@ func (c *componentManagerMachine) Check(t *rapid.T) {
 	}
 
 	if startupSucceeded && allComponentsReady {
-		assert.True(t, isClosed(c.cm.Ready()), "all components ready but component manager ready channel not closed")
+		c.assertClosed(t, c.cm.Ready(), "all components ready but component manager ready channel not closed")
 	}
 
 	allWorkersDone := true
@@ -1268,13 +1267,13 @@ func (c *componentManagerMachine) Check(t *rapid.T) {
 		case workerStarted:
 			fallthrough
 		case workerRunning:
-			assert.False(t, isClosed(c.cm.Done()), "component manager done channel closed before worker finished running")
+			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before worker finished running")
 		case workerShuttingDown:
-			assert.True(t, isClosed(c.cm.ShutdownSignal()), "worker shutting down but context was not canceled")
-			assert.False(t, isClosed(c.cm.Done()), "component manager done channel closed before worker finished shutting down")
+			c.assertClosed(t, c.cm.ShutdownSignal(), "worker shutting down but context was not canceled")
+			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before worker finished shutting down")
 		case workerDone:
 		case workerEncounteredFatal:
-			assert.True(t, isClosed(c.cm.ShutdownSignal()), "worker encountered fatal but context was not canceled")
+			c.assertClosed(t, c.cm.ShutdownSignal(), "worker encountered fatal but context was not canceled")
 		default:
 			assert.FailNow(t, "unexpected worker state", wState)
 		}
@@ -1282,13 +1281,13 @@ func (c *componentManagerMachine) Check(t *rapid.T) {
 
 	if c.thrownErrors != nil {
 		c.assertErrorThrownMatches(t, c.thrownErrors, "error received by signaler did not match any of the ones thrown")
-		assert.True(t, isClosed(c.cm.ShutdownSignal()), "fatal error thrown but context was not canceled")
+		c.assertClosed(t, c.cm.ShutdownSignal(), "fatal error thrown but context was not canceled")
 	} else {
 		c.assertErrorNotThrown(t)
 	}
 
 	if startupDone && allComponentsDone && allWorkersDone {
-		assert.True(t, isClosed(c.cm.Done()), "all components and workers done but component manager done channel not closed")
+		c.assertClosed(t, c.cm.Done(), "all components and workers done but component manager done channel not closed")
 	}
 }
 
