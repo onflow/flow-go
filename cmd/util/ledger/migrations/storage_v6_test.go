@@ -790,7 +790,7 @@ func uint64ToBinary(integer uint64) []byte {
 	return b
 }
 
-func Test(t *testing.T) {
+func TestDeferredValues(t *testing.T) {
 
 	var payloads []ledger.Payload
 
