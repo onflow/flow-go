@@ -39,6 +39,7 @@ type accountRecord struct {
 	Address        string `json:"address"`
 	StorageUsed    uint64 `json:"storageUsed"`
 	AccountBalance uint64 `json:"accountBalance"`
+	FUSDBalance    uint64 `json:"fusdBalance"`
 	HasVault       bool   `json:"hasVault"`
 	HasReceiver    bool   `json:"hasReceiver"`
 	IsDapper       bool   `json:"isDapper"`
@@ -109,11 +110,12 @@ type balanceProcessor struct {
 	accounts state.Accounts
 	st       *state.State
 
-	rwa    ReportWriter
-	rwc    ReportWriter
-	wg     *sync.WaitGroup
-	logger zerolog.Logger
-	rwm    ReportWriter
+	rwa        ReportWriter
+	rwc        ReportWriter
+	wg         *sync.WaitGroup
+	logger     zerolog.Logger
+	rwm        ReportWriter
+	fusdScript []byte
 }
 
 func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa ReportWriter, rwc ReportWriter, rwm ReportWriter, chain flow.Chain, view state.View) *balanceProcessor {
@@ -134,6 +136,21 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa Repo
 					return vaultRef.balance
 				}
 			`, fvm.FungibleTokenAddress(ctx.Chain), fvm.FlowTokenAddress(ctx.Chain)))
+
+	fusdScript := []byte(fmt.Sprintf(`
+			import FungibleToken from 0x%s
+			import FUSD from 0x%s
+			
+			pub fun main(address: Address): UFix64 {
+				let account = getAccount(address)
+			
+				let vaultRef = account.getCapability(/public/fusdBalance)!
+					.borrow<&FUSD.Vault{FungibleToken.Balance}>()
+					?? panic("Could not borrow Balance reference to the Vault")
+			
+				return vaultRef.balance
+			}
+			`, fvm.FungibleTokenAddress(ctx.Chain), "3c5959b568896393"))
 
 	momentsScript := []byte(`
 			import TopShot from 0x0b2a3299cc857e29
@@ -165,7 +182,9 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa Repo
 		rwc:           rwc,
 		rwm:           rwm,
 		balanceScript: balanceScript,
-		momentsScript: momentsScript}
+		momentsScript: momentsScript,
+		fusdScript:    fusdScript,
+	}
 }
 
 func (c *balanceProcessor) reportAccountData(addressIndexes <-chan uint64) {
@@ -197,6 +216,15 @@ func (c *balanceProcessor) reportAccountData(addressIndexes <-chan uint64) {
 				Uint64("index", indx).
 				Str("address", address.String()).
 				Msgf("Error getting balance for account")
+			continue
+		}
+		fusdBalance, err := c.fusdBalance(address)
+		if err != nil {
+			c.logger.
+				Err(err).
+				Uint64("index", indx).
+				Str("address", address.String()).
+				Msgf("Error getting FUSD balance for account")
 			continue
 		}
 
@@ -239,6 +267,7 @@ func (c *balanceProcessor) reportAccountData(addressIndexes <-chan uint64) {
 			Address:        address.Hex(),
 			StorageUsed:    u,
 			AccountBalance: balance,
+			FUSDBalance:    fusdBalance,
 			HasVault:       hasVault,
 			HasReceiver:    hasReceiver,
 			IsDapper:       dapper,
@@ -286,6 +315,23 @@ func (c *balanceProcessor) balance(address flow.Address) (uint64, bool, error) {
 		hasVault = false
 	}
 	return balance, hasVault, nil
+}
+
+func (c *balanceProcessor) fusdBalance(address flow.Address) (uint64, error) {
+	script := fvm.Script(c.fusdScript).WithArguments(
+		jsoncdc.MustEncode(cadence.NewAddress(address)),
+	)
+
+	err := c.vm.Run(c.ctx, script, c.view, c.prog)
+	if err != nil {
+		return 0, err
+	}
+
+	var balance uint64
+	if script.Err == nil && script.Value != nil {
+		balance = script.Value.ToGoValue().(uint64)
+	}
+	return balance, nil
 }
 
 func (c *balanceProcessor) moments(address flow.Address) (int, error) {
