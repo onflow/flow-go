@@ -89,23 +89,26 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	if !p.done.CAS(false, true) {
 		return nil
 	}
-	err = p.buildQC()
+	qc, err := p.buildQC()
 	if err != nil {
-		return fmt.Errorf("could not build QC: %w", err)
+		return fmt.Errorf("internal error constructing QC from votes: %w", err)
 	}
+
+	p.onQCCreated(qc)
 
 	return nil
 }
 
-func (p *StakingVoteProcessor) buildQC() error {
-	_, _, err := p.stakingSigAggtor.Aggregate()
+func (p *StakingVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
+	stakingSigners, aggregatedStakingSig, err := p.stakingSigAggtor.Aggregate()
 	if err != nil {
-		return fmt.Errorf("could not aggregate staking signature: %w", err)
+		return nil, fmt.Errorf("could not aggregate staking signature: %w", err)
 	}
 
-	// TODO: use signature to build qc
-	var qc *flow.QuorumCertificate
-	p.onQCCreated(qc)
-
-	panic("not implemented")
+	return &flow.QuorumCertificate{
+		View:      p.block.View,
+		BlockID:   p.block.BlockID,
+		SignerIDs: stakingSigners,
+		SigData:   aggregatedStakingSig,
+	}, nil
 }
