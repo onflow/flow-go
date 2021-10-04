@@ -85,7 +85,12 @@ type VoteCollector interface {
 // VoteProcessor processes votes. It implements the vote-format specific processing logic.
 // Depending on their implementation, a VoteProcessor might drop votes or attempt to construct a QC.
 type VoteProcessor interface {
-	// Process processes the given vote.
+	// Process performs processing of single vote. This function is safe to call from multiple goroutines.
+	// Expected error returns during normal operations:
+	// * VoteForIncompatibleBlockError - submitted vote for incompatible block
+	// * VoteForIncompatibleViewError - submitted vote for incompatible view
+	// * model.InvalidVoteError - submitted vote with invalid signature
+	// All other errors should be treated as exceptions.
 	Process(vote *model.Vote) error
 
 	// Status returns the status of the vote processor
