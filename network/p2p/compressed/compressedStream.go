@@ -12,6 +12,9 @@ import (
 	"github.com/onflow/flow-go/network/compressor"
 )
 
+// compressedStream is an internal networking layer data structure,
+// which implements a compression mechanism as a wrapper around a native
+// libp2p stream.
 type compressedStream struct {
 	network.Stream
 
