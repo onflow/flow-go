@@ -727,12 +727,14 @@ func (st *stateTransition) String() string {
 type componentManagerMachine struct {
 	cm *ComponentManager
 
-	cancel                  context.CancelFunc
-	checkSignalerError      func() (error, bool)
-	checkStartError         func() (error, bool)
-	resetChannelReadTimeout func()
-	assertClosed            func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
-	assertNotClosed         func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
+	cancel                     context.CancelFunc
+	resetChannelReadTimeout    func()
+	assertClosed               func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
+	assertNotClosed            func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
+	assertErrorThrownMatches   func(t *rapid.T, err error, msgAndArgs ...interface{})
+	assertErrorNotThrown       func(t *rapid.T)
+	assertErrorReturnedMatches func(t *rapid.T, err error, msgAndArgs ...interface{})
+	assertNotReturned          func(t *rapid.T)
 
 	cancelGenerator     *rapid.Generator
 	drawStateTransition func(t *rapid.T) *stateTransition
@@ -876,7 +878,9 @@ func (c *componentManagerMachine) Init(t *rapid.T) {
 	go func() {
 		err := c.cm.Start(signalerCtx)
 		t.Logf("component manager returned from Start: %v\n", err)
-		startErrChan <- err
+		if err != nil {
+			startErrChan <- err
+		}
 		close(startErrChan)
 	}()
 
@@ -894,13 +898,12 @@ func (c *componentManagerMachine) Init(t *rapid.T) {
 	c.assertClosed = func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{}) {
 		select {
 		case <-ch:
-			return
 		default:
-		}
-		select {
-		case <-channelReadTimeout:
-			assert.Fail(t, "channel is not closed", msgAndArgs...)
-		case <-ch:
+			select {
+			case <-channelReadTimeout:
+				assert.Fail(t, "channel is not closed", msgAndArgs...)
+			case <-ch:
+			}
 		}
 	}
 
@@ -909,40 +912,81 @@ func (c *componentManagerMachine) Init(t *rapid.T) {
 		case <-ch:
 			assert.Fail(t, "channel is closed", msgAndArgs...)
 		default:
-		}
-		select {
-		case <-ch:
-			assert.Fail(t, "channel is closed", msgAndArgs...)
-		case <-channelReadTimeout:
+			select {
+			case <-ch:
+				assert.Fail(t, "channel is closed", msgAndArgs...)
+			case <-channelReadTimeout:
+			}
 		}
 	}
 
 	var signalerErr error
-	var signalerErrOk bool
-	c.checkSignalerError = func() (error, bool) {
-		if !signalerErrOk {
+
+	c.assertErrorThrownMatches = func(t *rapid.T, err error, msgAndArgs ...interface{}) {
+		if signalerErr == nil {
 			select {
-			case err := <-signaler.Error():
-				signalerErrOk = true
-				signalerErr = err
+			case signalerErr = <-signaler.Error():
 			default:
+				select {
+				case <-channelReadTimeout:
+					assert.Fail(t, "error was not thrown")
+					return
+				case signalerErr = <-signaler.Error():
+				}
 			}
 		}
-		return signalerErr, signalerErrOk
+		assert.ErrorIs(t, err, signalerErr, msgAndArgs...)
 	}
 
-	var startErr error
-	var startErrOk bool
-	c.checkStartError = func() (error, bool) {
-		if !startErrOk {
+	c.assertErrorNotThrown = func(t *rapid.T) {
+		if signalerErr == nil {
 			select {
-			case err := <-startErrChan:
-				startErrOk = true
-				startErr = err
+			case signalerErr = <-signaler.Error():
 			default:
+				select {
+				case signalerErr = <-signaler.Error():
+				case <-channelReadTimeout:
+					return
+				}
 			}
 		}
-		return startErr, startErrOk
+		assert.Fail(t, "error was thrown: %v", signalerErr)
+	}
+
+	var startReturned bool
+	var startErr error
+
+	c.assertErrorReturnedMatches = func(t *rapid.T, err error, msgAndArgs ...interface{}) {
+		if !startReturned {
+			select {
+			case startErr = <-startErrChan:
+			default:
+				select {
+				case <-channelReadTimeout:
+					assert.Fail(t, "error was not returned")
+					return
+				case startErr = <-startErrChan:
+				}
+			}
+		}
+		startReturned = true
+		assert.ErrorIs(t, err, startErr, msgAndArgs...)
+	}
+
+	c.assertNotReturned = func(t *rapid.T) {
+		if !startReturned {
+			select {
+			case startErr = <-startErrChan:
+			default:
+				select {
+				case startErr = <-startErrChan:
+				case <-channelReadTimeout:
+					return
+				}
+			}
+		}
+		startReturned = true
+		assert.Fail(t, "component manager returned: %v", startErr)
 	}
 
 	if !hasStartup {
@@ -1092,10 +1136,8 @@ func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 }
 
 func (c *componentManagerMachine) Check(t *rapid.T) {
+	c.resetChannelReadTimeout()
 	time.Sleep(CHANNEL_CLOSE_LATENCY_ALLOWANCE)
-
-	startErr, startErrOk := c.checkStartError()
-	thrownErr, thrownErrOk := c.checkSignalerError()
 
 	if c.canceled {
 		assert.True(t, isClosed(c.cm.ShutdownSignal()), "context canceled but component manager shutdown signal was not closed")
@@ -1110,13 +1152,12 @@ func (c *componentManagerMachine) Check(t *rapid.T) {
 		fallthrough
 	case startupRunning:
 		assert.False(t, isClosed(c.cm.Done()), "component manager done channel closed before startup function completed")
-		assert.False(t, startErrOk, "component manager returned before startup function completed")
-		assert.False(t, thrownErrOk, "error was thrown before startup function completed")
+		c.assertNotReturned(t)
+		c.assertErrorNotThrown(t)
 	case startupCanceled:
 		fallthrough
 	case startupFailed:
-		assert.True(t, startErrOk, "startup failed but component manager did not return")
-		assert.ErrorIs(t, c.startupError, startErr, "error returned from component manager did not match the one returned from startup function")
+		c.assertErrorReturnedMatches(t, c.startupError, "error returned from component manager did not match the one returned from startup function")
 		assert.True(t, isClosed(c.cm.ShutdownSignal()), "startup failed but context was not canceled")
 		assert.True(t, isClosed(c.cm.Done()), "startup failed but component manager done channel not closed")
 	case startupFinished:
@@ -1169,7 +1210,7 @@ func (c *componentManagerMachine) Check(t *rapid.T) {
 		case componentStartingUp:
 			assert.False(t, isClosed(c.cm.Done()), "component manager done channel closed before component finished startup")
 			assert.False(t, isClosed(c.cm.Ready()), "component manager ready channel closed before component finished startup")
-			assert.False(t, startErrOk, "component manager returned before component startup completed")
+			c.assertNotReturned(t)
 		case componentStartupCanceled:
 			fallthrough
 		case componentStartupFailed:
@@ -1202,14 +1243,12 @@ func (c *componentManagerMachine) Check(t *rapid.T) {
 	}
 
 	if anyComponentStartupFailed && allComponentsDone {
-		assert.True(t, startErrOk, "startup failed but component manager did not return")
-		assert.ErrorIs(t, c.componentStartupErrors, startErr)
+		c.assertErrorReturnedMatches(t, c.componentStartupErrors, "error returned from component manager did not match the one returned by startup")
 		assert.True(t, isClosed(c.cm.Done()), "startup failed but component manager done channel not closed")
 	}
 
 	if startupSucceeded && allComponentsStartupSucceeded {
-		assert.True(t, startErrOk, "startup succeeded but component manager did not return")
-		assert.NoError(t, startErr)
+		c.assertErrorReturnedMatches(t, nil, "startup succeeded but error was returned from component manager")
 	}
 
 	if startupSucceeded && allComponentsReady {
@@ -1242,11 +1281,10 @@ func (c *componentManagerMachine) Check(t *rapid.T) {
 	}
 
 	if c.thrownErrors != nil {
-		assert.True(t, thrownErrOk, "fatal error thrown but was not received by signaler")
-		assert.ErrorIs(t, c.thrownErrors, thrownErr)
+		c.assertErrorThrownMatches(t, c.thrownErrors, "error received by signaler did not match any of the ones thrown")
 		assert.True(t, isClosed(c.cm.ShutdownSignal()), "fatal error thrown but context was not canceled")
 	} else {
-		assert.False(t, thrownErrOk, "received unexpected error from signaler", thrownErr)
+		c.assertErrorNotThrown(t)
 	}
 
 	if startupDone && allComponentsDone && allWorkersDone {
