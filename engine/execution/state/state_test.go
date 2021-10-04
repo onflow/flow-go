@@ -2,6 +2,7 @@ package state_test
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/dgraph-io/badger/v2"
@@ -12,6 +13,9 @@ import (
 
 	ledger2 "github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
+	st "github.com/onflow/flow-go/storage"
+	badgerstorage "github.com/onflow/flow-go/storage/badger"
+	"github.com/onflow/flow-go/storage/badger/operation"
 
 	"github.com/onflow/flow-go/engine/execution/state"
 	ledger "github.com/onflow/flow-go/ledger/complete"
@@ -211,5 +215,80 @@ func TestExecutionStateWithTrieStorage(t *testing.T) {
 
 		require.Equal(t, sc2, sc2Same)
 	}))
+
+}
+
+func TestChunkDataPackStorageAndPruge(t *testing.T) {
+
+	ls, err := ledger.NewLedger(&fixtures.NoopWAL{}, 100, &metrics.NoopCollector{}, zerolog.Nop(), ledger.DefaultPathFinderVersion)
+	require.NoError(t, err)
+
+	db, _ := unittest.TempBadgerDB(t)
+
+	blks := unittest.BlockFixtures(2)
+	prevBlock := blks[0]
+	prevBlock.Header.View = 1
+	block := blks[1]
+	block.Header.View = 2
+	header := block.Header
+
+	headers := badgerstorage.NewHeaders(&metrics.NoopCollector{}, db)
+	index := badgerstorage.NewIndex(&metrics.NoopCollector{}, db)
+	guarantees := badgerstorage.NewGuarantees(&metrics.NoopCollector{}, db, 100)
+	seals := badgerstorage.NewSeals(&metrics.NoopCollector{}, db)
+	results := badgerstorage.NewExecutionResults(&metrics.NoopCollector{}, db)
+	receipts := badgerstorage.NewExecutionReceipts(&metrics.NoopCollector{}, db, results, 100)
+	payloads := badgerstorage.NewPayloads(db, index, guarantees, seals, receipts, results)
+	blocks := badgerstorage.NewBlocks(db, headers, payloads)
+	stateCommitments := badgerstorage.NewCommits(&metrics.NoopCollector{}, db)
+	transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, db)
+	collections := badgerstorage.NewCollections(db, transactions)
+	chunkDataPacks := badgerstorage.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 100)
+	myReceipts := badgerstorage.NewMyExecutionReceipts(&metrics.NoopCollector{}, db, receipts)
+	events := badgerstorage.NewEvents(&metrics.NoopCollector{}, db)
+	serEvents := badgerstorage.NewServiceEvents(&metrics.NoopCollector{}, db)
+	txResults := badgerstorage.NewTransactionResults(&metrics.NoopCollector{}, db, 100)
+
+	es := state.NewExecutionState(
+		ls, stateCommitments, blocks, headers, collections, chunkDataPacks, results, receipts, myReceipts, events, serEvents, txResults, db, trace.NewNoopTracer(),
+	)
+
+	err = blocks.Store(block)
+	assert.NoError(t, err)
+
+	operation.RetryOnConflict(db.Update, func(txn *badger.Txn) error {
+		err = operation.InsertExecutedBlock(block.ID())(txn)
+		assert.NoError(t, err)
+		return nil
+	})
+
+	stateCommit := unittest.StateCommitmentFixture()
+
+	result := unittest.ExecutionResultFixture(unittest.WithBlock(block))
+
+	chdps := unittest.ChunkDataPacksFixture(result.Chunks.Len())
+	for i, ch := range result.Chunks {
+		chdps[i].ChunkID = ch.ID()
+		err = collections.Store(chdps[i].Collection)
+		assert.NoError(t, err)
+	}
+
+	receipt := unittest.ExecutionReceiptFixture(unittest.WithResult(result))
+
+	err = es.SaveExecutionResults(context.Background(), header, stateCommit, chdps, receipt, nil, nil, nil)
+	assert.NoError(t, err)
+
+	for _, ch := range result.Chunks {
+		_, err := es.ChunkDataPackByChunkID(context.Background(), ch.ID())
+		assert.NoError(t, err)
+	}
+
+	err = es.PurgeChunkDataPacksByBlockID(context.Background(), header.ID())
+	assert.NoError(t, err)
+
+	for _, ch := range result.Chunks {
+		_, err := es.ChunkDataPackByChunkID(context.Background(), ch.ID())
+		assert.True(t, errors.Is(err, st.ErrNotFound))
+	}
 
 }
