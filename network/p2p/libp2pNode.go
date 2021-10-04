@@ -693,6 +693,7 @@ func (n *Node) Host() host.Host {
 // SetFlowProtocolStreamHandler sets the stream handler of Flow libp2p Protocol
 func (n *Node) SetFlowProtocolStreamHandler(handler libp2pnet.StreamHandler) {
 	n.host.SetStreamHandler(n.flowLibP2PProtocolID, func(s libp2pnet.Stream) {
+		// converts incoming libp2p stream to a compressed stream
 		s, err := n.compressedStream(s)
 		if err != nil {
 			n.logger.Error().Err(err).Msg("could not create compressed stream")
@@ -705,6 +706,7 @@ func (n *Node) SetFlowProtocolStreamHandler(handler libp2pnet.StreamHandler) {
 // SetPingStreamHandler sets the stream handler for the Flow Ping protocol.
 func (n *Node) SetPingStreamHandler(handler libp2pnet.StreamHandler) {
 	n.host.SetStreamHandler(n.flowLibP2PProtocolID, func(s libp2pnet.Stream) {
+		// converts incoming libp2p stream to a compressed stream
 		s, err := n.compressedStream(s)
 		if err != nil {
 			n.logger.Error().Err(err).Msg("could not create compressed stream")
