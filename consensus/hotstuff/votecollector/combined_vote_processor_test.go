@@ -10,7 +10,6 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
@@ -25,46 +24,28 @@ func TestCombinedVoteProcessor(t *testing.T) {
 
 // CombinedVoteProcessorTestSuite is a test suite that holds mocked state for isolated testing of CombinedVoteProcessor.
 type CombinedVoteProcessorTestSuite struct {
-	suite.Suite
+	VoteProcessorTestSuiteBase
 
-	sigWeight            uint64
-	stakingTotalWeight   uint64
 	thresholdTotalWeight uint64
 	rbSharesTotal        uint64
-	onQCCreatedState     mock.Mock
 
-	packer            *mockhotstuff.Packer
-	stakingAggregator *mockhotstuff.WeightedSignatureAggregator
-	rbSigAggregator   *mockhotstuff.WeightedSignatureAggregator
-	reconstructor     *mockhotstuff.RandomBeaconReconstructor
-	minRequiredStake  uint64
+	packer *mockhotstuff.Packer
+
+	rbSigAggregator *mockhotstuff.WeightedSignatureAggregator
+	reconstructor   *mockhotstuff.RandomBeaconReconstructor
+
 	minRequiredShares uint64
-	proposal          *model.Proposal
 	processor         *CombinedVoteProcessor
 }
 
 func (s *CombinedVoteProcessorTestSuite) SetupTest() {
-	s.stakingAggregator = &mockhotstuff.WeightedSignatureAggregator{}
+	s.VoteProcessorTestSuiteBase.SetupTest()
+
 	s.rbSigAggregator = &mockhotstuff.WeightedSignatureAggregator{}
 	s.reconstructor = &mockhotstuff.RandomBeaconReconstructor{}
 	s.packer = &mockhotstuff.Packer{}
-	s.proposal = helper.MakeProposal(s.T())
-	s.sigWeight = 100
-	s.minRequiredStake = 1000 // we require at least 10 sigs to collect min weight
-	s.minRequiredShares = 10  // we require 10 RB shares to reconstruct signature
-	s.thresholdTotalWeight, s.stakingTotalWeight, s.rbSharesTotal = 0, 0, 0
-
-	// setup staking signature aggregator
-	s.stakingAggregator.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		s.stakingTotalWeight += s.sigWeight
-	}).Return(func(signerID flow.Identifier, sig crypto.Signature) uint64 {
-		return s.stakingTotalWeight
-	}, func(signerID flow.Identifier, sig crypto.Signature) error {
-		return nil
-	}).Maybe()
-	s.stakingAggregator.On("TotalWeight").Return(func() uint64 {
-		return s.stakingTotalWeight
-	}).Maybe()
+	s.minRequiredShares = 10 // we require 10 RB shares to reconstruct signature
+	s.thresholdTotalWeight, s.rbSharesTotal = 0, 0
 
 	// setup threshold signature aggregator
 	s.rbSigAggregator.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -100,13 +81,6 @@ func (s *CombinedVoteProcessorTestSuite) SetupTest() {
 		s.packer,
 		s.minRequiredStake,
 	)
-}
-
-// onQCCreated is a special function that registers call in mocked state.
-// ATTENTION: don't change name of this function since the same name is used in:
-// s.onQCCreatedState.On("onQCCreated") statements
-func (s *CombinedVoteProcessorTestSuite) onQCCreated(qc *flow.QuorumCertificate) {
-	s.onQCCreatedState.Called(qc)
 }
 
 // TestInitialState tests that Block() and Status() return correct values after calling constructor
