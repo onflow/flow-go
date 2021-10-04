@@ -43,6 +43,8 @@ type ReadOnlyExecutionState interface {
 	// ChunkDataPackByChunkID retrieve a chunk data pack given the chunk ID.
 	ChunkDataPackByChunkID(context.Context, flow.Identifier) (*flow.ChunkDataPack, error)
 
+	PurgeChunkDataPacksByBlockID(context.Context, flow.Identifier) error
+
 	GetExecutionResultID(context.Context, flow.Identifier) (flow.Identifier, error)
 
 	RetrieveStateDelta(context.Context, flow.Identifier) (*messages.ExecutionStateDelta, error)
@@ -314,6 +316,21 @@ func (s *state) ChunkDataPackByChunkID(ctx context.Context, chunkID flow.Identif
 	}
 
 	return chunkDataPack, nil
+}
+
+func (s *state) PurgeChunkDataPacksByBlockID(ctx context.Context, blockID flow.Identifier) error {
+	res, err := s.results.ByBlockID(blockID)
+	if err != nil {
+		return fmt.Errorf("could not fetch results for blockID: %w", err)
+	}
+
+	for _, chunk := range res.Chunks {
+		err = s.chunkDataPacks.Remove(chunk.ID())
+		if err != nil {
+			return fmt.Errorf("could not remove chunk data pack: %w", err)
+		}
+	}
+	return nil
 }
 
 func (s *state) GetExecutionResultID(ctx context.Context, blockID flow.Identifier) (flow.Identifier, error) {

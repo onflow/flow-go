@@ -423,6 +423,32 @@ func (e *Engine) BlockProcessable(b *flow.Header) {
 	}
 }
 
+// BlockFinalized handles the finalized blocks
+func (e *Engine) BlockFinalized(b *flow.Header) {
+	blockID := b.ID()
+	newBlock, err := e.blocks.ByID(blockID)
+	if err != nil {
+		e.log.Warn().Msgf("failed to handle block finalized: %s", err.Error())
+	}
+	// purge chunk data packs
+	e.purgeChunkDataPacks(context.Background(), newBlock)
+
+	e.log.Info().Hex("block_id", blockID[:]).
+		Uint64("height", b.Height).
+		Msg("handling block finalized")
+}
+
+func (e *Engine) purgeChunkDataPacks(ctx context.Context, block *flow.Block) {
+	seals := block.Payload.Seals
+	for _, seal := range seals {
+		err := e.execState.PurgeChunkDataPacksByBlockID(ctx, seal.BlockID)
+		// since this only purging operation its fine if it fails
+		if err != nil {
+			e.log.Warn().Msgf("failed to purge chunk data packs: %s", err.Error())
+		}
+	}
+}
+
 // Main handling
 
 // handle block will process the incoming block.
