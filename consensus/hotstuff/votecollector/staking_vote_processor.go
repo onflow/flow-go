@@ -77,7 +77,7 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	err = p.stakingSigAggtor.Verify(vote.SignerID, vote.SigData)
 	if err != nil {
 		if errors.Is(err, msig.ErrInvalidFormat) {
-			return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
+			return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d: %w", vote.ID(), vote.View, err)
 		}
 		return fmt.Errorf("internal error checking signature validity: %w", err)
 	}
