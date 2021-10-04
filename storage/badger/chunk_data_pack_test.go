@@ -79,6 +79,39 @@ func TestChunkDataPacks_MissingItem(t *testing.T) {
 	})
 }
 
+// TestChunkDataPacks_Remove tests remove functionality
+func TestChunkDataPacks_Remove(t *testing.T) {
+
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		transactions := badgerstorage.NewTransactions(&metrics.NoopCollector{}, db)
+		collections := badgerstorage.NewCollections(db, transactions)
+		store := badgerstorage.NewChunkDataPacks(&metrics.NoopCollector{}, db, collections, 1)
+
+		chunkDataPacks := unittest.ChunkDataPacksFixture(1)
+		cdp := chunkDataPacks[0]
+
+		err := store.Store(cdp)
+		require.NoError(t, err)
+
+		err = collections.Store(cdp.Collection)
+		assert.NoError(t, err)
+
+		_, err = store.ByChunkID(cdp.ChunkID)
+		assert.NoError(t, err)
+
+		err = store.Remove(cdp.ChunkID)
+		require.NoError(t, err)
+
+		// after removal
+		_, err = store.ByChunkID(cdp.ChunkID)
+		assert.True(t, errors.Is(err, storage.ErrNotFound))
+
+		// don't remove collection
+		_, err = collections.ByID(cdp.Collection.ID())
+		assert.NoError(t, err)
+	})
+}
+
 // WithChunkDataPacks is a test helper that generates specified number of chunk data packs, store them using the storeFunc, and
 // then evaluates whether they are successfully retrieved from storage.
 func WithChunkDataPacks(t *testing.T, chunks int, storeFunc func(*testing.T, []*flow.ChunkDataPack, *badgerstorage.ChunkDataPacks, *badger.DB)) {
