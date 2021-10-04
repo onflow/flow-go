@@ -1,13 +1,15 @@
 package reporters_test
 
 import (
-	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/require"
 	"os"
 	"path"
 	"sync"
 	"testing"
+
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 )
 
 func TestReportFileWriter(t *testing.T) {

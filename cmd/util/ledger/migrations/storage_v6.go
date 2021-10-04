@@ -118,7 +118,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.programs = programs.NewEmptyPrograms()
 
-	m.migratedPayloadPaths = make(map[storagePath]bool, 0)
+	m.migratedPayloadPaths = make(map[storagePath]bool)
 
 	fvmPayloads, storagePayloads, slabPayloads := splitPayloads(payloads)
 	if len(slabPayloads) != 0 {
@@ -229,17 +229,6 @@ func (m *StorageFormatV6Migration) completeProgress() {
 	}
 }
 
-func (m *StorageFormatV6Migration) addProgress(progress int) {
-	if m.progress == nil {
-		return
-	}
-
-	err := m.progress.Add(progress)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
 	st := state.NewState(
 		v,
@@ -264,32 +253,11 @@ func (m *StorageFormatV6Migration) getAccounts(payloads []ledger.Payload) state.
 	return accounts
 }
 
-func (m *StorageFormatV6Migration) getFVMRegisters(payloads []ledger.Payload) []ledger.Payload {
-	var fvmPayloads []ledger.Payload
-
-	for _, payload := range payloads {
-		keyParts := payload.Key.KeyParts
-		rawOwner := keyParts[0].Value
-		rawController := keyParts[1].Value
-		rawKey := keyParts[2].Value
-
-		if state.IsFVMStateKey(
-			string(rawOwner),
-			string(rawController),
-			string(rawKey),
-		) {
-			fvmPayloads = append(fvmPayloads, payload)
-		}
-	}
-
-	return fvmPayloads
-}
-
 func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) map[storagePath]bool {
 	m.clearProgress()
 	m.Log.Info().Msgf("Collecting deferred keys...")
 
-	deferredValuePaths := make(map[storagePath]bool, 0)
+	deferredValuePaths := make(map[storagePath]bool)
 	for _, payload := range payloads {
 		m.incrementProgress()
 
@@ -606,7 +574,7 @@ func (m *StorageFormatV6Migration) decode(
 	if err != nil {
 		if tagErr, ok := err.(oldInter.UnsupportedTagDecodingError); ok &&
 			tagErr.Tag == cborTagStorageReference &&
-			bytes.Compare(data[:2], storageReferenceEncodingStart) == 0 {
+			bytes.Equal(data[:2], storageReferenceEncodingStart) {
 
 			m.Log.Warn().
 				Str("key", key).
@@ -995,7 +963,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 
 		switch err := r.(type) {
 		case newInter.TypeLoadingError:
-			c.migration.reportFile.WriteString(
+			_, _ = c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: missing static type: %s, owner: %s\n",
 					err.TypeID,
@@ -1003,7 +971,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 				),
 			)
 		case newInter.ContainerMutationError:
-			c.migration.reportFile.WriteString(
+			_, _ = c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: %s, owner: %s\n",
 					err.Error(),
@@ -1012,7 +980,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 			)
 		case runtime.Error:
 			if parsingCheckingErr, ok := err.Unwrap().(*runtime.ParsingCheckingError); ok {
-				c.migration.reportFile.WriteString(
+				_, _ = c.migration.reportFile.WriteString(
 					fmt.Sprintf(
 						"skipped migrating value: broken contract type: %s, cause: %s\n",
 						parsingCheckingErr.Location,
@@ -1020,7 +988,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 					),
 				)
 			} else {
-				c.migration.reportFile.WriteString(
+				_, _ = c.migration.reportFile.WriteString(
 					fmt.Sprintf(
 						"skipped migrating value: cause: %s\n",
 						err.Error(),
@@ -1028,7 +996,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 				)
 			}
 		case newInter.Error:
-			c.migration.reportFile.WriteString(
+			_, _ = c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: cause: %s\n",
 					err.Error(),

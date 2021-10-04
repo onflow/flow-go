@@ -49,11 +49,6 @@ type contractRecord struct {
 	Contract string `json:"contract"`
 }
 
-type momentsRecord struct {
-	Address  string `json:"address"`
-	Contract int    `json:"moments"`
-}
-
 func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	rwa := r.RWF.ReportWriter("account_report")
 	rwc := r.RWF.ReportWriter("contract_report")
@@ -140,7 +135,7 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa Repo
 				}
 			`, fvm.FungibleTokenAddress(ctx.Chain), fvm.FlowTokenAddress(ctx.Chain)))
 
-	momentsScript := []byte(fmt.Sprintf(`
+	momentsScript := []byte(`
 			import TopShot from 0x0b2a3299cc857e29
 			
 			pub fun main(account: Address): Int {
@@ -150,7 +145,7 @@ func newAccountDataProcessor(wg *sync.WaitGroup, logger zerolog.Logger, rwa Repo
 
 				return collectionRef.getIDs().length
 			}
-			`))
+			`)
 
 	v := view.NewChild()
 	st := state.NewState(v)

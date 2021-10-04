@@ -4,11 +4,12 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"github.com/rs/zerolog"
 	"os"
 	"path"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog"
 )
 
 // TODO janezp: we should be able to swithch the report writer to write to a database.

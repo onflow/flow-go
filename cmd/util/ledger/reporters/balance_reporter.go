@@ -23,11 +23,10 @@ import (
 
 // BalanceReporter iterates through registers getting the location and balance of all FlowVaults
 type BalanceReporter struct {
-	Log            zerolog.Logger
-	RWF            ReportWriterFactory
-	rw             ReportWriter
-	progress       *progressbar.ProgressBar
-	addressMoments map[string]int
+	Log      zerolog.Logger
+	RWF      ReportWriterFactory
+	rw       ReportWriter
+	progress *progressbar.ProgressBar
 }
 
 func (r *BalanceReporter) Name() string {
