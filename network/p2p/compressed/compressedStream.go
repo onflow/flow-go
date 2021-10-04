@@ -19,6 +19,7 @@ type compressedStream struct {
 	network.Stream
 
 	writeLock  sync.Mutex
+	readLock   sync.Mutex
 	compressor flownet.Compressor
 
 	r io.ReadCloser
@@ -62,6 +63,9 @@ func (c *compressedStream) Write(b []byte) (int, error) {
 }
 
 func (c *compressedStream) Read(b []byte) (int, error) {
+	c.readLock.Lock()
+	defer c.readLock.Unlock()
+
 	if c.r == nil {
 		r, err := c.compressor.NewReader(c.Stream)
 		if err != nil {
