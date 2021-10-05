@@ -95,7 +95,7 @@ func main() {
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientOpts     []*common.FlowClientConfig
+		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 
@@ -367,35 +367,23 @@ func main() {
 			return err
 		}).
 		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			var anIDS []flow.Identifier
-
-			// if * provided use all ids in protocol state by default
-			if accessNodeIDS[0] == "*" {
-				anIDS, err = common.DefaultAccessNodeIDS(node.State.Sealed())
-				if err != nil {
-					return fmt.Errorf("failed to get default access node ids %w", err)
-				}
-			} else if len(accessNodeIDS) < common.DefaultAccessNodeIDSMinimum {
-				return fmt.Errorf("invalid flag --access-node-ids expected atleast %d IDs got %d", common.DefaultAccessNodeIDSMinimum, len(accessNodeIDS))
-			} else {
-				anIDS, err = common.FlowIDFromHexString(accessNodeIDS...)
-				if err != nil {
-					return fmt.Errorf("failed to convert access node ID(s) into flow identifier(s) %w", err)
-				}
+			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
+			if err != nil {
+				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
 			}
 
-			flowClientOpts, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
+			flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
 			if err != nil {
-				return fmt.Errorf("failed to prepare flow client connection options for each access node id %w", err)
+				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
 			}
 
 			return nil
 		}).
 		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
-			flowClient, err := common.FlowClient(flowClientOpts[0])
+			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
-				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientOpts[0].AccessAddress, err)
+				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
 
 			validator, err := epochs.NewMachineAccountConfigValidator(
@@ -743,7 +731,7 @@ func main() {
 			node.ProtocolEvents.AddConsumer(viewsObserver)
 
 			// construct DKG contract client
-			dkgContractClients, err := createDKGContractClients(node, machineAccountInfo, flowClientOpts)
+			dkgContractClients, err := createDKGContractClients(node, machineAccountInfo, flowClientConfigs)
 			if err != nil {
 				return nil, fmt.Errorf("could not create dkg contract client %w", err)
 			}
