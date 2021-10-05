@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module"
 	"os"
 
 	"github.com/onflow/flow-go/module"
