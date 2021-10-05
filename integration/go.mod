@@ -17,7 +17,7 @@ require (
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.19.1-0.20211004181150-4ca952eefe9b
+	github.com/onflow/cadence v0.19.1-0.20211005163153-293dce2b4302
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
 	github.com/onflow/flow-emulator v0.20.3
