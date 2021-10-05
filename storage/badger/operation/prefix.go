@@ -12,7 +12,8 @@ import (
 const (
 
 	// codes for special database markers
-	codeMax = 1 // keeps track of the maximum key size
+	codeMax    = 1 // keeps track of the maximum key size
+	codeDBType = 2 // specifies a database type
 
 	// codes for views with special meaning
 	codeStartedView           = 10 // latest view hotstuff started

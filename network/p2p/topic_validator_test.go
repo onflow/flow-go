@@ -10,9 +10,10 @@ import (
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/message"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -20,11 +21,11 @@ import (
 func TestTopicValidator(t *testing.T) {
 
 	// create two staked nodes - node1 and node2
-	identity1, privateKey1 := createID(t)
-	node1 := createNode(t, identity1.NodeID, privateKey1)
+	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
+	node1 := createNode(t, identity1.NodeID, privateKey1, rootBlockID)
 
-	identity2, privateKey2 := createID(t)
-	node2 := createNode(t, identity2.NodeID, privateKey2)
+	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
+	node2 := createNode(t, identity2.NodeID, privateKey2, rootBlockID)
 
 	badTopic := engine.TopicFromChannel(engine.SyncCommittee, rootBlockID)
 
@@ -32,18 +33,18 @@ func TestTopicValidator(t *testing.T) {
 	translator, err := NewFixedTableIdentityTranslator(ids)
 	require.NoError(t, err)
 
-	validator := StakedValidator{func(pid peer.ID) (*flow.Identity, bool) {
+	stakedValidator := validator.StakedValidator(func(pid peer.ID) (*flow.Identity, bool) {
 		fid, err := translator.GetFlowID(pid)
 		if err != nil {
 			return &flow.Identity{}, false
 		}
 		return ids.ByNodeID(fid)
-	}}
+	})
 
 	unstakedKey, err := unittest.NetworkingKey()
 	require.NoError(t, err)
 	// create one unstaked node
-	unstakedNode := createNode(t, flow.ZeroID, unstakedKey)
+	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, rootBlockID)
 	require.NoError(t, err)
 
 	// node1 is connected to node2, and the unstaked node is connected to node1
@@ -52,9 +53,9 @@ func TestTopicValidator(t *testing.T) {
 	require.NoError(t, unstakedNode.AddPeer(context.TODO(), *host.InfoFromHost(node1.host)))
 
 	// node1 and node2 subscribe to the topic with the topic validator
-	sub1, err := node1.Subscribe(context.TODO(), badTopic, validator.Validate)
+	sub1, err := node1.Subscribe(context.TODO(), badTopic, stakedValidator)
 	require.NoError(t, err)
-	sub2, err := node2.Subscribe(context.TODO(), badTopic, validator.Validate)
+	sub2, err := node2.Subscribe(context.TODO(), badTopic, stakedValidator)
 	require.NoError(t, err)
 	// the unstaked node subscribes to the topic WITHOUT the topic validator
 	unstakedSub, err := unstakedNode.Subscribe(context.TODO(), badTopic)
@@ -67,7 +68,11 @@ func TestTopicValidator(t *testing.T) {
 			len(unstakedNode.pubSub.ListPeers(badTopic.String())) > 0
 	}, 3*time.Second, 100*time.Millisecond)
 
-	data := []byte("hello")
+	m := message.Message{
+		Payload: []byte("hello"),
+	}
+	data, err := m.Marshal()
+	require.NoError(t, err)
 
 	timedCtx, cancel5s := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel5s()
@@ -125,28 +130,4 @@ func TestTopicValidator(t *testing.T) {
 	}()
 
 	wg.Wait()
-}
-
-func createID(t *testing.T) (*flow.Identity, crypto.PrivateKey) {
-	networkKey, err := unittest.NetworkingKey()
-	require.NoError(t, err)
-	id := unittest.IdentityFixture(
-		unittest.WithRole(flow.RoleAccess),
-		unittest.WithNetworkingKey(networkKey.PublicKey()),
-	)
-	return id, networkKey
-}
-
-func createNode(
-	t *testing.T,
-	nodeID flow.Identifier,
-	networkKey crypto.PrivateKey,
-) *Node {
-	libp2pNode, err := NewDefaultLibP2PNodeBuilder(nodeID, "0.0.0.0:0", networkKey).
-		SetRootBlockID(rootBlockID).
-		SetPubsubOptions(DefaultPubsubOptions(DefaultMaxPubSubMsgSize)...).
-		Build(context.TODO())
-	require.NoError(t, err)
-
-	return libp2pNode
 }
