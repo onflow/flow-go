@@ -9,6 +9,9 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 )
 
+// mockStream is a mocked libp2p stream that is implemented as a pipe with a reader and writer.
+// Whatever is written on the stream is written by the writer on the pipe, which in turn makes
+// it available for read by the reader.
 type mockStream struct {
 	pw *io.PipeWriter
 	pr *io.PipeReader
@@ -66,9 +69,7 @@ func (m *mockStream) Protocol() protocol.ID {
 	return ""
 }
 
-func (m *mockStream) SetProtocol(id protocol.ID) {
-
-}
+func (m *mockStream) SetProtocol(_ protocol.ID) {}
 
 func (m *mockStream) Stat() network.Stat {
 	return network.Stat{}
