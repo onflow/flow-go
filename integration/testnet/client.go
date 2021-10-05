@@ -249,20 +249,20 @@ func (c *Client) UserAddress(txResp *sdk.TransactionResult) (sdk.Address, bool) 
 	return address, found
 }
 
-func (c *Client) TokenAmountByRole(role string) (string, error) {
-	if role == "collection" {
+func (c *Client) TokenAmountByRole(role flow.Role) (string, error) {
+	if role == flow.RoleCollection {
 		return "250000.0", nil
 	}
-	if role == "consensus" {
+	if role == flow.RoleConsensus {
 		return "500000.0", nil
 	}
-	if role == "execution" {
+	if role == flow.RoleExecution {
 		return "1250000.0", nil
 	}
-	if role == "verification" {
+	if role == flow.RoleVerification {
 		return "135000.0", nil
 	}
-	if role == "access" {
+	if role == flow.RoleAccess {
 		return "0.0", nil
 	}
 
