@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"go.uber.org/atomic"
@@ -34,16 +35,28 @@ type ComponentFactory func() (Component, error)
 
 // OnError reacts to an irrecoverable error
 // It is meant to inspect the error, determining its type and seeing if e.g. a restart or some other measure is suitable,
-// and optionally trigger the continuation provided by the caller (RunComponent), which defines what "a restart" means.
-// Instead of restarting the component, it could also:
+// and then return an ErrorHandlingResult indicating how RunComponent should proceed.
+// Before returning, it could also:
 // - panic (in canary / benchmark)
 // - log in various Error channels and / or send telemetry ...
-type OnError = func(err error, triggerRestart func())
+type OnError = func(err error) ErrorHandlingResult
+
+type ErrorHandlingResult int
+
+const (
+	ErrorHandlingRestart ErrorHandlingResult = iota
+	ErrorHandlingStop
+)
 
 // RunComponent repeatedly starts components returned from the given ComponentFactory, shutting them
 // down when they encounter irrecoverable errors and passing those errors to the given error handler.
-// Any errors encountered during component startup are returned directly. If the given context is
-// cancelled, it will wait for the current running component to shutdown before returning.
+// If the given context is cancelled, it will wait for the current component instance to shutdown
+// before returning.
+// The returned error is either:
+// - The context error if the context was canceled
+// - The last error handled if the error handler returns ErrorHandlingStop
+// - An error returned from componentFactory while generating an instance of component
+// - An error returned from starting an instance of the component
 func RunComponent(ctx context.Context, componentFactory ComponentFactory, handler OnError) error {
 	// reference to per-run signals for the component
 	var component Component
@@ -51,10 +64,12 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 	var done <-chan struct{}
 	var irrecoverableErr <-chan error
 
-	start := func() (err error) {
+	start := func() error {
+		var err error
+
 		component, err = componentFactory()
 		if err != nil {
-			return // failure to generate the component, should be handled out-of-band because a restart won't help
+			return err // failure to generate the component, should be handled out-of-band because a restart won't help
 		}
 
 		// context used to run the component
@@ -62,40 +77,26 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 		runCtx, cancel = context.WithCancel(ctx)
 
 		// signaler used for irrecoverables
-		signaler := irrecoverable.NewSignaler()
+		var signaler *irrecoverable.Signaler
+		signaler, irrecoverableErr = irrecoverable.NewSignaler()
 		signalingCtx := irrecoverable.WithSignaler(runCtx, signaler)
-		irrecoverableErr = signaler.Error()
 
 		if err = component.Start(signalingCtx); err != nil {
 			cancel()
-			return
+			return err
 		}
 
 		done = component.Done()
-		return
+
+		return nil
 	}
 
-	shutdownAndWaitForRestart := func(err error) error {
+	stop := func() {
 		// shutdown the component
 		cancel()
 
 		// wait until it's done
 		<-done
-
-		// send error to the handler programmed with a restart continuation
-		restartChan := make(chan struct{})
-		go handler(err, func() {
-			close(restartChan)
-		})
-
-		// wait for handler to trigger restart or abort
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-restartChan:
-		}
-
-		return nil
 	}
 
 	for {
@@ -105,10 +106,19 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 
 		select {
 		case <-done:
+			// either clean completion or canceled by context
 			return ctx.Err()
 		case err := <-irrecoverableErr:
-			if canceled := shutdownAndWaitForRestart(err); canceled != nil {
-				return canceled
+			stop()
+
+			// send error to the handler
+			switch result := handler(err); result {
+			case ErrorHandlingRestart:
+				continue
+			case ErrorHandlingStop:
+				return err
+			default:
+				panic(fmt.Sprint("invalid error handling result: %v", result))
 			}
 		}
 	}
