@@ -88,7 +88,7 @@ func main() {
 
 		// epoch qc contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientOpts     []*common.FlowClientConfig
+		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
 	)
@@ -146,7 +146,7 @@ func main() {
 
 		// epoch qc contract flags
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
-		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node ID's sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. minimum length %d", common.DefaultAccessNodeIDSMinimum))
+		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
 	}).ValidateFlags(func() error {
 		if startupTimeString != cmd.NotSet {
 			t, err := time.Parse(time.RFC3339, startupTimeString)
@@ -203,22 +203,23 @@ func main() {
 			return err
 		}).
 		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			if len(accessNodeIDS) < common.DefaultAccessNodeIDSMinimum {
-				return fmt.Errorf("invalid flag --access-node-ids atleast %d IDs must be provided", common.DefaultAccessNodeIDSMinimum)
+			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
+			if err != nil {
+				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
 			}
 
-			flowClientOpts, err = common.FlowClientConfigs(accessNodeIDS, insecureAccessAPI, node.State.Sealed())
+			flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
 			if err != nil {
-				return fmt.Errorf("failed to prepare flow client connection options for each access node id %w", err)
+				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
 			}
 
 			return nil
 		}).
 		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
-			flowClient, err := common.FlowClient(flowClientOpts[0])
+			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
-				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientOpts[0].AccessAddress, err)
+				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)
 			}
 
 			validator, err := epochs.NewMachineAccountConfigValidator(
@@ -460,40 +461,8 @@ func main() {
 
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
-			// create flow client with correct GRPC configuration for QC contract client
-			var flowClient *client.Client
-			if insecureAccessAPI {
-				flowClient, err = common.InsecureFlowClient(accessAddress)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				if secureAccessNodeID == "" {
-					return nil, fmt.Errorf("invalid flag --secure-access-node-id required")
-				}
-
-				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
-				if err != nil {
-					return nil, fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
-				}
-
-				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))
-				if err != nil {
-					return nil, fmt.Errorf("could not get identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				if len(identities) < 1 {
-					return nil, fmt.Errorf("could not find identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				flowClient, err = common.SecureFlowClient(accessAddress, identities[0].NetworkPubKey.String()[2:])
-				if err != nil {
-					return nil, err
-				}
-			}
-
 			// construct QC contract client
-			qcContractClients, err := createQCContractClients(node, machineAccountInfo, flowClientOpts)
+			qcContractClients, err := createQCContractClients(node, machineAccountInfo, flowClientConfigs)
 			if err != nil {
 				return nil, fmt.Errorf("could not create qc contract clients %w", err)
 			}

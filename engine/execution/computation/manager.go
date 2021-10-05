@@ -13,8 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
-
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	"github.com/onflow/flow-go/fvm"
