@@ -51,20 +51,15 @@ type SignalerContext interface {
 // private, to force context derivation / WithSignaler
 type signalerCtx struct {
 	context.Context
-	signaler *Signaler
+	*Signaler
 }
 
 func (sc signalerCtx) sealed() {}
 
-// Drop-in replacement for panic, log.Fatal, log.Panic, etc
-// to use when we are able to get an SignalerContext and thread it down in the component
-func (sc signalerCtx) Throw(err error) {
-	sc.signaler.Throw(err)
-}
-
 // the One True Way of getting a SignalerContext
-func WithSignaler(ctx context.Context, sig *Signaler) SignalerContext {
-	return signalerCtx{ctx, sig}
+func WithSignaler(parent context.Context) (SignalerContext, <-chan error) {
+	sig, errChan := NewSignaler()
+	return &signalerCtx{parent, sig}, errChan
 }
 
 // If we have an SignalerContext, we can directly ctx.Throw.
