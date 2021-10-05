@@ -33,11 +33,14 @@ func (r *SealingRecord) ApprovalsMissing(chunksWithMissingApprovals map[uint64]f
 	sufficientApprovals := len(chunksWithMissingApprovals) == 0
 	r.entries["sufficient_approvals_for_sealing"] = sufficientApprovals
 	if !sufficientApprovals {
-		indices := make([]string, 0, len(chunksWithMissingApprovals))
+		chunksInfo := make([]map[string]interface{}, 0, len(chunksWithMissingApprovals))
 		for i, list := range chunksWithMissingApprovals {
-			indices = append(indices, fmt.Sprintf("chunk_index: %v, verifier_ids: %v", i, list))
+			chunk := make(map[string]interface{})
+			chunk["chunk_index"] = i
+			chunk["missing_approvals_from_verifiers"] = list
+			chunksInfo = append(chunksInfo, chunk)
 		}
-		bytes, err := json.Marshal(r)
+		bytes, err := json.Marshal(chunksInfo)
 		if err != nil {
 			bytes = []byte("failed to marshal data about chunks with missing approvals")
 		}
