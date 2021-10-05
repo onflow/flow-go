@@ -11,42 +11,47 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestRoundTrip evaluates that (1) reading what has been written by compressor yields in same result,
-// and (2) data is compressed when written.
-func TestRoundTrip(t *testing.T) {
+// TestHappyPath evaluates reading from a compressed stream retrieves what originally has been written on it.
+func TestHappyPath(t *testing.T) {
 	text := "hello world, hello world!"
-	byteLen := len([]byte(text))
+	textByte := []byte(text)
+	textByteLen := len(textByte)
 
-	mca, _, mcb, _ := newCompressedStreamPair(t)
+	// creates a pair of compressed streams
+	mca, mcb := newCompressedStreamPair(t)
 
+	// writes on stream mca
 	writeWG := sync.WaitGroup{}
 	writeWG.Add(1)
 	go func() {
 		defer writeWG.Done()
 
-		n, err := mca.Write([]byte(text))
+		n, err := mca.Write(textByte)
 		require.NoError(t, err)
 
 		require.Equal(t, n, len(text))
 	}()
 
+	// write on stream mca should be read on steam mcb
 	readWG := sync.WaitGroup{}
 	readWG.Add(1)
 	go func() {
 		defer readWG.Done()
 
-		b := make([]byte, byteLen)
+		b := make([]byte, textByteLen)
 		n, err := mcb.Read(b)
 		require.NoError(t, err)
 
-		require.Equal(t, n, byteLen)
-		require.Equal(t, b, []byte(text))
+		require.Equal(t, n, textByteLen)
+		require.Equal(t, b, textByte)
 	}()
 
 	unittest.RequireReturnsBefore(t, writeWG.Wait, 1*time.Second, "timeout for writing on stream")
 	unittest.RequireReturnsBefore(t, readWG.Wait, 1*time.Second, "timeout for reading from stream")
 }
 
+// newStreamPair is a test helper that creates a pair of compressed streams a and b such that
+// a reads what b writes and b reads what a writes.
 func newStreamPair() (*mockStream, *mockStream) {
 	ra, wb := io.Pipe()
 	rb, wa := io.Pipe()
@@ -57,7 +62,9 @@ func newStreamPair() (*mockStream, *mockStream) {
 	return sa, sb
 }
 
-func newCompressedStreamPair(t *testing.T) (*compressedStream, *mockStream, *compressedStream, *mockStream) {
+// newCompressedStreamPair is a test helper that creates a pair of compressed streams a and b such that
+// a reads what b writes and b reads what a writes.
+func newCompressedStreamPair(t *testing.T) (*compressedStream, *compressedStream) {
 	sa, sb := newStreamPair()
 
 	mca, err := NewCompressedStream(sa)
@@ -66,5 +73,5 @@ func newCompressedStreamPair(t *testing.T) (*compressedStream, *mockStream, *com
 	mcb, err := NewCompressedStream(sb)
 	require.NoError(t, err)
 
-	return mca, sa, mcb, sb
+	return mca, mcb
 }
