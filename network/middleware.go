@@ -78,7 +78,6 @@ type BlockExchange interface {
 
 // BlockExchangeFetcher is an interface for requesting blocks from a BlockExchange.
 type BlockExchangeFetcher interface {
-	// GetBlocks creates a
 	GetBlocks(cids ...cid.Cid) BlocksPromise
 }
 
@@ -90,7 +89,7 @@ type BlocksPromise interface {
 // BlocksPromise represents a request for blocks on the Bitswap network.
 type BlocksRequest interface {
 	// Send initiates the request
-	Send(ctx context.Context) error
+	Send(ctx context.Context) (<-chan struct{}, error)
 }
 
 // Overlay represents the interface that middleware uses to interact with the

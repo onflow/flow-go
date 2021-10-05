@@ -47,7 +47,9 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
 	// both nodes should be of the same role to get connected on epidemic dissemination
-	suite.ids, _, suite.nets, _, suite.cancel = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun)
+	suite.ids, _, suite.nets, _, suite.cancel = GenerateIDsMiddlewaresNetworks(
+		suite.T(), count, logger, 100, nil, !DryRun, nil, nil
+	)
 }
 
 // TearDownTest closes the networks within a specified timeout

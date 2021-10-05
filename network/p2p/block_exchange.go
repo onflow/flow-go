@@ -97,23 +97,25 @@ type BlocksRequest struct {
 	blocks  func(context.Context) (<-chan blocks.Block, error)
 }
 
-func (p *BlocksRequest) Send(ctx context.Context) error {
+func (p *BlocksRequest) Send(ctx context.Context) (<-chan struct{}, error) {
 	cb := p.forEach
 
 	if cb == nil {
-		return errors.New("handler must be set by calling ForEach before request can be sent")
+		return nil, errors.New("handler must be set by calling ForEach before request can be sent")
 	}
 
 	blocks, err := p.blocks(ctx)
 	if err != nil {
-		return fmt.Errorf("failed to get channel for blocks: %w", err)
+		return nil, fmt.Errorf("failed to get channel for blocks: %w", err)
 	}
 
+	done := make(chan struct{})
 	go func() {
 		for block := range blocks {
 			p.forEach(block)
 		}
+		close(done)
 	}()
 
-	return nil
+	return done, nil
 }
