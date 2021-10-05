@@ -28,12 +28,14 @@ type compressedStream struct {
 
 type StreamOptFunc func(*compressedStream)
 
+// WithStreamCompressor is an option function setting the underlying compressor of the stream.
 func WithStreamCompressor(comp flownet.Compressor) StreamOptFunc {
 	return func(stream *compressedStream) {
 		stream.compressor = comp
 	}
 }
 
+// NewCompressedStream creates a compressed stream with gzip as default compressor.
 func NewCompressedStream(s network.Stream, opts ...StreamOptFunc) (*compressedStream, error) {
 	c := &compressedStream{
 		Stream:     s,
