@@ -48,9 +48,8 @@ var ErrMultipleStartup = errors.New("component may only be started once")
 // Startable provides an interface to start a component. Once started, the component
 // can be stopped by cancelling the given context.
 type Startable interface {
-	// Start starts the component. Any errors encountered during startup should be returned
-	// directly, whereas irrecoverable errors encountered while the component is running
+	// Start starts the component. Any irrecoverable errors encountered while the component is running
 	// should be thrown with the given SignalerContext.
-	// This method should only be called once, and subsequent calls should return ErrMultipleStartup.
-	Start(irrecoverable.SignalerContext) error
+	// This method should only be called once, and subsequent calls should panic with ErrMultipleStartup.
+	Start(irrecoverable.SignalerContext)
 }
