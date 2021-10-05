@@ -51,7 +51,7 @@ func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model
 		return nil, fmt.Errorf("expecting block for current view %d, but block's view is %d", curView, block.View)
 	}
 	if curView <= v.lastVotedView {
-		return nil, fmt.Errorf("current view (%d) is lower than the last voted view (%d)", curView, v.lastVotedView)
+		return nil, fmt.Errorf("current view (%d) must be larger than the last voted view (%d)", curView, v.lastVotedView)
 	}
 
 	// Do not produce a vote for blocks where we are not a valid committee member.
