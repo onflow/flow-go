@@ -199,6 +199,6 @@ func DefaultBaseConfig() *BaseConfig {
 		metricsEnabled:           true,
 		receiptsCacheSize:        bstorage.DefaultCacheSize,
 		guaranteesCacheSize:      bstorage.DefaultCacheSize,
-		LibP2PCompressionEnabled: false,
+		LibP2PCompressionEnabled: true,
 	}
 }
