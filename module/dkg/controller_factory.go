@@ -31,8 +31,7 @@ func NewControllerFactory(
 	me module.Local,
 	dkgContractClients []module.DKGContractClient,
 	tunnel *BrokerTunnel,
-	config ControllerConfig,
-) *ControllerFactory {
+	config ControllerConfig) *ControllerFactory {
 
 	return &ControllerFactory{
 		log:                log,

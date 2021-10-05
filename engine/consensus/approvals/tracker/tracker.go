@@ -3,7 +3,6 @@ package tracker
 import (
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -171,24 +170,7 @@ func (st *SealingObservation) Complete() {
 
 	// dump observation to Logger
 	observation = observation.Int64("duration_ms", time.Since(st.startTime).Milliseconds())
-	reason := st.UnsealedReason()
-	observation.Msgf("sealing observation, unsealed reason: %v", reason)
-}
-
-func (st *SealingObservation) UnsealedReason() string {
-	if st.finalizedBlock == st.latestSealedBlock {
-		return "all finalized blocks have been sealed"
-	}
-
-	unsealedHeight := st.latestSealedBlock.Height + 1
-	if len(st.records) == 0 {
-		return fmt.Sprintf("no result found for next unsealed block at height: %v", unsealedHeight)
-	}
-
-	return fmt.Sprintf("unsealed block at height %v has been executed, the result has been incorporated on %v fork(s), "+
-		"but no result has received enough approvals, check the chunks_with_insufficient_approvals field for more details",
-		len(st.records),
-		unsealedHeight)
+	observation.Msg("sealing observation")
 }
 
 // latestFinalizedSealInfo returns a json string representation with the most
