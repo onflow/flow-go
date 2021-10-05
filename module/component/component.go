@@ -10,7 +10,6 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/util"
 )
 
 // Component represents a component which can be started and stopped, and exposes
@@ -77,11 +76,10 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 		runCtx, cancel = context.WithCancel(ctx)
 
 		// signaler used for irrecoverables
-		var signaler *irrecoverable.Signaler
-		signaler, irrecoverableErr = irrecoverable.NewSignaler()
-		signalingCtx := irrecoverable.WithSignaler(runCtx, signaler)
+		var signalCtx irrecoverable.SignalerContext
+		signalCtx, irrecoverableErr = irrecoverable.WithSignaler(runCtx)
 
-		if err = component.Start(signalingCtx); err != nil {
+		if err = component.Start(signalCtx); err != nil {
 			cancel()
 			return err
 		}
@@ -92,10 +90,8 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 	}
 
 	stop := func() {
-		// shutdown the component
+		// shutdown the component and wait until it's done
 		cancel()
-
-		// wait until it's done
 		<-done
 	}
 
@@ -118,221 +114,178 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			case ErrorHandlingStop:
 				return err
 			default:
-				panic(fmt.Sprint("invalid error handling result: %v", result))
+				panic(fmt.Sprintf("invalid error handling result: %v", result))
 			}
 		}
 	}
 }
 
-// ComponentWorker represents a worker routine of a component
-type ComponentWorker func(ctx irrecoverable.SignalerContext)
+type ReadyFunc func()
 
-// ComponentStartup implements a startup routine for a component
-// This is where a component should perform any necessary startup
-// tasks before worker routines are launched.
-type ComponentStartup func(context.Context) error
+// ComponentWorker represents a worker routine of a component
+type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
+
+// ComponentStartupRoutine implements a startup routine for a component
+// This is where a component should perform any necessary startup tasks
+// before worker routines are launched.
+type ComponentStartupRoutine func(context.Context) error
 
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
-	// OnStart sets the startup routine for the ComponentManager. If an error is
-	// encountered during the startup routine, the ComponentManager will shutdown
-	// immediately.
-	OnStart(ComponentStartup) ComponentManagerBuilder
+	// AddStartupRoutine adds a startup routine for the ComponentManager
+	// If an error is encountered during the startup routine, the ComponentManager
+	// will shutdown immediately
+	AddStartupRoutine(ComponentStartupRoutine) ComponentManagerBuilder
 
 	// AddWorker adds a worker routine for the ComponentManager
 	AddWorker(ComponentWorker) ComponentManagerBuilder
-
-	// AddComponent adds a new sub-component for the ComponentManager.
-	// This should be used for critical sub-components whose failure would be
-	// considered irrecoverable. For non-critical sub-components, consider using
-	// RunComponent instead.
-	AddComponent(Component) ComponentManagerBuilder
 
 	// Build builds and returns a new ComponentManager instance
 	Build() *ComponentManager
 }
 
-type ComponentManagerBuilderImpl struct {
-	startup    ComponentStartup
-	workers    []ComponentWorker
-	components []Component
+type componentManagerBuilderImpl struct {
+	startupRoutines []ComponentStartupRoutine
+	workers         []ComponentWorker
 }
 
 // NewComponentManagerBuilder returns a new ComponentManagerBuilder
 func NewComponentManagerBuilder() ComponentManagerBuilder {
-	return &ComponentManagerBuilderImpl{
-		startup: func(ctx context.Context) error {
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-				return nil
-			}
-		},
-	}
+	return &componentManagerBuilderImpl{}
 }
 
-func (c *ComponentManagerBuilderImpl) OnStart(startup ComponentStartup) ComponentManagerBuilder {
-	c.startup = startup
+func (c *componentManagerBuilderImpl) AddStartupRoutine(startupRoutine ComponentStartupRoutine) ComponentManagerBuilder {
+	c.startupRoutines = append(c.startupRoutines, startupRoutine)
 	return c
 }
 
-func (c *ComponentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
+func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
 	c.workers = append(c.workers, worker)
 	return c
 }
 
-func (c *ComponentManagerBuilderImpl) AddComponent(component Component) ComponentManagerBuilder {
-	c.components = append(c.components, component)
-	return c
-}
-
-func (c *ComponentManagerBuilderImpl) Build() *ComponentManager {
+func (c *componentManagerBuilderImpl) Build() *ComponentManager {
 	return &ComponentManager{
-		started:    atomic.NewBool(false),
-		ready:      make(chan struct{}),
-		done:       make(chan struct{}),
-		startup:    c.startup,
-		workers:    c.workers,
-		components: c.components,
+		started:         atomic.NewBool(false),
+		ready:           make(chan struct{}),
+		done:            make(chan struct{}),
+		workers:         c.workers,
+		startupRoutines: c.startupRoutines,
 	}
 }
 
 var _ Component = (*ComponentManager)(nil)
 
-// ComponentManager is used to manage worker routines and sub-components of a Component.
-// When a ComponentManager is started, it first runs the startup function if one is provided,
-// and then proceeds to start up any components that it contains. Once all components have
-// started up successfully, it then launches any worker routines.
+// ComponentManager is used to manage the worker routines of a Component.
+// When a ComponentManager is started, it first runs the startup routines provided,
+// and then launches any worker routines.
 type ComponentManager struct {
 	started        *atomic.Bool
-	ready          <-chan struct{}
+	ready          chan struct{}
 	done           chan struct{}
 	shutdownSignal <-chan struct{}
 
-	startup    func(context.Context) error
-	workers    []ComponentWorker
-	components []Component
+	startupRoutines []ComponentStartupRoutine
+	workers         []ComponentWorker
 }
 
-// Start initiates the ComponentManager. It will first run the startup routine if one
-// was set, and then start all sub-components and launch all worker routines.
-func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) (err error) {
+// Start initiates the ComponentManager by first running the startup routines provided, and then
+// launching all worker routines.
+// If an error is encountered during any startup routine, the remaining routines are canceled and
+// the error is returned.
+func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) error {
 	// only start once
 	if c.started.CAS(false, true) {
-		ctx, cancel := context.WithCancel(parent)
-		_ = cancel // pacify vet lostcancel check: startupCtx is always canceled through its parent
-		defer func() {
-			if err != nil {
-				cancel()
-			}
-		}()
-		c.shutdownSignal = ctx.Done()
+		startupGroup, startupCtx := errgroup.WithContext(parent)
 
-		if err = c.startup(ctx); err != nil {
-			defer close(c.done)
-			return
+		for _, startupRoutine := range c.startupRoutines {
+			startupRoutine := startupRoutine
+			startupGroup.Go(func() error {
+				return startupRoutine(startupCtx)
+			})
 		}
 
-		signaler := irrecoverable.NewSignaler()
-		startupCtx := irrecoverable.WithSignaler(ctx, signaler)
+		if err := startupGroup.Wait(); err != nil {
+			defer close(c.done)
+			return err
+		}
 
+		ctx, cancel := context.WithCancel(parent)
+		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+		c.shutdownSignal = ctx.Done()
+
+		// launch goroutine to propagate irrecoverable error
 		go func() {
 			select {
-			case err := <-signaler.Error():
-				cancel()
+			case err := <-errChan:
+				cancel() // shutdown all workers
 
 				// we propagate the error directly to the parent because a failure in a
-				// worker routine or a critical sub-component is considered irrecoverable
-
-				// TODO: It may be useful to allow the user of the ComponentManager to wrap
-				// errors thrown from sub-components before propagating them to the parent,
-				// to provide context for the parent about which sub-component the error
-				// originates from. This way the parent error handler doesn't need to handle
-				// every irrecoverable error type that may be thrown from a sub-component.
+				// worker routine is considered irrecoverable
 				parent.Throw(err)
 			case <-c.done:
 			}
 		}()
 
-		// TODO: We may eventually want to introduce a way for sub-component startup
-		// and the provided ComponentStartup to occur concurrently, or even make this
-		// the default.
-		// In the current usecases, sub-components may have dependencies that must be
-		// initialized in the provided ComponentStartup before they can be started,
-		// but these dependencies can be removed by refactoring the code.
-
-		var componentGroup errgroup.Group
-		for _, component := range c.components {
-			component := component
-			componentGroup.Go(func() error {
-				if err := component.Start(startupCtx); err != nil {
-					defer cancel() // cancel startup for all other components
-					return err
-				}
-				return nil
-			})
-		}
-
-		components := make([]module.ReadyDoneAware, len(c.components))
-		for i, component := range c.components {
-			components[i] = component.(module.ReadyDoneAware)
-		}
-		componentsDone := util.AllDone(components...)
-
-		if err = componentGroup.Wait(); err != nil {
-			// wait for sub-components to shutdown before returning
-			<-componentsDone
-
-			defer close(c.done)
-			return
-		}
-
-		c.ready = util.AllReady(components...)
-
+		var workersReady sync.WaitGroup
 		var workersDone sync.WaitGroup
+		workersReady.Add(len(c.workers))
 		workersDone.Add(len(c.workers))
+
+		// launch workers
 		for _, worker := range c.workers {
-			go func(w ComponentWorker) {
+			worker := worker
+			go func() {
 				defer workersDone.Done()
-				w(startupCtx)
-			}(worker)
+				var readyOnce sync.Once
+				worker(signalerCtx, func() {
+					readyOnce.Do(func() {
+						workersReady.Done()
+					})
+				})
+			}()
 		}
+
+		// launch goroutine to close ready channel
+		go c.waitForReady(&workersReady)
 
 		// launch goroutine to close done channel
-		go func() {
-			// wait for sub-components to shutdown
-			<-componentsDone
+		go c.waitForDone(&workersDone)
 
-			// wait for worker routines to finish
-			workersDone.Wait()
-
-			close(c.done)
-		}()
-
-		return
+		return nil
 	}
 
 	return module.ErrMultipleStartup
 }
 
-// Ready returns a channel which is closed once the startup routine has completed successfully.
-// If an error occurs during startup, the returned channel will never close. If this is called
-// before startup has been initiated, a nil channel will be returned.
+func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
+	workersReady.Wait()
+	close(c.ready)
+}
+
+func (c *ComponentManager) waitForDone(workersDone *sync.WaitGroup) {
+	workersDone.Wait()
+	close(c.done)
+}
+
+// Ready returns a channel which is closed once all the worker routines have been launched and are ready.
+// If an error occurs during Start, the channel returned from Ready will never close.
 func (c *ComponentManager) Ready() <-chan struct{} {
 	return c.ready
 }
 
-// Done returns a channel which is closed once the ComponentManager has shut down following a
-// call to Start. This includes ungraceful shutdowns, such as when an error is encountered
-// during startup. If startup had succeeded, it will wait for all worker routines and sub-components
-// to shut down before closing the returned channel.
+// Done returns a channel which is closed once the ComponentManager has shut down.
+// This can happen either if an error is returned from Start, or all worker routines have exited.
+// If Start did not return an error, the returned channel will close when all worker routines have
+// shut down (either gracefully or by throwing an error).
 func (c *ComponentManager) Done() <-chan struct{} {
 	return c.done
 }
 
 // ShutdownSignal returns a channel that is closed when shutdown has commenced.
-// If this is called before startup has been initiated, a nil channel will be returned.
+// This can happen either if the ComponentManager's context is canceled, or a worker routine encounters
+// an irrecoverable error.
+// If this is called before Start or after Start returned an error, a nil channel will be returned.
 func (c *ComponentManager) ShutdownSignal() <-chan struct{} {
 	return c.shutdownSignal
 }
