@@ -46,11 +46,6 @@ type balanceDataPoint struct {
 	Balance uint64 `json:"balance"`
 }
 
-type moments struct {
-	Address string `json:"address"`
-	Moments int    `json:"moments"`
-}
-
 // Report creates a balance_report_*.json file that contains data on all FlowVaults in the state commitment.
 // I recommend using gojq to browse through the data, because of the large uint64 numbers which jq won't be able to handle.
 func (r *BalanceReporter) Report(payload []ledger.Payload) error {

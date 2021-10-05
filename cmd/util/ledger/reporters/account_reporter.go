@@ -50,6 +50,11 @@ type contractRecord struct {
 	Contract string `json:"contract"`
 }
 
+type momentsRecord struct {
+	Address string `json:"address"`
+	Moments int    `json:"moments"`
+}
+
 func (r *AccountReporter) Report(payload []ledger.Payload) error {
 	rwa := r.RWF.ReportWriter("account_report")
 	rwc := r.RWF.ReportWriter("contract_report")
@@ -247,7 +252,7 @@ func (c *balanceProcessor) reportAccountData(addressIndexes <-chan uint64) {
 					Msgf("Error getting moments for account")
 				continue
 			}
-			c.rwm.Write(moments{
+			c.rwm.Write(momentsRecord{
 				Address: address.Hex(),
 				Moments: m,
 			})
