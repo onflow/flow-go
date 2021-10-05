@@ -121,7 +121,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.nodeIDHex, "nodeid", defaultConfig.nodeIDHex, "identity of our node")
 	fnb.flags.StringVar(&fnb.BaseConfig.BindAddr, "bind", defaultConfig.BindAddr, "address to bind on")
 	fnb.flags.StringVarP(&fnb.BaseConfig.BootstrapDir, "bootstrapdir", "b", defaultConfig.BootstrapDir, "path to the bootstrap directory")
-	fnb.flags.DurationVarP(&fnb.BaseConfig.timeout, "timeout", "t", defaultConfig.timeout, "node startup / shutdown timeout")
 	fnb.flags.StringVarP(&fnb.BaseConfig.datadir, "datadir", "d", defaultConfig.datadir, "directory to store the public database (protocol state)")
 	fnb.flags.StringVar(&fnb.BaseConfig.secretsdir, "secretsdir", defaultConfig.secretsdir, "directory to store private database (secrets)")
 	fnb.flags.StringVarP(&fnb.BaseConfig.level, "loglevel", "l", defaultConfig.level, "level for logging output")
@@ -338,7 +337,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 		fnb.Logger.Fatal().Err(err).Msgf("could not parse node ID from string: %v", fnb.BaseConfig.nodeIDHex)
 	}
 
-	info, err := loadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
+	info, err := LoadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
 	if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("failed to load private node info")
 	}
@@ -706,10 +705,12 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Mainnet {
+		fvm.WithTransactionFeesEnabled(true)
+	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedDeployment(false),
-			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
 	fnb.FvmOptions = vmOpts
@@ -939,8 +940,6 @@ func (fnb *FlowNodeBuilder) Run() {
 	select {
 	case <-fnb.Ready():
 		fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.NodeRole)
-	case <-time.After(fnb.BaseConfig.timeout):
-		fnb.Logger.Fatal().Msg("node startup timed out")
 	case <-fnb.sig:
 		fnb.Logger.Warn().Msg("node startup aborted")
 		os.Exit(1)
@@ -954,8 +953,6 @@ func (fnb *FlowNodeBuilder) Run() {
 	select {
 	case <-fnb.Done():
 		fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.NodeRole)
-	case <-time.After(fnb.BaseConfig.timeout):
-		fnb.Logger.Fatal().Msg("node shutdown timed out")
 	case <-fnb.sig:
 		fnb.Logger.Warn().Msg("node shutdown aborted")
 		os.Exit(1)
@@ -1075,7 +1072,7 @@ func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
-func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
+func LoadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
 	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID))
 	data, err := io.ReadFile(path)
 	if err != nil {
