@@ -291,26 +291,48 @@ func (e *EventHandlerV2) startNewView() error {
 // It checks whether to vote for this block.
 // It might trigger a view change to go to a different view, which might re-enter this function.
 func (e *EventHandlerV2) processBlockForCurrentView(block *model.Block) error {
-
-	// this is a sanity check to see if the block is really for the current view.
+	// sanity check that block is really for the current view:
 	curView := e.paceMaker.CurView()
 	if block.View != curView {
 		return fmt.Errorf("sanity check fails: block proposal's view does not match with curView, (blockView: %v, curView: %v)",
 			block.View, curView)
 	}
-
-	// checking if I'm the next leader
-	nextView := curView + 1
-	nextLeader, err := e.committee.LeaderForView(nextView)
+	// leader (node ID) for next view
+	nextLeader, err := e.committee.LeaderForView(curView + 1)
 	if err != nil {
-		return fmt.Errorf("failed to determine primary for next view %d: %w", nextView, err)
+		return fmt.Errorf("failed to determine primary for next view %d: %w", curView+1, err)
 	}
 
-	return e.processBlockForCurrentViewWithNextLeader(block, e.committee.Self(), nextLeader)
+	// voter performs all the checks to decide whether to vote for this block or not.
+	err = e.ownVote(block, curView, nextLeader)
+	if err != nil {
+		return fmt.Errorf("unexpected error in voting logic: %w", err)
+	}
+
+	// Inform PaceMaker that we've processed a block for the current view. We expect a view change
+	// if an only if we are _not_ the next leader
+	// Depending on whether
+	// we are the leader for the next view, the PaceMaker should trigger a view change. We
+	// perform a sanity check here, because a wrong view change can have disastrous consequences.
+	isSelfNextLeader := e.committee.Self() == nextLeader
+	_, viewChanged := e.paceMaker.UpdateCurViewWithBlock(block, isSelfNextLeader)
+	if viewChanged == isSelfNextLeader {
+		if isSelfNextLeader {
+			return fmt.Errorf("I am primary for next view (%v) and should be collecting votes, but pacemaker triggered already view change", curView+1)
+		} else {
+			return fmt.Errorf("pacemaker should trigger a view change to net view (%v), but didn't", curView+1)
+		}
+	}
+
+	if viewChanged {
+		return e.startNewView()
+	}
+	return nil
 }
 
-func (e *EventHandlerV2) processBlockForCurrentViewWithNextLeader(block *model.Block, self flow.Identifier, nextLeader flow.Identifier) error {
-
+// ownVote generates and forwards the own vote, if we decide to vote.
+// Any errors are potential symptoms of uncovered edge cases or corrupted internal state (fatal).
+func (e *EventHandlerV2) ownVote(block *model.Block, curView uint64, nextLeader flow.Identifier) error {
 	log := e.log.With().
 		Uint64("block_view", block.View).
 		Hex("block_id", block.BlockID[:]).
@@ -320,10 +342,6 @@ func (e *EventHandlerV2) processBlockForCurrentViewWithNextLeader(block *model.B
 		Logger()
 
 	// voter performs all the checks to decide whether to vote for this block or not.
-	isSelfNextLeader := self == nextLeader
-	curView := block.View
-
-	shouldVote := true
 	ownVote, err := e.voter.ProduceVoteIfVotable(block, curView)
 	if err != nil {
 		if !model.IsNoVoteError(err) {
@@ -331,41 +349,23 @@ func (e *EventHandlerV2) processBlockForCurrentViewWithNextLeader(block *model.B
 			return fmt.Errorf("could not produce vote: %w", err)
 		}
 		log.Debug().Err(err).Msg("should not vote for this block")
-		shouldVote = false
+		return nil
 	}
 
-	// send my vote if I should vote if I'm not the leader for the current view
-	if shouldVote {
-		e.notifier.OnVoting(ownVote)
-		log.Debug().Msg("forwarding vote to compliance engine")
-
-		// if I'm the next leader, just forward the vote to the vote aggregator of ourselves
-		// if I'm not the next leader, then send the vote to the next leader.
-		if isSelfNextLeader {
-			// TODO: consider add own vote along with the proposal atomically to VoteAggregator
-			// in order to ensure the own vote will always be included.
-			err := e.voteAggregator.AddVote(ownVote)
-			log.Warn().Err(err).Msg("could not forward vote to the vote aggregator of ourselves")
-		} else {
-			err := e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
-			if err != nil {
-				log.Warn().Err(err).Msg("could not forward vote")
-			}
+	// The following code is only reached, if this replica has produced a vote.
+	// Send the vote to the next leader (or directly process it, if I am the next leader).
+	e.notifier.OnVoting(ownVote)
+	log.Debug().Msg("forwarding vote to compliance engine")
+	if e.committee.Self() == nextLeader { // I am the next leader
+		err = e.voteAggregator.AddVote(ownVote)
+		log.Warn().Err(err).Msg("failed to add my own vote to vote aggregator")
+	} else {
+		err = e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
+		if err != nil {
+			log.Warn().Err(err).Msg("could not forward vote")
 		}
 	}
-
-	// inform pacemaker that we've done the work for the current view, it should increment the current view
-	_, viewChanged := e.paceMaker.UpdateCurViewWithBlock(block, isSelfNextLeader)
-	if !viewChanged {
-		// this is a sanity check
-		// when I've processed the block for the current view and I'm not the next leader,
-		// the pacemaker should trigger a view change
-		nextView := curView + 1
-		return fmt.Errorf("pacemaker should trigger a view change to (view %v), but didn't", nextView)
-	}
-
-	// current view has changed, go to new view
-	return e.startNewView()
+	return nil
 }
 
 // processQC stores the QC and check whether the QC will trigger view change.
