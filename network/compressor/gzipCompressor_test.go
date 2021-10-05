@@ -37,7 +37,13 @@ func TestRoundTrip(t *testing.T) {
 	//
 	r, err := gzipComp.NewReader(buf)
 	require.NoError(t, err)
-	b, err := io.ReadAll(r)
-	require.NoError(t, err)
+
+	b := make([]byte, textBytesLen)
+	n, err = r.Read(b)
+	// we read the entire buffer on reader, so it should return an EOF at the end
+	require.ErrorIs(t, err, io.EOF)
+	// we should read same number of bytes as we've written
+	require.Equal(t, n, textBytesLen)
+	// we should read what we have written
 	require.Equal(t, b, textBytes)
 }
