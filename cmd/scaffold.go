@@ -338,7 +338,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 		fnb.Logger.Fatal().Err(err).Msgf("could not parse node ID from string: %v", fnb.BaseConfig.nodeIDHex)
 	}
 
-	info, err := loadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
+	info, err := LoadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
 	if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("failed to load private node info")
 	}
@@ -1073,7 +1073,7 @@ func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
-func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
+func LoadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
 	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID))
 	data, err := io.ReadFile(path)
 	if err != nil {

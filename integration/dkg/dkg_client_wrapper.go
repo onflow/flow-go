@@ -14,6 +14,8 @@ import (
 	dkgmod "github.com/onflow/flow-go/module/dkg"
 )
 
+var errClientDisabled = fmt.Errorf("dkg client artifically disabled for tests")
+
 // DKGClientWrapper implements the DKGContractClient interface , and provides a
 // mechanism to simulate a situations where the DKG node cannot access the DKG
 // smart-contract. The client can be disabled so that all requests to the
@@ -59,7 +61,7 @@ func (c *DKGClientWrapper) WaitForSealed(ctx context.Context, txID sdk.Identifie
 // Broadcast implements the DKGContractClient interface
 func (c *DKGClientWrapper) Broadcast(msg model.BroadcastDKGMessage) error {
 	if !c.enabled {
-		return fmt.Errorf("failed to broadcast DKG message")
+		return fmt.Errorf("failed to broadcast DKG message: %w", errClientDisabled)
 	}
 	return c.client.Broadcast(msg)
 }
@@ -67,7 +69,7 @@ func (c *DKGClientWrapper) Broadcast(msg model.BroadcastDKGMessage) error {
 // ReadBroadcast implements the DKGContractClient interface
 func (c *DKGClientWrapper) ReadBroadcast(fromIndex uint, referenceBlock flow.Identifier) ([]messages.BroadcastDKGMessage, error) {
 	if !c.enabled {
-		return []messages.BroadcastDKGMessage{}, fmt.Errorf("failed to read DKG broadcast messages")
+		return []messages.BroadcastDKGMessage{}, fmt.Errorf("failed to read DKG broadcast messages: %w", errClientDisabled)
 	}
 	return c.client.ReadBroadcast(fromIndex, referenceBlock)
 }
@@ -75,7 +77,7 @@ func (c *DKGClientWrapper) ReadBroadcast(fromIndex uint, referenceBlock flow.Ide
 // SubmitResult implements the DKGContractClient interface
 func (c *DKGClientWrapper) SubmitResult(groupPubKey crypto.PublicKey, pubKeys []crypto.PublicKey) error {
 	if !c.enabled {
-		return fmt.Errorf("failed to submit DKG result")
+		return fmt.Errorf("failed to submit DKG result: %w", errClientDisabled)
 	}
 	return c.client.SubmitResult(groupPubKey, pubKeys)
 }
