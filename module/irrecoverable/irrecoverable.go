@@ -16,16 +16,12 @@ type Signaler struct {
 	errThrown *atomic.Bool
 }
 
-func NewSignaler() *Signaler {
+func NewSignaler() (*Signaler, <-chan error) {
+	errChan := make(chan error, 1)
 	return &Signaler{
-		errChan:   make(chan error, 1),
+		errChan:   errChan,
 		errThrown: atomic.NewBool(false),
-	}
-}
-
-// Error returns the Signaler's error channel.
-func (s *Signaler) Error() <-chan error {
-	return s.errChan
+	}, errChan
 }
 
 // Throw is a narrow drop-in replacement for panic, log.Fatal, log.Panic, etc
@@ -34,13 +30,12 @@ func (s *Signaler) Error() <-chan error {
 // errors as unhandled.
 func (s *Signaler) Throw(err error) {
 	defer runtime.Goexit()
-
 	if s.errThrown.CAS(false, true) {
 		s.errChan <- err
 		close(s.errChan)
 	} else {
-		// TODO: we simply log the unhandled irrecoverable for now, but we should probably
-		// find a way to actually handle them.
+		// TODO: we simply log the unhandled irrecoverable to stderr for now, but we should probably
+		// allow the user to customize the logger / logging format used
 		log.New(os.Stderr, "", log.LstdFlags).Println(fmt.Errorf("unhandled irrecoverable: %w", err))
 	}
 }
