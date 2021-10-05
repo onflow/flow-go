@@ -66,6 +66,7 @@ unittest:
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	$(MAKE) -C crypto test
+	$(MAKE) -C crypto cross-blst-test
 	$(MAKE) -C integration test
 
 .PHONY: test
@@ -307,7 +308,7 @@ tool-bootstrap: docker-build-bootstrap
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=bootstrap/transit --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(VERSION) --no-cache \
-	    --target production-transit-nocgo  \
+	    --target production  \
 		-t "$(CONTAINER_REGISTRY)/bootstrap-transit:latest" -t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(IMAGE_TAG)" .
 
 PHONY: tool-transit

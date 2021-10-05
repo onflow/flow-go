@@ -82,6 +82,13 @@ func (u *Unit) LaunchPeriodically(f func(), interval time.Duration, delay time.D
 
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
+
+		select {
+		case <-u.ctx.Done():
+			return
+		case <-time.After(delay):
+		}
+
 		for {
 			select {
 			case <-u.ctx.Done():

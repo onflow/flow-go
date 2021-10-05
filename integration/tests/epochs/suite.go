@@ -59,6 +59,7 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
 		testnet.NewNodeConfig(flow.RoleAccess),
+		testnet.NewNodeConfig(flow.RoleAccess),
 		ghostConNode,
 	}
 

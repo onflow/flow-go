@@ -875,6 +875,17 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	return &identity
 }
 
+// IdentityFixture returns a node identity and networking private key
+func IdentityWithNetworkingKeyFixture(opts ...func(*flow.Identity)) (*flow.Identity, crypto.PrivateKey) {
+	networkKey, err := NetworkingKey()
+	if err != nil {
+		panic(err)
+	}
+	opts = append(opts, WithNetworkingKey(networkKey.PublicKey()))
+	id := IdentityFixture(opts...)
+	return id, networkKey
+}
+
 func WithKeys(identity *flow.Identity) {
 	staking, err := StakingKey()
 	if err != nil {
