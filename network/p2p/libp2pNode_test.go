@@ -279,8 +279,6 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
 func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
-	suite.T().Skip()
-
 	count := 2
 	ch := make(chan string, count)
 
