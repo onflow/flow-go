@@ -11,7 +11,7 @@ import (
 func ValidateAccessNodeIDSFlag(accessNodeIDS []string, chainID flow.ChainID, snapshot protocol.Snapshot) ([]flow.Identifier, error) {
 	// disallow all flag for mainnet
 	if accessNodeIDS[0] == "*" && chainID == flow.Mainnet {
-		return nil, fmt.Errorf("all ('*') can not be used as a value on network %s, please specify  access node IDS explicitly.", flow.Mainnet)
+		return nil, fmt.Errorf("all ('*') can not be used as a value on network %s, please specify access node IDs explicitly.", flow.Mainnet)
 	}
 
 	if accessNodeIDS[0] == "*" {
