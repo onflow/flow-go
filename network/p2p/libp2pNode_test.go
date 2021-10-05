@@ -532,7 +532,7 @@ func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
 			require.NoError(suite.T(), err)
 		}(s)
 		// wait for stream to be closed
-		wg.Wait()
+		unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second, "could not close stream")
 
 		// wait for the message to be received
 		unittest.RequireReturnsBefore(suite.T(),
