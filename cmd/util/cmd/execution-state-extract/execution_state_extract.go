@@ -94,8 +94,9 @@ func extractExecutionState(
 				RWF:   reportFileWriterFactory,
 			},
 			&reporters.BalanceReporter{
-				Log: log,
-				RWF: reportFileWriterFactory,
+				Log:   log,
+				Chain: chain,
+				RWF:   reportFileWriterFactory,
 			},
 		}
 	}

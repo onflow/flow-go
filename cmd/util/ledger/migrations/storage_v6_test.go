@@ -859,7 +859,10 @@ func TestDeferredValues(t *testing.T) {
 
 	ledgerView := NewView(payloads)
 
-	migration := &StorageFormatV6Migration{}
+	dir := t.TempDir()
+	migration := &StorageFormatV6Migration{
+		OutputDir: dir,
+	}
 	migration.initPersistentSlabStorage(ledgerView)
 	migration.initNewInterpreter()
 	migration.initOldInterpreter(payloads)

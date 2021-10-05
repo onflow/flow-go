@@ -1,6 +1,7 @@
 package reporters
 
 import (
+	"fmt"
 	"runtime"
 	"strings"
 	"sync"
@@ -16,6 +17,7 @@ import (
 	"github.com/onflow/cadence/runtime/interpreter"
 
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -23,10 +25,12 @@ import (
 
 // BalanceReporter iterates through registers getting the location and balance of all FlowVaults
 type BalanceReporter struct {
-	Log      zerolog.Logger
-	RWF      ReportWriterFactory
-	rw       ReportWriter
-	progress *progressbar.ProgressBar
+	Log         zerolog.Logger
+	RWF         ReportWriterFactory
+	Chain       flow.Chain
+	rw          ReportWriter
+	progress    *progressbar.ProgressBar
+	vaultTypeID string
 }
 
 func (r *BalanceReporter) Name() string {
@@ -53,6 +57,7 @@ func (r *BalanceReporter) Report(payload []ledger.Payload) error {
 	defer r.rw.Close()
 
 	r.progress = progressbar.Default(int64(len(payload)), "Processing:")
+	r.vaultTypeID = fmt.Sprintf("A.%s.FlowToken.Vault", fvm.FlowTokenAddress(r.Chain).Hex())
 
 	l := migrations.NewView(payload)
 
@@ -164,7 +169,7 @@ func (r *BalanceReporter) handlePayload(p ledger.Payload, storage *cadenceRuntim
 				firstComposite = string(value.TypeID())
 			}
 
-			if string(value.TypeID()) == "A.1654653399040a61.FlowToken.Vault" {
+			if string(value.TypeID()) == r.vaultTypeID {
 				b := uint64(value.GetField("balance").(interpreter.UFix64Value))
 				if b == 0 {
 					// ignore 0 balance results
