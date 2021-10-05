@@ -136,6 +136,11 @@ func DefaultAccessNodeIDS(snapshot protocol.Snapshot) ([]flow.Identifier, error)
 		return nil, fmt.Errorf("failed to get staked access node IDs from protocol state %w", err)
 	}
 
+	// sanity check something went wrong if no access node IDs are returned
+	if len(identities) == 0 {
+		return nil, fmt.Errorf("faled to get any access node IDs from protocol state")
+	}
+
 	return identities.NodeIDs(), nil
 }
 
