@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"go.uber.org/atomic"
-	"golang.org/x/sync/errgroup"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -16,7 +15,6 @@ import (
 // channels that close when startup and shutdown have completed.
 // Once Start has been called, the channel returned by Done must close eventually,
 // whether that be because of a graceful shutdown or an irrecoverable error.
-// If Start returns an error, the done channel should close immediately.
 type Component interface {
 	module.Startable
 	module.ReadyDoneAware
@@ -26,9 +24,9 @@ type NoopComponent struct{}
 
 var _ Component = (*NoopComponent)(nil)
 
-func (c *NoopComponent) Start(irrecoverable.SignalerContext) error { return nil }
-func (c *NoopComponent) Ready() <-chan struct{}                    { return nil }
-func (c *NoopComponent) Done() <-chan struct{}                     { return nil }
+func (c *NoopComponent) Start(irrecoverable.SignalerContext) {}
+func (c *NoopComponent) Ready() <-chan struct{}              { return nil }
+func (c *NoopComponent) Done() <-chan struct{}               { return nil }
 
 type ComponentFactory func() (Component, error)
 
@@ -55,7 +53,6 @@ const (
 // - The context error if the context was canceled
 // - The last error handled if the error handler returns ErrorHandlingStop
 // - An error returned from componentFactory while generating an instance of component
-// - An error returned from starting an instance of the component
 func RunComponent(ctx context.Context, componentFactory ComponentFactory, handler OnError) error {
 	// reference to per-run signals for the component
 	var component Component
@@ -75,14 +72,11 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 		var runCtx context.Context
 		runCtx, cancel = context.WithCancel(ctx)
 
-		// signaler used for irrecoverables
+		// signaler context used for irrecoverables
 		var signalCtx irrecoverable.SignalerContext
 		signalCtx, irrecoverableErr = irrecoverable.WithSignaler(runCtx)
 
-		if err = component.Start(signalCtx); err != nil {
-			cancel()
-			return err
-		}
+		component.Start(signalCtx)
 
 		done = component.Done()
 
@@ -102,7 +96,7 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 
 		select {
 		case <-done:
-			// either clean completion or canceled by context
+			// clean completion or canceled by context
 			return ctx.Err()
 		case err := <-irrecoverableErr:
 			stop()
@@ -125,18 +119,8 @@ type ReadyFunc func()
 // ComponentWorker represents a worker routine of a component
 type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
 
-// ComponentStartupRoutine implements a startup routine for a component
-// This is where a component should perform any necessary startup tasks
-// before worker routines are launched.
-type ComponentStartupRoutine func(context.Context) error
-
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
-	// AddStartupRoutine adds a startup routine for the ComponentManager
-	// If an error is encountered during the startup routine, the ComponentManager
-	// will shutdown immediately
-	AddStartupRoutine(ComponentStartupRoutine) ComponentManagerBuilder
-
 	// AddWorker adds a worker routine for the ComponentManager
 	AddWorker(ComponentWorker) ComponentManagerBuilder
 
@@ -145,18 +129,12 @@ type ComponentManagerBuilder interface {
 }
 
 type componentManagerBuilderImpl struct {
-	startupRoutines []ComponentStartupRoutine
-	workers         []ComponentWorker
+	workers []ComponentWorker
 }
 
 // NewComponentManagerBuilder returns a new ComponentManagerBuilder
 func NewComponentManagerBuilder() ComponentManagerBuilder {
 	return &componentManagerBuilderImpl{}
-}
-
-func (c *componentManagerBuilderImpl) AddStartupRoutine(startupRoutine ComponentStartupRoutine) ComponentManagerBuilder {
-	c.startupRoutines = append(c.startupRoutines, startupRoutine)
-	return c
 }
 
 func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
@@ -166,11 +144,10 @@ func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) Componen
 
 func (c *componentManagerBuilderImpl) Build() *ComponentManager {
 	return &ComponentManager{
-		started:         atomic.NewBool(false),
-		ready:           make(chan struct{}),
-		done:            make(chan struct{}),
-		workers:         c.workers,
-		startupRoutines: c.startupRoutines,
+		started: atomic.NewBool(false),
+		ready:   make(chan struct{}),
+		done:    make(chan struct{}),
+		workers: c.workers,
 	}
 }
 
@@ -185,31 +162,13 @@ type ComponentManager struct {
 	done           chan struct{}
 	shutdownSignal <-chan struct{}
 
-	startupRoutines []ComponentStartupRoutine
-	workers         []ComponentWorker
+	workers []ComponentWorker
 }
 
-// Start initiates the ComponentManager by first running the startup routines provided, and then
-// launching all worker routines.
-// If an error is encountered during any startup routine, the remaining routines are canceled and
-// the error is returned.
-func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) error {
+// Start initiates the ComponentManager by launching all worker routines.
+func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	// only start once
 	if c.started.CAS(false, true) {
-		startupGroup, startupCtx := errgroup.WithContext(parent)
-
-		for _, startupRoutine := range c.startupRoutines {
-			startupRoutine := startupRoutine
-			startupGroup.Go(func() error {
-				return startupRoutine(startupCtx)
-			})
-		}
-
-		if err := startupGroup.Wait(); err != nil {
-			defer close(c.done)
-			return err
-		}
-
 		ctx, cancel := context.WithCancel(parent)
 		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 		c.shutdownSignal = ctx.Done()
@@ -251,11 +210,9 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) error {
 
 		// launch goroutine to close done channel
 		go c.waitForDone(&workersDone)
-
-		return nil
 	}
 
-	return module.ErrMultipleStartup
+	panic(module.ErrMultipleStartup)
 }
 
 func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
@@ -269,15 +226,13 @@ func (c *ComponentManager) waitForDone(workersDone *sync.WaitGroup) {
 }
 
 // Ready returns a channel which is closed once all the worker routines have been launched and are ready.
-// If an error occurs during Start, the channel returned from Ready will never close.
+// If any worker routines exit before they indicate that they are ready, the channel returned from Ready will never close.
 func (c *ComponentManager) Ready() <-chan struct{} {
 	return c.ready
 }
 
 // Done returns a channel which is closed once the ComponentManager has shut down.
-// This can happen either if an error is returned from Start, or all worker routines have exited.
-// If Start did not return an error, the returned channel will close when all worker routines have
-// shut down (either gracefully or by throwing an error).
+// This happens when all worker routines have shut down (either gracefully or by throwing an error).
 func (c *ComponentManager) Done() <-chan struct{} {
 	return c.done
 }
@@ -285,7 +240,7 @@ func (c *ComponentManager) Done() <-chan struct{} {
 // ShutdownSignal returns a channel that is closed when shutdown has commenced.
 // This can happen either if the ComponentManager's context is canceled, or a worker routine encounters
 // an irrecoverable error.
-// If this is called before Start or after Start returned an error, a nil channel will be returned.
+// If this is called before Start, a nil channel will be returned.
 func (c *ComponentManager) ShutdownSignal() <-chan struct{} {
 	return c.shutdownSignal
 }
