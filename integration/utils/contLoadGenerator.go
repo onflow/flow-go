@@ -336,7 +336,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 			lg.log.Error().Err(err).Msg("setup transaction (account creation) encountered an error")
 			wg.Done()
 		}, // on error
-		120)
+		180)
 
 	wg.Wait()
 
