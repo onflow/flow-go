@@ -105,7 +105,7 @@ func NewNetwork(
 	o.mw.SetOverlay(o)
 
 	o.ComponentManager = component.NewComponentManagerBuilder().
-		OnStart(func(ctx context.Context) error {
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// setup the message queue
 			// create priority queue
 			o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, metrics)
@@ -113,16 +113,21 @@ func NewNetwork(
 			// create workers to read from the queue and call queueSubmitFunc
 			queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
 
-			return nil
+			o.mw.Start(ctx)
+			<-o.mw.Ready()
+
+			ready()
 		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext) {
+		AddWorker(func(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+
 			for {
 				select {
 				case req := <-o.registerRequests:
 					// TODO: remove ctx field from Conduit
 
 					// create a cancellable child context
-					ctx, cancel := context.WithCancel(ctx)
+					ctx, cancel := context.WithCancel(parent)
 
 					// create the conduit
 					conduit := &Conduit{
@@ -140,11 +145,11 @@ func NewNetwork(
 						return
 					case req.respChan <- conduit:
 					}
-				case <-ctx.Done():
+				case <-parent.Done():
 					return
 				}
 			}
-		}).AddComponent(o.mw).Build()
+		}).Build()
 
 	return o, nil
 }
