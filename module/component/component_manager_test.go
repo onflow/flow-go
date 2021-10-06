@@ -438,7 +438,8 @@ func (c *ComponentManagerMachine) Init(t *rapid.T) {
 	var signalerErr error
 
 	c.resetChannelReadTimeout = func() {
-		ctx, _ := context.WithTimeout(context.Background(), CHANNEL_CLOSE_LATENCY_ALLOWANCE)
+		ctx, cancel := context.WithTimeout(context.Background(), CHANNEL_CLOSE_LATENCY_ALLOWANCE)
+		_ = cancel
 		channelReadTimeout = ctx.Done()
 	}
 
