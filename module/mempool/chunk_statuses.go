@@ -7,10 +7,10 @@ import (
 
 // ChunkStatuses is an in-memory storage for maintaining the chunk status data objects.
 type ChunkStatuses interface {
-	// ByID returns a chunk status by its chunk ID.
+	// Get returns a chunk status by its chunk index and result ID.
 	// There is a one-to-one correspondence between the chunk statuses in memory, and
-	// their chunk ID.
-	ByID(chunkID flow.Identifier) (*verification.ChunkStatus, bool)
+	// their pair of chunk index and result id.
+	Get(chunkIndex uint64, chunkID flow.Identifier) (*verification.ChunkStatus, bool)
 
 	// Add provides insertion functionality into the memory pool.
 	// The insertion is only successful if there is no duplicate status with the same
