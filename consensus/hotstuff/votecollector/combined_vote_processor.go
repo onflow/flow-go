@@ -155,7 +155,7 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		return nil
 	}
 
-	// Our algorithm for checking votes and adding them to the aggregators should 
+	// Our algorithm for checking votes and adding them to the aggregators should
 	// guarantee that we are _always_ able to successfully construct a QC when we
 	// reach this point. A failure implies that the VoteProcessor's internal state is corrupted.
 	qc, err := p.buildQC()
