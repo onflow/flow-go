@@ -45,13 +45,13 @@ func (_m *ChunkStatuses) All() []*verification.ChunkStatus {
 	return r0
 }
 
-// ByID provides a mock function with given fields: chunkID
-func (_m *ChunkStatuses) Get(chunkID flow.Identifier) (*verification.ChunkStatus, bool) {
-	ret := _m.Called(chunkID)
+// Get provides a mock function with given fields: chunkIndex, chunkID
+func (_m *ChunkStatuses) Get(chunkIndex uint64, chunkID flow.Identifier) (*verification.ChunkStatus, bool) {
+	ret := _m.Called(chunkIndex, chunkID)
 
 	var r0 *verification.ChunkStatus
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *verification.ChunkStatus); ok {
-		r0 = rf(chunkID)
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) *verification.ChunkStatus); ok {
+		r0 = rf(chunkIndex, chunkID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*verification.ChunkStatus)
@@ -59,8 +59,8 @@ func (_m *ChunkStatuses) Get(chunkID flow.Identifier) (*verification.ChunkStatus
 	}
 
 	var r1 bool
-	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
-		r1 = rf(chunkID)
+	if rf, ok := ret.Get(1).(func(uint64, flow.Identifier) bool); ok {
+		r1 = rf(chunkIndex, chunkID)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
@@ -68,13 +68,13 @@ func (_m *ChunkStatuses) Get(chunkID flow.Identifier) (*verification.ChunkStatus
 	return r0, r1
 }
 
-// Rem provides a mock function with given fields: chunkID
-func (_m *ChunkStatuses) Rem(chunkID flow.Identifier) bool {
-	ret := _m.Called(chunkID)
+// Rem provides a mock function with given fields: chunkIndex, resultID
+func (_m *ChunkStatuses) Rem(chunkIndex uint64, resultID flow.Identifier) bool {
+	ret := _m.Called(chunkIndex, resultID)
 
 	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
-		r0 = rf(chunkID)
+	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) bool); ok {
+		r0 = rf(chunkIndex, resultID)
 	} else {
 		r0 = ret.Get(0).(bool)
 	}
