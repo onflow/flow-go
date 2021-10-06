@@ -15,7 +15,6 @@ import (
 	"math/big"
 	"net"
 	"net/http"
-	"sync"
 	"testing"
 	"time"
 
@@ -59,9 +58,6 @@ func (suite *CommandRunnerSuite) TearDownTest() {
 	suite.NoError(err)
 	suite.cancel()
 	<-suite.runner.Done()
-	suite.Len(suite.runner.commandQ, 0)
-	_, ok := <-suite.runner.commandQ
-	suite.False(ok)
 }
 
 func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption) {
@@ -274,7 +270,11 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 	reqBody := bytes.NewBuffer([]byte(`{"commandName": "foo", "data": {"key": "value"}}`))
 	resp, err := http.Post(url, "application/json", reqBody)
 	suite.NoError(err)
-	defer resp.Body.Close()
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
 
 	suite.True(called)
 	suite.Equal("200 OK", resp.Status)
@@ -431,36 +431,4 @@ func (suite *CommandRunnerSuite) TestTLS() {
 
 	suite.True(called)
 	suite.Equal("200 OK", resp.Status)
-}
-
-func (suite *CommandRunnerSuite) TestCleanup() {
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
-		<-ctx.Done()
-		return ctx.Err()
-	})
-
-	suite.SetupCommandRunner()
-
-	data := make(map[string]interface{})
-	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
-	suite.NoError(err)
-	request := &pb.RunCommandRequest{
-		CommandName: "foo",
-		Data:        val,
-	}
-
-	var requestsDone sync.WaitGroup
-	for i := 0; i < CommandRunnerMaxQueueLength; i++ {
-		requestsDone.Add(1)
-		go func() {
-			defer requestsDone.Done()
-			_, err = suite.client.RunCommand(context.Background(), request)
-			suite.Error(err)
-		}()
-	}
-
-	suite.cancel()
-
-	requestsDone.Wait()
 }

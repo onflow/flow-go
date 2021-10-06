@@ -46,6 +46,12 @@ type EncodableDKG struct {
 	Participants map[flow.Identifier]flow.DKGParticipant
 }
 
+type EncodableFullDKG struct {
+	GroupKey      encodable.RandomBeaconPubKey
+	PrivKeyShares []encodable.RandomBeaconPrivKey
+	PubKeyShares  []encodable.RandomBeaconPubKey
+}
+
 // EncodableCluster is the encoding format for protocol.Cluster
 type EncodableCluster struct {
 	Index     uint
