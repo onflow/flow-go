@@ -982,28 +982,37 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 			)
 		case runtime.Error:
 			if parsingCheckingErr, ok := err.Unwrap().(*runtime.ParsingCheckingError); ok {
-				c.migration.reportFile.WriteString(
+				_, err := c.migration.reportFile.WriteString(
 					fmt.Sprintf(
 						"skipped migrating value: broken contract type: %s, cause: %s\n",
 						parsingCheckingErr.Location,
 						parsingCheckingErr.Error(),
 					),
 				)
+				if err != nil {
+					panic(err)
+				}
 			} else {
-				c.migration.reportFile.WriteString(
+				_, err := c.migration.reportFile.WriteString(
 					fmt.Sprintf(
 						"skipped migrating value: cause: %s\n",
 						err.Error(),
 					),
 				)
+				if err != nil {
+					panic(err)
+				}
 			}
 		case newInter.Error:
-			c.migration.reportFile.WriteString(
+			_, er := c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: cause: %s\n",
 					err.Error(),
 				),
 			)
+			if er != nil {
+				panic(err)
+			}
 		default:
 			panic(err)
 		}
