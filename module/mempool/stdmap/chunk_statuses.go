@@ -50,11 +50,16 @@ func (cs *ChunkStatuses) Add(status *verification.ChunkStatus) bool {
 	return cs.Backend.Add(status)
 }
 
-// Rem provides deletion functionality from the memory pool.
-// If there is a chunk status with this ID, Rem removes it and returns true.
-// Otherwise it returns false.
-func (cs *ChunkStatuses) Rem(chunkID flow.Identifier) bool {
-	return cs.Backend.Rem(chunkID)
+// Rem provides deletion functionality from the memory pool based on the pair of
+// chunk index and result id.
+// If there is a chunk status associated with this pair, Rem removes it and returns true.
+// Otherwise, it returns false.
+func (cs *ChunkStatuses) Rem(chunkIndex uint64, resultID flow.Identifier) bool {
+	locatorID := chunks.Locator{
+		ResultID: resultID,
+		Index:    chunkIndex,
+	}.ID()
+	return cs.Backend.Rem(locatorID)
 }
 
 // All returns all chunk statuses stored in this memory pool.
