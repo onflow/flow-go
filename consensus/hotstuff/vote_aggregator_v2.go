@@ -34,9 +34,9 @@ type VoteAggregatorV2 interface {
 	// No errors are expected during normal operations, any error should be threatened as exception
 	AddVote(vote *model.Vote) error
 
-	// AddBlock notifies the VoteAggregator about a known block so that it can start processing
-	// pending votes whose block was unknown.
-	// It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
+	// AddBlock notifies the VoteAggregator that it should start processing votes for the given block.
+	// AddBlock is a _synchronous_ call (logic is executed by the calling go routine). It also verifies
+	// validity of the proposer's vote for its own block.
 	// Expected error returns during normal operations:
 	// * model.InvalidBlockError if the block is invalid
 	AddBlock(block *model.Proposal) error

@@ -64,7 +64,6 @@ func (s *VoteAggregatorV2TestSuite) SetupTest() {
 		})
 
 	var err error
-
 	s.aggregator, err = NewVoteAggregatorV2(unittest.Logger(), s.notifier, 0, s.collectors)
 	require.NoError(s.T(), err)
 
@@ -85,7 +84,7 @@ func (s *VoteAggregatorV2TestSuite) prepareMockedCollector(view uint64) *mocks.V
 	return collector
 }
 
-// TestAddVote_DeliveryOfQueuedVotes tests if votes are being delivered for processing by queening logic
+// TestAddVote_DeliveryOfQueuedVotes tests if votes are being delivered for processing by queueing logic
 func (s *VoteAggregatorV2TestSuite) TestAddVote_DeliveryOfQueuedVotes() {
 	view := uint64(1000)
 	clr := s.prepareMockedCollector(view)
@@ -138,7 +137,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddBlock_ValidProposal() {
 	view := uint64(1000)
 	clr := s.prepareMockedCollector(view)
 	proposal := helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(view))))
-	clr.On("ProcessBlock", proposal).Return(nil)
+	clr.On("ProcessBlock", proposal).Return(nil).Once()
 	err := s.aggregator.AddBlock(proposal)
 	require.NoError(s.T(), err)
 	clr.AssertExpectations(s.T())
@@ -192,7 +191,7 @@ func (s *VoteAggregatorV2TestSuite) TestVoteProcessing_DoubleVoting() {
 	firstVote := unittest.VoteFixture(unittest.WithVoteView(view))
 	secondVote := unittest.VoteFixture(unittest.WithVoteView(view))
 	clr.On("AddVote", secondVote).Return(model.NewDoubleVoteErrorf(firstVote, secondVote, ""))
-	s.notifier.On("OnDoubleVotingDetected", firstVote, secondVote).Return(nil)
+	s.notifier.On("OnDoubleVotingDetected", firstVote, secondVote).Return(nil).Once()
 
 	err := s.aggregator.processQueuedVote(secondVote)
 	// double voting should be handled internally and reported to notifier
@@ -222,9 +221,10 @@ func (s *VoteAggregatorV2TestSuite) TestVoteProcessing_ProcessingExceptions() {
 	vote = unittest.VoteFixture(unittest.WithVoteView(view))
 	clr := s.prepareMockedCollector(view)
 	expectedError := errors.New("processing-error")
-	clr.On("AddVote", vote).Return(expectedError)
+	clr.On("AddVote", vote).Return(expectedError).Once()
 	err = s.aggregator.processQueuedVote(vote)
 	require.ErrorIs(s.T(), err, expectedError)
+	clr.AssertExpectations(s.T())
 }
 
 // TestInvalidBlock tests that InvalidBlock reports all previously processed votes to hotstuff.Consumer
