@@ -965,41 +965,47 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 
 		switch err := r.(type) {
 		case newInter.TypeLoadingError:
-			c.migration.reportFile.WriteString(
+			_, er := c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: missing static type: %s, owner: %s\n",
 					err.TypeID,
 					value.GetOwner(),
 				),
 			)
+			if er != nil {
+				panic(err)
+			}
 		case newInter.ContainerMutationError:
-			c.migration.reportFile.WriteString(
+			_, er := c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: %s, owner: %s\n",
 					err.Error(),
 					value.GetOwner(),
 				),
 			)
+			if er != nil {
+				panic(err)
+			}
 		case runtime.Error:
 			if parsingCheckingErr, ok := err.Unwrap().(*runtime.ParsingCheckingError); ok {
-				_, err := c.migration.reportFile.WriteString(
+				_, er := c.migration.reportFile.WriteString(
 					fmt.Sprintf(
 						"skipped migrating value: broken contract type: %s, cause: %s\n",
 						parsingCheckingErr.Location,
 						parsingCheckingErr.Error(),
 					),
 				)
-				if err != nil {
+				if er != nil {
 					panic(err)
 				}
 			} else {
-				_, err := c.migration.reportFile.WriteString(
+				_, er := c.migration.reportFile.WriteString(
 					fmt.Sprintf(
 						"skipped migrating value: cause: %s\n",
 						err.Error(),
 					),
 				)
-				if err != nil {
+				if er != nil {
 					panic(err)
 				}
 			}
