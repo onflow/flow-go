@@ -46,7 +46,7 @@ func (_m *ChunkStatuses) All() []*verification.ChunkStatus {
 }
 
 // ByID provides a mock function with given fields: chunkID
-func (_m *ChunkStatuses) ByID(chunkID flow.Identifier) (*verification.ChunkStatus, bool) {
+func (_m *ChunkStatuses) Get(chunkID flow.Identifier) (*verification.ChunkStatus, bool) {
 	ret := _m.Called(chunkID)
 
 	var r0 *verification.ChunkStatus
