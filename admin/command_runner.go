@@ -24,11 +24,7 @@ import (
 
 var _ component.Component = (*CommandRunner)(nil)
 
-const (
-	CommandRunnerMaxQueueLength  = 128
-	CommandRunnerNumWorkers      = 1
-	CommandRunnerShutdownTimeout = 5 * time.Second
-)
+const CommandRunnerShutdownTimeout = 5 * time.Second
 
 type CommandHandler func(ctx context.Context, data map[string]interface{}) error
 type CommandValidator func(data map[string]interface{}) error
