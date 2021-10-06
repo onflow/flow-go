@@ -948,6 +948,78 @@ func TestBlockContext_ExecuteScript(t *testing.T) {
 		assert.Equal(t, "\"foo\"", script.Logs[0])
 		assert.Equal(t, "\"bar\"", script.Logs[1])
 	})
+
+	t.Run("storage ID allocation", func(t *testing.T) {
+
+		ledger := testutil.RootBootstrappedLedger(vm, ctx)
+
+		// Create an account private key.
+		privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+		require.NoError(t, err)
+
+		// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+		accounts, err := testutil.CreateAccounts(vm, ledger, programs.NewEmptyPrograms(), privateKeys, chain)
+		require.NoError(t, err)
+
+		// Deploy the test contract
+
+		const contract = `
+			pub contract Test {
+
+				pub struct Foo {}
+
+                pub let foos: [Foo]
+
+				init() {
+					self.foos = []
+				}
+
+				pub fun add() {
+					self.foos.append(Foo())
+				}
+			}
+		`
+
+		address := accounts[0]
+
+		txBody := testutil.CreateContractDeploymentTransaction("Test", contract, address, chain)
+
+		txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+		txBody.SetPayer(chain.ServiceAddress())
+
+		err = testutil.SignPayload(txBody, address, privateKeys[0])
+		require.NoError(t, err)
+
+		err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+		require.NoError(t, err)
+
+		tx := fvm.Transaction(txBody, 0)
+
+		err = vm.Run(ctx, tx, ledger, programs.NewEmptyPrograms())
+		require.NoError(t, err)
+
+		assert.NoError(t, tx.Err)
+
+		// Run test script
+
+		code := []byte(fmt.Sprintf(
+			`
+			  import Test from 0x%s
+
+			  pub fun main() {
+			      Test.add()
+			  }
+			`,
+			address.String(),
+		))
+
+		script := fvm.Script(code)
+
+		err = vm.Run(ctx, script, ledger, programs.NewEmptyPrograms())
+		assert.NoError(t, err)
+
+		assert.NoError(t, script.Err)
+	})
 }
 
 func TestBlockContext_GetBlockInfo(t *testing.T) {
