@@ -13,11 +13,17 @@ type ChunkStatus struct {
 }
 
 func (s ChunkStatus) ID() flow.Identifier {
-	return s.ExecutionResult.Chunks[s.ChunkIndex].ID()
+	return chunks.Locator{
+		ResultID: s.ExecutionResult.ID(),
+		Index:    s.ChunkIndex,
+	}.ID()
 }
 
 func (s ChunkStatus) Checksum() flow.Identifier {
-	return s.ExecutionResult.Chunks[s.ChunkIndex].ID()
+	return chunks.Locator{
+		ResultID: s.ExecutionResult.ID(),
+		Index:    s.ChunkIndex,
+	}.ID()
 }
 
 func (s ChunkStatus) ChunkLocatorID() flow.Identifier {
