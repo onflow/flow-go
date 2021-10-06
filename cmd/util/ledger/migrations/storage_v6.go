@@ -120,7 +120,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		m.programs = programs.NewEmptyPrograms()
 	}
 
-	m.migratedPayloadPaths = make(map[storagePath]bool, 0)
+	m.migratedPayloadPaths = make(map[storagePath]bool)
 
 	fvmPayloads, storagePayloads, slabPayloads := splitPayloads(payloads)
 	if len(slabPayloads) != 0 {
@@ -231,17 +231,6 @@ func (m *StorageFormatV6Migration) completeProgress() {
 	}
 }
 
-func (m *StorageFormatV6Migration) addProgress(progress int) {
-	if m.progress == nil {
-		return
-	}
-
-	err := m.progress.Add(progress)
-	if err != nil {
-		panic(err)
-	}
-}
-
 func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
 	st := state.NewState(
 		v,
@@ -270,7 +259,7 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 	m.clearProgress()
 	m.Log.Info().Msgf("Collecting deferred keys...")
 
-	deferredValuePaths := make(map[storagePath]bool, 0)
+	deferredValuePaths := make(map[storagePath]bool)
 	for _, payload := range payloads {
 		m.incrementProgress()
 
@@ -587,7 +576,7 @@ func (m *StorageFormatV6Migration) decode(
 	if err != nil {
 		if tagErr, ok := err.(oldInter.UnsupportedTagDecodingError); ok &&
 			tagErr.Tag == cborTagStorageReference &&
-			bytes.Compare(data[:2], storageReferenceEncodingStart) == 0 {
+			bytes.Equal(data[:2], storageReferenceEncodingStart) {
 
 			m.Log.Warn().
 				Str("key", key).
@@ -976,45 +965,60 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 
 		switch err := r.(type) {
 		case newInter.TypeLoadingError:
-			c.migration.reportFile.WriteString(
+			_, er := c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: missing static type: %s, owner: %s\n",
 					err.TypeID,
 					value.GetOwner(),
 				),
 			)
+			if er != nil {
+				panic(err)
+			}
 		case newInter.ContainerMutationError:
-			c.migration.reportFile.WriteString(
+			_, er := c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: %s, owner: %s\n",
 					err.Error(),
 					value.GetOwner(),
 				),
 			)
+			if er != nil {
+				panic(err)
+			}
 		case runtime.Error:
 			if parsingCheckingErr, ok := err.Unwrap().(*runtime.ParsingCheckingError); ok {
-				c.migration.reportFile.WriteString(
+				_, er := c.migration.reportFile.WriteString(
 					fmt.Sprintf(
 						"skipped migrating value: broken contract type: %s, cause: %s\n",
 						parsingCheckingErr.Location,
 						parsingCheckingErr.Error(),
 					),
 				)
+				if er != nil {
+					panic(err)
+				}
 			} else {
-				c.migration.reportFile.WriteString(
+				_, er := c.migration.reportFile.WriteString(
 					fmt.Sprintf(
 						"skipped migrating value: cause: %s\n",
 						err.Error(),
 					),
 				)
+				if er != nil {
+					panic(err)
+				}
 			}
 		case newInter.Error:
-			c.migration.reportFile.WriteString(
+			_, er := c.migration.reportFile.WriteString(
 				fmt.Sprintf(
 					"skipped migrating value: cause: %s\n",
 					err.Error(),
 				),
 			)
+			if er != nil {
+				panic(err)
+			}
 		default:
 			panic(err)
 		}
