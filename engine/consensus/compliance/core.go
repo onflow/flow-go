@@ -162,7 +162,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 			ancestorHeight = ancestor.Header.Height - 1
 		}
 
-		log.Info().
+		log.Debug().
 			Uint64("ancestor_height", ancestorHeight).
 			Hex("ancestor_id", ancestorID[:]).
 			Msg("requesting missing ancestor for proposal")
@@ -182,7 +182,7 @@ func (c *Core) OnBlockProposal(originID flow.Identifier, proposal *messages.Bloc
 
 		c.mempool.MempoolEntries(metrics.ResourceProposal, c.pending.Size())
 
-		log.Info().Msg("requesting missing parent for proposal")
+		log.Debug().Msg("requesting missing parent for proposal")
 
 		c.sync.RequestBlock(header.ParentID)
 

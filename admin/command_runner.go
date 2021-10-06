@@ -22,9 +22,14 @@ import (
 
 const CommandRunnerShutdownTimeout = 5 * time.Second
 
-type CommandHandler func(ctx context.Context, data map[string]interface{}) error
-type CommandValidator func(data map[string]interface{}) error
+type CommandHandler func(ctx context.Context, request *CommandRequest) error
+type CommandValidator func(request *CommandRequest) error
 type CommandRunnerOption func(*CommandRunner)
+
+type CommandRequest struct {
+	Data          map[string]interface{}
+	ValidatorData interface{}
+}
 
 func WithTLS(config *tls.Config) CommandRunnerOption {
 	return func(r *CommandRunner) {
@@ -242,14 +247,15 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 func (r *CommandRunner) runCommand(ctx context.Context, command string, data map[string]interface{}) error {
 	r.logger.Info().Str("command", command).Msg("received new command")
 
+	req := &CommandRequest{Data: data}
 	if validator := r.getValidator(command); validator != nil {
-		if validationErr := validator(data); validationErr != nil {
+		if validationErr := validator(req); validationErr != nil {
 			return status.Error(codes.InvalidArgument, validationErr.Error())
 		}
 	}
 
 	if handler := r.getHandler(command); handler != nil {
-		if handleErr := handler(ctx, data); handleErr != nil {
+		if handleErr := handler(ctx, req); handleErr != nil {
 			if errors.Is(handleErr, context.Canceled) {
 				return status.Error(codes.Canceled, "client canceled")
 			} else if errors.Is(handleErr, context.DeadlineExceeded) {
