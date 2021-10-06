@@ -20,8 +20,7 @@ func EncodeSingleSig(sigType hotstuff.SigType, sig crypto.Signature) []byte {
 // DecodeSingleSig decodes signature data into a cryptographic signature and a type as required by
 // the consensus design.
 // It returns:
-//  - 0, nil, ErrInvalidFormat if the sig data is empty
-//  - 0, nil, ErrInvalidFormat if the sig type is invalid
+//  - 0, nil, ErrInvalidFormat if the sig type is invalid (covers nil or empty sigData)
 //  - sigType, signature, nil if the sig type is valid and the decoding is done successfully.
 func DecodeSingleSig(sigData []byte) (hotstuff.SigType, crypto.Signature, error) {
 	if len(sigData) == 0 {
