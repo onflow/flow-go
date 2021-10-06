@@ -738,9 +738,7 @@ func (fnb *FlowNodeBuilder) handleComponent(ctx irrecoverable.SignalerContext, v
 
 	component, ok := readyAware.(component.Component)
 	if ok {
-		if err := component.Start(ctx); err != nil {
-			log.Fatal().Err(err).Msg("component startup failed")
-		}
+		component.Start(ctx)
 	}
 
 	select {
@@ -1006,13 +1004,12 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 
 		ctx, cancel := context.WithCancel(context.TODO())
 		fnb.Cancel = cancel
-		signaler := irrecoverable.NewSignaler()
-		signalerCtx := irrecoverable.WithSignaler(ctx, signaler)
+		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 
 		// TODO: implement proper error handling
 		go func() {
 			select {
-			case err := <-signaler.Error():
+			case err := <-errChan:
 				fnb.Logger.Fatal().Err(err).Msg("component encountered irrecoverable error")
 			case <-ctx.Done():
 			}
@@ -1028,6 +1025,10 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 
 // Done returns a channel that closes after all registered components are stopped
 func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
+	// cancel the context used by the networking layer
+	if fnb.Cancel != nil {
+		fnb.Cancel()
+	}
 	fnb.lm.OnStop(func() {
 		for i := len(fnb.doneObject) - 1; i >= 0; i-- {
 			doneObject := fnb.doneObject[i]
@@ -1037,10 +1038,6 @@ func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
 
 		fnb.closeDatabase()
 	})
-	// cancel the context used by the networking layer
-	if fnb.Cancel != nil {
-		fnb.Cancel()
-	}
 	return fnb.lm.Stopped()
 }
 

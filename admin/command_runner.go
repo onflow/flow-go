@@ -113,14 +113,12 @@ func (r *CommandRunner) getValidator(command string) CommandValidator {
 	return r.validators[command]
 }
 
-func (r *CommandRunner) Start(ctx irrecoverable.SignalerContext) error {
+func (r *CommandRunner) Start(ctx irrecoverable.SignalerContext) {
 	if err := r.runAdminServer(ctx); err != nil {
-		return fmt.Errorf("failed to start admin server: %w", err)
+		ctx.Throw(fmt.Errorf("failed to start admin server: %w", err))
 	}
 
 	close(r.startupCompleted)
-
-	return nil
 }
 
 func (r *CommandRunner) Ready() <-chan struct{} {
