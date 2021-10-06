@@ -66,6 +66,7 @@ unittest:
 	# test all packages with Relic library enabled
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
 	$(MAKE) -C crypto test
+	$(MAKE) -C crypto cross-blst-test
 	$(MAKE) -C integration test
 
 .PHONY: test
@@ -118,6 +119,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/computation/computer -case=underscore -output="./engine/execution/computation/computer/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/consensus -case=underscore -output="./engine/consensus/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=engine/consensus/approvals -case=underscore -output="./engine/consensus/approvals/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=fvm -case=underscore -output="./fvm/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=fvm/state -case=underscore -output="./fvm/mock/state" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=ledger -case=underscore -output="./ledger/mock" -outpkg="mock"
@@ -306,7 +308,7 @@ tool-bootstrap: docker-build-bootstrap
 .PHONY: docker-build-bootstrap-transit
 docker-build-bootstrap-transit:
 	docker build -f cmd/Dockerfile  --build-arg TARGET=bootstrap/transit --build-arg COMMIT=$(COMMIT)  --build-arg VERSION=$(VERSION) --no-cache \
-	    --target production-transit-nocgo  \
+	    --target production  \
 		-t "$(CONTAINER_REGISTRY)/bootstrap-transit:latest" -t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(SHORT_COMMIT)" -t "$(CONTAINER_REGISTRY)/bootstrap-transit:$(IMAGE_TAG)" .
 
 PHONY: tool-transit
@@ -417,10 +419,10 @@ PHONY: tool-remove-execution-fork
 tool-remove-execution-fork: docker-build-remove-execution-fork
 	docker container create --name remove-execution-fork $(CONTAINER_REGISTRY)/remove-execution-fork:latest;docker container cp remove-execution-fork:/bin/app ./remove-execution-fork;docker container rm remove-execution-fork
 
-# Check if the go version is 1.13 or higher. flow-go only supports go 1.13 and up.
+# Check if the go version is 1.15 or higher. flow-go only supports go 1.15 and up.
 .PHONY: check-go-version
 check-go-version:
-	go version | grep '1.1[3-6]'
+	go version | grep '1.1[5-9]'
 
 #----------------------------------------------------------------------
 # CD COMMANDS

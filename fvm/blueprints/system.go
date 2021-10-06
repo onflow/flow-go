@@ -7,6 +7,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const SystemChunkTransactionGasLimit = 100_000_000
+
 // TODO (Ramtin) after changes to this method are merged into master move them here.
 
 const systemChunkTransactionTemplate = `
@@ -32,7 +34,8 @@ func SystemChunkTransaction(chain flow.Chain) (*flow.TransactionBody, error) {
 
 	tx := flow.NewTransactionBody().
 		SetScript([]byte(fmt.Sprintf(systemChunkTransactionTemplate, contracts.Epoch.Address))).
-		AddAuthorizer(contracts.Epoch.Address)
+		AddAuthorizer(contracts.Epoch.Address).
+		SetGasLimit(SystemChunkTransactionGasLimit)
 
 	return tx, nil
 }

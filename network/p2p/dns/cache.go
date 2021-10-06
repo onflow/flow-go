@@ -6,16 +6,17 @@ import (
 	"time"
 )
 
-// defaultTimeToLive is the default duration a dns result is cached.
+// DefaultTimeToLive is the default duration a dns result is cached.
 const (
-	defaultTimeToLive     = 5 * time.Minute
-	cacheEntryExists      = true
-	cacheEntryInvalidated = true
+	// DefaultTimeToLive is the default duration a dns result is cached.
+	DefaultTimeToLive = 5 * time.Minute
+	cacheEntryExists  = true
+	cacheEntryFresh   = true // TTL yet has not reached
 )
 
 // cache is a ttl-based cache for dns entries
 type cache struct {
-	sync.Mutex
+	sync.RWMutex
 	ttl      time.Duration // time-to-live for cache entry
 	ipCache  map[string]*ipCacheEntry
 	txtCache map[string]*txtCacheEntry
@@ -23,50 +24,58 @@ type cache struct {
 
 func newCache() *cache {
 	return &cache{
-		ttl:      defaultTimeToLive,
+		ttl:      DefaultTimeToLive,
 		ipCache:  make(map[string]*ipCacheEntry),
 		txtCache: make(map[string]*txtCacheEntry),
 	}
 }
 
 // resolveIPCache resolves the domain through the cache if it is available.
+// First boolean variable determines whether the domain exists in the cache.
+// Second boolean variable determines whether the domain cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveIPCache(domain string) ([]net.IPAddr, bool, bool) {
-	c.Lock()
-	defer c.Unlock()
+	c.RLock()
 
 	entry, ok := c.ipCache[domain]
 
+	c.RUnlock()
+
 	if !ok {
-		return nil, !cacheEntryExists, !cacheEntryInvalidated
+		// does not exist
+		return nil, !cacheEntryExists, !cacheEntryFresh
 	}
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
-		// invalidates cache entry
-		delete(c.ipCache, domain)
-		return nil, !cacheEntryExists, cacheEntryInvalidated
+		// exists but expired
+		return entry.addresses, cacheEntryExists, !cacheEntryFresh
 	}
 
-	return entry.addresses, cacheEntryExists, !cacheEntryInvalidated
+	// exists and fresh
+	return entry.addresses, cacheEntryExists, cacheEntryFresh
 }
 
 // resolveIPCache resolves the txt through the cache if it is available.
+// First boolean variable determines whether the txt exists in the cache.
+// Second boolean variable determines whether the txt cache is fresh, i.e., TTL has not yet reached.
 func (c *cache) resolveTXTCache(txt string) ([]string, bool, bool) {
-	c.Lock()
-	defer c.Unlock()
+	c.RLock()
 
 	entry, ok := c.txtCache[txt]
 
+	c.RUnlock()
+
 	if !ok {
-		return nil, !cacheEntryExists, !cacheEntryInvalidated
+		// does not exist
+		return nil, !cacheEntryExists, !cacheEntryFresh
 	}
 
 	if time.Duration(runtimeNano()-entry.timestamp) > c.ttl {
-		// invalidates cache entry
-		delete(c.txtCache, txt)
-		return nil, !cacheEntryExists, cacheEntryInvalidated
+		// exists but expired
+		return entry.addresses, cacheEntryExists, !cacheEntryFresh
 	}
 
-	return entry.addresses, cacheEntryExists, !cacheEntryInvalidated
+	// exists and fresh
+	return entry.addresses, cacheEntryExists, cacheEntryFresh
 }
 
 // updateIPCache updates the cache entry for the domain.
@@ -89,4 +98,40 @@ func (c *cache) updateTXTCache(txt string, addr []string) {
 		addresses: addr,
 		timestamp: runtimeNano(),
 	}
+}
+
+// invalidateIPCacheEntry atomically invalidates ip cache entry. Boolean variable determines whether invalidation
+// is successful.
+func (c *cache) invalidateIPCacheEntry(domain string) bool {
+	c.RLock()
+	_, exists := c.ipCache[domain]
+	c.RUnlock()
+
+	if !exists {
+		return false
+	}
+
+	c.Lock()
+	delete(c.ipCache, domain)
+	c.Unlock()
+
+	return true
+}
+
+// invalidateTXTCacheEntry atomically invalidates txt cache entry. Boolean variable determines whether invalidation
+// is successful.
+func (c *cache) invalidateTXTCacheEntry(txt string) bool {
+	c.RLock()
+	_, exists := c.txtCache[txt]
+	c.RUnlock()
+
+	if !exists {
+		return false
+	}
+
+	c.Lock()
+	delete(c.txtCache, txt)
+	c.Unlock()
+
+	return exists
 }

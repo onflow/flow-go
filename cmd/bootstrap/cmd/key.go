@@ -5,6 +5,7 @@ import (
 	"net"
 	"strconv"
 
+	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 
 	"github.com/multiformats/go-multiaddr"
@@ -38,24 +39,35 @@ func init() {
 
 	// required flags
 	keyCmd.Flags().StringVar(&flagRole, "role", "", "node role (can be \"collection\", \"consensus\", \"execution\", \"verification\" or \"access\")")
-	_ = keyCmd.MarkFlagRequired("role")
+	cmd.MarkFlagRequired(keyCmd, "role")
 	keyCmd.Flags().StringVar(&flagAddress, "address", "", "network address")
-	_ = keyCmd.MarkFlagRequired("address")
+	cmd.MarkFlagRequired(keyCmd, "address")
 
-	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded networking seed (min %v bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded staking seed (min %v bytes)", minSeedBytes))
-	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", GenerateRandomSeed(), fmt.Sprintf("hex encoded machine account seed (min %v bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagNetworkSeed, "networking-seed", []byte{}, fmt.Sprintf("hex encoded networking seed (min %d bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagStakingSeed, "staking-seed", []byte{}, fmt.Sprintf("hex encoded staking seed (min %d bytes)", minSeedBytes))
+	keyCmd.Flags().BytesHexVar(&flagMachineSeed, "machine-seed", []byte{}, fmt.Sprintf("hex encoded machine account seed (min %d bytes)", minSeedBytes))
 }
 
 // keyCmdRun generate the node staking key, networking key and node information
 func keyCmdRun(_ *cobra.Command, _ []string) {
+
+	// generate private key seeds if not specified via flag
+	if len(flagNetworkSeed) == 0 {
+		flagNetworkSeed = GenerateRandomSeed()
+	}
+	if len(flagStakingSeed) == 0 {
+		flagStakingSeed = GenerateRandomSeed()
+	}
+	if len(flagMachineSeed) == 0 {
+		flagMachineSeed = GenerateRandomSeed()
+	}
 
 	// validate inputs
 	role := validateRole(flagRole)
 	validateAddressFormat(flagAddress)
 
 	// generate staking and network keys
-	networkKey, stakingKey, err := generateKeys()
+	networkKey, stakingKey, secretsDBKey, err := generateKeys()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not generate staking or network keys")
 	}
@@ -76,6 +88,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	// write files
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
+	writeText(fmt.Sprintf(model.PathSecretsEncryptionKey, nodeInfo.NodeID), secretsDBKey)
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 
 	// write machine account info
@@ -94,13 +107,13 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	}
 }
 
-func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, error) {
+func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, []byte, error) {
 
 	log.Debug().Msg("will generate networking key")
 	networkSeed := validateSeed(flagNetworkSeed)
 	networkKey, err := utils.GenerateNetworkingKey(networkSeed)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not generate networking key: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not generate networking key: %w", err)
 	}
 	log.Info().Msg("generated networking key")
 
@@ -108,11 +121,18 @@ func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, error) {
 	stakingSeed := validateSeed(flagStakingSeed)
 	stakingKey, err := utils.GenerateStakingKey(stakingSeed)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not generate staking key: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not generate staking key: %w", err)
 	}
 	log.Info().Msg("generated staking key")
 
-	return networkKey, stakingKey, nil
+	log.Debug().Msg("will generate db encryption key")
+	secretsDBKey, err := utils.GenerateSecretsDBEncryptionKey()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not generate secrets db encryption key: %w", err)
+	}
+	log.Info().Msg("generated db encryption key")
+
+	return networkKey, stakingKey, secretsDBKey, nil
 }
 
 func generateMachineAccountKey() (crypto.PrivateKey, error) {

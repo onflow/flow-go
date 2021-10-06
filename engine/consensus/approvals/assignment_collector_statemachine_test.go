@@ -31,13 +31,13 @@ func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 
 	s.collector = NewAssignmentCollectorStateMachine(AssignmentCollectorBase{
 		workerPool:                           workerpool.New(4),
-		assigner:                             s.assigner,
-		state:                                s.state,
-		headers:                              s.headers,
-		verifier:                             s.sigVerifier,
-		seals:                                s.sealsPL,
-		approvalConduit:                      s.conduit,
-		requestTracker:                       s.requestTracker,
+		assigner:                             s.Assigner,
+		state:                                s.State,
+		headers:                              s.Headers,
+		verifier:                             s.SigVerifier,
+		seals:                                s.SealsPL,
+		approvalConduit:                      s.Conduit,
+		requestTracker:                       s.RequestTracker,
 		requiredApprovalsForSealConstruction: 5,
 		executedBlock:                        &s.Block,
 		result:                               s.IncorporatedResult.Result,
@@ -51,11 +51,11 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 	require.Equal(s.T(), CachingApprovals, s.collector.ProcessingStatus())
 	results := make([]*flow.IncorporatedResult, 3)
 
-	s.sigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	for i := range results {
 		block := unittest.BlockHeaderWithParentFixture(&s.Block)
-		s.blocks[block.ID()] = &block
+		s.Blocks[block.ID()] = &block
 		result := unittest.IncorporatedResult.Fixture(
 			unittest.IncorporatedResult.WithIncorporatedBlockID(block.ID()),
 			unittest.IncorporatedResult.WithResult(s.IncorporatedResult.Result),

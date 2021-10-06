@@ -15,6 +15,8 @@ import (
 	"github.com/onflow/flow-go/integration/client"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/utils/io"
 )
 
 // healthcheckAccessGRPC returns a Docker healthcheck function that pings the Access node GRPC
@@ -102,6 +104,30 @@ func WriteJSON(path string, data interface{}) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(path, marshaled, 0644)
+	return WriteFile(path, marshaled)
+}
+
+func WriteFile(path string, data []byte) error {
+	err := ioutil.WriteFile(path, data, 0644)
 	return err
+}
+
+// rootProtocolJsonWithoutAddresses strips out all node addresses from the root protocol json file specified as srcFile
+// and creates the dstFile with the modified contents
+func rootProtocolJsonWithoutAddresses(srcfile string, dstFile string) error {
+
+	data, err := io.ReadFile(filepath.Join(srcfile))
+	if err != nil {
+		return err
+	}
+
+	var rootSnapshot inmem.EncodableSnapshot
+	err = json.Unmarshal(data, &rootSnapshot)
+	if err != nil {
+		return err
+	}
+
+	strippedSnapshot := inmem.StrippedInmemSnapshot(rootSnapshot)
+
+	return WriteJSON(dstFile, strippedSnapshot)
 }

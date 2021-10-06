@@ -73,7 +73,7 @@ func Test_Compactor(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1) //keep only latest checkpoint
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1, zerolog.Nop()) //keep only latest checkpoint
 			co := CompactorObserver{fromBound: 9, done: make(chan struct{})}
 			compactor.Subscribe(&co)
 
@@ -113,7 +113,7 @@ func Test_Compactor(t *testing.T) {
 			select {
 			case <-co.done:
 				// continue
-			case <-time.After(20 * time.Second):
+			case <-time.After(60 * time.Second):
 				assert.FailNow(t, "timed out")
 			}
 
@@ -138,6 +138,8 @@ func Test_Compactor(t *testing.T) {
 			require.NoError(t, err)
 		})
 
+		time.Sleep(2 * time.Second)
+
 		t.Run("remove unnecessary files", func(t *testing.T) {
 			// Remove all files apart from target checkpoint and WAL segments ahead of it
 			// We know their names, so just hardcode them
@@ -158,6 +160,8 @@ func Test_Compactor(t *testing.T) {
 
 		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
+
+		time.Sleep(2 * time.Second)
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
 			wal2, err := NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
@@ -245,7 +249,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2)
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2, zerolog.Nop())
 
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {

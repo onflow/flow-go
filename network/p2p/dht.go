@@ -5,7 +5,6 @@ import (
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -13,7 +12,7 @@ import (
 
 // This produces a new IPFS DHT
 // on the name, see https://github.com/libp2p/go-libp2p-kad-dht/issues/337
-func NewDHT(ctx context.Context, host host.Host, options ...dht.Option) (*discovery.RoutingDiscovery, error) {
+func NewDHT(ctx context.Context, host host.Host, options ...dht.Option) (*dht.IpfsDHT, error) {
 
 	defaultOptions := defaultDHTOptions()
 	allOptions := append(defaultOptions, options...)
@@ -27,8 +26,7 @@ func NewDHT(ctx context.Context, host host.Host, options ...dht.Option) (*discov
 		return nil, err
 	}
 
-	routingDiscovery := discovery.NewRoutingDiscovery(kdht)
-	return routingDiscovery, nil
+	return kdht, nil
 }
 
 // DHT defaults to ModeAuto which will automatically switch the DHT between Server and Client modes based on
@@ -41,7 +39,7 @@ func AsServer(enable bool) dht.Option {
 	if enable {
 		return dht.Mode(dht.ModeServer)
 	}
-	return dht.Mode(dht.ModeAuto)
+	return dht.Mode(dht.ModeClient)
 }
 
 func WithBootstrapPeers(bootstrapNodes flow.IdentityList) (dht.Option, error) {

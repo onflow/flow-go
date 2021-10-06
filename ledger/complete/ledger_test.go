@@ -48,7 +48,7 @@ func TestLedger_Update(t *testing.T) {
 		up, err := ledger.NewEmptyUpdate(currentState)
 		require.NoError(t, err)
 
-		newState, err := l.Set(up)
+		newState, _, err := l.Set(up)
 		require.NoError(t, err)
 
 		// state shouldn't change
@@ -67,7 +67,7 @@ func TestLedger_Update(t *testing.T) {
 		u := utils.UpdateFixture()
 		u.SetState(curSC)
 
-		newSc, err := led.Set(u)
+		newSc, _, err := led.Set(u)
 		require.NoError(t, err)
 		assert.NotEqual(t, curSC, newSc)
 
@@ -174,7 +174,7 @@ func TestLedger_Proof(t *testing.T) {
 		u := utils.UpdateFixture()
 		u.SetState(curS)
 
-		newSc, err := led.Set(u)
+		newSc, _, err := led.Set(u)
 		require.NoError(t, err)
 		assert.NotEqual(t, curS, newSc)
 
@@ -221,7 +221,7 @@ func Test_WAL(t *testing.T) {
 			values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 			update, err := ledger.NewUpdate(state, keys, values)
 			assert.NoError(t, err)
-			state, err = led.Set(update)
+			state, _, err = led.Set(update)
 			require.NoError(t, err)
 			fmt.Printf("Updated with %x\n", state)
 
@@ -308,7 +308,7 @@ func TestLedgerFunctionality(t *testing.T) {
 				values := utils.RandomValues(numInsPerStep, 1, valueMaxByteSize)
 				update, err := ledger.NewUpdate(state, keys, values)
 				assert.NoError(t, err)
-				newState, err := led.Set(update)
+				newState, _, err := led.Set(update)
 				assert.NoError(t, err)
 
 				// capture new values for future query
@@ -397,7 +397,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				u := utils.UpdateFixture()
 				u.SetState(state)
 
-				state, err = led.Set(u)
+				state, _, err = led.Set(u)
 				require.NoError(t, err)
 
 				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{noOpMigration}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
@@ -441,7 +441,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				u := utils.UpdateFixture()
 				u.SetState(state)
 
-				state, err = led.Set(u)
+				state, _, err = led.Set(u)
 				require.NoError(t, err)
 
 				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByValue}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
@@ -483,7 +483,7 @@ func Test_ExportCheckpointAt(t *testing.T) {
 				u := utils.UpdateFixture()
 				u.SetState(state)
 
-				state, err = led.Set(u)
+				state, _, err = led.Set(u)
 				require.NoError(t, err)
 
 				newState, err := led.ExportCheckpointAt(state, []ledger.Migration{migrationByKey}, []ledger.Reporter{}, complete.DefaultPathFinderVersion, dir2, "root.checkpoint")
@@ -546,7 +546,7 @@ func TestWALUpdateIsRunInParallel(t *testing.T) {
 	require.NoError(t, err)
 
 	go func() {
-		newState, err := led.Set(update)
+		newState, _, err := led.Set(update)
 		require.NoError(t, err)
 		require.Equal(t, newState, expectedState)
 	}()
@@ -585,7 +585,7 @@ func TestWALUpdateFailuresBubbleUp(t *testing.T) {
 	update, err := ledger.NewUpdate(led.InitialState(), []ledger.Key{key}, values)
 	require.NoError(t, err)
 
-	_, err = led.Set(update)
+	_, _, err = led.Set(update)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, theError))
 }

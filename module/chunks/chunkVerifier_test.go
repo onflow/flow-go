@@ -279,7 +279,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 
 	require.NoError(t, err)
 
-	startState, err := f.Set(update)
+	startState, _, err := f.Set(update)
 	require.NoError(t, err)
 
 	query, err := ledger.NewQuery(startState, keys)
@@ -299,7 +299,7 @@ func GetBaselineVerifiableChunk(t *testing.T, script string, system bool) *verif
 	)
 	require.NoError(t, err)
 
-	endState, err := f.Set(update)
+	endState, _, err := f.Set(update)
 	require.NoError(t, err)
 
 	// events

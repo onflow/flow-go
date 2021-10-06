@@ -9,6 +9,9 @@ import (
 
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
+	"golang.org/x/sync/errgroup"
+
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
 	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
@@ -50,6 +53,7 @@ type Manager struct {
 	blockComputer      computer.BlockComputer
 	programsCache      *ProgramsCache
 	scriptLogThreshold time.Duration
+	uploaders          []uploader.Uploader
 }
 
 func New(
@@ -63,6 +67,7 @@ func New(
 	programsCacheSize uint,
 	committer computer.ViewCommitter,
 	scriptLogThreshold time.Duration,
+	uploaders []uploader.Uploader,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -94,6 +99,7 @@ func New(
 		blockComputer:      blockComputer,
 		programsCache:      programsCache,
 		scriptLogThreshold: scriptLogThreshold,
+		uploaders:          uploaders,
 	}
 
 	return &e, nil
@@ -209,6 +215,24 @@ func (e *Manager) ComputeBlock(
 
 	e.programsCache.Set(block.ID(), toInsert)
 
+	if len(e.uploaders) > 0 {
+		var g errgroup.Group
+
+		for _, uploader := range e.uploaders {
+			uploader := uploader
+
+			g.Go(func() error {
+				return uploader.Upload(result)
+			})
+		}
+
+		err := g.Wait()
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to upload block result: %w", err)
+		}
+	}
+
 	e.log.Debug().
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
@@ -223,7 +247,7 @@ func (e *Manager) GetAccount(address flow.Address, blockHeader *flow.Header, vie
 
 	account, err := e.vm.GetAccount(blockCtx, address, view, programs)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get account at block (%s): %w", blockHeader.ID(), err)
+		return nil, fmt.Errorf("failed to get account (%s) at block (%s): %w", address.String(), blockHeader.ID(), err)
 	}
 
 	return account, nil

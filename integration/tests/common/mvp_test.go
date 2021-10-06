@@ -122,8 +122,6 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		// TODO replace these with actual values
-		testnet.WithAdditionalFlag("--access-address=null"),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -143,6 +141,7 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
+		testnet.NewNodeConfig(flow.RoleAccess),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 
@@ -181,7 +180,8 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		serviceAddress).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
-		SetPayer(serviceAddress)
+		SetPayer(serviceAddress).
+		SetGasLimit(9999)
 
 	childCtx, cancel := context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(ctx, createAccountTx)
@@ -231,7 +231,8 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		AddAuthorizer(serviceAddress).
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(serviceAddress, 0, serviceAccountClient.GetSeqNumber()).
-		SetPayer(serviceAddress)
+		SetPayer(serviceAddress).
+		SetGasLimit(9999)
 
 	err = fundAccountTx.AddArgument(cadence.UFix64(1_0000_0000))
 	require.NoError(t, err)
@@ -271,7 +272,8 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
 		SetProposalKey(newAccountAddress, 0, 0).
 		SetPayer(newAccountAddress).
-		AddAuthorizer(newAccountAddress)
+		AddAuthorizer(newAccountAddress).
+		SetGasLimit(9999)
 
 	fmt.Println(">> creating counter...")
 

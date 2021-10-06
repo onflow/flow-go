@@ -25,7 +25,7 @@ func TestLedgerViewCommitter(t *testing.T) {
 		var expectedStateCommitment led.State
 		copy(expectedStateCommitment[:], []byte{1, 2, 3})
 		ledger.On("Set", mock.Anything).
-			Return(expectedStateCommitment, nil).
+			Return(expectedStateCommitment, nil, nil).
 			Once()
 
 		expectedProof := led.Proof([]byte{2, 3, 4})
@@ -43,7 +43,7 @@ func TestLedgerViewCommitter(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		newState, proof, err := com.CommitView(view, utils.StateCommitmentFixture())
+		newState, proof, _, err := com.CommitView(view, utils.StateCommitmentFixture())
 		require.NoError(t, err)
 		require.Equal(t, flow.StateCommitment(expectedStateCommitment), newState)
 		require.Equal(t, []uint8(expectedProof), proof)

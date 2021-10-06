@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -8,7 +9,11 @@ import (
 	"path/filepath"
 	"time"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/spf13/pflag"
+
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -54,52 +59,59 @@ import (
 func main() {
 
 	var (
-		followerState               protocol.MutableState
-		ledgerStorage               *ledger.Ledger
-		events                      *storage.Events
-		serviceEvents               *storage.ServiceEvents
-		txResults                   *storage.TransactionResults
-		results                     *storage.ExecutionResults
-		myReceipts                  *storage.MyExecutionReceipts
-		providerEngine              *exeprovider.Engine
-		checkerEng                  *checker.Engine
-		syncCore                    *chainsync.Core
-		pendingBlocks               *buffer.PendingBlocks // used in follower engine
-		deltas                      *ingestion.Deltas
-		syncEngine                  *synchronization.Engine
-		followerEng                 *followereng.Engine // to sync blocks from consensus nodes
-		computationManager          *computation.Manager
-		collectionRequester         *requester.Engine
-		ingestionEng                *ingestion.Engine
-		finalizationDistributor     *pubsub.FinalizationDistributor
-		finalizedHeader             *synchronization.FinalizedHeaderCache
-		rpcConf                     rpc.Config
-		err                         error
-		executionState              state.ExecutionState
-		triedir                     string
-		collector                   module.ExecutionMetrics
-		mTrieCacheSize              uint32
-		transactionResultsCacheSize uint
-		checkpointDistance          uint
-		checkpointsToKeep           uint
-		stateDeltasLimit            uint
-		cadenceExecutionCache       uint
-		chdpCacheSize               uint
-		requestInterval             time.Duration
-		preferredExeNodeIDStr       string
-		syncByBlocks                bool
-		syncFast                    bool
-		syncThreshold               int
-		extensiveLog                bool
-		pauseExecution              bool
-		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
-		diskWAL                     *wal.DiskWAL
-		scriptLogThreshold          time.Duration
-		chdpQueryTimeout            uint
-		chdpDeliveryTimeout         uint
+		followerState                 protocol.MutableState
+		ledgerStorage                 *ledger.Ledger
+		events                        *storage.Events
+		serviceEvents                 *storage.ServiceEvents
+		txResults                     *storage.TransactionResults
+		results                       *storage.ExecutionResults
+		myReceipts                    *storage.MyExecutionReceipts
+		providerEngine                *exeprovider.Engine
+		checkerEng                    *checker.Engine
+		syncCore                      *chainsync.Core
+		pendingBlocks                 *buffer.PendingBlocks // used in follower engine
+		deltas                        *ingestion.Deltas
+		syncEngine                    *synchronization.Engine
+		followerEng                   *followereng.Engine // to sync blocks from consensus nodes
+		computationManager            *computation.Manager
+		collectionRequester           *requester.Engine
+		ingestionEng                  *ingestion.Engine
+		finalizationDistributor       *pubsub.FinalizationDistributor
+		finalizedHeader               *synchronization.FinalizedHeaderCache
+		rpcConf                       rpc.Config
+		err                           error
+		executionState                state.ExecutionState
+		triedir                       string
+		collector                     module.ExecutionMetrics
+		mTrieCacheSize                uint32
+		transactionResultsCacheSize   uint
+		checkpointDistance            uint
+		checkpointsToKeep             uint
+		stateDeltasLimit              uint
+		cadenceExecutionCache         uint
+		chdpCacheSize                 uint
+		requestInterval               time.Duration
+		preferredExeNodeIDStr         string
+		syncByBlocks                  bool
+		syncFast                      bool
+		syncThreshold                 int
+		extensiveLog                  bool
+		pauseExecution                bool
+		checkStakedAtBlock            func(blockID flow.Identifier) (bool, error)
+		diskWAL                       *wal.DiskWAL
+		scriptLogThreshold            time.Duration
+		chdpQueryTimeout              uint
+		chdpDeliveryTimeout           uint
+		enableBlockDataUpload         bool
+		gcpBucketName                 string
+		s3BucketName                  string
+		blockDataUploaders            []uploader.Uploader
+		blockDataUploaderMaxRetry     uint64 = 5
+		blockdataUploaderRetryTimeout        = 1 * time.Second
 	)
 
-	cmd.FlowNode(flow.RoleExecution.String()).
+	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
+	nodeBuilder.
 		ExtraFlags(func(flags *pflag.FlagSet) {
 			homedir, _ := os.UserHomeDir()
 			datadir := filepath.Join(homedir, ".flow", "execution")
@@ -124,8 +136,24 @@ func main() {
 			flags.UintVar(&chdpQueryTimeout, "chunk-data-pack-query-timeout-sec", 10, "number of seconds to determine a chunk data pack query being slow")
 			flags.UintVar(&chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10, "number of seconds to determine a chunk data pack response delivery being slow")
 			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
+			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
+			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
+			flags.StringVar(&s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
 		}).
-		Initialize().
+		ValidateFlags(func() error {
+			if enableBlockDataUpload {
+				if gcpBucketName == "" && s3BucketName == "" {
+					return fmt.Errorf("invalid flag. gcp-bucket-name or s3-bucket-name required when blockdata-uploader is enabled")
+				}
+			}
+			return nil
+		})
+
+	if err = nodeBuilder.Initialize(); err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+
+	nodeBuilder.
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
@@ -159,6 +187,70 @@ func main() {
 		Module("pending block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
+		}).
+		Component("GCP block data uploader", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if enableBlockDataUpload && gcpBucketName != "" {
+				logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
+				gcpBucketUploader, err := uploader.NewGCPBucketUploader(
+					context.Background(),
+					gcpBucketName,
+					logger,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("cannot create GCP Bucket uploader: %w", err)
+				}
+
+				asyncUploader := uploader.NewAsyncUploader(
+					gcpBucketUploader,
+					blockdataUploaderRetryTimeout,
+					blockDataUploaderMaxRetry,
+					logger,
+					collector,
+				)
+
+				blockDataUploaders = append(blockDataUploaders, asyncUploader)
+
+				return asyncUploader, nil
+			}
+
+			// Since we don't have conditional component creation, we just use Noop one.
+			// It's functions will be once per startup/shutdown - non-measurable performance penalty
+			// blockDataUploader will stay nil and disable calling uploader at all
+			return &module.NoopReadDoneAware{}, nil
+		}).
+		Component("S3 block data uploader", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if enableBlockDataUpload && s3BucketName != "" {
+				logger := node.Logger.With().Str("component_name", "s3_block_data_uploader").Logger()
+
+				ctx := context.Background()
+				config, err := awsconfig.LoadDefaultConfig(ctx)
+				if err != nil {
+					return nil, fmt.Errorf("failed to load AWS configuration: %w", err)
+				}
+
+				client := s3.NewFromConfig(config)
+				s3Uploader := uploader.NewS3Uploader(
+					ctx,
+					client,
+					s3BucketName,
+					logger,
+				)
+				asyncUploader := uploader.NewAsyncUploader(
+					s3Uploader,
+					blockdataUploaderRetryTimeout,
+					blockDataUploaderMaxRetry,
+					logger,
+					collector,
+				)
+				blockDataUploaders = append(blockDataUploaders, asyncUploader)
+
+				return asyncUploader, nil
+			}
+
+			// Since we don't have conditional component creation, we just use Noop one.
+			// It's functions will be once per startup/shutdown - non-measurable performance penalty
+			// blockDataUploader will stay nil and disable calling uploader at all
+			return &module.NoopReadDoneAware{}, nil
 		}).
 		Module("state deltas mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
@@ -218,7 +310,7 @@ func main() {
 			if err != nil {
 				return nil, fmt.Errorf("cannot create checkpointer: %w", err)
 			}
-			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep)
+			compactor := wal.NewCompactor(checkpointer, 10*time.Second, checkpointDistance, checkpointsToKeep, node.Logger.With().Str("subcomponent", "checkpointer").Logger())
 
 			return compactor, nil
 		}).
@@ -248,6 +340,7 @@ func main() {
 				cadenceExecutionCache,
 				committer,
 				scriptLogThreshold,
+				blockDataUploaders,
 			)
 			if err != nil {
 				return nil, err
@@ -360,11 +453,11 @@ func main() {
 		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := storage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -410,6 +503,7 @@ func main() {
 				pendingBlocks,
 				followerCore,
 				syncCore,
+				node.Tracer,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -456,7 +550,7 @@ func main() {
 				followerEng,
 				syncCore,
 				finalizedHeader,
-				node.State,
+				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)

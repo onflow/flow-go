@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -41,6 +42,13 @@ func RandomAddressFixture() flow.Address {
 		panic(err)
 	}
 	return addr
+}
+
+func RandomSDKAddressFixture() sdk.Address {
+	addr := RandomAddressFixture()
+	var sdkAddr sdk.Address
+	copy(sdkAddr[:], addr[:])
+	return sdkAddr
 }
 
 func InvalidAddressFixture() flow.Address {
@@ -867,6 +875,17 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	return &identity
 }
 
+// IdentityFixture returns a node identity and networking private key
+func IdentityWithNetworkingKeyFixture(opts ...func(*flow.Identity)) (*flow.Identity, crypto.PrivateKey) {
+	networkKey, err := NetworkingKey()
+	if err != nil {
+		panic(err)
+	}
+	opts = append(opts, WithNetworkingKey(networkKey.PublicKey()))
+	id := IdentityFixture(opts...)
+	return id, networkKey
+}
+
 func WithKeys(identity *flow.Identity) {
 	staking, err := StakingKey()
 	if err != nil {
@@ -1223,7 +1242,7 @@ func WithHeight(height uint64) func(*verification.ChunkDataPackRequest) {
 
 func WithHeightGreaterThan(height uint64) func(*verification.ChunkDataPackRequest) {
 	return func(request *verification.ChunkDataPackRequest) {
-		request.Height = height + uint64(rand.Uint32()) + 1
+		request.Height = height + 1
 	}
 }
 
@@ -1719,4 +1738,44 @@ func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 		DKGMessage: *DKGMessageFixture(),
 		Signature:  SignatureFixture(),
 	}
+}
+
+func PrivateKeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
+	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(64))
+	if err != nil {
+		panic(err)
+	}
+	return sk
+}
+
+func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
+	return bootstrap.NodeMachineAccountInfo{
+		Address:           RandomAddressFixture().String(),
+		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256).Encode(),
+		HashAlgorithm:     bootstrap.DefaultMachineAccountHashAlgo,
+		SigningAlgorithm:  bootstrap.DefaultMachineAccountSignAlgo,
+		KeyIndex:          bootstrap.DefaultMachineAccountKeyIndex,
+	}
+}
+
+func MachineAccountFixture(t *testing.T) (bootstrap.NodeMachineAccountInfo, *sdk.Account) {
+	info := NodeMachineAccountInfoFixture()
+
+	bal, err := cadence.NewUFix64("0.5")
+	require.NoError(t, err)
+
+	acct := &sdk.Account{
+		Address: sdk.HexToAddress(info.Address),
+		Balance: uint64(bal),
+		Keys: []*sdk.AccountKey{
+			{
+				Index:     int(info.KeyIndex),
+				PublicKey: info.MustPrivateKey().PublicKey(),
+				SigAlgo:   info.SigningAlgorithm,
+				HashAlgo:  info.HashAlgorithm,
+				Weight:    1000,
+			},
+		},
+	}
+	return info, acct
 }

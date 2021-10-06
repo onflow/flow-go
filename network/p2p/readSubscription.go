@@ -2,20 +2,17 @@ package p2p
 
 import (
 	"context"
-	"fmt"
 	"strings"
 	"sync"
 
-	lcrypto "github.com/libp2p/go-libp2p-core/crypto"
 	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
-	_ "github.com/onflow/flow-go/utils/binstat"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
 // readSubscription reads the messages coming in on the subscription and calls the given callback until
@@ -25,13 +22,13 @@ type readSubscription struct {
 	log      zerolog.Logger
 	sub      *pubsub.Subscription
 	metrics  module.NetworkMetrics
-	callback func(msg *message.Message, pubKey crypto.PublicKey)
+	callback func(msg *message.Message, peerID peer.ID)
 }
 
 // newReadSubscription reads the messages coming in on the subscription
 func newReadSubscription(ctx context.Context,
 	sub *pubsub.Subscription,
-	callback func(msg *message.Message, pubKey crypto.PublicKey),
+	callback func(msg *message.Message, peerID peer.ID),
 	log zerolog.Logger,
 	metrics module.NetworkMetrics) *readSubscription {
 
@@ -82,71 +79,18 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 			return
 		}
 
-		// if pubsub.WithMessageSigning(true) and pubsub.WithStrictSignatureVerification(true),
-		// the emitter is authenticated
-		emitterKey, err := messagePubKey(rawMsg)
-		if err != nil {
-			r.log.Err(err).Msg("failed to extract libp2p public key of message")
-			return
-		}
-		flowKey, err := FlowPublicKeyFromLibP2P(emitterKey)
-		if err != nil {
-			r.log.Err(err).Msg("failed to extract flow public key of libp2p key")
+		validatorData, ok := rawMsg.ValidatorData.(validator.ValidatorData)
+		if !ok {
+			r.log.Error().Str("raw_msg", rawMsg.String()).Msg("[BUG] validator data missing!")
 			return
 		}
 
-		var msg message.Message
-		// convert the incoming raw message payload to Message type
-		//bs := binstat.EnterTimeVal(binstat.BinNet+":wire>1protobuf2message", int64(len(rawMsg.Data)))
-		err = msg.Unmarshal(rawMsg.Data)
-		//binstat.Leave(bs)
-		if err != nil {
-			r.log.Err(err).Str("topic_message", msg.String()).Msg("failed to unmarshal message")
-			return
-		}
+		msg := validatorData.Message
 
 		// log metrics
 		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID, msg.Type)
 
 		// call the callback
-		r.callback(&msg, flowKey)
+		r.callback(msg, validatorData.From)
 	}
-}
-
-// messagePubKey extracts the public key of the envelope signer from a libp2p message.
-// The location of that key depends on the type of the key, see:
-// https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md
-// This reproduces the exact logic of the private function doing the same decoding in libp2p:
-// https://github.com/libp2p/go-libp2p-pubsub/blob/ba28f8ecfc551d4d916beb748d3384951bce3ed0/sign.go#L77
-func messagePubKey(m *pubsub.Message) (lcrypto.PubKey, error) {
-	var pubk lcrypto.PubKey
-
-	// m.From is the original sender of the message (versus `m.ReceivedFrom` which is the last hop which sent us this message)
-	pid, err := peer.IDFromBytes(m.From)
-	if err != nil {
-		return nil, err
-	}
-
-	if m.Key == nil {
-		// no attached key, it must be extractable from the source ID
-		pubk, err = pid.ExtractPublicKey()
-		if err != nil {
-			return nil, fmt.Errorf("cannot extract signing key: %s", err.Error())
-		}
-		if pubk == nil {
-			return nil, fmt.Errorf("cannot extract signing key")
-		}
-	} else {
-		pubk, err = lcrypto.UnmarshalPublicKey(m.Key)
-		if err != nil {
-			return nil, fmt.Errorf("cannot unmarshal signing key: %s", err.Error())
-		}
-
-		// verify that the source ID matches the attached key
-		if !pid.MatchesPublicKey(pubk) {
-			return nil, fmt.Errorf("bad signing key; source ID %s doesn't match key", pid)
-		}
-	}
-
-	return pubk, nil
 }
