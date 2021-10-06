@@ -712,7 +712,11 @@ func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	return e.contracts.Commit()
 }
 
-// AllocateStorageIndex is not implemented in this enviornment
-func (e *ScriptEnv) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
-	return atree.StorageIndex{}, errors.NewOperationNotSupportedError("AllocateStorageIndex")
+// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
+func (e *ScriptEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+	if err != nil {
+		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
+	}
+	return v, nil
 }
