@@ -56,7 +56,7 @@ func TestPrivateSend_Valid(t *testing.T) {
 		committee,
 		locals[orig],
 		orig,
-		&mock.DKGContractClient{},
+		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
 
@@ -98,7 +98,7 @@ func TestPrivateSend_IndexOutOfRange(t *testing.T) {
 		committee,
 		locals[orig],
 		orig,
-		&mock.DKGContractClient{},
+		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
 
@@ -132,7 +132,7 @@ func TestReceivePrivateMessage_Valid(t *testing.T) {
 		committee,
 		locals[dest],
 		dest,
-		&mock.DKGContractClient{},
+		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
 
@@ -179,7 +179,7 @@ func TestProcessPrivateMessage_InvalidOrigin(t *testing.T) {
 		committee,
 		locals[dest],
 		dest,
-		&mock.DKGContractClient{},
+		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
 
@@ -244,7 +244,7 @@ func TestBroadcastMessage(t *testing.T) {
 		committee,
 		locals[orig],
 		orig,
-		&mock.DKGContractClient{},
+		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
 
@@ -256,7 +256,7 @@ func TestBroadcastMessage(t *testing.T) {
 	contractClient.On("Broadcast", expectedMsg).
 		Return(nil).
 		Once()
-	sender.dkgContractClient = contractClient
+	sender.dkgContractClients[0] = contractClient
 
 	sender.Broadcast(msgb)
 	unittest.AssertClosesBefore(t, sender.unit.Done(), time.Second)
@@ -274,7 +274,7 @@ func TestPoll(t *testing.T) {
 		committee,
 		locals[orig],
 		orig,
-		&mock.DKGContractClient{},
+		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
 
@@ -284,7 +284,7 @@ func TestPoll(t *testing.T) {
 		committee,
 		locals[dest],
 		dest,
-		&mock.DKGContractClient{},
+		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
 
@@ -303,7 +303,7 @@ func TestPoll(t *testing.T) {
 	contractClient.On("ReadBroadcast", recipient.messageOffset, blockID).
 		Return(bcastMsgs, nil).
 		Once()
-	sender.dkgContractClient = contractClient
+	sender.dkgContractClients[0] = contractClient
 
 	// launch a background routine to capture messages forwarded to the msgCh
 	receivedMsgs := []msg.DKGMessage{}
@@ -354,7 +354,7 @@ func TestLogHook(t *testing.T) {
 		committee,
 		locals[orig],
 		orig,
-		&mock.DKGContractClient{},
+		[]module.DKGContractClient{&mock.DKGContractClient{}},
 		NewBrokerTunnel(),
 	)
 

@@ -6,18 +6,12 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
-// Checks constraints about the number of partner and internal nodes.
-// Internal nodes must comprise >2/3 of consensus committee.
-// Internal nodes must comprise >2/3 of each collector cluster.
-func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
-
-	partners := model.ToIdentityList(partnerNodes)
-	internals := model.ToIdentityList(internalNodes)
-	all := append(partners, internals...)
-
+// ensureUniformNodeWeightsPerRole verifies that the following condition is satisfied for each role R:
+// * all node with role R must have the same weight
+func ensureUniformNodeWeightsPerRole(allNodes flow.IdentityList) {
 	// ensure all nodes of the same role have equal stake/weight
 	for _, role := range flow.Roles() {
-		withRole := all.Filter(filter.HasRole(role))
+		withRole := allNodes.Filter(filter.HasRole(role))
 		expectedStake := withRole[0].Stake
 		for _, node := range withRole {
 			if node.Stake != expectedStake {
@@ -28,16 +22,18 @@ func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
 			}
 		}
 	}
+}
 
-	// check consensus committee Byzantine threshold
-	partnerCONCount := partners.Filter(filter.HasRole(flow.RoleConsensus)).Count()
-	internalCONCount := internals.Filter(filter.HasRole(flow.RoleConsensus)).Count()
-	if internalCONCount <= partnerCONCount*2 {
-		log.Fatal().Msgf(
-			"will not bootstrap configuration without Byzantine majority of consensus nodes: "+
-				"(partners=%d, internals=%d, min_internals=%d)",
-			partnerCONCount, internalCONCount, partnerCONCount*2+1)
-	}
+// Checks constraints about the number of partner and internal nodes.
+// * Internal nodes must comprise >2/3 of each collector cluster.
+// * for all roles R:
+//   all node with role R must have the same weight
+func checkConstraints(partnerNodes, internalNodes []model.NodeInfo) {
+	partners := model.ToIdentityList(partnerNodes)
+	internals := model.ToIdentityList(internalNodes)
+	all := append(partners, internals...)
+
+	ensureUniformNodeWeightsPerRole(all)
 
 	// check collection committee Byzantine threshold for each cluster
 	// for checking Byzantine constraints, the seed doesn't matter

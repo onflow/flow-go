@@ -168,8 +168,6 @@ func (suite *IngestionSuite) TestOnGuaranteeNewFromCollection() {
 	suite.pool.On("Has", guarantee.ID()).Return(false)
 	suite.pool.On("Add", guarantee).Return(true)
 
-	suite.expectGuaranteePublished(guarantee)
-
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.ingest.onGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error on new guarantee from collection node")
@@ -177,8 +175,9 @@ func (suite *IngestionSuite) TestOnGuaranteeNewFromCollection() {
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
-	// check that the submit call was called
-	suite.conduit.AssertExpectations(suite.T())
+	// we should not propagate the guarantee
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeUnstaked() {
@@ -200,7 +199,8 @@ func (suite *IngestionSuite) TestOnGuaranteeUnstaked() {
 	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
 	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeNewFromConsensus() {
@@ -218,8 +218,9 @@ func (suite *IngestionSuite) TestOnGuaranteeNewFromConsensus() {
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
-	// check that the submit call was not called
-	suite.conduit.AssertExpectations(suite.T())
+	// we should not propagate the guarantee
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeOld() {
@@ -237,8 +238,9 @@ func (suite *IngestionSuite) TestOnGuaranteeOld() {
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
-	// check that the submit call was not called
-	suite.conduit.AssertExpectations(suite.T())
+	// we should not propagate the guarantee
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeNotAdded() {
@@ -256,8 +258,9 @@ func (suite *IngestionSuite) TestOnGuaranteeNotAdded() {
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
-	// check that the submit call was not called
-	suite.conduit.AssertExpectations(suite.T())
+	// we should not propagate the guarantee
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeNoGuarantor() {
@@ -279,8 +282,9 @@ func (suite *IngestionSuite) TestOnGuaranteeNoGuarantor() {
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
-	// check that the submit call was not called
-	suite.conduit.AssertExpectations(suite.T())
+	// we should not propagate the guarantee
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeInvalidRole() {
@@ -302,8 +306,9 @@ func (suite *IngestionSuite) TestOnGuaranteeInvalidRole() {
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
-	// check that the submit call was not called
-	suite.conduit.AssertExpectations(suite.T())
+	// we should not propagate the guarantee
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeExpired() {
@@ -327,11 +332,9 @@ func (suite *IngestionSuite) TestOnGuaranteeExpired() {
 	suite.Assert().Error(err, "should error with expired collection")
 	suite.Assert().True(engine.IsOutdatedInputError(err))
 
-	// check that the guarantee has been added to the mempool
-	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
-
-	// check that the submit call was not called
-	suite.conduit.AssertExpectations(suite.T())
+	// we should not propagate the guarantee
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeInvalidGuarantor() {
@@ -350,11 +353,9 @@ func (suite *IngestionSuite) TestOnGuaranteeInvalidGuarantor() {
 	suite.Assert().Error(err, "should error with invalid guarantor")
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
-	// check that the guarantee has not been added to the mempool
-	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
-
-	// check that the submit call was not called
-	suite.conduit.AssertExpectations(suite.T())
+	// we should not propagate the guarantee
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 // test that just after an epoch boundary we still accept guarantees from collectors
@@ -375,8 +376,6 @@ func (suite *IngestionSuite) TestOnGuaranteeEpochEnd() {
 	suite.pool.On("Has", guarantee.ID()).Return(false)
 	suite.pool.On("Add", guarantee).Return(true)
 
-	suite.expectGuaranteePublished(guarantee)
-
 	// submit the guarantee as if it was sent by the collection node which
 	// is leaving at the current epoch boundary
 	err := suite.ingest.onGuarantee(suite.collID, guarantee)
@@ -385,8 +384,9 @@ func (suite *IngestionSuite) TestOnGuaranteeEpochEnd() {
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertExpectations(suite.T())
 
-	// check that the Publish call was called
-	suite.conduit.AssertExpectations(suite.T())
+	// we should not propagate the guarantee
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 func (suite *IngestionSuite) TestOnGuaranteeUnknownOrigin() {
@@ -403,6 +403,10 @@ func (suite *IngestionSuite) TestOnGuaranteeUnknownOrigin() {
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
+
+	// we should not propagate the guarantee
+	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
+	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 // validGuarantee returns a valid collection guarantee based on the suite state.
@@ -411,22 +415,4 @@ func (suite *IngestionSuite) validGuarantee() *flow.CollectionGuarantee {
 	guarantee.SignerIDs = []flow.Identifier{suite.collID}
 	guarantee.ReferenceBlockID = suite.head.ID()
 	return guarantee
-}
-
-// expectGuaranteePublished creates an expectation on the Conduit mock that the
-// guarantee should be published to the consensus nodes
-func (suite *IngestionSuite) expectGuaranteePublished(guarantee *flow.CollectionGuarantee) {
-
-	// check that we call the submit with the correct consensus node IDs
-	suite.conduit.On("Publish", guarantee, mock.Anything, mock.Anything, mock.Anything).Run(
-		func(args mock.Arguments) {
-			nodeID1 := args.Get(1).(flow.Identifier)
-			nodeID2 := args.Get(2).(flow.Identifier)
-			nodeID3 := args.Get(3).(flow.Identifier)
-			suite.Assert().ElementsMatch(
-				[]flow.Identifier{nodeID1, nodeID2, nodeID3},
-				[]flow.Identifier{suite.con1ID, suite.con2ID, suite.con3ID},
-			)
-		},
-	).Return(nil).Once()
 }

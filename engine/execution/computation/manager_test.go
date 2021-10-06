@@ -20,6 +20,7 @@ import (
 
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
@@ -156,7 +157,7 @@ func TestComputeBlock_Uploader(t *testing.T) {
 		blockComputer: blockComputer,
 		me:            me,
 		programsCache: programsCache,
-		uploader:      fakeUploader,
+		uploaders:     []uploader.Uploader{fakeUploader},
 	}
 
 	view := delta.NewView(state2.LedgerGetRegister(ledger, flow.StateCommitment(ledger.InitialState())))
