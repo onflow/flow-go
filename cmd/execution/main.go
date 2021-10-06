@@ -11,7 +11,6 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
@@ -327,7 +326,7 @@ func main() {
 			extralog.ExtraLogDumpPath = extraLogPath
 
 			rt := fvm.NewInterpreterRuntime(
-				runtime.WithAtreeValidationEnabled(atreeValidationEnabled),
+			// runtime.WithAtreeValidationEnabled(atreeValidationEnabled),
 			)
 
 			vm := fvm.NewVirtualMachine(rt)

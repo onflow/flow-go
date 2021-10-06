@@ -59,20 +59,20 @@ func extractExecutionState(
 	reporters := []ledger.Reporter{}
 
 	if migrate {
-		storageFormatV6Migration := mgr.StorageFormatV6Migration{
-			Log:       log,
-			OutputDir: outputDir,
-		}
+		// storageFormatV6Migration := mgr.StorageFormatV6Migration{
+		// 	Log:       log,
+		// 	OutputDir: outputDir,
+		// }
 
-		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
-			Log:       log,
-			OutputDir: outputDir,
-		}
+		// storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
+		// 	Log:       log,
+		// 	OutputDir: outputDir,
+		// }
 
 		migrations = []ledger.Migration{
 			mgr.PruneMigration,
-			storageFormatV6Migration.Migrate,
-			storageUsedUpdateMigration.Migrate,
+			// storageFormatV6Migration.Migrate,
+			// storageUsedUpdateMigration.Migrate,
 		}
 	}
 	if report {

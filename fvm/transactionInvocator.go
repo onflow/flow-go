@@ -319,7 +319,6 @@ func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclara
 
 					return interpreter.VoidValue{}
 				},
-				setAccountFrozenFunctionType,
 			),
 		}
 
