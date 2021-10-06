@@ -3,11 +3,8 @@ package utils
 import (
 	"fmt"
 	"github.com/onflow/cadence"
-	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	fttemplates "github.com/onflow/flow-ft/lib/go/templates"
-	"github.com/onflow/flow-go/utils/unittest"
-
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,68 +18,6 @@ func LocalnetEnv() templates.Environment {
 		LockedTokensAddress:  "f8d6e0586b0a20c7",
 		StakingProxyAddress:  "f8d6e0586b0a20c7",
 	}
-}
-
-func MakeCreateLocalnetLeaseAccountWithKey(
-	env templates.Environment,
-	fullAccountKey *sdk.AccountKey,
-	creatorAccount *sdk.Account,
-	creatorAccountKeyIndex int,
-	latestBlockID sdk.Identifier,
-) *sdk.Transaction {
-	creatorKey := creatorAccount.Keys[creatorAccountKeyIndex]
-
-	adminPublicKey, err := unittest.AdminPublicKeyFixture()
-	if err != nil {
-		panic(err)
-	}
-	fullAdminAccountKey := sdk.NewAccountKey().
-		SetPublicKey(adminPublicKey).
-		SetHashAlgo(crypto.SHA2_256).
-		SetWeight(1000)
-
-	tx := sdk.NewTransaction().
-		SetScript(templates.GenerateCustodyCreateAccountWithLeaseAccountScript(env)).
-		AddAuthorizer(creatorAccount.Address).
-		AddRawArgument(jsoncdc.MustEncode(bytesToCadenceArray(fullAdminAccountKey.Encode()))).
-		AddRawArgument(jsoncdc.MustEncode(bytesToCadenceArray(fullAccountKey.Encode()))).
-		SetReferenceBlockID(latestBlockID).
-		SetGasLimit(1000).
-		SetProposalKey(creatorAccount.Address, creatorAccountKeyIndex, creatorKey.SequenceNumber).
-		SetPayer(creatorAccount.Address)
-	creatorKey.SequenceNumber++
-	return tx
-}
-
-func MakeDepositLeaseToken(env templates.Environment, receiver sdk.Address, sender *sdk.Account, senderKeyID int, tokenAmount string, latestBlockID sdk.Identifier) (*sdk.Transaction, error) {
-	senderKey := sender.Keys[senderKeyID]
-
-	tx := sdk.NewTransaction().
-		SetScript(templates.GenerateDepositTokensScript(env)).
-		SetGasLimit(1000).
-		SetReferenceBlockID(latestBlockID).
-		SetProposalKey(sender.Address, senderKeyID, senderKey.SequenceNumber).
-		SetPayer(sender.Address).
-		AddAuthorizer(sender.Address)
-
-	err := tx.AddArgument(cadence.NewAddress(receiver))
-	if err != nil {
-		return nil, fmt.Errorf("could not add argument to transaction :%w", err)
-	}
-
-	amount, err := cadence.NewUFix64(tokenAmount)
-	if err != nil {
-		return nil, fmt.Errorf("could not add arguments to transaction :%w", err)
-	}
-
-	err = tx.AddArgument(amount)
-	if err != nil {
-		return nil, fmt.Errorf("could not add argument to transaction :%w", err)
-	}
-
-	senderKey.SequenceNumber++
-
-	return tx, nil
 }
 
 // MakeCreateStakingCollectionTx submits transaction stakingCollection/setup_staking_collection.cdc

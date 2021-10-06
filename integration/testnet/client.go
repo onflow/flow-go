@@ -3,6 +3,7 @@ package testnet
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go-sdk/templates"
 	"time"
 
 	"google.golang.org/grpc"
@@ -161,6 +162,15 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) (cadence.Va
 	return res, nil
 }
 
+func (c *Client) ExecuteScriptBytes(ctx context.Context, script []byte, args []cadence.Value) (cadence.Value, error) {
+	res, err := c.client.ExecuteScriptAtLatestBlock(ctx, script, args)
+	if err != nil {
+		return nil, fmt.Errorf("could not execute script: %w", err)
+	}
+
+	return res, nil
+}
+
 func (c *Client) SDKServiceAddress() sdk.Address {
 	return sdk.Address(c.Chain.ServiceAddress())
 }
@@ -277,4 +287,37 @@ func (c *Client) GetAccount(accountAddress sdk.Address) (*sdk.Account, error) {
 	}
 
 	return account, nil
+}
+
+func (c *Client) CreateAccount(
+	ctx context.Context,
+	accountKey *sdk.AccountKey,
+	payerAccount *sdk.Account,
+	payer sdk.Address,
+	latestBlockID sdk.Identifier,
+	) (sdk.Address, error) {
+
+	payerKey := payerAccount.Keys[0]
+	tx := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+	tx.SetGasLimit(1000).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(payer, 0, payerKey.SequenceNumber).
+		SetPayer(payer)
+
+	payerKey.SequenceNumber++
+	err := c.SignAndSendTransaction(ctx, tx)
+	if err != nil {
+		return sdk.Address{}, fmt.Errorf("failed to sign and send create account transaction %w", err)
+	}
+
+	result, err := c.WaitForSealed(ctx, tx.ID())
+	if err != nil {
+		return sdk.Address{}, fmt.Errorf("failed to wait for create account transaction to seal %w", err)
+	}
+
+	if address, ok := c.UserAddress(result); ok {
+		return address, nil
+	}
+
+	return sdk.Address{}, fmt.Errorf("failed to get account address of the created flow account")
 }

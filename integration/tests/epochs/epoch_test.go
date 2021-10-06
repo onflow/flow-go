@@ -2,7 +2,9 @@ package epochs
 
 import (
 	"context"
+	"github.com/onflow/flow-go/integration/utils"
 	"github.com/stretchr/testify/suite"
+	"log"
 	"testing"
 
 	"github.com/onflow/flow-go/integration/testnet"
@@ -31,7 +33,6 @@ func (s *Suite) TestViewsProgress() {
 	}
 
 	phaseChecks := []*phaseCheck{}
-
 	// iterate through two epochs and populate a list of phase checks
 	for counter := 0; counter < 2; counter++ {
 
@@ -74,7 +75,7 @@ func (s *Suite) TestViewsProgress() {
 
 	s.net.StopContainers()
 
-	consensusContainers := []*testnet.Container{}
+	consensusContainers := make([]*testnet.Container, 0)
 	for _, c := range s.net.Containers {
 		if c.Config.Role == flow.RoleConsensus {
 			consensusContainers = append(consensusContainers, c)
@@ -122,4 +123,18 @@ func (s *Suite) TestViewsProgress() {
 			assert.Equal(s.T(), v.phase, item.phase, "wrong phase at view %d", v.finalView)
 		}
 	}
+}
+
+// TestEpochJoin . . .
+func (s *Suite) TestEpochJoin() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	env := utils.LocalnetEnv()
+	info := s.StakeNode(ctx, env, flow.RoleConsensus)
+
+	v := s.ExecuteGetNodeInfoScript(ctx, env, info.StakingAccountAddress)
+
+	log.Println("HEYYYYYYYYY", v)
+	s.net.StopContainers()
 }

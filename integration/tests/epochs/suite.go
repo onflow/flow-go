@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/integration/utils"
@@ -104,8 +105,11 @@ func (s *Suite) TearDownTest() {
 	}
 }
 
+// StakedNodeOperationInfo struct contains all the node information needed to start a node after it is onboarded (staked and registered)
 type StakedNodeOperationInfo struct {
+	NodeID                  flow.Identifier
 	Role                    flow.Role
+	StakingAccountAddress   sdk.Address
 	FullAccountKey          *sdk.AccountKey
 	StakingAccountKey       sdkcrypto.PrivateKey
 	NetworkingKey           sdkcrypto.PrivateKey
@@ -121,7 +125,7 @@ type StakedNodeOperationInfo struct {
 // 4. Add additional funds to staking account for storage
 // 5. Create Staking collection for node
 // 6. Register node using staking collection object
-func (s *Suite) StakeNode(role flow.Role) *StakedNodeOperationInfo {
+func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role flow.Role) *StakedNodeOperationInfo {
 	stakingAccountKey, networkingKey, stakingKey, machineAccountKey, machineAccountPubKey := s.generateAccountKeys(role)
 	nodeID := flow.MakeID(stakingKey.PublicKey().Encode())
 	fullAccountKey := sdk.NewAccountKey().
@@ -129,19 +133,25 @@ func (s *Suite) StakeNode(role flow.Role) *StakedNodeOperationInfo {
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
-	env := utils.LocalnetEnv()
-
 	// create staking account
-	stakingAccountAddress, err := s.createNewLeaseAccount(env, fullAccountKey)
+	stakingAccountAddress, err := s.createAccount(
+		ctx,
+		fullAccountKey,
+		s.client.Account(),
+		s.client.SDKServiceAddress(),
+	)
+	require.NoError(s.T(), err)
+
+	stakeAmount, err := s.client.TokenAmountByRole(role)
 	require.NoError(s.T(), err)
 
 	// fund account with token amount to stake
-	result, err := s.depositLeaseTokens(env, role, stakingAccountAddress)
+	result, err := s.fundAccount(ctx, stakingAccountAddress, stakeAmount)
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
 	// fund account for storage
-	result, err = s.fundAccount(stakingAccountAddress, "10.0")
+	result, err = s.fundAccount(ctx, stakingAccountAddress, "10.0")
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
@@ -149,7 +159,7 @@ func (s *Suite) StakeNode(role flow.Role) *StakedNodeOperationInfo {
 	require.NoError(s.T(), err)
 
 	// create staking collection
-	_, err = s.createStakingCollection(env, stakingAccountKey, stakingAccount)
+	result, err = s.createStakingCollection(ctx, env, stakingAccountKey, stakingAccount)
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
@@ -161,11 +171,12 @@ func (s *Suite) StakeNode(role flow.Role) *StakedNodeOperationInfo {
 
 	// register node using staking collection
 	result, err = s.registerNode(
+		ctx,
 		env,
 		stakingAccountKey,
 		stakingAccount,
 		nodeID,
-		flow.RoleConsensus,
+		role,
 		"localhost:9000",
 		networkingKey.PublicKey().String()[2:],
 		stakingKey.PublicKey().String()[2:],
@@ -176,7 +187,9 @@ func (s *Suite) StakeNode(role flow.Role) *StakedNodeOperationInfo {
 	require.NoError(s.T(), result.Error)
 
 	return &StakedNodeOperationInfo{
+		NodeID:                  nodeID,
 		Role:                    role,
+		StakingAccountAddress:   stakingAccountAddress,
 		FullAccountKey:          fullAccountKey,
 		StakingAccountKey:       stakingAccountKey,
 		StakingKey:              stakingKey,
@@ -187,8 +200,7 @@ func (s *Suite) StakeNode(role flow.Role) *StakedNodeOperationInfo {
 }
 
 // transfers tokens to receiver from service account
-func (s *Suite) fundAccount(receiver sdk.Address, tokenAmount string) (*sdk.TransactionResult, error) {
-	ctx := context.Background()
+func (s *Suite) fundAccount(ctx context.Context, receiver sdk.Address, tokenAmount string) (*sdk.TransactionResult, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -245,66 +257,23 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	return
 }
 
-// creates a new lease account, can be used to test staking
-func (s *Suite) createNewLeaseAccount(env templates.Environment, fullAccountKey *sdk.AccountKey) (sdk.Address, error) {
-	ctx := context.Background()
-
+// creates a new flow account, can be used to test staking
+func (s *Suite) createAccount(ctx context.Context,
+	accountKey *sdk.AccountKey,
+	payerAccount *sdk.Account,
+	payer sdk.Address,
+) (sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	makeLeaseAcctTx := utils.MakeCreateLocalnetLeaseAccountWithKey(
-		env,
-		fullAccountKey,
-		s.client.Account(),
-		0,
-		sdk.Identifier(latestBlockID),
-	)
-
-	err = s.client.SignAndSendTransaction(ctx, makeLeaseAcctTx)
+	addr, err := s.client.CreateAccount(ctx, accountKey, payerAccount, payer, sdk.Identifier(latestBlockID))
 	require.NoError(s.T(), err)
 
-	result, err := s.client.WaitForSealed(ctx, makeLeaseAcctTx.ID())
-	require.NoError(s.T(), err)
-
-	stakingAccountAddress, found := s.client.UserAddress(result)
-	if !found {
-		return sdk.Address{}, fmt.Errorf("failed to stake node, could not create locked token account")
-	}
-
-	return stakingAccountAddress, nil
-}
-
-// deposits tokens into lease account
-func (s *Suite) depositLeaseTokens(env templates.Environment, role flow.Role, to sdk.Address) (*sdk.TransactionResult, error) {
-	ctx := context.Background()
-	tokenAmount, err := s.client.TokenAmountByRole(role)
-	require.NoError(s.T(), err)
-	fmt.Println(tokenAmount)
-
-	latestBlockID, err := s.client.GetLatestBlockID(ctx)
-	require.NoError(s.T(), err)
-
-	transferLeaseTokenTx, err := utils.MakeDepositLeaseToken(
-		env,
-		to,
-		s.client.Account(),
-		0,
-		tokenAmount,
-		sdk.Identifier(latestBlockID),
-	)
-
-	err = s.client.SignAndSendTransaction(ctx, transferLeaseTokenTx)
-	require.NoError(s.T(), err)
-
-	result, err := s.client.WaitForSealed(ctx, transferLeaseTokenTx.ID())
-	require.NoError(s.T(), err)
-
-	return result, nil
+	return addr, nil
 }
 
 // creates a staking collection for the given node
-func (s *Suite) createStakingCollection(env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account) (*sdk.TransactionResult, error) {
-	ctx := context.Background()
+func (s *Suite) createStakingCollection(ctx context.Context, env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account) (*sdk.TransactionResult, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -330,6 +299,7 @@ func (s *Suite) createStakingCollection(env templates.Environment, accountKey sd
 
 // submits register node transaction for staking collection
 func (s *Suite) registerNode(
+	ctx context.Context,
 	env templates.Environment,
 	accountKey sdkcrypto.PrivateKey,
 	stakingAccount *sdk.Account,
@@ -341,7 +311,6 @@ func (s *Suite) registerNode(
 	amount string,
 	machineKey string,
 ) (*sdk.TransactionResult, error) {
-	ctx := context.Background()
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -371,4 +340,11 @@ func (s *Suite) registerNode(
 	require.NoError(s.T(), err)
 
 	return result, nil
+}
+
+func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, env templates.Environment, address sdk.Address) cadence.Value {
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetNodeInfoFromAddressScript(env), []cadence.Value{cadence.NewAddress(address)})
+	require.NoError(s.T(), err)
+
+	return v
 }
