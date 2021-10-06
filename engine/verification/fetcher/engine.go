@@ -239,7 +239,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	e.metrics.OnChunkDataPackArrivedAtFetcher()
 
 	// make sure we still need it
-	status, exists := e.pendingChunks.ByID(chunkDataPack.ChunkID)
+	status, exists := e.pendingChunks.Get(chunkDataPack.ChunkID)
 	if !exists {
 		lg.Debug().Msg("could not fetch pending status from mempool, dropping chunk data")
 		return
@@ -464,7 +464,7 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 		Hex("chunk_id", logging.ID(chunkID)).
 		Logger()
 	// we need to report that the job has been finished eventually
-	status, exists := e.pendingChunks.ByID(chunkID)
+	status, exists := e.pendingChunks.Get(chunkID)
 	if !exists {
 		lg.Debug().
 			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
