@@ -42,7 +42,7 @@ type ComputationManager interface {
 
 var DefaultScriptLogThreshold = 1 * time.Second
 
-const MaxScriptErrorMessageSize = 1000
+const MaxScriptErrorMessageSize = 1000 // 1000 chars
 
 // Manager manages computation and execution
 type Manager struct {
