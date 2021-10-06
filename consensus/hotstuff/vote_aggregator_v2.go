@@ -37,7 +37,8 @@ type VoteAggregatorV2 interface {
 	// AddBlock is a _synchronous_ call (logic is executed by the calling go routine). It also verifies
 	// validity of the proposer's vote for its own block.
 	// Expected error returns during normal operations:
-	// * model.InvalidBlockError if the block is invalid
+	// * model.InvalidBlockError if the proposer's vote for its own block is invalid
+	// * mempool.DecreasingPruningHeightError if the block's view has already been pruned
 	AddBlock(block *model.Proposal) error
 
 	// InvalidBlock notifies the VoteAggregator about an invalid proposal, so that it

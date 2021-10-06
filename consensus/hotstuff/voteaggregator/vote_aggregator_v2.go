@@ -171,19 +171,16 @@ func (va *VoteAggregatorV2) AddVote(vote *model.Vote) {
 // pending votes whose block was unknown.
 // It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
 // Expected error returns during normal operations:
-// * model.InvalidBlockError if the block is invalid
+// * model.InvalidBlockError if the proposer's vote for its own block is invalid
+// * mempool.DecreasingPruningHeightError if the block's view has already been pruned
 func (va *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
 	if block.Block.View <= va.highestPrunedView.Value() {
-		return nil
+		return mempool.NewDecreasingPruningHeightErrorf("block proposal for view %d is stale, highestPrunedView is %d", block.Block.View, va.highestPrunedView.Value())
 	}
 
 	collector, _, err := va.collectors.GetOrCreateCollector(block.Block.View)
 	if err != nil {
-		// ignore if our routine is outdated and some other one has pruned collectors
-		if mempool.IsDecreasingPruningHeightError(err) {
-			return nil
-		}
 		return fmt.Errorf("could not get or create collector for block %v: %w", block.Block.BlockID, err)
 	}
 
