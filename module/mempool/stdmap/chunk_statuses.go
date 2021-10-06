@@ -3,6 +3,7 @@ package stdmap
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 )
@@ -29,8 +30,12 @@ func chunkStatus(entity flow.Entity) *verification.ChunkStatus {
 // ByID returns a chunk status by its chunk ID.
 // There is a one-to-one correspondence between the chunk statuses in memory, and
 // their chunk ID.
-func (cs ChunkStatuses) ByID(chunkID flow.Identifier) (*verification.ChunkStatus, bool) {
-	entity, exists := cs.Backend.ByID(chunkID)
+func (cs ChunkStatuses) Get(chunkIndex uint64, resultID flow.Identifier) (*verification.ChunkStatus, bool) {
+	locatorID := chunks.Locator{
+		ResultID: resultID,
+		Index:    chunkIndex,
+	}.ID()
+	entity, exists := cs.Backend.ByID(locatorID)
 	if !exists {
 		return nil, false
 	}
