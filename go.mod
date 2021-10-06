@@ -59,7 +59,6 @@ require (
 	github.com/prometheus/client_golang v1.10.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/rs/zerolog v1.19.0
-	github.com/schollz/progressbar/v3 v3.7.6
 	github.com/sethvargo/go-retry v0.1.0
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.2.1
