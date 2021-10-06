@@ -99,25 +99,27 @@ func (s *Signaler) Throw(err error) {
 To start a component, a `SignalerContext` must be created to start it with:
 
 ```golang
-// this is the context for the routine which manages the component
-var parentCtx context.Context
+var parentCtx context.Context // this is the context for the routine which manages the component
+var childComponent component.Component
 
 ctx, cancel := context.WithCancel(parentCtx)
+
+// create a SignalerContext and return an error channel which can be used to receive
+// any irrecoverable errors thrown with the Signaler
 signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 
+// start the child component
+childComponent.Start(signalerCtx)
+
+// launch goroutine to handle errors thrown from the child component
 go func() {
   select {
-  case err := <-errChan:
+  case err := <-errChan: // error thrown by child component
     cancel()
-    // handle the error
-  case <-parentCtx.Done():
-    // canceled by parent
+    // handle the error...
+  case <-parentCtx.Done(): // canceled by parent
+    // perform any necessary cleanup...
   }
-}
-
-if err := childComponent.Start(signalerCtx); err != nil {
-  cancel()
-  // handle the error if necessary...
 }
 ```
 
@@ -143,9 +145,10 @@ A component will now be started by passing a `SignalerContext` to its `Start` me
 ### Motivations
 - `Context`s are the standard way of doing go-routine lifecycle management in Go, and adhering to standards helps eliminate confusion and ambiguity for anyone interacting with the `flow-go` codebase. This is especially true now that we are beginning to provide API's and interfaces for third parties to interact with the codebase (e.g DPS).
   - Even to someone unfamiliar with our codebase (but familiar with Go idioms), it is clear how a method signature like `Start(context.Context) error` will behave. A method signature like `Ready()` is not so clear.
+- This promotes a hierarchical supervision paradigm, where each `Component` is equipped with a fresh signaler to its parent at launch, and is thus supervised by his parent for any irrecoverable errors it may encounter (the call to `WithSignaler` replaces the signaler in a parent context). As a consequence, sub-components themselves started by a component have it as a supervisor, which handles their irrecoverable failures, and so on.
   - If context propagation is done properly, there is no need to worry about any cleanup code in the `Done` method. Cancelling the context for a component will automatically cancel all subcomponents / child routines in the component tree, and we do not have to explicitly call `Done` on each and every subcomponent to trigger their shutdown.
-- This allows us to separate the capability to check a component's state from the capability to start / stop it. We may want to give multiple other components the capability to check its state, without giving them the capability to start or stop it. Here is an [example](https://github.com/onflow/flow-go/blob/b50f0ffe054103a82e4aa9e0c9e4610c2cbf2cc9/engine/common/splitter/network/network.go#L112) of where this would be useful.
-- This provides a clearer way of defining ownership of components, and hence may potentially eliminate the need to deal with concurrency-safety altogether. Whoever creates a component should be responsible for starting it, and therefore they should be the only one with access to its `Startable` interface. If each component only has a single parent that is capable of starting it, then we should never run into concurrency issues.
+  - This allows us to separate the capability to check a component's state from the capability to start / stop it. We may want to give multiple other components the capability to check its state, without giving them the capability to start or stop it. Here is an [example](https://github.com/onflow/flow-go/blob/b50f0ffe054103a82e4aa9e0c9e4610c2cbf2cc9/engine/common/splitter/network/network.go#L112) of where this would be useful.
+  - This provides a clearer way of defining ownership of components, and hence may potentially eliminate the need to deal with concurrency-safety altogether. Whoever creates a component should be responsible for starting it, and therefore they should be the only one with access to its `Startable` interface. If each component only has a single parent that is capable of starting it, then we should never run into concurrency issues.
 
 ## Implementation (WIP)
 * Lifecycle management logic for components can be further abstracted into a `RunComponent` helper function:
