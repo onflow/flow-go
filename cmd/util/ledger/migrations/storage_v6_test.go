@@ -262,7 +262,7 @@ func TestEncoding(t *testing.T) {
 		migration := &StorageFormatV6Migration{}
 		migration.initPersistentSlabStorage(ledgerView)
 		migration.initNewInterpreter()
-		migration.migratedPayloadPaths = make(map[storagePath]bool, 0)
+		migration.migratedPayloadPaths = make(map[storagePath]bool)
 		migration.converter = NewValueConverter(migration)
 
 		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
