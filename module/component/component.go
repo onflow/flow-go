@@ -188,9 +188,7 @@ func (c *componentManagerBuilderImpl) Build() *ComponentManager {
 
 var _ Component = (*ComponentManager)(nil)
 
-// ComponentManager is used to manage the worker routines of a Component.
-// When a ComponentManager is started, it first runs the startup routines provided,
-// and then launches any worker routines.
+// ComponentManager is used to manage the worker routines of a Component
 type ComponentManager struct {
 	started        *atomic.Bool
 	ready          chan struct{}
