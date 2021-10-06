@@ -2,9 +2,10 @@ package epochs
 
 import (
 	"context"
+	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/stretchr/testify/suite"
-	"log"
+	"strings"
 	"testing"
 
 	"github.com/onflow/flow-go/integration/testnet"
@@ -131,10 +132,18 @@ func (s *Suite) TestEpochJoin() {
 	defer cancel()
 
 	env := utils.LocalnetEnv()
+
+	// stake a new node
 	info := s.StakeNode(ctx, env, flow.RoleConsensus)
 
-	v := s.ExecuteGetNodeInfoScript(ctx, env, info.StakingAccountAddress)
+	// get node info from staking table
+	nodeInfoCDC := s.ExecuteGetNodeInfoScript(ctx, env, info.NodeID)
+	nodeInfo, ok := nodeInfoCDC.(cadence.Struct)
+	require.True(s.T(), ok)
 
-	log.Println("HEYYYYYYYYY", v)
+	// make sure node info we generated matches what we get from the flow staking table
+	nodeID := nodeInfo.Fields[0].(cadence.String).String()
+	require.True(s.T(), info.NodeID.String() == strings.Trim(nodeID, "\""))
+
 	s.net.StopContainers()
 }

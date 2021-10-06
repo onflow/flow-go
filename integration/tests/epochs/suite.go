@@ -342,8 +342,17 @@ func (s *Suite) registerNode(
 	return result, nil
 }
 
-func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, env templates.Environment, address sdk.Address) cadence.Value {
-	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetNodeInfoFromAddressScript(env), []cadence.Value{cadence.NewAddress(address)})
+// @TODO use templates repo
+const getNodeInfo = `import FlowIDTableStaking from 0xf8d6e0586b0a20c7
+
+// This script gets all the info about a node and returns it
+
+pub fun main(nodeID: String): FlowIDTableStaking.NodeInfo {
+    return FlowIDTableStaking.NodeInfo(nodeID: nodeID)
+}`
+
+func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
+	v, err := s.client.ExecuteScriptBytes(ctx, []byte(getNodeInfo), []cadence.Value{cadence.String(nodeID.String())})
 	require.NoError(s.T(), err)
 
 	return v
