@@ -256,9 +256,9 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 
 		// launch goroutine to close done channel
 		go c.waitForDone(&workersDone)
+	} else {
+		panic(module.ErrMultipleStartup)
 	}
-
-	panic(module.ErrMultipleStartup)
 }
 
 func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
