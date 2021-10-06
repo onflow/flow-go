@@ -64,7 +64,6 @@ func (s *VoteAggregatorV2TestSuite) SetupTest() {
 		})
 
 	var err error
-
 	s.aggregator, err = NewVoteAggregatorV2(unittest.Logger(), s.notifier, 0, s.collectors)
 	require.NoError(s.T(), err)
 
@@ -85,7 +84,7 @@ func (s *VoteAggregatorV2TestSuite) prepareMockedCollector(view uint64) *mocks.V
 	return collector
 }
 
-// TestAddVote_DeliveryOfQueuedVotes tests if votes are being delivered for processing by queening logic
+// TestAddVote_DeliveryOfQueuedVotes tests if votes are being delivered for processing by queueing logic
 func (s *VoteAggregatorV2TestSuite) TestAddVote_DeliveryOfQueuedVotes() {
 	view := uint64(1000)
 	clr := s.prepareMockedCollector(view)
@@ -99,8 +98,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddVote_DeliveryOfQueuedVotes() {
 	}
 
 	for _, vote := range votes {
-		err := s.aggregator.AddVote(vote)
-		require.NoError(s.T(), err)
+		s.aggregator.AddVote(vote)
 	}
 
 	require.Eventually(s.T(), func() bool {
@@ -114,7 +112,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddVote_DeliveryOfQueuedVotes() {
 // and not processed.
 func (s *VoteAggregatorV2TestSuite) TestAddVote_StaleVote() {
 	view := uint64(1000)
-	s.collectors.On("PruneUpToView", view).Return(nil)
+	s.collectors.On("PruneUpToView", view).Return(nil).Once()
 	s.aggregator.PruneUpToView(view)
 
 	lengthObserver := func(int) {
@@ -128,8 +126,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddVote_StaleVote() {
 	votes := uint64(10)
 	for i := uint64(0); i < votes; i++ {
 		vote := unittest.VoteFixture(unittest.WithVoteView(view - i))
-		err := s.aggregator.AddVote(vote)
-		require.NoError(s.T(), err)
+		s.aggregator.AddVote(vote)
 	}
 }
 
@@ -138,7 +135,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddBlock_ValidProposal() {
 	view := uint64(1000)
 	clr := s.prepareMockedCollector(view)
 	proposal := helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(view))))
-	clr.On("ProcessBlock", proposal).Return(nil)
+	clr.On("ProcessBlock", proposal).Return(nil).Once()
 	err := s.aggregator.AddBlock(proposal)
 	require.NoError(s.T(), err)
 	clr.AssertExpectations(s.T())
@@ -167,7 +164,8 @@ func (s *VoteAggregatorV2TestSuite) TestAddBlock_DecreasingPruningHeightError() 
 	*s.collectors = mocks.VoteCollectors{}
 	s.collectors.On("GetOrCreateCollector", staleView).Return(nil, false, mempool.NewDecreasingPruningHeightError(""))
 	err := s.aggregator.AddBlock(staleProposal)
-	require.NoError(s.T(), err)
+	require.Error(s.T(), err)
+	require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
 	s.collectors.AssertExpectations(s.T())
 }
 
@@ -175,12 +173,13 @@ func (s *VoteAggregatorV2TestSuite) TestAddBlock_DecreasingPruningHeightError() 
 // and not processed.
 func (s *VoteAggregatorV2TestSuite) TestAddBlock_StaleProposal() {
 	view := uint64(1000)
-	s.collectors.On("PruneUpToView", view).Return(nil)
+	s.collectors.On("PruneUpToView", view).Return(nil).Once()
 	s.aggregator.PruneUpToView(view)
 
 	proposal := helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(view))))
 	err := s.aggregator.AddBlock(proposal)
-	require.NoError(s.T(), err)
+	require.Error(s.T(), err)
+	require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
 	s.collectors.AssertNotCalled(s.T(), "GetOrProcessCollector")
 }
 
@@ -192,7 +191,7 @@ func (s *VoteAggregatorV2TestSuite) TestVoteProcessing_DoubleVoting() {
 	firstVote := unittest.VoteFixture(unittest.WithVoteView(view))
 	secondVote := unittest.VoteFixture(unittest.WithVoteView(view))
 	clr.On("AddVote", secondVote).Return(model.NewDoubleVoteErrorf(firstVote, secondVote, ""))
-	s.notifier.On("OnDoubleVotingDetected", firstVote, secondVote).Return(nil)
+	s.notifier.On("OnDoubleVotingDetected", firstVote, secondVote).Return(nil).Once()
 
 	err := s.aggregator.processQueuedVote(secondVote)
 	// double voting should be handled internally and reported to notifier
@@ -222,30 +221,31 @@ func (s *VoteAggregatorV2TestSuite) TestVoteProcessing_ProcessingExceptions() {
 	vote = unittest.VoteFixture(unittest.WithVoteView(view))
 	clr := s.prepareMockedCollector(view)
 	expectedError := errors.New("processing-error")
-	clr.On("AddVote", vote).Return(expectedError)
+	clr.On("AddVote", vote).Return(expectedError).Once()
 	err = s.aggregator.processQueuedVote(vote)
 	require.ErrorIs(s.T(), err, expectedError)
+	clr.AssertExpectations(s.T())
 }
 
 // TestInvalidBlock tests that InvalidBlock reports all previously processed votes to hotstuff.Consumer
 // By definition only votes for invalid proposal has to be reported
 func (s *VoteAggregatorV2TestSuite) TestInvalidBlock() {
 	view := uint64(1000)
-	proposal := helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(view))))
+	byzProposal := helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(view))))
 
 	votes := 10
 	consumedVotes := make([]*model.Vote, 0, votes*2)
 	// generate votes for two proposals
-	otherBlockID := unittest.IdentifierFixture()
+	honestBlockID := unittest.IdentifierFixture()
 	for i := 0; i < votes; i++ {
-		vote := unittest.VoteFixture(unittest.WithVoteView(view),
-			unittest.WithVoteBlockID(proposal.Block.BlockID))
-		otherVote := unittest.VoteFixture(unittest.WithVoteView(view),
-			unittest.WithVoteBlockID(otherBlockID))
-		consumedVotes = append(consumedVotes, vote, otherVote)
+		byzVote := unittest.VoteFixture(unittest.WithVoteView(view),
+			unittest.WithVoteBlockID(byzProposal.Block.BlockID))
+		honestVote := unittest.VoteFixture(unittest.WithVoteView(view),
+			unittest.WithVoteBlockID(honestBlockID))
+		consumedVotes = append(consumedVotes, byzVote, honestVote)
 
 		// only votes for one of the proposals should be reported
-		s.notifier.On("OnVoteForInvalidBlockDetected", vote, proposal)
+		s.notifier.On("OnVoteForInvalidBlockDetected", byzVote, byzProposal)
 	}
 
 	clr := s.prepareMockedCollector(view)
@@ -257,7 +257,38 @@ func (s *VoteAggregatorV2TestSuite) TestInvalidBlock() {
 		}
 	})
 
-	err := s.aggregator.InvalidBlock(proposal)
+	err := s.aggregator.InvalidBlock(byzProposal)
 	require.NoError(s.T(), err)
+
+	clr.On("AddVote", mock.Anything).Run(func(args mock.Arguments) {
+		voteConsumerCallback(args.Get(0).(*model.Vote))
+	}).Return(nil)
+
+	// generate more votes after notifying about invalid block
+	for i := 0; i < votes; i++ {
+		byzVote := unittest.VoteFixture(unittest.WithVoteView(view),
+			unittest.WithVoteBlockID(byzProposal.Block.BlockID))
+		honestVote := unittest.VoteFixture(unittest.WithVoteView(view),
+			unittest.WithVoteBlockID(honestBlockID))
+
+		// only votes for one of the proposals should be reported
+		s.notifier.On("OnVoteForInvalidBlockDetected", byzVote, byzProposal).Once()
+		require.NoError(s.T(), s.aggregator.processQueuedVote(byzVote))
+		require.NoError(s.T(), s.aggregator.processQueuedVote(honestVote))
+	}
+
 	s.notifier.AssertExpectations(s.T())
+}
+
+// TestPruneUpToView tests behavior of pruning logic, we expect that valid pruning call be delegated to VoteCollectors
+func (s *VoteAggregatorV2TestSuite) TestPruneUpToView() {
+	// if we pass view which is higher than current highest pruned view then we should prune VoteCollectors
+	view := uint64(1000)
+	s.collectors.On("PruneUpToView", view).Return(nil).Once()
+	s.aggregator.PruneUpToView(view)
+
+	// calling with same view should result in noop since it's lower or equal than current highest pruned view
+	s.aggregator.PruneUpToView(view)
+
+	s.collectors.AssertNumberOfCalls(s.T(), "PruneUpToView", 1)
 }

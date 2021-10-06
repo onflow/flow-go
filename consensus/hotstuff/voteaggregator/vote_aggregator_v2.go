@@ -75,8 +75,6 @@ func (va *VoteAggregatorV2) Ready() <-chan struct{} {
 		for i := 0; i < defaultVoteAggregatorWorkers; i++ {
 			va.unit.Launch(va.queuedVotesProcessingLoop)
 		}
-
-		<-va.unit.Ready()
 	})
 	return va.lm.Started()
 }
@@ -97,7 +95,7 @@ func (va *VoteAggregatorV2) queuedVotesProcessingLoop() {
 		case <-notifier:
 			err := va.processQueuedVoteEvents()
 			if err != nil {
-				va.log.Fatal().Err(err).Msg("internal error processing block incorporated queued message")
+				va.log.Fatal().Err(err).Msg("internal error processing queued vote events")
 			}
 		}
 	}
@@ -156,10 +154,10 @@ func (va *VoteAggregatorV2) processQueuedVote(vote *model.Vote) error {
 
 // AddVote checks if vote is stale and appends vote into processing queue
 // actual vote processing will be called in other dispatching goroutine.
-func (va *VoteAggregatorV2) AddVote(vote *model.Vote) error {
+func (va *VoteAggregatorV2) AddVote(vote *model.Vote) {
 	// drop stale votes
 	if vote.View <= va.highestPrunedView.Value() {
-		return nil
+		return
 	}
 
 	// It's ok to silently drop votes in case our processing pipeline is full.
@@ -167,27 +165,22 @@ func (va *VoteAggregatorV2) AddVote(vote *model.Vote) error {
 	if ok := va.queuedVotes.Push(vote); ok {
 		va.queuedVotesNotifier.Notify()
 	}
-
-	return nil
 }
 
 // AddBlock notifies the VoteAggregator about a known block so that it can start processing
 // pending votes whose block was unknown.
 // It also verifies the proposer vote of a block, and return whether the proposer signature is valid.
 // Expected error returns during normal operations:
-// * model.InvalidBlockError if the block is invalid
+// * model.InvalidBlockError if the proposer's vote for its own block is invalid
+// * mempool.DecreasingPruningHeightError if the block's view has already been pruned
 func (va *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
 	if block.Block.View <= va.highestPrunedView.Value() {
-		return nil
+		return mempool.NewDecreasingPruningHeightErrorf("block proposal for view %d is stale, highestPrunedView is %d", block.Block.View, va.highestPrunedView.Value())
 	}
 
 	collector, _, err := va.collectors.GetOrCreateCollector(block.Block.View)
 	if err != nil {
-		// ignore if our routine is outdated and some other one has pruned collectors
-		if mempool.IsDecreasingPruningHeightError(err) {
-			return nil
-		}
 		return fmt.Errorf("could not get or create collector for block %v: %w", block.Block.BlockID, err)
 	}
 
