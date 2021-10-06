@@ -154,14 +154,20 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	mw.ComponentManager = component.NewComponentManagerBuilder().OnStart(func(ctx context.Context) error {
-		// TODO: refactor to avoid storing ctx altogether
-		mw.ctx = ctx
-		return mw.start(ctx)
-	}).AddWorker(func(ctx irrecoverable.SignalerContext) {
-		<-ctx.Done()
-		mw.stop()
-	}).Build()
+	mw.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// TODO: refactor to avoid storing ctx altogether
+			mw.ctx = ctx
+
+			if err := mw.start(ctx); err != nil {
+				ctx.Throw(err)
+			}
+
+			ready()
+
+			<-ctx.Done()
+			mw.stop()
+		}).Build()
 
 	return mw
 }
