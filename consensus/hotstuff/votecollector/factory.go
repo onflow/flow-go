@@ -105,7 +105,7 @@ func (f *VoteProcessorFactory) Create(proposal *model.Proposal) (hotstuff.Verify
 func (f *combinedVoteProcessorFactoryBase) Create(proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
 	allParticipants, err := f.committee.Identities(proposal.Block.BlockID, filter.Any)
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
+		return nil, fmt.Errorf("error retrieving consensus participants at block %v: %w", proposal.Block.BlockID, err)
 	}
 
 	// message that has to be verified against aggregated signature

@@ -81,8 +81,7 @@ func (m *VoteCollector) AddVote(vote *model.Vote) error {
 		if errors.Is(err, RepeatedVoteErr) {
 			return nil
 		}
-		if model.IsDoubleVoteError(err) {
-			doubleVoteErr := err.(model.DoubleVoteError)
+		if doubleVoteErr, isDoubleVoteErr := model.AsDoubleVoteError(err); isDoubleVoteErr {
 			m.notifier.OnDoubleVotingDetected(doubleVoteErr.FirstVote, doubleVoteErr.ConflictingVote)
 			return nil
 		}

@@ -71,7 +71,7 @@ func (p *CombinedVoteProcessor) Status() hotstuff.VoteCollectorStatus {
 
 // Process performs processing of single vote in concurrent safe way. This function is implemented to be
 // called by multiple goroutines at the same time. Supports processing of both staking and threshold signatures.
-// Design of this function is event driven, as soon as we collect enough weight to create a QC we will immediately do this
+// Design of this function is event driven, as soon as we collect enough weight to create a QC we will immediately do so
 // and submit it via callback for further processing.
 // Expected error returns during normal operations:
 // * VoteForIncompatibleBlockError - submitted vote for incompatible block
@@ -102,7 +102,7 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		err := p.stakingSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
 			if errors.Is(err, msig.ErrInvalidFormat) {
-				return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d: %w",
+				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid staking signature: %w",
 					vote.ID(), vote.View, err)
 			}
 			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
@@ -119,7 +119,7 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		err := p.rbSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
 			if errors.Is(err, msig.ErrInvalidFormat) {
-				return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d: %w",
+				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid random beacon signature: %w",
 					vote.ID(), vote.View, err)
 			}
 			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
@@ -155,10 +155,9 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 		return nil
 	}
 
-	// ATTENTION: this code will be called only once, if by some reason building QC will finish with error
-	// we won't be able to try again unless we create new vote processor.
-	// This behavior is desired since a failure to create QC is not an expected error and means we have received
-	// an exception.
+	// Our algorithm for checking votes and adding them to the aggregators should
+	// guarantee that we are _always_ able to successfully construct a QC when we
+	// reach this point. A failure implies that the VoteProcessor's internal state is corrupted.
 	qc, err := p.buildQC()
 	if err != nil {
 		return fmt.Errorf("internal error constructing QC from votes: %w", err)
