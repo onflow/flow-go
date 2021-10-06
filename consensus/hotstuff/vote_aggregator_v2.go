@@ -31,8 +31,7 @@ type VoteAggregatorV2 interface {
 	// The voting block could either be known or unknown.
 	// If the voting block is unknown, the vote won't be processed until AddBlock is called with the block.
 	// This method can be called concurrently, votes will be queued and processed asynchronously.
-	// No errors are expected during normal operations, any error should be threatened as exception
-	AddVote(vote *model.Vote) error
+	AddVote(vote *model.Vote)
 
 	// AddBlock notifies the VoteAggregator that it should start processing votes for the given block.
 	// AddBlock is a _synchronous_ call (logic is executed by the calling go routine). It also verifies

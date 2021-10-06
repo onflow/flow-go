@@ -98,8 +98,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddVote_DeliveryOfQueuedVotes() {
 	}
 
 	for _, vote := range votes {
-		err := s.aggregator.AddVote(vote)
-		require.NoError(s.T(), err)
+		s.aggregator.AddVote(vote)
 	}
 
 	require.Eventually(s.T(), func() bool {
@@ -127,8 +126,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddVote_StaleVote() {
 	votes := uint64(10)
 	for i := uint64(0); i < votes; i++ {
 		vote := unittest.VoteFixture(unittest.WithVoteView(view - i))
-		err := s.aggregator.AddVote(vote)
-		require.NoError(s.T(), err)
+		s.aggregator.AddVote(vote)
 	}
 }
 

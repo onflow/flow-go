@@ -75,8 +75,6 @@ func (va *VoteAggregatorV2) Ready() <-chan struct{} {
 		for i := 0; i < defaultVoteAggregatorWorkers; i++ {
 			va.unit.Launch(va.queuedVotesProcessingLoop)
 		}
-
-		<-va.unit.Ready()
 	})
 	return va.lm.Started()
 }
@@ -97,7 +95,7 @@ func (va *VoteAggregatorV2) queuedVotesProcessingLoop() {
 		case <-notifier:
 			err := va.processQueuedVoteEvents()
 			if err != nil {
-				va.log.Fatal().Err(err).Msg("internal error processing block incorporated queued message")
+				va.log.Fatal().Err(err).Msg("internal error processing queued vote events")
 			}
 		}
 	}
@@ -156,10 +154,10 @@ func (va *VoteAggregatorV2) processQueuedVote(vote *model.Vote) error {
 
 // AddVote checks if vote is stale and appends vote into processing queue
 // actual vote processing will be called in other dispatching goroutine.
-func (va *VoteAggregatorV2) AddVote(vote *model.Vote) error {
+func (va *VoteAggregatorV2) AddVote(vote *model.Vote) {
 	// drop stale votes
 	if vote.View <= va.highestPrunedView.Value() {
-		return nil
+		return
 	}
 
 	// It's ok to silently drop votes in case our processing pipeline is full.
@@ -167,8 +165,6 @@ func (va *VoteAggregatorV2) AddVote(vote *model.Vote) error {
 	if ok := va.queuedVotes.Push(vote); ok {
 		va.queuedVotesNotifier.Notify()
 	}
-
-	return nil
 }
 
 // AddBlock notifies the VoteAggregator about a known block so that it can start processing
