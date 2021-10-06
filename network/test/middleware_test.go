@@ -115,11 +115,11 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.mwCancel = cancel
-	signaler := irrecoverable.NewSignaler()
-	m.mwCtx = irrecoverable.WithSignaler(ctx, signaler)
+	var errChan <-chan error
+	m.mwCtx, errChan = irrecoverable.WithSignaler(ctx)
 	go func() {
 		select {
-		case err := <-signaler.Error():
+		case err := <-errChan:
 			m.T().Error("middlewares encountered fatal error", err)
 		case <-m.mwCtx.Done():
 			return
@@ -128,7 +128,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	for i, mw := range m.mws {
 		mw.SetOverlay(m.ov[i])
-		assert.NoError(m.T(), mw.Start(m.mwCtx))
+		mw.Start(m.mwCtx)
 		mw.UpdateAllowList()
 	}
 }
@@ -152,7 +152,7 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 		mock.AnythingOfType("*message.Message"),
 	).Return(nil)
 	newMw.SetOverlay(overlay)
-	assert.NoError(m.T(), newMw.Start(m.mwCtx))
+	newMw.Start(m.mwCtx)
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
