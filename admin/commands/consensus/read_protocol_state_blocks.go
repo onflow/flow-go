@@ -24,7 +24,7 @@ type ReadProtocolStateBlocksCommandData struct {
 	requestType      requestType
 	blockID          flow.Identifier
 	blockHeight      uint64
-	numBlocksToQuery int
+	numBlocksToQuery uint
 }
 
 var ReadProtocolStateBlocksCommand commands.AdminCommand = commands.AdminCommand{
@@ -38,28 +38,26 @@ var ReadProtocolStateBlocksCommand commands.AdminCommand = commands.AdminCommand
 		if !ok {
 			return errors.New("the \"block\" field is required")
 		}
-		switch block.(type) {
+		switch block := block.(type) {
 		case string:
 			if block == "latest" {
 				data.requestType = Latest
 			} else if block == "latest_sealed" {
 				data.requestType = LatestSealed
 			} else {
-				id := block.(string)
-				b, err := hex.DecodeString(id)
+				b, err := hex.DecodeString(block)
 				if err != nil {
-					return fmt.Errorf("could not parse block ID: %v", id)
+					return fmt.Errorf("could not parse block ID: %v", block)
 				}
 				data.requestType = ID
 				data.blockID = flow.BytesToID(b)
 			}
 		case float64:
-			height := uint64(block.(float64))
-			if height < 0 {
+			if block < 0 {
 				return fmt.Errorf("block height must not be negative")
 			}
 			data.requestType = Height
-			data.blockHeight = uint64(height)
+			data.blockHeight = uint64(block)
 		default:
 			return fmt.Errorf("invalid value for \"block\": %v", block)
 		}
@@ -69,7 +67,12 @@ var ReadProtocolStateBlocksCommand commands.AdminCommand = commands.AdminCommand
 			if !ok {
 				return fmt.Errorf("invalid value for \"n\": %v", n)
 			}
-			data.numBlocksToQuery = int(n)
+			if n < 0 {
+				return fmt.Errorf("\"n\" must not be negative")
+			}
+			data.numBlocksToQuery = uint(n)
+		} else {
+			data.numBlocksToQuery = 1
 		}
 
 		req.ValidatorData = data

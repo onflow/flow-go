@@ -88,10 +88,10 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 func (suite *CommandRunnerSuite) TestHandler() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
@@ -99,7 +99,7 @@ func (suite *CommandRunnerSuite) TestHandler() {
 		suite.EqualValues(req.Data["number"], 123)
 		called = true
 
-		return nil
+		return "ok", nil
 	})
 
 	suite.SetupCommandRunner()
@@ -144,16 +144,16 @@ func (suite *CommandRunnerSuite) TestUnimplementedHandler() {
 func (suite *CommandRunnerSuite) TestValidator() {
 	calls := 0
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
 		calls += 1
 
-		return nil
+		return "ok", nil
 	})
 
 	validatorErr := errors.New("unexpected value")
@@ -194,14 +194,14 @@ func (suite *CommandRunnerSuite) TestValidator() {
 
 func (suite *CommandRunnerSuite) TestHandlerError() {
 	handlerErr := errors.New("handler error")
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
-		return handlerErr
+		return nil, handlerErr
 	})
 
 	suite.SetupCommandRunner()
@@ -224,9 +224,9 @@ func (suite *CommandRunnerSuite) TestHandlerError() {
 }
 
 func (suite *CommandRunnerSuite) TestTimeout() {
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		<-ctx.Done()
-		return ctx.Err()
+		return nil, ctx.Err()
 	})
 
 	suite.SetupCommandRunner()
@@ -250,17 +250,17 @@ func (suite *CommandRunnerSuite) TestTimeout() {
 func (suite *CommandRunnerSuite) TestHTTPServer() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
 		suite.EqualValues(req.Data["key"], "value")
 		called = true
 
-		return nil
+		return "ok", nil
 	})
 
 	suite.SetupCommandRunner()
@@ -389,17 +389,17 @@ func generateCerts(t *testing.T) (tls.Certificate, *x509.CertPool, tls.Certifica
 func (suite *CommandRunnerSuite) TestTLS() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
 		suite.EqualValues(req.Data["key"], "value")
 		called = true
 
-		return nil
+		return "ok", nil
 	})
 
 	serverCert, serverCertPool, clientCert, clientCertPool := generateCerts(suite.T())

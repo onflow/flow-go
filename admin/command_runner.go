@@ -243,6 +243,7 @@ func (r *CommandRunner) runCommand(ctx context.Context, command string, data map
 	r.logger.Info().Str("command", command).Msg("received new command")
 
 	req := &CommandRequest{Data: data}
+
 	if validator := r.getValidator(command); validator != nil {
 		if validationErr := validator(req); validationErr != nil {
 			return nil, status.Error(codes.InvalidArgument, validationErr.Error())

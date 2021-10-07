@@ -22,6 +22,7 @@ message RunCommandRequest {
   google.protobuf.Struct data = 2;  // Arguments to pass to the command
 }
 
+/* RunCommandResponse represents an admin command response */
 message RunCommandResponse {
   string output = 1;  // The command output
 }
