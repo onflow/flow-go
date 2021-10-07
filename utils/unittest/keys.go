@@ -4,19 +4,11 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/crypto"
 
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 )
-
-func AdminPublicKeyFixture() (sdkcrypto.PublicKey, error) {
-	return sdkcrypto.DecodePublicKeyHex(
-		sdkcrypto.ECDSA_P256,
-		"b60899344f1779bb4c6df5a81db73e5781d895df06dee951e813eba99e76dd3c9288cceb5a5a9ada390671f60b71f3fd2653ca5c4e1ccc6f8b5a62be6d17256a",
-	)
-}
 
 func NetworkingKey() (crypto.PrivateKey, error) {
 	return ECDSAKey()
