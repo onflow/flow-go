@@ -317,9 +317,7 @@ func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
 	status *verification.ChunkStatus,
 	chunkDataPack *flow.ChunkDataPack) (bool, error) {
 
-	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
-	removed := e.pendingChunks.Rem(chunkDataPack.ChunkID)
-
+	removed := e.pendingChunks.Rem(status.ChunkIndex, status.ExecutionResult.ID())
 	if !removed {
 		// we deduplicate the chunk data responses at this point, reaching here means a
 		// duplicate chunk data response is under process concurrently, so we give up
@@ -328,6 +326,7 @@ func (e *Engine) handleValidatedChunkDataPack(ctx context.Context,
 	}
 
 	// pushes chunk data pack to verifier, and waits for it to be verified.
+	chunk := status.ExecutionResult.Chunks[status.ChunkIndex]
 	err := e.pushToVerifierWithTracing(ctx, chunk, status.ExecutionResult, chunkDataPack)
 	if err != nil {
 		return false, fmt.Errorf("could not push the chunk to verifier engine")
