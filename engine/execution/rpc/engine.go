@@ -167,7 +167,28 @@ func (h *handler) ExecuteScriptAtBlockID(
 	return res, nil
 }
 
-// TODO(ramtin) add RPC endpoint here
+func (h *handler) GetRegisterAtBlockID(
+	ctx context.Context,
+	req *execution.GetRegisterAtBlockIDRequest,
+) (*execution.GetRegisterAtBlockIDResponse, error) {
+
+	blockID, err := convert.BlockID(req.GetBlockId())
+	if err != nil {
+		return nil, err
+	}
+
+	value, err := h.engine.GetRegisterAtBlockID(ctx, req.GetRegisterOwner(), req.GetRegisterController(), req.GetRegisterKey(), blockID)
+
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to collect register: %v", err)
+	}
+
+	res := &execution.GetRegisterAtBlockIDResponse{
+		Value: value,
+	}
+
+	return res, nil
+}
 
 func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	req *execution.GetEventsForBlockIDsRequest) (*execution.GetEventsForBlockIDsResponse, error) {
