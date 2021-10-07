@@ -55,6 +55,10 @@ const (
 	// timeout for FindPeer queries to the DHT
 	// TODO: is this a sensible value?
 	findPeerQueryTimeout = 10 * time.Second
+
+	// stream compression factories
+	NoCompression   = "no-compression"
+	GzipCompression = "gzip-compression"
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
@@ -73,6 +77,19 @@ func WithGzipCompression(s libp2pnet.Stream) (libp2pnet.Stream, error) {
 	return compressed.NewCompressedStream(s)
 }
 
+// LibP2PStreamCompressorFactoryFunc translates name of a stream factory to its corresponding stream compressor factory
+// function.
+func LibP2PStreamCompressorFactoryFunc(factory string) (LibP2PStreamCompressorWrapperFunc, error) {
+	switch factory {
+	case NoCompression:
+		return WithoutCompression, nil
+	case GzipCompression:
+		return WithGzipCompression, nil
+	default:
+		return nil, fmt.Errorf("unknown stream factory: %s", factory)
+	}
+}
+
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
 func DefaultLibP2PNodeFactory(ctx context.Context,
@@ -88,7 +105,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
 	role string,
-	streamCompression bool) (LibP2PFactoryFunc, error) {
+	streamFactory LibP2PStreamCompressorWrapperFunc) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
@@ -115,7 +132,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			SetResolver(resolver).
-			EnableStreamCompressor(streamCompression).
+			SetStreamCompressor(streamFactory).
 			Build(ctx)
 	}, nil
 }
@@ -130,7 +147,7 @@ type NodeBuilder interface {
 	SetTopicValidation(bool) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
 	SetResolver(*dns.Resolver) NodeBuilder
-	EnableStreamCompressor(bool) NodeBuilder
+	SetStreamCompressor(LibP2PStreamCompressorWrapperFunc) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -208,10 +225,8 @@ func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *dns.Resolver) Nod
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) EnableStreamCompressor(enable bool) NodeBuilder {
-	if enable {
-		builder.streamFactory = WithGzipCompression
-	}
+func (builder *DefaultLibP2PNodeBuilder) SetStreamCompressor(streamFactory LibP2PStreamCompressorWrapperFunc) NodeBuilder {
+	builder.streamFactory = streamFactory
 	return builder
 }
 

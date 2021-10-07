@@ -713,7 +713,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
 		SetTopicValidation(false).
-		EnableStreamCompressor(true).
+		SetStreamCompressor(WithGzipCompression).
 		SetLogger(log)
 
 	if allowList {

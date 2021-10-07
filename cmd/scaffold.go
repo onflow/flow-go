@@ -143,8 +143,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.adminClientCAs, "admin-client-certs", defaultConfig.adminClientCAs, "admin client certs (for mutual TLS)")
 
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
-	fnb.flags.BoolVar(&fnb.BaseConfig.LibP2PCompressionEnabled, "libp2p-compression-enabled", defaultConfig.LibP2PCompressionEnabled,
-		"whether to enable libp2p stream compression")
+	fnb.flags.StringVar(&fnb.BaseConfig.LibP2PStreamCompression, "libp2p-compression", p2p.NoCompression,
+		"libp2p stream compression mechanism")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 }
@@ -173,6 +173,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			},
 		}
 
+		streamFactory, err := p2p.LibP2PStreamCompressorFactoryFunc(fnb.BaseConfig.LibP2PStreamCompression)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert stream factory: %w", err)
+		}
+
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(ctx,
 			fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
@@ -186,7 +191,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			pingProvider,
 			fnb.BaseConfig.DNSCacheTTL,
 			fnb.BaseConfig.NodeRole,
-			fnb.BaseConfig.LibP2PCompressionEnabled)
+			streamFactory)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)

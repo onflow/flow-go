@@ -247,7 +247,7 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 			SetResolver(resolver).
 			SetLogger(logger).
 			SetTopicValidation(false).
-			EnableStreamCompressor(true).
+			SetStreamCompressor(WithGzipCompression).
 			Build(suite.ctx)
 		require.NoError(suite.T(), err)
 
