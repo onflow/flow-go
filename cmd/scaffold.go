@@ -706,7 +706,9 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithAccountStorageLimit(true),
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Mainnet {
-		fvm.WithTransactionFeesEnabled(true)
+		vmOpts = append(vmOpts,
+			fvm.WithTransactionFeesEnabled(true),
+		)
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary {
 		vmOpts = append(vmOpts,
