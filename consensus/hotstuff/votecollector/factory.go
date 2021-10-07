@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
@@ -45,33 +44,28 @@ var _ hotstuff.VoteProcessorFactory = &combinedVoteProcessorFactoryBase{}
 var _ hotstuff.VoteProcessorFactory = &stakingVoteProcessorFactoryBase{}
 var _ hotstuff.VoteProcessorFactory = &VoteProcessorFactory{}
 
-func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, eventHandler hotstuff.EventHandlerV2) *VoteProcessorFactory {
+func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
 	return &VoteProcessorFactory{
 		base: &combinedVoteProcessorFactoryBase{
-			voteProcessorFactoryBase: newVoteProcessorFactoryBase(log, committee, eventHandler),
+			voteProcessorFactoryBase: newVoteProcessorFactoryBase(log, committee, onQCCreated),
 			packer:                   signature.NewConsensusSigDataPacker(committee),
 		},
 	}
 }
 
-func NewStakingVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, eventHandler hotstuff.EventHandlerV2) *VoteProcessorFactory {
+func NewStakingVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
 	return &VoteProcessorFactory{
 		base: &stakingVoteProcessorFactoryBase{
-			voteProcessorFactoryBase: newVoteProcessorFactoryBase(log, committee, eventHandler),
+			voteProcessorFactoryBase: newVoteProcessorFactoryBase(log, committee, onQCCreated),
 		},
 	}
 }
 
-func newVoteProcessorFactoryBase(log zerolog.Logger, committee hotstuff.Committee, eventHandler hotstuff.EventHandlerV2) voteProcessorFactoryBase {
+func newVoteProcessorFactoryBase(log zerolog.Logger, committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) voteProcessorFactoryBase {
 	return voteProcessorFactoryBase{
-		log:       log,
-		committee: committee,
-		onQCCreated: func(qc *flow.QuorumCertificate) {
-			err := eventHandler.OnQCConstructed(qc)
-			if err != nil {
-				log.Fatal().Err(err).Msgf("failed to submit constructed QC at view %d to event handler", qc.View)
-			}
-		},
+		log:         log,
+		committee:   committee,
+		onQCCreated: onQCCreated,
 	}
 }
 

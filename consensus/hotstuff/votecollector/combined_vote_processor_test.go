@@ -2,6 +2,7 @@ package votecollector
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"sync"
 	"testing"
 
@@ -44,7 +45,9 @@ func (s *CombinedVoteProcessorTestSuite) SetupTest() {
 	s.rbSigAggregator = &mockhotstuff.WeightedSignatureAggregator{}
 	s.reconstructor = &mockhotstuff.RandomBeaconReconstructor{}
 	s.packer = &mockhotstuff.Packer{}
-	s.minRequiredShares = 10 // we require 10 RB shares to reconstruct signature
+	s.proposal = helper.MakeProposal()
+
+	s.minRequiredShares = 9 // we require 9 RB shares to reconstruct signature
 	s.thresholdTotalWeight, s.rbSharesTotal = 0, 0
 
 	// setup threshold signature aggregator
@@ -85,17 +88,16 @@ func (s *CombinedVoteProcessorTestSuite) SetupTest() {
 
 // TestInitialState tests that Block() and Status() return correct values after calling constructor
 func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
-	require.Equal(s.T(), s.processor.Block(), s.processor.Block())
+	require.Equal(s.T(), s.proposal.Block, s.processor.Block())
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.processor.Status())
 }
 
-// TestProcess_VoteNotForProposal tests that vote should pass to validation only if it has correct
-// view and block ID matching proposal that is locked in CombinedVoteProcessor
+// TestProcess_VoteNotForProposal tests that CombinedVoteProcessor accepts only votes for the block it was initialized with. According to interface specification of `VoteProcessor`, we expect dedicated sentinel errors for votes for different views (`VoteForIncompatibleViewError`) _or_ block  (`VoteForIncompatibleBlockError`).
 func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
-	require.Error(s.T(), err)
+	require.ErrorAs(s.T(), err, &VoteForIncompatibleBlockError)
 	err = s.processor.Process(unittest.VoteFixture(unittest.WithVoteBlockID(s.proposal.Block.BlockID)))
-	require.Error(s.T(), err)
+	require.ErrorAs(s.T(), err, &VoteForIncompatibleViewError)
 	s.stakingAggregator.AssertNotCalled(s.T(), "Verify")
 	s.rbSigAggregator.AssertNotCalled(s.T(), "Verify")
 }
@@ -108,31 +110,31 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignatureFormat() {
 	err := s.processor.Process(vote)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.ErrorIs(s.T(), err.(model.InvalidVoteError).Err, msig.ErrInvalidFormat)
+	require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
 }
 
 // TestProcess_InvalidSignature tests that CombinedVoteProcessor doesn't collect signatures for votes with invalid signature.
 // Checks are made for cases where both staking and threshold signatures were submitted.
 func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
-	invalidVoteException := errors.New("invalid-vote-exception")
+	exception := errors.New("unexpected-exception")
 	// test for staking signatures
 	s.Run("staking-sig", func() {
 		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 
 		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
 
-		// expect sentinel error in case Verify returns ErrInvalidFormat
+		// sentinel error from `ErrInvalidFormat` should be wrapped as `InvalidVoteError`
 		err := s.processor.Process(stakingVote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorIs(s.T(), err.(model.InvalidVoteError).Err, msig.ErrInvalidFormat)
+		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
 
-		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(invalidVoteException)
+		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(exception)
 
-		// except exception
+		// unexpected errors from `Verify` should be propagated, but should _not_ be wrapped as `InvalidVoteError`
 		err = s.processor.Process(stakingVote)
-		require.Error(s.T(), err)
-		require.ErrorIs(s.T(), err, invalidVoteException)
+		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
+		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
 
 		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
 	})
@@ -146,13 +148,14 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 		err := s.processor.Process(thresholdVote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
+		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
 
-		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(invalidVoteException)
+		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(exception)
 
 		// except exception
 		err = s.processor.Process(thresholdVote)
-		require.Error(s.T(), err)
-		require.ErrorIs(s.T(), err, invalidVoteException)
+		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
+		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
 
 		s.rbSigAggregator.AssertNotCalled(s.T(), "TrustedAdd")
 		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
@@ -162,28 +165,31 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 
 // TestProcess_TrustedAddError tests a case where we were able to successfully verify signature but failed to collect it.
 func (s *CombinedVoteProcessorTestSuite) TestProcess_TrustedAddError() {
-	trustedAddException := errors.New("trusted-add-exception")
+	exception := errors.New("unexpected-exception")
 	s.Run("staking-sig", func() {
 		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 		*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
 		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(nil).Once()
-		s.stakingAggregator.On("TrustedAdd", stakingVote.SignerID, mock.Anything).Return(uint64(0), trustedAddException).Once()
+		s.stakingAggregator.On("TrustedAdd", stakingVote.SignerID, mock.Anything).Return(uint64(0), exception).Once()
 		err := s.processor.Process(stakingVote)
-		require.ErrorIs(s.T(), err, trustedAddException)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
 	s.Run("threshold-sig", func() {
 		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
 		*s.rbSigAggregator = mockhotstuff.WeightedSignatureAggregator{}
 		*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
 		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(nil)
-		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(uint64(0), trustedAddException).Once()
+		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(uint64(0), exception).Once()
 		err := s.processor.Process(thresholdVote)
-		require.ErrorIs(s.T(), err, trustedAddException)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
 		// test also if reconstructor failed to add it
 		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(s.sigWeight, nil).Once()
-		s.reconstructor.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(false, trustedAddException).Once()
+		s.reconstructor.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(false, exception).Once()
 		err = s.processor.Process(thresholdVote)
-		require.ErrorIs(s.T(), err, trustedAddException)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
 }
 
@@ -279,10 +285,10 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 	})
 }
 
-// TestProcess_NotEnoughStakingWeight tests a scenario where we first don't have enough stake,
+// TestProcess_EnoughStakeNotEnoughShares tests a scenario where we first don't have enough stake,
 // then we iteratively increase it to the point where we have enough staking weight. No QC should be created
 // in this scenario since there is not enough random beacon shares.
-func (s *CombinedVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
+func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughStakeNotEnoughShares() {
 	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
@@ -292,7 +298,28 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
 
 	require.False(s.T(), s.processor.done.Load())
 	s.reconstructor.AssertCalled(s.T(), "HasSufficientShares")
-	s.onQCCreatedState.AssertExpectations(s.T())
+	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
+}
+
+// TestProcess_EnoughStakeNotEnoughShares tests a scenario where we are collecting only threshold signatures
+// to the point where we have enough shares to reconstruct RB signature. No QC should be created
+// in this scenario since there is not enough staking weight.
+func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughSharesNotEnoughStakes() {
+	// change sig weight to be really low, so we don't reach min staking weight while collecting
+	// threshold signatures
+	s.sigWeight = 10
+	for i := uint64(0); i < s.minRequiredShares; i++ {
+		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
+		s.rbSigAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
+		err := s.processor.Process(vote)
+		require.NoError(s.T(), err)
+	}
+
+	require.False(s.T(), s.processor.done.Load())
+	s.reconstructor.AssertNotCalled(s.T(), "HasSufficientShares")
+	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
+	// verify if we indeed have enough shares
+	require.True(s.T(), s.reconstructor.HasSufficientShares())
 }
 
 // TestProcess_CreatingQC tests a scenario when we have collected enough staking weight and random beacon shares
@@ -308,21 +335,27 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	}
 
 	// prepare for aggregation, as soon as we will collect enough shares we will try to create QC
-	stakingSigners := unittest.IdentifierListFixture(10)
+	stakingSigners := unittest.IdentifierListFixture(7)
+	thresholdSigners := unittest.IdentifierListFixture(7)
 	expectedSigs := unittest.SignaturesFixture(3)
 	s.stakingAggregator.On("Aggregate").Return(stakingSigners, []byte(expectedSigs[0]), nil)
-	s.rbSigAggregator.On("Aggregate").Return(stakingSigners, []byte(expectedSigs[1]), nil)
+	s.rbSigAggregator.On("Aggregate").Return(thresholdSigners, []byte(expectedSigs[1]), nil)
 	s.reconstructor.On("Reconstruct").Return(expectedSigs[2], nil)
 	expectedSigData := unittest.RandomBytes(128)
 
-	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(stakingSigners, expectedSigData, nil)
+	mergedSignerIDs := make([]flow.Identifier, 0, len(stakingSigners)+len(thresholdSigners))
+	// merge both staking and threshold signers into one list
+	mergedSignerIDs = append(mergedSignerIDs, stakingSigners...)
+	mergedSignerIDs = append(mergedSignerIDs, thresholdSigners...)
+
+	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(mergedSignerIDs, expectedSigData, nil)
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Run(func(args mock.Arguments) {
 		qc := args.Get(0).(*flow.QuorumCertificate)
 		// ensure that QC contains correct field
 		expectedQC := &flow.QuorumCertificate{
 			View:      s.proposal.Block.View,
 			BlockID:   s.proposal.Block.BlockID,
-			SignerIDs: qc.SignerIDs,
+			SignerIDs: mergedSignerIDs,
 			SigData:   qc.SigData,
 		}
 		require.Equal(s.T(), expectedQC, qc)

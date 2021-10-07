@@ -134,7 +134,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddVote_StaleVote() {
 func (s *VoteAggregatorV2TestSuite) TestAddBlock_ValidProposal() {
 	view := uint64(1000)
 	clr := s.prepareMockedCollector(view)
-	proposal := helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(view))))
+	proposal := helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(view))))
 	clr.On("ProcessBlock", proposal).Return(nil).Once()
 	err := s.aggregator.AddBlock(proposal)
 	require.NoError(s.T(), err)
@@ -144,7 +144,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddBlock_ValidProposal() {
 // TestAddBlock_ProcessingErrors tests that all errors during block processing are correctly propagated to caller.
 func (s *VoteAggregatorV2TestSuite) TestAddBlock_ProcessingErrors() {
 	view := uint64(1000)
-	proposal := helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(view))))
+	proposal := helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(view))))
 	// calling AddBlock without prepared collector will result in factory error
 	err := s.aggregator.AddBlock(proposal)
 	require.ErrorIs(s.T(), err, voteCollectorsFactoryError)
@@ -160,7 +160,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddBlock_ProcessingErrors() {
 // trigger an error
 func (s *VoteAggregatorV2TestSuite) TestAddBlock_DecreasingPruningHeightError() {
 	staleView := uint64(1000)
-	staleProposal := helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(staleView))))
+	staleProposal := helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(staleView))))
 	*s.collectors = mocks.VoteCollectors{}
 	s.collectors.On("GetOrCreateCollector", staleView).Return(nil, false, mempool.NewDecreasingPruningHeightError(""))
 	err := s.aggregator.AddBlock(staleProposal)
@@ -176,7 +176,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddBlock_StaleProposal() {
 	s.collectors.On("PruneUpToView", view).Return(nil).Once()
 	s.aggregator.PruneUpToView(view)
 
-	proposal := helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(view))))
+	proposal := helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(view))))
 	err := s.aggregator.AddBlock(proposal)
 	require.Error(s.T(), err)
 	require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
@@ -231,7 +231,7 @@ func (s *VoteAggregatorV2TestSuite) TestVoteProcessing_ProcessingExceptions() {
 // By definition only votes for invalid proposal has to be reported
 func (s *VoteAggregatorV2TestSuite) TestInvalidBlock() {
 	view := uint64(1000)
-	byzProposal := helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(view))))
+	byzProposal := helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(view))))
 
 	votes := 10
 	consumedVotes := make([]*model.Vote, 0, votes*2)
