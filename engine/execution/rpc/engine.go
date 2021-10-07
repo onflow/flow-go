@@ -167,6 +167,8 @@ func (h *handler) ExecuteScriptAtBlockID(
 	return res, nil
 }
 
+// TODO(ramtin) add RPC endpoint here
+
 func (h *handler) GetEventsForBlockIDs(_ context.Context,
 	req *execution.GetEventsForBlockIDsRequest) (*execution.GetEventsForBlockIDsResponse, error) {
 
