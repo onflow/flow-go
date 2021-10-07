@@ -356,7 +356,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 			View:      s.proposal.Block.View,
 			BlockID:   s.proposal.Block.BlockID,
 			SignerIDs: mergedSignerIDs,
-			SigData:   qc.SigData,
+			SigData:   expectedSigData,
 		}
 		require.Equal(s.T(), expectedQC, qc)
 	}).Return(nil).Once()
