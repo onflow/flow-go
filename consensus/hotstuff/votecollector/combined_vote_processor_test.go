@@ -118,9 +118,9 @@ func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
 // TestProcess_VoteNotForProposal tests that CombinedVoteProcessor accepts only votes for the block it was initialized with. According to interface specification of `VoteProcessor`, we expect dedicated sentinel errors for votes for different views (`VoteForIncompatibleViewError`) _or_ block  (`VoteForIncompatibleBlockError`).
 func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
-	require.Error(s.T(), err)
+	require.ErrorAs(s.T(), err, &VoteForIncompatibleBlockError)
 	err = s.processor.Process(unittest.VoteFixture(unittest.WithVoteBlockID(s.proposal.Block.BlockID)))
-	require.Error(s.T(), err)
+	require.ErrorAs(s.T(), err, &VoteForIncompatibleViewError)
 	s.stakingAggregator.AssertNotCalled(s.T(), "Verify")
 	s.rbSigAggregator.AssertNotCalled(s.T(), "Verify")
 }
@@ -133,7 +133,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignatureFormat() {
 	err := s.processor.Process(vote)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.ErrorIs(s.T(), err.(model.InvalidVoteError).Err, msig.ErrInvalidFormat)
+	require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
 }
 
 // TestProcess_InvalidSignature tests that CombinedVoteProcessor doesn't collect signatures for votes with invalid signature.
@@ -150,7 +150,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 		err := s.processor.Process(stakingVote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorIs(s.T(), err.(model.InvalidVoteError).Err, msig.ErrInvalidFormat)
+		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
 
 		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(exception)
 
@@ -171,12 +171,12 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 		err := s.processor.Process(thresholdVote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
+		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
 
 		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(exception)
 
 		// except exception
 		err = s.processor.Process(thresholdVote)
-		require.Error(s.T(), err)
 		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
 		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
 
