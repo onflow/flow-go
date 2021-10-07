@@ -254,10 +254,8 @@ func (c *NonErroringComponent) Done() <-chan struct{} {
 	return c.done
 }
 
+//tests that after starting a component that generates, an expected error is received
 func TestRunComponentStartupError(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	componentFactory := func() (component.Component, error) {
 		return NewStartupErroringComponent(), nil
 	}
@@ -265,20 +263,20 @@ func TestRunComponentStartupError(t *testing.T) {
 	called := false
 	onError := func(err error) component.ErrorHandlingResult {
 		called = true
-		require.ErrorIs(t, err, ErrFatal)
-		return component.ErrorHandlingStop
+		require.ErrorIs(t, err, ErrFatal)  //check that really got the fatal error we were expecting
+		return component.ErrorHandlingStop //stop component after receiving the error (don't restart it)
 	}
 
-	err := component.RunComponent(ctx, componentFactory, onError)
+	//irrelevant what context we use - test won't be using it
+	err := component.RunComponent(context.Background(), componentFactory, onError)
 	require.ErrorIs(t, err, ErrFatal)
 	require.True(t, called)
 }
 
+//tests repeatedly restarting a component during an error that occurs while shutting down
 func TestRunComponentShutdownError(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	componentFactory := func() (component.Component, error) {
+		//shutdown the component after some time - simulate an error during shutdown
 		return NewShutdownErroringComponent(100 * time.Millisecond), nil
 	}
 
@@ -286,16 +284,17 @@ func TestRunComponentShutdownError(t *testing.T) {
 	onError := func(err error) component.ErrorHandlingResult {
 		fatals++
 		require.ErrorIs(t, err, ErrFatal)
-		if fatals < 2 {
+		if fatals < 3 { //restart component after first and second error
 			return component.ErrorHandlingRestart
-		} else {
+		} else { //stop component after third error
 			return component.ErrorHandlingStop
 		}
 	}
 
-	err := component.RunComponent(ctx, componentFactory, onError)
+	//irrelevant what context we use - test won't be using it
+	err := component.RunComponent(context.Background(), componentFactory, onError)
 	require.ErrorIs(t, err, ErrFatal)
-	require.Equal(t, 2, fatals)
+	require.Equal(t, 3, fatals)
 }
 
 func TestRunComponentConcurrentError(t *testing.T) {
