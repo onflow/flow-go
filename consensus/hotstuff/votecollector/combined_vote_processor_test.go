@@ -111,12 +111,11 @@ func (s *CombinedVoteProcessorTestSuite) onQCCreated(qc *flow.QuorumCertificate)
 
 // TestInitialState tests that Block() and Status() return correct values after calling constructor
 func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
-	require.Equal(s.T(), s.processor.Block(), s.processor.Block())
+	require.Equal(s.T(), s.proposal.Block, s.processor.Block())
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.processor.Status())
 }
 
-// TestProcess_VoteNotForProposal tests that vote should pass to validation only if it has correct
-// view and block ID matching proposal that is locked in CombinedVoteProcessor
+// TestProcess_VoteNotForProposal tests that CombinedVoteProcessor accepts only votes for the block it was initialized with. According to interface specification of `VoteProcessor`, we expect dedicated sentinel errors for votes for different views (`VoteForIncompatibleViewError`) _or_ block  (`VoteForIncompatibleBlockError`). 
 func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
 	require.Error(s.T(), err)
@@ -140,14 +139,14 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignatureFormat() {
 // TestProcess_InvalidSignature tests that CombinedVoteProcessor doesn't collect signatures for votes with invalid signature.
 // Checks are made for cases where both staking and threshold signatures were submitted.
 func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
-	invalidVoteException := errors.New("invalid-vote-exception")
+	exception := errors.New("unexpected-exception")
 	// test for staking signatures
 	s.Run("staking-sig", func() {
 		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 
 		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
 
-		// expect sentinel error in case Verify returns ErrInvalidFormat
+		// sentinel error from `ErrInvalidFormat` should be wrapped as `InvalidVoteError`
 		err := s.processor.Process(stakingVote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
@@ -155,10 +154,10 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 
 		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(invalidVoteException)
 
-		// except exception
+		// unexpected errors from `Verify` should be propagated, but should _not_ be wrapped as `InvalidVoteError`
 		err = s.processor.Process(stakingVote)
-		require.Error(s.T(), err)
-		require.ErrorIs(s.T(), err, invalidVoteException)
+		require.ErrorIs(s.T(), err, invalidVoteException) // unexpected errors from verifying the vote signature should be propagated
+		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
 
 		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
 	})
@@ -178,7 +177,8 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 		// except exception
 		err = s.processor.Process(thresholdVote)
 		require.Error(s.T(), err)
-		require.ErrorIs(s.T(), err, invalidVoteException)
+		require.ErrorIs(s.T(), err, invalidVoteException) // unexpected errors from verifying the vote signature should be propagated
+		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
 
 		s.rbSigAggregator.AssertNotCalled(s.T(), "TrustedAdd")
 		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
@@ -188,7 +188,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 
 // TestProcess_TrustedAddError tests a case where we were able to successfully verify signature but failed to collect it.
 func (s *CombinedVoteProcessorTestSuite) TestProcess_TrustedAddError() {
-	trustedAddException := errors.New("trusted-add-exception")
+	exception := errors.New("unexpected-exception")
 	s.Run("staking-sig", func() {
 		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 		*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
@@ -196,6 +196,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_TrustedAddError() {
 		s.stakingAggregator.On("TrustedAdd", stakingVote.SignerID, mock.Anything).Return(uint64(0), trustedAddException).Once()
 		err := s.processor.Process(stakingVote)
 		require.ErrorIs(s.T(), err, trustedAddException)
+		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
 	s.Run("threshold-sig", func() {
 		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
