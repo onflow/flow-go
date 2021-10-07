@@ -3,6 +3,7 @@
 package ingestion
 
 import (
+	"context"
 	"errors"
 	"fmt"
 
@@ -72,7 +73,6 @@ func New(
 		return nil, fmt.Errorf("could not register engine: %w", err)
 	}
 	e.con = con
-
 	return e, nil
 }
 
@@ -171,11 +171,11 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // * OutdatedInputError
 func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
-	span := e.tracer.StartSpan(guarantee.CollectionID, trace.CONProcessCollection)
-	// TODO finish span if we error? How are they shown in Jaeger?
-	span.SetTag("collection_id", guarantee.CollectionID)
-	childSpan := e.tracer.StartSpanFromParent(span, trace.CONIngOnCollectionGuarantee)
-	defer childSpan.Finish()
+	span, _, isSampled := e.tracer.StartCollectionSpan(context.Background(), guarantee.CollectionID, trace.CONIngOnCollectionGuarantee)
+	if isSampled {
+		span.LogKV("originID", originID.String())
+	}
+	defer span.Finish()
 
 	guaranteeID := guarantee.ID()
 
@@ -244,26 +244,10 @@ func (e *Engine) onGuarantee(originID flow.Identifier, guarantee *flow.Collectio
 	// NOTE: there are two ways to go about this:
 	// - expect the collection nodes to propagate the guarantee to all consensus nodes;
 	// - ensure that we take care of propagating guarantees to other consensus nodes.
-	// It's probably a better idea to make sure the consensus nodes take care of this.
-	// The consensus committee is the backbone of the network and should rely as little
-	// as possible on correct behaviour from other node roles. At the same time, there
-	// are likely to be significantly more consensus nodes on the network, which means
-	// it's a better usage of resources to distribute the load for propagation over
-	// consensus node committee than over the collection clusters.
-
-	// select all the consensus nodes on the network as our targets
-	committee, err := final.Identities(filter.HasRole(flow.RoleConsensus))
-	if err != nil {
-		return fmt.Errorf("could not get committee: %w", err)
-	}
-
-	// send the collection guarantee to all consensus committee
-	err = e.con.Publish(guarantee, committee.NodeIDs()...)
-	if err != nil {
-		return fmt.Errorf("could not send guarantee: %w", err)
-	}
-
-	log.Info().Msg("collection guarantee broadcast to committee")
+	// Currently, we go with first option as each collection node broadcasts a guarantee to
+	// all consensus nodes. So we expect all collections of a cluster to broadcast a guarantee to
+	// all consensus nodes. Even on an unhappy path, as long as only one collection node does it
+	// the guarantee must be delivered to all consensus nodes.
 
 	return nil
 }

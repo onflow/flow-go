@@ -3,8 +3,9 @@ package epochs
 import (
 	"context"
 	"fmt"
-	"math/rand"
 	"time"
+
+	"github.com/sethvargo/go-retry"
 
 	"github.com/rs/zerolog"
 
@@ -16,14 +17,23 @@ import (
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+const (
+	// retryMilliseconds is the number of milliseconds to wait between retries
+	retryMilliseconds = 1000 * time.Millisecond
+
+	// percentage of jitter to add to QC contract requests
+	retryJitter = 10
+)
+
 // RootQCVoter is responsible for generating and submitting votes for the
 // root quorum certificate of the upcoming epoch for this node's cluster.
 type RootQCVoter struct {
-	log    zerolog.Logger
-	me     module.Local
-	signer hotstuff.Signer
-	state  protocol.State
-	client module.QCContractClient // client to the QC aggregator smart contract
+	log                    zerolog.Logger
+	me                     module.Local
+	signer                 hotstuff.Signer
+	state                  protocol.State
+	qcContractClients      []module.QCContractClient // priority ordered array of client to the QC aggregator smart contract
+	activeQCContractClient int                       // index of the qc contract client that is currently in use
 
 	wait time.Duration // how long to sleep in between vote attempts
 }
@@ -34,16 +44,16 @@ func NewRootQCVoter(
 	me module.Local,
 	signer hotstuff.Signer,
 	state protocol.State,
-	client module.QCContractClient,
+	contractClients []module.QCContractClient,
 ) *RootQCVoter {
 
 	voter := &RootQCVoter{
-		log:    log.With().Str("module", "root_qc_voter").Logger(),
-		me:     me,
-		signer: signer,
-		state:  state,
-		client: client,
-		wait:   time.Second * 10,
+		log:               log.With().Str("module", "root_qc_voter").Logger(),
+		me:                me,
+		signer:            signer,
+		state:             state,
+		qcContractClients: contractClients,
+		wait:              time.Second * 10,
 	}
 	return voter
 }
@@ -86,22 +96,19 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		return fmt.Errorf("could not create vote for cluster root qc: %w", err)
 	}
 
+	expRetry, err := retry.NewExponential(retryMilliseconds)
+	if err != nil {
+		log.Fatal().Err(err).Msg("create retry mechanism")
+	}
+
 	attempts := 0
-	for {
+	err = retry.Do(ctx, retry.WithJitterPercent(retryJitter, expRetry), func(ctx context.Context) error {
 		attempts++
-		log := log.With().Int("attempt", attempts).Logger()
 
-		// for all attempts after the first, wait before re-trying
-		if attempts > 1 {
-			wait := voter.getWaitInterval(attempts - 2) // -2 so that we wait the base interval in the first Sleep
-			log.Info().Msgf("waiting for %s before retry", wait.String())
-
-			select {
-			case <-ctx.Done():
-				return fmt.Errorf("context cancelled: %w", ctx.Err())
-			case <-time.After(wait):
-				// proceed and re-submit vote
-			}
+		// retry with next fallback client after 2 failed attempts
+		if attempts%2 == 0 {
+			voter.updateActiveQcContractClient()
+			log.Warn().Msgf("retrying on attempt (%d) with fallback access node at index (%d)", attempts, voter.activeQCContractClient)
 		}
 
 		// check that we're still in the setup phase, if we're not we can't
@@ -114,10 +121,10 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		}
 
 		// check whether we've already voted, if we have we can exit early
-		voted, err := voter.client.Voted(ctx)
+		voted, err := voter.qcContractClient().Voted(ctx)
 		if err != nil {
 			log.Error().Err(err).Msg("could not check vote status")
-			continue
+			return retry.RetryableError(err)
 		} else if voted {
 			log.Info().Msg("already voted - exiting QC vote process...")
 			return nil
@@ -126,23 +133,30 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		// submit the vote - this call will block until the transaction has
 		// either succeeded or we are able to retry
 		log.Info().Msg("submitting vote...")
-		err = voter.client.SubmitVote(ctx, vote)
+		err = voter.qcContractClient().SubmitVote(ctx, vote)
 		if err != nil {
 			log.Error().Err(err).Msg("could not submit vote - retrying...")
-			continue
+			return retry.RetryableError(err)
 		}
 
 		log.Info().Msg("successfully submitted vote - exiting QC vote process...")
+
 		return nil
-	}
+	})
+
+	return err
 }
 
-// getWaitInterval returns an interval to wait after the given number of attempts.
-// The interval includes some jitter to avoid synchronization of requests from
-// all collection nodes.
-func (voter *RootQCVoter) getWaitInterval(attempts int) time.Duration {
-	base := voter.wait << attempts                // base wait period on a geometric backoff
-	jitter := float64(base) * rand.Float64() * .1 // add 10% jitter to avoid synchronization across cluster
+func (voter *RootQCVoter) qcContractClient() module.QCContractClient {
+	return voter.qcContractClients[voter.activeQCContractClient]
+}
 
-	return time.Duration(base) + time.Duration(jitter)
+func (voter *RootQCVoter) updateActiveQcContractClient() {
+	// if we have reached the end of our array start from beginning
+	if voter.activeQCContractClient == len(voter.qcContractClients)-1 {
+		voter.activeQCContractClient = 0
+		return
+	}
+
+	voter.activeQCContractClient++
 }
