@@ -5,9 +5,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
-	"github.com/rs/zerolog"
 )
 
 var SetLogLevelCommand commands.AdminCommand = commands.AdminCommand{
