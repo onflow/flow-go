@@ -49,9 +49,10 @@ func (s *CombinedVoteProcessorTestSuite) SetupTest() {
 	s.reconstructor = &mockhotstuff.RandomBeaconReconstructor{}
 	s.packer = &mockhotstuff.Packer{}
 	s.proposal = helper.MakeProposal()
+	// let's assume we have 19 nodes each with stake 100
 	s.sigWeight = 100
-	s.minRequiredStake = 1000 // we require at least 10 sigs to collect min weight
-	s.minRequiredShares = 10  // we require 10 RB shares to reconstruct signature
+	s.minRequiredStake = 1300 // we require at least 13 sigs to collect min weight
+	s.minRequiredShares = 9   // we require 9 RB shares to reconstruct signature
 	s.thresholdTotalWeight, s.stakingTotalWeight, s.rbSharesTotal = 0, 0, 0
 
 	// setup staking signature aggregator
@@ -308,10 +309,10 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 	})
 }
 
-// TestProcess_EnoughStakeNotNotEnoughShares tests a scenario where we first don't have enough stake,
+// TestProcess_EnoughStakeNotEnoughShares tests a scenario where we first don't have enough stake,
 // then we iteratively increase it to the point where we have enough staking weight. No QC should be created
 // in this scenario since there is not enough random beacon shares.
-func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughStakeNotNotEnoughShares() {
+func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughStakeNotEnoughShares() {
 	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
@@ -322,6 +323,27 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughStakeNotNotEnoughShar
 	require.False(s.T(), s.processor.done.Load())
 	s.reconstructor.AssertCalled(s.T(), "HasSufficientShares")
 	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
+}
+
+// TestProcess_EnoughStakeNotEnoughShares tests a scenario where we are collecting only threshold signatures
+// to the point where we have enough shares to reconstruct RB signature. No QC should be created
+// in this scenario since there is not enough staking weight.
+func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughSharesNotEnoughStakes() {
+	// change sig weight to be really low, so we don't reach min staking weight while collecting
+	// threshold signatures
+	s.sigWeight = 10
+	for i := uint64(0); i < s.minRequiredShares; i++ {
+		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
+		s.rbSigAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
+		err := s.processor.Process(vote)
+		require.NoError(s.T(), err)
+	}
+
+	require.False(s.T(), s.processor.done.Load())
+	s.reconstructor.AssertNotCalled(s.T(), "HasSufficientShares")
+	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
+	// verify if we indeed have enough shares
+	require.True(s.T(), s.reconstructor.HasSufficientShares())
 }
 
 // TestProcess_CreatingQC tests a scenario when we have collected enough staking weight and random beacon shares
@@ -337,21 +359,27 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	}
 
 	// prepare for aggregation, as soon as we will collect enough shares we will try to create QC
-	stakingSigners := unittest.IdentifierListFixture(10)
+	stakingSigners := unittest.IdentifierListFixture(7)
+	thresholdSigners := unittest.IdentifierListFixture(7)
 	expectedSigs := unittest.SignaturesFixture(3)
 	s.stakingAggregator.On("Aggregate").Return(stakingSigners, []byte(expectedSigs[0]), nil)
-	s.rbSigAggregator.On("Aggregate").Return(stakingSigners, []byte(expectedSigs[1]), nil)
+	s.rbSigAggregator.On("Aggregate").Return(thresholdSigners, []byte(expectedSigs[1]), nil)
 	s.reconstructor.On("Reconstruct").Return(expectedSigs[2], nil)
 	expectedSigData := unittest.RandomBytes(128)
 
-	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(stakingSigners, expectedSigData, nil)
+	mergedSignerIDs := make([]flow.Identifier, 0, len(stakingSigners)+len(thresholdSigners))
+	// merge both staking and threshold signers into one list
+	mergedSignerIDs = append(mergedSignerIDs, stakingSigners...)
+	mergedSignerIDs = append(mergedSignerIDs, thresholdSigners...)
+
+	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(mergedSignerIDs, expectedSigData, nil)
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Run(func(args mock.Arguments) {
 		qc := args.Get(0).(*flow.QuorumCertificate)
 		// ensure that QC contains correct field
 		expectedQC := &flow.QuorumCertificate{
 			View:      s.proposal.Block.View,
 			BlockID:   s.proposal.Block.BlockID,
-			SignerIDs: qc.SignerIDs,
+			SignerIDs: mergedSignerIDs,
 			SigData:   qc.SigData,
 		}
 		require.Equal(s.T(), expectedQC, qc)

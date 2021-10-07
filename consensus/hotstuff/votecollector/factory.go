@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
 
@@ -34,18 +33,13 @@ type CombinedBaseVoteProcessorFactory struct {
 var _ hotstuff.VoteProcessorFactory = &CombinedBaseVoteProcessorFactory{}
 var _ hotstuff.VoteProcessorFactory = &VoteProcessorFactory{}
 
-func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, eventHandler hotstuff.EventHandlerV2) *VoteProcessorFactory {
+func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
 	return &VoteProcessorFactory{
 		base: &CombinedBaseVoteProcessorFactory{
-			log:       log,
-			committee: committee,
-			packer:    signature.NewConsensusSigDataPacker(committee),
-			onQCCreated: func(qc *flow.QuorumCertificate) {
-				err := eventHandler.OnQCConstructed(qc)
-				if err != nil {
-					log.Fatal().Err(err).Msgf("failed to submit constructed QC at view %d to event handler", qc.View)
-				}
-			},
+			log:         log,
+			committee:   committee,
+			packer:      signature.NewConsensusSigDataPacker(committee),
+			onQCCreated: onQCCreated,
 		},
 	}
 }
