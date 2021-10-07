@@ -12,10 +12,10 @@ import (
 )
 
 var SetLogLevelCommand commands.AdminCommand = commands.AdminCommand{
-	Handler: func(ctx context.Context, req *admin.CommandRequest) error {
+	Handler: func(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 		level := req.ValidatorData.(zerolog.Level)
 		zerolog.SetGlobalLevel(level)
-		return nil
+		return "ok", nil
 	},
 	Validator: func(req *admin.CommandRequest) error {
 		level, ok := req.Data["level"]

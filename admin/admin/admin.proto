@@ -22,4 +22,6 @@ message RunCommandRequest {
   google.protobuf.Struct data = 2;  // Arguments to pass to the command
 }
 
-message RunCommandResponse {}
+message RunCommandResponse {
+  string output = 1;  // The command output
+}
