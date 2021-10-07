@@ -121,6 +121,17 @@ func IsDoubleVoteError(err error) bool {
 	return errors.As(err, &e)
 }
 
+// AsDoubleVoteError determines whether the given error is a DoubleVoteError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsDoubleVoteError(err error) (*DoubleVoteError, bool) {
+	var e DoubleVoteError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
+}
+
 func (e DoubleVoteError) Unwrap() error {
 	return e.err
 }
