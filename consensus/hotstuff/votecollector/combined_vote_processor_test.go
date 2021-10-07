@@ -308,10 +308,10 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 	})
 }
 
-// TestProcess_NotEnoughStakingWeight tests a scenario where we first don't have enough stake,
+// TestProcess_EnoughStakeNotNotEnoughShares tests a scenario where we first don't have enough stake,
 // then we iteratively increase it to the point where we have enough staking weight. No QC should be created
 // in this scenario since there is not enough random beacon shares.
-func (s *CombinedVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
+func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughStakeNotNotEnoughShares() {
 	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
@@ -321,7 +321,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
 
 	require.False(s.T(), s.processor.done.Load())
 	s.reconstructor.AssertCalled(s.T(), "HasSufficientShares")
-	s.onQCCreatedState.AssertExpectations(s.T())
+	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
 }
 
 // TestProcess_CreatingQC tests a scenario when we have collected enough staking weight and random beacon shares
