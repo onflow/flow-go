@@ -31,7 +31,7 @@ func DefaultConfig() Config {
 		MaxTransactionByteSize: flow.DefaultMaxTransactionByteSize,
 		MaxCollectionByteSize:  flow.DefaultMaxCollectionByteSize,
 		CheckScriptsParse:      true,
-		MaxAddressIndex:        10_000_000,
+		MaxAddressIndex:        flow.DefaultMaxAddressIndex,
 		PropagationRedundancy:  2,
 	}
 }
