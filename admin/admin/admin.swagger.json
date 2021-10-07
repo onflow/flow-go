@@ -69,7 +69,8 @@
         "output": {
           "type": "string"
         }
-      }
+      },
+      "title": "RunCommandResponse represents an admin command response"
     },
     "protobufAny": {
       "type": "object",

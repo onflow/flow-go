@@ -21,7 +21,7 @@ func (s *adminServer) RunCommand(ctx context.Context, in *pb.RunCommandRequest) 
 	}
 
 	return &pb.RunCommandResponse{
-		Output: fmt.Sprint(result),
+		Output: fmt.Sprintf("%v", result),
 	}, nil
 }
 
