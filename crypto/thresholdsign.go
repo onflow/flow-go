@@ -499,15 +499,9 @@ func ThresholdSignKeyGen(size int, threshold int, seed []byte) ([]PrivateKey,
 	pkShares := make([]PublicKey, size)
 	var pkGroup PublicKey
 	for i := 0; i < size; i++ {
-		skShares[i] = &PrKeyBLSBLS12381{
-			scalar: x[i],
-		}
-		pkShares[i] = &PubKeyBLSBLS12381{
-			point: y[i],
-		}
+		skShares[i] = newPrKeyBLSBLS12381(&x[i])
+		pkShares[i] = newPubKeyBLSBLS12381(&y[i])
 	}
-	pkGroup = &PubKeyBLSBLS12381{
-		point: X0,
-	}
+	pkGroup = newPubKeyBLSBLS12381(&X0)
 	return skShares, pkShares, pkGroup, nil
 }

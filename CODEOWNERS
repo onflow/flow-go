@@ -32,7 +32,7 @@
 /network/** @yhassanzadeh13 @vishalchangrani
 
 # Cryptography Stream
-/crypto/** @tarakby
+/crypto/** @tarakby @huitseeker
 
 # Bootstrap and transit scripts
 /cmd/bootstrap/** @vishalchangrani @ljk662

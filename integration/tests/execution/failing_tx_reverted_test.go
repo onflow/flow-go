@@ -10,26 +10,24 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/onflow/flow-go/integration/tests/common"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 func TestExecutionFailingTxReverted(t *testing.T) {
-	suite.Run(t, &FailingTxRevertedSuite{
-		chainID: flow.Testnet,
-	})
+	suite.Run(t, new(FailingTxRevertedSuite))
 }
 
 type FailingTxRevertedSuite struct {
 	Suite
-	chainID flow.ChainID
 }
 
 func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 
-	chain := s.net.Root().Header.ChainID.Chain()
+	chainID := s.net.Root().Header.ChainID
+	chain := chainID.Chain()
+	serviceAddress := chain.ServiceAddress()
 
-	// wait for first finalized block, called blockA
-	blockA := s.BlockState.WaitForFirstFinalized(s.T())
+	// wait for next height finalized (potentially first height), called blockA
+	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T())
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// send transaction
@@ -37,7 +35,7 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	require.NoError(s.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
-	blockB, erBlockB := common.WaitUntilFinalizedStateCommitmentChanged(s.T(), &s.BlockState, &s.ReceiptState)
+	blockB, erBlockB := common.WaitUntilFinalizedStateCommitmentChanged(s.T(), s.BlockState, s.ReceiptState)
 	s.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// final states
@@ -48,14 +46,17 @@ func (s *FailingTxRevertedSuite) TestExecutionFailingTxReverted() {
 	tx := common.SDKTransactionFixture(
 		common.WithTransactionDSL(common.CreateCounterPanicTx(chain)),
 		common.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
+		common.WithChainID(chainID),
 	)
+
 	err = s.AccessClient().SendTransaction(context.Background(), &tx)
 	require.NoError(s.T(), err, "could not send tx to create counter that should panic")
 
 	// send transaction that has no sigs and should not execute
 	tx = common.SDKTransactionFixture(
-		common.WithTransactionDSL(common.CreateCounterTx(sdk.Address(chain.ServiceAddress()))),
+		common.WithTransactionDSL(common.CreateCounterTx(sdk.Address(serviceAddress))),
 		common.WithReferenceBlock(sdk.Identifier(s.net.Root().ID())),
+		common.WithChainID(chainID),
 	)
 	tx.PayloadSignatures = nil
 	tx.EnvelopeSignatures = nil

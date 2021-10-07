@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/ethereum/go-ethereum/rlp"
+	"github.com/fxamacker/cbor/v2"
 	"github.com/pkg/errors"
 	"github.com/vmihailenco/msgpack"
 
@@ -100,6 +101,16 @@ type encodableIdentity struct {
 	NetworkPubKey []byte
 }
 
+// stealthIdentity represents a node identity without an address
+type stealthIdentity struct {
+	NodeID        Identifier
+	Address       string `json:"-"`
+	Role          Role
+	Stake         uint64
+	StakingPubKey []byte
+	NetworkPubKey []byte
+}
+
 func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 	ie := encodableIdentity{iy.NodeID, iy.Address, iy.Role, iy.Stake, nil, nil}
 	if iy.StakingPubKey != nil {
@@ -112,13 +123,34 @@ func encodableFromIdentity(iy Identity) (encodableIdentity, error) {
 }
 
 func (iy Identity) MarshalJSON() ([]byte, error) {
+	var identity interface{}
 	encodable, err := encodableFromIdentity(iy)
 	if err != nil {
 		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
 	}
-	data, err := json.Marshal(encodable)
+
+	// if the address is empty, suppress the Address field in the output json
+	if encodable.Address == "" {
+		identity = stealthIdentity(encodable)
+	} else {
+		identity = encodable
+	}
+
+	data, err := json.Marshal(identity)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode json: %w", err)
+	}
+	return data, nil
+}
+
+func (iy Identity) MarshalCBOR() ([]byte, error) {
+	encodable, err := encodableFromIdentity(iy)
+	if err != nil {
+		return nil, fmt.Errorf("could not convert identity to encodable: %w", err)
+	}
+	data, err := cbor.Marshal(encodable)
+	if err != nil {
+		return nil, fmt.Errorf("could not encode cbor: %w", err)
 	}
 	return data, nil
 }
@@ -179,6 +211,19 @@ func (iy *Identity) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+func (iy *Identity) UnmarshalCBOR(b []byte) error {
+	var encodable encodableIdentity
+	err := cbor.Unmarshal(b, &encodable)
+	if err != nil {
+		return fmt.Errorf("could not decode json: %w", err)
+	}
+	err = identityFromEncodable(encodable, iy)
+	if err != nil {
+		return fmt.Errorf("could not convert from encodable cbor: %w", err)
+	}
+	return nil
+}
+
 func (iy *Identity) UnmarshalMsgpack(b []byte) error {
 	var encodable encodableIdentity
 	err := msgpack.Unmarshal(b, &encodable)
@@ -190,6 +235,41 @@ func (iy *Identity) UnmarshalMsgpack(b []byte) error {
 		return fmt.Errorf("could not convert from encodable msgpack: %w", err)
 	}
 	return nil
+}
+
+func (iy *Identity) EqualTo(other *Identity) bool {
+	if iy.NodeID != other.NodeID {
+		return false
+	}
+	if iy.Address != other.Address {
+		return false
+	}
+	if iy.Role != other.Role {
+		return false
+	}
+	if iy.Stake != other.Stake {
+		return false
+	}
+	if iy.Ejected != other.Ejected {
+		return false
+	}
+	if (iy.StakingPubKey != nil && other.StakingPubKey == nil) ||
+		(iy.StakingPubKey == nil && other.StakingPubKey != nil) {
+		return false
+	}
+	if iy.StakingPubKey != nil && !iy.StakingPubKey.Equals(other.StakingPubKey) {
+		return false
+	}
+
+	if (iy.NetworkPubKey != nil && other.NetworkPubKey == nil) ||
+		(iy.NetworkPubKey == nil && other.NetworkPubKey != nil) {
+		return false
+	}
+	if iy.NetworkPubKey != nil && !iy.NetworkPubKey.Equals(other.NetworkPubKey) {
+		return false
+	}
+
+	return true
 }
 
 // IdentityFilter is a filter on identities.
@@ -257,10 +337,10 @@ func (il IdentityList) Selector() IdentityFilter {
 	}
 }
 
-func (il IdentityList) Lookup() map[Identifier]struct{} {
-	lookup := make(map[Identifier]struct{})
+func (il IdentityList) Lookup() map[Identifier]*Identity {
+	lookup := make(map[Identifier]*Identity, len(il))
 	for _, identity := range il {
-		lookup[identity.NodeID] = struct{}{}
+		lookup[identity.NodeID] = identity
 	}
 	return lookup
 }
@@ -325,6 +405,16 @@ func (il IdentityList) ByIndex(index uint) (*Identity, bool) {
 func (il IdentityList) ByNodeID(nodeID Identifier) (*Identity, bool) {
 	for _, identity := range il {
 		if identity.NodeID == nodeID {
+			return identity, true
+		}
+	}
+	return nil, false
+}
+
+// ByNetworkingKey gets a node from the list by network public key.
+func (il IdentityList) ByNetworkingKey(key crypto.PublicKey) (*Identity, bool) {
+	for _, identity := range il {
+		if identity.NetworkPubKey.Equals(key) {
 			return identity, true
 		}
 	}
@@ -403,4 +493,18 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 	}
 
 	return union
+}
+
+// EqualTo checks if the other list if the same, that it contains the same elements
+// in the same order
+func (il IdentityList) EqualTo(other IdentityList) bool {
+	if len(il) != len(other) {
+		return false
+	}
+	for i, identity := range il {
+		if !identity.EqualTo(other[i]) {
+			return false
+		}
+	}
+	return true
 }

@@ -1,12 +1,14 @@
 package crypto
 
 import (
+	"encoding/hex"
 	"testing"
 
 	"crypto/elliptic"
 	"crypto/rand"
 	"math/big"
 
+	"github.com/btcsuite/btcd/btcec"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -283,4 +285,37 @@ func TestSignatureFormatCheck(t *testing.T) {
 			assert.False(t, valid)
 		})
 	}
+}
+
+func TestEllipticUnmarshalSecp256k1(t *testing.T) {
+
+	testVectors := []string{
+		"028b10bf56476bf7da39a3286e29df389177a2fa0fca2d73348ff78887515d8da1", // IsOnCurve for elliptic returns false
+		"03d39427f07f680d202fe8504306eb29041aceaf4b628c2c69b0ec248155443166", // negative, IsOnCurve for elliptic returns false
+		"0267d1942a6cbe4daec242ea7e01c6cdb82dadb6e7077092deb55c845bf851433e", // arith of sqrt in elliptic doesn't match secp256k1
+		"0345d45eda6d087918b041453a96303b78c478dce89a4ae9b3c933a018888c5e06", // negative, arith of sqrt in elliptic doesn't match secp256k1
+	}
+
+	s := ECDSASecp256k1
+
+	for _, testVector := range testVectors {
+
+		// get the compressed bytes
+		publicBytes, err := hex.DecodeString(testVector)
+		require.NoError(t, err)
+
+		// decompress, check that those are perfectly valid Secp256k1 public keys
+		retrieved, err := DecodePublicKeyCompressed(s, publicBytes)
+		require.NoError(t, err)
+
+		// check the compression is canonical by re-compressing to the same bytes
+		require.Equal(t, retrieved.EncodeCompressed(), publicBytes)
+
+		// check that elliptic fails at decompressing them
+		x, y := elliptic.UnmarshalCompressed(btcec.S256(), publicBytes)
+		require.Nil(t, x)
+		require.Nil(t, y)
+
+	}
+
 }

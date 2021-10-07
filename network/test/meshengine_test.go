@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-log"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/observable"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -31,6 +34,7 @@ type MeshEngineTestSuite struct {
 	ConduitWrapper                   // used as a wrapper around conduit methods
 	nets           []*p2p.Network    // used to keep track of the networks
 	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
+	obs            chan string       // used to keep track of Protect events tagged by pubsub messages
 }
 
 // TestMeshNetTestSuite runs all tests in this test suit
@@ -45,7 +49,21 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 	const count = 10
 	logger := zerolog.New(os.Stderr).Level(zerolog.ErrorLevel)
 	log.SetAllLoggers(log.LevelError)
-	suite.ids, _, suite.nets = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun, unittest.WithAllRoles())
+
+	// set up a channel to receive pubsub tags from connManagers of the nodes
+	var obs []observable.Observable
+	peerChannel := make(chan string)
+	ob := tagsObserver{
+		tags: peerChannel,
+		log:  logger,
+	}
+
+	suite.ids, _, suite.nets, obs = GenerateIDsMiddlewaresNetworks(suite.T(), count, logger, 100, nil, !DryRun, unittest.WithAllRoles())
+
+	for _, observableConnMgr := range obs {
+		observableConnMgr.Subscribe(&ob)
+	}
+	suite.obs = peerChannel
 }
 
 // TearDownTest closes the networks within a specified timeout
@@ -147,7 +165,14 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	// each node will register ~D protect messages, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
 
 	// Each node broadcasting a message to all others
 	for i := range suite.nets {
@@ -179,6 +204,10 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 		if len(e.event) != (count - 1) {
 			assert.Fail(suite.Suite.T(),
 				fmt.Sprintf("Message reception mismatch at node %v. Expected: %v, Got: %v", index, count-1, len(e.event)))
+		}
+
+		for i := 0; i < count-1; i++ {
+			assertChannelReceived(suite.T(), e, engine.TestNetwork)
 		}
 
 		// extracts failed messages
@@ -215,7 +244,14 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(5 * time.Second)
+	// each node will register ~D protect messages, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
 
 	// choose half of the nodes as target
 	allIds := suite.ids.NodeIDs()
@@ -246,6 +282,7 @@ func (suite *MeshEngineTestSuite) targetValidatorScenario(send ConduitSendWrappe
 	for index, e := range engs {
 		if index < len(engs)/2 {
 			assert.Len(suite.Suite.T(), e.event, 1, fmt.Sprintf("message not received %v", index))
+			assertChannelReceived(suite.T(), e, engine.TestNetwork)
 		} else {
 			assert.Len(suite.Suite.T(), e.event, 0, fmt.Sprintf("message received when none was expected %v", index))
 		}
@@ -267,8 +304,14 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
-
+	// each node will register ~D protect messages per mesh setup, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
 	// others keeps the identifier of all nodes except node that is sender.
 	others := suite.ids.Filter(filter.Not(filter.HasNodeID(suite.ids[0].NodeID))).NodeIDs()
 
@@ -294,6 +337,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	// evaluates that all messages are received
 	for index, e := range engs[1:] {
 		assert.Len(suite.Suite.T(), e.event, 1, "message not received by engine %d", index+1)
+		assertChannelReceived(suite.T(), e, engine.TestNetwork)
 	}
 }
 
@@ -313,7 +357,14 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 	}
 
 	// allow nodes to heartbeat and discover each other
-	time.Sleep(2 * time.Second)
+	// each node will register ~D protect messages, where D is the default out-degree
+	for i := 0; i < pubsub.GossipSubD*count; i++ {
+		select {
+		case <-suite.obs:
+		case <-time.After(2 * time.Second):
+			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
+		}
+	}
 
 	// unregister a random engine from the test topic by calling close on it's conduit
 	unregisterIndex := rand.Intn(count)
@@ -364,6 +415,13 @@ func (suite *MeshEngineTestSuite) conduitCloseScenario(send ConduitSendWrapperFu
 	// assert that the unregistered engine did not receive the message
 	unregisteredEng := engs[unregisterIndex]
 	assert.Emptyf(suite.T(), unregisteredEng.received, "unregistered engine received the topic message")
+}
+
+// assertChannelReceived asserts that the given channel was received on the given engine
+func assertChannelReceived(t *testing.T, e *MeshEngine, channel network.Channel) {
+	unittest.AssertReturnsBefore(t, func() {
+		assert.Equal(t, channel, <-e.channel)
+	}, 100*time.Millisecond)
 }
 
 // extractSenderID returns a bool array with the index i true if there is a message from node i in the provided messages.

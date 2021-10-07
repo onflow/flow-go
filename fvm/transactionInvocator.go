@@ -46,11 +46,12 @@ func (i *TransactionInvocator) Process(
 	programs *programs.Programs,
 ) (processErr error) {
 
+	txIDStr := proc.ID.String()
 	var span opentracing.Span
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
 		span.LogFields(
-			traceLog.String("transaction.ID", proc.ID.String()),
+			traceLog.String("transaction_id", txIDStr),
 		)
 		defer span.Finish()
 	}
@@ -60,14 +61,14 @@ func (i *TransactionInvocator) Process(
 		blockHeight = ctx.BlockHeader.Height
 	}
 
-	var env *hostEnv
+	var env *TransactionEnv
 	var txError error
 	retry := false
 	numberOfRetries := 0
 
 	parentState := sth.State()
 	childState := sth.NewChild()
-	env = newEnvironment(*ctx, vm, sth, programs)
+	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 	predeclaredValues := valueDeclarations(ctx, env)
 
 	defer func() {
@@ -76,7 +77,7 @@ func (i *TransactionInvocator) Process(
 			// error transaction
 			msg := "child state doesn't match the active state on the state holder"
 			i.logger.Error().
-				Str("txHash", proc.ID.String()).
+				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
 				Msg(msg)
 
@@ -102,7 +103,7 @@ func (i *TransactionInvocator) Process(
 			programs.ForceCleanup()
 
 			i.logger.Warn().
-				Str("txHash", proc.ID.String()).
+				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
 				Int("retries_count", numberOfRetries).
 				Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
@@ -110,19 +111,16 @@ func (i *TransactionInvocator) Process(
 
 			// reset error part of proc
 			// Warning right now the tx requires retry logic doesn't change
-			// anything on state but we might want to revert the state changes (or not commiting)
-			// if we decided to expand it furthur.
+			// anything on state but we might want to revert the state changes (or not committing)
+			// if we decided to expand it further.
 			proc.Err = nil
 			proc.Logs = make([]string, 0)
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 
 			// reset env
-			env = newEnvironment(*ctx, vm, sth, programs)
+			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
 		}
-
-		env.setTransaction(proc.Transaction, proc.TxIndex)
-		env.setTraceSpan(span)
 
 		location := common.TransactionLocation(proc.ID[:])
 
@@ -155,57 +153,90 @@ func (i *TransactionInvocator) Process(
 	// 	panic(err)
 	// }
 
+	// try to deduct fees even if there is an error.
+	feesError := i.deductTransactionFees(env, proc)
+	if feesError != nil {
+		txError = feesError
+	}
+
 	// applying contract changes
 	// this writes back the contract contents to accounts
 	// if any error occurs we fail the tx
+	// this needs to happen before checking limits, so that contract changes are committed to the state
 	updatedKeys, err := env.Commit()
 	if err != nil && txError == nil {
 		txError = fmt.Errorf("transaction invocation failed: %w", err)
 	}
 
+	// if there is still no error check if all account storage limits are ok
 	if txError == nil {
-		txError = i.checkAccountStorageLimit(vm, ctx, proc, sth, programs)
+		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
 	}
 
-	if txError == nil {
-		txError = i.deductTransactionFees(env, proc)
-	}
-
-	proc.Logs = append(proc.Logs, env.getLogs()...)
-	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
-
+	// it there was any transaction error clear changes and try to deduct fees again
 	if txError != nil {
-		// drop delta
+		// drop delta since transaction failed
 		childState.View().DropDelta()
 		// if tx fails just do clean up
 		programs.Cleanup(nil)
+		// log transaction as failed
 		i.logger.Info().
-			Str("txHash", proc.ID.String()).
+			Str("txHash", txIDStr).
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
-		return txError
+
+		// reset env
+		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+
+		// try to deduct fees again, to get the fee deduction events
+		feesError = i.deductTransactionFees(env, proc)
+
+		updatedKeys, err = env.Commit()
+		if err != nil && feesError == nil {
+			feesError = fmt.Errorf("transaction invocation failed: %w", err)
+		}
+
+		// if fee deduction fails just do clean up and exit
+		if feesError != nil {
+			// drop delta
+			childState.View().DropDelta()
+			programs.Cleanup(nil)
+			i.logger.Info().
+				Str("txHash", txIDStr).
+				Uint64("blockHeight", blockHeight).
+				Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
+				Msg("transaction fee deduction executed with error")
+
+			return feesError
+		}
+	} else {
+		// transaction is ok, log as successful
+		i.logger.Info().
+			Str("txHash", txIDStr).
+			Uint64("blockHeight", blockHeight).
+			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
+			Int("retried", proc.Retried).
+			Msg("transaction executed successfully")
 	}
+
+	// if tx failed this will only contain fee deduction logs and computation
+	proc.Logs = append(proc.Logs, env.Logs()...)
+	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
 	// transaction without any deployed contracts
 	programs.Cleanup(updatedKeys)
 
-	proc.Events = append(proc.Events, env.getEvents()...)
-	proc.ServiceEvents = append(proc.ServiceEvents, env.getServiceEvents()...)
+	// if tx failed this will only contain fee deduction events
+	proc.Events = append(proc.Events, env.Events()...)
+	proc.ServiceEvents = append(proc.ServiceEvents, env.ServiceEvents()...)
 
-	i.logger.Info().
-		Str("txHash", proc.ID.String()).
-		Uint64("blockHeight", blockHeight).
-		Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
-		Int("retried", proc.Retried).
-		Msg("transaction executed successfully")
-
-	return nil
+	return txError
 }
 
-func (i *TransactionInvocator) deductTransactionFees(env *hostEnv, proc *TransactionProcedure) error {
+func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) error {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
@@ -238,16 +269,7 @@ func (i *TransactionInvocator) deductTransactionFees(env *hostEnv, proc *Transac
 	return nil
 }
 
-func (i *TransactionInvocator) checkAccountStorageLimit(vm *VirtualMachine, ctx *Context, proc *TransactionProcedure, sth *state.StateHolder, programs *programs.Programs) error {
-	if !ctx.LimitAccountStorage {
-		return nil
-	}
-
-	// check the storage limits
-	return NewTransactionStorageLimiter().Process(vm, ctx, proc, sth, programs)
-}
-
-func valueDeclarations(ctx *Context, env *hostEnv) []runtime.ValueDeclaration {
+func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
 	if ctx.AccountFreezeAvailable {

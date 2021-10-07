@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	collectioningest "github.com/onflow/flow-go/engine/collection/ingest"
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	followereng "github.com/onflow/flow-go/engine/common/follower"
@@ -29,8 +30,6 @@ import (
 	"github.com/onflow/flow-go/engine/verification/assigner/blockconsumer"
 	"github.com/onflow/flow-go/engine/verification/fetcher"
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
-	"github.com/onflow/flow-go/engine/verification/finder"
-	"github.com/onflow/flow-go/engine/verification/match"
 	verificationrequester "github.com/onflow/flow-go/engine/verification/requester"
 	"github.com/onflow/flow-go/engine/verification/verifier"
 	"github.com/onflow/flow-go/fvm"
@@ -43,8 +42,8 @@ import (
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
+	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -56,9 +55,10 @@ import (
 // StateFixture is a test helper struct that encapsulates a flow protocol state
 // as well as all of its backend dependencies.
 type StateFixture struct {
-	DB             *badger.DB
-	Storage        *storage.All
 	DBDir          string
+	PublicDB       *badger.DB
+	SecretsDB      *badger.DB
+	Storage        *storage.All
 	ProtocolEvents *events.Distributor
 	State          protocol.MutableState
 }
@@ -68,7 +68,8 @@ type GenericNode struct {
 	Log            zerolog.Logger
 	Metrics        *metrics.NoopCollector
 	Tracer         module.Tracer
-	DB             *badger.DB
+	PublicDB       *badger.DB
+	SecretsDB      *badger.DB
 	Headers        storage.Headers
 	Identities     storage.Identities
 	Guarantees     storage.Guarantees
@@ -85,7 +86,7 @@ type GenericNode struct {
 }
 
 func (g *GenericNode) Done() {
-	_ = g.DB.Close()
+	_ = g.PublicDB.Close()
 	_ = os.RemoveAll(g.DBDir)
 
 	<-g.Tracer.Done()
@@ -109,17 +110,45 @@ func RequireGenericNodesDoneBefore(t testing.TB, duration time.Duration, nodes .
 
 // CloseDB closes the badger database of the node
 func (g *GenericNode) CloseDB() error {
-	return g.DB.Close()
+	return g.PublicDB.Close()
 }
 
 // CollectionNode implements an in-process collection node for tests.
 type CollectionNode struct {
 	GenericNode
-	Collections     storage.Collections
-	Transactions    storage.Transactions
-	IngestionEngine *collectioningest.Engine
-	PusherEngine    *pusher.Engine
-	ProviderEngine  *provider.Engine
+	Collections        storage.Collections
+	Transactions       storage.Transactions
+	ClusterPayloads    storage.ClusterPayloads
+	TxPools            *epochpool.TransactionPools
+	Voter              module.ClusterRootQCVoter
+	IngestionEngine    *collectioningest.Engine
+	PusherEngine       *pusher.Engine
+	ProviderEngine     *provider.Engine
+	EpochManagerEngine *epochmgr.Engine
+}
+
+func (n CollectionNode) Ready() <-chan struct{} {
+	return lifecycle.AllReady(
+		n.PusherEngine,
+		n.ProviderEngine,
+		n.IngestionEngine,
+		n.EpochManagerEngine,
+	)
+}
+
+func (n CollectionNode) Done() <-chan struct{} {
+	done := make(chan struct{})
+	go func() {
+		<-lifecycle.AllDone(
+			n.PusherEngine,
+			n.ProviderEngine,
+			n.IngestionEngine,
+			n.EpochManagerEngine,
+		)
+		n.GenericNode.Done()
+		close(done)
+	}()
+	return done
 }
 
 // ConsensusNode implements an in-process consensus node for tests.
@@ -219,20 +248,10 @@ func (en ExecutionNode) AssertHighestExecutedBlock(t *testing.T, header *flow.He
 // VerificationNode implements an in-process verification node for tests.
 type VerificationNode struct {
 	*GenericNode
-	CachedReceipts           mempool.ReceiptDataPacks
-	ReadyReceipts            mempool.ReceiptDataPacks // TODO: backward compatibility, remove once new verification node is active.
-	PendingReceipts          mempool.ReceiptDataPacks // TODO: backward compatibility, remove once new verification node is active.
-	PendingResults           mempool.ResultDataPacks  // TODO: backward compatibility, remove once new verification node is active.
-	ChunkStatuses            mempool.ChunkStatuses
-	ChunkRequests            mempool.ChunkRequests
-	ProcessedResultIDs       mempool.Identifiers // TODO: backward compatibility, remove once new verification node is active.
-	DiscardedResultIDs       mempool.Identifiers // TODO: backward compatibility, remove once new verification node is active.
-	BlockIDsCache            mempool.Identifiers // TODO: backward compatibility, remove once new verification node is active.
-	Results                  storage.ExecutionResults
-	Receipts                 storage.ExecutionReceipts
-	PendingReceiptIDsByBlock mempool.IdentifierMap // TODO: backward compatibility, remove once new verification node is active.
-	ReceiptIDsByResult       mempool.IdentifierMap // TODO: backward compatibility, remove once new verification node is active.
-	ChunkIDsByResult         mempool.IdentifierMap // TODO: backward compatibility, remove once new verification node is active.
+	ChunkStatuses mempool.ChunkStatuses
+	ChunkRequests mempool.ChunkRequests
+	Results       storage.ExecutionResults
+	Receipts      storage.ExecutionReceipts
 
 	// chunk consumer and processor for fetcher engine
 	ProcessedChunkIndex storage.ConsumerProgress
@@ -243,10 +262,7 @@ type VerificationNode struct {
 	ProcessedBlockHeight storage.ConsumerProgress
 	BlockConsumer        *blockconsumer.BlockConsumer
 
-	PendingChunks   *match.Chunks // TODO: backward compatibility, remove once new verification node is active.
 	VerifierEngine  *verifier.Engine
-	FinderEngine    *finder.Engine // TODO: backward compatibility, remove once new verification node is active.
-	MatchEngine     network.Engine // TODO: backward compatibility, remove once new verification node is active.
 	AssignerEngine  *assigner.Engine
 	FetcherEngine   *fetcher.Engine
 	RequesterEngine *verificationrequester.Engine

@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/engine/verification/fetcher/chunkconsumer"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/metrics"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -153,8 +154,10 @@ func WithConsumer(
 			process: process,
 		}
 
+		collector := &metrics.NoopCollector{}
 		consumer := chunkconsumer.NewChunkConsumer(
 			unittest.Logger(),
+			collector,
 			processedIndex,
 			chunksQueue,
 			engine,
@@ -169,6 +172,18 @@ func WithConsumer(
 type mockChunkProcessor struct {
 	notifier module.ProcessingNotifier
 	process  func(notifier module.ProcessingNotifier, locator *chunks.Locator)
+}
+
+func (e *mockChunkProcessor) Ready() <-chan struct{} {
+	ready := make(chan struct{})
+	close(ready)
+	return ready
+}
+
+func (e *mockChunkProcessor) Done() <-chan struct{} {
+	done := make(chan struct{})
+	close(done)
+	return done
 }
 
 func (e *mockChunkProcessor) ProcessAssignedChunk(locator *chunks.Locator) {

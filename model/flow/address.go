@@ -16,6 +16,7 @@ type AddressGenerator interface {
 	NextAddress() (Address, error)
 	CurrentAddress() Address
 	Bytes() []byte
+	AddressCount() uint64 // returns the total number of addresses that have been generated so far
 }
 
 type MonotonicAddressGenerator struct {
@@ -149,6 +150,11 @@ func (gen *MonotonicAddressGenerator) CurrentAddress() Address {
 	return uint64ToAddress(gen.index)
 }
 
+// AddressCount returns the total number of addresses generated so far
+func (gen *MonotonicAddressGenerator) AddressCount() uint64 {
+	return gen.index
+}
+
 // NextAddress generates an account address from the addressing index.
 //
 // The address is generated for a specific network (Flow mainnet, testnet..)
@@ -180,6 +186,11 @@ func (gen *linearCodeAddressGenerator) CurrentAddress() Address {
 	// customize the code word for a specific network
 	address ^= gen.chainCodeWord
 	return uint64ToAddress(address)
+}
+
+// AddressCount returns the total number of addresses generated so far
+func (gen *linearCodeAddressGenerator) AddressCount() uint64 {
+	return gen.index
 }
 
 // increments the internal index of the generator.
@@ -234,10 +245,14 @@ const (
 	maxIndex = (1 << linearCodeK) - 1
 )
 
-// invalid code-words in the [64,45] code
-// these constants are used to generate non-Flow-Mainnet addresses
-const invalidCodeTestnet = uint64(0x6834ba37b3980209)
-const invalidCodeEmulator = uint64(0x1cb159857af02018)
+// The following are invalid code-words in the [64,45] code.
+// These constants are used to generate non-Flow-Mainnet addresses
+
+// invalidCodeTestNetwork is the invalid codeword used for long-lived test networks.
+const invalidCodeTestNetwork = uint64(0x6834ba37b3980209)
+
+// invalidCodeTransientNetwork  is the invalid codeword used for transient test networks.
+const invalidCodeTransientNetwork = uint64(0x1cb159857af02018)
 
 // encodeWord encodes a word into a code word.
 // In Flow, the word is the account index while the code word

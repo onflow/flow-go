@@ -7,36 +7,49 @@ import (
 	"sync"
 	"time"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	channels "github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-type identifierFilter func(ids ...flow.Identifier) ([]flow.Identifier, error)
+const DefaultCacheSize = 10e6
+
+// NotEjectedFilter is an identity filter that, when applied to the identity
+// table at a given snapshot, returns all nodes that we should communicate with
+// over the networking layer.
+//
+// NOTE: The protocol state includes nodes from the previous/next epoch that should
+// be included in network communication. We omit any nodes that have been ejected.
+var NotEjectedFilter = filter.Not(filter.Ejected)
 
 // Network represents the overlay network of our peer-to-peer network, including
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	logger  zerolog.Logger
-	codec   network.Codec
-	ids     flow.IdentityList
-	me      module.Local
-	mw      network.Middleware
-	top     network.Topology // used to determine fanout connections
-	metrics module.NetworkMetrics
-	rcache  *RcvCache // used to deduplicate incoming messages
-	queue   network.MessageQueue
-	ctx     context.Context
-	cancel  context.CancelFunc
-	subMngr network.SubscriptionManager // used to keep track of subscribed channels
-
+	identityProvider id.IdentityProvider
+	logger           zerolog.Logger
+	codec            network.Codec
+	me               module.Local
+	mw               network.Middleware
+	top              network.Topology // used to determine fanout connections
+	metrics          module.NetworkMetrics
+	rcache           *RcvCache // used to deduplicate incoming messages
+	queue            network.MessageQueue
+	ctx              context.Context
+	cancel           context.CancelFunc
+	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
+	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
 }
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
@@ -46,13 +59,13 @@ type Network struct {
 func NewNetwork(
 	log zerolog.Logger,
 	codec network.Codec,
-	ids flow.IdentityList,
 	me module.Local,
 	mw network.Middleware,
 	csize int,
 	top network.Topology,
 	sm network.SubscriptionManager,
 	metrics module.NetworkMetrics,
+	identityProvider id.IdentityProvider,
 ) (*Network, error) {
 
 	rcache, err := newRcvCache(csize)
@@ -61,17 +74,18 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		logger:  log,
-		codec:   codec,
-		me:      me,
-		mw:      mw,
-		rcache:  rcache,
-		top:     top,
-		metrics: metrics,
-		subMngr: sm,
+		logger:           log,
+		codec:            codec,
+		me:               me,
+		mw:               mw,
+		rcache:           rcache,
+		top:              top,
+		metrics:          metrics,
+		subMngr:          sm,
+		lifecycleManager: lifecycle.NewLifecycleManager(),
+		identityProvider: identityProvider,
 	}
 	o.ctx, o.cancel = context.WithCancel(context.Background())
-	o.ids = ids
 
 	// setup the message queue
 	// create priority queue
@@ -85,26 +99,20 @@ func NewNetwork(
 
 // Ready returns a channel that will close when the network stack is ready.
 func (n *Network) Ready() <-chan struct{} {
-	ready := make(chan struct{})
-	go func() {
+	n.lifecycleManager.OnStart(func() {
 		err := n.mw.Start(n)
 		if err != nil {
 			n.logger.Fatal().Err(err).Msg("failed to start middleware")
 		}
-		close(ready)
-	}()
-	return ready
+	})
+	return n.lifecycleManager.Started()
 }
 
 // Done returns a channel that will close when shutdown is complete.
 func (n *Network) Done() <-chan struct{} {
-	done := make(chan struct{})
-	go func() {
-		n.cancel()
-		n.mw.Stop()
-		close(done)
-	}()
-	return done
+	n.cancel()
+	n.lifecycleManager.OnStop(n.mw.Stop)
+	return n.lifecycleManager.Stopped()
 }
 
 // Register will register the given engine with the given unique engine engineID,
@@ -151,25 +159,22 @@ func (n *Network) unregister(channel network.Channel) error {
 	return nil
 }
 
-// Identity returns a map of all flow.Identifier to flow identity by querying the flow state
-func (n *Network) Identity() (map[flow.Identifier]flow.Identity, error) {
-	n.RLock()
-	defer n.RUnlock()
-	identifierToID := make(map[flow.Identifier]flow.Identity)
-	for _, id := range n.ids {
-		identifierToID[id.NodeID] = *id
-	}
-	return identifierToID, nil
+func (n *Network) Identities() flow.IdentityList {
+	return n.identityProvider.Identities(NotEjectedFilter)
 }
 
-// Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
+func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
+	return n.identityProvider.ByPeerID(pid)
+}
+
+// Topology returns the identitiess of a uniform subset of nodes in protocol state using the topology provided earlier.
 // Independent invocations of Topology on different nodes collectively constructs a connected network graph.
 func (n *Network) Topology() (flow.IdentityList, error) {
 	n.Lock()
 	defer n.Unlock()
 
 	subscribedChannels := n.subMngr.Channels()
-	top, err := n.top.GenerateFanout(n.ids, subscribedChannels)
+	top, err := n.top.GenerateFanout(n.Identities(), subscribedChannels)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate topology: %w", err)
 	}
@@ -181,25 +186,6 @@ func (n *Network) Receive(nodeID flow.Identifier, msg *message.Message) error {
 	if err != nil {
 		return fmt.Errorf("could not process message: %w", err)
 	}
-	return nil
-}
-
-// SetIDs updates the identity list cached by the network layer
-func (n *Network) SetIDs(ids flow.IdentityList) error {
-
-	// remove self from id
-	ids = ids.Filter(n.me.NotMeFilter())
-
-	n.Lock()
-	n.ids = ids
-	n.Unlock()
-
-	// update the allow list
-	err := n.mw.UpdateAllowList()
-	if err != nil {
-		return fmt.Errorf("failed to update middleware allow list: %w", err)
-	}
-
 	return nil
 }
 
@@ -251,6 +237,9 @@ func (n *Network) genNetworkMessage(channel network.Channel, event interface{}, 
 	if err != nil {
 		return nil, fmt.Errorf("could not encode event: %w", err)
 	}
+
+	//bs := binstat.EnterTimeVal(binstat.BinNet+":wire<3payload2message", int64(len(payload)))
+	//defer binstat.Leave(bs)
 
 	// use a hash with an engine-specific salt to get the payload hash
 	h := hash.NewSHA3_384()
@@ -320,8 +309,13 @@ func (n *Network) unicast(channel network.Channel, message interface{}, targetID
 // channel and can be read by any node subscribed to that channel.
 // The selector could be used to optimize or restrict delivery.
 func (n *Network) publish(channel network.Channel, message interface{}, targetIDs ...flow.Identifier) error {
+	filteredIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter())
 
-	err := n.sendOnChannel(channel, message, targetIDs, n.removeSelfFilter)
+	if len(filteredIDs) == 0 {
+		return network.EmptyTargetList
+	}
+
+	err := n.sendOnChannel(channel, message, filteredIDs)
 
 	if err != nil {
 		return fmt.Errorf("failed to publish on channel %s: %w", channel, err)
@@ -333,10 +327,13 @@ func (n *Network) publish(channel network.Channel, message interface{}, targetID
 // multicast unreliably sends the specified event over the channel to randomly selected 'num' number of recipients
 // selected from the specified targetIDs.
 func (n *Network) multicast(channel network.Channel, message interface{}, num uint, targetIDs ...flow.Identifier) error {
+	selectedIDs := flow.IdentifierList(targetIDs).Filter(n.removeSelfFilter()).Sample(num)
 
-	filters := []identifierFilter{n.removeSelfFilter, sampleFilter(num)}
+	if len(selectedIDs) == 0 {
+		return network.EmptyTargetList
+	}
 
-	err := n.sendOnChannel(channel, message, targetIDs, filters...)
+	err := n.sendOnChannel(channel, message, targetIDs)
 
 	// publishes the message to the selected targets
 	if err != nil {
@@ -347,40 +344,14 @@ func (n *Network) multicast(channel network.Channel, message interface{}, num ui
 }
 
 // removeSelfFilter removes the flow.Identifier of this node if present, from the list of nodes
-func (n *Network) removeSelfFilter(ids ...flow.Identifier) ([]flow.Identifier, error) {
-	targetIDMinusSelf := make([]flow.Identifier, 0, len(ids))
-	for _, t := range ids {
-		if t != n.me.NodeID() {
-			targetIDMinusSelf = append(targetIDMinusSelf, t)
-		}
-	}
-	return targetIDMinusSelf, nil
-}
-
-// sampleFilter returns an identifier filter which returns a random sample from ids.
-func sampleFilter(size uint) identifierFilter {
-	return func(ids ...flow.Identifier) ([]flow.Identifier, error) {
-		return flow.Sample(size, ids...), nil
+func (n *Network) removeSelfFilter() flow.IdentifierFilter {
+	return func(id flow.Identifier) bool {
+		return id != n.me.NodeID()
 	}
 }
 
-// sendOnChannel sends the message on channel to targets after applying the all the filters to targets.
-func (n *Network) sendOnChannel(channel network.Channel, message interface{}, targetIDs []flow.Identifier, filters ...identifierFilter) error {
-
-	var err error
-	// filter the targetIDs
-	for _, f := range filters {
-		targetIDs, err = f(targetIDs...)
-		// if filter failed
-		if err != nil {
-			return err
-		}
-		// if the filtration resulted in an empty list, throw an error
-		if len(targetIDs) == 0 {
-			return network.EmptyTargetList
-		}
-	}
-
+// sendOnChannel sends the message on channel to targets.
+func (n *Network) sendOnChannel(channel network.Channel, message interface{}, targetIDs []flow.Identifier) error {
 	// generate network message (encoding) based on list of recipients
 	msg, err := n.genNetworkMessage(channel, message, targetIDs...)
 	if err != nil {
@@ -415,7 +386,7 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	// tracks its processing time.
 	startTimestamp := time.Now()
 
-	err = eng.Process(qm.SenderID, qm.Payload)
+	err = eng.Process(qm.Target, qm.SenderID, qm.Payload)
 	if err != nil {
 		n.logger.Error().
 			Err(err).

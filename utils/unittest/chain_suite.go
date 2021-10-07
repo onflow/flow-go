@@ -523,21 +523,16 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 }
 
 func (bc *BaseChainSuite) Extend(block *flow.Block) {
-	bc.Blocks[block.ID()] = block
+	blockID := block.ID()
+	bc.Blocks[blockID] = block
 	if seal, ok := bc.SealsIndex[block.Header.ParentID]; ok {
 		bc.SealsIndex[block.ID()] = seal
 	}
 
 	for _, result := range block.Payload.Results {
 		// Exec Receipt for block with valid subgraph
-		// ATTENTION:
-		// Here, IncorporatedBlockID (the first argument) should be set
-		// to ancestorID, because that is the block that contains the
-		// ExecutionResult. However, in phase 2 of the sealing roadmap,
-		// we are still using a temporary sealing logic where the
-		// IncorporatedBlockID is expected to be the result's block ID.
 		incorporatedResult := IncorporatedResult.Fixture(IncorporatedResult.WithResult(result),
-			IncorporatedResult.WithIncorporatedBlockID(result.BlockID))
+			IncorporatedResult.WithIncorporatedBlockID(blockID))
 
 		// assign each chunk to 50% of validation Nodes and generate respective approvals
 		assignment := chunks.NewAssignment()
@@ -559,7 +554,7 @@ func (bc *BaseChainSuite) Extend(block *flow.Block) {
 		bc.PersistedResults[result.ID()] = result
 	}
 	for _, seal := range block.Payload.Seals {
-		bc.SealsIndex[block.ID()] = seal
+		bc.SealsIndex[blockID] = seal
 	}
 }
 

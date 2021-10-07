@@ -15,7 +15,7 @@ import (
 func TestCombinedVote(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true)
+	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true, epochCounter)
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
@@ -63,9 +63,8 @@ func TestCombinedVote(t *testing.T) {
 func TestCombinedProposalIsVote(t *testing.T) {
 
 	// NOTE: I don't think this is true for every signature scheme
-
 	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
-	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true)
+	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true, epochCounter)
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
@@ -82,7 +81,7 @@ func TestCombinedQC(t *testing.T) {
 
 	identities := unittest.IdentityListFixture(8, unittest.WithRole(flow.RoleConsensus))
 	minShares := (len(identities)-1)/2 + 1
-	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true)
+	committeeState, stakingKeys, beaconKeys := MakeHotstuffCommitteeState(t, identities, true, epochCounter)
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal

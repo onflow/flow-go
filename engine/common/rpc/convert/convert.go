@@ -155,7 +155,7 @@ func BlockToMessage(h *flow.Block) (*entities.Block, error) {
 		Timestamp:            t,
 		CollectionGuarantees: cg,
 		BlockSeals:           seals,
-		Signatures:           [][]byte{h.Header.ParentVoterSig},
+		Signatures:           [][]byte{h.Header.ParentVoterSigData},
 	}
 
 	return &bh, nil
@@ -338,6 +338,18 @@ func IdentifierToMessage(i flow.Identifier) []byte {
 
 func MessageToIdentifier(b []byte) flow.Identifier {
 	return flow.HashToID(b)
+}
+
+func StateCommitmentToMessage(s flow.StateCommitment) []byte {
+	return s[:]
+}
+
+func MessageToStateCommitment(bytes []byte) (sc flow.StateCommitment, err error) {
+	if len(bytes) != len(sc) {
+		return sc, fmt.Errorf("invalid state commitment length. got %d expected %d", len(bytes), len(sc))
+	}
+	copy(sc[:], bytes)
+	return
 }
 
 func IdentifiersToMessages(l []flow.Identifier) [][]byte {

@@ -2,6 +2,7 @@ package delta
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/fvm/state"
@@ -19,9 +20,11 @@ type View struct {
 	delta       Delta
 	regTouchSet map[string]flow.RegisterID // contains all the registers that have been touched (either read or written to)
 	readsCount  uint64                     // contains the total number of reads
-	// SpocksSecret keeps the secret used for SPoCKs
-	// TODO we can add a flag to disable capturing SpocksSecret
+	// spockSecret keeps the secret used for SPoCKs
+	// TODO we can add a flag to disable capturing spockSecret
 	// for views other than collection views to improve performance
+	spockSecret       []byte
+	spockSecretLock   sync.Mutex
 	spockSecretHasher hash.Hasher
 	readFunc          GetRegisterFunc
 }
@@ -68,16 +71,12 @@ func (v *View) Interactions() *SpockSnapshot {
 		reads[i] = id
 	}
 
-	spockSecHashSum := v.spockSecretHasher.SumHash()
-	var spockSecret = make([]byte, len(spockSecHashSum))
-	copy(spockSecret, spockSecHashSum)
-
 	return &SpockSnapshot{
 		Snapshot: Snapshot{
 			Delta: delta,
 			Reads: reads,
 		},
-		SpockSecret: spockSecret,
+		SpockSecret: v.SpockSecret(),
 	}
 }
 
@@ -119,32 +118,27 @@ func (v *View) RegisterUpdates() ([]flow.RegisterID, []flow.RegisterValue) {
 // This function will return an error if it fails to read from the underlying
 // data source for this view.
 func (v *View) Get(owner, controller, key string) (flow.RegisterValue, error) {
+	var err error
+	registerID := flow.NewRegisterID(owner, controller, key)
+
 	value, exists := v.delta.Get(owner, controller, key)
-	if exists {
-		// every time we read a value (order preserving) we update spock
-		var err error
-		if value != nil {
-			err = v.updateSpock(value)
+	if !exists {
+		value, err = v.readFunc(owner, controller, key)
+		if err != nil {
+			return nil, fmt.Errorf("get register failed: %w", err)
 		}
-		return value, err
+		// capture register touch
+		v.regTouchSet[registerID.String()] = registerID
+		// increase reads
+		v.readsCount++
 	}
-
-	value, err := v.readFunc(owner, controller, key)
+	// every time we read a value (order preserving) we update the secret
+	// with the registerID only (value is not required)
+	_, err = v.spockSecretHasher.Write(registerID.Bytes())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get register failed: %w", err)
 	}
-
-	registerID := toRegisterID(owner, controller, key)
-
-	// capture register touch
-	v.regTouchSet[registerID.String()] = registerID
-
-	// increase reads
-	v.readsCount++
-
-	// every time we read a value (order preserving) we update spock
-	err = v.updateSpock(value)
-	return value, err
+	return value, nil
 }
 
 // Peek reads the value without registering the read, as when used as parent read function
@@ -159,35 +153,31 @@ func (v *View) Peek(owner, controller, key string) (flow.RegisterValue, error) {
 
 // Set sets a register value in this view.
 func (v *View) Set(owner, controller, key string, value flow.RegisterValue) error {
-	// every time we write something to delta (order preserving) we update spock
-	// TODO return the error and handle it properly on other places
+	registerID := flow.NewRegisterID(owner, controller, key)
+	// every time we write something to delta (order preserving) we update
+	// the spock secret with both the register ID and value.
 
-	err := v.updateSpock(value)
+	_, err := v.spockSecretHasher.Write(registerID.Bytes())
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("set register failed: %w", err)
+	}
+
+	_, err = v.spockSecretHasher.Write(value)
+	if err != nil {
+		return fmt.Errorf("set register failed: %w", err)
 	}
 
 	// capture register touch
-	registerID := toRegisterID(owner, controller, key)
-
 	v.regTouchSet[registerID.String()] = registerID
 	// add key value to delta
 	v.delta.Set(owner, controller, key, value)
 	return nil
 }
 
-func (v *View) updateSpock(value []byte) error {
-	_, err := v.spockSecretHasher.Write(value)
-	if err != nil {
-		return fmt.Errorf("error updating spock secret data: %w", err)
-	}
-	return nil
-}
-
 // Touch explicitly adds a register to the touched registers set.
 func (v *View) Touch(owner, controller, key string) error {
 
-	k := toRegisterID(owner, controller, key)
+	k := flow.NewRegisterID(owner, controller, key)
 
 	// capture register touch
 	v.regTouchSet[k.String()] = k
@@ -227,9 +217,9 @@ func (v *View) MergeView(ch state.View) error {
 
 	spockSecret := child.SpockSecret()
 
-	err := v.updateSpock(spockSecret)
+	_, err := v.spockSecretHasher.Write(spockSecret)
 	if err != nil {
-		return fmt.Errorf("can not merge view: %w", err)
+		return fmt.Errorf("merging SPoCK secrets failed: %w", err)
 	}
 	v.delta.MergeWith(child.delta)
 
@@ -253,8 +243,17 @@ func (v *View) ReadsCount() uint64 {
 }
 
 // SpockSecret returns the secret value for SPoCK
+//
+// This function modifies the internal state of the SPoCK secret hasher.
+// Once called, it doesn't allow writing more data into the SPoCK secret.
 func (v *View) SpockSecret() []byte {
-	return v.spockSecretHasher.SumHash()
+	// check if spockSecret has been already computed
+	v.spockSecretLock.Lock()
+	if v.spockSecret == nil {
+		v.spockSecret = v.spockSecretHasher.SumHash()
+	}
+	v.spockSecretLock.Unlock()
+	return v.spockSecret
 }
 
 // Detach detaches view from parent, by setting readFunc to

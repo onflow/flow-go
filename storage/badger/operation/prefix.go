@@ -12,7 +12,8 @@ import (
 const (
 
 	// codes for special database markers
-	codeMax = 1 // keeps track of the maximum key size
+	codeMax    = 1 // keeps track of the maximum key size
+	codeDBType = 2 // specifies a database type
 
 	// codes for views with special meaning
 	codeStartedView = 10 // latest view hotstuff started
@@ -63,8 +64,9 @@ const (
 	codeIndexBlockByChunkID = 60 // index mapping chunk ID to block ID
 
 	// codes related to epoch information
-	codeEpochSetup  = 61 // EpochSetup service event, keyed by ID
-	codeEpochCommit = 62 // EpochCommit service event, keyed by ID
+	codeEpochSetup     = 61 // EpochSetup service event, keyed by ID
+	codeEpochCommit    = 62 // EpochCommit service event, keyed by ID
+	codeDKGPrivateInfo = 63 // DKGPrivateInfo, keyed by epoch counter
 
 	// job queue consumers and producers
 	codeJobConsumerProcessed = 70

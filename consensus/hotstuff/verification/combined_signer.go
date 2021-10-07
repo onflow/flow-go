@@ -19,25 +19,33 @@ import (
 // be used to reconstruct a threshold signature.
 type CombinedSigner struct {
 	*CombinedVerifier
-	staking  module.AggregatingSigner
-	beacon   module.ThresholdSigner
-	merger   module.Merger
-	signerID flow.Identifier
+	staking              module.AggregatingSigner
+	merger               module.Merger
+	thresholdSignerStore module.ThresholdSignerStore
+	signerID             flow.Identifier
 }
 
 // NewCombinedSigner creates a new combined signer with the given dependencies:
 // - the hotstuff committee's state is used to retrieve public keys for signers;
-// - the signer ID is used as the identity when creating signatures;
-// - the staking signer is used to create aggregatable signatures for the first signature part;
-// - the threshold signer is used to create threshold signture shres for the second signature part;
+// - the staking signer is used to create and verify aggregatable signatures for the first signature part;
+// - the thresholdVerifier is used to verify threshold signatures
 // - the merger is used to join and split the two signature parts on our models;
-func NewCombinedSigner(committee hotstuff.Committee, staking module.AggregatingSigner, beacon module.ThresholdSigner, merger module.Merger, signerID flow.Identifier) *CombinedSigner {
+// - the thresholdSignerStore is used to get threshold-signers by epoch/view;
+// - the signer ID is used as the identity when creating signatures;
+func NewCombinedSigner(
+	committee hotstuff.Committee,
+	staking module.AggregatingSigner,
+	thresholdVerifier module.ThresholdVerifier,
+	merger module.Merger,
+	thresholdSignerStore module.ThresholdSignerStore,
+	signerID flow.Identifier) *CombinedSigner {
+
 	sc := &CombinedSigner{
-		CombinedVerifier: NewCombinedVerifier(committee, staking, beacon, merger),
-		staking:          staking,
-		beacon:           beacon,
-		merger:           merger,
-		signerID:         signerID,
+		CombinedVerifier:     NewCombinedVerifier(committee, staking, thresholdVerifier, merger),
+		staking:              staking,
+		merger:               merger,
+		thresholdSignerStore: thresholdSignerStore,
+		signerID:             signerID,
 	}
 	return sc
 }
@@ -98,6 +106,7 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 
 	// get the DKG group size
 	blockID := votes[0].BlockID
+	view := votes[0].View
 	dkg, err := c.committee.DKG(blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get DKG: %w", err)
@@ -144,8 +153,12 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 		return nil, fmt.Errorf("could not aggregate staking signatures: %w", err)
 	}
 
+	beaconSigner, err := c.thresholdSignerStore.GetThresholdSigner(view)
+	if err != nil {
+		return nil, fmt.Errorf("could not get threshold signer for view (%d): %w", view, err)
+	}
 	// construct the threshold signature from the shares
-	beaconThresSig, err := c.beacon.Reconstruct(dkg.Size(), beaconShares, dkgIndices)
+	beaconThresSig, err := beaconSigner.Reconstruct(dkg.Size(), beaconShares, dkgIndices)
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct beacon signatures: %w", err)
 	}
@@ -171,12 +184,17 @@ func (c *CombinedSigner) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate,
 func (c *CombinedSigner) genSigData(block *model.Block) ([]byte, error) {
 
 	// create the message to be signed and generate signatures
-	msg := makeVoteMessage(block.View, block.BlockID)
+	msg := MakeVoteMessage(block.View, block.BlockID)
 	stakingSig, err := c.staking.Sign(msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)
 	}
-	beaconShare, err := c.beacon.Sign(msg)
+
+	beacon, err := c.thresholdSignerStore.GetThresholdSigner(block.View)
+	if err != nil {
+		return nil, fmt.Errorf("could not get threshold signer for view %d: %w", block.View, err)
+	}
+	beaconShare, err := beacon.Sign(msg)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate beacon signature: %w", err)
 	}

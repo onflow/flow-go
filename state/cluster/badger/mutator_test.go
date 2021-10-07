@@ -1,6 +1,7 @@
 package badger
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"math/rand"
@@ -21,6 +22,7 @@ import (
 	pbadger "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	protocolutil "github.com/onflow/flow-go/state/protocol/util"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
 	"github.com/onflow/flow-go/storage/badger/procedure"
@@ -85,7 +87,7 @@ func (suite *MutatorSuite) SetupTest() {
 	state, err := pbadger.Bootstrap(metrics, suite.db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 	require.NoError(suite.T(), err)
 
-	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer)
+	suite.protoState, err = pbadger.NewFollowerState(state, index, conPayloads, tracer, consumer, protocolutil.MockBlockTimer())
 	require.NoError(suite.T(), err)
 }
 
@@ -300,9 +302,9 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 		next := unittest.BlockWithParentFixture(parent)
 		next.Payload.Guarantees = nil
 		next.SetPayload(*next.Payload)
-		err := suite.protoState.Extend(&next)
+		err := suite.protoState.Extend(context.Background(), &next)
 		suite.Require().Nil(err)
-		err = suite.protoState.Finalize(next.ID())
+		err = suite.protoState.Finalize(context.Background(), next.ID())
 		suite.Require().Nil(err)
 		parent = next.Header
 	}

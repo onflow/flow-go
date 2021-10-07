@@ -10,14 +10,41 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
+type TraceSpan opentracing.Span
+
 var _ Tracer = &trace.OpenTracer{}
+var _ Tracer = &trace.NoopTracer{}
 
 // Tracer interface for tracers in flow. Uses open tracing span definitions
 type Tracer interface {
 	ReadyDoneAware
-	StartSpan(entity flow.Identifier, spanName trace.SpanName, opts ...opentracing.StartSpanOption) opentracing.Span
-	FinishSpan(entity flow.Identifier, spanName trace.SpanName)
-	GetSpan(entity flow.Identifier, spanName trace.SpanName) (opentracing.Span, bool)
+
+	// StartBlockSpan starts an span for a block, built as a child of rootSpan
+	// it also returns the context including this span which can be used for nested calls.
+	// and also a boolean reporting if this span is sampled (is used for avoiding unncessary computation for tags)
+	StartBlockSpan(
+		ctx context.Context,
+		blockID flow.Identifier,
+		spanName trace.SpanName,
+		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool)
+
+	// StartCollectionSpan starts an span for a collection, built as a child of rootSpan
+	// it also returns the context including this span which can be used for nested calls.
+	// and also a boolean reporting if this span is sampled (is used for avoiding unncessary computation for tags)
+	StartCollectionSpan(
+		ctx context.Context,
+		collectionID flow.Identifier,
+		spanName trace.SpanName,
+		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool)
+
+	// StartTransactionSpan starts an span for a transaction, built as a child of rootSpan
+	// it also returns the context including this span which can be used for nested calls.
+	// and also a boolean reporting if this span is sampled (is used for avoiding unncessary computation for tags)
+	StartTransactionSpan(
+		ctx context.Context,
+		transactionID flow.Identifier,
+		spanName trace.SpanName,
+		opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool)
 
 	StartSpanFromContext(
 		ctx context.Context,

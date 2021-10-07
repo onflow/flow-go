@@ -4,14 +4,18 @@ import (
 	"errors"
 	"fmt"
 
-	executionState "github.com/onflow/flow-go/engine/execution/state"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/verification"
 
+	"github.com/onflow/flow-go/engine/execution/computation/computer"
+	executionState "github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
-	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/partial"
 	chmodels "github.com/onflow/flow-go/model/chunks"
@@ -27,18 +31,16 @@ type ChunkVerifier struct {
 	vm             VirtualMachine
 	vmCtx          fvm.Context
 	systemChunkCtx fvm.Context
+	logger         zerolog.Logger
 }
 
 // NewChunkVerifier creates a chunk verifier containing a flow virtual machine
-func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context) *ChunkVerifier {
+func NewChunkVerifier(vm VirtualMachine, vmCtx fvm.Context, logger zerolog.Logger) *ChunkVerifier {
 	return &ChunkVerifier{
-		vm:    vm,
-		vmCtx: vmCtx,
-		systemChunkCtx: fvm.NewContextFromParent(vmCtx,
-			fvm.WithRestrictedDeployment(false),
-			fvm.WithServiceEventCollectionEnabled(),
-			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(vmCtx.Logger)),
-		),
+		vm:             vm,
+		vmCtx:          vmCtx,
+		systemChunkCtx: computer.SystemChunkContext(vmCtx, vmCtx.Logger),
+		logger:         logger.With().Str("component", "chunk_verifier").Logger(),
 	}
 }
 
@@ -53,8 +55,8 @@ func (fcv *ChunkVerifier) Verify(vc *verification.VerifiableChunkData) ([]byte, 
 	}
 
 	transactions := make([]*fvm.TransactionProcedure, 0)
-	for i, txBody := range vc.Collection.Transactions {
-		tx := fvm.Transaction(txBody, uint32(i))
+	for i, txBody := range vc.ChunkDataPack.Collection.Transactions {
+		tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(i))
 		transactions = append(transactions, tx)
 	}
 
@@ -72,22 +74,26 @@ func (fcv *ChunkVerifier) SystemChunkVerify(vc *verification.VerifiableChunkData
 	}
 
 	// transaction body of system chunk
-	txBody := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain.ServiceAddress())
-	tx := fvm.Transaction(txBody, uint32(0))
+	txBody, err := blueprints.SystemChunkTransaction(fcv.vmCtx.Chain)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not get system chunk transaction: %w", err)
+	}
+
+	tx := fvm.Transaction(txBody, vc.TransactionOffset+uint32(0))
 	transactions := []*fvm.TransactionProcedure{tx}
 
 	systemChunkContext := fvm.NewContextFromParent(fcv.systemChunkCtx,
 		fvm.WithBlockHeader(vc.Header),
 	)
 
-	return fcv.verifyTransactionsInContext(systemChunkContext, vc.Chunk, vc.ChunkDataPack, vc.Result, transactions, vc.EndState)
+	return fcv.verifyTransactionsInContext(systemChunkContext, vc.Chunk, vc.ChunkDataPack, vc.Result, transactions, vc.EndState, true)
 }
 
 func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk *flow.Chunk,
 	chunkDataPack *flow.ChunkDataPack,
 	result *flow.ExecutionResult,
 	transactions []*fvm.TransactionProcedure,
-	endState flow.StateCommitment) ([]byte, chmodels.ChunkFault, error) {
+	endState flow.StateCommitment, systemChunk bool) ([]byte, chmodels.ChunkFault, error) {
 
 	// TODO check collection hash to match
 	// TODO check datapack hash to match
@@ -99,6 +105,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	if chunkDataPack == nil {
 		return nil, nil, fmt.Errorf("missing chunk data pack")
 	}
+
+	events := make(flow.EventsList, 0)
+	serviceEvents := make(flow.EventsList, 0)
 
 	// constructing a partial trie given chunk data package
 	psmt, err := partial.NewLedger(chunkDataPack.Proof, ledger.State(chunkDataPack.StartState), partial.DefaultPathFinderVersion)
@@ -117,6 +126,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	// unknown register tracks access to parts of the partial trie which
 	// are not expanded and values are unknown.
 	unknownRegTouch := make(map[string]*ledger.Key)
+	var problematicTx flow.Identifier
 	getRegister := func(owner, controller, key string) (flow.RegisterValue, error) {
 		// check if register has been provided in the chunk data pack
 		registerID := flow.NewRegisterID(owner, controller, key)
@@ -157,14 +167,19 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 	for i, tx := range transactions {
 		txView := chunkView.NewChild()
 
-		// tx := fvm.Transaction(txBody, uint32(i))
-
 		err := fcv.vm.Run(context, tx, txView, programs)
 		if err != nil {
 			// this covers unexpected and very rare cases (e.g. system memory issues...),
 			// so we shouldn't be here even if transaction naturally fails (e.g. permission, runtime ... )
 			return nil, nil, fmt.Errorf("failed to execute transaction: %d (%w)", i, err)
 		}
+
+		if len(unknownRegTouch) > 0 {
+			problematicTx = tx.ID
+		}
+
+		events = append(events, tx.Events...)
+		serviceEvents = append(serviceEvents, tx.ServiceEvents...)
 
 		// always merge back the tx view (fvm is responsible for changes on tx errors)
 		err = chunkView.MergeView(txView)
@@ -179,7 +194,54 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		for _, key := range unknownRegTouch {
 			missingRegs = append(missingRegs, key.String())
 		}
-		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID), nil
+		return nil, chmodels.NewCFMissingRegisterTouch(missingRegs, chIndex, execResID, problematicTx), nil
+	}
+
+	eventsHash, err := flow.EventsListHash(events)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cannot calculate events collection hash: %w", err)
+	}
+	if chunk.EventCollection != eventsHash {
+
+		for i, event := range events {
+
+			fcv.logger.Warn().Int("list_index", i).
+				Str("event_id", event.ID().String()).
+				Hex("event_fingerptint", event.Fingerprint()).
+				Str("event_type", string(event.Type)).
+				Str("event_tx_id", event.TransactionID.String()).
+				Uint32("event_tx_index", event.TransactionIndex).
+				Uint32("event_index", event.EventIndex).
+				Bytes("event_payload", event.Payload).
+				Str("block_id", chunk.BlockID.String()).
+				Str("collection_id", chunkDataPack.Collection.ID().String()).
+				Str("result_id", result.ID().String()).
+				Uint64("chunk_index", chunk.Index).
+				Msg("not matching events debug")
+		}
+
+		return nil, chmodels.NewCFInvalidEventsCollection(chunk.EventCollection, eventsHash, chIndex, execResID, events), nil
+	}
+
+	if systemChunk {
+
+		computedServiceEvents := make(flow.ServiceEventList, len(serviceEvents))
+
+		for i, serviceEvent := range serviceEvents {
+			realServiceEvent, err := convert.ServiceEvent(fcv.vmCtx.Chain.ChainID(), serviceEvent)
+			if err != nil {
+				return nil, nil, fmt.Errorf("cannot convert service event %d: %w", i, err)
+			}
+			computedServiceEvents[i] = *realServiceEvent
+		}
+
+		equal, err := result.ServiceEvents.EqualTo(computedServiceEvents)
+		if err != nil {
+			return nil, nil, fmt.Errorf("error while compariong service events: %w", err)
+		}
+		if !equal {
+			return nil, chmodels.CFInvalidServiceSystemEventsEmitted(result.ServiceEvents, computedServiceEvents, chIndex, execResID), nil
+		}
 	}
 
 	// applying chunk delta (register updates at chunk level) to the partial trie
@@ -196,7 +258,7 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 		return nil, nil, fmt.Errorf("cannot create ledger update: %w", err)
 	}
 
-	expEndStateComm, err := psmt.Set(update)
+	expEndStateComm, _, err := psmt.Set(update)
 
 	if err != nil {
 		if errors.Is(err, ledger.ErrMissingKeys{}) {
@@ -205,9 +267,9 @@ func (fcv *ChunkVerifier) verifyTransactionsInContext(context fvm.Context, chunk
 			for i, key := range keys {
 				stringKeys[i] = key.String()
 			}
-			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID), nil
+			return nil, chmodels.NewCFMissingRegisterTouch(stringKeys, chIndex, execResID, problematicTx), nil
 		}
-		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID), nil
+		return nil, chmodels.NewCFMissingRegisterTouch(nil, chIndex, execResID, problematicTx), nil
 	}
 
 	// TODO check if exec node provided register touches that was not used (no read and no update)
@@ -229,5 +291,5 @@ func (fcv *ChunkVerifier) verifyTransactions(chunk *flow.Chunk,
 	// build a block context
 	blockCtx := fvm.NewContextFromParent(fcv.vmCtx, fvm.WithBlockHeader(header))
 
-	return fcv.verifyTransactionsInContext(blockCtx, chunk, chunkDataPack, result, transactions, endState)
+	return fcv.verifyTransactionsInContext(blockCtx, chunk, chunkDataPack, result, transactions, endState, false)
 }

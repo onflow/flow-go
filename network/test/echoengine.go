@@ -18,11 +18,12 @@ import (
 // driving the engines with libp2p, in addition to receiving and storing incoming messages
 // it also echos them back
 type EchoEngine struct {
-	sync.Mutex
+	sync.RWMutex
 	t        *testing.T
 	con      network.Conduit        // used to directly communicate with the network
 	originID flow.Identifier        // used to keep track of the id of the sender of the messages
 	event    chan interface{}       // used to keep track of the events that the node receives
+	channel  chan network.Channel   // used to keep track of the channels that events are received on
 	received chan struct{}          // used as an indicator on reception of messages for testing
 	echomsg  string                 // used as a fix string to be included in the reply echos
 	seen     map[string]int         // used to track the seen events
@@ -35,6 +36,7 @@ func NewEchoEngine(t *testing.T, net module.Network, cap int, channel network.Ch
 		t:        t,
 		echomsg:  "this is an echo",
 		event:    make(chan interface{}, cap),
+		channel:  make(chan network.Channel, cap),
 		received: make(chan struct{}, cap),
 		seen:     make(map[string]int),
 		echo:     echo,
@@ -56,9 +58,9 @@ func (te *EchoEngine) SubmitLocal(event interface{}) {
 
 // Submit is implemented for a valid type assertion to Engine
 // any call to it fails the test
-func (te *EchoEngine) Submit(originID flow.Identifier, event interface{}) {
+func (te *EchoEngine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	go func() {
-		err := te.Process(originID, event)
+		err := te.Process(channel, originID, event)
 		if err != nil {
 			require.Fail(te.t, "could not process submitted event")
 		}
@@ -75,11 +77,12 @@ func (te *EchoEngine) ProcessLocal(event interface{}) error {
 // Process receives an originID and an event and casts them into the corresponding fields of the
 // EchoEngine. It then flags the received channel on reception of an event.
 // It also sends back an echo of the message to the origin ID
-func (te *EchoEngine) Process(originID flow.Identifier, event interface{}) error {
+func (te *EchoEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	te.Lock()
 	defer te.Unlock()
 	te.originID = originID
 	te.event <- event
+	te.channel <- channel
 	te.received <- struct{}{}
 
 	// asserting event as string

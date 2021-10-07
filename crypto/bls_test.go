@@ -36,6 +36,7 @@ func BenchmarkBLSBLS12381Verify(b *testing.B) {
 	benchVerify(b, BLSBLS12381, halg)
 }
 
+// utility function to generate a random private key
 func randomSK(t *testing.T, seed []byte) PrivateKey {
 	n, err := rand.Read(seed)
 	require.Equal(t, n, KeyGenSeedMinLenBLSBLS12381)
@@ -86,7 +87,6 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 
 // TestBLSEncodeDecode tests encoding and decoding of BLS keys
 func TestBLSEncodeDecode(t *testing.T) {
-
 	// generic tests
 	testEncodeDecode(t, BLSBLS12381)
 

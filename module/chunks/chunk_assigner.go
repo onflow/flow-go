@@ -17,8 +17,7 @@ import (
 
 // DefaultChunkAssignmentAlpha is the default number of verifiers that should be
 // assigned to each chunk.
-// DISCLAIMER: the current value is not necessarily suitable for production
-const DefaultChunkAssignmentAlpha = 20
+const DefaultChunkAssignmentAlpha = 3
 
 // ChunkAssigner implements an instance of the Public Chunk Assignment
 // algorithm for assigning chunks to verifier nodes in a deterministic but
@@ -57,7 +56,7 @@ func (p *ChunkAssigner) Size() uint {
 //    (which contains the block's source of randomness)
 //  * unexpected errors should be considered symptoms of internal bugs
 func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identifier) (*chunkmodels.Assignment, error) {
-	// computes a finger print for blockID||resultID||alpha
+	// computes a fingerprint for blockID||resultID||alpha
 	hash, err := fingerPrint(blockID, result.ID(), p.alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute hash of identifiers: %w", err)
@@ -97,16 +96,15 @@ func (p *ChunkAssigner) Assign(result *flow.ExecutionResult, blockID flow.Identi
 }
 
 func (p *ChunkAssigner) rngByBlockID(stateSnapshot protocol.Snapshot) (random.Rand, error) {
-	// TODO: rng could be cached to optimize performance
-
+	// TODO: seed could be cached to optimize performance
 	seed, err := stateSnapshot.Seed(indices.ProtocolVerificationChunkAssignment...) // potentially returns NoValidChildBlockError
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to retrieve source of randomness: %w", err)
 	}
 
 	rng, err := random.NewRand(seed)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate random generator: %w", err)
+		return nil, fmt.Errorf("failed to instantiate random number generator: %w", err)
 	}
 
 	return rng, nil

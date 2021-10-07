@@ -268,11 +268,7 @@ func DecodeValue(encodedValue []byte) (ledger.Value, error) {
 		return nil, err
 	}
 
-	return decodeValue(rest)
-}
-
-func decodeValue(inp []byte) (ledger.Value, error) {
-	return ledger.Value(inp), nil
+	return rest, nil
 }
 
 // EncodePath encodes a path into a byte slice
@@ -406,13 +402,7 @@ func decodePayload(inp []byte) (*ledger.Payload, error) {
 		return nil, fmt.Errorf("error decoding payload: %w", err)
 	}
 
-	// decode value
-	value, err := decodeValue(encValue)
-	if err != nil {
-		return nil, fmt.Errorf("error decoding payload: %w", err)
-	}
-
-	return &ledger.Payload{Key: *key, Value: value}, nil
+	return &ledger.Payload{Key: *key, Value: encValue}, nil
 }
 
 // EncodeTrieUpdate encodes a trie update struct

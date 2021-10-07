@@ -2,6 +2,8 @@ package access
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/onflow/flow/protobuf/go/flow/access"
 	"github.com/onflow/flow/protobuf/go/flow/entities"
@@ -417,6 +419,20 @@ func (h *Handler) GetLatestProtocolStateSnapshot(ctx context.Context, req *acces
 	}, nil
 }
 
+// GetExecutionResultForBlockID returns the latest received execution result for the given block ID.
+// AN might receive multiple receipts with conflicting results for unsealed blocks.
+// If this case happens, since AN is not able to determine which result is the correct one until the block is sealed, it has to pick one result to respond to this query. For now, we return the result from the latest received receipt.
+func (h *Handler) GetExecutionResultForBlockID(ctx context.Context, req *access.GetExecutionResultForBlockIDRequest) (*access.ExecutionResultForBlockIDResponse, error) {
+	blockID := convert.MessageToIdentifier(req.GetBlockId())
+
+	result, err := h.api.GetExecutionResultForBlockID(ctx, blockID)
+	if err != nil {
+		return nil, err
+	}
+
+	return executionResultToMessages(result)
+}
+
 func blockResponse(block *flow.Block) (*access.BlockResponse, error) {
 	msg, err := convert.BlockToMessage(block)
 	if err != nil {
@@ -437,6 +453,59 @@ func blockHeaderResponse(header *flow.Header) (*access.BlockHeaderResponse, erro
 	return &access.BlockHeaderResponse{
 		Block: msg,
 	}, nil
+}
+
+func executionResultToMessages(er *flow.ExecutionResult) (*access.ExecutionResultForBlockIDResponse, error) {
+
+	chunks := make([]*entities.Chunk, len(er.Chunks))
+
+	for i, chunk := range er.Chunks {
+		chunks[i] = chunkToMessage(chunk)
+	}
+
+	serviceEvents := make([]*entities.ServiceEvent, len(er.ServiceEvents))
+	var err error
+	for i, serviceEvent := range er.ServiceEvents {
+		serviceEvents[i], err = serviceEventToMessage(serviceEvent)
+		if err != nil {
+			return nil, fmt.Errorf("error while convering service event %d: %w", i, err)
+		}
+	}
+
+	return &access.ExecutionResultForBlockIDResponse{
+		ExecutionResult: &entities.ExecutionResult{
+			PreviousResultId: convert.IdentifierToMessage(er.PreviousResultID),
+			BlockId:          convert.IdentifierToMessage(er.BlockID),
+			Chunks:           chunks,
+			ServiceEvents:    serviceEvents,
+		},
+	}, nil
+}
+
+func serviceEventToMessage(event flow.ServiceEvent) (*entities.ServiceEvent, error) {
+
+	bytes, err := json.Marshal(event.Event)
+	if err != nil {
+		return nil, fmt.Errorf("cannot marshal service event: %w", err)
+	}
+
+	return &entities.ServiceEvent{
+		Type:    event.Type,
+		Payload: bytes,
+	}, nil
+}
+
+func chunkToMessage(chunk *flow.Chunk) *entities.Chunk {
+	return &entities.Chunk{
+		CollectionIndex:      uint32(chunk.CollectionIndex),
+		StartState:           convert.StateCommitmentToMessage(chunk.StartState),
+		EventCollection:      convert.IdentifierToMessage(chunk.EventCollection),
+		BlockId:              convert.IdentifierToMessage(chunk.BlockID),
+		TotalComputationUsed: chunk.TotalComputationUsed,
+		NumberOfTransactions: uint32(chunk.NumberOfTransactions),
+		Index:                chunk.Index,
+		EndState:             convert.StateCommitmentToMessage(chunk.EndState),
+	}
 }
 
 func blockEventsToMessages(blocks []flow.BlockEvents) ([]*access.EventsResponse_Result, error) {

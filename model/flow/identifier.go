@@ -3,6 +3,7 @@
 package flow
 
 import (
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"math/rand"
@@ -12,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
 	"github.com/onflow/flow-go/storage/merkle"
+	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
 // Identifier represents a 32-byte unique identifier for an entity.
@@ -39,6 +41,14 @@ func HexStringToIdentifier(hexString string) (Identifier, error) {
 	return identifier, nil
 }
 
+func MustHexStringToIdentifier(hexString string) Identifier {
+	id, err := HexStringToIdentifier(hexString)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // String returns the hex string representation of the identifier.
 func (id Identifier) String() string {
 	return hex.EncodeToString(id[:])
@@ -53,6 +63,21 @@ func (id Identifier) Format(state fmt.State, verb rune) {
 	default:
 		_, _ = state.Write([]byte(fmt.Sprintf("%%!%c(%s=%s)", verb, reflect.TypeOf(id), id)))
 	}
+}
+
+// IsSampled is a utility method to sample entities based on their ids
+// the range is from [0, 64].
+// 0 is 100% (all data will be collected)
+// 32 is ~50%
+// 64 is ~0% (no data will be collected)
+func (id Identifier) IsSampled(sensitivity uint) bool {
+	if sensitivity > 64 {
+		return false
+	}
+	// take the first 8 bytes and check the first few bits based on sensitivity
+	// higher sensitivity means more bits has to be zero, means less number of samples
+	// sensitivity of zero, means everything is sampled
+	return binary.BigEndian.Uint64(id[:8])>>uint64(64-sensitivity) == 0
 }
 
 func (id Identifier) MarshalText() ([]byte, error) {
@@ -80,9 +105,15 @@ func HashToID(hash []byte) Identifier {
 // needed in the pre-image of the hash that comprises the Identifier, which could be different from the encoding for
 // sending entities in messages or for storing them.
 func MakeID(entity interface{}) Identifier {
+	//bs1 := binstat.EnterTime(binstat.BinMakeID + ".??lock.Fingerprint")
+	data := fingerprint.Fingerprint(entity)
+	//binstat.LeaveVal(bs1, int64(len(data)))
+	//bs2 := binstat.EnterTimeVal(binstat.BinMakeID+".??lock.Hash", int64(len(data)))
 	hasher := hash.NewSHA3_256()
-	hash := hasher.ComputeHash(fingerprint.Fingerprint(entity))
-	return HashToID(hash)
+	hash := hasher.ComputeHash(data)
+	id := HashToID(hash)
+	//binstat.Leave(bs2)
+	return id
 }
 
 // PublicKeyToID creates an ID from a public key.

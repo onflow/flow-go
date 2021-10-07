@@ -1,6 +1,7 @@
 package vertestutils
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"testing"
@@ -36,200 +37,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// VerificationHappyPath runs `verNodeCount`-many verification nodes
-// and checks that concurrently received execution receipts with the same result part that
-// by each verification node results in:
-// - the selection of the assigned chunks by the ingest engine
-// - request of the associated chunk data pack to the assigned chunks
-// - formation of a complete verifiable chunk by the ingest engine for each assigned chunk
-// - submitting a verifiable chunk locally to the verify engine by the ingest engine
-// - dropping the ingestion of the ERs that share the same result once the verifiable chunk is submitted to verify engine
-// - broadcast of a matching result approval to consensus nodes for each assigned chunk
-func VerificationHappyPath(t *testing.T,
-	verNodeCount int,
-	chunkNum int,
-	verCollector module.VerificationMetrics,
-	mempoolCollector module.MempoolMetrics) {
-	// to demarcate the debug logs
-	log.Debug().
-		Int("verification_nodes_count", verNodeCount).
-		Int("chunk_num", chunkNum).
-		Msg("TestHappyPath started")
-
-	// ingest engine parameters
-	// set based on following issue (3443)
-	processInterval := 1 * time.Second
-	requestInterval := 1 * time.Second
-	failureThreshold := uint(2)
-
-	// generates network hub
-	hub := stub.NewNetworkHub()
-
-	chainID := flow.Testnet
-
-	// generates identities of nodes, one of each type, `verNodeCount` many of verification nodes
-	colIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	exeIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verIdentities := unittest.IdentityListFixture(verNodeCount, unittest.WithRole(flow.RoleVerification))
-	conIdentity := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-
-	identities := flow.IdentityList{colIdentity, conIdentity, exeIdentity}
-	identities = append(identities, verIdentities...)
-
-	// creates verification nodes
-	verNodes := make([]enginemock.VerificationNode, 0)
-	assigner := &mock.ChunkAssigner{}
-	for _, verIdentity := range verIdentities {
-		verNode := testutil.VerificationNode(t,
-			hub,
-			verIdentity,
-			identities,
-			assigner,
-			requestInterval,
-			processInterval,
-			failureThreshold,
-			uint(10),          // limits size of receipt related mempools to 10
-			uint(10*chunkNum), // limits size of chunks related mempools to 10 * chunkNum
-			chainID,
-			verCollector,
-			mempoolCollector)
-
-		// starts all the engines
-		unittest.RequireComponentsReadyBefore(t, 1*time.Second,
-			verNode.FinderEngine,
-			verNode.MatchEngine.(module.ReadyDoneAware),
-			verNode.VerifierEngine)
-
-		verNodes = append(verNodes, verNode)
-	}
-
-	// extracts root block (at height 0) to build a child block succeeding that.
-	// since all nodes bootstrapped with same fixture, their root block is same.
-	root, err := verNodes[0].State.Params().Root()
-	require.NoError(t, err)
-
-	// creates a child block of root, with its corresponding execution result.
-	completeER := CompleteExecutionReceiptFixture(t, chunkNum, chainID.Chain(), root)
-
-	// imitates follower engine on verification nodes
-	// received block of `completeER` and mutate state accordingly.
-	for _, node := range verNodes {
-		// ensures all nodes have same root block
-		// this is necessary for state mutation.
-		rootBlock, err := node.State.Params().Root()
-		require.NoError(t, err)
-		require.Equal(t, root, rootBlock)
-
-		// extends state of node by block of `completeER`.
-		err = node.State.Extend(completeER.ReceiptsData[0].ReferenceBlock)
-		assert.Nil(t, err)
-	}
-
-	// mocks the assignment to only assign "some" chunks to each verification node.
-	// the assignment is done based on `isAssigned` function
-	_, assignedChunkIDs := MockChunkAssignmentFixture(assigner, verIdentities, CompleteExecutionReceiptList{completeER},
-		EvenChunkIndexAssigner)
-
-	// mock execution node
-	exeNode, exeEngine, _ := SetupChunkDataPackProvider(t,
-		hub,
-		exeIdentity,
-		identities,
-		chainID,
-		CompleteExecutionReceiptList{completeER},
-		assignedChunkIDs,
-		RespondChunkDataPackRequestImmediately) // always responds to chunk data pack requests.
-
-	// mock consensus node
-	conNode, conEngine, conWG := SetupMockConsensusNode(t,
-		unittest.Logger(),
-		hub,
-		conIdentity,
-		verIdentities,
-		identities,
-		CompleteExecutionReceiptList{completeER},
-		chainID,
-		assignedChunkIDs)
-
-	// sends execution receipt to each of verification nodes
-	verWG := sync.WaitGroup{}
-	for _, verNode := range verNodes {
-		verWG.Add(1)
-		go func(vn enginemock.VerificationNode, receipt *flow.ExecutionReceipt) {
-			defer verWG.Done()
-			err := vn.FinderEngine.Process(exeIdentity.NodeID, receipt)
-			require.NoError(t, err)
-		}(verNode, completeER.Receipts[0])
-	}
-
-	// requires all verification nodes process the receipt
-	unittest.RequireReturnsBefore(t, verWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second,
-		"verification node process")
-
-	// creates a network instance for each verification node
-	// and sets it in continuous delivery mode
-	// then flushes the collection requests
-	verNets := make([]*stub.Network, 0)
-	for _, verIdentity := range verIdentities {
-		verNet, ok := hub.GetNetwork(verIdentity.NodeID)
-		assert.True(t, ok)
-		verNet.StartConDev(requestInterval, true)
-		verNet.DeliverSome(true, func(m *stub.PendingMessage) bool {
-			return m.Channel == engine.RequestCollections
-		})
-
-		verNets = append(verNets, verNet)
-	}
-
-	// requires all verification nodes send a result approval per assigned chunk
-	unittest.RequireReturnsBefore(t, conWG.Wait, time.Duration(chunkNum*verNodeCount*5)*time.Second,
-		"consensus node process")
-	// assert that the RA was received
-	conEngine.AssertExpectations(t)
-
-	// assert proper number of calls made
-	exeEngine.AssertExpectations(t)
-
-	// stops verification nodes
-	// Note: this should be done prior to any evaluation to make sure that
-	// the process method of Ingest engines is done working.
-	for _, verNode := range verNodes {
-		// stops all the engines
-		unittest.RequireComponentsDoneBefore(t, 1*time.Second,
-			verNode.FinderEngine,
-			verNode.MatchEngine.(module.ReadyDoneAware),
-			verNode.VerifierEngine)
-	}
-
-	// stops continuous delivery of nodes
-	for _, verNet := range verNets {
-		verNet.StopConDev()
-	}
-
-	enginemock.RequireGenericNodesDoneBefore(t, 1*time.Second,
-		conNode,
-		exeNode)
-
-	// asserts that all processing pipeline of verification node is fully
-	// cleaned up.
-	for _, verNode := range verNodes {
-		assert.Equal(t, verNode.ChunkIDsByResult.Size(), uint(0))
-		assert.Equal(t, verNode.CachedReceipts.Size(), uint(0))
-		assert.Equal(t, verNode.ReadyReceipts.Size(), uint(0))
-		assert.Equal(t, verNode.PendingChunks.Size(), uint(0))
-		assert.Equal(t, verNode.PendingReceiptIDsByBlock.Size(), uint(0))
-		assert.Equal(t, verNode.PendingReceipts.Size(), uint(0))
-		assert.Equal(t, verNode.PendingResults.Size(), uint(0))
-		assert.Equal(t, verNode.ReceiptIDsByResult.Size(), uint(0))
-	}
-
-	// to demarcate the debug logs
-	log.Debug().
-		Int("verification_nodes_count", verNodeCount).
-		Int("chunk_num", chunkNum).
-		Msg("TestHappyPath finishes")
-}
-
 // MockChunkDataProviderFunc is a test helper function encapsulating the logic of whether to reply a chunk data pack request.
 type MockChunkDataProviderFunc func(*testing.T, CompleteExecutionReceiptList, flow.Identifier, flow.Identifier, network.Conduit) bool
 
@@ -247,7 +54,7 @@ func SetupChunkDataPackProvider(t *testing.T,
 	provider MockChunkDataProviderFunc) (*enginemock.GenericNode,
 	*mocknetwork.Engine, *sync.WaitGroup) {
 
-	exeNode := testutil.GenericNode(t, hub, exeIdentity, participants, chainID)
+	exeNode := testutil.GenericNodeFromParticipants(t, hub, exeIdentity, participants, chainID)
 	exeEngine := new(mocknetwork.Engine)
 
 	exeChunkDataConduit, err := exeNode.Net.Register(engine.ProvideChunks, exeEngine)
@@ -258,14 +65,19 @@ func SetupChunkDataPackProvider(t *testing.T,
 	wg := &sync.WaitGroup{}
 	wg.Add(len(assignedChunkIDs))
 
-	exeEngine.On("Process", testifymock.Anything, testifymock.Anything).
+	mu := &sync.Mutex{} // making testify Run thread-safe
+
+	exeEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			originID, ok := args[0].(flow.Identifier)
+			mu.Lock()
+			defer mu.Unlock()
+
+			originID, ok := args[1].(flow.Identifier)
 			require.True(t, ok)
 			// request should be dispatched by a verification node.
 			require.Contains(t, participants.Filter(filter.HasRole(flow.RoleVerification)).NodeIDs(), originID)
 
-			req, ok := args[1].(*messages.ChunkDataRequest)
+			req, ok := args[2].(*messages.ChunkDataRequest)
 			require.True(t, ok)
 			require.Contains(t, assignedChunkIDs, req.ChunkID) // only assigned chunks should be requested.
 
@@ -356,7 +168,7 @@ func SetupMockConsensusNode(t *testing.T,
 
 	// mock the consensus node with a generic node and mocked engine to assert
 	// that the result approval is broadcast
-	conNode := testutil.GenericNode(t, hub, conIdentity, othersIdentity, chainID)
+	conNode := testutil.GenericNodeFromParticipants(t, hub, conIdentity, othersIdentity, chainID)
 	conEngine := new(mocknetwork.Engine)
 
 	// map form verIds --> result approval ID
@@ -368,12 +180,17 @@ func SetupMockConsensusNode(t *testing.T,
 	// creates a hasher for spock
 	hasher := crypto.NewBLSKMAC(encoding.SPOCKTag)
 
-	conEngine.On("Process", testifymock.Anything, testifymock.Anything).
+	mu := &sync.Mutex{} // making testify mock thread-safe
+
+	conEngine.On("Process", testifymock.AnythingOfType("network.Channel"), testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			originID, ok := args[0].(flow.Identifier)
+			mu.Lock()
+			defer mu.Unlock()
+
+			originID, ok := args[1].(flow.Identifier)
 			assert.True(t, ok)
 
-			resultApproval, ok := args[1].(*flow.ResultApproval)
+			resultApproval, ok := args[2].(*flow.ResultApproval)
 			assert.True(t, ok)
 
 			lg.Debug().
@@ -521,7 +338,7 @@ func MockChunkAssignmentFixture(chunkAssigner *mock.ChunkAssigner,
 
 			}
 
-			chunkAssigner.On("Assign", &receipt.ExecutionResult, receipt.ExecutionResult.BlockID).Return(a, nil)
+			chunkAssigner.On("Assign", &receipt.ExecutionResult, completeER.ContainerBlock.ID()).Return(a, nil)
 			visited[receipt.ExecutionResult.ID()] = struct{}{}
 		}
 	}
@@ -562,9 +379,9 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 				continue
 			}
 
-			err := state.Extend(receipt.ReferenceBlock)
+			err := state.Extend(context.Background(), receipt.ReferenceBlock)
 			require.NoError(t, err)
-			err = state.Finalize(refBlockID)
+			err = state.Finalize(context.Background(), refBlockID)
 			require.NoError(t, err)
 			blocks = append(blocks, receipt.ReferenceBlock)
 			duplicate[refBlockID] = struct{}{}
@@ -577,9 +394,9 @@ func ExtendStateWithFinalizedBlocks(t *testing.T, completeExecutionReceipts Comp
 			// skips extending state with already duplicate container block
 			continue
 		}
-		err := state.Extend(completeER.ContainerBlock)
+		err := state.Extend(context.Background(), completeER.ContainerBlock)
 		require.NoError(t, err)
-		err = state.Finalize(containerBlockID)
+		err = state.Finalize(context.Background(), containerBlockID)
 		require.NoError(t, err)
 		blocks = append(blocks, completeER.ContainerBlock)
 		duplicate[containerBlockID] = struct{}{}
@@ -642,7 +459,6 @@ func withConsumers(t *testing.T,
 	ops ...CompleteExecutionReceiptBuilderOpt) {
 
 	tracer := &trace.NoopTracer{}
-	chainID := flow.Testnet
 
 	// bootstraps system with one node of each role.
 	s, verID, participants := bootstrapSystem(t, tracer, staked)
@@ -657,6 +473,7 @@ func withConsumers(t *testing.T,
 	// hold any guarantees.
 	root, err := s.State.Final().Head()
 	require.NoError(t, err)
+	chainID := root.ChainID
 	completeERs := CompleteExecutionReceiptChainFixture(t, root, blockCount, ops...)
 	blocks := ExtendStateWithFinalizedBlocks(t, completeERs, s.State)
 
@@ -704,7 +521,7 @@ func withConsumers(t *testing.T,
 		chainID,
 		assignedChunkIDs)
 
-	verNode := testutil.NewVerificationNode(t,
+	verNode := testutil.VerificationNode(t,
 		hub,
 		verID,
 		participants,
@@ -774,7 +591,8 @@ func bootstrapSystem(t *testing.T, tracer module.Tracer, staked bool) (*enginemo
 
 	// bootstraps the system
 	collector := &metrics.NoopCollector{}
-	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, identities)
+	rootSnapshot := unittest.RootSnapshotFixture(identities)
+	stateFixture := testutil.CompleteStateFixture(t, collector, tracer, rootSnapshot)
 
 	if !staked {
 		// creates a new verification node identity that is unstaked for this epoch

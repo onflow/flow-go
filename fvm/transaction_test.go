@@ -220,14 +220,14 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 		require.Len(t, proc.Logs, 1)
-		require.Contains(t, proc.Logs[0], "Düsseldorf")
+		require.Contains(t, proc.Logs[0], "\"D\\u{fc}sseldorf\"")
 
 		proc = fvm.Transaction(&flow.TransactionBody{Script: code(notFrozenAddress)}, 0)
 		err = vm.Run(context, proc, st.State().View(), programsStorage)
 		require.NoError(t, err)
 		require.NoError(t, proc.Err)
 		require.Len(t, proc.Logs, 1)
-		require.Contains(t, proc.Logs[0], "Düsseldorf")
+		require.Contains(t, proc.Logs[0], "\"D\\u{fc}sseldorf\"")
 
 		// freeze account
 		err = accounts.SetAccountFrozen(frozenAddress, true)
@@ -307,9 +307,6 @@ func TestAccountFreezing(t *testing.T) {
 		txBody.SetPayer(accounts[0])
 		txBody.SetProposalKey(accounts[0], 0, 0)
 
-		err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
-		require.NoError(t, err)
-
 		err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 		require.NoError(t, err)
 
@@ -327,9 +324,6 @@ func TestAccountFreezing(t *testing.T) {
 		txBody.AddAuthorizer(serviceAddress)
 		txBody.SetPayer(serviceAddress)
 		txBody.SetProposalKey(serviceAddress, 0, 0)
-
-		err = testutil.SignPayload(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
 
 		err = testutil.SignEnvelope(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)
@@ -385,9 +379,6 @@ func TestAccountFreezing(t *testing.T) {
 		txBody.SetProposalKey(serviceAddress, 0, 0)
 		txBody.SetPayer(serviceAddress)
 		txBody.AddAuthorizer(serviceAddress)
-
-		err = testutil.SignPayload(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
-		require.NoError(t, err)
 
 		err = testutil.SignEnvelope(txBody, serviceAddress, unittest.ServiceAccountPrivateKey)
 		require.NoError(t, err)

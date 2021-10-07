@@ -40,27 +40,29 @@ const (
 
 // Consensus subsystems represent the different components of the consensus algorithm.
 const (
-	subsystemCompliance = "compliance"
-	subsystemHotstuff   = "hotstuff"
+	subsystemCompliance  = "compliance"
+	subsystemHotstuff    = "hotstuff"
+	subsystemMatchEngine = "match"
 )
 
 // Execution Subsystems
 const (
-	subsystemStateStorage = "state_storage"
-	subsystemMTrie        = "mtrie"
-	subsystemIngestion    = "ingestion"
-	subsystemRuntime      = "runtime"
-	subsystemProvider     = "provider"
+	subsystemStateStorage      = "state_storage"
+	subsystemMTrie             = "mtrie"
+	subsystemIngestion         = "ingestion"
+	subsystemRuntime           = "runtime"
+	subsystemProvider          = "provider"
+	subsystemBlockDataUploader = "block_data_uploader"
 )
 
 // Verification Subsystems
 const (
 	subsystemAssignerEngine  = "assigner"
-	subsystemFinderEngine    = "finder" // TODO: should be removed once new architecture is in place.
-	subsystemMatchEngine     = "match"  // TODO: should be removed once new architecture is in place.
 	subsystemFetcherEngine   = "fetcher"
 	subsystemRequesterEngine = "requester"
 	subsystemVerifierEngine  = "verifier"
+	subsystemBlockConsumer   = "block_consumer"
+	subsystemChunkConsumer   = "chunk_consumer"
 )
 
 // METRIC NAMING GUIDELINES

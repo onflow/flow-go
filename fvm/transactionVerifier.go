@@ -37,7 +37,7 @@ func (v *TransactionSignatureVerifier) Process(
 	ctx *Context,
 	proc *TransactionProcedure,
 	sth *state.StateHolder,
-	programs *programs.Programs,
+	_ *programs.Programs,
 ) error {
 	return v.verifyTransactionSignatures(proc, *ctx, sth)
 }
@@ -65,6 +65,11 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 	var err error
 	var payloadWeights map[flow.Address]int
 	var proposalKeyVerifiedInPayload bool
+
+	err = v.checkSignatureDuplications(tx)
+	if err != nil {
+		return fmt.Errorf("transaction verification failed: %w", err)
+	}
 
 	payloadWeights, proposalKeyVerifiedInPayload, err = v.aggregateAccountSignatures(
 		accounts,
@@ -122,7 +127,7 @@ func (v *TransactionSignatureVerifier) verifyTransactionSignatures(
 }
 
 func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
-	accounts *state.Accounts,
+	accounts state.Accounts,
 	signatures []flow.TransactionSignature,
 	message []byte,
 	proposalKey flow.ProposalKey,
@@ -158,7 +163,7 @@ func (v *TransactionSignatureVerifier) aggregateAccountSignatures(
 // An error is returned if the account does not contain a public key that
 // correctly verifies the signature against the given message.
 func (v *TransactionSignatureVerifier) verifyAccountSignature(
-	accounts *state.Accounts,
+	accounts state.Accounts,
 	txSig flow.TransactionSignature,
 	message []byte,
 	sType signType,
@@ -216,4 +221,26 @@ func (v *TransactionSignatureVerifier) sigIsForProposalKey(
 	proposalKey flow.ProposalKey,
 ) bool {
 	return txSig.Address == proposalKey.Address && txSig.KeyIndex == proposalKey.KeyIndex
+}
+
+func (v *TransactionSignatureVerifier) checkSignatureDuplications(tx *flow.TransactionBody) error {
+	observedSigs := make(map[string]bool)
+	for _, sig := range tx.PayloadSignatures {
+		key := sig.UniqueKeyString()
+		if observedSigs[key] {
+			err := fmt.Errorf("duplicate signatures are provided for the same key")
+			return errors.NewInvalidPayloadSignatureError(sig.Address, sig.KeyIndex, err)
+		}
+		observedSigs[key] = true
+	}
+
+	for _, sig := range tx.EnvelopeSignatures {
+		key := sig.UniqueKeyString()
+		if observedSigs[key] {
+			err := fmt.Errorf("duplicate signatures are provided for the same key")
+			return errors.NewInvalidEnvelopeSignatureError(sig.Address, sig.KeyIndex, err)
+		}
+		observedSigs[key] = true
+	}
+	return nil
 }

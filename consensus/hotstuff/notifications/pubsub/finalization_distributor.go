@@ -3,6 +3,7 @@ package pubsub
 import (
 	"sync"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -12,9 +13,10 @@ type OnBlockIncorporatedConsumer = func(incorporatedBlockID flow.Identifier)
 
 // FinalizationDistributor subscribes for finalization events from hotstuff and distributes it to subscribers
 type FinalizationDistributor struct {
-	blockFinalizedConsumers    []OnBlockFinalizedConsumer
-	blockIncorporatedConsumers []OnBlockIncorporatedConsumer
-	lock                       sync.RWMutex
+	blockFinalizedConsumers       []OnBlockFinalizedConsumer
+	blockIncorporatedConsumers    []OnBlockIncorporatedConsumer
+	hotStuffFinalizationConsumers []hotstuff.FinalizationConsumer
+	lock                          sync.RWMutex
 }
 
 func NewFinalizationDistributor() *FinalizationDistributor {
@@ -30,10 +32,17 @@ func (p *FinalizationDistributor) AddOnBlockFinalizedConsumer(consumer OnBlockFi
 	defer p.lock.Unlock()
 	p.blockFinalizedConsumers = append(p.blockFinalizedConsumers, consumer)
 }
+
 func (p *FinalizationDistributor) AddOnBlockIncorporatedConsumer(consumer OnBlockIncorporatedConsumer) {
 	p.lock.Lock()
 	defer p.lock.Unlock()
 	p.blockIncorporatedConsumers = append(p.blockIncorporatedConsumers, consumer)
+}
+
+func (p *FinalizationDistributor) AddConsumer(consumer hotstuff.FinalizationConsumer) {
+	p.lock.Lock()
+	defer p.lock.Unlock()
+	p.hotStuffFinalizationConsumers = append(p.hotStuffFinalizationConsumers, consumer)
 }
 
 func (p *FinalizationDistributor) OnEventProcessed() {}
@@ -44,6 +53,9 @@ func (p *FinalizationDistributor) OnBlockIncorporated(block *model.Block) {
 	for _, consumer := range p.blockIncorporatedConsumers {
 		consumer(block.BlockID)
 	}
+	for _, consumer := range p.hotStuffFinalizationConsumers {
+		consumer.OnBlockIncorporated(block)
+	}
 }
 
 func (p *FinalizationDistributor) OnFinalizedBlock(block *model.Block) {
@@ -52,9 +64,18 @@ func (p *FinalizationDistributor) OnFinalizedBlock(block *model.Block) {
 	for _, consumer := range p.blockFinalizedConsumers {
 		consumer(block.BlockID)
 	}
+	for _, consumer := range p.hotStuffFinalizationConsumers {
+		consumer.OnFinalizedBlock(block)
+	}
 }
 
-func (p *FinalizationDistributor) OnDoubleProposeDetected(*model.Block, *model.Block) {}
+func (p *FinalizationDistributor) OnDoubleProposeDetected(block1, block2 *model.Block) {
+	p.lock.RLock()
+	defer p.lock.RUnlock()
+	for _, consumer := range p.hotStuffFinalizationConsumers {
+		consumer.OnDoubleProposeDetected(block1, block2)
+	}
+}
 
 func (p *FinalizationDistributor) OnReceiveVote(uint64, *model.Vote) {}
 

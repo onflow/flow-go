@@ -15,6 +15,7 @@ type EpochSetups struct {
 	cache *Cache
 }
 
+// NewEpochSetups instantiates a new EpochSetups storage.
 func NewEpochSetups(collector module.CacheMetrics, db *badger.DB) *EpochSetups {
 
 	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {

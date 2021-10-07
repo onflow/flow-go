@@ -83,7 +83,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 		Hex("executed_block_id", logging.ID(result.BlockID)).
 		Hex("incorporating_block_id", logging.ID(incorporatingBlock)).
 		Logger()
-	e.metrics.OnExecutionReceiptReceived()
+	e.metrics.OnExecutionResultReceivedAtAssignerEngine()
 
 	// verification node should be staked at the reference block id.
 	ok, err := stakedAsVerification(e.state, result.BlockID, e.me.NodeID())
@@ -104,6 +104,7 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 
 	// TODO: de-escalate to debug level on stable version.
 	log.Info().
+		Int("total_chunks", len(result.Chunks)).
 		Int("total_assigned_chunks", len(chunkList)).
 		Msg("chunk assignment done")
 
@@ -117,11 +118,13 @@ func (e *Engine) resultChunkAssignment(ctx context.Context,
 // (through the chunk assigner), and belong to the execution result.
 //
 // Deduplication of chunk locators is delegated to the chunks queue.
-func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool, error) {
-	log := e.log.With().
+func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier, blockHeight uint64) (bool, error) {
+	lg := e.log.With().
 		Hex("result_id", logging.ID(resultID)).
 		Hex("chunk_id", logging.ID(chunk.ID())).
-		Uint64("chunk_index", chunk.Index).Logger()
+		Uint64("chunk_index", chunk.Index).
+		Uint64("block_height", blockHeight).
+		Logger()
 
 	locator := &chunks.Locator{
 		ResultID: resultID,
@@ -134,7 +137,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 		return false, fmt.Errorf("could not push chunk locator to chunks queue: %w", err)
 	}
 	if !ok {
-		log.Debug().Msg("could not push duplicate chunk locator to chunks queue")
+		lg.Debug().Msg("could not push duplicate chunk locator to chunks queue")
 		return false, nil
 	}
 
@@ -142,7 +145,7 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 
 	// notifies chunk queue consumer of a new chunk
 	e.newChunkListener.Check()
-	log.Info().Msg("chunk locator successfully pushed to chunks queue")
+	lg.Info().Msg("chunk locator successfully pushed to chunks queue")
 
 	return true, nil
 }
@@ -153,17 +156,11 @@ func (e *Engine) processChunk(chunk *flow.Chunk, resultID flow.Identifier) (bool
 // Once the assigner engine is done handling all the receipts in the block, it notifies the block consumer.
 func (e *Engine) ProcessFinalizedBlock(block *flow.Block) {
 	blockID := block.ID()
-	span, ok := e.tracer.GetSpan(blockID, trace.VERProcessFinalizedBlock)
-	if !ok {
-		span = e.tracer.StartSpan(blockID, trace.VERProcessFinalizedBlock)
-		span.SetTag("block_id", blockID)
-		defer span.Finish()
-	}
 
-	ctx := opentracing.ContextWithSpan(e.unit.Ctx(), span)
-	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerHandleFinalizedBlock, func() {
-		e.processFinalizedBlock(ctx, block)
-	})
+	span, ctx, _ := e.tracer.StartBlockSpan(e.unit.Ctx(), blockID, trace.VERProcessFinalizedBlock)
+	defer span.Finish()
+
+	e.processFinalizedBlock(ctx, block)
 }
 
 // processFinalizedBlock indexes the execution receipts included in the block, performs chunk assignment on its result, and
@@ -204,7 +201,7 @@ func (e *Engine) processFinalizedBlock(ctx context.Context, block *flow.Block) {
 
 		assignedChunksCount += uint64(len(chunkList))
 		for _, chunk := range chunkList {
-			processed, err := e.processChunkWithTracing(ctx, chunk, resultID)
+			processed, err := e.processChunkWithTracing(ctx, chunk, resultID, block.Header.Height)
 			if err != nil {
 				resultLog.Fatal().
 					Err(err).
@@ -231,16 +228,6 @@ func (e *Engine) chunkAssignments(ctx context.Context, result *flow.ExecutionRes
 	var span opentracing.Span
 	span, _ = e.tracer.StartSpanFromContext(ctx, trace.VERMatchMyChunkAssignments)
 	defer span.Finish()
-
-	// TODO remove shortcut which is only applicable during Sealing Phase 2
-	// Details: in the mature protocol, the chunk assignment for a result is computed
-	// using the Source of Randomness from the _first_ block that incorporates the result
-	// in the respective fork. Per protocol definition, a result is only incorporated _once_
-	// in each fork, specifically in the first block that contains an execution receipt
-	// committing to the result.
-	// However, for Sealing Phase 2, we use a NON-BFT shortcut: we use the source of
-	// randomness from the block the result is for.
-	incorporatingBlock = result.BlockID
 
 	assignment, err := e.assigner.Assign(result, incorporatingBlock)
 	if err != nil {
@@ -301,11 +288,11 @@ func (e *Engine) resultChunkAssignmentWithTracing(
 //
 // Note that the chunk in the input should be legitimately assigned to this verification node
 // (through the chunk assigner), and belong to the same execution result.
-func (e *Engine) processChunkWithTracing(ctx context.Context, chunk *flow.Chunk, resultID flow.Identifier) (bool, error) {
+func (e *Engine) processChunkWithTracing(ctx context.Context, chunk *flow.Chunk, resultID flow.Identifier, blockHeight uint64) (bool, error) {
 	var err error
 	var processed bool
 	e.tracer.WithSpanFromContext(ctx, trace.VERAssignerProcessChunk, func() {
-		processed, err = e.processChunk(chunk, resultID)
+		processed, err = e.processChunk(chunk, resultID, blockHeight)
 	})
 	return processed, err
 }

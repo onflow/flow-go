@@ -6,6 +6,7 @@ import (
 
 //revive:disable:var-naming
 
+// the `go generate` command requires bash scripting, `cmake` and `git`.
 //go:generate bash ./build_dependency.sh
 
 // SigningAlgorithm is an identifier for a signing algorithm

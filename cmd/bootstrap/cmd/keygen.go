@@ -5,10 +5,15 @@ import (
 	"io"
 	"os"
 
+	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+
 	"github.com/spf13/cobra"
 
 	model "github.com/onflow/flow-go/model/bootstrap"
 )
+
+var flagDefaultMachineAccount bool
 
 // keygenCmd represents the key gen command
 var keygenCmd = &cobra.Command{
@@ -42,6 +47,43 @@ var keygenCmd = &cobra.Command{
 		nodes := genNetworkAndStakingKeys()
 		log.Info().Msg("")
 
+		// write key files
+		writeJSONFile := func(relativePath string, val interface{}) error {
+			writeJSON(relativePath, val)
+			return nil
+		}
+		writeFile := func(relativePath string, data []byte) error {
+			writeText(relativePath, data)
+			return nil
+		}
+
+		log.Info().Msg("writing internal private key files")
+		err = utils.WriteStakingNetworkingKeyFiles(nodes, writeJSONFile)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to write internal private key files")
+		}
+		log.Info().Msg("")
+
+		log.Info().Msg("writing internal db encryption key files")
+		err = utils.WriteSecretsDBEncryptionKeyFiles(nodes, writeFile)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to write internal db encryption key files")
+		}
+		log.Info().Msg("")
+
+		// if specified, write machine account key files
+		// this should be only be used on non-production networks and immediately after
+		// bootstrapping from a fresh execution state (eg. benchnet)
+		if flagDefaultMachineAccount {
+			chainID := parseChainID(flagRootChain)
+			log.Info().Msg("writing default machine account files")
+			err = utils.WriteMachineAccountFiles(chainID, nodes, writeJSONFile)
+			if err != nil {
+				log.Fatal().Err(err).Msg("failed to write machine account key files")
+			}
+			log.Info().Msg("")
+		}
+
 		// count roles
 		roleCounts := nodeCountByRole(nodes)
 		for role, count := range roleCounts {
@@ -57,10 +99,12 @@ func init() {
 	rootCmd.AddCommand(keygenCmd)
 
 	// required parameters
-	keygenCmd.Flags().
-		StringVar(&flagConfig, "config", "node-config.json", "path to a JSON file containing multiple node configurations (Role, Address, Stake)")
-	_ = keygenCmd.MarkFlagRequired("config")
+	keygenCmd.Flags().StringVar(&flagConfig, "config", "node-config.json", "path to a JSON file containing multiple node configurations (Role, Address, Stake)")
+	cmd.MarkFlagRequired(keygenCmd, "config")
 
+	// optional parameters, used for generating machine account files
+	keygenCmd.Flags().BoolVar(&flagDefaultMachineAccount, "machine-account", false, "whether or not to generate a default (same as networking key) machine account key file")
+	keygenCmd.Flags().StringVar(&flagRootChain, "root-chain", "local", "chain ID for the root block (can be 'main', 'test', 'canary', 'bench', or 'local'")
 }
 
 // isEmptyDir returns True if the directory contains children

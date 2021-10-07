@@ -20,9 +20,9 @@ type blockSummary struct {
 	BlockID        string   `json:"block_id"`
 	ParentBlockID  string   `json:"parent_block_id"`
 	ParentVoterIDs []string `json:"parent_voter_ids"`
-	// ParentVoterSig []string  `json:"parent_voter_sig"`
+	// ParentVoterSigData []string  `json:"parent_voter_sig"`
 	ProposerID string `json:"proposer_id"`
-	// ProposerSig    string  `json:"proposer_sig"`
+	// ProposerSigData    string  `json:"proposer_sig"`
 	Timestamp         time.Time `json:"timestamp"`
 	CollectionIDs     []string  `json:"collection_ids"`
 	SealedBlocks      []string  `json:"sealed_blocks"`
@@ -40,10 +40,10 @@ func ExportBlocks(blockID flow.Identifier, dbPath string, outputPath string) (fl
 	cacheMetrics := &metrics.NoopCollector{}
 	headers := badger.NewHeaders(cacheMetrics, db)
 	index := badger.NewIndex(cacheMetrics, db)
-	guarantees := badger.NewGuarantees(cacheMetrics, db)
+	guarantees := badger.NewGuarantees(cacheMetrics, db, badger.DefaultCacheSize)
 	seals := badger.NewSeals(cacheMetrics, db)
 	results := badger.NewExecutionResults(cacheMetrics, db)
-	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results)
+	receipts := badger.NewExecutionReceipts(cacheMetrics, db, results, badger.DefaultCacheSize)
 	payloads := badger.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := badger.NewBlocks(db, headers, payloads)
 	commits := badger.NewCommits(&metrics.NoopCollector{}, db)

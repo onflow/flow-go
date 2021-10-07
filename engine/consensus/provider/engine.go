@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/utils/logging"
@@ -80,15 +79,20 @@ func (e *Engine) Done() <-chan struct{} {
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.ProcessLocal(event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(originID, event)
+		err := e.Process(channel, originID, event)
 		if err != nil {
 			engine.LogError(e.log, err)
 		}
@@ -97,12 +101,14 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -122,18 +128,6 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 
 // onBlockProposal is used when we want to broadcast a local block to the network.
 func (e *Engine) onBlockProposal(originID flow.Identifier, proposal *messages.BlockProposal) error {
-	if span, ok := e.tracer.GetSpan(proposal.Header.ID(), trace.CONProcessBlock); ok {
-		childSpan := e.tracer.StartSpanFromParent(span, trace.CONProvOnBlockProposal)
-		defer childSpan.Finish()
-	}
-
-	for _, g := range proposal.Payload.Guarantees {
-		if span, ok := e.tracer.GetSpan(g.CollectionID, trace.CONProcessCollection); ok {
-			childSpan := e.tracer.StartSpanFromParent(span, trace.CONProvOnBlockProposal)
-			defer childSpan.Finish()
-		}
-	}
-
 	log := e.log.With().
 		Hex("origin_id", originID[:]).
 		Uint64("block_view", proposal.Header.View).

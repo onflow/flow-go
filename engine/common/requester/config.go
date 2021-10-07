@@ -6,12 +6,13 @@ import (
 )
 
 type Config struct {
-	BatchInterval  time.Duration // minimum interval between requests
-	BatchThreshold uint          // maximum batch size for one request
-	RetryInitial   time.Duration // interval after which we retry request for an entity
-	RetryFunction  RetryFunc     // function determining growth of retry interval
-	RetryMaximum   time.Duration // maximum interval for retrying request for an entity
-	RetryAttempts  uint          // maximum amount of request attemps per entity
+	BatchInterval   time.Duration // minimum interval between requests
+	BatchThreshold  uint          // maximum batch size for one request
+	RetryInitial    time.Duration // interval after which we retry request for an entity
+	RetryFunction   RetryFunc     // function determining growth of retry interval
+	RetryMaximum    time.Duration // maximum interval for retrying request for an entity
+	RetryAttempts   uint          // maximum amount of request attempts per entity
+	ValidateStaking bool          // should staking of target/origin be checked
 }
 
 type RetryFunc func(time.Duration) time.Duration
@@ -85,5 +86,12 @@ func WithRetryMaximum(interval time.Duration) OptionFunc {
 func WithRetryAttempts(attempts uint) OptionFunc {
 	return func(cfg *Config) {
 		cfg.RetryAttempts = attempts
+	}
+}
+
+// WithValidateStaking sets the flag which determines if the target and origin must be checked for staking
+func WithValidateStaking(validateStaking bool) OptionFunc {
+	return func(cfg *Config) {
+		cfg.ValidateStaking = validateStaking
 	}
 }
