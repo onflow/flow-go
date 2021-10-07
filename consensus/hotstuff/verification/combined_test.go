@@ -19,7 +19,7 @@ func TestCombinedVote(t *testing.T) {
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[2].NodeID))
+	block := helper.MakeBlock(helper.WithBlockProposer(identities[2].NodeID))
 	vote, err := signers[0].CreateVote(block)
 	voter := identities[0]
 	require.NoError(t, err)
@@ -68,7 +68,7 @@ func TestCombinedProposalIsVote(t *testing.T) {
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
+	block := helper.MakeBlock(helper.WithBlockProposer(identities[0].NodeID))
 	proposal, err := signers[0].CreateProposal(block)
 	require.NoError(t, err)
 	vote, err := signers[0].CreateVote(block)
@@ -85,7 +85,7 @@ func TestCombinedQC(t *testing.T) {
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, beaconKeys)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
+	block := helper.MakeBlock(helper.WithBlockProposer(identities[0].NodeID))
 	var votes []*model.Vote
 	for _, signer := range signers {
 		vote, err := signer.CreateVote(block)

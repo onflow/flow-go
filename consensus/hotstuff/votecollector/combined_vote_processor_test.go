@@ -48,7 +48,7 @@ func (s *CombinedVoteProcessorTestSuite) SetupTest() {
 	s.rbSigAggregator = &mockhotstuff.WeightedSignatureAggregator{}
 	s.reconstructor = &mockhotstuff.RandomBeaconReconstructor{}
 	s.packer = &mockhotstuff.Packer{}
-	s.proposal = helper.MakeProposal(s.T())
+	s.proposal = helper.MakeProposal()
 	s.sigWeight = 100
 	s.minRequiredStake = 1000 // we require at least 10 sigs to collect min weight
 	s.minRequiredShares = 10  // we require 10 RB shares to reconstruct signature
@@ -115,7 +115,7 @@ func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.processor.Status())
 }
 
-// TestProcess_VoteNotForProposal tests that CombinedVoteProcessor accepts only votes for the block it was initialized with. According to interface specification of `VoteProcessor`, we expect dedicated sentinel errors for votes for different views (`VoteForIncompatibleViewError`) _or_ block  (`VoteForIncompatibleBlockError`). 
+// TestProcess_VoteNotForProposal tests that CombinedVoteProcessor accepts only votes for the block it was initialized with. According to interface specification of `VoteProcessor`, we expect dedicated sentinel errors for votes for different views (`VoteForIncompatibleViewError`) _or_ block  (`VoteForIncompatibleBlockError`).
 func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
 	require.Error(s.T(), err)
@@ -152,11 +152,11 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 		require.True(s.T(), model.IsInvalidVoteError(err))
 		require.ErrorIs(s.T(), err.(model.InvalidVoteError).Err, msig.ErrInvalidFormat)
 
-		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(invalidVoteException)
+		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(exception)
 
 		// unexpected errors from `Verify` should be propagated, but should _not_ be wrapped as `InvalidVoteError`
 		err = s.processor.Process(stakingVote)
-		require.ErrorIs(s.T(), err, invalidVoteException) // unexpected errors from verifying the vote signature should be propagated
+		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
 		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
 
 		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
@@ -172,12 +172,12 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
 
-		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(invalidVoteException)
+		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(exception)
 
 		// except exception
 		err = s.processor.Process(thresholdVote)
 		require.Error(s.T(), err)
-		require.ErrorIs(s.T(), err, invalidVoteException) // unexpected errors from verifying the vote signature should be propagated
+		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
 		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
 
 		s.rbSigAggregator.AssertNotCalled(s.T(), "TrustedAdd")
@@ -193,9 +193,9 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_TrustedAddError() {
 		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 		*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
 		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(nil).Once()
-		s.stakingAggregator.On("TrustedAdd", stakingVote.SignerID, mock.Anything).Return(uint64(0), trustedAddException).Once()
+		s.stakingAggregator.On("TrustedAdd", stakingVote.SignerID, mock.Anything).Return(uint64(0), exception).Once()
 		err := s.processor.Process(stakingVote)
-		require.ErrorIs(s.T(), err, trustedAddException)
+		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
 	s.Run("threshold-sig", func() {
@@ -203,14 +203,16 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_TrustedAddError() {
 		*s.rbSigAggregator = mockhotstuff.WeightedSignatureAggregator{}
 		*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
 		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(nil)
-		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(uint64(0), trustedAddException).Once()
+		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(uint64(0), exception).Once()
 		err := s.processor.Process(thresholdVote)
-		require.ErrorIs(s.T(), err, trustedAddException)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
 		// test also if reconstructor failed to add it
 		s.rbSigAggregator.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(s.sigWeight, nil).Once()
-		s.reconstructor.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(false, trustedAddException).Once()
+		s.reconstructor.On("TrustedAdd", thresholdVote.SignerID, mock.Anything).Return(false, exception).Once()
 		err = s.processor.Process(thresholdVote)
-		require.ErrorIs(s.T(), err, trustedAddException)
+		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
 }
 
