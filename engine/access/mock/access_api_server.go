@@ -429,6 +429,29 @@ func (_m *AccessAPIServer) GetNetworkParameters(_a0 context.Context, _a1 *access
 	return r0, r1
 }
 
+// GetRegisterAtBlockID provides a mock function with given fields: _a0, _a1
+func (_m *AccessAPIServer) GetRegisterAtBlockID(_a0 context.Context, _a1 *access.GetRegisterAtBlockIDRequest) (*access.GetRegisterAtBlockIDResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *access.GetRegisterAtBlockIDResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *access.GetRegisterAtBlockIDRequest) *access.GetRegisterAtBlockIDResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*access.GetRegisterAtBlockIDResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *access.GetRegisterAtBlockIDRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetTransaction provides a mock function with given fields: _a0, _a1
 func (_m *AccessAPIServer) GetTransaction(_a0 context.Context, _a1 *access.GetTransactionRequest) (*access.TransactionResponse, error) {
 	ret := _m.Called(_a0, _a1)

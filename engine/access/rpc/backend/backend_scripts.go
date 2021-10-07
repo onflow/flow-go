@@ -51,6 +51,17 @@ func (b *backendScripts) ExecuteScriptAtBlockID(
 	return b.executeScriptOnExecutionNode(ctx, blockID, script, arguments)
 }
 
+func (b *backendScripts) GetRegisterAtBlockID(
+	ctx context.Context,
+	registerOwner []byte,
+	registerController []byte,
+	registerKey []byte,
+	blockID flow.Identifier,
+) ([]byte, error) {
+	// get the register from a execution node at that block id
+	return b.getRegisterFromExecutionNode(ctx, registerOwner, registerController, registerKey, blockID)
+}
+
 func (b *backendScripts) ExecuteScriptAtBlockHeight(
 	ctx context.Context,
 	blockHeight uint64,
@@ -118,6 +129,62 @@ func (b *backendScripts) tryExecuteScript(ctx context.Context, execNode *flow.Id
 	execResp, err := execRPCClient.ExecuteScriptAtBlockID(ctx, &req)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to execute the script on the execution node %s: %v", execNode.String(), err)
+	}
+	return execResp.GetValue(), nil
+}
+
+// getRegisterFromExecutionNode forwards the request to the execution node using the execution node
+// grpc client and converts the response back to the access node api response format
+func (b *backendScripts) getRegisterFromExecutionNode(
+	ctx context.Context,
+	owner []byte,
+	controller []byte,
+	key []byte,
+	blockID flow.Identifier,
+) ([]byte, error) {
+
+	execReq := execproto.GetRegisterAtBlockIDRequest{
+		BlockId:            blockID[:],
+		RegisterOwner:      owner[:],
+		RegisterController: controller[:],
+		RegisterKey:        key[:],
+	}
+
+	// find few execution nodes which have executed the block earlier and provided an execution receipt for it
+	execNodes, err := executionNodesForBlockID(ctx, blockID, b.executionReceipts, b.state, b.log)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get the register value from the execution node: %v", err)
+	}
+
+	// try each of the execution nodes found
+	var errors *multierror.Error
+	// try to execute the script on one of the execution nodes
+	for _, execNode := range execNodes {
+		result, err := b.tryGetRegister(ctx, execNode, execReq)
+		if err == nil {
+			b.log.Debug().
+				Str("execution_node", execNode.String()).
+				Hex("block_id", blockID[:]).
+				Hex("owner_in_hex", owner[:]).
+				Hex("controller_in_hex", controller[:]).
+				Hex("key_in_hex", key[:]).
+				Msg("Successfully got the register value")
+			return result, nil
+		}
+		errors = multierror.Append(errors, err)
+	}
+	return nil, errors.ErrorOrNil()
+}
+
+func (b *backendScripts) tryGetRegister(ctx context.Context, execNode *flow.Identity, req execproto.GetRegisterAtBlockIDRequest) ([]byte, error) {
+	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "ailed to get register from the execution node %s: %v", execNode.String(), err)
+	}
+	defer closer.Close()
+	execResp, err := execRPCClient.GetRegisterAtBlockID(ctx, &req)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "failed to get register from the execution node %s: %v", execNode.String(), err)
 	}
 	return execResp.GetValue(), nil
 }
