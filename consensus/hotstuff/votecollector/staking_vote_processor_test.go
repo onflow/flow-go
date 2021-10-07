@@ -42,7 +42,7 @@ func (s *StakingVoteProcessorTestSuite) SetupTest() {
 
 // TestInitialState tests that Block() and Status() return correct values after calling constructor
 func (s *StakingVoteProcessorTestSuite) TestInitialState() {
-	require.Equal(s.T(), s.processor.Block(), s.processor.Block())
+	require.Equal(s.T(), s.proposal.Block, s.processor.Block())
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.processor.Status())
 }
 
@@ -50,45 +50,46 @@ func (s *StakingVoteProcessorTestSuite) TestInitialState() {
 // view and block ID matching proposal that is locked in StakingVoteProcessor
 func (s *StakingVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
-	require.Error(s.T(), err)
+	require.ErrorAs(s.T(), err, &VoteForIncompatibleBlockError)
 	err = s.processor.Process(unittest.VoteFixture(unittest.WithVoteBlockID(s.proposal.Block.BlockID)))
-	require.Error(s.T(), err)
+	require.ErrorAs(s.T(), err, &VoteForIncompatibleViewError)
 	s.stakingAggregator.AssertNotCalled(s.T(), "Verify")
 }
 
 // TestProcess_InvalidSignature tests that StakingVoteProcessor doesn't collect signatures for votes with invalid signature.
 // Checks are made for cases where both staking and threshold signatures were submitted.
 func (s *StakingVoteProcessorTestSuite) TestProcess_InvalidSignature() {
-	invalidVoteException := errors.New("invalid-vote-exception")
-	stakingVote := unittest.VoteForBlockFixture(s.proposal.Block)
+	exception := errors.New("unexpected-exception")
+	stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 
 	s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
 
-	// expect sentinel error in case Verify returns ErrInvalidFormat
+	// sentinel error from `ErrInvalidFormat` should be wrapped as `InvalidVoteError`
 	err := s.processor.Process(stakingVote)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.ErrorIs(s.T(), err.(model.InvalidVoteError).Err, msig.ErrInvalidFormat)
+	require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
 
-	s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(invalidVoteException)
+	s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(exception)
 
-	// except exception
+	// unexpected errors from `Verify` should be propagated, but should _not_ be wrapped as `InvalidVoteError`
 	err = s.processor.Process(stakingVote)
-	require.Error(s.T(), err)
-	require.ErrorIs(s.T(), err, invalidVoteException)
+	require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
+	require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
 
 	s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
 }
 
 // TestProcess_TrustedAddError tests a case where we were able to successfully verify signature but failed to collect it.
 func (s *StakingVoteProcessorTestSuite) TestProcess_TrustedAddError() {
-	trustedAddException := errors.New("trusted-add-exception")
-	stakingVote := unittest.VoteForBlockFixture(s.proposal.Block)
+	exception := errors.New("unexpected-exception")
+	stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 	*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
 	s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(nil).Once()
-	s.stakingAggregator.On("TrustedAdd", stakingVote.SignerID, mock.Anything).Return(uint64(0), trustedAddException).Once()
+	s.stakingAggregator.On("TrustedAdd", stakingVote.SignerID, mock.Anything).Return(uint64(0), exception).Once()
 	err := s.processor.Process(stakingVote)
-	require.ErrorIs(s.T(), err, trustedAddException)
+	require.ErrorIs(s.T(), err, exception)
+	require.False(s.T(), model.IsInvalidVoteError(err))
 }
 
 // TestProcess_BuildQCError tests all error paths during process of building QC.
@@ -129,7 +130,7 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
 	}
 
 	require.False(s.T(), s.processor.done.Load())
-	s.onQCCreatedState.AssertExpectations(s.T())
+	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
 }
 
 // TestProcess_CreatingQC tests a scenario when we have collected enough staking weight and random beacon shares
