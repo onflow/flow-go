@@ -5,7 +5,6 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/stretchr/testify/suite"
-	"strings"
 	"testing"
 
 	"github.com/onflow/flow-go/integration/testnet"
@@ -144,8 +143,8 @@ func (s *Suite) TestEpochJoin() {
 	require.True(s.T(), ok)
 
 	// make sure node info we generated matches what we get from the flow staking table
-	nodeID := nodeInfo.Fields[0].(cadence.String).String()
-	require.True(s.T(), info.NodeID.String() == strings.Trim(nodeID, "\""))
+	nodeID := string(nodeInfo.Fields[0].(cadence.String))
+	require.Equal(s.T(), info.NodeID.String(), nodeID, "expected generated in test to equal node ID node ID from staking table ")
 
 	s.net.StopContainers()
 }
