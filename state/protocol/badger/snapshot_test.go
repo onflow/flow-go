@@ -75,9 +75,9 @@ func TestSnapshot_Params(t *testing.T) {
 		const nBlocks = 10
 		for i := 0; i < nBlocks; i++ {
 			next := unittest.BlockWithParentFixture(head)
-			err = state.Extend(&next)
+			err = state.Extend(context.Background(), &next)
 			require.NoError(t, err)
-			err = state.Finalize(next.ID())
+			err = state.Finalize(context.Background(), next.ID())
 			require.NoError(t, err)
 			head = next.Header
 		}
