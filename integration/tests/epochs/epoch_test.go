@@ -131,20 +131,22 @@ func (s *Suite) TestViewsProgress() {
 func (s *Suite) TestEpochJoin() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
 	env := utils.LocalnetEnv()
 
 	// stake a new node
 	info := s.StakeNode(ctx, env, flow.RoleConsensus)
 
 	// get node info from staking table
-	nodeInfoCDC := s.ExecuteGetNodeInfoScript(ctx, env, info.NodeID)
+	nodeInfoCDC := s.ExecuteGetNodeInfoScript(ctx, info.NodeID)
 	nodeInfo, ok := nodeInfoCDC.(cadence.Struct)
 	require.True(s.T(), ok)
 
 	// make sure node info we generated matches what we get from the flow staking table
 	nodeID := string(nodeInfo.Fields[0].(cadence.String))
 	require.Equal(s.T(), info.NodeID.String(), nodeID, "expected generated in test to equal node ID node ID from staking table ")
+
+	result := s.SetApprovedNodesScript(ctx, env, info.NodeID)
+	require.NoError(s.T(), result.Error)
 
 	s.net.StopContainers()
 }

@@ -71,7 +71,7 @@ func (s *Suite) SetupTest() {
 	}
 
 	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs tests", confs, 100, 50, 280)
-
+	
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
 
@@ -351,9 +351,46 @@ pub fun main(nodeID: String): FlowIDTableStaking.NodeInfo {
     return FlowIDTableStaking.NodeInfo(nodeID: nodeID)
 }`
 
-func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
+func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, nodeID flow.Identifier) cadence.Value {
 	v, err := s.client.ExecuteScriptBytes(ctx, []byte(getNodeInfo), []cadence.Value{cadence.String(nodeID.String())})
 	require.NoError(s.T(), err)
 
 	return v
+}
+
+func (s *Suite) SetApprovedNodesScript(ctx context.Context, env templates.Environment, nodes ...flow.Identifier) *sdk.TransactionResult {
+	identities := s.net.Identities().NodeIDs()
+	identities = append(identities, nodes...)
+
+	ids := make([]cadence.Value, 0)
+	for _, id := range identities {
+		idCDC, err := cadence.NewString(id.String())
+		require.NoError(s.T(), err)
+
+		ids = append(ids, idCDC)
+	}
+
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
+
+
+	idTableAddress := sdk.HexToAddress(env.IDTableAddress)
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateSetApprovedNodesScript(env)).
+		SetGasLimit(9999).
+		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
+		SetProposalKey(s.client.SDKServiceAddress(), 0, s.client.Account().Keys[0].SequenceNumber).
+		SetPayer(s.client.SDKServiceAddress()).
+		AddAuthorizer(idTableAddress)
+
+	err = tx.AddArgument(cadence.NewArray(ids))
+	require.NoError(s.T(), err)
+
+	err = s.client.SignAndSendTransaction(ctx, tx)
+	require.NoError(s.T(), err)
+
+	result, err := s.client.WaitForSealed(ctx, tx.ID())
+	require.NoError(s.T(), err)
+
+	return result
 }
