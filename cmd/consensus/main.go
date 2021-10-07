@@ -9,14 +9,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
-
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
 
+	consensusCommand "github.com/onflow/flow-go/admin/commands/consensus"
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
@@ -168,6 +168,10 @@ func main() {
 	}
 
 	nodeBuilder.
+		AdminCommand("read-protocol-state-blocks",
+			consensusCommand.ReadProtocolStateBlocksCommand.Handler,
+			consensusCommand.ReadProtocolStateBlocksCommand.Validator,
+		).
 		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil

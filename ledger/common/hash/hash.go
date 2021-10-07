@@ -1,12 +1,19 @@
 package hash
 
-import "fmt"
+import (
+	"encoding/hex"
+	"fmt"
+)
 
 // HashLen is the ledger default output hash length in bytes
 const HashLen = 32
 
 // Hash is the hash type used in all ledger
 type Hash [HashLen]byte
+
+func (h Hash) String() string {
+	return hex.EncodeToString(h[:])
+}
 
 // DummyHash is an arbitrary hash value, used in function errors.
 // DummyHash represents a valid hash value.

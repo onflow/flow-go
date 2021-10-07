@@ -64,7 +64,12 @@
       "title": "RunCommandRequest represents an admin command with arguments"
     },
     "adminRunCommandResponse": {
-      "type": "object"
+      "type": "object",
+      "properties": {
+        "output": {
+          "type": "string"
+        }
+      }
     },
     "protobufAny": {
       "type": "object",
