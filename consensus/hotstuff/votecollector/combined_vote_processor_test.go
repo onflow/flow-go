@@ -325,7 +325,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughStakeNotEnoughShares(
 	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
 }
 
-// TestProcess_EnoughStakeNotEnoughShares tests a scenario where we are collecting only threshold signatures
+// TestProcess_EnoughSharesNotEnoughStakes tests a scenario where we are collecting only threshold signatures
 // to the point where we have enough shares to reconstruct RB signature. No QC should be created
 // in this scenario since there is not enough staking weight.
 func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughSharesNotEnoughStakes() {
