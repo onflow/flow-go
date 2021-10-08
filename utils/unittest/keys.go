@@ -21,7 +21,7 @@ func NetworkingKey() crypto.PrivateKey {
 	return ECDSAP256Key()
 }
 
-func NetworkingKeys(n int) ([]crypto.PrivateKey, error) {
+func NetworkingKeys(n int) []crypto.PrivateKey {
 	keys := make([]crypto.PrivateKey, 0, n)
 
 	for i := 0; i < n; i++ {
@@ -29,14 +29,14 @@ func NetworkingKeys(n int) ([]crypto.PrivateKey, error) {
 		keys = append(keys, key)
 	}
 
-	return keys, nil
+	return keys
 }
 
 func StakingKey() crypto.PrivateKey {
 	return BLS12381Key()
 }
 
-func StakingKeys(n int) ([]crypto.PrivateKey, error) {
+func StakingKeys(n int) []crypto.PrivateKey {
 	keys := make([]crypto.PrivateKey, 0, n)
 
 	for i := 0; i < n; i++ {
@@ -44,7 +44,7 @@ func StakingKeys(n int) ([]crypto.PrivateKey, error) {
 		keys = append(keys, key)
 	}
 
-	return keys, nil
+	return keys
 }
 
 func DKGParticipantPriv() *dkg.DKGParticipantPriv {

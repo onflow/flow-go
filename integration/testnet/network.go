@@ -1006,16 +1006,10 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 	roleCounter := make(map[flow.Role]int)
 
 	// get networking keys for all nodes
-	networkKeys, err := unittest.NetworkingKeys(nNodes)
-	if err != nil {
-		return nil, err
-	}
+	networkKeys := unittest.NetworkingKeys(nNodes)
 
 	// get staking keys for all nodes
-	stakingKeys, err := unittest.StakingKeys(nNodes)
-	if err != nil {
-		return nil, err
-	}
+	stakingKeys := unittest.StakingKeys(nNodes)
 
 	// create node container configs and corresponding public identities
 	confs := make([]ContainerConfig, 0, nNodes)
