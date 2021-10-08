@@ -179,7 +179,7 @@ func (b *backendScripts) getRegisterFromExecutionNode(
 func (b *backendScripts) tryGetRegister(ctx context.Context, execNode *flow.Identity, req execproto.GetRegisterAtBlockIDRequest) ([]byte, error) {
 	execRPCClient, closer, err := b.connFactory.GetExecutionAPIClient(execNode.Address)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "ailed to get register from the execution node %s: %v", execNode.String(), err)
+		return nil, status.Errorf(codes.Internal, "failed to get register from the execution node %s: %v", execNode.String(), err)
 	}
 	defer closer.Close()
 	execResp, err := execRPCClient.GetRegisterAtBlockID(ctx, &req)
