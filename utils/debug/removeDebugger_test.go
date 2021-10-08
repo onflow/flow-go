@@ -50,5 +50,4 @@ func TestDebugger(t *testing.T) {
 	require.NoError(t, txErr)
 	require.NoError(t, err)
 
-	t.Fatal("XXX")
 }
