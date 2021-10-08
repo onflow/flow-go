@@ -450,7 +450,6 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 
 	// processing extra votes shouldn't result in creating new QCs
 	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
-	s.rbSigAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
 	err := s.processor.Process(vote)
 	require.NoError(s.T(), err)
 
