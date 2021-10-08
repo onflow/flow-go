@@ -10,9 +10,8 @@ import (
 
 func TestSecureGRPCDialOpt(t *testing.T) {
 	t.Run("should return valid secured GRPC dial option with no errors", func(t *testing.T) {
-		nk, err := unittest.NetworkingKey()
-		require.NoError(t, err)
-		_, err = SecureGRPCDialOpt(nk.PublicKey().String()[2:])
+		nk := unittest.NetworkingKey()
+		_, err := SecureGRPCDialOpt(nk.PublicKey().String()[2:])
 		require.NoError(t, err)
 	})
 

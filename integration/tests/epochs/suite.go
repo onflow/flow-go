@@ -232,19 +232,13 @@ func (s *Suite) generateAccountKeys(role flow.Role) (
 	machineAccountKey sdkcrypto.PrivateKey,
 	machineAccountPubKey flow.AccountPublicKey,
 ) {
-	stakingAccountKey, err := unittest.ECDSAKey()
-	require.NoError(s.T(), err)
-
-	networkingKey, err = unittest.ECDSAKey()
-	require.NoError(s.T(), err)
-
-	stakingKey, err = unittest.StakingKey()
-	require.NoError(s.T(), err)
+	stakingAccountKey = unittest.ECDSAP256Key()
+	networkingKey = unittest.ECDSAP256Key()
+	stakingKey = unittest.StakingKey()
 
 	// create a machine account
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
-		machineAccountKey, err = unittest.ECDSAKey()
-		require.NoError(s.T(), err)
+		machineAccountKey = unittest.ECDSAP256Key()
 
 		machineAccountPubKey = flow.AccountPublicKey{
 			PublicKey: machineAccountKey.PublicKey(),

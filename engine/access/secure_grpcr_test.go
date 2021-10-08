@@ -91,8 +91,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	}
 
 	// generate a server certificate that will be served by the GRPC server
-	networkingKey, err := unittest.NetworkingKey()
-	assert.NoError(suite.T(), err)
+	networkingKey := unittest.NetworkingKey()
 	x509Certificate, err := grpcutils.X509Certificate(networkingKey)
 	assert.NoError(suite.T(), err)
 	tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
@@ -133,11 +132,10 @@ func (suite *SecureGRPCTestSuite) TestAPICallUsingSecureGRPC() {
 	})
 
 	suite.Run("happy path - connection fails with an incorrect public key", func() {
-		newKey, err := unittest.NetworkingKey()
-		assert.NoError(suite.T(), err)
+		newKey := unittest.NetworkingKey()
 		client, closer := suite.secureGRPCClient(newKey.PublicKey())
 		defer closer.Close()
-		_, err = client.Ping(ctx, req)
+		_, err := client.Ping(ctx, req)
 		assert.Error(suite.T(), err)
 	})
 }

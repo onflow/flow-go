@@ -1,7 +1,6 @@
 package unittest
 
 import (
-	"crypto/rand"
 	"encoding/hex"
 
 	"github.com/onflow/flow-go/crypto"
@@ -10,54 +9,38 @@ import (
 	"github.com/onflow/flow-go/model/encodable"
 )
 
-func NetworkingKey() (crypto.PrivateKey, error) {
-	return ECDSAKey()
+func ECDSAP256Key() crypto.PrivateKey {
+	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
+}
+
+func BLS12381Key() crypto.PrivateKey {
+	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
+}
+
+func NetworkingKey() crypto.PrivateKey {
+	return ECDSAP256Key()
 }
 
 func NetworkingKeys(n int) ([]crypto.PrivateKey, error) {
 	keys := make([]crypto.PrivateKey, 0, n)
 
 	for i := 0; i < n; i++ {
-		key, err := NetworkingKey()
-		if err != nil {
-			return nil, err
-		}
+		key := ECDSAP256Key()
 		keys = append(keys, key)
 	}
 
 	return keys, nil
 }
 
-func ECDSAKey() (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
-	n, err := rand.Read(seed)
-	if err != nil || n != crypto.KeyGenSeedMinLenECDSAP256 {
-		return nil, err
-	}
-
-	sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
-	return sk, err
-}
-
-func StakingKey() (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
-	n, err := rand.Read(seed)
-	if err != nil || n != crypto.KeyGenSeedMinLenBLSBLS12381 {
-		return nil, err
-	}
-
-	sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
-	return sk, err
+func StakingKey() crypto.PrivateKey {
+	return BLS12381Key()
 }
 
 func StakingKeys(n int) ([]crypto.PrivateKey, error) {
 	keys := make([]crypto.PrivateKey, 0, n)
 
 	for i := 0; i < n; i++ {
-		key, err := StakingKey()
-		if err != nil {
-			return nil, err
-		}
+		key := StakingKey()
 		keys = append(keys, key)
 	}
 
@@ -65,7 +48,7 @@ func StakingKeys(n int) ([]crypto.PrivateKey, error) {
 }
 
 func DKGParticipantPriv() *dkg.DKGParticipantPriv {
-	privKey, _ := StakingKey()
+	privKey := StakingKey()
 	randBeaconKey := encodable.RandomBeaconPrivKey{
 		PrivateKey: privKey,
 	}
