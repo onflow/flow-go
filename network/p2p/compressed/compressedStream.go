@@ -74,12 +74,5 @@ func (c *compressedStream) Close() error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
-	if err := c.w.Close(); err != nil {
-		return err
-	}
-	if err := c.Stream.Close(); err != nil {
-		return err
-	}
-
-	return nil
+	return multierr.Combine(c.w.Close(), c.Stream.Close())
 }
