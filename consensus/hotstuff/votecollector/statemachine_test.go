@@ -76,8 +76,8 @@ func (s *StateMachineTestSuite) prepareMockedProcessor(block *model.Block) *mock
 // TestStatus_StateTransitions tests that Status returns correct state of VoteCollector in different scenarios
 // when proposal processing can possibly change state of collector
 func (s *StateMachineTestSuite) TestStatus_StateTransitions() {
-	block := helper.MakeBlock(s.T(), helper.WithBlockView(s.view))
-	proposal := helper.MakeProposal(s.T(), helper.WithBlock(block))
+	block := helper.MakeBlock(helper.WithBlockView(s.view))
+	proposal := helper.MakeProposal(helper.WithBlock(block))
 	s.prepareMockedProcessor(block)
 
 	// by default, we should create in caching status
@@ -89,9 +89,9 @@ func (s *StateMachineTestSuite) TestStatus_StateTransitions() {
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.collector.Status())
 
 	// after submitting double proposal we should transfer into invalid state
-	err = s.collector.ProcessBlock(helper.MakeProposal(s.T(),
+	err = s.collector.ProcessBlock(helper.MakeProposal(
 		helper.WithBlock(
-			helper.MakeBlock(s.T(), helper.WithBlockView(s.view)))))
+			helper.MakeBlock(helper.WithBlockView(s.view)))))
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusInvalid, s.collector.Status())
 }
@@ -106,7 +106,7 @@ func (s *StateMachineTestSuite) Test_FactoryErrorPropagation() {
 	s.collector.createVerifyingProcessor = factory
 
 	// failing to create collector has to result in error and won't change state
-	err := s.collector.ProcessBlock(helper.MakeProposal(s.T(), helper.WithBlock(helper.MakeBlock(s.T(), helper.WithBlockView(s.view)))))
+	err := s.collector.ProcessBlock(helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(s.view)))))
 	require.ErrorIs(s.T(), err, factoryError)
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusCaching, s.collector.Status())
 }
@@ -114,8 +114,8 @@ func (s *StateMachineTestSuite) Test_FactoryErrorPropagation() {
 // TestAddVote_VerifyingState tests that AddVote correctly process valid and invalid votes as well
 // as repeated, invalid and double votes in verifying state
 func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
-	block := helper.MakeBlock(s.T(), helper.WithBlockView(s.view))
-	proposal := helper.MakeProposal(s.T(), helper.WithBlock(block))
+	block := helper.MakeBlock(helper.WithBlockView(s.view))
+	proposal := helper.MakeProposal(helper.WithBlock(block))
 	processor := s.prepareMockedProcessor(block)
 	err := s.collector.ProcessBlock(proposal)
 	require.NoError(s.T(), err)
@@ -197,8 +197,8 @@ func (s *StateMachineTestSuite) TestAddVote_VerifyingState() {
 // are sent to vote processor
 func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 	votes := 10
-	block := helper.MakeBlock(s.T(), helper.WithBlockView(s.view))
-	proposal := helper.MakeProposal(s.T(), helper.WithBlock(block))
+	block := helper.MakeBlock(helper.WithBlockView(s.view))
+	proposal := helper.MakeProposal(helper.WithBlock(block))
 	processor := s.prepareMockedProcessor(block)
 	for i := 0; i < votes; i++ {
 		vote := unittest.VoteForBlockFixture(block)
@@ -218,10 +218,10 @@ func (s *StateMachineTestSuite) TestProcessBlock_ProcessingOfCachedVotes() {
 // Test_VoteProcessorErrorPropagation verifies that unexpected errors from the `VoteProcessor`
 // are propagated up the call stack (potentially wrapped), but are not replaced.
 func (s *StateMachineTestSuite) Test_VoteProcessorErrorPropagation() {
-	block := helper.MakeBlock(s.T(), helper.WithBlockView(s.view))
+	block := helper.MakeBlock(helper.WithBlockView(s.view))
 	processor := s.prepareMockedProcessor(block)
 
-	err := s.collector.ProcessBlock(helper.MakeProposal(s.T(), helper.WithBlock(block)))
+	err := s.collector.ProcessBlock(helper.MakeProposal(helper.WithBlock(block)))
 	require.NoError(s.T(), err)
 
 	unexpectedError := errors.New("some unexpected error")
@@ -235,7 +235,7 @@ func (s *StateMachineTestSuite) Test_VoteProcessorErrorPropagation() {
 // in strict ordering of arrival.
 func (s *StateMachineTestSuite) RegisterVoteConsumer() {
 	votes := 10
-	block := helper.MakeBlock(s.T(), helper.WithBlockView(s.view))
+	block := helper.MakeBlock(helper.WithBlockView(s.view))
 	processor := s.prepareMockedProcessor(block)
 	expectedVotes := make([]*model.Vote, 0)
 	for i := 0; i < votes; i++ {
