@@ -24,7 +24,7 @@ require (
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.21.3 // replaced by version on-disk
-	github.com/onflow/flow/protobuf/go/flow v0.2.2
+	github.com/onflow/flow/protobuf/go/flow v0.2.3-0.20211007062332-279075f29e2c
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/common v0.20.0 // indirect
 	github.com/rs/zerolog v1.21.0
