@@ -3,7 +3,9 @@
 package mock
 
 import (
+	ledger "github.com/onflow/flow-go/ledger"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 
 	state "github.com/onflow/flow-go/fvm/state"
@@ -15,7 +17,7 @@ type ViewCommitter struct {
 }
 
 // CommitView provides a mock function with given fields: _a0, _a1
-func (_m *ViewCommitter) CommitView(_a0 state.View, _a1 flow.StateCommitment) (flow.StateCommitment, []byte, error) {
+func (_m *ViewCommitter) CommitView(_a0 state.View, _a1 flow.StateCommitment) (flow.StateCommitment, []byte, *ledger.TrieUpdate, error) {
 	ret := _m.Called(_a0, _a1)
 
 	var r0 flow.StateCommitment
@@ -36,12 +38,21 @@ func (_m *ViewCommitter) CommitView(_a0 state.View, _a1 flow.StateCommitment) (f
 		}
 	}
 
-	var r2 error
-	if rf, ok := ret.Get(2).(func(state.View, flow.StateCommitment) error); ok {
+	var r2 *ledger.TrieUpdate
+	if rf, ok := ret.Get(2).(func(state.View, flow.StateCommitment) *ledger.TrieUpdate); ok {
 		r2 = rf(_a0, _a1)
 	} else {
-		r2 = ret.Error(2)
+		if ret.Get(2) != nil {
+			r2 = ret.Get(2).(*ledger.TrieUpdate)
+		}
 	}
 
-	return r0, r1, r2
+	var r3 error
+	if rf, ok := ret.Get(3).(func(state.View, flow.StateCommitment) error); ok {
+		r3 = rf(_a0, _a1)
+	} else {
+		r3 = ret.Error(3)
+	}
+
+	return r0, r1, r2, r3
 }

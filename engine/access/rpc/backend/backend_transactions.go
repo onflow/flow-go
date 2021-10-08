@@ -477,7 +477,7 @@ func (b *backendTransactions) getTransactionResultFromAnyExeNode(ctx context.Con
 				Str("execution_node", execNode.String()).
 				Hex("block_id", req.GetBlockId()).
 				Hex("transaction_id", req.GetTransactionId()).
-				Msg("Successfully got account info")
+				Msg("Successfully got transaction results from any node")
 			return resp, nil
 		}
 		if status.Code(err) == codes.NotFound {

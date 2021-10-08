@@ -95,6 +95,15 @@ func RequireCloseBefore(t testing.TB, c <-chan struct{}, duration time.Duration,
 	}
 }
 
+// RequireClosed is a test helper function that fails the test if channel `ch` is not closed.
+func RequireClosed(t *testing.T, ch <-chan struct{}, message string) {
+	select {
+	case <-ch:
+	default:
+		require.Fail(t, "channel is not closed: "+message)
+	}
+}
+
 // RequireConcurrentCallsReturnBefore is a test helper that runs function `f` count-many times concurrently,
 // and requires all invocations to return within duration.
 func RequireConcurrentCallsReturnBefore(t *testing.T, f func(), count int, duration time.Duration, message string) {
@@ -146,6 +155,15 @@ func RequireNeverClosedWithin(t *testing.T, ch <-chan struct{}, duration time.Du
 	}
 }
 
+// RequireNotClosed is a test helper function that fails the test if channel `ch` is closed.
+func RequireNotClosed(t *testing.T, ch <-chan struct{}, message string) {
+	select {
+	case <-ch:
+		require.Fail(t, "channel is closed: "+message)
+	default:
+	}
+}
+
 // AssertErrSubstringMatch asserts that two errors match with substring
 // checking on the Error method (`expected` must be a substring of `actual`, to
 // account for the actual error being wrapped). Fails the test if either error
@@ -171,24 +189,51 @@ func TempDir(t testing.TB) string {
 
 func RunWithTempDir(t testing.TB, f func(string)) {
 	dbDir := TempDir(t)
-	defer os.RemoveAll(dbDir)
+	defer func() {
+		require.NoError(t, os.RemoveAll(dbDir))
+	}()
 	f(dbDir)
 }
 
-func BadgerDB(t testing.TB, dir string) *badger.DB {
+func badgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
 	opts := badger.
 		DefaultOptions(dir).
 		WithKeepL0InMemory(true).
 		WithLogger(nil)
-	db, err := badger.Open(opts)
+	db, err := create(opts)
 	require.NoError(t, err)
 	return db
+}
+
+func BadgerDB(t testing.TB, dir string) *badger.DB {
+	return badgerDB(t, dir, badger.Open)
+}
+
+func TypedBadgerDB(t testing.TB, dir string, create func(badger.Options) (*badger.DB, error)) *badger.DB {
+	return badgerDB(t, dir, create)
 }
 
 func RunWithBadgerDB(t testing.TB, f func(*badger.DB)) {
 	RunWithTempDir(t, func(dir string) {
 		db := BadgerDB(t, dir)
-		defer db.Close()
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
+		f(db)
+	})
+}
+
+// RunWithTypedBadgerDB creates a Badger DB that is passed to f and closed
+// after f returns. The extra create parameter allows passing in a database
+// constructor function which instantiates a database with a particular type
+// marker, for testing storage modules which require a backed with a particular
+// type.
+func RunWithTypedBadgerDB(t testing.TB, create func(badger.Options) (*badger.DB, error), f func(*badger.DB)) {
+	RunWithTempDir(t, func(dir string) {
+		db := badgerDB(t, dir, create)
+		defer func() {
+			assert.NoError(t, db.Close())
+		}()
 		f(db)
 	})
 }
@@ -197,4 +242,16 @@ func TempBadgerDB(t testing.TB) (*badger.DB, string) {
 	dir := TempDir(t)
 	db := BadgerDB(t, dir)
 	return db, dir
+}
+
+func Concurrently(n int, f func(int)) {
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func(i int) {
+			f(i)
+			wg.Done()
+		}(i)
+	}
+	wg.Wait()
 }

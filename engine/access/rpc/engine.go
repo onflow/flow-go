@@ -13,6 +13,7 @@ import (
 	legacyaccessproto "github.com/onflow/flow/protobuf/go/flow/legacy/access"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
@@ -22,32 +23,40 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // Config defines the configurable options for the access node server
+// A secure GRPC server here implies a server that presents a self-signed TLS certificate and a client that authenticates
+// the server via a pre-shared public key
 type Config struct {
-	GRPCListenAddr            string        // the GRPC server address as ip:port
-	HTTPListenAddr            string        // the HTTP web proxy address as ip:port
-	CollectionAddr            string        // the address of the upstream collection node
-	HistoricalAccessAddrs     string        // the list of all access nodes from previous spork
-	MaxMsgSize                int           // GRPC max message size
-	ExecutionClientTimeout    time.Duration // execution API GRPC client timeout
-	CollectionClientTimeout   time.Duration // collection API GRPC client timeout
-	MaxHeightRange            uint          // max size of height range requests
-	PreferredExecutionNodeIDs []string      // preferred list of upstream execution node IDs
-	FixedExecutionNodeIDs     []string      // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
+	UnsecureGRPCListenAddr    string                           // the non-secure GRPC server address as ip:port
+	SecureGRPCListenAddr      string                           // the secure GRPC server address as ip:port
+	TransportCredentials      credentials.TransportCredentials // the secure GRPC credentials
+	HTTPListenAddr            string                           // the HTTP web proxy address as ip:port
+	CollectionAddr            string                           // the address of the upstream collection node
+	HistoricalAccessAddrs     string                           // the list of all access nodes from previous spork
+	MaxMsgSize                int                              // GRPC max message size
+	ExecutionClientTimeout    time.Duration                    // execution API GRPC client timeout
+	CollectionClientTimeout   time.Duration                    // collection API GRPC client timeout
+	MaxHeightRange            uint                             // max size of height range requests
+	PreferredExecutionNodeIDs []string                         // preferred list of upstream execution node IDs
+	FixedExecutionNodeIDs     []string                         // fixed list of execution node IDs to choose from if no node node ID can be chosen from the PreferredExecutionNodeIDs
 }
 
-// Engine implements a gRPC server with a simplified version of the Observation API.
+// Engine exposes the server with a simplified version of the Access API.
+// An unsecured GRPC server (default port 9000), a secure GRPC server (default port 9001) and an HTTP Web proxy (default
+// port 8000) are brought up.
 type Engine struct {
-	unit        *engine.Unit
-	log         zerolog.Logger
-	backend     *backend.Backend // the gRPC service implementation
-	grpcServer  *grpc.Server     // the gRPC server
-	httpServer  *http.Server
-	config      Config
-	grpcAddress net.Addr
+	unit                *engine.Unit
+	log                 zerolog.Logger
+	backend             *backend.Backend // the gRPC service implementation
+	unsecureGrpcServer  *grpc.Server     // the unsecure gRPC server
+	secureGrpcServer    *grpc.Server     // the secure gRPC server
+	httpServer          *http.Server
+	config              Config
+	unsecureGrpcAddress net.Addr
+	secureGrpcAddress   net.Addr
 }
 
 // New returns a new RPC engine.
@@ -61,6 +70,7 @@ func New(log zerolog.Logger,
 	collections storage.Collections,
 	transactions storage.Transactions,
 	executionReceipts storage.ExecutionReceipts,
+	executionResults storage.ExecutionResults,
 	chainID flow.ChainID,
 	transactionMetrics module.TransactionMetrics,
 	collectionGRPCPort uint,
@@ -105,10 +115,15 @@ func New(log zerolog.Logger,
 		grpcOpts = append(grpcOpts, chainedInterceptors)
 	}
 
-	grpcServer := grpc.NewServer(grpcOpts...)
+	// create an unsecured grpc server
+	unsecureGrpcServer := grpc.NewServer(grpcOpts...)
 
-	// wrap the GRPC server with an HTTP proxy server to serve HTTP clients
-	httpServer := NewHTTPServer(grpcServer, config.HTTPListenAddr)
+	// create a secure server server by using the secure grpc credentials that are passed in as part of config
+	grpcOpts = append(grpcOpts, grpc.Creds(config.TransportCredentials))
+	secureGrpcServer := grpc.NewServer(grpcOpts...)
+
+	// wrap the unsecured server with an HTTP proxy server to serve HTTP clients
+	httpServer := NewHTTPServer(unsecureGrpcServer, config.HTTPListenAddr)
 
 	connectionFactory := &backend.ConnectionFactoryImpl{
 		CollectionGRPCPort:        collectionGRPCPort,
@@ -126,6 +141,7 @@ func New(log zerolog.Logger,
 		collections,
 		transactions,
 		executionReceipts,
+		executionResults,
 		chainID,
 		transactionMetrics,
 		connectionFactory,
@@ -137,28 +153,39 @@ func New(log zerolog.Logger,
 	)
 
 	eng := &Engine{
-		log:        log,
-		unit:       engine.NewUnit(),
-		backend:    backend,
-		grpcServer: grpcServer,
-		httpServer: httpServer,
-		config:     config,
+		log:                log,
+		unit:               engine.NewUnit(),
+		backend:            backend,
+		unsecureGrpcServer: unsecureGrpcServer,
+		secureGrpcServer:   secureGrpcServer,
+		httpServer:         httpServer,
+		config:             config,
 	}
 
 	accessproto.RegisterAccessAPIServer(
-		eng.grpcServer,
+		eng.unsecureGrpcServer,
+		access.NewHandler(backend, chainID.Chain()),
+	)
+
+	accessproto.RegisterAccessAPIServer(
+		eng.secureGrpcServer,
 		access.NewHandler(backend, chainID.Chain()),
 	)
 
 	if rpcMetricsEnabled {
 		// Not interested in legacy metrics, so initialize here
 		grpc_prometheus.EnableHandlingTimeHistogram()
-		grpc_prometheus.Register(grpcServer)
+		grpc_prometheus.Register(unsecureGrpcServer)
+		grpc_prometheus.Register(secureGrpcServer)
 	}
 
 	// Register legacy gRPC handlers for backwards compatibility, to be removed at a later date
 	legacyaccessproto.RegisterAccessAPIServer(
-		eng.grpcServer,
+		eng.unsecureGrpcServer,
+		legacyaccess.NewHandler(backend, chainID.Chain()),
+	)
+	legacyaccessproto.RegisterAccessAPIServer(
+		eng.secureGrpcServer,
 		legacyaccess.NewHandler(backend, chainID.Chain()),
 	)
 
@@ -169,7 +196,8 @@ func New(log zerolog.Logger,
 // started. The RPC engine is ready when the gRPC server has successfully
 // started.
 func (e *Engine) Ready() <-chan struct{} {
-	e.unit.Launch(e.serveGRPC)
+	e.unit.Launch(e.serveUnsecureGRPC)
+	e.unit.Launch(e.serveSecureGRPC)
 	e.unit.Launch(e.serveGRPCWebProxy)
 	return e.unit.Ready()
 }
@@ -178,7 +206,8 @@ func (e *Engine) Ready() <-chan struct{} {
 // It sends a signal to stop the gRPC server, then closes the channel.
 func (e *Engine) Done() <-chan struct{} {
 	return e.unit.Done(
-		e.grpcServer.GracefulStop,
+		e.unsecureGrpcServer.GracefulStop,
+		e.secureGrpcServer.GracefulStop,
 		func() {
 			err := e.httpServer.Shutdown(context.Background())
 			if err != nil {
@@ -197,8 +226,12 @@ func (e *Engine) SubmitLocal(event interface{}) {
 	})
 }
 
-func (e *Engine) GRPCAddress() net.Addr {
-	return e.grpcAddress
+func (e *Engine) UnsecureGRPCAddress() net.Addr {
+	return e.unsecureGrpcAddress
+}
+
+func (e *Engine) SecureGRPCAddress() net.Addr {
+	return e.secureGrpcAddress
 }
 
 // process processes the given ingestion engine event. Events that are given
@@ -214,27 +247,49 @@ func (e *Engine) process(event interface{}) error {
 	}
 }
 
-// serveGRPC starts the gRPC server
+// serveUnsecureGRPC starts the unsecure gRPC server
 // When this function returns, the server is considered ready.
-func (e *Engine) serveGRPC() {
+func (e *Engine) serveUnsecureGRPC() {
 
-	e.log.Info().Str("grpc_address", e.config.GRPCListenAddr).Msg("starting grpc server on address")
+	e.log.Info().Str("grpc_address", e.config.UnsecureGRPCListenAddr).Msg("starting grpc server on address")
 
-	l, err := net.Listen("tcp", e.config.GRPCListenAddr)
+	l, err := net.Listen("tcp", e.config.UnsecureGRPCListenAddr)
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the grpc server")
 		return
 	}
 
-	// save the actual address on which we are listening (may be different from e.config.GRPCListenAddr if not port
+	// save the actual address on which we are listening (may be different from e.config.UnsecureGRPCListenAddr if not port
 	// was specified)
-	e.grpcAddress = l.Addr()
+	e.unsecureGrpcAddress = l.Addr()
 
-	e.log.Debug().Str("grpc_address", e.grpcAddress.String()).Msg("listening on port")
+	e.log.Debug().Str("unsecure_grpc_address", e.unsecureGrpcAddress.String()).Msg("listening on port")
 
-	err = e.grpcServer.Serve(l) // blocking call
+	err = e.unsecureGrpcServer.Serve(l) // blocking call
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("fatal error in grpc server")
+		e.log.Fatal().Err(err).Msg("fatal error in unsecure grpc server")
+	}
+}
+
+// serveSecureGRPC starts the secure gRPC server
+// When this function returns, the server is considered ready.
+func (e *Engine) serveSecureGRPC() {
+
+	e.log.Info().Str("secure_grpc_address", e.config.SecureGRPCListenAddr).Msg("starting grpc server on address")
+
+	l, err := net.Listen("tcp", e.config.SecureGRPCListenAddr)
+	if err != nil {
+		e.log.Err(err).Msg("failed to start the grpc server")
+		return
+	}
+
+	e.secureGrpcAddress = l.Addr()
+
+	e.log.Debug().Str("secure_grpc_address", e.secureGrpcAddress.String()).Msg("listening on port")
+
+	err = e.secureGrpcServer.Serve(l) // blocking call
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("fatal error in secure grpc server")
 	}
 }
 

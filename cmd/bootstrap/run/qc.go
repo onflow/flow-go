@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -37,9 +38,34 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 	return bootstrap.ToIdentityList(nodes)
 }
 
-func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.QuorumCertificate, error) {
+// GenerateRootQC generates QC for root block, caller needs to provide votes for root QC and
+// participantData to build the QC.
+// NOTE: at the moment, we require private keys for one node because we we re-using the full business logic, which assumes that only consensus participants construct QCs, which also have produce votes.
+// TODO: modularize QC construction code (and code to verify QC) to be instantiated without needing private keys.
+func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *ParticipantData, identities flow.IdentityList) (*flow.QuorumCertificate, error) {
 
-	validators, signers, err := createValidators(participantData)
+	validators, signers, err := createValidators(participantData, identities)
+	if err != nil {
+		return nil, err
+	}
+
+	hotBlock := model.GenesisBlockFromFlow(block.Header)
+
+	// manually aggregate sigs
+	qc, err := signers[0].CreateQC(votes)
+	if err != nil {
+		return nil, err
+	}
+
+	// validate QC
+	err = validators[0].ValidateQC(qc, hotBlock)
+
+	return qc, err
+}
+
+// GenerateRootBlockVotes generates votes for root block based on participantData
+func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData) ([]*model.Vote, error) {
+	_, signers, err := createValidators(participantData, participantData.Identities())
 	if err != nil {
 		return nil, err
 	}
@@ -54,22 +80,17 @@ func GenerateRootQC(block *flow.Block, participantData *ParticipantData) (*flow.
 		}
 		votes = append(votes, vote)
 	}
-
-	// manually aggregate sigs
-	qc, err := signers[0].CreateQC(votes)
-	if err != nil {
-		return nil, err
-	}
-
-	// validate QC
-	err = validators[0].ValidateQC(qc, hotBlock)
-
-	return qc, err
+	return votes, nil
 }
 
-func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
+func createValidators(participantData *ParticipantData, identities flow.IdentityList) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
 	n := len(participantData.Participants)
-	identities := participantData.Identities()
+
+	fmt.Println("len(participants)", len(participantData.Participants))
+	fmt.Println("len(identities)", len(identities))
+	for _, id := range identities {
+		fmt.Println(id.NodeID, id.Address, id.StakingPubKey.String())
+	}
 
 	groupSize := uint(len(participantData.Participants))
 	if groupSize < uint(n) {
@@ -100,10 +121,12 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 		}
 
 		// create signer
-		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
-		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
 		merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-		signer := verification.NewCombinedSigner(committee, stakingSigner, beaconSigner, merger, participant.NodeID)
+		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
+		beaconVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+		beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, participant.RandomBeaconPrivKey)
+		beaconStore := signature.NewSingleSignerStore(beaconSigner)
+		signer := verification.NewCombinedSigner(committee, stakingSigner, beaconVerifier, merger, beaconStore, participant.NodeID)
 		signers[i] = signer
 
 		// create validator
@@ -118,7 +141,7 @@ func createValidators(participantData *ParticipantData) ([]hotstuff.Validator, [
 // random beacon and staking signatures on the QC.
 //
 // allNodes must be in the same order that was used when running the DKG.
-func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData bootstrap.DKGData) (*ParticipantData, error) {
+func GenerateQCParticipantData(allNodes, internalNodes []bootstrap.NodeInfo, dkgData dkg.DKGData) (*ParticipantData, error) {
 
 	// stakingNodes can include external validators, so it can be longer than internalNodes
 	if len(allNodes) < len(internalNodes) {

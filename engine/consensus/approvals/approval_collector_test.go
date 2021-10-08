@@ -31,9 +31,11 @@ type ApprovalCollectorTestSuite struct {
 
 func (s *ApprovalCollectorTestSuite) SetupTest() {
 	s.BaseApprovalsTestSuite.SetupTest()
-
 	s.sealsPL = &mempool.IncorporatedResultSeals{}
-	s.collector = NewApprovalCollector(s.IncorporatedResult, &s.IncorporatedBlock, s.ChunksAssignment, s.sealsPL, uint(len(s.AuthorizedVerifiers)))
+
+	var err error
+	s.collector, err = NewApprovalCollector(unittest.Logger(), s.IncorporatedResult, &s.IncorporatedBlock, &s.Block, s.ChunksAssignment, s.sealsPL, uint(len(s.AuthorizedVerifiers)))
+	require.NoError(s.T(), err)
 }
 
 // TestProcessApproval_ValidApproval tests that valid approval is processed without error
@@ -53,6 +55,8 @@ func (s *ApprovalCollectorTestSuite) TestProcessApproval_SealResult() {
 			seal := args.Get(0).(*flow.IncorporatedResultSeal)
 			require.Equal(s.T(), s.Block.ID(), seal.Seal.BlockID)
 			require.Equal(s.T(), s.IncorporatedResult.Result.ID(), seal.Seal.ResultID)
+			require.Equal(s.T(), s.IncorporatedResult.Result.BlockID, seal.Seal.BlockID)
+			require.Equal(s.T(), seal.Seal.BlockID, seal.Header.ID())
 		},
 	).Return(true, nil).Once()
 
@@ -68,19 +72,7 @@ func (s *ApprovalCollectorTestSuite) TestProcessApproval_SealResult() {
 		expectedSignatures[i] = sigCollector.ToAggregatedSignature()
 	}
 
-	finalState, _ := s.IncorporatedResult.Result.FinalStateCommitment()
-	expectedArguments := &flow.IncorporatedResultSeal{
-		IncorporatedResult: s.IncorporatedResult,
-		Seal: &flow.Seal{
-			BlockID:                s.IncorporatedResult.Result.BlockID,
-			ResultID:               s.IncorporatedResult.Result.ID(),
-			FinalState:             finalState,
-			AggregatedApprovalSigs: expectedSignatures,
-			ServiceEvents:          nil,
-		},
-	}
-
-	s.sealsPL.AssertCalled(s.T(), "Add", expectedArguments)
+	s.sealsPL.AssertExpectations(s.T())
 }
 
 // TestProcessApproval_InvalidChunk tests that approval with invalid chunk index will be rejected without

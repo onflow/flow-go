@@ -147,7 +147,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 		// check previous timeouts were called
 		if !s.fvss[i].sharesTimeout || !s.fvss[i].complaintsTimeout {
 			return nil, nil, nil,
-				errors.New("two timeouts should be set before ending dkg")
+				fmt.Errorf("%d: two timeouts should be set before ending dkg", s.currentIndex)
 		}
 
 		// check if a complaint has remained without an answer
@@ -180,19 +180,15 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	jointx, jointPublicKey, jointy := s.sumUpQualifiedKeys(s.size - disqualifiedTotal)
 
 	// private key of the current node
-	x := &PrKeyBLSBLS12381{
-		scalar: *jointx, // the private share
-	}
+	x := newPrKeyBLSBLS12381(jointx)
+
 	// Group public key
-	Y := &PubKeyBLSBLS12381{
-		point: *jointPublicKey,
-	}
+	Y := newPubKeyBLSBLS12381(jointPublicKey)
+
 	// The nodes public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range jointy {
-		y[i] = &PubKeyBLSBLS12381{
-			point: p,
-		}
+		y[i] = newPubKeyBLSBLS12381(&p)
 	}
 	return x, Y, y, nil
 }
@@ -264,6 +260,7 @@ func (s *JointFeldmanState) sumUpQualifiedKeys(qualified int) (*scalar, *pointG2
 
 	// sum up x
 	var jointx scalar
+	C.bn_new_wrapper((*C.bn_st)(&jointx))
 	C.bn_sum_vector((*C.bn_st)(&jointx), (*C.bn_st)(&qualifiedx[0]),
 		(C.int)(qualified))
 	// sum up Y

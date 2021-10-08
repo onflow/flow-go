@@ -2,12 +2,13 @@ package trace
 
 import (
 	"context"
-	"fmt"
 	"io"
-	"sync"
+	"math/rand"
 	"time"
 
+	lru "github.com/hashicorp/golang-lru"
 	"github.com/opentracing/opentracing-go"
+	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
 	"github.com/uber/jaeger-client-go/config"
@@ -15,15 +16,27 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const DefaultEntityCacheSize = 1000
+
+const SensitivityCaptureAll = 0
+const EntityTypeBlock = "Block"
+const EntityTypeCollection = "Collection"
+const EntityTypeTransaction = "Transaction"
+
 type SpanName string
+
+func (s SpanName) Child(subOp string) SpanName {
+	return SpanName(string(s) + "." + subOp)
+}
 
 // OpenTracer is the implementation of the Tracer interface
 type OpenTracer struct {
 	opentracing.Tracer
-	closer    io.Closer
-	log       zerolog.Logger
-	openSpans map[string]opentracing.Span
-	lock      sync.RWMutex
+	closer      io.Closer
+	log         zerolog.Logger
+	spanCache   *lru.Cache
+	sensitivity uint
+	chainID     string
 }
 
 type traceLogger struct {
@@ -40,7 +53,12 @@ func (t traceLogger) Infof(msg string, args ...interface{}) {
 }
 
 // NewTracer creates a new tracer.
-func NewTracer(log zerolog.Logger, serviceName string) (*OpenTracer, error) {
+//
+// TODO (ramtin) : we might need to add a mutex lock (not sure if tracer itself is thread-safe)
+func NewTracer(log zerolog.Logger,
+	serviceName string,
+	chainID string,
+	sensitivity uint) (*OpenTracer, error) {
 	cfg, err := config.FromEnv()
 	if err != nil {
 		return nil, err
@@ -55,11 +73,18 @@ func NewTracer(log zerolog.Logger, serviceName string) (*OpenTracer, error) {
 		return nil, err
 	}
 
+	spanCache, err := lru.New(int(DefaultEntityCacheSize))
+	if err != nil {
+		return nil, err
+	}
+
 	t := &OpenTracer{
-		Tracer:    tracer,
-		closer:    closer,
-		log:       log,
-		openSpans: map[string]opentracing.Span{},
+		Tracer:      tracer,
+		closer:      closer,
+		log:         log,
+		spanCache:   spanCache,
+		sensitivity: sensitivity,
+		chainID:     chainID,
 	}
 
 	return t, nil
@@ -84,36 +109,86 @@ func (t *OpenTracer) Done() <-chan struct{} {
 	return done
 }
 
-// StartSpan starts a span using the flow identifier as a key into the span map
-func (t *OpenTracer) StartSpan(entityID flow.Identifier, spanName SpanName, opts ...opentracing.StartSpanOption) opentracing.Span {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	key := spanKey(entityID, spanName)
-	t.openSpans[key] = t.Tracer.StartSpan(string(spanName), opts...)
-	return t.openSpans[key]
-}
-
-// FinishSpan finishes a span started with the passed in flow identifier
-func (t *OpenTracer) FinishSpan(entityID flow.Identifier, spanName SpanName) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
-	key := spanKey(entityID, spanName)
-	span, ok := t.openSpans[key]
-	if ok {
-		span.Finish()
-		jaegerSpan := span.(*jaeger.Span)
-		spanDurationMetric.WithLabelValues(jaegerSpan.OperationName()).Observe(jaegerSpan.Duration().Seconds())
-		delete(t.openSpans, key)
+// entityRootSpan returns the root span for the given entity from the cache
+// and if not exist it would construct it and cache it and return it
+// This should be used mostly for the very first span created for an entity on the service
+func (t *OpenTracer) entityRootSpan(entityID flow.Identifier, entityType string, opts ...opentracing.StartSpanOption) opentracing.Span {
+	if span, ok := t.spanCache.Get(entityID); ok {
+		return span.(opentracing.Span)
 	}
+
+	// flow.Identifier to flow
+	traceID, err := jaeger.TraceIDFromString(entityID.String()[:32])
+	if err != nil {
+		// don't panic, gracefully move forward with background context
+		sp, _ := t.StartSpanFromContext(context.Background(), "entity tracing started")
+		return sp
+	}
+
+	ctx := jaeger.NewSpanContext(
+		traceID,
+		jaeger.SpanID(rand.Uint64()),
+		jaeger.SpanID(0),
+		true,
+		nil,
+	)
+	opts = append(opts, jaeger.SelfRef(ctx))
+	span := t.Tracer.StartSpan(string(entityType), opts...)
+	// keep full entityID
+	span.LogFields(log.String("entity_id", entityID.String()))
+	// set chainID as tag for filtering traces from different networks
+	span.SetTag("chainID", t.chainID)
+	t.spanCache.Add(entityID, span)
+
+	span.Finish() // finish span right away
+	return span
 }
 
-// GetSpan will get the span started with the passed in flow identifier
-func (t *OpenTracer) GetSpan(entityID flow.Identifier, spanName SpanName) (opentracing.Span, bool) {
-	t.lock.RLock()
-	defer t.lock.RUnlock()
-	key := spanKey(entityID, spanName)
-	span, exists := t.openSpans[key]
-	return span, exists
+func (t *OpenTracer) StartBlockSpan(
+	ctx context.Context,
+	blockID flow.Identifier,
+	spanName SpanName,
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
+
+	if !blockID.IsSampled(t.sensitivity) {
+		return &NoopSpan{&NoopTracer{}}, ctx, false
+	}
+
+	rootSpan := t.entityRootSpan(blockID, EntityTypeBlock)
+	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
+}
+
+func (t *OpenTracer) StartCollectionSpan(
+	ctx context.Context,
+	collectionID flow.Identifier,
+	spanName SpanName,
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
+
+	if !collectionID.IsSampled(t.sensitivity) {
+		return &NoopSpan{&NoopTracer{}}, ctx, false
+	}
+
+	rootSpan := t.entityRootSpan(collectionID, EntityTypeCollection)
+	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
+}
+
+// StartTransactionSpan starts a span that will be aggregated under the given transaction.
+// All spans for the same transaction will be aggregated under a root span
+func (t *OpenTracer) StartTransactionSpan(
+	ctx context.Context,
+	transactionID flow.Identifier,
+	spanName SpanName,
+	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
+
+	if !transactionID.IsSampled(t.sensitivity) {
+		return &NoopSpan{&NoopTracer{}}, ctx, false
+	}
+
+	rootSpan := t.entityRootSpan(transactionID, EntityTypeTransaction)
+	ctx = opentracing.ContextWithSpan(ctx, rootSpan)
+	return t.StartSpanFromParent(rootSpan, spanName, opts...), ctx, true
 }
 
 func (t *OpenTracer) StartSpanFromContext(
@@ -121,7 +196,17 @@ func (t *OpenTracer) StartSpanFromContext(
 	operationName SpanName,
 	opts ...opentracing.StartSpanOption,
 ) (opentracing.Span, context.Context) {
-	return opentracing.StartSpanFromContextWithTracer(ctx, t.Tracer, string(operationName), opts...)
+	parentSpan := opentracing.SpanFromContext(ctx)
+	if parentSpan == nil {
+		return &NoopSpan{&NoopTracer{}}, ctx
+	}
+	if _, ok := parentSpan.(*NoopSpan); ok {
+		return &NoopSpan{&NoopTracer{}}, ctx
+	}
+
+	opts = append(opts, opentracing.ChildOf(parentSpan.Context()))
+	span := t.Tracer.StartSpan(string(operationName), opts...)
+	return span, opentracing.ContextWithSpan(ctx, span)
 }
 
 func (t *OpenTracer) StartSpanFromParent(
@@ -129,7 +214,10 @@ func (t *OpenTracer) StartSpanFromParent(
 	operationName SpanName,
 	opts ...opentracing.StartSpanOption,
 ) opentracing.Span {
-	opts = append(opts, opentracing.FollowsFrom(span.Context()))
+	if _, ok := span.(*NoopSpan); ok {
+		return &NoopSpan{&NoopTracer{}}
+	}
+	opts = append(opts, opentracing.ChildOf(span.Context()))
 	return t.Tracer.StartSpan(string(operationName), opts...)
 }
 
@@ -140,8 +228,9 @@ func (t *OpenTracer) RecordSpanFromParent(
 	logs []opentracing.LogRecord,
 	opts ...opentracing.StartSpanOption,
 ) {
-	t.lock.Lock()
-	defer t.lock.Unlock()
+	if _, ok := span.(*NoopSpan); ok {
+		return
+	}
 	end := time.Now()
 	start := end.Add(-duration)
 	opts = append(opts, opentracing.FollowsFrom(span.Context()))
@@ -160,10 +249,4 @@ func (t *OpenTracer) WithSpanFromContext(ctx context.Context,
 	defer span.Finish()
 
 	f()
-}
-
-// in order to avoid different spans using the same entityID as the key, which creates a conflict,
-// we use span name and entity id as the key for a span.
-func spanKey(entityID flow.Identifier, spanName SpanName) string {
-	return fmt.Sprintf("%s-%x", spanName, entityID)
 }

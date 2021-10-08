@@ -48,4 +48,6 @@ func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Equal(t, flow.BytesToAddress(stateBytes), flow.HexToAddress("02"))
+	// counts is one unit higher than returned index (index include zero, but counts starts from 1)
+	require.Equal(t, uint64(2), generator.AddressCount())
 }

@@ -11,12 +11,13 @@ type AggregatedSignature struct {
 	// List of signatures
 	VerifierSignatures []crypto.Signature
 	// List of signer identifiers
-	SignerIDs []Identifier
+	SignerIDs IdentifierList
 }
 
-// NumberSigners returns the number of signers that contributed to the AggregatedSignature
-func (a *AggregatedSignature) NumberSigners() int {
-	return len(a.VerifierSignatures)
+// CardinalitySignerSet returns the number of _distinct_ signer IDs in the AggregatedSignature.
+// We explicitly de-duplicate here to prevent repetition attacks.
+func (a *AggregatedSignature) CardinalitySignerSet() int {
+	return len(a.SignerIDs.Lookup())
 }
 
 // HasSigner returns true if and only if signer's signature is part of this aggregated signature

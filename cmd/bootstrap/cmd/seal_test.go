@@ -4,14 +4,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestRandomSource_Deterministic(t *testing.T) {
-	blockID := unittest.IdentifierFixture()
+	seed := GenerateRandomSeed()
 
-	randomSource1 := getRandomSource(blockID)
-	randomSource2 := getRandomSource(blockID)
+	randomSource1 := getRandomSource(seed)
+	randomSource2 := getRandomSource(seed)
 	assert.Equal(t, randomSource1, randomSource2)
 }

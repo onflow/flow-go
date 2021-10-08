@@ -14,6 +14,7 @@ import (
 // | Chunk Queue  | ---> assigned chunk locators --> | Chunk Consumer | ---> chunk workers --> | Assigned Chunk Processor|
 // ----------------                           		 ------------------                        ---------------------------
 type AssignedChunkProcessor interface {
+	module.ReadyDoneAware
 	// ProcessAssignedChunk receives an assigned chunk locator and processes its corresponding chunk.
 	// A chunk processor is expected to shape a verifiable chunk out of the assigned chunk, and pass it to
 	// the verifier Engine.

@@ -24,7 +24,7 @@ func BlockFromFlow(header *flow.Header, parentView uint64) *Block {
 		BlockID:   header.ParentID,
 		View:      parentView,
 		SignerIDs: header.ParentVoterIDs,
-		SigData:   header.ParentVoterSig,
+		SigData:   header.ParentVoterSigData,
 	}
 
 	block := Block{

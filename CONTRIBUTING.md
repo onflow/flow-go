@@ -109,6 +109,18 @@ following when creating your pull request:
 
 A reviewer will be assigned automatically when your PR is created.
 
+We use [bors](https://github.com/bors-ng/bors-ng) merge bot to ensure that the `master` branch never breaks.
+Once a PR is approved, you can comment on it with the following to add your PR to the merge queue:
+
+```
+bors merge
+```
+
+If the PR passes CI, it will automatically be pushed to the `master` branch. If it fails, bors will comment
+on the PR so you can fix it.
+
+See the [documentation](https://bors.tech/documentation/) for a more comprehensive list of bors commands.
+
 ## Style Guide
 
 The following is a brief summary of the coding style used in Flow. 

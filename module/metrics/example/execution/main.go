@@ -17,7 +17,7 @@ import (
 // increases result approvals counter and checked chunks counter 100 times each
 func main() {
 	example.WithMetricsServer(func(logger zerolog.Logger) {
-		tracer, err := trace.NewTracer(logger, "collection")
+		tracer, err := trace.NewTracer(logger, "collection", "test", trace.SensitivityCaptureAll)
 		if err != nil {
 			panic(err)
 		}
@@ -35,10 +35,11 @@ func main() {
 			blockID := unittest.BlockFixture().ID()
 			collector.StartBlockReceivedToExecuted(blockID)
 
+			duration := time.Duration(rand.Int31n(2000)) * time.Millisecond
 			// adds a random delay for execution duration, between 0 and 2 seconds
-			time.Sleep(time.Duration(rand.Int31n(2000)) * time.Millisecond)
+			time.Sleep(duration)
 
-			collector.ExecutionGasUsedPerBlock(uint64(rand.Int63n(1e6)))
+			collector.ExecutionBlockExecuted(duration, uint64(rand.Int63n(1e6)), 1, 1)
 			collector.ExecutionStateReadsPerBlock(uint64(rand.Int63n(1e6)))
 
 			diskIncrease := rand.Int63n(1024 ^ 2)

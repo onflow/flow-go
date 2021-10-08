@@ -14,15 +14,15 @@ import (
 	"github.com/onflow/flow-go/utils/io"
 )
 
-func generateRandomSeeds(n int) [][]byte {
+func GenerateRandomSeeds(n int) [][]byte {
 	seeds := make([][]byte, 0, n)
 	for i := 0; i < n; i++ {
-		seeds = append(seeds, generateRandomSeed())
+		seeds = append(seeds, GenerateRandomSeed())
 	}
 	return seeds
 }
 
-func generateRandomSeed() []byte {
+func GenerateRandomSeed() []byte {
 	seed := make([]byte, randomSeedBytes)
 	if n, err := rand.Read(seed); err != nil || n != randomSeedBytes {
 		log.Fatal().Err(err).Msg("cannot generate random seeds")

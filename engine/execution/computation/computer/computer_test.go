@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/engine/execution"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
 	"github.com/onflow/flow-go/engine/execution/computation/computer"
 	computermock "github.com/onflow/flow-go/engine/execution/computation/computer/mock"
@@ -25,12 +26,14 @@ import (
 	"github.com/onflow/flow-go/engine/execution/testutil"
 	"github.com/onflow/flow-go/fvm"
 	fvmErrors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/metrics"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -46,14 +49,29 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		vm := new(computermock.VirtualMachine)
 		vm.On("Run", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
 			Return(nil).
+			Run(func(args mock.Arguments) {
+				//ctx := args[0].(fvm.Context)
+				tx := args[1].(*fvm.TransactionProcedure)
+
+				tx.Events = generateEvents(1, tx.TxIndex)
+			}).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
 		committer := new(computermock.ViewCommitter)
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil).
+			Return(nil, nil, nil, nil).
 			Times(2 + 1) // 2 txs in collection + system chunk
 
-		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer)
+		metrics := new(modulemock.ExecutionMetrics)
+		metrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).
+			Times(2) // 1 collection + system collection
+
+		metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+			Return(nil).
+			Times(2 + 1) // 2 txs in collection + system chunk tx
+
+		exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer)
 		require.NoError(t, err)
 
 		// create a block with 1 collection with 2 transactions
@@ -66,13 +84,18 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs.NewEmptyPrograms())
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1+1) // +1 system chunk
+		assert.Len(t, result.TrieUpdates, 1+1)    // +1 system chunk
+
+		assertEventHashesMatch(t, 1+1, result)
 
 		vm.AssertExpectations(t)
 	})
 
 	t.Run("empty block still computes system chunk", func(t *testing.T) {
 
-		execCtx := fvm.NewContext(zerolog.Nop())
+		execCtx := fvm.NewContext(
+			zerolog.Nop(),
+		)
 
 		vm := new(computermock.VirtualMachine)
 		committer := new(computermock.ViewCommitter)
@@ -89,7 +112,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Once() // just system chunk
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil).
+			Return(nil, nil, nil, nil).
 			Once() // just system chunk
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
@@ -99,9 +122,73 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		result, err := exe.ExecuteBlock(context.Background(), block, view, programs)
 		assert.NoError(t, err)
 		assert.Len(t, result.StateSnapshots, 1)
+		assert.Len(t, result.TrieUpdates, 1)
 		assert.Len(t, result.TransactionResults, 1)
 
+		assertEventHashesMatch(t, 1, result)
+
 		vm.AssertExpectations(t)
+	})
+
+	t.Run("system chunk transaction should not fail", func(t *testing.T) {
+
+		// include all fees. System chunk should ignore them
+		contextOptions := []fvm.Option{
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithAccountStorageLimit(true),
+			fvm.WithBlocks(&fvm.NoopBlockFinder{}),
+		}
+		// set 0 clusters to pass n_collectors >= n_clusters check
+		epochConfig := epochs.DefaultEpochConfig()
+		epochConfig.NumCollectorClusters = 0
+		bootstrapOptions := []fvm.BootstrapProcedureOption{
+			fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+			fvm.WithAccountCreationFee(fvm.DefaultAccountCreationFee),
+			fvm.WithMinimumStorageReservation(fvm.DefaultMinimumStorageReservation),
+			fvm.WithStorageMBPerFLOW(fvm.DefaultStorageMBPerFLOW),
+			fvm.WithEpochConfig(epochConfig),
+		}
+
+		rt := fvm.NewInterpreterRuntime()
+		chain := flow.Localnet.Chain()
+		vm := fvm.NewVirtualMachine(rt)
+		baseOpts := []fvm.Option{
+			fvm.WithChain(chain),
+		}
+
+		opts := append(baseOpts, contextOptions...)
+		ctx := fvm.NewContext(zerolog.Nop(), opts...)
+		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
+			return nil, nil
+		})
+
+		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		}
+		progs := programs.NewEmptyPrograms()
+		bootstrapOpts := append(baseBootstrapOpts, bootstrapOptions...)
+		err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view, progs)
+		require.NoError(t, err)
+
+		comm := new(computermock.ViewCommitter)
+
+		exe, err := computer.NewBlockComputer(vm, ctx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), comm)
+		require.NoError(t, err)
+
+		// create an empty block
+		block := generateBlock(0, 0, rag)
+
+		comm.On("CommitView", mock.Anything, mock.Anything).
+			Return(nil, nil, nil, nil).
+			Once() // just system chunk
+
+		result, err := exe.ExecuteBlock(context.Background(), block, view, progs)
+		assert.NoError(t, err)
+		assert.Len(t, result.StateSnapshots, 1)
+		assert.Len(t, result.TrieUpdates, 1)
+		assert.Len(t, result.TransactionResults, 1)
+
+		assert.Empty(t, result.TransactionResults[0].ErrorMessage)
 	})
 
 	t.Run("multiple collections", func(t *testing.T) {
@@ -116,8 +203,9 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		collectionCount := 2
 		transactionsPerCollection := 2
 		eventsPerTransaction := 2
+		eventsPerCollection := eventsPerTransaction * transactionsPerCollection
 		totalTransactionCount := (collectionCount * transactionsPerCollection) + 1 //+1 for system chunk
-		totalEventCount := eventsPerTransaction * totalTransactionCount
+		//totalEventCount := eventsPerTransaction * totalTransactionCount
 
 		// create a block with 2 collections with 2 transactions each
 		block := generateBlock(collectionCount, transactionsPerCollection, rag)
@@ -135,7 +223,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			Times(totalTransactionCount)
 
 		committer.On("CommitView", mock.Anything, mock.Anything).
-			Return(nil, nil, nil).
+			Return(nil, nil, nil, nil).
 			Times(collectionCount + 1)
 
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
@@ -149,13 +237,23 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		assert.Len(t, result.StateSnapshots, collectionCount+1) // system chunk
 
 		// all events should have been collected
-		assert.Len(t, result.Events, totalEventCount)
+		assert.Len(t, result.Events, collectionCount+1)
+
+		for i := 0; i < collectionCount; i++ {
+			assert.Len(t, result.Events[i], eventsPerCollection)
+		}
+
+		assert.Len(t, result.Events[len(result.Events)-1], eventsPerTransaction)
 
 		// events should have been indexed by transaction and event
 		k := 0
 		for expectedTxIndex := 0; expectedTxIndex < totalTransactionCount; expectedTxIndex++ {
 			for expectedEventIndex := 0; expectedEventIndex < eventsPerTransaction; expectedEventIndex++ {
-				e := result.Events[k]
+
+				chunkIndex := k / eventsPerCollection
+				eventIndex := k % eventsPerCollection
+
+				e := result.Events[chunkIndex][eventIndex]
 				assert.EqualValues(t, expectedEventIndex, int(e.EventIndex))
 				assert.EqualValues(t, expectedTxIndex, e.TransactionIndex)
 				k++
@@ -173,6 +271,8 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			}
 		}
 		assert.ElementsMatch(t, expectedResults, result.TransactionResults[0:len(result.TransactionResults)-1]) //strip system chunk
+
+		assertEventHashesMatch(t, collectionCount+1, result)
 
 		vm.AssertExpectations(t)
 	})
@@ -197,21 +297,23 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 			},
 		}
 
-		eventWhitelist := handler.GetServiceEventWhitelist()
+		serviceEvents, err := systemcontracts.ServiceEventsForChain(execCtx.Chain.ChainID())
+		require.NoError(t, err)
+
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
+					Address: common.BytesToAddress(serviceEvents.EpochSetup.Address.Bytes()),
 				},
-				QualifiedIdentifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				QualifiedIdentifier: serviceEvents.EpochSetup.QualifiedIdentifier(),
 			},
 		}
 		serviceEventB := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(execCtx.Chain.ServiceAddress().Bytes()),
+					Address: common.BytesToAddress(serviceEvents.EpochCommit.Address.Bytes()),
 				},
-				QualifiedIdentifier: eventWhitelist[rand.Intn(len(eventWhitelist))], //lets assume its not empty
+				QualifiedIdentifier: serviceEvents.EpochCommit.QualifiedIdentifier(),
 			},
 		}
 
@@ -241,19 +343,6 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		exe, err := computer.NewBlockComputer(vm, execCtx, metrics.NewNoopCollector(), trace.NewNoopTracer(), zerolog.Nop(), committer.NewNoopViewCommitter())
 		require.NoError(t, err)
 
-		//vm.On("Run", mock.Anything, mock.Anything, mock.Anything).
-		//	Run(func(args mock.Arguments) {
-		//
-		//		tx := args[1].(*fvm.TransactionProcedure)
-		//
-		//
-		//		tx.Err = &fvm.MissingPayerError{}
-		//		tx.Events = events[txCount]
-		//		txCount++
-		//	}).
-		//	Return(nil).
-		//	Times(totalTransactionCount)
-
 		view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 			return nil, nil
 		})
@@ -264,9 +353,11 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		// all events should have been collected
 		require.Len(t, result.ServiceEvents, 2)
 
-		//events are ordered
+		// events are ordered
 		require.Equal(t, serviceEventA.EventType.ID(), string(result.ServiceEvents[0].Type))
 		require.Equal(t, serviceEventB.EventType.ID(), string(result.ServiceEvents[1].Type))
+
+		assertEventHashesMatch(t, collectionCount+1, result)
 	})
 
 	t.Run("succeeding transactions store programs", func(t *testing.T) {
@@ -383,6 +474,19 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 	})
 }
 
+func assertEventHashesMatch(t *testing.T, expectedNoOfChunks int, result *execution.ComputationResult) {
+
+	require.Len(t, result.Events, expectedNoOfChunks)
+	require.Len(t, result.EventsHashes, expectedNoOfChunks)
+
+	for i := 0; i < expectedNoOfChunks; i++ {
+		calculatedHash, err := flow.EventsListHash(result.Events[i])
+		require.NoError(t, err)
+
+		require.Equal(t, calculatedHash, result.EventsHashes[i])
+	}
+}
+
 type testRuntime struct {
 	executeScript      func(runtime.Script, runtime.Context) (cadence.Value, error)
 	executeTransaction func(runtime.Script, runtime.Context) error
@@ -436,6 +540,10 @@ func (r *RandomAddressGenerator) Bytes() []byte {
 	panic("not implemented")
 }
 
+func (r *RandomAddressGenerator) AddressCount() uint64 {
+	panic("not implemented")
+}
+
 type FixedAddressGenerator struct {
 	Address flow.Address
 }
@@ -449,6 +557,10 @@ func (f *FixedAddressGenerator) CurrentAddress() flow.Address {
 }
 
 func (f *FixedAddressGenerator) Bytes() []byte {
+	panic("not implemented")
+}
+
+func (f *FixedAddressGenerator) AddressCount() uint64 {
 	panic("not implemented")
 }
 
@@ -504,7 +616,11 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 
 func Test_ExecutingSystemCollection(t *testing.T) {
 
-	execCtx := fvm.NewContext(zerolog.Nop())
+	execCtx := fvm.NewContext(
+		zerolog.Nop(),
+		fvm.WithChain(flow.Localnet.Chain()),
+		fvm.WithBlocks(&fvm.NoopBlockFinder{}),
+	)
 
 	runtime := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(runtime)
@@ -515,10 +631,19 @@ func Test_ExecutingSystemCollection(t *testing.T) {
 
 	committer := new(computermock.ViewCommitter)
 	committer.On("CommitView", mock.Anything, mock.Anything).
-		Return(nil, nil, nil).
+		Return(nil, nil, nil, nil).
 		Times(1) // only system chunk
 
-	exe, err := computer.NewBlockComputer(vm, execCtx, nil, trace.NewNoopTracer(), zerolog.Nop(), committer)
+	metrics := new(modulemock.ExecutionMetrics)
+	metrics.On("ExecutionCollectionExecuted", mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).
+		Times(1) // system collection
+
+	metrics.On("ExecutionTransactionExecuted", mock.Anything, mock.Anything, mock.Anything, mock.Anything).
+		Return(nil).
+		Times(1) // system chunk tx
+
+	exe, err := computer.NewBlockComputer(vm, execCtx, metrics, trace.NewNoopTracer(), zerolog.Nop(), committer)
 	require.NoError(t, err)
 
 	// create empty block, it will have system collection attached while executing
@@ -554,7 +679,9 @@ func generateBlockWithVisitor(collectionCount, transactionCount int, addressGene
 
 	block := flow.Block{
 		Header: &flow.Header{
-			View: 42,
+			Timestamp: flow.GenesisTime,
+			Height:    42,
+			View:      42,
 		},
 		Payload: &flow.Payload{
 			Guarantees: guarantees,

@@ -17,6 +17,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
 var directionLookUp = map[network.Direction]string{
@@ -106,7 +107,7 @@ func networkingInfo(identity flow.Identity) (string, string, crypto.PubKey, erro
 	}
 
 	// convert the Flow key to a LibP2P key
-	lkey, err := publicKey(identity.NetworkPubKey)
+	lkey, err := keyutils.LibP2PPublicKeyFromFlow(identity.NetworkPubKey)
 	if err != nil {
 		return "", "", nil, fmt.Errorf("could not convert flow key to libp2p key: %w", err)
 	}
@@ -161,12 +162,12 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-func generateFlowProtocolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID)
+func generateFlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID.String())
 }
 
-func generatePingProtcolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID)
+func generatePingProtcolID(rootBlockID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID.String())
 }
 
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
@@ -214,6 +215,7 @@ func peerInfosFromIDs(ids flow.IdentityList) ([]peer.AddrInfo, map[flow.Identifi
 // streamLogger creates a logger for libp2p stream which logs the remote and local peer IDs and addresses
 func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logger {
 	logger := log.With().
+		Str("protocol", string(stream.Protocol())).
 		Str("remote_peer", stream.Conn().RemotePeer().String()).
 		Str("remote_address", stream.Conn().RemoteMultiaddr().String()).
 		Str("local_peer", stream.Conn().LocalPeer().String()).

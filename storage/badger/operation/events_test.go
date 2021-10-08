@@ -42,7 +42,7 @@ func TestRetrieveEventByBlockIDTxID(t *testing.T) {
 
 					eEvents := make([]flow.Event, 0)
 
-					event := unittest.EventFixture(etype, uint32(i), uint32(j), tx)
+					event := unittest.EventFixture(etype, uint32(i), uint32(j), tx, 0)
 
 					// insert event into the db
 					err := db.Update(InsertEvent(b, event))

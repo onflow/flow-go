@@ -3,71 +3,59 @@ package trace
 // Span names
 const (
 
-	// Common
+	// Protocol State
 	//
 
-	// State
-	// mutator.Extend - full payload check
-	ProtoStateMutatorExtend                SpanName = "common.state.proto.mutator.extend"
-	ProtoStateMutatorExtendCheckHeader     SpanName = "common.state.proto.mutator.extend.checkHeader"
-	ProtoStateMutatorExtendCheckGuarantees SpanName = "common.state.proto.mutator.extend.checkGuarantees"
-	ProtoStateMutatorExtendCheckSeals      SpanName = "common.state.proto.mutator.extend.checkSeals"
-	ProtoStateMutatorExtendCheckReceipts   SpanName = "common.state.proto.mutator.extend.checkReceipts"
-	ProtoStateMutatorExtendDBInsert        SpanName = "common.state.proto.mutator.extend.dbInsert"
+	// Extend
+	ProtoStateMutatorExtend                SpanName = "proto.state.mutator.extend"
+	ProtoStateMutatorExtendCheckHeader     SpanName = "proto.state.mutator.extend.checkHeader"
+	ProtoStateMutatorExtendCheckGuarantees SpanName = "proto.state.mutator.extend.checkGuarantees"
+	ProtoStateMutatorExtendCheckSeals      SpanName = "proto.state.mutator.extend.checkSeals"
+	ProtoStateMutatorExtendCheckReceipts   SpanName = "proto.state.mutator.extend.checkReceipts"
+	ProtoStateMutatorExtendDBInsert        SpanName = "proto.state.mutator.extend.dbInsert"
 
-	// mutator.HeaderExtend - header-only check
-	ProtoStateMutatorHeaderExtend              SpanName = "common.state.proto.mutator.headerExtend"
-	ProtoStateMutatorHeaderExtendGetLastSealed SpanName = "common.state.proto.mutator.headerExtend.lastSealed"
+	// HeaderExtend
+	ProtoStateMutatorHeaderExtend              SpanName = "proto.state.mutator.headerExtend"
+	ProtoStateMutatorHeaderExtendGetLastSealed SpanName = "proto.state.mutator.headerExtend.lastSealed"
 
 	// mutator.Finalize
-	ProtoStateMutatorFinalize SpanName = "common.state.proto.mutator.finalize"
+	ProtoStateMutatorFinalize SpanName = "proto.state.mutator.finalize"
 
-	// Consensus Node
+	// Consensus
 	//
 
-	CONProcessCollection SpanName = "con.processCollection"
-	CONProcessBlock      SpanName = "con.processBlock"
+	// Builder
+	CONBuilderBuildOn SpanName = "con.builder.buildOn"
 
-	// Hotstuff
-	CONHotFinalizeCollection SpanName = "con.hotstuff.finalizeCollection"
-	CONHotFinalizeBlock      SpanName = "con.hotstuff.finalizeBlock"
+	// Finalizer
+	CONFinalizerFinalizeBlock SpanName = "con.finalizer.finalizeBlock"
 
 	// Ingestion
 	CONIngOnCollectionGuarantee SpanName = "con.ingestion.onCollectionGuarantee"
 
-	// Propagation
-	CONPropOnGuarantee SpanName = "con.propagation.onGuarantee"
-
 	// Provider
-	CONProvOnBlockProposal SpanName = "con.provider.onBlockProposal"
 
 	// Compliance
-	CONCompBroadcastProposalWithDelay      SpanName = "con.compliance.BroadcastProposalWithDelay"
-	CONCompOnBlockProposal                 SpanName = "con.compliance.onBlockProposal"
-	CONCompOnBlockProposalProcessRecursive SpanName = "con.compliance.onBlockProposal.processBlockProposal.recursive"
-	CONCompOnBlockProposalProcessSingle    SpanName = "con.compliance.onBlockProposal.processBlockProposal.single"
+	CONCompOnBlockProposal      SpanName = "con.compliance.onBlockProposal"
+	ConCompProcessBlockProposal SpanName = "con.compliance.processBlockProposal"
+	CONCompOnBlockVote          SpanName = "con.compliance.onBlockVote"
 
 	// Matching
-	CONMatchRequestPendingReceipts SpanName = "con.matching.requestPendingReceipts"
-	CONMatchProcessReceiptVal      SpanName = "con.matching.processReceipt.validation"
-	CONMatchProcessReceipt         SpanName = "con.matching.processReceipt"
+	CONMatchProcessReceipt    SpanName = "con.matching.processReceipt"
+	CONMatchProcessReceiptVal SpanName = "con.matching.processReceipt.validation"
 
 	// Sealing
 	CONSealingProcessFinalizedBlock           SpanName = "con.sealing.processFinalizedBlock"
 	CONSealingCheckForEmergencySealableBlocks SpanName = "con.sealing.processFinalizedBlock.checkEmergencySealing"
-	CONSealingUpdateAssignmentCollectorTree   SpanName = "con.sealing.processFinalizedBlock.updateAssignmentCollectorTree"
+	CONSealingPruning                         SpanName = "con.sealing.processFinalizedBlock.pruning"
 	CONSealingRequestingPendingApproval       SpanName = "con.sealing.processFinalizedBlock.requestPendingApprovals"
+	CONSealingProcessIncorporatedResult       SpanName = "con.sealing.processIncorporatedResult"
+	CONSealingProcessApproval                 SpanName = "con.sealing.processApproval"
 
-	CONSealingProcessIncorporatedResult SpanName = "con.sealing.processIncorporatedResult"
-	CONSealingProcessApproval           SpanName = "con.sealing.processApproval"
-
-	// Builder
-	CONBuildOn                        SpanName = "con.builder"
-	CONBuildOnCreatePayloadGuarantees SpanName = "con.builder.createPayload.guarantees"
-	CONBuildOnCreatePayloadSeals      SpanName = "con.builder.createPayload.seals"
-	CONBuildOnCreatePayloadReceipts   SpanName = "con.builder.createPayload.receipts"
-	CONBuildOnCreateHeader            SpanName = "con.builder.createHeader"
-	CONBuildOnDBInsert                SpanName = "con.builder.dbInsert"
+	//Follower Engine
+	FollowerOnBlockProposal        SpanName = "follower.onBlockProposal"
+	FollowerProcessBlockProposal   SpanName = "follower.processBlockProposal"
+	FollowerProcessPendingChildren SpanName = "follower.processPendingChildren"
 
 	// Collection Node
 	//
@@ -92,11 +80,11 @@ const (
 	// Execution Node
 	//
 
-	EXEExecuteBlock           SpanName = "exe.ingestion.executeBlock"
-	EXESaveExecutionResults   SpanName = "exe.ingestion.saveExecutionResults"
-	EXESaveExecutionReceipt   SpanName = "exe.ingestion.saveExecutionReceipt"
-	EXESaveTransactionResults SpanName = "exe.ingestion.saveTransactionResults"
-	EXESaveTransactionEvents  SpanName = "exe.ingestion.saveTransactionEvents"
+	EXEHandleBlock             SpanName = "exe.ingestion.handleBlock"
+	EXEHandleCollection        SpanName = "exe.ingestion.handleCollection"
+	EXEHandleComputationResult SpanName = "exe.ingestion.handleComputationResult"
+	EXEExecuteBlock            SpanName = "exe.ingestion.executeBlock"
+	EXESaveExecutionResults    SpanName = "exe.ingestion.saveExecutionResults"
 
 	EXEBroadcastExecutionReceipt SpanName = "exe.provider.broadcastExecutionReceipt"
 
@@ -104,19 +92,16 @@ const (
 	EXEComputeCollection       SpanName = "exe.computer.computeCollection"
 	EXEComputeSystemCollection SpanName = "exe.computer.computeSystemCollection"
 	EXEComputeTransaction      SpanName = "exe.computer.computeTransaction"
+	EXERunTransaction          SpanName = "exe.computer.runTransaction"
 	EXEMergeTransactionView    SpanName = "exe.computer.mergeTransactionView"
 
+	EXEStateSaveExecutionResults          SpanName = "exe.state.saveExecutionResults"
 	EXECommitDelta                        SpanName = "exe.state.commitDelta"
-	EXEGenerateChunkDataPacks             SpanName = "exe.state.generateChunkDataPacks"
 	EXEGetRegisters                       SpanName = "exe.state.getRegisters"
 	EXEGetRegistersWithProofs             SpanName = "exe.state.getRegistersWithProofs"
-	EXEPersistStateCommitment             SpanName = "exe.state.persistStateCommitment"
-	EXEPersistEvents                      SpanName = "exe.state.persistEvents"
-	EXEPersistChunkDataPack               SpanName = "exe.state.persistChunkDataPack"
 	EXEGetExecutionResultID               SpanName = "exe.state.getExecutionResultID"
-	EXEPersistExecutionResult             SpanName = "exe.state.persistExecutionResult"
 	EXEUpdateHighestExecutedBlockIfHigher SpanName = "exe.state.updateHighestExecutedBlockIfHigher"
-	EXEGetHighestExecutedBlockID          SpanName = "exe.state.getHighestExecutedBlockID"
+	EXEHashEvents                         SpanName = "exe.state.hashEvents"
 
 	// Verification node
 	//
@@ -179,6 +164,7 @@ const (
 	FVMEnvGetAccountBalance         SpanName = "fvm.env.getAccountBalance"
 	FVMEnvResolveLocation           SpanName = "fvm.env.resolveLocation"
 	FVMEnvGetCode                   SpanName = "fvm.env.getCode"
+	FVMEnvGetAccountContractNames   SpanName = "fvm.env.getAccountContractNames"
 	FVMEnvGetProgram                SpanName = "fvm.env.getCachedProgram"
 	FVMEnvSetProgram                SpanName = "fvm.env.cacheProgram"
 	FVMEnvProgramLog                SpanName = "fvm.env.programLog"
@@ -198,18 +184,5 @@ const (
 	FVMEnvRemoveAccountContractCode SpanName = "fvm.env.removeAccountContractCode"
 	FVMEnvGetSigningAccounts        SpanName = "fvm.env.getSigningAccounts"
 
-	FVMCadenceParseProgram     SpanName = "fvm.cadence.parseProgram"
-	FVMCadenceCheckProgram     SpanName = "fvm.cadence.checkProgram"
-	FVMCadenceInterpretProgram SpanName = "fvm.cadence.interpretProgram"
-	FVMCadenceEncodeValue      SpanName = "fvm.cadence.encodeValue"
-	FVMCadenceDecodeValue      SpanName = "fvm.cadence.decodeValue"
-)
-
-// Tag names
-const (
-	EXEParseDurationTag         = "runtime.parseTransactionDuration"
-	EXECheckDurationTag         = "runtime.checkTransactionDuration"
-	EXEInterpretDurationTag     = "runtime.interpretTransactionDuration"
-	EXEValueEncodingDurationTag = "runtime.encodingValueDuration"
-	EXEValueDecodingDurationTag = "runtime.decodingValueDuration"
+	FVMCadenceTrace SpanName = "fvm.cadence.trace"
 )

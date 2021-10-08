@@ -66,6 +66,7 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 		ctx:       ctx,
 		cancel:    cancel,
 		channel:   channel,
+		close:     n.Unregister,
 		publish:   n.publish,
 		unicast:   n.unicast,
 		multicast: n.multicast,
@@ -245,7 +246,7 @@ func (n *Network) sendToAllTargets(m *PendingMessage, syncOnProcess bool) error 
 
 		if syncOnProcess {
 			// sender and receiver are synced over processing the message
-			if err := receiverEngine.Process(m.From, m.Event); err != nil {
+			if err := receiverEngine.Process(m.Channel, m.From, m.Event); err != nil {
 				return fmt.Errorf("receiver engine failed to process event (%v): %w", m.Event, err)
 			}
 		} else {
@@ -255,7 +256,7 @@ func (n *Network) sendToAllTargets(m *PendingMessage, syncOnProcess bool) error 
 			// Submit is supposed to process event asynchronously, but if it doesn't we are risking
 			// deadlock (if it trigger another message sending we might end up calling this very function again)
 			// Running it in Go-routine is some cheap form of defense against deadlock in tests
-			go receiverEngine.Submit(m.From, m.Event)
+			go receiverEngine.Submit(m.Channel, m.From, m.Event)
 		}
 
 	}

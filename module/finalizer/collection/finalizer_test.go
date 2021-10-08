@@ -183,7 +183,7 @@ func TestFinalizer(t *testing.T) {
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block.Payload.Collection.ID(),
 					SignerIDs:    block.Header.ParentVoterIDs,
-					Signature:    block.Header.ParentVoterSig,
+					Signature:    block.Header.ParentVoterSigData,
 				},
 			})
 		})
@@ -234,14 +234,14 @@ func TestFinalizer(t *testing.T) {
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
 					SignerIDs:    block1.Header.ParentVoterIDs,
-					Signature:    block1.Header.ParentVoterSig,
+					Signature:    block1.Header.ParentVoterSigData,
 				},
 			})
 			prov.AssertCalled(t, "SubmitLocal", &messages.SubmitCollectionGuarantee{
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block2.Payload.Collection.ID(),
 					SignerIDs:    block2.Header.ParentVoterIDs,
-					Signature:    block2.Header.ParentVoterSig,
+					Signature:    block2.Header.ParentVoterSigData,
 				},
 			})
 		})
@@ -291,7 +291,7 @@ func TestFinalizer(t *testing.T) {
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
 					SignerIDs:    block1.Header.ParentVoterIDs,
-					Signature:    block1.Header.ParentVoterSig,
+					Signature:    block1.Header.ParentVoterSigData,
 				},
 			})
 		})
@@ -343,7 +343,7 @@ func TestFinalizer(t *testing.T) {
 				Guarantee: flow.CollectionGuarantee{
 					CollectionID: block1.Payload.Collection.ID(),
 					SignerIDs:    block1.Header.ParentVoterIDs,
-					Signature:    block1.Header.ParentVoterSig,
+					Signature:    block1.Header.ParentVoterSigData,
 				},
 			})
 		})

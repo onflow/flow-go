@@ -22,16 +22,16 @@ type TransactionProcessor interface {
 }
 
 type TransactionProcedure struct {
-	ID            flow.Identifier
-	Transaction   *flow.TransactionBody
-	TxIndex       uint32
-	Logs          []string
-	Events        []flow.Event
-	ServiceEvents []flow.Event
-	GasUsed       uint64
-	Err           errors.Error
-	Retried       int
-	TraceSpan     opentracing.Span
+	ID              flow.Identifier
+	Transaction     *flow.TransactionBody
+	TxIndex         uint32
+	Logs            []string
+	Events          []flow.Event
+	ServiceEvents   []flow.Event
+	ComputationUsed uint64
+	Err             errors.Error
+	Retried         int
+	TraceSpan       opentracing.Span
 }
 
 func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {

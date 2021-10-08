@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
@@ -170,4 +171,139 @@ func TestIdentity_Sort(t *testing.T) {
 
 	canonical := il.Sort(order.Canonical)
 	assert.True(t, canonical.Sorted(order.Canonical))
+}
+
+func TestIdentity_EqualTo(t *testing.T) {
+
+	pks := unittest.PublicKeysFixture(2, crypto.ECDSASecp256k1)
+
+	t.Run("empty are equal", func(t *testing.T) {
+		a := &flow.Identity{}
+		b := &flow.Identity{}
+
+		require.True(t, a.EqualTo(b))
+		require.True(t, b.EqualTo(a))
+	})
+
+	t.Run("NodeID diff", func(t *testing.T) {
+		a := &flow.Identity{NodeID: [32]byte{1, 2, 3}}
+		b := &flow.Identity{NodeID: [32]byte{2, 2, 2}}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("Address diff", func(t *testing.T) {
+		a := &flow.Identity{Address: "b"}
+		b := &flow.Identity{Address: "c"}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("Role diff", func(t *testing.T) {
+		a := &flow.Identity{Role: flow.RoleCollection}
+		b := &flow.Identity{Role: flow.RoleExecution}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("Stake diff", func(t *testing.T) {
+		a := &flow.Identity{Stake: 1}
+		b := &flow.Identity{Stake: 2}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("Ejected diff", func(t *testing.T) {
+		a := &flow.Identity{Ejected: true}
+		b := &flow.Identity{Ejected: false}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("StakingPubKey diff", func(t *testing.T) {
+		a := &flow.Identity{StakingPubKey: pks[0]}
+		b := &flow.Identity{StakingPubKey: pks[1]}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("NetworkPubKey diff", func(t *testing.T) {
+		a := &flow.Identity{NetworkPubKey: pks[0]}
+		b := &flow.Identity{NetworkPubKey: pks[1]}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("Same data equals", func(t *testing.T) {
+		a := &flow.Identity{
+			NodeID:        flow.Identifier{1, 2, 3},
+			Address:       "address",
+			Role:          flow.RoleCollection,
+			Stake:         23,
+			Ejected:       false,
+			StakingPubKey: pks[0],
+			NetworkPubKey: pks[1],
+		}
+		b := &flow.Identity{
+			NodeID:        flow.Identifier{1, 2, 3},
+			Address:       "address",
+			Role:          flow.RoleCollection,
+			Stake:         23,
+			Ejected:       false,
+			StakingPubKey: pks[0],
+			NetworkPubKey: pks[1],
+		}
+
+		require.True(t, a.EqualTo(b))
+		require.True(t, b.EqualTo(a))
+	})
+}
+
+func TestIdentityList_EqualTo(t *testing.T) {
+
+	t.Run("empty are equal", func(t *testing.T) {
+		a := flow.IdentityList{}
+		b := flow.IdentityList{}
+
+		require.True(t, a.EqualTo(b))
+		require.True(t, b.EqualTo(a))
+	})
+
+	t.Run("different len arent equal", func(t *testing.T) {
+		identityA := unittest.IdentityFixture()
+
+		a := flow.IdentityList{identityA}
+		b := flow.IdentityList{}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("different data means not equal", func(t *testing.T) {
+		identityA := unittest.IdentityFixture()
+		identityB := unittest.IdentityFixture()
+
+		a := flow.IdentityList{identityA}
+		b := flow.IdentityList{identityB}
+
+		require.False(t, a.EqualTo(b))
+		require.False(t, b.EqualTo(a))
+	})
+
+	t.Run("same data means equal", func(t *testing.T) {
+		identityA := unittest.IdentityFixture()
+
+		a := flow.IdentityList{identityA, identityA}
+		b := flow.IdentityList{identityA, identityA}
+
+		require.True(t, a.EqualTo(b))
+		require.True(t, b.EqualTo(a))
+	})
 }

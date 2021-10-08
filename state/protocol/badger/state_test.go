@@ -1,6 +1,7 @@
 package badger_test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"testing"
@@ -12,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	mock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/inmem"
@@ -32,22 +34,105 @@ func TestBootstrapAndOpen(t *testing.T) {
 	})
 
 	protoutil.RunWithBootstrapState(t, rootSnapshot, func(db *badger.DB, _ *bprotocol.State) {
-		// protocol state has been bootstrapped, now open a protocol state with the database
-		metrics := new(metrics.NoopCollector)
-		all := storagebadger.InitAll(metrics, db)
-		state, err := bprotocol.OpenState(
-			metrics,
-			db,
-			all.Headers,
-			all.Seals,
-			all.Results,
-			all.Blocks,
-			all.Setups,
-			all.EpochCommits,
-			all.Statuses)
+
+		// expect the final view metric to be set to current epoch's final view
+		epoch := rootSnapshot.Epochs().Current()
+		finalView, err := epoch.FinalView()
+		require.NoError(t, err)
+		counter, err := epoch.Counter()
+		require.NoError(t, err)
+		phase, err := rootSnapshot.Phase()
 		require.NoError(t, err)
 
+		complianceMetrics := new(mock.ComplianceMetrics)
+		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
+		complianceMetrics.On("CurrentEpochCounter", counter).Once()
+		complianceMetrics.On("CurrentEpochPhase", phase).Once()
+		complianceMetrics.On("CurrentEpochFinalView", finalView).Once()
+
+		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(epoch)
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
+
+		noopMetrics := new(metrics.NoopCollector)
+		all := storagebadger.InitAll(noopMetrics, db)
+		// protocol state has been bootstrapped, now open a protocol state with the database
+		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
+		require.NoError(t, err)
+
+		complianceMetrics.AssertExpectations(t)
+
 		unittest.AssertSnapshotsEqual(t, rootSnapshot, state.Final())
+	})
+}
+
+// TestBootstrapAndOpen_EpochCommitted verifies after bootstrapping with a
+// root snapshot from EpochCommitted phase  we should be able to open it and
+// got the same state.
+func TestBootstrapAndOpen_EpochCommitted(t *testing.T) {
+
+	// create a state root and bootstrap the protocol state with it
+	participants := unittest.CompleteIdentitySet()
+	rootSnapshot := unittest.RootSnapshotFixture(participants, func(block *flow.Block) {
+		block.Header.ParentID = unittest.IdentifierFixture()
+	})
+	rootBlock, err := rootSnapshot.Head()
+	require.NoError(t, err)
+
+	// build an epoch on the root state and return a snapshot from the committed phase
+	committedPhaseSnapshot := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+		unittest.NewEpochBuilder(t, state).BuildEpoch().CompleteEpoch()
+
+		// find the point where we transition to the epoch committed phase
+		for height := rootBlock.Height + 1; ; height++ {
+			phase, err := state.AtHeight(height).Phase()
+			require.NoError(t, err)
+			if phase == flow.EpochPhaseCommitted {
+				return state.AtHeight(height)
+			}
+		}
+	})
+
+	protoutil.RunWithBootstrapState(t, committedPhaseSnapshot, func(db *badger.DB, _ *bprotocol.State) {
+
+		complianceMetrics := new(mock.ComplianceMetrics)
+
+		// expect the final view metric to be set to next epoch's final view
+		finalView, err := committedPhaseSnapshot.Epochs().Next().FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CommittedEpochFinalView", finalView).Once()
+
+		// expect counter to be set to current epochs counter
+		counter, err := committedPhaseSnapshot.Epochs().Current().Counter()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentEpochCounter", counter).Once()
+
+		// expect epoch phase to be set to current phase
+		phase, err := committedPhaseSnapshot.Phase()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentEpochPhase", phase).Once()
+
+		currentEpochFinalView, err := committedPhaseSnapshot.Epochs().Current().FinalView()
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentEpochFinalView", currentEpochFinalView).Once()
+
+		dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(committedPhaseSnapshot.Epochs().Current())
+		require.NoError(t, err)
+		complianceMetrics.On("CurrentDKGPhase1FinalView", dkgPhase1FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase2FinalView", dkgPhase2FinalView).Once()
+		complianceMetrics.On("CurrentDKGPhase3FinalView", dkgPhase3FinalView).Once()
+
+		noopMetrics := new(metrics.NoopCollector)
+		all := storagebadger.InitAll(noopMetrics, db)
+		state, err := bprotocol.OpenState(complianceMetrics, db, all.Headers, all.Seals, all.Results, all.Blocks, all.Setups, all.EpochCommits, all.Statuses)
+		require.NoError(t, err)
+
+		// assert update final view was called
+		complianceMetrics.AssertExpectations(t)
+
+		unittest.AssertSnapshotsEqual(t, committedPhaseSnapshot, state.Final())
 	})
 }
 
@@ -332,7 +417,7 @@ func snapshotAfter(t *testing.T, rootSnapshot protocol.Snapshot, f func(*bprotoc
 
 // buildBlock builds and marks valid the given block
 func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
-	err := state.Extend(block)
+	err := state.Extend(context.Background(), block)
 	require.NoError(t, err)
 	err = state.MarkValid(block.ID())
 	require.NoError(t, err)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
@@ -14,8 +15,6 @@ import (
 const (
 	EventAccountCreated EventType = "flow.AccountCreated"
 	EventAccountUpdated EventType = "flow.AccountUpdated"
-	EventEpochSetup     EventType = "flow.EpochSetup"
-	EventEpochCommit    EventType = "flow.EpochCommit"
 )
 
 type EventType string
@@ -42,17 +41,16 @@ func (e Event) String() string {
 
 // ID returns a canonical identifier that is guaranteed to be unique.
 func (e Event) ID() Identifier {
-	return MakeID(e.Body())
+	return MakeID(wrapEventID(e))
 }
 
-// Body returns the body of the execution receipt.
-func (e *Event) Body() interface{} {
-	return wrapEvent(*e)
+func (e Event) Checksum() Identifier {
+	return MakeID(e)
 }
 
 // Encode returns the canonical encoding of this event, containing only the fields necessary to uniquely identify it.
 func (e Event) Encode() []byte {
-	w := wrapEvent(e)
+	w := wrapEventID(e)
 	return encoding.DefaultEncoder.MustEncode(w)
 }
 
@@ -61,15 +59,33 @@ func (e Event) Fingerprint() []byte {
 }
 
 // Defines only the fields needed to uniquely identify an event.
-type eventWrapper struct {
+type eventIDWrapper struct {
 	TxID  []byte
 	Index uint32
 }
 
-func wrapEvent(e Event) eventWrapper {
-	return eventWrapper{
+type eventWrapper struct {
+	TxID             []byte
+	Index            uint32
+	Type             string
+	TransactionIndex uint32
+	Payload          []byte
+}
+
+func wrapEventID(e Event) eventIDWrapper {
+	return eventIDWrapper{
 		TxID:  e.TransactionID[:],
 		Index: e.EventIndex,
+	}
+}
+
+func wrapEvent(e Event) eventWrapper {
+	return eventWrapper{
+		TxID:             e.TransactionID[:],
+		Index:            e.EventIndex,
+		Type:             string(e.Type),
+		TransactionIndex: e.TransactionIndex,
+		Payload:          e.Payload[:],
 	}
 }
 
@@ -79,4 +95,22 @@ type BlockEvents struct {
 	BlockHeight    uint64
 	BlockTimestamp time.Time
 	Events         []Event
+}
+
+type EventsList []Event
+
+// EventsListHash calculates a hash of events list,
+// by simply hashing byte representation of events in the lists
+func EventsListHash(el EventsList) (Identifier, error) {
+
+	hasher := hash.NewSHA3_256()
+
+	for _, event := range el {
+		_, err := hasher.Write(event.Fingerprint())
+		if err != nil {
+			return ZeroID, fmt.Errorf("cannot write to hasher: %w", err)
+		}
+	}
+
+	return HashToID(hasher.SumHash()), nil
 }

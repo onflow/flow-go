@@ -26,8 +26,12 @@ func parseChainID(chainID string) flow.ChainID {
 		return flow.Mainnet
 	case "test":
 		return flow.Testnet
-	case "emulator":
-		return flow.Emulator
+	case "canary":
+		return flow.Canary
+	case "bench":
+		return flow.Benchnet
+	case "local":
+		return flow.Localnet
 	default:
 		log.Fatal().Str("chain_id", chainID).Msg("invalid chain ID")
 		return ""

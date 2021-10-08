@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"fmt"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime/common"
 
 	"github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -66,8 +68,14 @@ func (h *EventHandler) EmitEvent(event cadence.Event,
 		Payload:          payload,
 	}
 
-	if h.serviceEventCollectionEnabled && IsServiceEvent(event, h.chain) {
-		h.eventCollection.AppendServiceEvent(flowEvent, payloadSize)
+	if h.serviceEventCollectionEnabled {
+		ok, err := IsServiceEvent(event, h.chain.ChainID())
+		if err != nil {
+			return fmt.Errorf("unable to check service event: %w", err)
+		}
+		if ok {
+			h.eventCollection.AppendServiceEvent(flowEvent, payloadSize)
+		}
 		// we don't return and append the service event into event collection as well.
 	}
 
@@ -84,8 +92,8 @@ func (h *EventHandler) ServiceEvents() []flow.Event {
 }
 
 type EventCollection struct {
-	events        []flow.Event
-	serviceEvents []flow.Event
+	events        flow.EventsList
+	serviceEvents flow.EventsList
 	totalByteSize uint64
 	eventCounter  uint32
 }
@@ -137,37 +145,22 @@ func (e *EventCollection) TotalByteSize() uint64 {
 	return e.totalByteSize
 }
 
-// TODO refactor this
-// Keep serviceEventWhitelist module-only to prevent accidental modifications
-var serviceEventWhitelist = map[string]struct{}{
-	"EpochManager.EpochSetup": {},
-}
+// IsServiceEvent determines whether or not an emitted Cadence event is considered
+// a service event for the given chain.
+func IsServiceEvent(event cadence.Event, chain flow.ChainID) (bool, error) {
 
-var serviceEventWhitelistFlat []string
-
-func init() {
-	for s := range serviceEventWhitelist {
-		serviceEventWhitelistFlat = append(serviceEventWhitelistFlat, s)
-	}
-}
-
-func GetServiceEventWhitelist() []string {
-	return serviceEventWhitelistFlat
-}
-
-func IsServiceEvent(event cadence.Event, chain flow.Chain) bool {
-	serviceAccount := chain.ServiceAddress()
-
-	addressLocation, casted := event.EventType.Location.(common.AddressLocation)
-	if !casted {
-		return false
+	// retrieve the service event information for this chain
+	events, err := systemcontracts.ServiceEventsForChain(chain)
+	if err != nil {
+		return false, fmt.Errorf("unknown system contracts for chain (%s): %w", chain.String(), err)
 	}
 
-	flowAddress := flow.BytesToAddress(addressLocation.Address.Bytes())
-
-	if flowAddress != serviceAccount {
-		return false
+	eventType := flow.EventType(event.EventType.ID())
+	for _, serviceEvent := range events.All() {
+		if serviceEvent.EventType() == eventType {
+			return true, nil
+		}
 	}
-	_, has := serviceEventWhitelist[event.EventType.QualifiedIdentifier]
-	return has
+
+	return false, nil
 }

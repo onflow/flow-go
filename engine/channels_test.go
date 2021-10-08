@@ -59,7 +59,7 @@ func TestGetChannelByRole(t *testing.T) {
 	// - TestMetric
 	// the roles list should contain collection and consensus roles
 	topics := ChannelsByRole(flow.RoleVerification)
-	assert.Len(t, topics, 7)
+	assert.Len(t, topics, 8)
 	assert.Contains(t, topics, PushBlocks)
 	assert.Contains(t, topics, PushReceipts)
 	assert.Contains(t, topics, PushApprovals)
@@ -67,6 +67,7 @@ func TestGetChannelByRole(t *testing.T) {
 	assert.Contains(t, topics, RequestChunks)
 	assert.Contains(t, topics, TestMetrics)
 	assert.Contains(t, topics, TestNetwork)
+	assert.Contains(t, topics, SyncCommittee)
 }
 
 // TestIsClusterChannel verifies the correctness of ClusterChannel method
@@ -74,20 +75,17 @@ func TestGetChannelByRole(t *testing.T) {
 func TestIsClusterChannel(t *testing.T) {
 	// creates a consensus cluster channel and verifies it
 	conClusterChannel := ChannelConsensusCluster("some-consensus-cluster-id")
-	clusterChannel, ok := ClusterChannel(conClusterChannel)
+	ok := IsClusterChannel(conClusterChannel)
 	require.True(t, ok)
-	require.Equal(t, clusterChannel, consensusClusterPrefix)
 
 	// creates a sync cluster channel and verifies it
 	syncClusterChannel := ChannelSyncCluster("some-sync-cluster-id")
-	clusterChannel, ok = ClusterChannel(syncClusterChannel)
+	ok = IsClusterChannel(syncClusterChannel)
 	require.True(t, ok)
-	require.Equal(t, clusterChannel, syncClusterPrefix)
 
 	// non-cluster channel should not be verified
-	clusterChannel, ok = ClusterChannel("non-cluster-channel-id")
+	ok = IsClusterChannel("non-cluster-channel-id")
 	require.False(t, ok)
-	require.Empty(t, clusterChannel)
 }
 
 // TestUniqueChannels_Uniqueness verifies that non-cluster channels returned by
@@ -100,7 +98,7 @@ func TestUniqueChannels_Uniqueness(t *testing.T) {
 		visited := make(map[flow.Identifier]struct{})
 		for _, channel := range uniques {
 
-			if _, ok := ClusterChannel(channel); ok {
+			if IsClusterChannel(channel) {
 				continue //only considering non-cluster channel in this test case
 			}
 
@@ -121,10 +119,13 @@ func TestUniqueChannels_Uniqueness(t *testing.T) {
 // We use the identifier of RoleList to determine their uniqueness.
 func TestUniqueChannels_ClusterChannels(t *testing.T) {
 	channels := ChannelsByRole(flow.RoleCollection)
+	consensusCluster := ChannelConsensusCluster(flow.Emulator)
+	syncCluster := ChannelSyncCluster(flow.Emulator)
+	channels = append(channels, consensusCluster, syncCluster)
 	uniques := UniqueChannels(channels)
 	// collection role has two cluster and one non-cluster channels all with the same RoleList.
 	// Hence all of them should be returned as unique channels.
-	require.Contains(t, uniques, syncClusterPrefix)      // cluster channel
-	require.Contains(t, uniques, consensusClusterPrefix) // cluster channel
-	require.Contains(t, uniques, PushTransactions)       // non-cluster channel
+	require.Contains(t, uniques, syncCluster)      // cluster channel
+	require.Contains(t, uniques, consensusCluster) // cluster channel
+	require.Contains(t, uniques, PushTransactions) // non-cluster channel
 }

@@ -18,13 +18,13 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
-	"github.com/onflow/flow-go/engine/consensus/approvals"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -34,6 +34,7 @@ import (
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
 	bprotocol "github.com/onflow/flow-go/state/protocol/badger"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/state/protocol/util"
@@ -117,22 +118,26 @@ func createNode(
 	tracer := trace.NewNoopTracer()
 
 	headersDB := storage.NewHeaders(metrics, db)
-	guaranteesDB := storage.NewGuarantees(metrics, db)
+	guaranteesDB := storage.NewGuarantees(metrics, db, storage.DefaultCacheSize)
 	sealsDB := storage.NewSeals(metrics, db)
 	indexDB := storage.NewIndex(metrics, db)
 	resultsDB := storage.NewExecutionResults(metrics, db)
-	receiptsDB := storage.NewExecutionReceipts(metrics, db, resultsDB)
+	receiptsDB := storage.NewExecutionReceipts(metrics, db, resultsDB, storage.DefaultCacheSize)
 	payloadsDB := storage.NewPayloads(db, indexDB, guaranteesDB, sealsDB, receiptsDB, resultsDB)
 	blocksDB := storage.NewBlocks(db, headersDB, payloadsDB)
 	setupsDB := storage.NewEpochSetups(metrics, db)
 	commitsDB := storage.NewEpochCommits(metrics, db)
 	statusesDB := storage.NewEpochStatuses(metrics, db)
-	consumer := events.NewNoop()
+	consumer := events.NewDistributor()
 
 	state, err := bprotocol.Bootstrap(metrics, db, headersDB, sealsDB, resultsDB, blocksDB, setupsDB, commitsDB, statusesDB, rootSnapshot)
 	require.NoError(t, err)
 
-	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
+	blockTimer, err := blocktimer.NewBlockTimer(1*time.Millisecond, 90*time.Second)
+	require.NoError(t, err)
+
+	fullState, err := bprotocol.NewFullConsensusState(state, indexDB, payloadsDB, tracer, consumer,
+		blockTimer, util.MockReceiptValidator(), util.MockSealValidator(sealsDB))
 	require.NoError(t, err)
 
 	localID := identity.ID()
@@ -182,11 +187,11 @@ func createNode(
 
 	receipts := consensusMempools.NewExecutionTree()
 
-	seals := stdmap.NewIncorporatedResultSeals(stdmap.WithLimit(sealLimit))
+	seals := stdmap.NewIncorporatedResultSeals(sealLimit)
 
 	// initialize the block builder
 	build, err := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
-		guarantees, approvals.NewIncorporatedResultSeals(seals, receiptsDB), receipts, tracer)
+		guarantees, consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB), receipts, tracer)
 	require.NoError(t, err)
 
 	signer := &Signer{identity.ID()}
@@ -205,7 +210,7 @@ func createNode(
 	require.NoError(t, err)
 
 	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, headersDB, fullState)
+	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
 
 	// initialize the persister
 	persist := persister.New(db, rootHeader.ChainID)
@@ -223,8 +228,28 @@ func createNode(
 	comp, err := compliance.NewEngine(log, net, me, prov, compCore)
 	require.NoError(t, err)
 
+	finalizedHeader, err := synceng.NewFinalizedHeaderCache(log, state, pubsub.NewFinalizationDistributor())
+	require.NoError(t, err)
+
+	identities, err := state.Final().Identities(filter.And(
+		filter.HasRole(flow.RoleConsensus),
+		filter.Not(filter.HasNodeID(me.NodeID())),
+	))
+	require.NoError(t, err)
+	idProvider := id.NewFixedIdentifierProvider(identities.NodeIDs())
+
 	// initialize the synchronization engine
-	sync, err := synceng.New(log, metrics, net, me, state, blocksDB, comp, syncCore)
+	sync, err := synceng.New(
+		log,
+		metrics,
+		net,
+		me,
+		blocksDB,
+		comp,
+		syncCore,
+		finalizedHeader,
+		idProvider,
+	)
 	require.NoError(t, err)
 
 	pending := []*flow.Header{}

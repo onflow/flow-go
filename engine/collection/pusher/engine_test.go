@@ -8,11 +8,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/collection/pusher"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
-	metrics "github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -86,7 +87,7 @@ func (suite *Suite) TestSubmitCollectionGuarantee() {
 
 	// should submit the collection to consensus nodes
 	consensus := suite.identities.Filter(filter.HasRole(flow.RoleConsensus))
-	suite.conduit.On("Multicast", guarantee, pusher.DefaultRecipientCount, consensus[0].NodeID).Return(nil)
+	suite.conduit.On("Publish", guarantee, consensus[0].NodeID).Return(nil)
 
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
@@ -108,7 +109,7 @@ func (suite *Suite) TestSubmitCollectionGuaranteeNonLocal() {
 	msg := &messages.SubmitCollectionGuarantee{
 		Guarantee: *guarantee,
 	}
-	err := suite.engine.Process(sender.NodeID, msg)
+	err := suite.engine.Process(engine.PushGuarantees, sender.NodeID, msg)
 	suite.Require().Error(err)
 
 	suite.conduit.AssertNumberOfCalls(suite.T(), "Multicast", 0)

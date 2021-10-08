@@ -402,3 +402,29 @@ func createByteArray(size int) []byte {
 	}
 	return bytes
 }
+
+func TestAccounts_AllocateStorageIndex(t *testing.T) {
+	view := utils.NewSimpleView()
+
+	sth := state.NewStateHolder(state.NewState(view))
+	accounts := state.NewAccounts(sth)
+	address := flow.HexToAddress("01")
+
+	err := accounts.Create(nil, address)
+	require.NoError(t, err)
+
+	// no register set case
+	i, err := accounts.AllocateStorageIndex(address)
+	require.NoError(t, err)
+	require.Equal(t, i, uint64(1))
+
+	// register already set case
+	i, err = accounts.AllocateStorageIndex(address)
+	require.NoError(t, err)
+	require.Equal(t, i, uint64(2))
+
+	// register update successful
+	i, err = accounts.AllocateStorageIndex(address)
+	require.NoError(t, err)
+	require.Equal(t, i, uint64(3))
+}

@@ -3,10 +3,12 @@
 package consensus
 
 import (
+	"context"
 	"fmt"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter/id"
@@ -15,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
@@ -56,10 +59,14 @@ func NewBuilder(
 	options ...func(*Config),
 ) (*Builder, error) {
 
+	blockTimer, err := blocktimer.NewBlockTimer(500*time.Millisecond, 10*time.Second)
+	if err != nil {
+		return nil, fmt.Errorf("could not create default block timer: %w", err)
+	}
+
 	// initialize default config
 	cfg := Config{
-		minInterval:       500 * time.Millisecond,
-		maxInterval:       10 * time.Second,
+		blockTimer:        blockTimer,
 		maxSealCount:      100,
 		maxGuaranteeCount: 100,
 		maxReceiptCount:   200,
@@ -88,7 +95,7 @@ func NewBuilder(
 		cfg:        cfg,
 	}
 
-	err := b.repopulateExecutionTree()
+	err = b.repopulateExecutionTree()
 	if err != nil {
 		return nil, fmt.Errorf("could not repopulate execution tree: %w", err)
 	}
@@ -100,8 +107,11 @@ func NewBuilder(
 // given view and applying the custom setter function to allow the caller to
 // make changes to the header before storing it.
 func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) error) (*flow.Header, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOn)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOn)
+
+	// since we don't know the blockID when building the block we track the
+	// time indirectly and insert the span directly at the end
+
+	startTime := time.Now()
 
 	// get the collection guarantees to insert in the payload
 	insertableGuarantees, err := b.getInsertableGuarantees(parentID)
@@ -131,10 +141,10 @@ func (b *Builder) BuildOn(parentID flow.Identifier, setter func(*flow.Header) er
 		return nil, fmt.Errorf("could not assemble proposal: %w", err)
 	}
 
-	b.tracer.StartSpan(parentID, trace.CONBuildOnDBInsert)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnDBInsert)
+	span, ctx, _ := b.tracer.StartBlockSpan(context.Background(), proposal.ID(), trace.CONBuilderBuildOn, opentracing.StartTime(startTime))
+	defer span.Finish()
 
-	err = b.state.Extend(proposal)
+	err = b.state.Extend(ctx, proposal)
 	if err != nil {
 		return nil, fmt.Errorf("could not extend state with built proposal: %w", err)
 	}
@@ -243,8 +253,6 @@ func (b *Builder) repopulateExecutionTree() error {
 //
 // 4) Otherwise, this guarantee can be included in the payload.
 func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.CollectionGuarantee, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadGuarantees)
 
 	// we look back only as far as the expiry limit for the current height we
 	// are building for; any guarantee with a reference block before that can
@@ -345,9 +353,6 @@ func (b *Builder) getInsertableGuarantees(parentID flow.Identifier) ([]*flow.Col
 //      block or by a seal included earlier in the block that we are constructing).
 // To limit block size, we cap the number of seals to maxSealCount.
 func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadSeals)
-
 	// get the latest seal in the fork, which we are extending and
 	// the corresponding block, whose result is sealed
 	// Note: the last seal might not be included in a finalized block yet
@@ -378,29 +383,40 @@ func (b *Builder) getInsertableSeals(parentID flow.Identifier) ([]*flow.Seal, er
 	//    Therefore, we only have to inspect the results incorporated in unsealed blocks.
 	sealsSuperset := make(map[uint64][]*flow.IncorporatedResultSeal) // map: executedBlock.Height -> candidate Seals
 	sealCollector := func(header *flow.Header) error {
-		block, err := b.blocks.ByID(header.ID())
+		blockID := header.ID()
+		if blockID == parentID {
+			// Important protocol edge case: There must be at least one block in between the block incorporating
+			// a result and the block sealing the result. This is because we need the Source of Randomness for
+			// the block that _incorporates_ the result, to compute the verifier assignment. Therefore, we require
+			// that the block _incorporating_ the result has at least one child in the fork, _before_ we include
+			// the seal. Thereby, we guarantee that a verifier assignment can be computed without needing
+			// information from the block that we are just constructing. Hence, we don't consider results for
+			// sealing that were incorporated in the immediate parent which we are extending.
+			return nil
+		}
+
+		index, err := b.index.ByBlockID(blockID)
 		if err != nil {
-			return fmt.Errorf("could not retrieve block %x: %w", header.ID(), err)
+			return fmt.Errorf("could not retrieve index for block %x: %w", blockID, err)
 		}
 
 		// enforce condition (1): only consider seals for results that are incorporated in the fork
-		for _, result := range block.Payload.Results {
+		for _, resultID := range index.ResultIDs {
+			result, err := b.resultsDB.ByID(resultID)
+			if err != nil {
+				return fmt.Errorf("could not retrieve execution result %x: %w", resultID, err)
+			}
+
 			// re-assemble the IncorporatedResult because we need its ID to
 			// check if it is in the seal mempool.
-			// ATTENTION:
-			// Here, IncorporatedBlockID (the first argument) should be set to
-			// ancestorID, because that is the block that contains the
-			// ExecutionResult. However, in phase 2 of the sealing roadmap, we
-			// are still using a temporary sealing logic where the
-			// IncorporatedBlockID is expected to be the result's block ID.
 			incorporatedResult := flow.NewIncorporatedResult(
-				result.BlockID,
+				blockID,
 				result,
 			)
 
 			// enforce condition (0): candidate seals are only constructed once sufficient
-			// have been collected. Hence, any incorporated result for which we find a
-			// candidate seal satisfy condition (0)
+			// approvals have been collected. Hence, any incorporated result for which we
+			// find a candidate seal satisfies condition (0)
 			irSeal, ok := b.sealPool.ByID(incorporatedResult.ID())
 			if !ok {
 				continue
@@ -484,8 +500,6 @@ type InsertableReceipts struct {
 //
 // Receipts have to be ordered by block height.
 func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableReceipts, error) {
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreatePayloadReceipts)
 
 	// Get the latest sealed block on this fork, ie the highest block for which
 	// there is a seal in this fork. This block is not necessarily finalized.
@@ -535,12 +549,19 @@ func (b *Builder) getInsertableReceipts(parentID flow.Identifier) (*InsertableRe
 	// 1) whose result connects all the way to the last sealed result
 	// 2) is unique (never seen in unsealed blocks)
 	receipts, err := b.recPool.ReachableReceipts(latestSeal.ResultID, isResultForUnsealedBlock, isReceiptUniqueAndUnsealed)
-	if err != nil {
+	// Occurrence of UnknownExecutionResultError:
+	// Populating the execution with receipts from incoming blocks happens concurrently in
+	// matching.Core. Hence, the following edge case can occur (rarely): matching.Core is
+	// just in the process of populating the Execution Tree with the receipts from the
+	// latest blocks, while the builder is already trying to build on top. In this rare
+	// situation, the Execution Tree might not yet know the latest sealed result.
+	// TODO: we should probably remove this edge case by _synchronously_ populating
+	//       the Execution Tree in the Fork's finalizationCallback
+	if err != nil && !mempool.IsUnknownExecutionResultError(err) {
 		return nil, fmt.Errorf("failed to retrieve reachable receipts from memool: %w", err)
 	}
 
 	insertables := toInsertables(receipts, includedResults, b.cfg.maxReceiptCount)
-
 	return insertables, nil
 }
 
@@ -584,9 +605,6 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 	insertableReceipts *InsertableReceipts,
 	setter func(*flow.Header) error) (*flow.Block, error) {
 
-	b.tracer.StartSpan(parentID, trace.CONBuildOnCreateHeader)
-	defer b.tracer.FinishSpan(parentID, trace.CONBuildOnCreateHeader)
-
 	// build the payload so we can get the hash
 	payload := &flow.Payload{
 		Guarantees: guarantees,
@@ -600,18 +618,7 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		return nil, fmt.Errorf("could not retrieve parent: %w", err)
 	}
 
-	// calculate the timestamp and cutoffs
-	timestamp := time.Now().UTC()
-	from := parent.Timestamp.Add(b.cfg.minInterval)
-	to := parent.Timestamp.Add(b.cfg.maxInterval)
-
-	// adjust timestamp if outside of cutoffs
-	if timestamp.Before(from) {
-		timestamp = from
-	}
-	if timestamp.After(to) {
-		timestamp = to
-	}
+	timestamp := b.cfg.blockTimer.Build(parent.Timestamp)
 
 	// construct default block on top of the provided parent
 	header := &flow.Header{
@@ -624,11 +631,11 @@ func (b *Builder) createProposal(parentID flow.Identifier,
 		// the following fields should be set by the custom function as needed
 		// NOTE: we could abstract all of this away into an interface{} field,
 		// but that would be over the top as we will probably always use hotstuff
-		View:           0,
-		ParentVoterIDs: nil,
-		ParentVoterSig: nil,
-		ProposerID:     flow.ZeroID,
-		ProposerSig:    nil,
+		View:               0,
+		ParentVoterIDs:     nil,
+		ParentVoterSigData: nil,
+		ProposerID:         flow.ZeroID,
+		ProposerSigData:    nil,
 	}
 
 	// apply the custom fields setter of the consensus algorithm

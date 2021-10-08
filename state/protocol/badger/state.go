@@ -31,6 +31,24 @@ type State struct {
 	}
 }
 
+type BootstrapConfig struct {
+	// SkipNetworkAddressValidation flags allows skipping all the network address related validations not needed for
+	// an unstaked node
+	SkipNetworkAddressValidation bool
+}
+
+func defaultBootstrapConfig() *BootstrapConfig {
+	return &BootstrapConfig{
+		SkipNetworkAddressValidation: false,
+	}
+}
+
+type BootstrapConfigOptions func(conf *BootstrapConfig)
+
+func SkipNetworkAddressValidation(conf *BootstrapConfig) {
+	conf.SkipNetworkAddressValidation = true
+}
+
 func Bootstrap(
 	metrics module.ComplianceMetrics,
 	db *badger.DB,
@@ -42,7 +60,14 @@ func Bootstrap(
 	commits storage.EpochCommits,
 	statuses storage.EpochStatuses,
 	root protocol.Snapshot,
+	options ...BootstrapConfigOptions,
 ) (*State, error) {
+
+	config := defaultBootstrapConfig()
+	for _, opt := range options {
+		opt(config)
+	}
+
 	isBootstrapped, err := IsBootstrapped(db)
 	if err != nil {
 		return nil, fmt.Errorf("failed to determine whether database contains bootstrapped state: %w", err)
@@ -50,9 +75,10 @@ func Bootstrap(
 	if isBootstrapped {
 		return nil, fmt.Errorf("expected empty database")
 	}
+
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
-	if err := isValidRootSnapshot(root); err != nil {
+	if err := isValidRootSnapshot(root, !config.SkipNetworkAddressValidation); err != nil {
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
 
@@ -97,7 +123,7 @@ func Bootstrap(
 		}
 
 		// 5) initialize values related to the epoch logic
-		err = state.bootstrapEpoch(root)(tx)
+		err = state.bootstrapEpoch(root, !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
@@ -108,6 +134,11 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
 
+		// 7) set metric values
+		err = state.updateEpochMetrics(root)
+		if err != nil {
+			return fmt.Errorf("could not update epoch metrics: %w", err)
+		}
 		state.metrics.BlockSealed(tail)
 		state.metrics.SealedHeight(tail.Header.Height)
 		state.metrics.FinalizedHeight(head.Header.Height)
@@ -247,7 +278,7 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 //
 // The root snapshot's sealing segment must not straddle any epoch transitions
 // or epoch phase transitions.
-func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx) error {
+func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress bool) func(*transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
 		previous := root.Epochs().Previous()
 		current := root.Epochs().Current()
@@ -271,9 +302,10 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 				return fmt.Errorf("could not get previous epoch commit event: %w", err)
 			}
 
-			if err := isValidEpochSetup(setup); err != nil {
+			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
+
 			if err := isValidEpochCommit(commit, setup); err != nil {
 				return fmt.Errorf("invalid commit")
 			}
@@ -296,9 +328,10 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 			return fmt.Errorf("could not get current epoch commit event: %w", err)
 		}
 
-		if err := isValidEpochSetup(setup); err != nil {
+		if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 			return fmt.Errorf("invalid setup: %w", err)
 		}
+
 		if err := isValidEpochCommit(commit, setup); err != nil {
 			return fmt.Errorf("invalid commit")
 		}
@@ -316,7 +349,8 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 			if err != nil {
 				return fmt.Errorf("could not get next epoch setup event: %w", err)
 			}
-			if err := isValidEpochSetup(setup); err != nil {
+
+			if err := verifyEpochSetup(setup, verifyNetworkAddress); err != nil {
 				return fmt.Errorf("invalid setup: %w", err)
 			}
 
@@ -377,7 +411,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot) func(*transaction.Tx)
 
 // bootstrapSporkInfo bootstraps the protocol state with information about the
 // spork which is used to disambiguate Flow networks.
-func (s *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn) error {
+func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn) error {
 	return func(tx *badger.Txn) error {
 		params := root.Params()
 
@@ -423,45 +457,53 @@ func OpenState(
 	}
 	state := newState(metrics, db, headers, seals, results, blocks, setups, commits, statuses)
 
+	finalSnapshot := state.Final()
+
+	// update all epoch related metrics
+	err = state.updateEpochMetrics(finalSnapshot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to update epoch metrics: %w", err)
+	}
+
 	return state, nil
 }
 
-func (s *State) Params() protocol.Params {
-	return &Params{state: s}
+func (state *State) Params() protocol.Params {
+	return &Params{state: state}
 }
 
-func (s *State) Sealed() protocol.Snapshot {
+func (state *State) Sealed() protocol.Snapshot {
 	// retrieve the latest sealed height
 	var sealed uint64
-	err := s.db.View(operation.RetrieveSealedHeight(&sealed))
+	err := state.db.View(operation.RetrieveSealedHeight(&sealed))
 	if err != nil {
 		return invalid.NewSnapshot(fmt.Errorf("could not retrieve sealed height: %w", err))
 	}
-	return s.AtHeight(sealed)
+	return state.AtHeight(sealed)
 }
 
-func (s *State) Final() protocol.Snapshot {
+func (state *State) Final() protocol.Snapshot {
 	// retrieve the latest finalized height
 	var finalized uint64
-	err := s.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	err := state.db.View(operation.RetrieveFinalizedHeight(&finalized))
 	if err != nil {
 		return invalid.NewSnapshot(fmt.Errorf("could not retrieve finalized height: %w", err))
 	}
-	return s.AtHeight(finalized)
+	return state.AtHeight(finalized)
 }
 
-func (s *State) AtHeight(height uint64) protocol.Snapshot {
+func (state *State) AtHeight(height uint64) protocol.Snapshot {
 	// retrieve the block ID for the finalized height
 	var blockID flow.Identifier
-	err := s.db.View(operation.LookupBlockHeight(height, &blockID))
+	err := state.db.View(operation.LookupBlockHeight(height, &blockID))
 	if err != nil {
 		return invalid.NewSnapshot(fmt.Errorf("could not look up block by height: %w", err))
 	}
-	return NewSnapshot(s, blockID)
+	return NewSnapshot(state, blockID)
 }
 
-func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
-	return NewSnapshot(s, blockID)
+func (state *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
+	return NewSnapshot(state, blockID)
 }
 
 // newState initializes a new state backed by the provided a badger database,
@@ -509,4 +551,85 @@ func IsBootstrapped(db *badger.DB) (bool, error) {
 		return false, fmt.Errorf("retrieving finalized height failed: %w", err)
 	}
 	return true, nil
+}
+
+// updateEpochMetrics update the `consensus_compliance_current_epoch_counter` and the
+// `consensus_compliance_current_epoch_phase` metric
+func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
+
+	// update epoch counter
+	counter, err := snap.Epochs().Current().Counter()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch counter: %w", err)
+	}
+	state.metrics.CurrentEpochCounter(counter)
+
+	// update epoch phase
+	phase, err := snap.Phase()
+	if err != nil {
+		return fmt.Errorf("could not get current epoch counter: %w", err)
+	}
+	state.metrics.CurrentEpochPhase(phase)
+
+	// update committed epoch final view
+	err = state.updateCommittedEpochFinalView(snap)
+	if err != nil {
+		return fmt.Errorf("could not update committed epoch final view")
+	}
+
+	currentEpochFinalView, err := snap.Epochs().Current().FinalView()
+	if err != nil {
+		return fmt.Errorf("could not update current epoch final view: %w", err)
+	}
+	state.metrics.CurrentEpochFinalView(currentEpochFinalView)
+
+	dkgPhase1FinalView, dkgPhase2FinalView, dkgPhase3FinalView, err := protocol.DKGPhaseViews(snap.Epochs().Current())
+	if err != nil {
+		return fmt.Errorf("could not get dkg phase final view: %w", err)
+	}
+
+	state.metrics.CurrentDKGPhase1FinalView(dkgPhase1FinalView)
+	state.metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
+	state.metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
+
+	return nil
+}
+
+// updateCommittedEpochFinalView updates the `committed_epoch_final_view` metric
+// based on the current epoch phase of the input snapshot. It should be called
+// at startup and during transitions between EpochSetup and EpochCommitted phases.
+//
+// For example, suppose we have epochs N and N+1.
+// If we are in epoch N's Staking or Setup Phase, then epoch N's final view should be the value of the metric.
+// If we are in epoch N's Committed Phase, then epoch N+1's final view should be the value of the metric.
+func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error {
+
+	phase, err := snap.Phase()
+	if err != nil {
+		return fmt.Errorf("could not get epoch phase: %w", err)
+	}
+
+	// update metric based of epoch phase
+	switch phase {
+	case flow.EpochPhaseStaking, flow.EpochPhaseSetup:
+
+		// if we are in Staking or Setup phase, then set the metric value to the current epoch's final view
+		finalView, err := snap.Epochs().Current().FinalView()
+		if err != nil {
+			return fmt.Errorf("could not get current epoch final view from snapshot: %w", err)
+		}
+		state.metrics.CommittedEpochFinalView(finalView)
+	case flow.EpochPhaseCommitted:
+
+		// if we are in Committed phase, then set the metric value to the next epoch's final view
+		finalView, err := snap.Epochs().Next().FinalView()
+		if err != nil {
+			return fmt.Errorf("could not get next epoch final view from snapshot: %w", err)
+		}
+		state.metrics.CommittedEpochFinalView(finalView)
+	default:
+		return fmt.Errorf("invalid phase: %s", phase)
+	}
+
+	return nil
 }

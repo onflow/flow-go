@@ -21,6 +21,27 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// Compactor observer that waits until it gets notified of a
+// latest checkpoint larger than fromBound
+type CompactorObserver struct {
+	fromBound int
+	done      chan struct{}
+}
+
+func (co *CompactorObserver) OnNext(val interface{}) {
+	res, ok := val.(int)
+	if ok {
+		new := res
+		if new >= co.fromBound {
+			co.done <- struct{}{}
+		}
+	}
+}
+func (co *CompactorObserver) OnError(err error) {}
+func (co *CompactorObserver) OnComplete() {
+	close(co.done)
+}
+
 func Test_Compactor(t *testing.T) {
 
 	numInsPerStep := 2
@@ -52,7 +73,9 @@ func Test_Compactor(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1) //keep only latest checkpoint
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 1, zerolog.Nop()) //keep only latest checkpoint
+			co := CompactorObserver{fromBound: 9, done: make(chan struct{})}
+			compactor.Subscribe(&co)
 
 			// Run Compactor in background.
 			<-compactor.Ready()
@@ -86,13 +109,18 @@ func Test_Compactor(t *testing.T) {
 				savedData[rootHash] = data
 			}
 
-			assert.Eventually(t, func() bool {
-				from, to, err := checkpointer.NotCheckpointedSegments()
-				require.NoError(t, err)
+			// wait for the bound-checking observer to confirm checkpoints have been made
+			select {
+			case <-co.done:
+				// continue
+			case <-time.After(60 * time.Second):
+				assert.FailNow(t, "timed out")
+			}
 
-				return from == 10 && to == 10 //make sure there is
-				// this is disk-based operation after all, so give it big timeout
-			}, 20*time.Second, 100*time.Millisecond)
+			from, to, err := checkpointer.NotCheckpointedSegments()
+			require.NoError(t, err)
+
+			assert.True(t, from == 10 && to == 10, "from: %v, to: %v", from, to) //make sure there is no leftover
 
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000000"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
@@ -109,6 +137,8 @@ func Test_Compactor(t *testing.T) {
 			<-wal.Done()
 			require.NoError(t, err)
 		})
+
+		time.Sleep(2 * time.Second)
 
 		t.Run("remove unnecessary files", func(t *testing.T) {
 			// Remove all files apart from target checkpoint and WAL segments ahead of it
@@ -130,6 +160,8 @@ func Test_Compactor(t *testing.T) {
 
 		f2, err := mtrie.NewForest(size*10, metricsCollector, func(tree *trie.MTrie) error { return nil })
 		require.NoError(t, err)
+
+		time.Sleep(2 * time.Second)
 
 		t.Run("load data from checkpoint and WAL", func(t *testing.T) {
 			wal2, err := NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), dir, size*10, pathByteSize, 32*1024)
@@ -217,7 +249,7 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 			checkpointer, err := wal.NewCheckpointer()
 			require.NoError(t, err)
 
-			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2)
+			compactor := NewCompactor(checkpointer, 100*time.Millisecond, checkpointDistance, 2, zerolog.Nop())
 
 			// Generate the tree and create WAL
 			for i := 0; i < size; i++ {
@@ -242,11 +274,11 @@ func Test_Compactor_checkpointInterval(t *testing.T) {
 				require.FileExists(t, path.Join(dir, NumberToFilenamePart(i)))
 
 				// run checkpoint creation after every file
-				err = compactor.createCheckpoints()
+				_, err = compactor.createCheckpoints()
 				require.NoError(t, err)
 			}
 
-			// assert precisely creation of checkpoint files
+			// assert creation of checkpoint files precisely
 			require.NoFileExists(t, path.Join(dir, bootstrap.FilenameWALRootCheckpoint))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000001"))
 			require.NoFileExists(t, path.Join(dir, "checkpoint.00000002"))
