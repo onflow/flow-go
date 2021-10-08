@@ -116,7 +116,9 @@ func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.processor.Status())
 }
 
-// TestProcess_VoteNotForProposal tests that CombinedVoteProcessor accepts only votes for the block it was initialized with. According to interface specification of `VoteProcessor`, we expect dedicated sentinel errors for votes for different views (`VoteForIncompatibleViewError`) _or_ block  (`VoteForIncompatibleBlockError`).
+// TestProcess_VoteNotForProposal tests that CombinedVoteProcessor accepts only votes for the block it was initialized with
+// according to interface specification of `VoteProcessor`, we expect dedicated sentinel errors for votes
+// for different views (`VoteForIncompatibleViewError`) _or_ block (`VoteForIncompatibleBlockError`).
 func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
 	require.ErrorAs(s.T(), err, &VoteForIncompatibleBlockError)
@@ -360,6 +362,23 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	stakingSigners := unittest.IdentifierListFixture(5)
 	beaconSigners := unittest.IdentifierListFixture(9)
 
+	// setup aggregators and reconstructor
+	*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
+	*s.rbSigAggregator = mockhotstuff.WeightedSignatureAggregator{}
+	*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
+
+	s.stakingAggregator.On("TotalWeight").Return(func() uint64 {
+		return s.stakingTotalWeight
+	})
+
+	s.rbSigAggregator.On("TotalWeight").Return(func() uint64 {
+		return s.thresholdTotalWeight
+	})
+
+	s.reconstructor.On("HasSufficientShares").Return(func() bool {
+		return s.rbSharesTotal >= s.minRequiredShares
+	})
+
 	// mock expected calls to aggregators and reconstructor
 	combinedSigs := unittest.SignaturesFixture(3)
 	s.stakingAggregator.On("Aggregate").Return(stakingSigners, []byte(combinedSigs[0]), nil).Once()
@@ -397,7 +416,9 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 		vote.SignerID = signer
 		expectedSig := crypto.Signature(vote.SigData[1:])
 		s.stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Once()
-		s.stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Return(...).Once()
+		s.stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
+			s.stakingTotalWeight += s.sigWeight
+		}).Return(s.stakingTotalWeight, nil).Once()
 		err := s.processor.Process(vote)
 		require.NoError(s.T(), err)
 	}
@@ -406,7 +427,17 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 		vote.SignerID = signer
 		expectedSig := crypto.Signature(vote.SigData[1:])
 		s.rbSigAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Once()
-		s.rbSigAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Return(...).Once()
+		s.rbSigAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
+			s.thresholdTotalWeight += s.sigWeight
+		}).Return(s.thresholdTotalWeight, nil).Once()
+		s.reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
+			s.rbSharesTotal++
+		}).Return(func(signerID flow.Identifier, sig crypto.Signature) bool {
+			return s.rbSharesTotal >= s.minRequiredShares
+		}, func(signerID flow.Identifier, sig crypto.Signature) error {
+			return nil
+		}).Once()
+
 		err := s.processor.Process(vote)
 		require.NoError(s.T(), err)
 	}
@@ -415,6 +446,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	s.onQCCreatedState.AssertExpectations(s.T())
 	s.rbSigAggregator.AssertExpectations(s.T())
 	s.stakingAggregator.AssertExpectations(s.T())
+	s.reconstructor.AssertExpectations(s.T())
 
 	// processing extra votes shouldn't result in creating new QCs
 	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
