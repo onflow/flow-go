@@ -130,7 +130,9 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 // If we have received vote with signature in invalid format we should return with sentinel error
 func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignatureFormat() {
 	// signature is random in this case
-	vote := unittest.VoteForBlockFixture(s.proposal.Block)
+	vote := unittest.VoteForBlockFixture(s.proposal.Block, func(vote *model.Vote) {
+		vote.SigData[0] = byte(42)
+	})
 	err := s.processor.Process(vote)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
@@ -277,6 +279,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
 		err := processor.Process(vote)
 		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
 	// in this test case we aren't able to aggregate threshold signature
 	s.Run("threshold-sig-aggregate", func() {
@@ -287,6 +290,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
 		err := processor.Process(vote)
 		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
 	// in this test case we aren't able to reconstruct signature
 	s.Run("reconstruct", func() {
@@ -297,6 +301,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
 		err := processor.Process(vote)
 		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
 	// in this test case we aren't able to pack signatures
 	s.Run("pack", func() {
@@ -306,6 +311,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
 		err := processor.Process(vote)
 		require.ErrorIs(s.T(), err, exception)
+		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
 }
 
