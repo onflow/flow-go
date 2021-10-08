@@ -122,8 +122,6 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithLogLevel(zerolog.InfoLevel),
-		// TODO replace these with actual values
-		testnet.WithAdditionalFlag("--access-address=null"),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -143,6 +141,7 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
+		testnet.NewNodeConfig(flow.RoleAccess),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 

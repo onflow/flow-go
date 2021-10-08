@@ -67,6 +67,8 @@ const (
 	ExeNodeAPIPort = "exe-api-port"
 	// AccessNodeAPIPort is the name used for the access node API port.
 	AccessNodeAPIPort = "access-api-port"
+	// AccessNodeAPISecurePort is the name used for the secure access API port.
+	AccessNodeAPISecurePort = "access-api-secure-port"
 	// AccessNodeAPIProxyPort is the name used for the access node API HTTP proxy port.
 	AccessNodeAPIProxyPort = "access-api-http-proxy-port"
 	// AccessNodeExternalNetworkPort is the name used for the access node network port accessible from outside any docker container
@@ -74,11 +76,13 @@ const (
 	// GhostNodeAPIPort is the name used for the access node API port.
 	GhostNodeAPIPort = "ghost-api-port"
 
-	// ExeNodeMetricsPort
+	// ExeNodeMetricsPort is the name used for the execution node metrics server port
 	ExeNodeMetricsPort = "exe-metrics-port"
 
-	// default network port
+	// DefaultFlowPort default gossip network port
 	DefaultFlowPort = 2137
+	// DefaultSecureGRPCPort is the port used to access secure GRPC server running on ANs
+	DefaultSecureGRPCPort = 9001
 
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
@@ -217,7 +221,7 @@ func (net *FlowNetwork) ConsensusFollowerByID(id flow.Identifier) consensus_foll
 // Otherwise fails the test.
 func (net *FlowNetwork) ContainerByName(name string) *Container {
 	container, exists := net.Containers[name]
-	require.True(net.t, exists)
+	require.True(net.t, exists, "container %s does not exists", name)
 	return container
 }
 
@@ -468,10 +472,32 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		bootstrapDir:       bootstrapDir,
 	}
 
+	// at-least 2 full access nodes must be configure in your test suite
+	// in order to provide a secure GRPC connection for LN & SN nodes
+	accessNodeIDS := make([]string, 0)
+	for _, n := range confs {
+		if n.Role == flow.RoleAccess && !n.Ghost {
+			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
+		}
+	}
+	require.True(t, len(accessNodeIDS) > 1, "at-least 2 access node that is not a ghost must be configured for test suite")
+
 	// add each node to the network
 	for _, nodeConf := range confs {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
+
+		anIDS := strings.Join(accessNodeIDS, ",")
+
+		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
+		if nodeConf.Role == flow.RoleConsensus || nodeConf.Role == flow.RoleCollection {
+			// ghost containers don't participate in the network skip any SN/LN ghost containers
+			if !nodeConf.Ghost {
+				nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
+				nodeContainer.addFlag("insecure-access-api", "false")
+				nodeContainer.addFlag("access-node-ids", anIDS)
+			}
+		}
 	}
 
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
@@ -625,8 +651,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 			net.AccessPorts[ColNodeAPIPort] = hostPort
 
-			nodeContainer.addFlag("access-address", "access_1:9000")
-
 		case flow.RoleExecution:
 
 			hostPort := testingdock.RandomPort(t)
@@ -663,16 +687,19 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		case flow.RoleAccess:
 			hostGRPCPort := testingdock.RandomPort(t)
 			hostHTTPProxyPort := testingdock.RandomPort(t)
+			hostSecureGRPCPort := testingdock.RandomPort(t)
 			containerGRPCPort := "9000/tcp"
+			containerSecureGRPCPort := "9001/tcp"
 			containerHTTPProxyPort := "8000/tcp"
 			nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
 			nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
-
+			nodeContainer.bindPort(hostSecureGRPCPort, containerSecureGRPCPort)
 			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.addFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
 			// uncomment line below to point the access node exclusively to a single collection node
 			// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
 			nodeContainer.addFlag("collection-ingress-port", "9000")
+			net.AccessPorts[AccessNodeAPISecurePort] = hostSecureGRPCPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
 			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
 			nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
@@ -690,7 +717,6 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
 			nodeContainer.addFlag("chunk-alpha", "1")
-			nodeContainer.addFlag("access-address", "access_1:9000")
 
 		case flow.RoleVerification:
 			// use 1 here instead of the default 5, because the integration
@@ -857,7 +883,11 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}
-	qc, err := run.GenerateRootQC(root, signerData)
+	votes, err := run.GenerateRootBlockVotes(root, signerData)
+	if err != nil {
+		return nil, nil, nil, nil, err
+	}
+	qc, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
 	if err != nil {
 		return nil, nil, nil, nil, err
 	}

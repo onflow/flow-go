@@ -95,10 +95,9 @@ func main() {
 
 		// DKG contract client
 		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClient         *client.Client
-		accessAddress      string
-		secureAccessNodeID string
+		flowClientOpts     []*common.FlowClientConfig
 		insecureAccessAPI  bool
+		accessNodeIDS      []string
 
 		err                     error
 		mutableState            protocol.MutableState
@@ -145,13 +144,23 @@ func main() {
 		flags.UintVar(&requiredApprovalsForSealVerification, "required-verification-seal-approvals", validation.DefaultRequiredApprovalsForSealValidation, "minimum number of approvals that are required to verify a seal")
 		flags.UintVar(&requiredApprovalsForSealConstruction, "required-construction-seal-approvals", sealing.DefaultRequiredApprovalsForSealConstruction, "minimum number of approvals that are required to construct a seal")
 		flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
-		flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
-		flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
-		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
+		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
+		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node ID's sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. minimum length %d", common.DefaultAccessNodeIDSMinimum))
 		flags.DurationVar(&dkgControllerConfig.BaseStartDelay, "dkg-controller-base-start-delay", dkgmodule.DefaultBaseStartDelay, "used to define the range for jitter prior to DKG start (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
 		flags.DurationVar(&dkgControllerConfig.BaseHandleFirstBroadcastDelay, "dkg-controller-base-handle-first-broadcast-delay", dkgmodule.DefaultBaseHandleFirstBroadcastDelay, "used to define the range for jitter prior to DKG handling the first broadcast messages (eg. 50ms) - the base value is scaled quadratically with the # of DKG participants")
 		flags.DurationVar(&dkgControllerConfig.HandleSubsequentBroadcastDelay, "dkg-controller-handle-subsequent-broadcast-delay", dkgmodule.DefaultHandleSubsequentBroadcastDelay, "used to define the constant delay introduced prior to DKG handling subsequent broadcast messages (eg. 2s)")
-		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 2006-01-02T15:04:05Z07:00)")
+		flags.StringVar(&startupTimeString, "hotstuff-startup-time", cmd.NotSet, "specifies date and time (in ISO 8601 format) after which the consensus participant may enter the first view (e.g 1996-04-24T15:04:05-07:00)")
+	}).ValidateFlags(func() error {
+		nodeBuilder.Logger.Info().Str("startup_time_str", startupTimeString).Msg("got startup_time_str")
+		if startupTimeString != cmd.NotSet {
+			t, err := time.Parse(time.RFC3339, startupTimeString)
+			if err != nil {
+				return fmt.Errorf("invalid start-time value: %w", err)
+			}
+			startupTime = t
+			nodeBuilder.Logger.Info().Time("startup_time", startupTime).Msg("got startup_time")
+		}
+		return nil
 	})
 
 	if err = nodeBuilder.Initialize(); err != nil {
@@ -159,16 +168,6 @@ func main() {
 	}
 
 	nodeBuilder.
-		ValidateFlags(func() error {
-			if startupTimeString != cmd.NotSet {
-				t, err := time.Parse(time.RFC3339, startupTimeString)
-				if err != nil {
-					return fmt.Errorf("invalid start-time value: %w", err)
-				}
-				startupTime = t
-			}
-			return nil
-		}).
 		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
@@ -367,38 +366,25 @@ func main() {
 			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
 			return err
 		}).
-		Module("sdk client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			if accessAddress == "" {
-				return fmt.Errorf("missing required flag --access-address")
+		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			if len(accessNodeIDS) < common.DefaultAccessNodeIDSMinimum {
+				return fmt.Errorf("invalid flag --access-node-ids atleast %d IDs must be provided", common.DefaultAccessNodeIDSMinimum)
 			}
-			// create flow client with correct GRPC configuration for QC contract client
-			if insecureAccessAPI {
-				flowClient, err = common.InsecureFlowClient(accessAddress)
-				return err
-			} else {
-				if secureAccessNodeID == "" {
-					return fmt.Errorf("invalid flag --secure-access-node-id required")
-				}
 
-				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
-				if err != nil {
-					return fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
-				}
-
-				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))
-				if err != nil {
-					return fmt.Errorf("could not get identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				if len(identities) < 1 {
-					return fmt.Errorf("could not find identity of secure access node: %s", secureAccessNodeID)
-				}
-
-				flowClient, err = common.SecureFlowClient(accessAddress, identities[0].NetworkPubKey.String()[2:])
-				return err
+			flowClientOpts, err = common.FlowClientConfigs(accessNodeIDS, insecureAccessAPI, node.State.Sealed())
+			if err != nil {
+				return fmt.Errorf("failed to prepare flow client connection options for each access node id %w", err)
 			}
+
+			return nil
 		}).
 		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
+			flowClient, err := common.FlowClient(flowClientOpts[0])
+			if err != nil {
+				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientOpts[0].AccessAddress, err)
+			}
+
 			validator, err := epochs.NewMachineAccountConfigValidator(
 				node.Logger,
 				flowClient,
@@ -744,7 +730,7 @@ func main() {
 			node.ProtocolEvents.AddConsumer(viewsObserver)
 
 			// construct DKG contract client
-			dkgContractClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
+			dkgContractClients, err := createDKGContractClients(node, machineAccountInfo, flowClientOpts)
 			if err != nil {
 				return nil, fmt.Errorf("could not create dkg contract client %w", err)
 			}
@@ -759,7 +745,7 @@ func main() {
 				dkgmodule.NewControllerFactory(
 					node.Logger,
 					node.Me,
-					dkgContractClient,
+					dkgContractClients,
 					dkgBrokerTunnel,
 					dkgControllerConfig,
 				),
@@ -789,9 +775,8 @@ func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPr
 	return &priv, nil
 }
 
-// createDKGContractClient creates a DKG contract client
+// createDKGContractClient creates an dkgContractClient
 func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClient *client.Client) (module.DKGContractClient, error) {
-
 	var dkgClient module.DKGContractClient
 
 	contracts, err := systemcontracts.SystemContractsForChain(node.RootChainID)
@@ -818,4 +803,26 @@ func createDKGContractClient(node *cmd.NodeConfig, machineAccountInfo *bootstrap
 	)
 
 	return dkgClient, nil
+}
+
+// createDKGContractClients creates an array dkgContractClient that is sorted by retry fallback priority
+func createDKGContractClients(node *cmd.NodeConfig, machineAccountInfo *bootstrap.NodeMachineAccountInfo, flowClientOpts []*common.FlowClientConfig) ([]module.DKGContractClient, error) {
+	dkgClients := make([]module.DKGContractClient, 0)
+
+	for _, opt := range flowClientOpts {
+		flowClient, err := common.FlowClient(opt)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create flow client for dkg contract client with options: %s %w", flowClientOpts, err)
+		}
+
+		node.Logger.Info().Msgf("created dkg contract client with opts: %s", opt.String())
+		dkgClient, err := createDKGContractClient(node, machineAccountInfo, flowClient)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create dkg contract client with flow client options: %s %w", flowClientOpts, err)
+		}
+
+		dkgClients = append(dkgClients, dkgClient)
+	}
+
+	return dkgClients, nil
 }
