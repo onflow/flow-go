@@ -50,30 +50,30 @@ type SignalerContext interface {
 
 // private, to force context derivation / WithSignaler
 type signalerCtx struct {
-	context.Context
-	*Signaler
+  context.Context
+  *Signaler
 }
 
 func (sc signalerCtx) sealed() {}
 
 // the One True Way of getting a SignalerContext
 func WithSignaler(parent context.Context) (SignalerContext, <-chan error) {
-	sig, errChan := NewSignaler()
-	return &signalerCtx{parent, sig}, errChan
+  sig, errChan := NewSignaler()
+  return &signalerCtx{parent, sig}, errChan
 }
 
 // Signaler sends the error out.
 type Signaler struct {
-	errChan   chan error
-	errThrown *atomic.Bool
+  errChan   chan error
+  errThrown *atomic.Bool
 }
 
 func NewSignaler() (*Signaler, <-chan error) {
-	errChan := make(chan error, 1)
-	return &Signaler{
-		errChan:   errChan,
-		errThrown: atomic.NewBool(false),
-	}, errChan
+  errChan := make(chan error, 1)
+  return &Signaler{
+    errChan:   errChan,
+    errThrown: atomic.NewBool(false),
+  }, errChan
 }
 
 // Throw is a narrow drop-in replacement for panic, log.Fatal, log.Panic, etc
@@ -81,16 +81,16 @@ func NewSignaler() (*Signaler, <-chan error) {
 // the first error it is called with to the error channel, there are various
 // options as to how subsequent errors can be handled.
 func (s *Signaler) Throw(err error) {
-	defer runtime.Goexit()
-	if s.errThrown.CAS(false, true) {
-		s.errChan <- err
-		close(s.errChan)
-	} else {
-		// Another thread, possibly from the same component, has already thrown
-    		// an irrecoverable error to this Signaler. Any subsequent irrecoverable
-    		// errors can either be logged or ignored, as the parent will already
-    		// be taking steps to remediate the first error.
-	}
+  defer runtime.Goexit()
+  if s.errThrown.CAS(false, true) {
+    s.errChan <- err
+    close(s.errChan)
+  } else {
+    // Another thread, possibly from the same component, has already thrown
+    // an irrecoverable error to this Signaler. Any subsequent irrecoverable
+    // errors can either be logged or ignored, as the parent will already
+    // be taking steps to remediate the first error.
+  }
 }
 ```
 
