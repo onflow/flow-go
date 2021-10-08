@@ -217,12 +217,12 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(ctx context.Context,
 	return func() (*p2p.Node, error) {
 		psOpts := p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)
 		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
-			return pubsub.WithSubscriptionFilter(p2p.NewRoleBasedFilter(
-				h.ID(), builder.RootBlock.ID(), builder.IdentityProvider,
-			)), nil
+			return pubsub.WithSubscriptionFilter(
+				p2p.NewRoleBasedFilter(h.ID(), builder.IdentityProvider),
+			), nil
 		})
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
-			SetRootBlockID(builder.RootBlock.ID()).
+			SetSporkID(builder.RootBlock.ID()). // TODO
 			// no connection gater
 			SetConnectionManager(connManager).
 			// act as a DHT server

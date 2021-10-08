@@ -284,7 +284,7 @@ func generateLibP2PNode(t *testing.T,
 	resolver := dns.NewResolver(noopMetrics)
 
 	libP2PNode, err := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
-		SetRootBlockID(rootBlockID).
+		SetSporkID(rootBlockID).
 		SetConnectionGater(connGater).
 		SetConnectionManager(connManager).
 		SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
