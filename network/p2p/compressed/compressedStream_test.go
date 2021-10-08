@@ -8,6 +8,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -67,10 +68,10 @@ func newStreamPair() (*mockStream, *mockStream) {
 func newCompressedStreamPair(t *testing.T) (*compressedStream, *compressedStream) {
 	sa, sb := newStreamPair()
 
-	mca, err := NewCompressedStream(sa)
+	mca, err := NewCompressedStream(sa, compressor.GzipStreamCompressor{})
 	require.NoError(t, err)
 
-	mcb, err := NewCompressedStream(sb)
+	mcb, err := NewCompressedStream(sb, compressor.GzipStreamCompressor{})
 	require.NoError(t, err)
 
 	return mca, mcb

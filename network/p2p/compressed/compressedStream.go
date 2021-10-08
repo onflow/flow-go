@@ -9,7 +9,6 @@ import (
 	"go.uber.org/multierr"
 
 	flownet "github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/compressor"
 )
 
 // compressedStream is an internal networking layer data structure,
@@ -26,24 +25,11 @@ type compressedStream struct {
 	w flownet.WriteCloseFlusher
 }
 
-type StreamOptFunc func(*compressedStream)
-
-// WithStreamCompressor is an option function setting the underlying compressor of the stream.
-func WithStreamCompressor(comp flownet.Compressor) StreamOptFunc {
-	return func(stream *compressedStream) {
-		stream.compressor = comp
-	}
-}
-
 // NewCompressedStream creates a compressed stream with gzip as default compressor.
-func NewCompressedStream(s network.Stream, opts ...StreamOptFunc) (*compressedStream, error) {
+func NewCompressedStream(s network.Stream, compressor flownet.Compressor) (*compressedStream, error) {
 	c := &compressedStream{
 		Stream:     s,
-		compressor: compressor.GzipStreamCompressor{},
-	}
-
-	for _, opt := range opts {
-		opt(c)
+		compressor: compressor,
 	}
 
 	w, err := c.compressor.NewWriter(s)
