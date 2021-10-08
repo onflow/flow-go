@@ -160,8 +160,12 @@ func TestValueConversion(t *testing.T) {
 				expectedNewValue: newInter.VoidValue{},
 			},
 			{
-				oldValue:         oldInter.NewSomeValueOwningNonCopying(oldInter.NewStringValue("foo")),
-				expectedNewValue: newInter.NewSomeValueNonCopying(newInter.NewStringValue("foo")),
+				oldValue: oldInter.NewSomeValueOwningNonCopying(
+					oldInter.NewStringValue("foo"),
+				),
+				expectedNewValue: newInter.NewSomeValueNonCopying(
+					newInter.NewStringValue("foo"),
+				),
 			},
 			{
 				oldValue:         oldInter.AddressValue{1, 2},
