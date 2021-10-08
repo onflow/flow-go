@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -92,9 +93,8 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_TrustedAddError() {
 	require.False(s.T(), model.IsInvalidVoteError(err))
 }
 
-// TestProcess_BuildQCError tests all error paths during process of building QC.
+// TestProcess_BuildQCError tests error path during process of building QC.
 // Building QC is a one time operation, we need to make sure that failing in one of the steps leads to exception.
-// Since it's a one time operation we need a complicated test to test all conditions.
 func (s *StakingVoteProcessorTestSuite) TestProcess_BuildQCError() {
 
 	// In this test we will mock all dependencies for happy path, and replace some branches with unhappy path
@@ -133,16 +133,21 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
 	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
 }
 
-// TestProcess_CreatingQC tests a scenario when we have collected enough staking weight and random beacon shares
+// TestProcess_CreatingQC tests a scenario when we have collected enough staking weight
 // and proceed to build QC. Created QC has to have all signatures and identities aggregated by
-// aggregators and packed with consensus packer.
+// aggregator.
 func (s *StakingVoteProcessorTestSuite) TestProcess_CreatingQC() {
+	// prepare test setup: 13 votes with staking sigs
+	stakingSigners := unittest.IdentifierListFixture(14)
 
-	// prepare for aggregation, as soon as we will collect enough shares we will try to create QC
-	stakingSigners := unittest.IdentifierListFixture(10)
-	expectedSig := unittest.SignatureFixture()
-	s.stakingAggregator.On("Aggregate").Return(stakingSigners, []byte(expectedSig), nil)
+	// setup aggregator
+	*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
 
+	// mock expected calls to aggregator
+	expectedSigData := unittest.RandomBytes(128)
+	s.stakingAggregator.On("Aggregate").Return(stakingSigners, expectedSigData, nil).Once()
+
+	// expected QC
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Run(func(args mock.Arguments) {
 		qc := args.Get(0).(*flow.QuorumCertificate)
 		// ensure that QC contains correct field
@@ -150,21 +155,27 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_CreatingQC() {
 			View:      s.proposal.Block.View,
 			BlockID:   s.proposal.Block.BlockID,
 			SignerIDs: stakingSigners,
-			SigData:   expectedSig,
+			SigData:   expectedSigData,
 		}
 		require.Equal(s.T(), expectedQC, qc)
 	}).Return(nil).Once()
 
-	// generate staking signatures till we reach enough stake
-	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
+	// add votes
+	for _, signer := range stakingSigners {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block)
-		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
+		vote.SignerID = signer
+		expectedSig := crypto.Signature(vote.SigData)
+		s.stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Once()
+		s.stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
+			s.stakingTotalWeight += s.sigWeight
+		}).Return(s.stakingTotalWeight, nil).Once()
 		err := s.processor.Process(vote)
 		require.NoError(s.T(), err)
 	}
 
 	require.True(s.T(), s.processor.done.Load())
 	s.onQCCreatedState.AssertExpectations(s.T())
+	s.stakingAggregator.AssertExpectations(s.T())
 
 	// processing extra votes shouldn't result in creating new QCs
 	vote := unittest.VoteForBlockFixture(s.proposal.Block)
