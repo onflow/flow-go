@@ -350,29 +350,29 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughSharesNotEnoughStakes
 // and proceed to build QC. Created QC has to have all signatures and identities aggregated by
 // aggregators and packed with consensus packer.
 func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
-	// generate staking signatures till we reach enough stake
-	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
-		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
-		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
-		err := s.processor.Process(vote)
-		require.NoError(s.T(), err)
+	// prepare test setup: 5 votes with staking sigs and 9 votes with random beacon sigs
+	stakingSigners := unittest.IdentifierListFixture(5)
+	beaconSigners := unittest.IdentifierListFixture(9)
+
+	// mock expected calls to aggregators and reconstructor
+	combinedSigs := unittest.SignaturesFixture(3)
+	s.stakingAggregator.On("Aggregate").Return(stakingSigners, []byte(combinedSigs[0]), nil).Once()
+	s.rbSigAggregator.On("Aggregate").Return(beaconSigners, []byte(combinedSigs[1]), nil).Once()
+	s.reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
+
+	// mock expected call to Packer
+	mergedSignerIDs := append(append([]flow.Identifier{}, stakingSigners...), beaconSigners...)
+	expectedBlockSigData := &hotstuff.BlockSignatureData{
+		StakingSigners:               stakingSigners,
+		RandomBeaconSigners:          beaconSigners,
+		AggregatedStakingSig:         []byte(combinedSigs[0]),
+		AggregatedRandomBeaconSig:    []byte(combinedSigs[1]),
+		ReconstructedRandomBeaconSig: combinedSigs[2],
 	}
+	packedSigData := unittest.RandomBytes(128)
+	s.packer.On("Pack", s.proposal.Block.BlockID, expectedBlockSigData).Return(mergedSignerIDs, packedSigData, nil).Once()
 
-	// prepare for aggregation, as soon as we will collect enough shares we will try to create QC
-	stakingSigners := unittest.IdentifierListFixture(7)
-	thresholdSigners := unittest.IdentifierListFixture(7)
-	expectedSigs := unittest.SignaturesFixture(3)
-	s.stakingAggregator.On("Aggregate").Return(stakingSigners, []byte(expectedSigs[0]), nil)
-	s.rbSigAggregator.On("Aggregate").Return(thresholdSigners, []byte(expectedSigs[1]), nil)
-	s.reconstructor.On("Reconstruct").Return(expectedSigs[2], nil)
-	expectedSigData := unittest.RandomBytes(128)
-
-	mergedSignerIDs := make([]flow.Identifier, 0, len(stakingSigners)+len(thresholdSigners))
-	// merge both staking and threshold signers into one list
-	mergedSignerIDs = append(mergedSignerIDs, stakingSigners...)
-	mergedSignerIDs = append(mergedSignerIDs, thresholdSigners...)
-
-	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(mergedSignerIDs, expectedSigData, nil)
+	// expected QC
 	s.onQCCreatedState.On("onQCCreated", mock.Anything).Run(func(args mock.Arguments) {
 		qc := args.Get(0).(*flow.QuorumCertificate)
 		// ensure that QC contains correct field
@@ -380,21 +380,35 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 			View:      s.proposal.Block.View,
 			BlockID:   s.proposal.Block.BlockID,
 			SignerIDs: mergedSignerIDs,
-			SigData:   expectedSigData,
+			SigData:   packedSigData,
 		}
 		require.Equal(s.T(), expectedQC, qc)
 	}).Return(nil).Once()
 
-	// generate threshold signatures till we have enough random beacon shares
-	for i := uint64(0); i < s.minRequiredShares; i++ {
+	// add votes
+	for _, signer := range stakingSigners {
+		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+		vote.SignerID = signer
+		expectedSig := crypto.Signature(vote.SigData[1:])
+		s.stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Once()
+		s.stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Return(...).Once()
+		err := s.processor.Process(vote)
+		require.NoError(s.T(), err)
+	}
+	for _, signer := range beaconSigners {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
-		s.rbSigAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
+		vote.SignerID = signer
+		expectedSig := crypto.Signature(vote.SigData[1:])
+		s.rbSigAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Once()
+		s.rbSigAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Return(...).Once()
 		err := s.processor.Process(vote)
 		require.NoError(s.T(), err)
 	}
 
 	require.True(s.T(), s.processor.done.Load())
 	s.onQCCreatedState.AssertExpectations(s.T())
+	s.rbSigAggregator.AssertExpectations(s.T())
+	s.stakingAggregator.AssertExpectations(s.T())
 
 	// processing extra votes shouldn't result in creating new QCs
 	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
