@@ -87,9 +87,9 @@ func (s *Signaler) Throw(err error) {
 		close(s.errChan)
 	} else {
 		// Another thread, possibly from the same component, has already thrown
-    // an irrecoverable error to this Signaler. Any subsequent irrecoverable
-    // errors can either be logged or ignored, as the parent will already
-    // be taking steps to remediate the first error.
+    		// an irrecoverable error to this Signaler. Any subsequent irrecoverable
+    		// errors can either be logged or ignored, as the parent will already
+    		// be taking steps to remediate the first error.
 	}
 }
 ```
