@@ -94,7 +94,7 @@ func (nc *NoopCollector) OnVerifiableChunkSentToVerifier()                      
 func (nc *NoopCollector) OnChunkDataPackResponseReceivedFromNetwork()                            {}
 func (nc *NoopCollector) StartBlockReceivedToExecuted(blockID flow.Identifier)                   {}
 func (nc *NoopCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier)                  {}
-func (nc *NoopCollector) ExecutionGasUsedPerBlock(gas uint64)                                    {}
+func (nc *NoopCollector) ExecutionComputationUsedPerBlock(computation uint64)                    {}
 func (nc *NoopCollector) ExecutionStateReadsPerBlock(reads uint64)                               {}
 func (nc *NoopCollector) ExecutionStateStorageDiskTotal(bytes int64)                             {}
 func (nc *NoopCollector) ExecutionStorageStateCommitment(bytes int64)                            {}
