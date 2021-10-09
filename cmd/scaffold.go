@@ -23,6 +23,7 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -174,6 +175,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 				}
 				return head.Height, nil
 			},
+		}
+
+		// only consensus roles will need to report hotstuff view
+		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
+			// initialize the persister
+			persist := persister.New(node.DB, node.RootChainID)
+
+			pingProvider.HotstuffViewFun = func() (uint64, error) {
+				curView, err := persist.GetStarted()
+				if err != nil {
+					return 0, err
+				}
+
+				return curView, nil
+			}
 		}
 
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
