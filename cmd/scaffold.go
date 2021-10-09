@@ -195,6 +195,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			}
 		}
 
+		// only consensus roles will need to report hotstuff view
+		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
+			// initialize the persister
+			persist := persister.New(node.DB, node.RootChainID)
+
+			pingProvider.HotstuffViewFun = func() (uint64, error) {
+				curView, err := persist.GetStarted()
+				if err != nil {
+					return 0, err
+				}
+
+				return curView, nil
+			}
+		}
+
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
 			fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
