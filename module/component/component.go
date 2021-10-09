@@ -76,7 +76,9 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 		var signalCtx irrecoverable.SignalerContext
 		signalCtx, irrecoverableErr = irrecoverable.WithSignaler(runCtx)
 
-		component.Start(signalCtx)
+		// we start the component in a separate goroutine, since an irrecoverable error
+		// could be thrown with `signalCtx` which terminates the calling goroutine
+		go component.Start(signalCtx)
 
 		done = component.Done()
 
@@ -151,7 +153,10 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 
 type ReadyFunc func()
 
-// ComponentWorker represents a worker routine of a component
+// ComponentWorker represents a worker routine of a component.
+// It takes a SignalerContext which can be used to throw any irrecoverable errors it encouters,
+// as well as a ReadyFunc which must be called to signal that it is ready. The ComponentManager
+// waits until all workers have signaled that they are ready before closing its own Ready channel.
 type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
 
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
