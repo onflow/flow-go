@@ -86,7 +86,7 @@ type BlocksPromise interface {
 	ForEach(cb func(blocks.Block)) BlocksRequest
 }
 
-// BlocksPromise represents a request for blocks on the Bitswap network.
+// BlocksRequest represents a request for blocks on the Bitswap network.
 type BlocksRequest interface {
 	// Send initiates the request
 	Send(ctx context.Context) (<-chan struct{}, error)

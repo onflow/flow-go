@@ -12,7 +12,7 @@ func AllReady(components ...module.ReadyDoneAware) <-chan struct{} {
 	readyChans := make([]<-chan struct{}, len(components))
 
 	for i, c := range components {
-		readyChans[i] = c.Done()
+		readyChans[i] = c.Ready()
 	}
 
 	return AllClosed(readyChans...)
