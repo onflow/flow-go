@@ -1,8 +1,12 @@
 package commands
 
-import "github.com/onflow/flow-go/admin"
+import (
+	"context"
+
+	"github.com/onflow/flow-go/admin"
+)
 
 type AdminCommand interface {
-	Handler() admin.CommandHandler
-	Validator() admin.CommandValidator
+	Handler(ctx context.Context, request *admin.CommandRequest) (interface{}, error)
+	Validator(request *admin.CommandRequest) error
 }
