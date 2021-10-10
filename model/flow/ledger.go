@@ -103,3 +103,16 @@ func ToStateCommitment(stateBytes []byte) (StateCommitment, error) {
 func (s StateCommitment) MarshalJSON() ([]byte, error) {
 	return json.Marshal(hex.EncodeToString(s[:]))
 }
+
+func (s *StateCommitment) UnmarshalJSON(data []byte) error {
+	b, err := hex.DecodeString(string(data))
+	if err != nil {
+		return err
+	}
+	h, err := hash.ToHash(b)
+	if err != nil {
+		return err
+	}
+	*s = StateCommitment(h)
+	return nil
+}
