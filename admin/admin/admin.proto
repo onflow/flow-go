@@ -18,11 +18,11 @@ service Admin {
 
 /* RunCommandRequest represents an admin command with arguments */
 message RunCommandRequest {
-  string commandName = 1;           // Name of the command to run
-  google.protobuf.Struct data = 2;  // Arguments to pass to the command
+  string commandName = 1;          // Name of the command to run
+  google.protobuf.Value data = 2;  // Arguments to pass to the command
 }
 
 /* RunCommandResponse represents an admin command response */
 message RunCommandResponse {
-  string output = 1;  // The command output
+  google.protobuf.Value output = 1;  // The command output
 }

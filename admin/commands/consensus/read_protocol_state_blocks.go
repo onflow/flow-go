@@ -130,14 +130,23 @@ func (r *ReadProtocolStateBlocksCommand) Handler(ctx context.Context, req *admin
 		result = append(result, block)
 	}
 
+	var resultList []interface{}
 	bytes, err := json.Marshal(result)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(bytes, &resultList)
 
-	return string(bytes), err
+	return resultList, err
 }
 
 func (r *ReadProtocolStateBlocksCommand) Validator(req *admin.CommandRequest) error {
+	input, ok := req.Data.(map[string]interface{})
+	if !ok {
+		return errors.New("wrong input format")
+	}
 	data := &requestData{}
-	block, ok := req.Data["block"]
+	block, ok := input["block"]
 	if !ok {
 		return errors.New("the \"block\" field is required")
 	}
@@ -165,7 +174,7 @@ func (r *ReadProtocolStateBlocksCommand) Validator(req *admin.CommandRequest) er
 		return fmt.Errorf("invalid value for \"block\": %v", block)
 	}
 
-	if n, ok := req.Data["n"]; ok {
+	if n, ok := input["n"]; ok {
 		n, ok := n.(float64)
 		if !ok {
 			return fmt.Errorf("invalid value for \"n\": %v", n)

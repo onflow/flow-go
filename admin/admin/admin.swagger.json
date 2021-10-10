@@ -67,7 +67,7 @@
       "type": "object",
       "properties": {
         "output": {
-          "type": "string"
+          "type": "object"
         }
       },
       "title": "RunCommandResponse represents an admin command response"
