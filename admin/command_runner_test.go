@@ -93,8 +93,10 @@ func (suite *CommandRunnerSuite) TestHandler() {
 		default:
 		}
 
-		suite.EqualValues(req.Data["string"], "foo")
-		suite.EqualValues(req.Data["number"], 123)
+		data := req.Data.(map[string]interface{})
+
+		suite.EqualValues(data["string"], "foo")
+		suite.EqualValues(data["number"], 123)
 		called = true
 
 		return "ok", nil
@@ -105,7 +107,7 @@ func (suite *CommandRunnerSuite) TestHandler() {
 	data := make(map[string]interface{})
 	data["string"] = "foo"
 	data["number"] = 123
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -125,7 +127,7 @@ func (suite *CommandRunnerSuite) TestUnimplementedHandler() {
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -156,7 +158,7 @@ func (suite *CommandRunnerSuite) TestValidator() {
 
 	validatorErr := errors.New("unexpected value")
 	suite.bootstrapper.RegisterValidator("foo", func(req *CommandRequest) error {
-		if req.Data["key"] != "value" {
+		if req.Data.(map[string]interface{})["key"] != "value" {
 			return validatorErr
 		}
 		return nil
@@ -166,7 +168,7 @@ func (suite *CommandRunnerSuite) TestValidator() {
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -181,7 +183,7 @@ func (suite *CommandRunnerSuite) TestValidator() {
 	suite.Equal(calls, 1)
 
 	data["key"] = "blah"
-	val, err = structpb.NewStruct(data)
+	val, err = structpb.NewValue(data)
 	suite.NoError(err)
 	request.Data = val
 	_, err = suite.client.RunCommand(ctx, request)
@@ -206,7 +208,7 @@ func (suite *CommandRunnerSuite) TestHandlerError() {
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -231,7 +233,7 @@ func (suite *CommandRunnerSuite) TestTimeout() {
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -255,7 +257,7 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 		default:
 		}
 
-		suite.EqualValues(req.Data["key"], "value")
+		suite.EqualValues(req.Data.(map[string]interface{})["key"], "value")
 		called = true
 
 		return "ok", nil
@@ -394,7 +396,7 @@ func (suite *CommandRunnerSuite) TestTLS() {
 		default:
 		}
 
-		suite.EqualValues(req.Data["key"], "value")
+		suite.EqualValues(req.Data.(map[string]interface{})["key"], "value")
 		called = true
 
 		return "ok", nil
