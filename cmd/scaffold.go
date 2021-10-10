@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/admin"
+	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/admin/commands/common"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
@@ -116,6 +117,7 @@ type FlowNodeBuilder struct {
 	lm                       *lifecycle.LifecycleManager
 	extraFlagCheck           func() error
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
+	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
@@ -821,10 +823,8 @@ func (fnb *FlowNodeBuilder) Module(name string, f func(builder NodeBuilder, node
 	return fnb
 }
 
-// AdminCommand registers a new admin command with the admin server
-func (fnb *FlowNodeBuilder) AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder {
-	fnb.adminCommandBootstrapper.RegisterHandler(command, handler)
-	fnb.adminCommandBootstrapper.RegisterValidator(command, validator)
+func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder {
+	fnb.adminCommands[command] = f
 	return fnb
 }
 
@@ -928,6 +928,7 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 		flags:                    pflag.CommandLine,
 		lm:                       lifecycle.NewLifecycleManager(),
 		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
+		adminCommands:            make(map[string]func(*NodeConfig) commands.AdminCommand),
 	}
 	return builder
 }
@@ -963,7 +964,9 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 }
 
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
-	fnb.AdminCommand("set-log-level", common.SetLogLevelCommand.Handler, common.SetLogLevelCommand.Validator)
+	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
+		return &common.SetLogLevelCommand{}
+	})
 }
 
 // Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
@@ -1032,6 +1035,13 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 
 		for _, f := range fnb.postInitFns {
 			fnb.handlePostInit(f)
+		}
+
+		// set up all admin commands
+		for commandName, commandFunc := range fnb.adminCommands {
+			command := commandFunc(fnb.NodeConfig)
+			fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
+			fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
 		}
 
 		// set up all modules
