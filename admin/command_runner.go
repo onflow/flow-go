@@ -27,7 +27,7 @@ type CommandValidator func(request *CommandRequest) error
 type CommandRunnerOption func(*CommandRunner)
 
 type CommandRequest struct {
-	Data          map[string]interface{}
+	Data          interface{}
 	ValidatorData interface{}
 }
 
@@ -244,7 +244,7 @@ func (r *CommandRunner) runAdminServer(ctx context.Context) error {
 	return nil
 }
 
-func (r *CommandRunner) runCommand(ctx context.Context, command string, data map[string]interface{}) (interface{}, error) {
+func (r *CommandRunner) runCommand(ctx context.Context, command string, data interface{}) (interface{}, error) {
 	r.logger.Info().Str("command", command).Msg("received new command")
 
 	req := &CommandRequest{Data: data}

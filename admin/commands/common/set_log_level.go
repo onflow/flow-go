@@ -22,15 +22,11 @@ func (s *SetLogLevelCommand) Handler(ctx context.Context, req *admin.CommandRequ
 }
 
 func (s *SetLogLevelCommand) Validator(req *admin.CommandRequest) error {
-	level, ok := req.Data["level"]
+	level, ok := req.Data.(string)
 	if !ok {
-		return errors.New("the \"level\" field must be provided")
+		return errors.New("the input must be a string")
 	}
-	levelStr, ok := level.(string)
-	if !ok {
-		return errors.New("\"level\" must be a string")
-	}
-	logLevel, err := zerolog.ParseLevel(levelStr)
+	logLevel, err := zerolog.ParseLevel(level)
 	if err != nil {
 		return fmt.Errorf("failed to parse level: %w", err)
 	}
