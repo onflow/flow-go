@@ -3,10 +3,11 @@ package admin
 import (
 	"context"
 
-	pb "github.com/onflow/flow-go/admin/admin"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/structpb"
+
+	pb "github.com/onflow/flow-go/admin/admin"
 )
 
 type adminServer struct {
