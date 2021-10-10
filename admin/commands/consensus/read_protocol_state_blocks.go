@@ -3,6 +3,7 @@ package consensus
 import (
 	"context"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -98,7 +99,7 @@ func (r *ReadProtocolStateBlocksCommand) getBlockByHeader(header *flow.Header) (
 }
 
 func (r *ReadProtocolStateBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
-	data := req.ValidatorData.(requestData)
+	data := req.ValidatorData.(*requestData)
 	var result []*flow.Block
 	var block *flow.Block
 	var err error
@@ -129,7 +130,9 @@ func (r *ReadProtocolStateBlocksCommand) Handler(ctx context.Context, req *admin
 		result = append(result, block)
 	}
 
-	return result, nil
+	bytes, err := json.Marshal(result)
+
+	return string(bytes), err
 }
 
 func (r *ReadProtocolStateBlocksCommand) Validator(req *admin.CommandRequest) error {

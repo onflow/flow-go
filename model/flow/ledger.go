@@ -1,6 +1,8 @@
 package flow
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -96,4 +98,8 @@ func ToStateCommitment(stateBytes []byte) (StateCommitment, error) {
 	}
 	copy(state[:], stateBytes)
 	return state, nil
+}
+
+func (s StateCommitment) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(s[:]))
 }
