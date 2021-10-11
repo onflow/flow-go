@@ -68,6 +68,7 @@ func (pc *PingCollector) NodeInfo(node *flow.Identity, nodeInfo string, version 
 	pc.hotstuffCurView.With(prometheus.Labels{
 		LabelNodeID:      node.NodeID.String(),
 		LabelNodeAddress: node.Address,
+		LabelNodeRole:    node.Role.String(),
 		LabelNodeInfo:    nodeInfo,
 	}).
 		Set(float64(hotstuffCurView))
