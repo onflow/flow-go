@@ -89,13 +89,14 @@ func Ejected(identity *flow.Identity) bool {
 
 // HasRole returns a filter for nodes with one of the input roles.
 func HasRole(roles ...flow.Role) flow.IdentityFilter {
-	lookup := make(map[flow.Role]struct{})
+	// since a role is of type byte, there's no need for a
+	// map
+	var lookup = [256]uint8{}
 	for _, role := range roles {
-		lookup[role] = struct{}{}
+		lookup[int(role)] = 1
 	}
 	return func(identity *flow.Identity) bool {
-		_, ok := lookup[identity.Role]
-		return ok
+		return lookup[int(identity.Role)] == 1
 	}
 }
 
