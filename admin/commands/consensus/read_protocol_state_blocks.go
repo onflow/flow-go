@@ -191,8 +191,8 @@ func (r *ReadProtocolStateBlocksCommand) Validator(req *admin.CommandRequest) er
 		if math.Trunc(n) != n {
 			return fmt.Errorf("\"n\" must be an integer")
 		}
-		if n < 0 {
-			return fmt.Errorf("\"n\" must not be negative")
+		if n < 1 {
+			return fmt.Errorf("\"n\" must be at least 1")
 		}
 		data.numBlocksToQuery = uint(n)
 	} else {
