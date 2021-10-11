@@ -29,7 +29,7 @@ type voteProcessorFactoryBase struct {
 
 // combinedVoteProcessorFactoryBase implements a factory for creating CombinedVoteProcessor
 // holds needed dependencies to initialize CombinedVoteProcessor.
-// combinedVoteProcessorFactoryBase is used in consensus cluster 
+// combinedVoteProcessorFactoryBase is used in consensus cluster
 type combinedVoteProcessorFactoryBase struct {
 	voteProcessorFactoryBase
 	packer hotstuff.Packer
