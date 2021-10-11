@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/cadence"
 	"github.com/stretchr/testify/require"
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -41,6 +43,13 @@ func RandomAddressFixture() flow.Address {
 		panic(err)
 	}
 	return addr
+}
+
+func RandomSDKAddressFixture() sdk.Address {
+	addr := RandomAddressFixture()
+	var sdkAddr sdk.Address
+	copy(sdkAddr[:], addr[:])
+	return sdkAddr
 }
 
 func InvalidAddressFixture() flow.Address {
@@ -1223,7 +1232,7 @@ func WithHeight(height uint64) func(*verification.ChunkDataPackRequest) {
 
 func WithHeightGreaterThan(height uint64) func(*verification.ChunkDataPackRequest) {
 	return func(request *verification.ChunkDataPackRequest) {
-		request.Height = height + uint64(rand.Uint32()) + 1
+		request.Height = height + 1
 	}
 }
 
@@ -1456,12 +1465,53 @@ func QCWithSignerIDs(signerIDs []flow.Identifier) func(*flow.QuorumCertificate) 
 	}
 }
 
-func VoteFixture() *hotstuff.Vote {
-	return &hotstuff.Vote{
+func VoteFixture(opts ...func(vote *hotstuff.Vote)) *hotstuff.Vote {
+	vote := &hotstuff.Vote{
 		View:     uint64(rand.Uint32()),
 		BlockID:  IdentifierFixture(),
 		SignerID: IdentifierFixture(),
 		SigData:  RandomBytes(128),
+	}
+
+	for _, opt := range opts {
+		opt(vote)
+	}
+
+	return vote
+}
+
+func WithVoteView(view uint64) func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.View = view
+	}
+}
+
+func WithVoteBlockID(blockID flow.Identifier) func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.BlockID = blockID
+	}
+}
+
+func VoteForBlockFixture(block *hotstuff.Block, opts ...func(vote *hotstuff.Vote)) *hotstuff.Vote {
+	vote := VoteFixture(WithVoteView(block.View),
+		WithVoteBlockID(block.BlockID))
+
+	for _, opt := range opts {
+		opt(vote)
+	}
+
+	return vote
+}
+
+func VoteWithStakingSig() func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeStaking)}, vote.SigData...)
+	}
+}
+
+func VoteWithThresholdSig() func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeRandomBeacon)}, vote.SigData...)
 	}
 }
 
@@ -1719,4 +1769,44 @@ func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 		DKGMessage: *DKGMessageFixture(),
 		Signature:  SignatureFixture(),
 	}
+}
+
+func PrivateKeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
+	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(64))
+	if err != nil {
+		panic(err)
+	}
+	return sk
+}
+
+func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
+	return bootstrap.NodeMachineAccountInfo{
+		Address:           RandomAddressFixture().String(),
+		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256).Encode(),
+		HashAlgorithm:     bootstrap.DefaultMachineAccountHashAlgo,
+		SigningAlgorithm:  bootstrap.DefaultMachineAccountSignAlgo,
+		KeyIndex:          bootstrap.DefaultMachineAccountKeyIndex,
+	}
+}
+
+func MachineAccountFixture(t *testing.T) (bootstrap.NodeMachineAccountInfo, *sdk.Account) {
+	info := NodeMachineAccountInfoFixture()
+
+	bal, err := cadence.NewUFix64("0.5")
+	require.NoError(t, err)
+
+	acct := &sdk.Account{
+		Address: sdk.HexToAddress(info.Address),
+		Balance: uint64(bal),
+		Keys: []*sdk.AccountKey{
+			{
+				Index:     int(info.KeyIndex),
+				PublicKey: info.MustPrivateKey().PublicKey(),
+				SigAlgo:   info.SigningAlgorithm,
+				HashAlgo:  info.HashAlgorithm,
+				Weight:    1000,
+			},
+		},
+	}
+	return info, acct
 }

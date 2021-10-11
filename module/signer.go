@@ -4,6 +4,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
+// TODO : to delete in V2
 // Signer is a simple cryptographic signer that can sign a simple message to
 // generate a signature, and verify the signature against the message.
 type Signer interface {
@@ -11,6 +12,7 @@ type Signer interface {
 	Sign(msg []byte) (crypto.Signature, error)
 }
 
+// TODO : to delete in V2
 // AggregatingSigner is a signer that can sign a simple message and aggregate
 // multiple signatures into a single aggregated signature.
 type AggregatingSigner interface {

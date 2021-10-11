@@ -2,7 +2,6 @@ package helper
 
 import (
 	"math/rand"
-	"testing"
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -10,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func MakeBlock(t *testing.T, options ...func(*model.Block)) *model.Block {
+func MakeBlock(options ...func(*model.Block)) *model.Block {
 	view := rand.Uint64()
 	block := model.Block{
 		View:        view,
@@ -18,7 +17,7 @@ func MakeBlock(t *testing.T, options ...func(*model.Block)) *model.Block {
 		PayloadHash: unittest.IdentifierFixture(),
 		ProposerID:  unittest.IdentifierFixture(),
 		Timestamp:   time.Now().UTC(),
-		QC:          MakeQC(t, WithQCView(view-1)),
+		QC:          MakeQC(WithQCView(view - 1)),
 	}
 	for _, option := range options {
 		option(&block)
@@ -48,5 +47,28 @@ func WithParentBlock(parent *model.Block) func(*model.Block) {
 func WithParentSigners(signerIDs []flow.Identifier) func(*model.Block) {
 	return func(block *model.Block) {
 		block.QC.SignerIDs = signerIDs
+	}
+}
+
+func MakeProposal(options ...func(*model.Proposal)) *model.Proposal {
+	proposal := &model.Proposal{
+		Block:   MakeBlock(),
+		SigData: unittest.SignatureFixture(),
+	}
+	for _, option := range options {
+		option(proposal)
+	}
+	return proposal
+}
+
+func WithBlock(block *model.Block) func(*model.Proposal) {
+	return func(proposal *model.Proposal) {
+		proposal.Block = block
+	}
+}
+
+func WithSigData(sigData []byte) func(*model.Proposal) {
+	return func(proposal *model.Proposal) {
+		proposal.SigData = sigData
 	}
 }

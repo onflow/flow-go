@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/storage"
 )
@@ -45,6 +46,8 @@ type RequestHandlerEngine struct {
 	pendingBatchRequests  engine.MessageStore    // message store for *message.BatchRequest
 	pendingRangeRequests  engine.MessageStore    // message store for *message.RangeRequest
 	requestMessageHandler *engine.MessageHandler // message handler responsible for request processing
+
+	queueMissingHeights bool // true if missing heights should be added to download queue
 }
 
 func NewRequestHandlerEngine(
@@ -55,17 +58,19 @@ func NewRequestHandlerEngine(
 	blocks storage.Blocks,
 	core module.SyncCore,
 	finalizedHeader *FinalizedHeaderCache,
+	queueMissingHeights bool,
 ) *RequestHandlerEngine {
 	r := &RequestHandlerEngine{
-		unit:            engine.NewUnit(),
-		lm:              lifecycle.NewLifecycleManager(),
-		me:              me,
-		log:             log.With().Str("engine", "synchronization").Logger(),
-		metrics:         metrics,
-		blocks:          blocks,
-		core:            core,
-		finalizedHeader: finalizedHeader,
-		con:             con,
+		unit:                engine.NewUnit(),
+		lm:                  lifecycle.NewLifecycleManager(),
+		me:                  me,
+		log:                 log.With().Str("engine", "synchronization").Logger(),
+		metrics:             metrics,
+		blocks:              blocks,
+		core:                core,
+		finalizedHeader:     finalizedHeader,
+		con:                 con,
+		queueMissingHeights: queueMissingHeights,
 	}
 
 	r.setupRequestMessageHandler()
@@ -174,9 +179,16 @@ func (r *RequestHandlerEngine) setupRequestMessageHandler() {
 // we have a lower height, we add the difference to our own download queue.
 func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
 	final := r.finalizedHeader.Get()
+	r.log.Debug().
+		Str("origin_id", originID.String()).
+		Uint64("origin_height", req.Height).
+		Uint64("local_height", final.Height).
+		Msg("received new sync request")
 
-	// queue any missing heights as needed
-	r.core.HandleHeight(final, req.Height)
+	if r.queueMissingHeights {
+		// queue any missing heights as needed
+		r.core.HandleHeight(final, req.Height)
+	}
 
 	// don't bother sending a response if we're within tolerance or if we're
 	// behind the requester
@@ -201,12 +213,19 @@ func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *mess
 
 // onRangeRequest processes a request for a range of blocks by height.
 func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
+	r.log.Debug().Str("origin_id", originID.String()).Msg("received new range request")
 	// get the latest final state to know if we can fulfill the request
 	head := r.finalizedHeader.Get()
 
 	// if we don't have anything to send, we can bail right away
 	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {
 		return nil
+	}
+
+	// enforce client-side max request size
+	maxHeight := req.FromHeight + uint64(synchronization.DefaultConfig().MaxSize)
+	if maxHeight < req.ToHeight {
+		req.ToHeight = maxHeight
 	}
 
 	// get all of the blocks, one by one
@@ -246,6 +265,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 
 // onBatchRequest processes a request for a specific block by block ID.
 func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
+	r.log.Debug().Str("origin_id", originID.String()).Msg("received new batch request")
 	// we should bail and send nothing on empty request
 	if len(req.BlockIDs) == 0 {
 		return nil
@@ -255,6 +275,11 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 	blockIDs := make(map[flow.Identifier]struct{})
 	for _, blockID := range req.BlockIDs {
 		blockIDs[blockID] = struct{}{}
+
+		// enforce client-side max request size
+		if len(blockIDs) == int(synchronization.DefaultConfig().MaxSize) {
+			break
+		}
 	}
 
 	// try to get all the blocks by ID

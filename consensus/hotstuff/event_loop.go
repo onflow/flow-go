@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 )
 
@@ -20,6 +21,7 @@ type EventLoop struct {
 	proposals    chan *model.Proposal
 	votes        chan *model.Vote
 
+	lm   *lifecycle.LifecycleManager
 	unit *engine.Unit // lock for preventing concurrent state transitions
 }
 
@@ -30,6 +32,7 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 
 	el := &EventLoop{
 		log:          log,
+		lm:           lifecycle.NewLifecycleManager(),
 		eventHandler: eventHandler,
 		metrics:      metrics,
 		proposals:    proposals,
@@ -195,11 +198,17 @@ func (el *EventLoop) SubmitVote(originID flow.Identifier, blockID flow.Identifie
 // Multiple calls are handled gracefully and the event loop will only start
 // once.
 func (el *EventLoop) Ready() <-chan struct{} {
-	el.unit.Launch(el.loop)
-	return el.unit.Ready()
+	el.lm.OnStart(func() {
+		el.unit.Launch(el.loop)
+	})
+	return el.lm.Started()
 }
 
 // Done implements interface module.ReadyDoneAware
 func (el *EventLoop) Done() <-chan struct{} {
-	return el.unit.Done()
+	el.lm.OnStop(func() {
+		// wait for event loop to exit
+		<-el.unit.Done()
+	})
+	return el.lm.Stopped()
 }

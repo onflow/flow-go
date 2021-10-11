@@ -276,11 +276,11 @@ func main() {
 		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := storage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -327,6 +327,7 @@ func main() {
 				pendingBlocks,
 				followerCore,
 				syncCore,
+				node.Tracer,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -352,7 +353,7 @@ func main() {
 				followerEng,
 				syncCore,
 				finalizedHeader,
-				node.State,
+				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)

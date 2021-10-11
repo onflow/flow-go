@@ -17,12 +17,15 @@ import (
 	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/utils/logging"
 )
+
+const SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
@@ -32,7 +35,7 @@ type VirtualMachine interface {
 // ViewCommitter commits views's deltas to the ledger and collects the proofs
 type ViewCommitter interface {
 	// CommitView commits a views' register delta and collects proofs
-	CommitView(state.View, flow.StateCommitment) (flow.StateCommitment, []byte, error)
+	CommitView(state.View, flow.StateCommitment) (flow.StateCommitment, []byte, *ledger.TrieUpdate, error)
 }
 
 // A BlockComputer executes the transactions in a block.
@@ -50,6 +53,17 @@ type blockComputer struct {
 	committer      ViewCommitter
 }
 
+func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
+	return fvm.NewContextFromParent(
+		vmCtx,
+		fvm.WithRestrictedDeployment(false),
+		fvm.WithTransactionFeesEnabled(false),
+		fvm.WithServiceEventCollectionEnabled(),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
+		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
+	)
+}
+
 // NewBlockComputer creates a new block executor.
 func NewBlockComputer(
 	vm VirtualMachine,
@@ -59,22 +73,13 @@ func NewBlockComputer(
 	logger zerolog.Logger,
 	committer ViewCommitter,
 ) (BlockComputer, error) {
-
-	systemChunkCtx := fvm.NewContextFromParent(
-		vmCtx,
-		fvm.WithRestrictedDeployment(false),
-		fvm.WithTransactionFeesEnabled(false),
-		fvm.WithServiceEventCollectionEnabled(),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
-	)
-
 	return &blockComputer{
 		vm:             vm,
 		vmCtx:          vmCtx,
 		metrics:        metrics,
 		tracer:         tracer,
 		log:            logger,
-		systemChunkCtx: systemChunkCtx,
+		systemChunkCtx: SystemChunkContext(vmCtx, logger),
 		committer:      committer,
 	}, nil
 }
@@ -87,15 +92,11 @@ func (e *blockComputer) ExecuteBlock(
 	program *programs.Programs,
 ) (*execution.ComputationResult, error) {
 
-	// call tracer
-	span, _ := e.tracer.StartSpanFromContext(ctx, trace.EXEComputeBlock)
-	defer func() {
-		span.SetTag("block.collectioncount", len(block.CompleteCollections))
-		span.LogFields(
-			log.String("block.hash", block.ID().String()),
-		)
-		span.Finish()
-	}()
+	span, _, isSampled := e.tracer.StartBlockSpan(ctx, block.ID(), trace.EXEComputeBlock)
+	if isSampled {
+		span.LogFields(log.Int("collection_counts", len(block.CompleteCollections)))
+	}
+	defer span.Finish()
 
 	results, err := e.executeBlock(span, block, stateView, program)
 	if err != nil {
@@ -141,6 +142,7 @@ func (e *blockComputer) executeBlock(
 
 	stateCommitments := make([]flow.StateCommitment, 0, len(collections)+1)
 	proofs := make([][]byte, 0, len(collections)+1)
+	trieUpdates := make([]*ledger.TrieUpdate, 0, len(collections)+1)
 
 	bc := blockCommitter{
 		committer: e.committer,
@@ -148,12 +150,13 @@ func (e *blockComputer) executeBlock(
 		tracer:    e.tracer,
 		state:     *block.StartState,
 		views:     make(chan state.View, len(collections)+1),
-		callBack: func(state flow.StateCommitment, proof []byte, err error) {
+		callBack: func(state flow.StateCommitment, proof []byte, trieUpdate *ledger.TrieUpdate, err error) {
 			if err != nil {
 				panic(err)
 			}
 			stateCommitments = append(stateCommitments, state)
 			proofs = append(proofs, proof)
+			trieUpdates = append(trieUpdates, trieUpdate)
 		},
 	}
 
@@ -217,6 +220,7 @@ func (e *blockComputer) executeBlock(
 	res.StateReads = stateView.(*delta.View).ReadsCount()
 	res.StateCommitments = stateCommitments
 	res.Proofs = proofs
+	res.TrieUpdates = trieUpdates
 
 	return res, nil
 }
@@ -323,31 +327,35 @@ func (e *blockComputer) executeTransaction(
 	res *execution.ComputationResult,
 ) error {
 	startedAt := time.Now()
-	var txSpan opentracing.Span
+	txID := txBody.ID()
+
+	// we capture two spans one for tx-based view and one for the current context (block-based) view
+	txSpan := e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
+	txSpan.LogFields(log.String("tx_id", txID.String()))
+	txSpan.LogFields(log.Uint32("tx_index", txIndex))
+	txSpan.LogFields(log.Int("col_index", collectionIndex))
+	defer txSpan.Finish()
+
 	var traceID string
-	// call tracing
-	txSpan = e.tracer.StartSpanFromParent(colSpan, trace.EXEComputeTransaction)
-
-	if sc, ok := txSpan.Context().(jaeger.SpanContext); ok {
-		traceID = sc.TraceID().String()
+	txInternalSpan, _, isSampled := e.tracer.StartTransactionSpan(context.Background(), txID, trace.EXERunTransaction)
+	if isSampled {
+		txInternalSpan.LogFields(log.String("tx_id", txID.String()))
+		if sc, ok := txInternalSpan.Context().(jaeger.SpanContext); ok {
+			traceID = sc.TraceID().String()
+		}
 	}
-
-	defer func() {
-		txSpan.LogFields(
-			log.String("transaction.ID", txBody.ID().String()),
-		)
-		txSpan.Finish()
-	}()
+	defer txInternalSpan.Finish()
 
 	e.log.Debug().
 		Hex("tx_id", logging.Entity(txBody)).
 		Msg("executing transaction")
 
-	txView := collectionView.NewChild()
-
 	tx := fvm.Transaction(txBody, txIndex)
-	tx.SetTraceSpan(txSpan)
+	if isSampled {
+		tx.SetTraceSpan(txInternalSpan)
+	}
 
+	txView := collectionView.NewChild()
 	err := e.vm.Run(ctx, tx, txView, programs)
 	if err != nil {
 		return fmt.Errorf("failed to execute transaction: %w", err)
@@ -399,7 +407,7 @@ func (e *blockComputer) executeTransaction(
 type blockCommitter struct {
 	tracer    module.Tracer
 	committer ViewCommitter
-	callBack  func(state flow.StateCommitment, proof []byte, err error)
+	callBack  func(state flow.StateCommitment, proof []byte, update *ledger.TrieUpdate, err error)
 	state     flow.StateCommitment
 	views     chan state.View
 	blockSpan opentracing.Span
@@ -408,8 +416,8 @@ type blockCommitter struct {
 func (bc *blockCommitter) Run() {
 	for view := range bc.views {
 		span := bc.tracer.StartSpanFromParent(bc.blockSpan, trace.EXECommitDelta)
-		stateCommit, proof, err := bc.committer.CommitView(view, bc.state)
-		bc.callBack(stateCommit, proof, err)
+		stateCommit, proof, trieUpdate, err := bc.committer.CommitView(view, bc.state)
+		bc.callBack(stateCommit, proof, trieUpdate, err)
 		bc.state = stateCommit
 		span.Finish()
 	}

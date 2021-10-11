@@ -68,6 +68,7 @@ func checkVotesValidity(votes []*model.Vote) error {
 	return nil
 }
 
+// To Delete in V2 (will be replace by module/signature.PublicKeyAggregator)
 // stakingKeysAggregator is a structure that aggregates the staking
 // public keys for QC verifications.
 type stakingKeysAggregator struct {
@@ -76,6 +77,7 @@ type stakingKeysAggregator struct {
 	sync.RWMutex
 }
 
+// To Delete in V2 (will be replace by module/signature.PublicKeyAggregator)
 // creates a new staking keys aggregator
 func newStakingKeysAggregator() *stakingKeysAggregator {
 	aggregator := &stakingKeysAggregator{
@@ -86,6 +88,7 @@ func newStakingKeysAggregator() *stakingKeysAggregator {
 	return aggregator
 }
 
+// To Delete in V2 (will be replace by module/signature.PublicKeyAggregator)
 // aggregatedStakingKey returns the aggregated public key of the input signers.
 func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) (crypto.PublicKey, error) {
 
@@ -126,6 +129,7 @@ func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) 
 	return updatedKey, nil
 }
 
+// To Delete in V2 (will be replace by module/signature.PublicKeyAggregator)
 // identitiesDeltaKeys computes the delta between the reference s.lastStakingSigners
 // and the input identity list.
 // It returns a list of the new signer keys, a list of the missing signer keys and the new map of signers.

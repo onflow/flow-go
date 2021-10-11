@@ -74,7 +74,7 @@ func benchmarkStorage(steps int, b *testing.B) {
 			b.Fatal(err)
 		}
 
-		newState, err := led.Set(update)
+		newState, _, err := led.Set(update)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -174,7 +174,7 @@ func BenchmarkTrieUpdate(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		_, err := led.Set(update)
+		_, _, err := led.Set(update)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -220,7 +220,7 @@ func BenchmarkTrieRead(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	newState, err := led.Set(update)
+	newState, _, err := led.Set(update)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -278,7 +278,7 @@ func BenchmarkTrieProve(b *testing.B) {
 		b.Fatal(err)
 	}
 
-	newState, err := led.Set(update)
+	newState, _, err := led.Set(update)
 	if err != nil {
 		b.Fatal(err)
 	}

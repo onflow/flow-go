@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -9,6 +10,8 @@ import (
 	"time"
 
 	"github.com/spf13/pflag"
+
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -54,49 +57,54 @@ import (
 func main() {
 
 	var (
-		followerState               protocol.MutableState
-		ledgerStorage               *ledger.Ledger
-		events                      *storage.Events
-		serviceEvents               *storage.ServiceEvents
-		txResults                   *storage.TransactionResults
-		results                     *storage.ExecutionResults
-		myReceipts                  *storage.MyExecutionReceipts
-		providerEngine              *exeprovider.Engine
-		checkerEng                  *checker.Engine
-		syncCore                    *chainsync.Core
-		pendingBlocks               *buffer.PendingBlocks // used in follower engine
-		deltas                      *ingestion.Deltas
-		syncEngine                  *synchronization.Engine
-		followerEng                 *followereng.Engine // to sync blocks from consensus nodes
-		computationManager          *computation.Manager
-		collectionRequester         *requester.Engine
-		ingestionEng                *ingestion.Engine
-		finalizationDistributor     *pubsub.FinalizationDistributor
-		finalizedHeader             *synchronization.FinalizedHeaderCache
-		rpcConf                     rpc.Config
-		err                         error
-		executionState              state.ExecutionState
-		triedir                     string
-		collector                   module.ExecutionMetrics
-		mTrieCacheSize              uint32
-		transactionResultsCacheSize uint
-		checkpointDistance          uint
-		checkpointsToKeep           uint
-		stateDeltasLimit            uint
-		cadenceExecutionCache       uint
-		chdpCacheSize               uint
-		requestInterval             time.Duration
-		preferredExeNodeIDStr       string
-		syncByBlocks                bool
-		syncFast                    bool
-		syncThreshold               int
-		extensiveLog                bool
-		pauseExecution              bool
-		checkStakedAtBlock          func(blockID flow.Identifier) (bool, error)
-		diskWAL                     *wal.DiskWAL
-		scriptLogThreshold          time.Duration
-		chdpQueryTimeout            uint
-		chdpDeliveryTimeout         uint
+		followerState                 protocol.MutableState
+		ledgerStorage                 *ledger.Ledger
+		events                        *storage.Events
+		serviceEvents                 *storage.ServiceEvents
+		txResults                     *storage.TransactionResults
+		results                       *storage.ExecutionResults
+		myReceipts                    *storage.MyExecutionReceipts
+		providerEngine                *exeprovider.Engine
+		checkerEng                    *checker.Engine
+		syncCore                      *chainsync.Core
+		pendingBlocks                 *buffer.PendingBlocks // used in follower engine
+		deltas                        *ingestion.Deltas
+		syncEngine                    *synchronization.Engine
+		followerEng                   *followereng.Engine // to sync blocks from consensus nodes
+		computationManager            *computation.Manager
+		collectionRequester           *requester.Engine
+		ingestionEng                  *ingestion.Engine
+		finalizationDistributor       *pubsub.FinalizationDistributor
+		finalizedHeader               *synchronization.FinalizedHeaderCache
+		rpcConf                       rpc.Config
+		err                           error
+		executionState                state.ExecutionState
+		triedir                       string
+		collector                     module.ExecutionMetrics
+		mTrieCacheSize                uint32
+		transactionResultsCacheSize   uint
+		checkpointDistance            uint
+		checkpointsToKeep             uint
+		stateDeltasLimit              uint
+		cadenceExecutionCache         uint
+		chdpCacheSize                 uint
+		requestInterval               time.Duration
+		preferredExeNodeIDStr         string
+		syncByBlocks                  bool
+		syncFast                      bool
+		syncThreshold                 int
+		extensiveLog                  bool
+		pauseExecution                bool
+		checkStakedAtBlock            func(blockID flow.Identifier) (bool, error)
+		diskWAL                       *wal.DiskWAL
+		scriptLogThreshold            time.Duration
+		chdpQueryTimeout              uint
+		chdpDeliveryTimeout           uint
+		enableBlockDataUpload         bool
+		gcpBucketName                 string
+		blockDataUploader             uploader.Uploader
+		blockDataUploaderMaxRetry     uint64 = 5
+		blockdataUploaderRetryTimeout        = 1 * time.Second
 	)
 
 	cmd.FlowNode(flow.RoleExecution.String()).
@@ -124,6 +132,16 @@ func main() {
 			flags.UintVar(&chdpQueryTimeout, "chunk-data-pack-query-timeout-sec", 10, "number of seconds to determine a chunk data pack query being slow")
 			flags.UintVar(&chdpDeliveryTimeout, "chunk-data-pack-delivery-timeout-sec", 10, "number of seconds to determine a chunk data pack response delivery being slow")
 			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
+			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to GCP Bucket")
+			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
+		}).
+		ValidateFlags(func() error {
+			if enableBlockDataUpload {
+				if gcpBucketName == "" {
+					return fmt.Errorf("invalid flag. gcp-bucket-name required when blockdata-uploader is enabled")
+				}
+			}
+			return nil
 		}).
 		Initialize().
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -159,6 +177,38 @@ func main() {
 		Module("pending block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
+		}).
+		Component("Block data uploader", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			if enableBlockDataUpload {
+
+				logger := node.Logger.With().Str("component_name", "block_data_uploader").Logger()
+				gcpBucketUploader, err := uploader.NewGCPBucketUploader(
+					context.Background(),
+					gcpBucketName,
+					logger,
+				)
+				if err != nil {
+					return nil, fmt.Errorf("cannot create GCP Bucket uploader: %w", err)
+				}
+
+				asyncUploader := uploader.NewAsyncUploader(
+					gcpBucketUploader,
+					blockdataUploaderRetryTimeout,
+					blockDataUploaderMaxRetry,
+					logger,
+					collector,
+				)
+
+				blockDataUploader = asyncUploader
+
+				return asyncUploader, nil
+			}
+
+			// Since we don't have conditional component creation, we just use Noop one.
+			// It's functions will be once per startup/shutdown - non-measurable performance penalty
+			// blockDataUploader will stay nil and disable calling uploader at all
+			return &module.NoopReadDoneAware{}, nil
+
 		}).
 		Module("state deltas mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
@@ -248,6 +298,7 @@ func main() {
 				cadenceExecutionCache,
 				committer,
 				scriptLogThreshold,
+				blockDataUploader,
 			)
 			if err != nil {
 				return nil, err
@@ -360,11 +411,11 @@ func main() {
 		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storage.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := storage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that handles updating the protocol
 			// state when the follower detects newly finalized blocks
-			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
+			final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -410,6 +461,7 @@ func main() {
 				pendingBlocks,
 				followerCore,
 				syncCore,
+				node.Tracer,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -456,7 +508,7 @@ func main() {
 				followerEng,
 				syncCore,
 				finalizedHeader,
-				node.State,
+				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize synchronization engine: %w", err)

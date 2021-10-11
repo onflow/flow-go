@@ -53,6 +53,7 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chunks"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/mempool"
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
@@ -64,6 +65,7 @@ import (
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
+	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerstate "github.com/onflow/flow-go/state/protocol/badger"
@@ -93,7 +95,7 @@ func GenericNodeFromParticipants(t testing.TB, hub *stub.Hub, identity *flow.Ide
 
 	// creates logger, metrics collector and tracer.
 	log := unittest.Logger().With().Int("index", i).Hex("node_id", identity.NodeID[:]).Str("role", identity.Role.String()).Logger()
-	tracer, err := trace.NewTracer(log, "test")
+	tracer, err := trace.NewTracer(log, "test", "test", trace.SensitivityCaptureAll)
 	require.NoError(t, err)
 	metrics := metrics.NewNoopCollector()
 
@@ -568,6 +570,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		computation.DefaultProgramsCacheSize,
 		committer,
 		computation.DefaultScriptLogThreshold,
+		nil,
 	)
 	require.NoError(t, err)
 
@@ -619,12 +622,14 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	cleaner := storage.NewCleaner(node.Log, node.DB, node.Metrics, flow.DefaultValueLogGCFrequency)
 
 	followerEng, err := follower.New(node.Log, node.Net, node.Me, node.Metrics, node.Metrics, cleaner,
-		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore)
+		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore, node.Tracer)
 	require.NoError(t, err)
 
 	finalizedHeader, err := synchronization.NewFinalizedHeaderCache(node.Log, node.State, finalizationDistributor)
 	require.NoError(t, err)
 
+	idCache, err := p2p.NewProtocolStateIDCache(node.Log, node.State, events.NewDistributor())
+	require.NoError(t, err, "could not create finalized snapshot cache")
 	syncEngine, err := synchronization.New(
 		node.Log,
 		node.Metrics,
@@ -634,7 +639,13 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		followerEng,
 		syncCore,
 		finalizedHeader,
-		node.State,
+		id.NewFilteredIdentifierProvider(
+			filter.And(
+				filter.HasRole(flow.RoleConsensus),
+				filter.Not(filter.HasNodeID(node.Me.NodeID())),
+			),
+			idCache,
+		),
 		synchronization.WithPollInterval(time.Duration(0)),
 	)
 	require.NoError(t, err)
@@ -724,7 +735,7 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState 
 	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
-	finalizer := confinalizer.NewFinalizer(node.DB, node.Headers, followerState)
+	finalizer := confinalizer.NewFinalizer(node.DB, node.Headers, followerState, trace.NewNoopTracer())
 
 	pending := make([]*flow.Header, 0)
 

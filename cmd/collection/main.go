@@ -4,8 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
+
 	"github.com/spf13/pflag"
-	"google.golang.org/grpc"
 
 	"github.com/onflow/flow-go-sdk/client"
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
@@ -83,7 +84,10 @@ func main() {
 		err               error
 
 		// epoch qc contract client
-		accessAddress string
+		accessAddress      string
+		secureAccessNodeID string
+
+		insecureAccessAPI bool
 	)
 
 	cmd.FlowNode(flow.RoleCollection.String()).
@@ -138,6 +142,8 @@ func main() {
 
 			// epoch qc contract flags
 			flags.StringVar(&accessAddress, "access-address", "", "the address of an access node")
+			flags.StringVar(&secureAccessNodeID, "secure-access-node-id", "", "the node ID of the secure access GRPC server")
+			flags.BoolVar(&insecureAccessAPI, "insecure-access-api", true, "required if insecure GRPC connection should be used")
 		}).
 		Initialize().
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -178,11 +184,11 @@ func main() {
 		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
-			cleaner := storagekv.NewCleaner(node.Logger, node.DB, metrics.NewCleanerCollector(), flow.DefaultValueLogGCFrequency)
+			cleaner := storagekv.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 
 			// create a finalizer that will handling updating the protocol
 			// state when the follower detects newly finalized blocks
-			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState)
+			finalizer := confinalizer.NewFinalizer(node.DB, node.Storage.Headers, followerState, node.Tracer)
 
 			// initialize the staking & beacon verifiers, signature joiner
 			staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -237,6 +243,7 @@ func main() {
 				followerBuffer,
 				followerCore,
 				mainChainSyncCore,
+				node.Tracer,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -264,7 +271,7 @@ func main() {
 				followerEng,
 				mainChainSyncCore,
 				finalizedHeader,
-				node.State,
+				node.SyncEngineIdentifierProvider,
 			)
 			if err != nil {
 				return nil, fmt.Errorf("could not create synchronization engine: %w", err)
@@ -317,7 +324,6 @@ func main() {
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
 		Component("epoch manager", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
 			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err
@@ -396,8 +402,40 @@ func main() {
 
 			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
 
+			// create flow client with correct GRPC configuration for QC contract client
+			var flowClient *client.Client
+			if insecureAccessAPI {
+				flowClient, err = common.InsecureFlowClient(accessAddress)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				if secureAccessNodeID == "" {
+					return nil, fmt.Errorf("invalid flag --secure-access-node-id required")
+				}
+
+				nodeID, err := flow.HexStringToIdentifier(secureAccessNodeID)
+				if err != nil {
+					return nil, fmt.Errorf("could not get flow identifer from secured access node id: %s", secureAccessNodeID)
+				}
+
+				identities, err := node.State.Sealed().Identities(filter.HasNodeID(nodeID))
+				if err != nil {
+					return nil, fmt.Errorf("could not get identity of secure access node: %s", secureAccessNodeID)
+				}
+
+				if len(identities) < 1 {
+					return nil, fmt.Errorf("could not find identity of secure access node: %s", secureAccessNodeID)
+				}
+
+				flowClient, err = common.SecureFlowClient(accessAddress, identities[0].NetworkPubKey.String()[2:])
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			// construct QC contract client
-			qcContractClient, err := createQCContractClient(node, accessAddress)
+			qcContractClient, err := createQCContractClient(node, accessAddress, flowClient)
 			if err != nil {
 				return nil, fmt.Errorf("could not create qc contract client %w", err)
 			}
@@ -444,11 +482,8 @@ func main() {
 		Run()
 }
 
-// TEMPORARY: The functionality to allow starting up a node without a properly configured
-// machine account is very much intended to be temporary.
-// Implemented by: https://github.com/dapperlabs/flow-go/issues/5585
-// Will be reverted by: https://github.com/dapperlabs/flow-go/issues/5619
-func createQCContractClient(node *cmd.NodeConfig, accessAddress string) (module.QCContractClient, error) {
+// createQCContractClient creates QC contract client
+func createQCContractClient(node *cmd.NodeConfig, accessAddress string, flowClient *client.Client) (module.QCContractClient, error) {
 
 	var qcContractClient module.QCContractClient
 
@@ -460,7 +495,7 @@ func createQCContractClient(node *cmd.NodeConfig, accessAddress string) (module.
 
 	// if not valid return a mock qc contract client
 	if valid := cmd.IsValidNodeMachineAccountConfig(node, accessAddress); !valid {
-		return epochs.NewMockQCContractClient(node.Logger), nil
+		return nil, fmt.Errorf("could not validate node machine account config")
 	}
 
 	// attempt to read NodeMachineAccountInfo
@@ -475,12 +510,6 @@ func createQCContractClient(node *cmd.NodeConfig, accessAddress string) (module.
 		return nil, fmt.Errorf("could not decode private key from hex: %w", err)
 	}
 	txSigner := sdkcrypto.NewInMemorySigner(sk, info.HashAlgorithm)
-
-	// create flow client
-	flowClient, err := client.New(accessAddress, grpc.WithInsecure())
-	if err != nil {
-		return nil, err
-	}
 
 	// create actual qc contract client, all flags and machine account info file found
 	qcContractClient = epochs.NewQCContractClient(node.Logger, flowClient, node.Me.NodeID(), info.Address, info.KeyIndex, qcContractAddress, txSigner)

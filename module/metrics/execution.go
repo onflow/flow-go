@@ -10,13 +10,6 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// Execution spans.
-const (
-	// executionBlockReceivedToExecuted is a duration metric
-	// from a block being received by an execution node to being executed
-	executionBlockReceivedToExecuted = "execution_block_received_to_executed"
-)
-
 type ExecutionCollector struct {
 	tracer                           module.Tracer
 	stateReadsPerBlock               prometheus.Histogram
@@ -65,6 +58,8 @@ type ExecutionCollector struct {
 	totalChunkDataPackRequests       prometheus.Counter
 	stateSyncActive                  prometheus.Gauge
 	executionStateDiskUsage          prometheus.Gauge
+	blockDataUploadsInProgress       prometheus.Gauge
+	blockDataUploadsDuration         prometheus.Histogram
 }
 
 func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registerer) *ExecutionCollector {
@@ -319,6 +314,21 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		Help:      "the total number of chunk data pack requests provider engine received",
 	})
 
+	blockDataUploadsInProgress := prometheus.NewGauge(prometheus.GaugeOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemBlockDataUploader,
+		Name:      "block_data_upload_in_progress",
+		Help:      "number of concurrently running Block Data upload operations",
+	})
+
+	blockDataUploadsDuration := prometheus.NewHistogram(prometheus.HistogramOpts{
+		Namespace: namespaceExecution,
+		Subsystem: subsystemBlockDataUploader,
+		Name:      "block_data_upload_duration_ms",
+		Help:      "the duration of update upload operation",
+		Buckets:   []float64{1, 100, 500, 1000, 2000},
+	})
+
 	registerer.MustRegister(forestApproxMemorySize)
 	registerer.MustRegister(forestNumberOfTrees)
 	registerer.MustRegister(latestTrieRegCount)
@@ -353,6 +363,8 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 	registerer.MustRegister(scriptExecutionTime)
 	registerer.MustRegister(scriptComputationUsed)
 	registerer.MustRegister(totalChunkDataPackRequests)
+	registerer.MustRegister(blockDataUploadsInProgress)
+	registerer.MustRegister(blockDataUploadsDuration)
 
 	ec := &ExecutionCollector{
 		tracer: tracer,
@@ -391,6 +403,8 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 		scriptExecutionTime:         scriptExecutionTime,
 		scriptComputationUsed:       scriptComputationUsed,
 		totalChunkDataPackRequests:  totalChunkDataPackRequests,
+		blockDataUploadsInProgress:  blockDataUploadsInProgress,
+		blockDataUploadsDuration:    blockDataUploadsDuration,
 
 		stateReadsPerBlock: promauto.NewHistogram(prometheus.HistogramOpts{
 			Namespace: namespaceExecution,
@@ -484,13 +498,11 @@ func NewExecutionCollector(tracer module.Tracer, registerer prometheus.Registere
 // StartBlockReceivedToExecuted starts a span to trace the duration of a block
 // from being received for execution to execution being finished
 func (ec *ExecutionCollector) StartBlockReceivedToExecuted(blockID flow.Identifier) {
-	ec.tracer.StartSpan(blockID, executionBlockReceivedToExecuted).SetTag("block_id", blockID.String)
 }
 
 // FinishBlockReceivedToExecuted finishes a span to trace the duration of a block
 // from being received for execution to execution being finished
 func (ec *ExecutionCollector) FinishBlockReceivedToExecuted(blockID flow.Identifier) {
-	ec.tracer.FinishSpan(blockID, executionBlockReceivedToExecuted)
 }
 
 // ExecutionBlockExecuted reports computation and total time spent on a block computation
@@ -634,6 +646,15 @@ func (ec *ExecutionCollector) ExecutionCollectionRequestSent() {
 
 func (ec *ExecutionCollector) ExecutionCollectionRequestRetried() {
 	ec.collectionRequestRetried.Inc()
+}
+
+func (ec *ExecutionCollector) ExecutionBlockDataUploadStarted() {
+	ec.blockDataUploadsInProgress.Inc()
+}
+
+func (ec *ExecutionCollector) ExecutionBlockDataUploadFinished(dur time.Duration) {
+	ec.blockDataUploadsInProgress.Dec()
+	ec.blockDataUploadsDuration.Observe(float64(dur.Milliseconds()))
 }
 
 // TransactionParsed reports the time spent parsing a single transaction

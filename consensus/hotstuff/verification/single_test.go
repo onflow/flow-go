@@ -19,7 +19,7 @@ func TestSingleVote(t *testing.T) {
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[2].NodeID))
+	block := helper.MakeBlock(helper.WithBlockProposer(identities[2].NodeID))
 	vote, err := signers[0].CreateVote(block)
 	require.NoError(t, err)
 	voter := identities[0]
@@ -67,7 +67,7 @@ func TestSingleProposalIsVote(t *testing.T) {
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
+	block := helper.MakeBlock(helper.WithBlockProposer(identities[0].NodeID))
 	proposal, err := signers[0].CreateProposal(block)
 	require.NoError(t, err)
 	vote, err := signers[0].CreateVote(block)
@@ -84,7 +84,7 @@ func TestSingleQC(t *testing.T) {
 	signers := MakeSigners(t, committeeState, identities.NodeIDs(), stakingKeys, nil)
 
 	// create proposal
-	block := helper.MakeBlock(t, helper.WithBlockProposer(identities[0].NodeID))
+	block := helper.MakeBlock(helper.WithBlockProposer(identities[0].NodeID))
 	var votes []*model.Vote
 	for _, signer := range signers {
 		vote, err := signer.CreateVote(block)
