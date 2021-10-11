@@ -793,13 +793,14 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 				}
 
 				// The first view needs to be exactly one greater than the current epoch final view
-				if ev.FirstView != activeSetup.FinalView+1 {
-					return nil, state.NewInvalidExtensionErrorf(
-						"next epoch first view must be exactly 1 more than current epoch final view (%d != %d+1)",
-						ev.FirstView,
-						activeSetup.FinalView,
-					)
-				}
+				// TODO temporarily disabling first view check
+				//if ev.FirstView != activeSetup.FinalView+1 {
+				//	return nil, state.NewInvalidExtensionErrorf(
+				//		"next epoch first view must be exactly 1 more than current epoch final view (%d != %d+1)",
+				//		ev.FirstView,
+				//		activeSetup.FinalView,
+				//	)
+				//}
 
 				// Finally, the epoch setup event must contain all necessary information.
 				err = isValidEpochSetup(ev)
