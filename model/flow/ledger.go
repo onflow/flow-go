@@ -105,7 +105,11 @@ func (s StateCommitment) MarshalJSON() ([]byte, error) {
 }
 
 func (s *StateCommitment) UnmarshalJSON(data []byte) error {
-	b, err := hex.DecodeString(string(data))
+	var stateCommitmentHex string
+	if err := json.Unmarshal(data, &stateCommitmentHex); err != nil {
+		return err
+	}
+	b, err := hex.DecodeString(stateCommitmentHex)
 	if err != nil {
 		return err
 	}
