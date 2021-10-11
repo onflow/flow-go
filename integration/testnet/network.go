@@ -106,6 +106,7 @@ type FlowNetwork struct {
 	root               *flow.Block
 	result             *flow.ExecutionResult
 	seal               *flow.Seal
+	qc                 *flow.QuorumCertificate
 	bootstrapDir       string
 }
 
@@ -225,6 +226,13 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 	return container
 }
 
+//RootProtocolSnapshot will return root protocol state snapshot for the network
+func (net *FlowNetwork) RootProtocolSnapshot() *inmem.Snapshot {
+	snapshot, err := inmem.SnapshotFromBootstrapState(net.root, net.result, net.seal, net.qc)
+	require.NoError(net.t, err, "failed to get root protocol snapshot")
+	return snapshot
+}
+
 type ConsensusFollowerConfig struct {
 	NodeID            flow.Identifier
 	NetworkingPrivKey crypto.PrivateKey
@@ -275,7 +283,7 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt)
 	return c
 }
 
-func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64,  opts ...NetworkConfigOpt) NetworkConfig {
+func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
 		Nodes:                 nodes,
 		Name:                  name,
@@ -471,7 +479,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	fmt.Printf("bootstrapDir: %s \n", bootstrapDir)
 
-	root, result, seal, confs, err := BootstrapNetwork(networkConf, bootstrapDir)
+	root, result, seal, confs, qc, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
@@ -486,6 +494,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		root:               root,
 		seal:               seal,
 		result:             result,
+		qc:                 qc,
 		bootstrapDir:       bootstrapDir,
 	}
 
@@ -807,14 +816,14 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	return nodeInfos, nil
 }
 
-func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.ExecutionResult, *flow.Seal, []ContainerConfig, error) {
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.ExecutionResult, *flow.Seal, []ContainerConfig, *flow.QuorumCertificate, error) {
 	chainID := flow.Localnet
 	chain := chainID.Chain()
 
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	if nNodes == 0 {
-		return nil, nil, nil, nil, fmt.Errorf("must specify at least one node")
+		return nil, nil, nil, nil, nil, fmt.Errorf("must specify at least one node")
 	}
 
 	// Sort so that access nodes start up last
@@ -823,13 +832,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// generate staking and networking keys for each configured node
 	stakedConfs, err := setupKeys(networkConf)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
 	// generate the follower node keys (follow nodes do not run as docker containers)
 	followerInfos, err := followerNodeInfos(networkConf.ConsensusFollowers)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
 	}
 
 	allNodeInfos := append(toNodeInfos(stakedConfs), followerInfos...)
@@ -841,7 +850,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// run DKG for all consensus nodes
 	dkg, err := runDKG(stakedConfs)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
 	// write private key files for each DKG participant
@@ -857,7 +866,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
 		err = WriteJSON(filepath.Join(bootstrapDir, path), privParticipant)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, nil, err
 		}
 	}
 
@@ -870,17 +879,17 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 	err = utils.WriteStakingNetworkingKeyFiles(allNodeInfos, writeJSONFile)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to write private key files: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write private key files: %w", err)
 	}
 
 	err = utils.WriteSecretsDBEncryptionKeyFiles(allNodeInfos, writeFile)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to write secrets db key files: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write secrets db key files: %w", err)
 	}
 
 	err = utils.WriteMachineAccountFiles(chainID, stakedNodeInfos, writeJSONFile)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to write machine account files: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write machine account files: %w", err)
 	}
 
 	// define root block parameters
@@ -896,27 +905,27 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// generate QC
 	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	votes, err := run.GenerateRootBlockVotes(root, signerData)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	qc, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	// generate root blocks for each collector cluster
 	clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
 	_, err = rand.Read(randomSource)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	dkgOffsetView := root.Header.View + networkConf.ViewsInStakingAuction - 1
@@ -943,7 +952,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not convert random source: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not convert random source: %w", err)
 	}
 	epochConfig := epochs.EpochConfig{
 		EpochTokenPayout:             cadence.UFix64(0),
@@ -975,27 +984,27 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		fvm.WithIdentities(participants),
 	)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	// generate execution result and block seal
 	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("generating root seal failed: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("generating root seal failed: %w", err)
 	}
 
 	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}
 
 	err = WriteJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
-	return root, result, seal, stakedConfs, nil
+	return root, result, seal, stakedConfs, qc, nil
 }
 
 // setupKeys generates private staking and networking keys for each configured
