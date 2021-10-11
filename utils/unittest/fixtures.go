@@ -881,15 +881,15 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 
 // IdentityFixture returns a node identity and networking private key
 func IdentityWithNetworkingKeyFixture(opts ...func(*flow.Identity)) (*flow.Identity, crypto.PrivateKey) {
-	networkKey := NetworkingKey()
+	networkKey := NetworkingPrivKeyFixture()
 	opts = append(opts, WithNetworkingKey(networkKey.PublicKey()))
 	id := IdentityFixture(opts...)
 	return id, networkKey
 }
 
 func WithKeys(identity *flow.Identity) {
-	staking := StakingKey()
-	networking := NetworkingKey()
+	staking := StakingPrivKeyFixture()
+	networking := NetworkingPrivKeyFixture()
 	identity.StakingPubKey = staking.PublicKey()
 	identity.NetworkPubKey = networking.PublicKey()
 }
@@ -1735,12 +1735,23 @@ func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 	}
 }
 
+// PrivateKeyFixture returns a random private key with specified signature algorithm and seed length
 func PrivateKeyFixture(algo crypto.SigningAlgorithm, seedLength int) crypto.PrivateKey {
 	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(seedLength))
 	if err != nil {
 		panic(err)
 	}
 	return sk
+}
+
+// NetworkingPrivKeyFixture returns random ECDSAP256 private key
+func NetworkingPrivKeyFixture() crypto.PrivateKey {
+	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
+}
+
+//StakingPrivKeyFixture returns a random BLS12381 private keyf
+func StakingPrivKeyFixture() crypto.PrivateKey {
+	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
 }
 
 func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {

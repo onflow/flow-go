@@ -17,7 +17,7 @@ const year = 365 * 24 * time.Hour
 // TestCertificateGeneration tests the X509Certificate certificate generation
 func TestCertificateGeneration(t *testing.T) {
 	// test key
-	key := unittest.NetworkingKey()
+	key := unittest.NetworkingPrivKeyFixture()
 
 	// generate the certificate from the key
 	certs, err := X509Certificate(key)
@@ -51,7 +51,7 @@ func TestCertificateGeneration(t *testing.T) {
 // TestPeerCertificateVerification tests that the verifyPeerCertificate function correctly verifies a server cert
 func TestPeerCertificateVerification(t *testing.T) {
 	// test key
-	key := unittest.NetworkingKey()
+	key := unittest.NetworkingPrivKeyFixture()
 
 	// generate the certificate from the key
 	certs, err := X509Certificate(key)
@@ -69,7 +69,7 @@ func TestPeerCertificateVerification(t *testing.T) {
 
 	t.Run("certificate validation fails for a different public key", func(t *testing.T) {
 		// generate another key and certificate
-		key2 := unittest.NetworkingKey()
+		key2 := unittest.NetworkingPrivKeyFixture()
 		certs2, err := X509Certificate(key2)
 		require.NoError(t, err)
 

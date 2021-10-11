@@ -312,7 +312,7 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	)
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID)
-	key := unittest.NetworkingKey()
+	key := unittest.NetworkingPrivKeyFixture()
 	identities[3].NetworkPubKey = key.PublicKey()
 
 	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)

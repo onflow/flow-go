@@ -786,7 +786,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	// TODO: currently just stashing a dummy key as staking key to prevent the nodeinfo.Type() function from
 	// returning an error. Eventually, a new key type NodeInfoTypePrivateUnstaked needs to be defined
 	// (see issue: https://github.com/onflow/flow-go/issues/1214)
-	dummyStakingKey := unittest.StakingKey()
+	dummyStakingKey := unittest.StakingPrivKeyFixture()
 
 	for _, conf := range confs {
 		info := bootstrap.NewPrivateNodeInfo(

@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 
@@ -226,19 +227,19 @@ func (s *Suite) fundAccount(ctx context.Context, receiver sdk.Address, tokenAmou
 
 // generates inital keys needed to bootstrap account
 func (s *Suite) generateAccountKeys(role flow.Role) (
-	stakingAccountKey,
+	operatorAccountKey,
 	networkingKey,
 	stakingKey,
 	machineAccountKey sdkcrypto.PrivateKey,
 	machineAccountPubKey flow.AccountPublicKey,
 ) {
-	stakingAccountKey = unittest.ECDSAP256Key()
-	networkingKey = unittest.ECDSAP256Key()
-	stakingKey = unittest.StakingKey()
+	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
+	networkingKey = unittest.NetworkingPrivKeyFixture()
+	stakingKey = unittest.StakingPrivKeyFixture()
 
 	// create a machine account
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
-		machineAccountKey = unittest.ECDSAP256Key()
+		machineAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
 
 		machineAccountPubKey = flow.AccountPublicKey{
 			PublicKey: machineAccountKey.PublicKey(),
