@@ -47,17 +47,18 @@ func NewEventHandlerV2(
 	notifier hotstuff.Consumer,
 ) (*EventHandlerV2, error) {
 	e := &EventHandlerV2{
-		log:           log.With().Str("hotstuff", "participant").Logger(),
-		paceMaker:     paceMaker,
-		blockProducer: blockProducer,
-		forks:         forks,
-		persist:       persist,
-		communicator:  communicator,
-		voter:         voter,
-		validator:     validator,
-		committee:     committee,
-		notifier:      notifier,
-		ownProposal:   flow.ZeroID,
+		log:            log.With().Str("hotstuff", "participant").Logger(),
+		paceMaker:      paceMaker,
+		blockProducer:  blockProducer,
+		forks:          forks,
+		persist:        persist,
+		communicator:   communicator,
+		voter:          voter,
+		validator:      validator,
+		committee:      committee,
+		voteAggregator: voteAggregator,
+		notifier:       notifier,
+		ownProposal:    flow.ZeroID,
 	}
 	return e, nil
 }
@@ -357,8 +358,7 @@ func (e *EventHandlerV2) ownVote(block *model.Block, curView uint64, nextLeader 
 	e.notifier.OnVoting(ownVote)
 	log.Debug().Msg("forwarding vote to compliance engine")
 	if e.committee.Self() == nextLeader { // I am the next leader
-		err = e.voteAggregator.AddVote(ownVote)
-		log.Warn().Err(err).Msg("failed to add my own vote to vote aggregator")
+		e.voteAggregator.AddVote(ownVote)
 	} else {
 		err = e.communicator.SendVote(ownVote.BlockID, ownVote.View, ownVote.SigData, nextLeader)
 		if err != nil {
