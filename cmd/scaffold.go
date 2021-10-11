@@ -172,6 +172,9 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 				}
 				return head.Height, nil
 			},
+			HotstuffViewFun: func() (uint64, error) {
+				return 0, nil
+			},
 		}
 
 		// only consensus roles will need to report hotstuff view
