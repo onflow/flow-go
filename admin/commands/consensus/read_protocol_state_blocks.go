@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"strings"
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
@@ -145,39 +147,49 @@ func (r *ReadProtocolStateBlocksCommand) Validator(req *admin.CommandRequest) er
 	if !ok {
 		return errors.New("wrong input format")
 	}
-	data := &requestData{}
+
 	block, ok := input["block"]
 	if !ok {
 		return errors.New("the \"block\" field is required")
 	}
+
+	errInvalidBlockValue := fmt.Errorf("invalid value for \"block\": %v", block)
+	data := &requestData{}
+
 	switch block := block.(type) {
 	case string:
+		block = strings.ToLower(strings.TrimSpace(block))
 		if block == "final" {
 			data.requestType = Final
 		} else if block == "sealed" {
 			data.requestType = Sealed
-		} else {
+		} else if len(block) == 2*flow.IdentifierLen {
 			b, err := hex.DecodeString(block)
 			if err != nil {
-				return fmt.Errorf("could not parse block ID: %v", block)
+				return errInvalidBlockValue
 			}
 			data.requestType = ID
 			data.blockID = flow.HashToID(b)
+		} else {
+			return errInvalidBlockValue
 		}
 	case float64:
-		if block < 0 {
-			return fmt.Errorf("block height must not be negative")
+		if block < 0 || math.Trunc(block) != block {
+			return errInvalidBlockValue
 		}
 		data.requestType = Height
 		data.blockHeight = uint64(block)
 	default:
-		return fmt.Errorf("invalid value for \"block\": %v", block)
+		return errInvalidBlockValue
 	}
 
 	if n, ok := input["n"]; ok {
 		n, ok := n.(float64)
 		if !ok {
 			return fmt.Errorf("invalid value for \"n\": %v", n)
+		}
+		if math.Trunc(n) != n {
+			return fmt.Errorf("\"n\" must be an integer")
 		}
 		if n < 0 {
 			return fmt.Errorf("\"n\" must not be negative")
