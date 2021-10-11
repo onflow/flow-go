@@ -2,14 +2,13 @@ package helper
 
 import (
 	"math/rand"
-	"testing"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func MakeQC(t *testing.T, options ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
+func MakeQC(options ...func(*flow.QuorumCertificate)) *flow.QuorumCertificate {
 	qc := flow.QuorumCertificate{
 		View:      rand.Uint64(),
 		BlockID:   unittest.IdentifierFixture(),

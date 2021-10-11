@@ -13,18 +13,18 @@ import (
 
 // signerInfo holds information about a signer, its stake and index
 type signerInfo struct {
-	weight uint64 //nolint:unused
+	weight uint64
 	index  int
 }
 
 // WeightedSignatureAggregator implements consensus/hotstuff.WeightedSignatureAggregator
 type WeightedSignatureAggregator struct {
 	aggregator   *signature.SignatureAggregatorSameMessage // low level crypto aggregator, agnostic of weights and flow IDs
-	signers      []flow.Identity                           //nolint:unused
-	idToSigner   map[flow.Identifier]signerInfo
-	totalWeight  uint64                       // weight collected
-	lock         sync.RWMutex                 // lock for atomic updates
-	collectedIDs map[flow.Identifier]struct{} // map of collected IDs
+	signers      flow.IdentityList
+	idToSigner   map[flow.Identifier]signerInfo // auxiliary map to lookup signer weight and index by ID
+	totalWeight  uint64                         // weight collected
+	lock         sync.RWMutex                   // lock for atomic updates
+	collectedIDs map[flow.Identifier]struct{}   // map of collected IDs
 }
 
 var _ hotstuff.WeightedSignatureAggregator = &WeightedSignatureAggregator{}
@@ -33,7 +33,7 @@ var _ hotstuff.WeightedSignatureAggregator = &WeightedSignatureAggregator{}
 //
 // A weighted aggregator is used for one aggregation only. A new instance should be used for each use.
 func NewWeightedSignatureAggregator(
-	signers []flow.Identity, // list of all possible signers
+	signers flow.IdentityList, // list of all possible signers
 	message []byte, // message to get an aggregated signature for
 	dsTag string, // domain separation tag used by the signature
 ) (*WeightedSignatureAggregator, error) {
