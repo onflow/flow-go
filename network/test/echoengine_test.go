@@ -48,7 +48,7 @@ func (suite *EchoEngineTestSuite) SetupTest() {
 	log.SetAllLoggers(log.LevelError)
 	// both nodes should be of the same role to get connected on epidemic dissemination
 	suite.ids, _, suite.nets, _, suite.cancel = GenerateIDsMiddlewaresNetworks(
-		suite.T(), count, logger, 100, nil, !DryRun, nil, nil
+		suite.T(), count, logger, 100, nil, !DryRun, nil, nil,
 	)
 }
 
