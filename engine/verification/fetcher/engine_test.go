@@ -423,6 +423,10 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	s.pendingChunks.On("ByID", chunkID).Return(nil, false)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataPacks))
+	response := &verification.ChunkDataPackResponse{
+		Locator: chunks.Locator{},
+		Cdp:     nil,
+	}
 	e.HandleChunkDataPack(unittest.IdentifierFixture(), chunkDataPacks[chunkID])
 
 	mock.AssertExpectationsForObjects(t, s.pendingChunks, s.metrics)
@@ -765,30 +769,38 @@ func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 
 // chunkDataPackResponseFixture creates chunk data packs for given chunks.
 func chunkDataPackResponseFixture(t *testing.T,
-	chunks flow.ChunkList,
+	chunkList flow.ChunkList,
 	collMap map[flow.Identifier]*flow.Collection,
 	result *flow.ExecutionResult,
-) map[flow.Identifier]*flow.ChunkDataPack {
-	chunkDataPacks := make(map[flow.Identifier]*flow.ChunkDataPack)
+) map[flow.Identifier]*verification.ChunkDataPackResponse {
+	responses := make(map[flow.Identifier]*verification.ChunkDataPackResponse)
 
-	for _, chunk := range chunks {
+	for _, chunk := range chunkList {
 		chunkID := chunk.ID()
 		coll, ok := collMap[chunkID]
 		// only non-system chunks must have a collection
 		require.Equal(t, ok, !fetcher.IsSystemChunk(chunk.Index, result))
 
-		chunkDataPacks[chunkID] = unittest.ChunkDataPackFixture(chunkID,
-			unittest.WithStartState(chunk.StartState),
-			unittest.WithChunkDataPackCollection(coll))
+		response := verification.ChunkDataPackResponse{
+			Locator: chunks.Locator{
+				ResultID: result.ID(),
+				Index:    chunk.Index,
+			},
+			Cdp: unittest.ChunkDataPackFixture(chunkID,
+				unittest.WithStartState(chunk.StartState),
+				unittest.WithChunkDataPackCollection(coll)),
+		}
+
+		responses[chunkID] = &response
 	}
 
-	return chunkDataPacks
+	return responses
 }
 
 // verifiableChunkFixture is a test helper that creates verifiable chunks, chunk data packs,
 // and collection fixtures for the given chunks list.
 func verifiableChunkFixture(t *testing.T, chunks flow.ChunkList, block *flow.Block, result *flow.ExecutionResult, collMap map[flow.Identifier]*flow.Collection) (
-	map[flow.Identifier]*flow.ChunkDataPack,
+	map[flow.Identifier]*verification.ChunkDataPackResponse,
 	map[flow.Identifier]*verification.VerifiableChunkData) {
 
 	chunkDataPacks := chunkDataPackResponseFixture(t, chunks, collMap, result)
