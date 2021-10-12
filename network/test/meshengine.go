@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -22,9 +22,10 @@ type MeshEngine struct {
 	event    chan interface{}     // used to keep track of the events that the node receives
 	channel  chan network.Channel // used to keep track of the channels that events are received on
 	received chan struct{}        // used as an indicator on reception of messages for testing
+	component.NoopComponent
 }
 
-func NewMeshEngine(t *testing.T, net module.Network, cap int, channel network.Channel) *MeshEngine {
+func NewMeshEngine(t *testing.T, net network.Network, cap int, channel network.Channel) *MeshEngine {
 	te := &MeshEngine{
 		t:        t,
 		event:    make(chan interface{}, cap),
