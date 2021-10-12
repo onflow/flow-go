@@ -201,7 +201,7 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 		return false, blockHeight, fmt.Errorf("data race detected, received a duplicate chunk locator")
 	}
 
-	err = e.requestChunkDataPack(chunkID, result.ID(), chunk.BlockID)
+	err = e.requestChunkDataPack(chunk.Index, chunkID, result.ID(), chunk.BlockID)
 	if err != nil {
 		return false, blockHeight, fmt.Errorf("could not request chunk data pack: %w", err)
 	}
@@ -556,7 +556,7 @@ func (e *Engine) makeVerifiableChunkData(chunk *flow.Chunk,
 }
 
 // requestChunkDataPack creates and dispatches a chunk data pack request to the requester engine.
-func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Identifier, blockID flow.Identifier) error {
+func (e *Engine) requestChunkDataPack(chunkIndex uint64, chunkID flow.Identifier, resultID flow.Identifier, blockID flow.Identifier) error {
 	agrees, disagrees, err := e.getAgreeAndDisagreeExecutors(blockID, resultID)
 	if err != nil {
 		return fmt.Errorf("could not segregate the agree and disagree executors for result: %x of block: %x", resultID, blockID)
@@ -573,6 +573,10 @@ func (e *Engine) requestChunkDataPack(chunkID flow.Identifier, resultID flow.Ide
 	}
 
 	request := &verification.ChunkDataPackRequest{
+		Locator: chunks.Locator{
+			ResultID: resultID,
+			Index:    chunkIndex,
+		},
 		ChunkID:   chunkID,
 		Height:    header.Height,
 		Agrees:    agrees,
