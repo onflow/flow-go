@@ -10,7 +10,7 @@ type ChunkStatuses interface {
 	// Get returns a chunk status by its chunk index and result ID.
 	// There is a one-to-one correspondence between the chunk statuses in memory, and
 	// their pair of chunk index and result id.
-	Get(chunkIndex uint64, chunkID flow.Identifier) (*verification.ChunkStatus, bool)
+	Get(chunkIndex uint64, resultID flow.Identifier) (*verification.ChunkStatus, bool)
 
 	// Add provides insertion functionality into the memory pool.
 	// The insertion is only successful if there is no duplicate status with the same
