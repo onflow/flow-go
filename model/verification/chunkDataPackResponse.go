@@ -1,6 +1,7 @@
 package verification
 
 import (
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -8,15 +9,14 @@ import (
 // and requester engine. It conveys requested chunk data pack as well as meta-data for fetcher engine to
 // process the chunk data pack.
 type ChunkDataPackResponse struct {
-	ChunkID    flow.Identifier
-	ChunkIndex uint64
-	ResultID   flow.Identifier
+	chunks.Locator
+	Cdp *flow.ChunkDataPack
 }
 
 func (c ChunkDataPackResponse) ID() flow.Identifier {
-	return c.ChunkID
+	return c.Locator.ID()
 }
 
 func (c ChunkDataPackResponse) Checksum() flow.Identifier {
-	return c.ChunkID
+	return c.Locator.ID()
 }
