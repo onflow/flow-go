@@ -22,7 +22,9 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/admin"
+	"github.com/onflow/flow-go/admin/commands/common"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -141,10 +143,10 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
 		"adjusts the level of sampling when tracing is enabled. 0 means capture everything, higher value results in less samples")
 
-	fnb.flags.StringVar(&fnb.BaseConfig.adminAddr, "admin-addr", defaultConfig.adminAddr, "address to bind on for admin HTTP server")
-	fnb.flags.StringVar(&fnb.BaseConfig.adminCert, "admin-cert", defaultConfig.adminCert, "admin cert file (for TLS)")
-	fnb.flags.StringVar(&fnb.BaseConfig.adminKey, "admin-key", defaultConfig.adminKey, "admin key file (for TLS)")
-	fnb.flags.StringVar(&fnb.BaseConfig.adminClientCAs, "admin-client-certs", defaultConfig.adminClientCAs, "admin client certs (for mutual TLS)")
+	fnb.flags.StringVar(&fnb.BaseConfig.AdminAddr, "admin-addr", defaultConfig.AdminAddr, "address to bind on for admin HTTP server")
+	fnb.flags.StringVar(&fnb.BaseConfig.AdminCert, "admin-cert", defaultConfig.AdminCert, "admin cert file (for TLS)")
+	fnb.flags.StringVar(&fnb.BaseConfig.AdminKey, "admin-key", defaultConfig.AdminKey, "admin key file (for TLS)")
+	fnb.flags.StringVar(&fnb.BaseConfig.AdminClientCAs, "admin-client-certs", defaultConfig.AdminClientCAs, "admin client certs (for mutual TLS)")
 
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", dns.DefaultTimeToLive, "time-to-live for dns cache")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
@@ -174,6 +176,21 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 				}
 				return head.Height, nil
 			},
+		}
+
+		// only consensus roles will need to report hotstuff view
+		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
+			// initialize the persister
+			persist := persister.New(node.DB, node.RootChainID)
+
+			pingProvider.HotstuffViewFun = func() (uint64, error) {
+				curView, err := persist.GetStarted()
+				if err != nil {
+					return 0, err
+				}
+
+				return curView, nil
+			}
 		}
 
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
@@ -264,34 +281,41 @@ func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
-	fnb.Component("admin server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
-		var opts []admin.CommandRunnerOption
-
-		if node.adminCert != NotSet {
-			serverCert, err := tls.LoadX509KeyPair(node.adminCert, node.adminKey)
-			if err != nil {
-				return nil, err
-			}
-			clientCAs, err := ioutil.ReadFile(node.adminClientCAs)
-			if err != nil {
-				return nil, err
-			}
-			certPool := x509.NewCertPool()
-			certPool.AppendCertsFromPEM(clientCAs)
-			config := &tls.Config{
-				MinVersion:   tls.VersionTLS13,
-				Certificates: []tls.Certificate{serverCert},
-				ClientAuth:   tls.RequireAndVerifyClientCert,
-				ClientCAs:    certPool,
-			}
-
-			opts = append(opts, admin.WithTLS(config))
+	if fnb.AdminAddr != NotSet {
+		if (fnb.AdminCert != NotSet || fnb.AdminKey != NotSet || fnb.AdminClientCAs != NotSet) &&
+			!(fnb.AdminCert != NotSet && fnb.AdminKey != NotSet && fnb.AdminClientCAs != NotSet) {
+			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
 		}
+		fnb.RegisterDefaultAdminCommands()
+		fnb.Component("admin server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+			var opts []admin.CommandRunnerOption
 
-		command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.adminAddr, opts...)
+			if node.AdminCert != NotSet {
+				serverCert, err := tls.LoadX509KeyPair(node.AdminCert, node.AdminKey)
+				if err != nil {
+					return nil, err
+				}
+				clientCAs, err := ioutil.ReadFile(node.AdminClientCAs)
+				if err != nil {
+					return nil, err
+				}
+				certPool := x509.NewCertPool()
+				certPool.AppendCertsFromPEM(clientCAs)
+				config := &tls.Config{
+					MinVersion:   tls.VersionTLS13,
+					Certificates: []tls.Certificate{serverCert},
+					ClientAuth:   tls.RequireAndVerifyClientCert,
+					ClientCAs:    certPool,
+				}
 
-		return command_runner, nil
-	})
+				opts = append(opts, admin.WithTLS(config))
+			}
+
+			command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.AdminAddr, opts...)
+
+			return command_runner, nil
+		})
+	}
 }
 
 func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
@@ -337,7 +361,7 @@ func (fnb *FlowNodeBuilder) initNodeInfo() {
 		fnb.Logger.Fatal().Err(err).Msgf("could not parse node ID from string: %v", fnb.BaseConfig.nodeIDHex)
 	}
 
-	info, err := loadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
+	info, err := LoadPrivateNodeInfo(fnb.BaseConfig.BootstrapDir, nodeID)
 	if err != nil {
 		fnb.Logger.Fatal().Err(err).Msg("failed to load private node info")
 	}
@@ -363,7 +387,8 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid log level")
 	}
-	log = log.Level(lvl)
+	log = log.Level(zerolog.DebugLevel)
+	zerolog.SetGlobalLevel(lvl)
 
 	fnb.Logger = log
 }
@@ -705,10 +730,12 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithBlocks(blockFinder),
 		fvm.WithAccountStorageLimit(true),
 	}
+	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Mainnet {
+		fvm.WithTransactionFeesEnabled(true)
+	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary {
 		vmOpts = append(vmOpts,
 			fvm.WithRestrictedDeployment(false),
-			fvm.WithTransactionFeesEnabled(true),
 		)
 	}
 	fnb.FvmOptions = vmOpts
@@ -736,9 +763,7 @@ func (fnb *FlowNodeBuilder) handleComponent(ctx irrecoverable.SignalerContext, v
 
 	component, ok := readyAware.(component.Component)
 	if ok {
-		if err := component.Start(ctx); err != nil {
-			log.Fatal().Err(err).Msg("component startup failed")
-		}
+		component.Start(ctx)
 	}
 
 	select {
@@ -916,17 +941,15 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 		}
 	}
 
-	if fnb.adminAddr != NotSet {
-		if (fnb.adminCert != NotSet || fnb.adminKey != NotSet || fnb.adminClientCAs != NotSet) &&
-			!(fnb.adminCert != NotSet && fnb.adminKey != NotSet && fnb.adminClientCAs != NotSet) {
-			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
-		}
-		fnb.EnqueueAdminServerInit()
-	}
+	fnb.EnqueueAdminServerInit()
 
 	fnb.EnqueueTracer()
 
 	return nil
+}
+
+func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
+	fnb.AdminCommand("set-log-level", common.SetLogLevelCommand.Handler, common.SetLogLevelCommand.Validator)
 }
 
 // Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
@@ -1004,13 +1027,12 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 
 		ctx, cancel := context.WithCancel(context.TODO())
 		fnb.Cancel = cancel
-		signaler := irrecoverable.NewSignaler()
-		signalerCtx := irrecoverable.WithSignaler(ctx, signaler)
+		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 
 		// TODO: implement proper error handling
 		go func() {
 			select {
-			case err := <-signaler.Error():
+			case err := <-errChan:
 				fnb.Logger.Fatal().Err(err).Msg("component encountered irrecoverable error")
 			case <-ctx.Done():
 			}
@@ -1026,6 +1048,10 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 
 // Done returns a channel that closes after all registered components are stopped
 func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
+	// cancel the context used by the networking layer
+	if fnb.Cancel != nil {
+		fnb.Cancel()
+	}
 	fnb.lm.OnStop(func() {
 		for i := len(fnb.doneObject) - 1; i >= 0; i-- {
 			doneObject := fnb.doneObject[i]
@@ -1035,10 +1061,6 @@ func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
 
 		fnb.closeDatabase()
 	})
-	// cancel the context used by the networking layer
-	if fnb.Cancel != nil {
-		fnb.Cancel()
-	}
 	return fnb.lm.Stopped()
 }
 
@@ -1087,7 +1109,7 @@ func loadRootProtocolSnapshot(dir string) (*inmem.Snapshot, error) {
 }
 
 // Loads the private info for this node from disk (eg. private staking/network keys).
-func loadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
+func LoadPrivateNodeInfo(dir string, myID flow.Identifier) (*bootstrap.NodeInfoPriv, error) {
 	path := filepath.Join(dir, fmt.Sprintf(bootstrap.PathNodeInfoPriv, myID))
 	data, err := io.ReadFile(path)
 	if err != nil {

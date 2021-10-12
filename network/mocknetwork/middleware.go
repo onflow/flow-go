@@ -114,17 +114,8 @@ func (_m *Middleware) SetOverlay(_a0 network.Overlay) {
 }
 
 // Start provides a mock function with given fields: _a0
-func (_m *Middleware) Start(_a0 irrecoverable.SignalerContext) error {
-	ret := _m.Called(_a0)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(irrecoverable.SignalerContext) error); ok {
-		r0 = rf(_a0)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *Middleware) Start(_a0 irrecoverable.SignalerContext) {
+	_m.Called(_a0)
 }
 
 // Subscribe provides a mock function with given fields: channel

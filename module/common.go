@@ -8,7 +8,7 @@ import (
 
 // WARNING: The semantics of this interface will be changing in the near future, with
 // startup / shutdown capabilities being delegated to the Startable interface instead.
-// For more details, see [FLIP 1167](https://github.com/onflow/flow-go/pull/1167)
+// For more details, see https://github.com/onflow/flow-go/pull/1167
 //
 // ReadyDoneAware provides an easy interface to wait for module startup and shutdown.
 // Modules that implement this interface only support a single start-stop cycle, and
@@ -48,9 +48,8 @@ var ErrMultipleStartup = errors.New("component may only be started once")
 // Startable provides an interface to start a component. Once started, the component
 // can be stopped by cancelling the given context.
 type Startable interface {
-	// Start starts the component. Any errors encountered during startup should be returned
-	// directly, whereas irrecoverable errors encountered while the component is running
+	// Start starts the component. Any irrecoverable errors encountered while the component is running
 	// should be thrown with the given SignalerContext.
-	// This method should only be called once, and subsequent calls should return ErrMultipleStartup.
-	Start(irrecoverable.SignalerContext) error
+	// This method should only be called once, and subsequent calls should panic with ErrMultipleStartup.
+	Start(irrecoverable.SignalerContext)
 }

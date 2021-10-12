@@ -24,15 +24,16 @@ import (
 
 var _ component.Component = (*CommandRunner)(nil)
 
-const (
-	CommandRunnerMaxQueueLength  = 128
-	CommandRunnerNumWorkers      = 1
-	CommandRunnerShutdownTimeout = 5 * time.Second
-)
+const CommandRunnerShutdownTimeout = 5 * time.Second
 
-type CommandHandler func(ctx context.Context, data map[string]interface{}) error
-type CommandValidator func(data map[string]interface{}) error
+type CommandHandler func(ctx context.Context, request *CommandRequest) error
+type CommandValidator func(request *CommandRequest) error
 type CommandRunnerOption func(*CommandRunner)
+
+type CommandRequest struct {
+	Data          map[string]interface{}
+	ValidatorData interface{}
+}
 
 func WithTLS(config *tls.Config) CommandRunnerOption {
 	return func(r *CommandRunner) {
@@ -62,7 +63,6 @@ func (r *CommandRunnerBootstrapper) Bootstrap(logger zerolog.Logger, bindAddress
 	commandRunner := &CommandRunner{
 		handlers:         r.handlers,
 		validators:       r.validators,
-		commandQ:         make(chan *CommandRequest, CommandRunnerMaxQueueLength),
 		grpcAddress:      fmt.Sprintf("%s/flow-node-admin.sock", os.TempDir()),
 		httpAddress:      bindAddress,
 		logger:           logger.With().Str("admin", "command_runner").Logger(),
@@ -95,7 +95,6 @@ func (r *CommandRunnerBootstrapper) RegisterValidator(command string, validator 
 type CommandRunner struct {
 	handlers    map[string]CommandHandler
 	validators  map[string]CommandValidator
-	commandQ    chan *CommandRequest
 	grpcAddress string
 	httpAddress string
 	tlsConfig   *tls.Config
@@ -119,20 +118,12 @@ func (r *CommandRunner) getValidator(command string) CommandValidator {
 	return r.validators[command]
 }
 
-func (r *CommandRunner) Start(ctx irrecoverable.SignalerContext) error {
+func (r *CommandRunner) Start(ctx irrecoverable.SignalerContext) {
 	if err := r.runAdminServer(ctx); err != nil {
-		return fmt.Errorf("failed to start admin server: %w", err)
-	}
-
-	for i := 0; i < CommandRunnerNumWorkers; i++ {
-		r.workersStarted.Add(1)
-		r.workersFinished.Add(1)
-		go r.processLoop(ctx)
+		ctx.Throw(fmt.Errorf("failed to start admin server: %w", err))
 	}
 
 	close(r.startupCompleted)
-
-	return nil
 }
 
 func (r *CommandRunner) Ready() <-chan struct{} {
@@ -174,7 +165,7 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 	}
 
 	grpcServer := grpc.NewServer()
-	pb.RegisterAdminServer(grpcServer, NewAdminServer(r.commandQ))
+	pb.RegisterAdminServer(grpcServer, NewAdminServer(r))
 
 	r.workersStarted.Add(1)
 	r.workersFinished.Add(1)
@@ -233,7 +224,6 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 		r.logger.Info().Msg("admin server shutting down")
 
 		grpcServer.Stop()
-		close(r.commandQ)
 
 		if httpServer != nil {
 			shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), CommandRunnerShutdownTimeout)
@@ -249,61 +239,30 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 	return nil
 }
 
-func (r *CommandRunner) processLoop(ctx context.Context) {
-	defer func() {
-		r.logger.Info().Msg("process loop shutting down")
+func (r *CommandRunner) runCommand(ctx context.Context, command string, data map[string]interface{}) error {
+	r.logger.Info().Str("command", command).Msg("received new command")
 
-		// cleanup uncompleted requests from the command queue
-		for command := range r.commandQ {
-			close(command.responseChan)
-		}
-
-		r.workersFinished.Done()
-	}()
-
-	r.workersStarted.Done()
-
-	for {
-		select {
-		case command, ok := <-r.commandQ:
-			if !ok {
-				return
-			}
-
-			r.logger.Info().Str("command", command.command).Msg("received new command")
-
-			var err error
-
-			if validator := r.getValidator(command.command); validator != nil {
-				if validationErr := validator(command.data); validationErr != nil {
-					err = status.Error(codes.InvalidArgument, validationErr.Error())
-					goto sendResponse
-				}
-			}
-
-			if handler := r.getHandler(command.command); handler != nil {
-				// TODO: we can probably merge the command context with the worker context
-				// using something like: https://github.com/teivah/onecontext
-				if handleErr := handler(command.ctx, command.data); handleErr != nil {
-					if errors.Is(handleErr, context.Canceled) {
-						err = status.Error(codes.Canceled, "client canceled")
-					} else if errors.Is(handleErr, context.DeadlineExceeded) {
-						err = status.Error(codes.DeadlineExceeded, "request timed out")
-					} else {
-						s, _ := status.FromError(handleErr)
-						err = s.Err()
-					}
-				}
-			} else {
-				err = status.Error(codes.Unimplemented, "invalid command")
-			}
-
-		sendResponse:
-			command.responseChan <- &CommandResponse{err}
-			close(command.responseChan)
-		case <-ctx.Done():
-			return
+	req := &CommandRequest{Data: data}
+	if validator := r.getValidator(command); validator != nil {
+		if validationErr := validator(req); validationErr != nil {
+			return status.Error(codes.InvalidArgument, validationErr.Error())
 		}
 	}
 
+	if handler := r.getHandler(command); handler != nil {
+		if handleErr := handler(ctx, req); handleErr != nil {
+			if errors.Is(handleErr, context.Canceled) {
+				return status.Error(codes.Canceled, "client canceled")
+			} else if errors.Is(handleErr, context.DeadlineExceeded) {
+				return status.Error(codes.DeadlineExceeded, "request timed out")
+			} else {
+				s, _ := status.FromError(handleErr)
+				return s.Err()
+			}
+		}
+	} else {
+		return status.Error(codes.Unimplemented, "invalid command")
+	}
+
+	return nil
 }

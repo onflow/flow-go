@@ -1,23 +1,24 @@
-package component
+package component_test
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"runtime"
 	"testing"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"pgregory.net/rapid"
 
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 const CHANNEL_CLOSE_LATENCY_ALLOWANCE = 20 * time.Millisecond
 
-func isClosed(c <-chan struct{}) bool {
+// IsClosed checks whether a channel is closed
+func IsClosed(c <-chan struct{}) bool {
 	select {
 	case <-c:
 		return true
@@ -26,320 +27,50 @@ func isClosed(c <-chan struct{}) bool {
 	}
 }
 
-type componentState int
+type WorkerState int
 
 const (
-	unknownComponentState componentState = iota
-	componentIdle
-	componentStarted
-	componentStartingUp
-	componentStartupFailed
-	componentStartupCanceled
-	componentStartupFinished
-	componentReadyEncounteredFatal
-	componentReadyCanceled
-	componentReadyShuttingDown
-	componentRunning
-	componentShuttingDown
-	componentDone
-	componentEncounteredFatal
+	UnknownWorkerState            = iota
+	WorkerStartingUp              // worker is starting up
+	WorkerStartupShuttingDown     // worker was canceled during startup and is shutting down
+	WorkerStartupCanceled         // worker has exited after being canceled during startup
+	WorkerStartupEncounteredFatal // worker encountered a fatal error during startup
+	WorkerRunning                 // worker has started up and is running normally
+	WorkerShuttingDown            // worker was canceled and is shutting down
+	WorkerCanceled                // worker has exited after being canceled
+	WorkerEncounteredFatal        // worker encountered a fatal error
+	WorkerDone                    // worker has shut down after running normally
+
 )
 
-func (s componentState) String() string {
+func (s WorkerState) String() string {
 	switch s {
-	case componentIdle:
-		return "component-idle"
-	case componentStarted:
-		return "component-started"
-	case componentStartingUp:
-		return "component-starting-up"
-	case componentStartupFailed:
-		return "component-startup-failed"
-	case componentStartupCanceled:
-		return "component-startup-canceled"
-	case componentStartupFinished:
-		return "component-startup-finished"
-	case componentRunning:
-		return "component-running"
-	case componentShuttingDown:
-		return "component-shutting-down"
-	case componentDone:
-		return "component-done"
-	case componentEncounteredFatal:
-		return "component-encountered-fatal"
-	case componentReadyShuttingDown:
-		return "component-ready-shutting-down"
-	case componentReadyCanceled:
-		return "component-ready-canceled"
-	case componentReadyEncounteredFatal:
-		return "component-ready-encountered-fatal"
+	case WorkerStartingUp:
+		return "WORKER_STARTING_UP"
+	case WorkerStartupShuttingDown:
+		return "WORKER_STARTUP_SHUTTING_DOWN"
+	case WorkerStartupCanceled:
+		return "WORKER_STARTUP_CANCELED"
+	case WorkerStartupEncounteredFatal:
+		return "WORKER_STARTUP_ENCOUNTERED_FATAL"
+	case WorkerRunning:
+		return "WORKER_RUNNING"
+	case WorkerShuttingDown:
+		return "WORKER_SHUTTING_DOWN"
+	case WorkerCanceled:
+		return "WORKER_CANCELED"
+	case WorkerEncounteredFatal:
+		return "WORKER_ENCOUNTERED_FATAL"
+	case WorkerDone:
+		return "WORKER_DONE"
 	default:
-		return "unknown"
+		return "UNKNOWN"
 	}
 }
 
-type componentStateList []componentState
+type WorkerStateList []WorkerState
 
-func (csl componentStateList) contains(cs componentState) bool {
-	for _, s := range csl {
-		if s == cs {
-			return true
-		}
-	}
-	return false
-}
-
-type componentStateTransition int
-
-const (
-	unknownComponentStateTransition componentStateTransition = iota
-	componentCheckCtx
-	componentCheckCtxWithCleanup
-	componentFailStartup
-	componentFinishStartup
-	componentBecomeReady
-	componentThrowErr
-	componentFinishShutdown
-)
-
-func (st componentStateTransition) String() string {
-	switch st {
-	case componentCheckCtx:
-		return "component-check-ctx"
-	case componentCheckCtxWithCleanup:
-		return "component-check-ctx-with-cleanup"
-	case componentFailStartup:
-		return "component-fail-startup"
-	case componentFinishStartup:
-		return "component-finish-startup"
-	case componentBecomeReady:
-		return "component-become-ready"
-	case componentThrowErr:
-		return "component-throw-err"
-	case componentFinishShutdown:
-		return "component-finish-shutdown"
-	default:
-		return "unknown"
-	}
-}
-
-type cstConsumer func(componentStateTransition) componentState
-type cstProvider func(componentState) componentStateTransition
-
-type component struct {
-	t     *rapid.T
-	id    int
-	next  cstProvider
-	ready chan struct{}
-	done  chan struct{}
-}
-
-func newComponent(t *rapid.T, id int, next cstProvider) *component {
-	return &component{t, id, next, make(chan struct{}), make(chan struct{})}
-}
-
-func (c *component) unexpectedStateTransition(s componentState, cst componentStateTransition) {
-	assert.Fail(c.t, "unexpected state transition", "[component %v] received %v for state %v", c.id, cst, s)
-	runtime.Goexit()
-}
-
-func (c *component) Start(ctx irrecoverable.SignalerContext) (err error) {
-	var state componentState
-	defer func() {
-		if err != nil {
-			close(c.done)
-			c.next(state)
-		}
-	}()
-	goto started
-
-started:
-	c.t.Logf("[component %v] started\n", c.id)
-	state = componentStarted
-	switch transition := c.next(state); transition {
-	case componentCheckCtx:
-		if isClosed(ctx.Done()) {
-			goto startupCanceled
-		}
-		goto startingUp
-	default:
-		c.unexpectedStateTransition(state, transition)
-	}
-
-startingUp:
-	c.t.Logf("[component %v] starting up\n", c.id)
-	state = componentStartingUp
-	switch transition := c.next(state); transition {
-	case componentFailStartup:
-		goto startupFailed
-	case componentBecomeReady:
-		fallthrough
-	case componentFinishStartup:
-		go func() {
-			defer func() {
-				close(c.done)
-				c.next(state)
-			}()
-
-			if transition == componentBecomeReady {
-				close(c.ready)
-				goto running
-			}
-			goto startupFinished
-
-		startupFinished:
-			c.t.Logf("[component %v] startup finished\n", c.id)
-			state = componentStartupFinished
-			switch transition := c.next(state); transition {
-			case componentBecomeReady:
-				close(c.ready)
-				goto running
-			case componentThrowErr:
-				goto readyEncounteredFatal
-			case componentCheckCtxWithCleanup:
-				if isClosed(ctx.Done()) {
-					goto readyShuttingDown
-				}
-				goto startupFinished
-			case componentCheckCtx:
-				if isClosed(ctx.Done()) {
-					goto readyCanceled
-				}
-				goto startupFinished
-			default:
-				c.unexpectedStateTransition(state, transition)
-			}
-
-		running:
-			c.t.Logf("[component %v] running\n", c.id)
-			state = componentRunning
-			switch transition := c.next(state); transition {
-			case componentThrowErr:
-				goto encounteredFatal
-			case componentCheckCtxWithCleanup:
-				if isClosed(ctx.Done()) {
-					goto shuttingDown
-				}
-				goto running
-			case componentCheckCtx:
-				if isClosed(ctx.Done()) {
-					goto done
-				}
-				goto running
-			default:
-				c.unexpectedStateTransition(state, transition)
-			}
-
-		readyShuttingDown:
-			c.t.Logf("[component %v] ready shutting down\n", c.id)
-			state = componentReadyShuttingDown
-			switch transition := c.next(state); transition {
-			case componentThrowErr:
-				goto readyEncounteredFatal
-			case componentFinishShutdown:
-				goto readyCanceled
-			default:
-				c.unexpectedStateTransition(state, transition)
-			}
-
-		shuttingDown:
-			c.t.Logf("[component %v] shutting down\n", c.id)
-			state = componentShuttingDown
-			switch transition := c.next(state); transition {
-			case componentThrowErr:
-				goto encounteredFatal
-			case componentFinishShutdown:
-				goto done
-			default:
-				c.unexpectedStateTransition(state, transition)
-			}
-
-		readyCanceled:
-			c.t.Logf("[component %v] ready canceled\n", c.id)
-			state = componentReadyCanceled
-			return
-
-		done:
-			c.t.Logf("[component %v] done\n", c.id)
-			state = componentDone
-			return
-
-		readyEncounteredFatal:
-			c.t.Logf("[component %v] ready encountered fatal\n", c.id)
-			state = componentReadyEncounteredFatal
-			ctx.Throw(&componentIrrecoverableError{c.id})
-
-		encounteredFatal:
-			c.t.Logf("[component %v] encountered fatal\n", c.id)
-			state = componentEncounteredFatal
-			ctx.Throw(&componentIrrecoverableError{c.id})
-		}()
-
-		goto startupFinished
-	case componentCheckCtx:
-		if isClosed(ctx.Done()) {
-			goto startupCanceled
-		}
-		goto startingUp
-	default:
-		c.unexpectedStateTransition(state, transition)
-	}
-
-startupFailed:
-	c.t.Logf("[component %v] startup failed\n", c.id)
-	state = componentStartupFailed
-	err = &componentStartupError{c.id}
-	return
-
-startupCanceled:
-	c.t.Logf("[component %v] startup canceled\n", c.id)
-	state = componentStartupCanceled
-	err = &componentCanceledError{c.id, ctx.Err()}
-	return
-
-startupFinished:
-	return nil
-}
-
-func (c *component) Ready() <-chan struct{} {
-	return c.ready
-}
-
-func (c *component) Done() <-chan struct{} {
-	return c.done
-}
-
-type workerState int
-
-const (
-	unknownWorkerState = iota
-	workerStarted
-	workerRunning
-	workerShuttingDown
-	workerDone
-	workerEncounteredFatal
-)
-
-func (s workerState) String() string {
-	switch s {
-	case workerStarted:
-		return "worker-started"
-	case workerRunning:
-		return "worker-running"
-	case workerShuttingDown:
-		return "worker-shutting-down"
-	case workerDone:
-		return "worker-done"
-	case workerEncounteredFatal:
-		return "worker-encountered-fatal"
-	default:
-		return "unknown"
-	}
-}
-
-type workerStateList []workerState
-
-func (wsl workerStateList) contains(ws workerState) bool {
+func (wsl WorkerStateList) Contains(ws WorkerState) bool {
 	for _, s := range wsl {
 		if s == ws {
 			return true
@@ -348,551 +79,368 @@ func (wsl workerStateList) contains(ws workerState) bool {
 	return false
 }
 
-type workerStateTransition int
+type WorkerStateTransition int
 
 const (
-	unknownWorkerStateTransition workerStateTransition = iota
-	workerCheckCtx
-	workerCheckCtxWithCleanup
-	workerThrowErr
-	workerFinish
+	UnknownWorkerStateTransition WorkerStateTransition = iota
+	WorkerCheckCtxAndShutdown                          // check context and shutdown if canceled
+	WorkerCheckCtxAndExit                              // check context and exit immediately if canceled
+	WorkerFinishStartup                                // finish starting up
+	WorkerDoWork                                       // do work
+	WorkerExit                                         // exit
+	WorkerThrowError                                   // throw error
 )
 
-func (st workerStateTransition) String() string {
-	switch st {
-	case workerCheckCtx:
-		return "worker-check-ctx"
-	case workerCheckCtxWithCleanup:
-		return "worker-check-ctx-with-cleanup"
-	case workerThrowErr:
-		return "worker-throw-err"
-	case workerFinish:
-		return "worker-finish"
+func (wst WorkerStateTransition) String() string {
+	switch wst {
+	case WorkerCheckCtxAndShutdown:
+		return "WORKER_CHECK_CTX_AND_SHUTDOWN"
+	case WorkerCheckCtxAndExit:
+		return "WORKER_CHECK_CTX_AND_EXIT"
+	case WorkerFinishStartup:
+		return "WORKER_FINISH_STARTUP"
+	case WorkerDoWork:
+		return "WORKER_DO_WORK"
+	case WorkerExit:
+		return "WORKER_EXIT"
+	case WorkerThrowError:
+		return "WORKER_THROW_ERROR"
 	default:
-		return "unknown"
+		return "UNKNOWN"
 	}
 }
 
-type wstConsumer func(workerStateTransition) workerState
-type wstProvider func(workerState) workerStateTransition
+// WorkerStateTransitions is a map from worker state to valid state transitions
+var WorkerStateTransitions = map[WorkerState][]WorkerStateTransition{
+	WorkerStartingUp:          {WorkerCheckCtxAndExit, WorkerCheckCtxAndShutdown, WorkerDoWork, WorkerFinishStartup},
+	WorkerStartupShuttingDown: {WorkerDoWork, WorkerExit, WorkerThrowError},
+	WorkerRunning:             {WorkerCheckCtxAndExit, WorkerCheckCtxAndShutdown, WorkerDoWork, WorkerExit, WorkerThrowError},
+	WorkerShuttingDown:        {WorkerDoWork, WorkerExit, WorkerThrowError},
+}
 
-func componentWorker(t *rapid.T, id int, next wstProvider) ComponentWorker {
-	unexpectedStateTransition := func(s workerState, wst workerStateTransition) {
-		assert.Fail(t, "unexpected state transition", "[worker %v] received %v for state %v", id, wst, s)
-		runtime.Goexit()
+// CheckWorkerStateTransition checks the validity of a worker state transition
+func CheckWorkerStateTransition(t *rapid.T, id int, start, end WorkerState, transition WorkerStateTransition, canceled bool) {
+	if !(func() bool {
+		switch start {
+		case WorkerStartingUp:
+			switch transition {
+			case WorkerCheckCtxAndExit:
+				return (canceled && end == WorkerStartupCanceled) || (!canceled && end == WorkerStartingUp)
+			case WorkerCheckCtxAndShutdown:
+				return (canceled && end == WorkerStartupShuttingDown) || (!canceled && end == WorkerStartingUp)
+			case WorkerDoWork:
+				return end == WorkerStartingUp
+			case WorkerFinishStartup:
+				return end == WorkerRunning
+			}
+		case WorkerStartupShuttingDown:
+			switch transition {
+			case WorkerDoWork:
+				return end == WorkerStartupShuttingDown
+			case WorkerExit:
+				return end == WorkerStartupCanceled
+			case WorkerThrowError:
+				return end == WorkerStartupEncounteredFatal
+			}
+		case WorkerRunning:
+			switch transition {
+			case WorkerCheckCtxAndExit:
+				return (canceled && end == WorkerCanceled) || (!canceled && end == WorkerRunning)
+			case WorkerCheckCtxAndShutdown:
+				return (canceled && end == WorkerShuttingDown) || (!canceled && end == WorkerRunning)
+			case WorkerDoWork:
+				return end == WorkerRunning
+			case WorkerExit:
+				return end == WorkerDone
+			case WorkerThrowError:
+				return end == WorkerEncounteredFatal
+			}
+		case WorkerShuttingDown:
+			switch transition {
+			case WorkerDoWork:
+				return end == WorkerShuttingDown
+			case WorkerExit:
+				return end == WorkerCanceled
+			case WorkerThrowError:
+				return end == WorkerEncounteredFatal
+			}
+		}
+
+		return false
+	}()) {
+		require.Fail(t, "invalid worker state transition", "[worker %v] start=%v, canceled=%v, transition=%v, end=%v", id, start, canceled, transition, end)
+	}
+}
+
+type WSTConsumer func(WorkerStateTransition) WorkerState
+type WSTProvider func(WorkerState) WorkerStateTransition
+
+// MakeWorkerTransitionFuncs creates a WorkerStateTransition Consumer / Provider pair.
+// The Consumer is called by the worker to notify the test code of the completion of a state transition
+// and receive the next state transition instruction.
+// The Provider is called by the test code to send the next state transition instruction and get the
+// resulting end state.
+func MakeWorkerTransitionFuncs() (WSTConsumer, WSTProvider) {
+	var started bool
+	stateChan := make(chan WorkerState, 1)
+	transitionChan := make(chan WorkerStateTransition)
+
+	consumer := func(wst WorkerStateTransition) WorkerState {
+		transitionChan <- wst
+		return <-stateChan
 	}
 
-	return func(ctx irrecoverable.SignalerContext) {
-		var state workerState
-		goto started
+	provider := func(ws WorkerState) WorkerStateTransition {
+		if started {
+			stateChan <- ws
+		} else {
+			started = true
+		}
 
-	started:
-		state = workerStarted
+		if _, ok := WorkerStateTransitions[ws]; !ok {
+			return UnknownWorkerStateTransition
+		}
+
+		return <-transitionChan
+	}
+
+	return consumer, provider
+}
+
+func ComponentWorker(t *rapid.T, id int, next WSTProvider) component.ComponentWorker {
+	unexpectedStateTransition := func(s WorkerState, wst WorkerStateTransition) {
+		panic(fmt.Sprintf("[worker %v] unexpected state transition: received %v for state %v", id, wst, s))
+	}
+
+	log := func(msg string) {
+		t.Logf("[worker %v] %v\n", id, msg)
+	}
+
+	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		var state WorkerState
+		goto startingUp
+
+	startingUp:
+		log("starting up")
+		state = WorkerStartingUp
 		switch transition := next(state); transition {
-		case workerCheckCtx:
-			if isClosed(ctx.Done()) {
-				goto done
+		case WorkerCheckCtxAndExit:
+			if IsClosed(ctx.Done()) {
+				goto startupCanceled
 			}
+			goto startingUp
+		case WorkerCheckCtxAndShutdown:
+			if IsClosed(ctx.Done()) {
+				goto startupShuttingDown
+			}
+			goto startingUp
+		case WorkerDoWork:
+			goto startingUp
+		case WorkerFinishStartup:
+			ready()
 			goto running
 		default:
 			unexpectedStateTransition(state, transition)
 		}
 
-	running:
-		state = workerRunning
+	startupShuttingDown:
+		log("startup shutting down")
+		state = WorkerStartupShuttingDown
 		switch transition := next(state); transition {
-		case workerFinish:
-			goto done
-		case workerThrowErr:
-			goto encounteredFatal
-		case workerCheckCtxWithCleanup:
-			if isClosed(ctx.Done()) {
+		case WorkerDoWork:
+			goto startupShuttingDown
+		case WorkerExit:
+			goto startupCanceled
+		case WorkerThrowError:
+			goto startupEncounteredFatal
+		default:
+			unexpectedStateTransition(state, transition)
+		}
+
+	startupCanceled:
+		log("startup canceled")
+		state = WorkerStartupCanceled
+		next(state)
+		return
+
+	startupEncounteredFatal:
+		log("startup encountered fatal")
+		state = WorkerStartupEncounteredFatal
+		defer next(state)
+		ctx.Throw(&WorkerError{id})
+
+	running:
+		log("running")
+		state = WorkerRunning
+		switch transition := next(state); transition {
+		case WorkerCheckCtxAndExit:
+			if IsClosed(ctx.Done()) {
+				goto canceled
+			}
+			goto running
+		case WorkerCheckCtxAndShutdown:
+			if IsClosed(ctx.Done()) {
 				goto shuttingDown
 			}
 			goto running
-		case workerCheckCtx:
-			if isClosed(ctx.Done()) {
-				goto done
-			}
+		case WorkerDoWork:
 			goto running
+		case WorkerExit:
+			goto done
+		case WorkerThrowError:
+			goto encounteredFatal
 		default:
 			unexpectedStateTransition(state, transition)
 		}
 
 	shuttingDown:
-		state = workerShuttingDown
+		log("shutting down")
+		state = WorkerShuttingDown
 		switch transition := next(state); transition {
-		case workerFinish:
-			goto done
-		case workerThrowErr:
+		case WorkerDoWork:
+			goto shuttingDown
+		case WorkerExit:
+			goto canceled
+		case WorkerThrowError:
 			goto encounteredFatal
 		default:
 			unexpectedStateTransition(state, transition)
 		}
 
-	done:
-		state = workerDone
-		defer next(state)
+	canceled:
+		log("canceled")
+		state = WorkerCanceled
+		next(state)
 		return
 
 	encounteredFatal:
-		state = workerEncounteredFatal
+		log("encountered fatal")
+		state = WorkerEncounteredFatal
 		defer next(state)
-		ctx.Throw(&workerError{id})
+		ctx.Throw(&WorkerError{id})
+
+	done:
+		log("done")
+		state = WorkerDone
+		next(state)
 	}
 }
 
-type startupState int
-
-const (
-	unknownStartupState startupState = iota
-	startupStarted
-	startupRunning
-	startupFailed
-	startupCanceled
-	startupFinished
-)
-
-func (s startupState) String() string {
-	switch s {
-	case startupStarted:
-		return "startup-started"
-	case startupRunning:
-		return "startup-running"
-	case startupFailed:
-		return "startup-failed"
-	case startupCanceled:
-		return "startup-canceled"
-	case startupFinished:
-		return "startup-finished"
-	default:
-		return "unknown"
-	}
-}
-
-type startupStateList []startupState
-
-func (ssl startupStateList) contains(ss startupState) bool {
-	for _, s := range ssl {
-		if s == ss {
-			return true
-		}
-	}
-	return false
-}
-
-type startupStateTransition int
-
-const (
-	unknownStartupStateTransition startupStateTransition = iota
-	startupCheckCtx
-	startupReturnErr
-	startupFinish
-)
-
-func (st startupStateTransition) String() string {
-	switch st {
-	case startupCheckCtx:
-		return "startup-check-ctx"
-	case startupReturnErr:
-		return "startup-return-err"
-	case startupFinish:
-		return "startup-finish"
-	default:
-		return "unknown"
-	}
-}
-
-type sstConsumer func(startupStateTransition) startupState
-type sstProvider func(startupState) startupStateTransition
-
-func componentStartup(t *rapid.T, next sstProvider) ComponentStartup {
-	unexpectedStateTransition := func(s startupState, sst startupStateTransition) {
-		assert.Fail(t, "unexpected state transition", "[startup] received %v for state %v", sst, s)
-		runtime.Goexit()
-	}
-
-	return func(ctx context.Context) error {
-		var state startupState
-		var err error
-		goto started
-
-	started:
-		t.Log("[startup] started\n")
-		state = startupStarted
-		switch transition := next(state); transition {
-		case startupCheckCtx:
-			if isClosed(ctx.Done()) {
-				goto canceled
-			}
-			goto running
-		default:
-			unexpectedStateTransition(state, transition)
-		}
-
-	running:
-		t.Log("[startup] running\n")
-		state = startupRunning
-		switch transition := next(state); transition {
-		case startupReturnErr:
-			err = errStartup
-			goto failed
-		case startupFinish:
-			goto finished
-		case startupCheckCtx:
-			if isClosed(ctx.Done()) {
-				goto canceled
-			}
-			goto running
-		default:
-			unexpectedStateTransition(state, transition)
-		}
-
-	canceled:
-		t.Log("[startup] canceled\n")
-		state = startupCanceled
-		defer next(state)
-		return ctx.Err()
-
-	failed:
-		t.Log("[startup] failed\n")
-		state = startupFailed
-		defer next(state)
-		return err
-
-	finished:
-		t.Log("[startup] finished\n")
-		state = startupFinished
-		defer next(state)
-		return nil
-	}
-}
-
-var errStartup = errors.New("startup error")
-
-type componentStartupError struct {
+type WorkerError struct {
 	id int
 }
 
-func (e *componentStartupError) Is(target error) bool {
-	if t, ok := target.(*componentStartupError); ok {
+func (e *WorkerError) Is(target error) bool {
+	if t, ok := target.(*WorkerError); ok {
 		return t.id == e.id
 	}
 	return false
 }
 
-func (e *componentStartupError) Error() string {
-	return fmt.Sprintf("[component %v] startup error", e.id)
-}
-
-type componentCanceledError struct {
-	id     int
-	ctxErr error
-}
-
-func (e *componentCanceledError) Is(target error) bool {
-	if t, ok := target.(*componentCanceledError); ok {
-		return t.id == e.id && errors.Is(t.ctxErr, e.ctxErr)
-	}
-	return false
-}
-
-func (e *componentCanceledError) Error() string {
-	return fmt.Sprintf("[component %v] %v", e.id, e.ctxErr)
-}
-
-func (e *componentCanceledError) Unwrap() error {
-	return e.ctxErr
-}
-
-type componentIrrecoverableError struct {
-	id int
-}
-
-func (e *componentIrrecoverableError) Is(target error) bool {
-	if t, ok := target.(*componentIrrecoverableError); ok {
-		return t.id == e.id
-	}
-	return false
-}
-
-func (e *componentIrrecoverableError) Error() string {
-	return fmt.Sprintf("[component %v] irrecoverable error", e.id)
-}
-
-type workerError struct {
-	id int
-}
-
-func (e *workerError) Is(target error) bool {
-	if t, ok := target.(*workerError); ok {
-		return t.id == e.id
-	}
-	return false
-}
-
-func (e *workerError) Error() string {
+func (e *WorkerError) Error() string {
 	return fmt.Sprintf("[worker %v] irrecoverable error", e.id)
 }
 
-func makeStartupTransitionFuncs() (sstConsumer, sstProvider) {
-	stateChan := make(chan startupState, 1)
-	transitionChan := make(chan startupStateTransition)
+// StartStateTransition returns a pair of functions AddTransition and ExecuteTransitions.
+// AddTransition is called to add a state transition step, and then ExecuteTransitions shuffles
+// all of the added steps and executes them in a random order.
+func StartStateTransition() (func(t func()), func(*rapid.T)) {
+	var transitions []func()
 
-	consumer := func(sst startupStateTransition) startupState {
-		transitionChan <- sst
-		return <-stateChan
-	}
-	provider := func(ss startupState) startupStateTransition {
-		if ss != startupStarted {
-			stateChan <- ss
-		}
-		if _, ok := startupStateTransitions[ss]; !ok {
-			return unknownStartupStateTransition
-		}
-		return <-transitionChan
+	addTransition := func(t func()) {
+		transitions = append(transitions, t)
 	}
 
-	return consumer, provider
+	executeTransitions := func(t *rapid.T) {
+		for i := 0; i < len(transitions); i++ {
+			j := rapid.IntRange(0, len(transitions)-i-1).Draw(t, "").(int)
+			transitions[i], transitions[j+i] = transitions[j+i], transitions[i]
+			transitions[i]()
+		}
+		// TODO: is this simpler?
+		// executionOrder := rapid.SliceOfNDistinct(
+		// 	rapid.IntRange(0, len(transitions)-1), len(transitions), len(transitions), nil,
+		// ).Draw(t, "transition_execution_order").([]int)
+		// for _, i := range executionOrder {
+		// 	transitions[i]()
+		// }
+	}
+
+	return addTransition, executeTransitions
 }
 
-func makeComponentTransitionFuncs() (cstConsumer, cstProvider) {
-	stateChan := make(chan componentState, 1)
-	transitionChan := make(chan componentStateTransition)
-
-	consumer := func(cst componentStateTransition) componentState {
-		transitionChan <- cst
-		return <-stateChan
-	}
-	provider := func(cs componentState) componentStateTransition {
-		if cs != componentStarted {
-			stateChan <- cs
-		}
-		if _, ok := componentStateTransitions[cs]; !ok {
-			return unknownComponentStateTransition
-		}
-		return <-transitionChan
-	}
-
-	return consumer, provider
-}
-
-func makeWorkerTransitionFuncs() (wstConsumer, wstProvider) {
-	stateChan := make(chan workerState, 1)
-	transitionChan := make(chan workerStateTransition)
-
-	consumer := func(wst workerStateTransition) workerState {
-		transitionChan <- wst
-		return <-stateChan
-	}
-	provider := func(ws workerState) workerStateTransition {
-		if ws != workerStarted {
-			stateChan <- ws
-		}
-		if _, ok := workerStateTransitions[ws]; !ok {
-			return unknownWorkerStateTransition
-		}
-		return <-transitionChan
-	}
-
-	return consumer, provider
-}
-
-type stateTransition struct {
-	cancel bool
-
-	startupStateTransition startupStateTransition
-
-	componentIDs         []int
-	componentTransitions []componentStateTransition
-
+type StateTransition struct {
+	cancel            bool
 	workerIDs         []int
-	workerTransitions []workerStateTransition
+	workerTransitions []WorkerStateTransition
 }
 
-func (st *stateTransition) String() string {
+func (st *StateTransition) String() string {
 	return fmt.Sprintf(
-		"stateTransition{\n"+
-			"\tcancel=%v\n"+
-			"\tstartupStateTransition=%v\n"+
-			"\tcomponentIDs=%v\n"+
-			"\tcomponentTransitions=%v\n"+
-			"\tworkerIDs=%v\n"+
-			"\tworkerTransitions=%v\n"+
-			"}",
-		st.cancel, st.startupStateTransition, st.componentIDs, st.componentTransitions, st.workerIDs, st.workerTransitions,
+		"stateTransition{ cancel=%v, workerIDs=%v, workerTransitions=%v }",
+		st.cancel, st.workerIDs, st.workerTransitions,
 	)
 }
 
-type componentManagerMachine struct {
-	cm *ComponentManager
+type ComponentManagerMachine struct {
+	cm *component.ComponentManager
 
-	cancel                     context.CancelFunc
-	resetChannelReadTimeout    func()
-	assertClosed               func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
-	assertNotClosed            func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
-	assertErrorThrownMatches   func(t *rapid.T, err error, msgAndArgs ...interface{})
-	assertErrorNotThrown       func(t *rapid.T)
-	assertErrorReturnedMatches func(t *rapid.T, err error, msgAndArgs ...interface{})
-	assertNotReturned          func(t *rapid.T)
+	cancel                    context.CancelFunc
+	workerTransitionConsumers []WSTConsumer
+
+	canceled     bool
+	workerErrors error
+	workerStates []WorkerState
+
+	resetChannelReadTimeout  func()
+	assertClosed             func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
+	assertNotClosed          func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{})
+	assertErrorThrownMatches func(t *rapid.T, err error, msgAndArgs ...interface{})
+	assertErrorNotThrown     func(t *rapid.T)
 
 	cancelGenerator     *rapid.Generator
-	drawStateTransition func(t *rapid.T) *stateTransition
-	updateStates        func()
-
-	canceled          bool
-	componentsStarted bool
-	workersStarted    bool
-
-	startupError           error
-	componentStartupErrors error
-	thrownErrors           error
-
-	startupTransitionConsumer sstConsumer
-	startupState              startupState
-
-	components                   []*component
-	componentTransitionConsumers []cstConsumer
-	componentStates              []componentState
-
-	workerTransitionConsumers []wstConsumer
-	workerStates              []workerState
+	drawStateTransition func(t *rapid.T) *StateTransition
 }
 
-func (c *componentManagerMachine) Init(t *rapid.T) {
-	hasStartup := rapid.Bool().Draw(t, "has_startup").(bool)
+func (c *ComponentManagerMachine) Init(t *rapid.T) {
 	numWorkers := rapid.IntRange(0, 5).Draw(t, "num_workers").(int)
-	numComponents := rapid.IntRange(0, 5).Draw(t, "num_components").(int)
 	pCancel := rapid.Float64Range(0, 100).Draw(t, "p_cancel").(float64)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	c.cancel = cancel
+	c.cancelGenerator = rapid.Float64Range(0, 100).
+		Map(func(n float64) bool {
+			return pCancel == 100 || n < pCancel
+		})
 
-	signaler := irrecoverable.NewSignaler()
-	signalerCtx := irrecoverable.WithSignaler(ctx, signaler)
-
-	cmb := NewComponentManagerBuilder()
-
-	c.cancelGenerator = rapid.Float64Range(0, 100).Map(func(n float64) bool { return pCancel == 100 || n < pCancel })
-	c.drawStateTransition = func(t *rapid.T) *stateTransition {
-		st := &stateTransition{}
+	c.drawStateTransition = func(t *rapid.T) *StateTransition {
+		st := &StateTransition{}
 
 		if !c.canceled {
 			st.cancel = c.cancelGenerator.Draw(t, "cancel").(bool)
 		}
 
-		if allowedTransitions, ok := startupStateTransitions[c.startupState]; ok {
-			st.startupStateTransition = rapid.SampledFrom(allowedTransitions).Draw(t, "startup_state_transition").(startupStateTransition)
-		}
-
-		for componentId, state := range c.componentStates {
-			if allowedTransitions, ok := componentStateTransitions[state]; ok {
-				label := fmt.Sprintf("component_transition_%v", componentId)
-				st.componentIDs = append(st.componentIDs, componentId)
-				st.componentTransitions = append(st.componentTransitions, rapid.SampledFrom(allowedTransitions).Draw(t, label).(componentStateTransition))
-			}
-		}
-
 		for workerId, state := range c.workerStates {
-			if allowedTransitions, ok := workerStateTransitions[state]; ok {
+			if allowedTransitions, ok := WorkerStateTransitions[state]; ok {
 				label := fmt.Sprintf("worker_transition_%v", workerId)
 				st.workerIDs = append(st.workerIDs, workerId)
-				st.workerTransitions = append(st.workerTransitions, rapid.SampledFrom(allowedTransitions).Draw(t, label).(workerStateTransition))
+				st.workerTransitions = append(st.workerTransitions, rapid.SampledFrom(allowedTransitions).Draw(t, label).(WorkerStateTransition))
 			}
 		}
 
-		return rapid.Just(st).Draw(t, "state_transition").(*stateTransition)
-	}
-	c.updateStates = func() {
-		if !c.componentsStarted && c.startupState == startupFinished {
-			for i := 0; i < len(c.componentStates); i++ {
-				c.componentStates[i] = componentStarted
-			}
-			c.componentsStarted = true
-		}
-
-		if !c.workersStarted && c.componentsStarted {
-			allComponentsStartupFinished := true
-			for _, s := range c.componentStates {
-				if !(componentStateList{
-					componentStartupFinished,
-					componentRunning,
-					componentShuttingDown,
-					componentDone,
-					componentEncounteredFatal,
-					componentReadyShuttingDown,
-					componentReadyCanceled,
-					componentReadyEncounteredFatal,
-				}).contains(s) {
-					allComponentsStartupFinished = false
-					break
-				}
-			}
-			if allComponentsStartupFinished {
-				for i := 0; i < len(c.workerStates); i++ {
-					c.workerStates[i] = workerStarted
-				}
-				c.workersStarted = true
-			}
-		}
+		return rapid.Just(st).Draw(t, "state_transition").(*StateTransition)
 	}
 
-	if hasStartup {
-		stc, stp := makeStartupTransitionFuncs()
+	ctx, cancel := context.WithCancel(context.Background())
+	c.cancel = cancel
 
-		c.startupTransitionConsumer = stc
-		c.startupState = startupStarted
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 
-		cmb.OnStart(componentStartup(t, stp))
-	}
-
-	c.components = make([]*component, numComponents)
-	c.componentTransitionConsumers = make([]cstConsumer, numComponents)
-	c.componentStates = make([]componentState, numComponents)
-
-	for i := 0; i < numComponents; i++ {
-		ctc, ctp := makeComponentTransitionFuncs()
-
-		c.componentTransitionConsumers[i] = ctc
-		c.componentStates[i] = componentIdle
-		c.components[i] = newComponent(t, i, ctp)
-
-		cmb.AddComponent(c.components[i])
-	}
-
-	c.workerTransitionConsumers = make([]wstConsumer, numWorkers)
-	c.workerStates = make([]workerState, numWorkers)
-
-	for i := 0; i < numWorkers; i++ {
-		wtc, wtp := makeWorkerTransitionFuncs()
-
-		c.workerTransitionConsumers[i] = wtc
-		c.workerStates[i] = unknownWorkerState
-
-		cmb.AddWorker(componentWorker(t, i, wtp))
-	}
-
-	c.cm = cmb.Build()
-	startErrChan := make(chan error, 1)
-
-	go func() {
-		err := c.cm.Start(signalerCtx)
-		t.Logf("component manager returned from Start: %v\n", err)
-		if err != nil {
-			startErrChan <- err
-		}
-		close(startErrChan)
-	}()
-
-	var channelReadTimeout chan struct{}
+	var channelReadTimeout <-chan struct{}
+	var signalerErr error
 
 	c.resetChannelReadTimeout = func() {
-		channelReadTimeout = make(chan struct{})
-		ch := channelReadTimeout
-		go func() {
-			time.Sleep(CHANNEL_CLOSE_LATENCY_ALLOWANCE)
-			close(ch)
-		}()
+		ctx, cancel := context.WithTimeout(context.Background(), CHANNEL_CLOSE_LATENCY_ALLOWANCE)
+		_ = cancel
+		channelReadTimeout = ctx.Done()
 	}
 
 	c.assertClosed = func(t *rapid.T, ch <-chan struct{}, msgAndArgs ...interface{}) {
@@ -920,90 +468,66 @@ func (c *componentManagerMachine) Init(t *rapid.T) {
 		}
 	}
 
-	var signalerErr error
-
 	c.assertErrorThrownMatches = func(t *rapid.T, err error, msgAndArgs ...interface{}) {
 		if signalerErr == nil {
 			select {
-			case signalerErr = <-signaler.Error():
+			case signalerErr = <-errChan:
 			default:
 				select {
 				case <-channelReadTimeout:
 					assert.Fail(t, "error was not thrown")
 					return
-				case signalerErr = <-signaler.Error():
+				case signalerErr = <-errChan:
 				}
 			}
 		}
+
 		assert.ErrorIs(t, err, signalerErr, msgAndArgs...)
 	}
 
 	c.assertErrorNotThrown = func(t *rapid.T) {
 		if signalerErr == nil {
 			select {
-			case signalerErr = <-signaler.Error():
+			case signalerErr = <-errChan:
 			default:
 				select {
-				case signalerErr = <-signaler.Error():
+				case signalerErr = <-errChan:
 				case <-channelReadTimeout:
 					return
 				}
 			}
 		}
+
 		assert.Fail(t, "error was thrown: %v", signalerErr)
 	}
 
-	var startReturned bool
-	var startErr error
+	c.workerTransitionConsumers = make([]WSTConsumer, numWorkers)
+	c.workerStates = make([]WorkerState, numWorkers)
 
-	c.assertErrorReturnedMatches = func(t *rapid.T, err error, msgAndArgs ...interface{}) {
-		if !startReturned {
-			select {
-			case startErr = <-startErrChan:
-			default:
-				select {
-				case <-channelReadTimeout:
-					assert.Fail(t, "error was not returned")
-					return
-				case startErr = <-startErrChan:
-				}
-			}
-		}
-		startReturned = true
-		assert.ErrorIs(t, err, startErr, msgAndArgs...)
+	cmb := component.NewComponentManagerBuilder()
+
+	for i := 0; i < numWorkers; i++ {
+		wtc, wtp := MakeWorkerTransitionFuncs()
+		c.workerTransitionConsumers[i] = wtc
+		cmb.AddWorker(ComponentWorker(t, i, wtp))
 	}
 
-	c.assertNotReturned = func(t *rapid.T) {
-		if !startReturned {
-			select {
-			case startErr = <-startErrChan:
-			default:
-				select {
-				case startErr = <-startErrChan:
-				case <-channelReadTimeout:
-					return
-				}
-			}
-		}
-		startReturned = true
-		assert.Fail(t, "component manager returned: %v", startErr)
-	}
+	c.cm = cmb.Build()
+	c.cm.Start(signalerCtx)
 
-	if !hasStartup {
-		c.startupState = startupFinished
-		c.updateStates()
+	for i := 0; i < numWorkers; i++ {
+		c.workerStates[i] = WorkerStartingUp
 	}
 }
 
-func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
+func (c *ComponentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 	st := c.drawStateTransition(t)
 
 	t.Logf("drew state transition: %v\n", st)
 
-	var componentStartupErrors *multierror.Error
-	var thrownErrors *multierror.Error
+	var errors *multierror.Error
 
-	addTransition, executeTransitionsInRandomOrder := startStateTransition()
+	addTransition, executeTransitionsInRandomOrder := StartStateTransition()
 
 	if st.cancel {
 		addTransition(func() {
@@ -1015,68 +539,6 @@ func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 		})
 	}
 
-	if st.startupStateTransition != unknownStartupStateTransition {
-		addTransition(func() {
-			t.Logf("executing startup transition: %v\n", st.startupStateTransition)
-			endState := c.startupTransitionConsumer(st.startupStateTransition)
-			checkStartupStateTransition(t, c.startupState, endState, st.startupStateTransition, c.canceled)
-			c.startupState = endState
-
-			var startupError error
-			if endState == startupFailed {
-				startupError = errStartup
-			} else if endState == startupCanceled {
-				startupError = context.Canceled
-			}
-
-			if startupError != nil {
-				assert.NoError(t, c.startupError)
-				c.startupError = startupError
-				c.canceled = true
-				c.resetChannelReadTimeout()
-				c.assertClosed(t, c.cm.ShutdownSignal())
-			}
-		})
-	}
-
-	for i, componentId := range st.componentIDs {
-		i := i
-		componentId := componentId
-		addTransition(func() {
-			cst := st.componentTransitions[i]
-			t.Logf("executing component %v transition: %v\n", componentId, cst)
-			endState := c.componentTransitionConsumers[componentId](cst)
-			checkComponentStateTransition(t, componentId, c.componentStates[componentId], endState, cst, c.canceled)
-			c.componentStates[componentId] = endState
-
-			var componentStartupErr error
-			if endState == componentStartupFailed {
-				componentStartupErr = &componentStartupError{componentId}
-			} else if endState == componentStartupCanceled {
-				componentStartupErr = &componentCanceledError{componentId, context.Canceled}
-			}
-
-			if componentStartupErr != nil {
-				assert.NotErrorIs(t, c.componentStartupErrors, componentStartupErr)
-				assert.NotErrorIs(t, componentStartupErrors, componentStartupErr)
-				componentStartupErrors = multierror.Append(componentStartupErrors, componentStartupErr)
-				c.canceled = true
-				c.resetChannelReadTimeout()
-				c.assertClosed(t, c.cm.ShutdownSignal())
-			}
-
-			if (componentStateList{componentEncounteredFatal, componentReadyEncounteredFatal}).contains(endState) {
-				thrownErr := &componentIrrecoverableError{componentId}
-				assert.NotErrorIs(t, c.thrownErrors, thrownErr)
-				assert.NotErrorIs(t, thrownErrors, thrownErr)
-				thrownErrors = multierror.Append(thrownErrors, thrownErr)
-				c.canceled = true
-				c.resetChannelReadTimeout()
-				c.assertClosed(t, c.cm.ShutdownSignal())
-			}
-		})
-	}
-
 	for i, workerId := range st.workerIDs {
 		i := i
 		workerId := workerId
@@ -1084,14 +546,14 @@ func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 			wst := st.workerTransitions[i]
 			t.Logf("executing worker %v transition: %v\n", workerId, wst)
 			endState := c.workerTransitionConsumers[workerId](wst)
-			checkWorkerStateTransition(t, workerId, c.workerStates[workerId], endState, wst, c.canceled)
+			CheckWorkerStateTransition(t, workerId, c.workerStates[workerId], endState, wst, c.canceled)
 			c.workerStates[workerId] = endState
 
-			if endState == workerEncounteredFatal {
-				thrownErr := &workerError{workerId}
-				assert.NotErrorIs(t, c.thrownErrors, thrownErr)
-				assert.NotErrorIs(t, thrownErrors, thrownErr)
-				thrownErrors = multierror.Append(thrownErrors, thrownErr)
+			if (WorkerStateList{WorkerStartupEncounteredFatal, WorkerEncounteredFatal}).Contains(endState) {
+				err := &WorkerError{workerId}
+				require.NotErrorIs(t, c.workerErrors, err)
+				require.NotErrorIs(t, errors, err)
+				errors = multierror.Append(errors, err)
 				c.canceled = true
 				c.resetChannelReadTimeout()
 				c.assertClosed(t, c.cm.ShutdownSignal())
@@ -1101,363 +563,76 @@ func (c *componentManagerMachine) ExecuteStateTransition(t *rapid.T) {
 
 	executeTransitionsInRandomOrder(t)
 
-	if c.componentStartupErrors == nil {
-		c.componentStartupErrors = componentStartupErrors.ErrorOrNil()
+	if c.workerErrors == nil {
+		c.workerErrors = errors.ErrorOrNil()
 	}
 
-	if c.thrownErrors == nil {
-		c.thrownErrors = thrownErrors.ErrorOrNil()
-	}
-
-	c.updateStates()
-
-	t.Logf("end state: {\n"+
-		"\tcanceled=%v\n"+
-		"\tcomponentsStarted=%v\n"+
-		"\tworkersStarted=%v\n"+
-		"\tstartupError=%v\n"+
-		"\tcomponentStartupErrors=%v\n"+
-		"\tthrownErrors=%v\n"+
-		"\tstartupState=%v\n"+
-		"\tcomponentStates=%v\n"+
-		"\tworkerStates=%v\n"+
-		"}\n",
-		c.canceled,
-		c.componentsStarted,
-		c.workersStarted,
-		c.startupError,
-		c.componentStartupErrors,
-		c.thrownErrors,
-		c.startupState,
-		c.componentStates,
-		c.workerStates,
-	)
-
+	t.Logf("end state: { canceled=%v, workerErrors=%v, workerStates=%v }\n", c.canceled, c.workerErrors, c.workerStates)
 }
 
-func (c *componentManagerMachine) Check(t *rapid.T) {
+func (c *ComponentManagerMachine) Check(t *rapid.T) {
 	c.resetChannelReadTimeout()
 
 	if c.canceled {
-		c.assertClosed(t, c.cm.ShutdownSignal(), "context canceled but component manager shutdown signal was not closed")
+		c.assertClosed(t, c.cm.ShutdownSignal(), "context is canceled but component manager shutdown signal is not closed")
 	}
 
-	sState := c.startupState
-	startupDone := (startupStateList{startupCanceled, startupFailed, startupFinished}).contains(sState)
-	startupSucceeded := false
-
-	switch sState {
-	case startupStarted:
-		fallthrough
-	case startupRunning:
-		c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before startup function completed")
-		c.assertNotReturned(t)
-		c.assertErrorNotThrown(t)
-	case startupCanceled:
-		fallthrough
-	case startupFailed:
-		c.assertErrorReturnedMatches(t, c.startupError, "error returned from component manager did not match the one returned from startup function")
-		c.assertClosed(t, c.cm.ShutdownSignal(), "startup failed but context was not canceled")
-		c.assertClosed(t, c.cm.Done(), "startup failed but component manager done channel not closed")
-	case startupFinished:
-		startupSucceeded = true
-	default:
-		assert.FailNow(t, "unexpected startup state", sState)
-	}
-
-	allComponentsDone := true
-	allComponentsReady := true
-	allComponentsStartupSucceeded := true
-	anyComponentStartupFailed := false
-
-	for _, cState := range c.componentStates {
-		if (componentStateList{
-			componentStartupFailed,
-			componentStartupCanceled,
-		}).contains(cState) {
-			anyComponentStartupFailed = true
-		} else if !(componentStateList{
-			componentDone,
-			componentEncounteredFatal,
-			componentReadyCanceled,
-			componentReadyEncounteredFatal,
-		}).contains(cState) {
-			allComponentsDone = false
-		}
-		if !(componentStateList{
-			componentRunning,
-			componentShuttingDown,
-			componentDone,
-			componentEncounteredFatal,
-		}).contains(cState) {
-			allComponentsReady = false
-			if !(componentStateList{
-				componentStartupFinished,
-				componentReadyShuttingDown,
-				componentReadyCanceled,
-				componentReadyEncounteredFatal,
-			}).contains(cState) {
-				allComponentsStartupSucceeded = false
-			}
-		}
-
-		switch cState {
-		case componentIdle:
-			assert.NotEqual(t, startupFinished, sState)
-		case componentStarted:
-			fallthrough
-		case componentStartingUp:
-			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before component finished startup")
-			c.assertNotClosed(t, c.cm.Ready(), "component manager ready channel closed before component finished startup")
-			c.assertNotReturned(t)
-		case componentStartupCanceled:
-			fallthrough
-		case componentStartupFailed:
-			c.assertClosed(t, c.cm.ShutdownSignal(), "component startup failed but context was not canceled")
-			c.assertNotClosed(t, c.cm.Ready(), "component manager ready channel closed despite component startup failure")
-		case componentStartupFinished:
-			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before component was done")
-			c.assertNotClosed(t, c.cm.Ready(), "component manager ready channel closed before component was ready")
-		case componentRunning:
-			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed while component still running")
-		case componentShuttingDown:
-			c.assertClosed(t, c.cm.ShutdownSignal(), "component shutting down but context was not canceled")
-			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before component finished shutting down")
-		case componentDone:
-			// component only reaches this state if it was canceled or it encountered a fatal error
-			c.assertClosed(t, c.cm.ShutdownSignal(), "component done but context was not canceled")
-		case componentEncounteredFatal:
-			c.assertClosed(t, c.cm.ShutdownSignal(), "component encountered fatal but context was not canceled")
-		case componentReadyShuttingDown:
-			fallthrough
-		case componentReadyCanceled:
-			c.assertClosed(t, c.cm.ShutdownSignal(), "component was canceled before ready but context was not canceled")
-			c.assertNotClosed(t, c.cm.Ready(), "component manager ready channel closed but component was canceled before ready")
-		case componentReadyEncounteredFatal:
-			c.assertClosed(t, c.cm.ShutdownSignal(), "component encountered fatal before ready but context was not canceled")
-			c.assertNotClosed(t, c.cm.Ready(), "component manager ready channel closed but component encountered fatal before ready")
-		default:
-			assert.FailNow(t, "unexpected component state", cState)
-		}
-	}
-
-	if anyComponentStartupFailed && allComponentsDone {
-		c.assertErrorReturnedMatches(t, c.componentStartupErrors, "error returned from component manager did not match the one returned by startup")
-		c.assertClosed(t, c.cm.Done(), "startup failed but component manager done channel not closed")
-	}
-
-	if startupSucceeded && allComponentsStartupSucceeded {
-		c.assertErrorReturnedMatches(t, nil, "startup succeeded but error was returned from component manager")
-	}
-
-	if startupSucceeded && allComponentsReady {
-		c.assertClosed(t, c.cm.Ready(), "all components ready but component manager ready channel not closed")
-	}
-
+	allWorkersReady := true
 	allWorkersDone := true
 
-	for _, wState := range c.workerStates {
-		if !(workerStateList{workerDone, workerEncounteredFatal}).contains(wState) {
-			allWorkersDone = false
+	for workerID, state := range c.workerStates {
+		if (WorkerStateList{
+			WorkerStartingUp,
+			WorkerStartupShuttingDown,
+			WorkerStartupCanceled,
+			WorkerStartupEncounteredFatal,
+		}).Contains(state) {
+			allWorkersReady = false
+			c.assertNotClosed(t, c.cm.Ready(), "worker %v has not finished startup but component manager ready channel is closed", workerID)
 		}
 
-		switch wState {
-		case unknownWorkerState:
-			assert.NotEqual(t, true, startupSucceeded && allComponentsStartupSucceeded)
-		case workerStarted:
-			fallthrough
-		case workerRunning:
-			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before worker finished running")
-		case workerShuttingDown:
-			c.assertClosed(t, c.cm.ShutdownSignal(), "worker shutting down but context was not canceled")
-			c.assertNotClosed(t, c.cm.Done(), "component manager done channel closed before worker finished shutting down")
-		case workerDone:
-		case workerEncounteredFatal:
-			c.assertClosed(t, c.cm.ShutdownSignal(), "worker encountered fatal but context was not canceled")
-		default:
-			assert.FailNow(t, "unexpected worker state", wState)
+		if !(WorkerStateList{
+			WorkerStartupCanceled,
+			WorkerStartupEncounteredFatal,
+			WorkerCanceled,
+			WorkerEncounteredFatal,
+			WorkerDone,
+		}).Contains(state) {
+			allWorkersDone = false
+			c.assertNotClosed(t, c.cm.Done(), "worker %v has not exited but component manager done channel is closed", workerID)
+		}
+
+		if (WorkerStateList{
+			WorkerStartupShuttingDown,
+			WorkerStartupCanceled,
+			WorkerStartupEncounteredFatal,
+			WorkerShuttingDown,
+			WorkerCanceled,
+			WorkerEncounteredFatal,
+		}).Contains(state) {
+			c.assertClosed(t, c.cm.ShutdownSignal(), "worker %v has been canceled or encountered a fatal error but component manager shutdown signal is not closed", workerID)
 		}
 	}
 
-	if c.thrownErrors != nil {
-		c.assertErrorThrownMatches(t, c.thrownErrors, "error received by signaler did not match any of the ones thrown")
-		c.assertClosed(t, c.cm.ShutdownSignal(), "fatal error thrown but context was not canceled")
+	if allWorkersReady {
+		c.assertClosed(t, c.cm.Ready(), "all workers are ready but component manager ready channel is not closed")
+	}
+
+	if allWorkersDone {
+		c.assertClosed(t, c.cm.Done(), "all workers are done but component manager done channel is not closed")
+	}
+
+	if c.workerErrors != nil {
+		c.assertErrorThrownMatches(t, c.workerErrors, "error received by signaler does not match any of the ones thrown")
+		c.assertClosed(t, c.cm.ShutdownSignal(), "fatal error thrown but context is not canceled")
 	} else {
 		c.assertErrorNotThrown(t)
-	}
-
-	if startupDone && allComponentsDone && allWorkersDone {
-		c.assertClosed(t, c.cm.Done(), "all components and workers done but component manager done channel not closed")
 	}
 }
 
 func TestComponentManager(t *testing.T) {
 	// skip because this test takes too long
-	// t.Skip()
-	rapid.Check(t, rapid.Run(&componentManagerMachine{}))
-}
+	t.Skip()
 
-func startStateTransition() (func(t func()), func(*rapid.T)) {
-	var transitions []func()
-
-	addTransition := func(t func()) {
-		transitions = append(transitions, t)
-	}
-	executeTransitions := func(t *rapid.T) {
-		n := rapid.IntRange(0, len(transitions)).Draw(t, "num_transitions_to_execute").(int)
-		for i := 0; i < n; i++ {
-			j := rapid.IntRange(0, len(transitions)-i-1).Draw(t, "").(int)
-			transitions[i], transitions[j+i] = transitions[j+i], transitions[i]
-			transitions[i]()
-		}
-		// TODO: is this simpler?
-		// executionOrder := rapid.SliceOfNDistinct(
-		// 	rapid.IntRange(0, len(transitions)-1), 0, len(transitions), nil,
-		// ).Draw(t, "transition_execution_order").([]int)
-		// for _, i := range executionOrder {
-		// 	transitions[i]()
-		// }
-	}
-
-	return addTransition, executeTransitions
-}
-
-var componentStateTransitions = map[componentState][]componentStateTransition{
-	componentStarted:           {componentCheckCtx},
-	componentStartingUp:        {componentCheckCtx, componentFailStartup, componentFinishStartup, componentBecomeReady},
-	componentStartupFinished:   {componentCheckCtx, componentCheckCtxWithCleanup, componentThrowErr, componentBecomeReady},
-	componentRunning:           {componentCheckCtx, componentCheckCtxWithCleanup, componentThrowErr},
-	componentShuttingDown:      {componentThrowErr, componentFinishShutdown},
-	componentReadyShuttingDown: {componentThrowErr, componentFinishShutdown},
-}
-
-func checkComponentStateTransition(t *rapid.T, id int, start, end componentState, transition componentStateTransition, canceled bool) {
-	if !(func() bool {
-		switch start {
-		case componentStarted:
-			switch transition {
-			case componentCheckCtx:
-				return (!canceled && end == componentStartingUp) || (canceled && end == componentStartupCanceled)
-			}
-		case componentStartingUp:
-			switch transition {
-			case componentCheckCtx:
-				return (!canceled && end == start) || (canceled && end == componentStartupCanceled)
-			case componentFailStartup:
-				return end == componentStartupFailed
-			case componentFinishStartup:
-				return end == componentStartupFinished
-			case componentBecomeReady:
-				return end == componentRunning
-			}
-		case componentStartupFinished:
-			switch transition {
-			case componentCheckCtx:
-				return (!canceled && end == start) || (canceled && end == componentReadyCanceled)
-			case componentCheckCtxWithCleanup:
-				return (!canceled && end == start) || (canceled && end == componentReadyShuttingDown)
-			case componentThrowErr:
-				return end == componentReadyEncounteredFatal
-			case componentBecomeReady:
-				return end == componentRunning
-			}
-		case componentRunning:
-			switch transition {
-			case componentCheckCtx:
-				return (!canceled && end == start) || (canceled && end == componentDone)
-			case componentCheckCtxWithCleanup:
-				return (!canceled && end == start) || (canceled && end == componentShuttingDown)
-			case componentThrowErr:
-				return end == componentEncounteredFatal
-			}
-		case componentShuttingDown:
-			switch transition {
-			case componentFinishShutdown:
-				return end == componentDone
-			case componentThrowErr:
-				return end == componentEncounteredFatal
-			}
-		case componentReadyShuttingDown:
-			switch transition {
-			case componentFinishShutdown:
-				return end == componentReadyCanceled
-			case componentThrowErr:
-				return end == componentReadyEncounteredFatal
-			}
-		}
-
-		return false
-	}()) {
-		assert.Fail(t, "invalid component state transition", "[component %v] canceled=%v, transition=%v, start=%v, end=%v", id, canceled, transition, start, end)
-	}
-}
-
-var workerStateTransitions = map[workerState][]workerStateTransition{
-	workerStarted:      {workerCheckCtx},
-	workerRunning:      {workerCheckCtx, workerCheckCtxWithCleanup, workerThrowErr, workerFinish},
-	workerShuttingDown: {workerThrowErr, workerFinish},
-}
-
-func checkWorkerStateTransition(t *rapid.T, id int, start, end workerState, transition workerStateTransition, canceled bool) {
-	if !(func() bool {
-		switch start {
-		case workerStarted:
-			switch transition {
-			case workerCheckCtx:
-				return (!canceled && end == workerRunning) || (canceled && end == workerDone)
-			}
-		case workerRunning:
-			switch transition {
-			case workerCheckCtx:
-				return (!canceled && end == start) || (canceled && end == workerDone)
-			case workerCheckCtxWithCleanup:
-				return (!canceled && end == start) || (canceled && end == workerShuttingDown)
-			case workerThrowErr:
-				return end == workerEncounteredFatal
-			case workerFinish:
-				return end == workerDone
-			}
-		case workerShuttingDown:
-			switch transition {
-			case workerThrowErr:
-				return end == workerEncounteredFatal
-			case workerFinish:
-				return end == workerDone
-			}
-		}
-
-		return false
-	}()) {
-		assert.Fail(t, "invalid worker state transition", "[worker %v] canceled=%v, transition=%v, start=%v, end=%v", id, canceled, transition, start, end)
-	}
-}
-
-var startupStateTransitions = map[startupState][]startupStateTransition{
-	startupStarted: {startupCheckCtx},
-	startupRunning: {startupCheckCtx, startupReturnErr, startupFinish},
-}
-
-func checkStartupStateTransition(t *rapid.T, start, end startupState, transition startupStateTransition, canceled bool) {
-	if !(func() bool {
-		switch start {
-		case startupStarted:
-			switch transition {
-			case startupCheckCtx:
-				return (!canceled && end == startupRunning) || (canceled && end == startupCanceled)
-			}
-		case startupRunning:
-			switch transition {
-			case startupCheckCtx:
-				return (!canceled && end == start) || (canceled && end == startupCanceled)
-			case startupReturnErr:
-				return end == startupFailed
-			case startupFinish:
-				return end == startupFinished
-			}
-		}
-
-		return false
-	}()) {
-		assert.Fail(t, "invalid startup state transition", "canceled=%v, transition=%v, start=%v, end=%v", canceled, transition, start, end)
-	}
+	rapid.Check(t, rapid.Run(&ComponentManagerMachine{}))
 }

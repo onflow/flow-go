@@ -78,11 +78,9 @@ func (mr *MockNetworkMockRecorder) Register(arg0, arg1 interface{}) *gomock.Call
 }
 
 // Start mocks base method
-func (m *MockNetwork) Start(arg0 irrecoverable.SignalerContext) error {
+func (m *MockNetwork) Start(arg0 irrecoverable.SignalerContext) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Start", arg0)
-	ret0, _ := ret[0].(error)
-	return ret0
+	m.ctrl.Call(m, "Start", arg0)
 }
 
 // Start indicates an expected call of Start
