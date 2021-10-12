@@ -21,6 +21,7 @@ func TestEventHandlerV2(t *testing.T) {
 	suite.Run(t, new(EventHandlerV2Suite))
 }
 
+// EventHandlerV2Suite contains mocked state for testing event handler under different scenarios.
 type EventHandlerV2Suite struct {
 	suite.Suite
 
@@ -209,20 +210,23 @@ func (es *EventHandlerV2Suite) TestOnReceiveProposal_ForCurView_NoVote_IsNextLea
 }
 
 // received a valid proposal for cur view, but not a safe node to vote, and I'm the next leader,
-// a qc can be built for the block, trigged view change
+// a qc can be built for the block, triggered view change
 func (es *EventHandlerV2Suite) TestOnReceiveProposal_ForCurView_NoVote_IsNextLeader_QCBuilt_ViewChange() {
 	proposal := createProposal(es.initView, es.initView-1)
+	qc := createQC(proposal.Block)
 	es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 	// I'm the next leader
 	es.committee.leaders[es.initView+1] = struct{}{}
-	// a qc can be built for this block
-	//es.voteAggregator.qcs[proposal.Block.BlockID] = createQC(proposal.Block)
 	// qc triggered view change
 	es.endView++
 	// I'm the leader of cur view (7)
 	// I'm not the leader of next view (8), trigger view change
 
 	err := es.eventhandler.OnReceiveProposal(proposal)
+	require.NoError(es.T(), err)
+
+	// after receiving proposal build QC and deliver it to event handler
+	err = es.eventhandler.OnQCConstructed(qc)
 	require.NoError(es.T(), err)
 
 	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
@@ -282,13 +286,20 @@ func (es *EventHandlerV2Suite) TestLeaderBuild100Blocks() {
 		es.committee.leaders[es.initView+uint64(i+1)] = struct{}{}
 		// I can build qc for all 100 views
 		proposal := createProposal(es.initView+uint64(i), es.initView+uint64(i)-1)
-		//es.voteAggregator.qcs[proposal.Block.BlockID] = createQC(proposal.Block)
+		qc := createQC(proposal.Block)
+
+		es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
+		es.voteAggregator.On("AddVote", proposal.ProposerVote()).Return(nil).Once()
+
 		es.voter.votable[proposal.Block.BlockID] = struct{}{}
 		// should trigger 100 view change
 		es.endView++
 
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
+		err = es.eventhandler.OnQCConstructed(qc)
+		require.NoError(es.T(), err)
+
 		lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
 		require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
 		header, ok := lastCall.Arguments[0].(*flow.Header)
@@ -298,6 +309,7 @@ func (es *EventHandlerV2Suite) TestLeaderBuild100Blocks() {
 
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	require.Equal(es.T(), totalView, len(es.forks.blocks))
+	es.voteAggregator.AssertExpectations(es.T())
 }
 
 // a follower receives 100 blocks
@@ -305,6 +317,7 @@ func (es *EventHandlerV2Suite) TestFollowerFollows100Blocks() {
 	for i := 0; i < 100; i++ {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i), es.initView+uint64(i)-1)
+		es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 		// as a follower, I receive these propsals
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
@@ -312,6 +325,7 @@ func (es *EventHandlerV2Suite) TestFollowerFollows100Blocks() {
 	}
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	require.Equal(es.T(), 100, len(es.forks.blocks))
+	es.voteAggregator.AssertExpectations(es.T())
 }
 
 // a follower receives 100 forks built on top of the same block
@@ -319,10 +333,12 @@ func (es *EventHandlerV2Suite) TestFollowerReceives100Forks() {
 	for i := 0; i < 100; i++ {
 		// create each proposal as if they are created by some leader
 		proposal := createProposal(es.initView+uint64(i)+1, es.initView-1)
+		es.voteAggregator.On("AddBlock", proposal).Return(nil).Once()
 		// as a follower, I receive these propsals
 		err := es.eventhandler.OnReceiveProposal(proposal)
 		require.NoError(es.T(), err)
 	}
 	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 	require.Equal(es.T(), 100, len(es.forks.blocks))
+	es.voteAggregator.AssertExpectations(es.T())
 }

@@ -63,8 +63,28 @@ func NewEventHandlerV2(
 	return e, nil
 }
 
+// OnQCConstructed processes constructed QC by our vote aggregator
 func (e *EventHandlerV2) OnQCConstructed(qc *flow.QuorumCertificate) error {
-	panic("to implement")
+	curView := e.paceMaker.CurView()
+
+	log := e.log.With().
+		Uint64("cur_view", curView).
+		Uint64("qc_view", qc.View).
+		Hex("qc_block_id", qc.BlockID[:]).
+		Logger()
+
+	e.notifier.OnQcConstructedFromVotes(qc)
+	defer e.notifier.OnEventProcessed()
+
+	log.Debug().Msg("received constructed QC")
+
+	// ignore stale qc
+	if qc.View < e.forks.FinalizedView() {
+		log.Debug().Msg("stale qc")
+		return nil
+	}
+
+	return e.processQC(qc)
 }
 
 // OnReceiveProposal processes the block when a block proposal is received.
