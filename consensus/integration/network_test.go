@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -60,6 +61,7 @@ type Network struct {
 	node     *Node
 	originID flow.Identifier
 	conduits map[network.Channel]*Conduit
+	component.NoopComponent
 }
 
 // Register registers an Engine of the attached node to the channel via a Conduit, and returns the
