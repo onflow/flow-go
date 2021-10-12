@@ -219,7 +219,7 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 // HandleChunkDataPack is called by the chunk requester module everytime a new requested chunk data pack arrives.
 // The chunks are supposed to be deduplicated by the requester.
 // So invocation of this method indicates arrival of a distinct requested chunk.
-func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response verification.ChunkDataPackResponse) {
+func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verification.ChunkDataPackResponse) {
 	lg := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
 		Hex("chunk_id", logging.ID(response.Cdp.ChunkID)).
