@@ -71,6 +71,29 @@ func (_m *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataP
 	return r0, r1
 }
 
+// GetAndRemove provides a mock function with given fields: chunkID
+func (_m *ChunkRequests) GetAndRemove(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool) {
+	ret := _m.Called(chunkID)
+
+	var r0 *verification.ChunkDataPackRequest
+	if rf, ok := ret.Get(0).(func(flow.Identifier) *verification.ChunkDataPackRequest); ok {
+		r0 = rf(chunkID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*verification.ChunkDataPackRequest)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(chunkID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
+}
+
 // IncrementAttempt provides a mock function with given fields: chunkID
 func (_m *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	ret := _m.Called(chunkID)

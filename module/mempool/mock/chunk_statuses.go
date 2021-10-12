@@ -45,13 +45,13 @@ func (_m *ChunkStatuses) All() []*verification.ChunkStatus {
 	return r0
 }
 
-// Get provides a mock function with given fields: chunkIndex, chunkID
-func (_m *ChunkStatuses) Get(chunkIndex uint64, chunkID flow.Identifier) (*verification.ChunkStatus, bool) {
-	ret := _m.Called(chunkIndex, chunkID)
+// Get provides a mock function with given fields: chunkIndex, resultID
+func (_m *ChunkStatuses) Get(chunkIndex uint64, resultID flow.Identifier) (*verification.ChunkStatus, bool) {
+	ret := _m.Called(chunkIndex, resultID)
 
 	var r0 *verification.ChunkStatus
 	if rf, ok := ret.Get(0).(func(uint64, flow.Identifier) *verification.ChunkStatus); ok {
-		r0 = rf(chunkIndex, chunkID)
+		r0 = rf(chunkIndex, resultID)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(*verification.ChunkStatus)
@@ -60,7 +60,7 @@ func (_m *ChunkStatuses) Get(chunkIndex uint64, chunkID flow.Identifier) (*verif
 
 	var r1 bool
 	if rf, ok := ret.Get(1).(func(uint64, flow.Identifier) bool); ok {
-		r1 = rf(chunkIndex, chunkID)
+		r1 = rf(chunkIndex, resultID)
 	} else {
 		r1 = ret.Get(1).(bool)
 	}
