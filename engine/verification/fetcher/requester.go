@@ -20,12 +20,12 @@ type ChunkDataPackRequester interface {
 type ChunkDataPackHandler interface {
 	// HandleChunkDataPack is called by the ChunkDataPackRequester anytime a new requested chunk arrives.
 	// It contains the logic of handling the chunk data pack.
-	HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack)
+	HandleChunkDataPack(originID flow.Identifier, response verification.ChunkDataPackResponse)
 
-	// NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler that the chunk ID has been sealed and
-	// hence the requester will no longer request it.
+	// NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler that the specified chunk
+	// has been sealed and hence the requester will no longer request it.
 	//
-	// When the requester calls this callback method, it will never returns a chunk data pack for this chunk ID to the handler (i.e.,
+	// When the requester calls this callback method, it will never return a chunk data pack for this specified chunk to the handler (i.e.,
 	// through HandleChunkDataPack).
-	NotifyChunkDataPackSealed(chunkID flow.Identifier)
+	NotifyChunkDataPackSealed(chunkIndex uint64, resultID flow.Identifier)
 }
