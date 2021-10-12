@@ -27,21 +27,24 @@ type BlockExchange struct {
 	bstore    blockstore.Blockstore
 	bsNetwork bsnet.BitSwapNetwork
 	bs        *bitswap.Bitswap
+	cancel    context.CancelFunc
 }
 
 func NewBlockExchange(
-	ctx context.Context,
+	parent context.Context,
 	host host.Host,
 	r routing.ContentRouting,
 	prefix string,
 	bstore blockstore.Blockstore,
 ) *BlockExchange {
+	ctx, cancel := context.WithCancel(parent)
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
 
 	return &BlockExchange{
 		bstore:    bstore,
 		bsNetwork: bsNetwork,
 		bs:        bitswap.New(ctx, bsNetwork, bstore).(*bitswap.Bitswap),
+		cancel:    cancel,
 	}
 }
 
@@ -59,6 +62,10 @@ func (e *BlockExchange) HasBlock(block blocks.Block) error {
 
 func (e *BlockExchange) GetSession(ctx context.Context) network.BlockExchangeFetcher {
 	return NewBlockExchangeSession(ctx, e)
+}
+
+func (e *BlockExchange) Close() {
+	e.cancel()
 }
 
 type BlockExchangeSession struct {

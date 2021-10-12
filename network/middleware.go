@@ -74,6 +74,9 @@ type BlockExchange interface {
 	// HasBlock notifies the BlockExchange about the existence of a new block.
 	// This may notify peers on the Bitswap network.
 	HasBlock(block blocks.Block) error
+
+	// Close closes the BlockExchange
+	Close()
 }
 
 // BlockExchangeFetcher is an interface for requesting blocks from a BlockExchange.
