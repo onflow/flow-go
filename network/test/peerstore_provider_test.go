@@ -46,7 +46,7 @@ func (suite *PeerStoreProviderTestSuite) SetupTest() {
 	log.SetAllLoggers(log.LevelError)
 	ctx := context.Background()
 
-	suite.ids, suite.nodes, _ = GenerateIDs(suite.T(), suite.logger, nodeCount, !DryRun, true)
+	suite.ids, suite.nodes, _ = GenerateIDs(suite.T(), suite.logger, nodeCount, !DryRun, true, nil, nil)
 	t, err := p2p.NewFixedTableIdentityTranslator(suite.ids)
 	require.NoError(suite.T(), err)
 
