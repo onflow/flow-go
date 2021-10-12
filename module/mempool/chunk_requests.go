@@ -70,8 +70,13 @@ type ChunkRequests interface {
 
 	// Rem provides deletion functionality from the memory pool.
 	// If there is a chunk request with this ID, Rem removes it and returns true.
-	// Otherwise it returns false.
+	// Otherwise, it returns false.
 	Rem(chunkID flow.Identifier) bool
+
+	// GetAndRemove atomically removes chunk ID from the memory pool, while returning it.
+	// Boolean return value indicates whether there is a request in the memory pool associated
+	// with chunk ID.
+	GetAndRemove(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool)
 
 	// IncrementAttempt increments the Attempt field of the corresponding status of the
 	// chunk request in memory pool that has the specified chunk ID.
