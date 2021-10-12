@@ -89,6 +89,31 @@ func (cs *ChunkRequests) Rem(chunkID flow.Identifier) bool {
 	return cs.Backend.Rem(chunkID)
 }
 
+// GetAndRemove atomically removes chunk ID from the memory pool, while returning it.
+// Boolean return value indicates whether there is a request in the memory pool associated
+// with chunk ID.
+func (cs *ChunkRequests) GetAndRemove(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool) {
+	var status *verification.ChunkDataPackRequest
+
+	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		entity, exists := backdata[chunkID]
+		if !exists {
+			return fmt.Errorf("not exist")
+		}
+		status = toChunkRequestStatus(entity).ChunkDataPackRequest
+
+		delete(backdata, chunkID)
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, false
+	}
+
+	return status, true
+}
+
 // IncrementAttempt increments the Attempt field of the corresponding status of the
 // chunk request in memory pool that has the specified chunk ID.
 // If such chunk ID does not exist in the memory pool, it returns false.
