@@ -26,7 +26,7 @@ func (c ChunkDataPackRequest) Checksum() flow.Identifier {
 type ChunkDataPackRequestList []*ChunkDataPackRequest
 
 // SampleTargets returns identifier of execution nodes that can be asked for the chunk data pack, based on
-// the agree and disagree execution nodes of the chunk data pack request.
+// the agreeing and disagreeing execution nodes of the chunk data pack request.
 func (c ChunkDataPackRequest) SampleTargets(count int) flow.IdentifierList {
 	// if there are enough receipts produced the same result (agrees), we sample from them.
 	if len(c.Agrees) >= count {
