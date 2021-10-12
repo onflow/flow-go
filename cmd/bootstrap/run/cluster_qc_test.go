@@ -39,11 +39,8 @@ func TestGenerateClusterRootQC(t *testing.T) {
 func createClusterParticipants(t *testing.T, n int) []model.NodeInfo {
 	ids := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleCollection))
 
-	networkKeys, err := unittest.NetworkingKeys(n)
-	require.NoError(t, err)
-
-	stakingKeys, err := unittest.StakingKeys(n)
-	require.NoError(t, err)
+	networkKeys := unittest.NetworkingKeys(n)
+	stakingKeys := unittest.StakingKeys(n)
 
 	participants := make([]model.NodeInfo, n)
 	for i, id := range ids {
