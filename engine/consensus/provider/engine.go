@@ -38,7 +38,7 @@ func New(
 	log zerolog.Logger,
 	message module.EngineMetrics,
 	tracer module.Tracer,
-	net module.Network,
+	net network.Network,
 	state protocol.State,
 	me module.Local,
 ) (*Engine, error) {

@@ -44,7 +44,7 @@ type SyncSuite struct {
 	head         *flow.Header
 	heights      map[uint64]*flow.Block
 	blockIDs     map[flow.Identifier]*flow.Block
-	net          *module.Network
+	net          *mocknetwork.Network
 	con          *mocknetwork.Conduit
 	me           *module.Local
 	state        *protocol.State
@@ -78,7 +78,7 @@ func (ss *SyncSuite) SetupTest() {
 	ss.blockIDs = make(map[flow.Identifier]*flow.Block)
 
 	// set up the network module mock
-	ss.net = &module.Network{}
+	ss.net = &mocknetwork.Network{}
 	ss.net.On("Register", mock.Anything, mock.Anything).Return(
 		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
 			return ss.con

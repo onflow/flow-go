@@ -71,7 +71,7 @@ func (suite *Suite) SetupTest() {
 	suite.me = new(module.Local)
 	suite.me.On("NodeID").Return(obsIdentity.NodeID)
 
-	net := new(module.Network)
+	net := new(mocknetwork.Network)
 	conduit := new(mocknetwork.Conduit)
 	net.On("Register", engine.ReceiveReceipts, mock.Anything).
 		Return(conduit, nil).

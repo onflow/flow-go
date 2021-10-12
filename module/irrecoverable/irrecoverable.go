@@ -6,30 +6,38 @@ import (
 	"log"
 	"os"
 	"runtime"
+
+	"go.uber.org/atomic"
 )
 
-// Signaler sends the error out
+// Signaler sends the error out.
 type Signaler struct {
-	errors chan<- error
+	errChan   chan error
+	errThrown *atomic.Bool
 }
 
-func NewSignaler(errors chan<- error) *Signaler {
-	return &Signaler{errors}
+func NewSignaler() (*Signaler, <-chan error) {
+	errChan := make(chan error, 1)
+	return &Signaler{
+		errChan:   errChan,
+		errThrown: atomic.NewBool(false),
+	}, errChan
 }
 
 // Throw is a narrow drop-in replacement for panic, log.Fatal, log.Panic, etc
-// anywhere there's something connected to the error channel
-func (e *Signaler) Throw(err error) {
-	defer func() {
-		// If the error channel was already closed by a concurrent call to Throw, the call
-		// to close below will panic. We simply log the unhandled irrecoverable for now.
-		if r := recover(); r != nil {
-			log.New(os.Stderr, "", log.LstdFlags).Println(fmt.Errorf("unhandled irrecoverable: %w", err))
-		}
-		runtime.Goexit()
-	}()
-	e.errors <- err
-	close(e.errors)
+// anywhere there's something connected to the error channel. It only sends
+// the first error it is called with to the error channel, and logs subsequent
+// errors as unhandled.
+func (s *Signaler) Throw(err error) {
+	defer runtime.Goexit()
+	if s.errThrown.CAS(false, true) {
+		s.errChan <- err
+		close(s.errChan)
+	} else {
+		// TODO: we simply log the unhandled irrecoverable to stderr for now, but we should probably
+		// allow the user to customize the logger / logging format used
+		log.New(os.Stderr, "", log.LstdFlags).Println(fmt.Errorf("unhandled irrecoverable: %w", err))
+	}
 }
 
 // We define a constrained interface to provide a drop-in replacement for context.Context
@@ -41,22 +49,17 @@ type SignalerContext interface {
 }
 
 // private, to force context derivation / WithSignaler
-type signalerCtxt struct {
+type signalerCtx struct {
 	context.Context
-	signaler *Signaler
+	*Signaler
 }
 
-func (sc signalerCtxt) sealed() {}
-
-// Drop-in replacement for panic, log.Fatal, log.Panic, etc
-// to use when we are able to get an SignalerContext and thread it down in the component
-func (sc signalerCtxt) Throw(err error) {
-	sc.signaler.Throw(err)
-}
+func (sc signalerCtx) sealed() {}
 
 // the One True Way of getting a SignalerContext
-func WithSignaler(ctx context.Context, sig *Signaler) SignalerContext {
-	return signalerCtxt{ctx, sig}
+func WithSignaler(parent context.Context) (SignalerContext, <-chan error) {
+	sig, errChan := NewSignaler()
+	return &signalerCtx{parent, sig}, errChan
 }
 
 // If we have an SignalerContext, we can directly ctx.Throw.
