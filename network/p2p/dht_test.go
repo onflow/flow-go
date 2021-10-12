@@ -235,7 +235,7 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 
 		connManager := NewConnManager(logger, noopMetrics)
 
-		pingInfoProvider, _, _ := MockPingInfoProvider()
+		pingInfoProvider, _, _, _ := MockPingInfoProvider()
 
 		resolver := dns.NewResolver(noopMetrics)
 

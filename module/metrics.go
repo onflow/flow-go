@@ -406,6 +406,6 @@ type PingMetrics interface {
 	// The nodeInfo provides additional information about the node such as the name of the node operator
 	NodeReachable(node *flow.Identity, nodeInfo string, rtt time.Duration)
 
-	// NodeInfo tracks the software version and sealed height of a node
-	NodeInfo(node *flow.Identity, nodeInfo string, version string, sealedHeight uint64)
+	// NodeInfo tracks the software version, sealed height and hotstuff view of a node
+	NodeInfo(node *flow.Identity, nodeInfo string, version string, sealedHeight uint64, hotstuffCurView uint64)
 }
