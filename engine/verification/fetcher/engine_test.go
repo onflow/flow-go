@@ -803,13 +803,13 @@ func verifiableChunkFixture(t *testing.T, chunks flow.ChunkList, block *flow.Blo
 	map[flow.Identifier]*verification.ChunkDataPackResponse,
 	map[flow.Identifier]*verification.VerifiableChunkData) {
 
-	chunkDataPacks := chunkDataPackResponseFixture(t, chunks, collMap, result)
+	responses := chunkDataPackResponseFixture(t, chunks, collMap, result)
 
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
 	for _, chunk := range chunks {
 		chunkID := chunk.ID()
 
-		chunkDataPack := chunkDataPacks[chunkID]
+		response := responses[chunkID]
 
 		if fetcher.IsSystemChunk(chunk.Index, result) {
 			collMap[chunkID] = &flow.Collection{Transactions: nil}
@@ -822,12 +822,12 @@ func verifiableChunkFixture(t *testing.T, chunks flow.ChunkList, block *flow.Blo
 			Chunk:             chunk,
 			Header:            block.Header,
 			Result:            result,
-			ChunkDataPack:     chunkDataPack,
+			ChunkDataPack:     response.Cdp,
 			TransactionOffset: offsetForChunk,
 		}
 	}
 
-	return chunkDataPacks, verifiableChunks
+	return responses, verifiableChunks
 }
 
 // chunkRequestFixture is a test helper creates and returns chunk data pack requests for given chunks that all belong to the
