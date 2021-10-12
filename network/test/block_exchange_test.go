@@ -16,6 +16,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/module/util"
@@ -52,10 +53,10 @@ func (suite *BlockExchangeTestSuite) SetupTest() {
 		bstore := makeBlockstore(suite.T(), fmt.Sprintf("bs%v", i))
 		block := blocks.NewBlock([]byte(fmt.Sprintf("foo%v", i)))
 		suite.blockCids = append(suite.blockCids, block.Cid())
-		bstore.Put(block)
+		require.NoError(suite.T(), bstore.Put(block))
 		blockstores = append(blockstores, bstore)
 		bex, err := net.RegisterBlockExchange(blockExchangeChannel, blockstores[i])
-		assert.NoError(suite.T(), err)
+		require.NoError(suite.T(), err)
 		suite.blockExchanges = append(suite.blockExchanges, bex)
 	}
 }
@@ -85,7 +86,7 @@ func (suite *BlockExchangeTestSuite) TestGetBlocks() {
 		done, err := bex.GetBlocks(blocksToGet...).ForEach(func(b blocks.Block) {
 			blocksReceived[b.Cid()] = struct{}{}
 		}).Send(ctx)
-		assert.NoError(suite.T(), err)
+		require.NoError(suite.T(), err)
 
 		<-done
 		cancel()
@@ -111,18 +112,18 @@ func (suite *BlockExchangeTestSuite) TestGetBlocksWithSession() {
 
 		var doneChans []<-chan struct{}
 		session := bex.GetSession(ctx)
-		for blockCid, _ := range blocksToGet {
+		for blockCid := range blocksToGet {
 			done, err := session.GetBlocks(blockCid).ForEach(func(b blocks.Block) {
 				delete(blocksToGet, blockCid)
 			}).Send(ctx)
-			assert.NoError(suite.T(), err)
+			require.NoError(suite.T(), err)
 			doneChans = append(doneChans, done)
 		}
 
 		<-util.AllClosed(doneChans...)
 		cancel()
 
-		for blockCid, _ := range blocksToGet {
+		for blockCid := range blocksToGet {
 			assert.Fail(suite.T(), "missing block", "block %v not received by node %v", blockCid, i)
 		}
 	}
@@ -149,13 +150,13 @@ func (suite *BlockExchangeTestSuite) TestHas() {
 		done, err := bex.GetBlocks(blocksToGet...).ForEach(func(b blocks.Block) {
 			blocksReceived[i][b.Cid()] = true
 		}).Send(ctx)
-		assert.NoError(suite.T(), err)
+		require.NoError(suite.T(), err)
 		doneChans = append(doneChans, done)
 	}
 
 	for i, bex := range suite.blockExchanges {
 		err := bex.HasBlock(blocks.NewBlock([]byte(fmt.Sprintf("bar%v", i))))
-		assert.NoError(suite.T(), err)
+		require.NoError(suite.T(), err)
 	}
 
 	<-util.AllClosed(doneChans...)
@@ -171,10 +172,10 @@ func (suite *BlockExchangeTestSuite) TestHas() {
 func makeBlockstore(t *testing.T, name string) blockstore.Blockstore {
 	dsDir := filepath.Join(os.TempDir(), name)
 	err := os.Mkdir(dsDir, fs.ModeDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	ds, err := datastore.NewDatastore(dsDir)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return blockstore.NewBlockstore(ds.(*datastore.Datastore))
 }
