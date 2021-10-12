@@ -22,3 +22,17 @@ type Network interface {
 	// The returned BlockExchange can be used to request blocks from the network.
 	RegisterBlockExchange(channel Channel, store blockstore.Blockstore) (BlockExchange, error)
 }
+
+type NoopNetwork struct {
+	component.NoopComponent
+}
+
+var _ Network = (*NoopNetwork)(nil)
+
+func (n *NoopNetwork) Register(channel Channel, engine Engine) (Conduit, error) {
+	return nil, nil
+}
+
+func (n *NoopNetwork) RegisterBlockExchange(channel Channel, store blockstore.Blockstore) (BlockExchange, error) {
+	return nil, nil
+}
