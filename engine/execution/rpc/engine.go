@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -177,10 +178,13 @@ func (h *handler) GetRegisterAtBlockID(
 		return nil, err
 	}
 
-	value, err := h.engine.GetRegisterAtBlockID(ctx, req.GetRegisterOwner(), req.GetRegisterController(), req.GetRegisterKey(), blockID)
+	owner := req.GetRegisterOwner()
+	controller := req.GetRegisterController()
+	key := req.GetRegisterKey()
+	value, err := h.engine.GetRegisterAtBlockID(ctx, owner, controller, key, blockID)
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to collect register: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to collect register  (owner : %s, controller: %s, key: %s): %v", hex.EncodeToString(owner), hex.EncodeToString(owner), string(key), err)
 	}
 
 	res := &execution.GetRegisterAtBlockIDResponse{
