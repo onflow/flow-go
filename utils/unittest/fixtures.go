@@ -1229,7 +1229,7 @@ func ChunkDataResponsesFixture(n int, opts ...func(*messages.ChunkDataResponse))
 func ChunkDataPackRequestListFixture(n int, opts ...func(*verification.ChunkDataPackRequest)) []*verification.ChunkDataPackRequest {
 	lst := make([]*verification.ChunkDataPackRequest, 0, n)
 	for i := 0; i < n; i++ {
-		lst = append(lst, ChunkDataPackRequestFixture(IdentifierFixture(), opts...))
+		lst = append(lst, ChunkDataPackRequestFixture(opts...))
 	}
 	return lst
 }
@@ -1261,10 +1261,15 @@ func WithDisagrees(list flow.IdentifierList) func(*verification.ChunkDataPackReq
 // ChunkDataPackRequestFixture creates a chunk data request with some default values, i.e., one agree execution node, one disagree execution node,
 // and height of zero.
 // Use options to customize the request.
-func ChunkDataPackRequestFixture(chunkID flow.Identifier, opts ...func(*verification.ChunkDataPackRequest)) *verification.ChunkDataPackRequest {
+func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest)) *verification.
+	ChunkDataPackRequest {
 
 	req := &verification.ChunkDataPackRequest{
-		ChunkID:   chunkID,
+		Locator: chunks.Locator{
+			ResultID: IdentifierFixture(),
+			Index:    0,
+		},
+		ChunkID:   IdentifierFixture(),
 		Height:    0,
 		Agrees:    IdentifierListFixture(1),
 		Disagrees: IdentifierListFixture(1),
