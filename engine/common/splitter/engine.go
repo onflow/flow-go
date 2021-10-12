@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -17,10 +16,10 @@ import (
 // and passes every event it receives to each of these engines in parallel.
 type Engine struct {
 	enginesMu sync.RWMutex
-	unit      *engine.Unit               // used to manage concurrency & shutdown
-	log       zerolog.Logger             // used to log relevant actions with context
-	engines   map[module.Engine]struct{} // stores registered engines
-	channel   network.Channel            // the channel that this splitter listens on
+	unit      *engine.Unit                // used to manage concurrency & shutdown
+	log       zerolog.Logger              // used to log relevant actions with context
+	engines   map[network.Engine]struct{} // stores registered engines
+	channel   network.Channel             // the channel that this splitter listens on
 }
 
 // New creates a new splitter engine.
@@ -31,7 +30,7 @@ func New(
 	return &Engine{
 		unit:    engine.NewUnit(),
 		log:     log.With().Str("engine", "splitter").Logger(),
-		engines: make(map[module.Engine]struct{}),
+		engines: make(map[network.Engine]struct{}),
 		channel: channel,
 	}
 }
@@ -39,7 +38,7 @@ func New(
 // RegisterEngine registers a new engine with the splitter. Events
 // that are received by the splitter after the engine has registered
 // will be passed down to it.
-func (e *Engine) RegisterEngine(engine module.Engine) {
+func (e *Engine) RegisterEngine(engine network.Engine) {
 	e.enginesMu.Lock()
 	defer e.enginesMu.Unlock()
 
@@ -50,7 +49,7 @@ func (e *Engine) RegisterEngine(engine module.Engine) {
 // the engine has been unregistered, the splitter will stop passing
 // events to it. If the given engine was never registered, this is
 // a noop.
-func (e *Engine) UnregisterEngine(engine module.Engine) {
+func (e *Engine) UnregisterEngine(engine network.Engine) {
 	e.enginesMu.Lock()
 	defer e.enginesMu.Unlock()
 
@@ -103,7 +102,7 @@ func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
 	return e.unit.Do(func() error {
-		return e.process(func(downstream module.Engine) error {
+		return e.process(func(downstream network.Engine) error {
 			return downstream.ProcessLocal(event)
 		})
 	})
@@ -118,7 +117,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 			return fmt.Errorf("received event on unknown channel %s", channel)
 		}
 
-		return e.process(func(downstream module.Engine) error {
+		return e.process(func(downstream network.Engine) error {
 			return downstream.Process(channel, originID, event)
 		})
 	})
@@ -126,7 +125,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 
 // process calls the given function in parallel for all the engines that have
 // registered with this splitter.
-func (e *Engine) process(processFunc func(module.Engine) error) error {
+func (e *Engine) process(processFunc func(network.Engine) error) error {
 	count := 0
 	errors := make(chan error)
 
@@ -135,7 +134,7 @@ func (e *Engine) process(processFunc func(module.Engine) error) error {
 		e.enginesMu.RUnlock()
 
 		count += 1
-		go func(downstream module.Engine) {
+		go func(downstream network.Engine) {
 			errors <- processFunc(downstream)
 		}(eng)
 
