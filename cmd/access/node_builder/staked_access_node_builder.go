@@ -86,7 +86,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 		return err
 	}
 
-	builder.EnqueueAdminServerInit(ctx)
+	builder.EnqueueAdminServerInit()
 
 	builder.EnqueueTracer()
 
