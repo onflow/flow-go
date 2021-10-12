@@ -61,8 +61,7 @@ func (ss *SyncSuite) SetupTest() {
 
 	// generate own ID
 	ss.participants = unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
-	keys, err := unittest.NetworkingKeys(len(ss.participants))
-	require.NoError(ss.T(), err)
+	keys := unittest.NetworkingKeys(len(ss.participants))
 
 	for i, p := range ss.participants {
 		p.NetworkPubKey = keys[i].PublicKey()

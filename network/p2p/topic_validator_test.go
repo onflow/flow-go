@@ -41,7 +41,7 @@ func TestTopicValidator(t *testing.T) {
 		return ids.ByNodeID(fid)
 	})
 
-	unstakedKey, err := unittest.NetworkingKey()
+	unstakedKey := unittest.NetworkingPrivKeyFixture()
 	require.NoError(t, err)
 	// create one unstaked node
 	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, rootBlockID)
