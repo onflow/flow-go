@@ -104,10 +104,10 @@ type NodeBuilder interface {
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
 	nodeIDHex             string
-	adminAddr             string
-	adminCert             string
-	adminKey              string
-	adminClientCAs        string
+	AdminAddr             string
+	AdminCert             string
+	AdminKey              string
+	AdminClientCAs        string
 	BindAddr              string
 	NodeRole              string
 	datadir               string
@@ -176,10 +176,10 @@ func DefaultBaseConfig() *BaseConfig {
 
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
-		adminAddr:             NotSet,
-		adminCert:             NotSet,
-		adminKey:              NotSet,
-		adminClientCAs:        NotSet,
+		AdminAddr:             NotSet,
+		AdminCert:             NotSet,
+		AdminKey:              NotSet,
+		AdminClientCAs:        NotSet,
 		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
 		datadir:               datadir,
