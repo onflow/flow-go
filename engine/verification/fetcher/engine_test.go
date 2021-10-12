@@ -142,7 +142,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
-	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agrees, disagrees)
+	requests := chunkRequestFixture(result.ID(), statuses.Chunks(), block.Header.Height, agrees, disagrees)
 	chunkDataPacks, verifiableChunks := verifiableChunkFixture(t, statuses.Chunks(), block, result, collMap)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
@@ -242,7 +242,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
-	requests := chunkRequestFixture(statuses.Chunks(), block.Header.Height, agrees, disagrees)
+	requests := chunkRequestFixture(result.ID(), statuses.Chunks(), block.Header.Height, agrees, disagrees)
 	chunkDataPacks, _ := verifiableChunkFixture(t, statuses.Chunks(), block, result, collMap)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
@@ -822,11 +822,20 @@ func verifiableChunkFixture(t *testing.T, chunks flow.ChunkList, block *flow.Blo
 // same block height.
 // Agrees and disagrees are the list of execution node identifiers that generate the same and contradicting execution result
 // with the execution result that chunks belong to, respectively.
-func chunkRequestFixture(chunks flow.ChunkList, height uint64, agrees flow.IdentityList, disagrees flow.IdentityList) map[flow.Identifier]*verification.ChunkDataPackRequest {
+func chunkRequestFixture(
+	resultID flow.Identifier,
+	chunkList flow.ChunkList,
+	height uint64,
+	agrees flow.IdentityList,
+	disagrees flow.IdentityList) map[flow.Identifier]*verification.ChunkDataPackRequest {
 
 	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
-	for _, chunk := range chunks {
+	for _, chunk := range chunkList {
 		requests[chunk.ID()] = &verification.ChunkDataPackRequest{
+			Locator: chunks.Locator{
+				ResultID: resultID,
+				Index:    chunk.Index,
+			},
 			ChunkID:   chunk.ID(),
 			Height:    height,
 			Agrees:    agrees.NodeIDs(),
