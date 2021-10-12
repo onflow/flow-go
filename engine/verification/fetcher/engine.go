@@ -219,17 +219,16 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 // HandleChunkDataPack is called by the chunk requester module everytime a new requested chunk data pack arrives.
 // The chunks are supposed to be deduplicated by the requester.
 // So invocation of this method indicates arrival of a distinct requested chunk.
-func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
-
+func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response verification.ChunkDataPackResponse) {
 	lg := e.log.With().
 		Hex("origin_id", logging.ID(originID)).
-		Hex("chunk_id", logging.ID(chunkDataPack.ChunkID)).
+		Hex("chunk_id", logging.ID(response.Cdp.ChunkID)).
 		Logger()
 
-	if chunkDataPack.Collection != nil {
+	if response.Cdp.Collection != nil {
 		// non-system chunk data packs have non-nil collection
 		lg = lg.With().
-			Hex("collection_id", logging.ID(chunkDataPack.Collection.ID())).
+			Hex("collection_id", logging.ID(response.Cdp.Collection.ID())).
 			Logger()
 		lg.Info().Msg("chunk data pack arrived")
 	} else {
@@ -239,7 +238,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	e.metrics.OnChunkDataPackArrivedAtFetcher()
 
 	// make sure we still need it
-	status, exists := e.pendingChunks.Get(chunkDataPack.ChunkID)
+	status, exists := e.pendingChunks.Get(response.Index, response.ResultID)
 	if !exists {
 		lg.Debug().Msg("could not fetch pending status from mempool, dropping chunk data")
 		return
@@ -257,7 +256,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	span, ctx, _ := e.tracer.StartBlockSpan(context.Background(), status.ExecutionResult.BlockID, trace.VERFetcherHandleChunkDataPack)
 	defer span.Finish()
 
-	processed, err := e.handleChunkDataPackWithTracing(ctx, originID, status, chunkDataPack)
+	processed, err := e.handleChunkDataPackWithTracing(ctx, originID, status, response.Cdp)
 	if IsChunkDataPackValidationError(err) {
 		lg.Error().Err(err).Msg("could not validate chunk data pack")
 		return
@@ -298,7 +297,7 @@ func (e *Engine) handleChunkDataPackWithTracing(
 	if err != nil {
 		// TODO: this can be due to a byzantine behavio
 		ferr = NewChunkDataPackValidationError(originID, chunkDataPack.ID(), chunkDataPack.ChunkID, chunkDataPack.Collection.ID(), err)
-		return processed, ferr
+		return false, ferr
 	}
 
 	processed, err = e.handleValidatedChunkDataPack(ctx, status, chunkDataPack)
@@ -453,17 +452,18 @@ func (e Engine) validateStakedExecutionNodeAtBlockID(senderID flow.Identifier, b
 	return valid
 }
 
-// NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler (i.e.,
-// this fetcher engine) that the chunk ID has been sealed and hence the requester will no longer request it.
+// NotifyChunkDataPackSealed is called by the ChunkDataPackRequester to notify the ChunkDataPackHandler that the specified chunk
+// has been sealed and hence the requester will no longer request it.
 //
-// When the requester calls this callback method, it will never returns a chunk data pack for this chunk ID to the handler (i.e.,
+// When the requester calls this callback method, it will never return a chunk data pack for this specified chunk to the handler (i.e.,
 // through HandleChunkDataPack).
-func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
+func (e *Engine) NotifyChunkDataPackSealed(chunkIndex uint64, resultID flow.Identifier) {
 	lg := e.log.With().
-		Hex("chunk_id", logging.ID(chunkID)).
+		Uint64("chunk_index", chunkIndex).
+		Hex("result_id", logging.ID(resultID)).
 		Logger()
 	// we need to report that the job has been finished eventually
-	status, exists := e.pendingChunks.Get(chunkID)
+	status, exists := e.pendingChunks.Get(chunkIndex, resultID)
 	if !exists {
 		lg.Debug().
 			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
@@ -472,8 +472,8 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkID flow.Identifier) {
 
 	lg = lg.With().
 		Uint64("block_height", status.BlockHeight).
-		Hex("result_id", logging.ID(status.ExecutionResult.ID())).Logger()
-	removed := e.pendingChunks.Rem(chunkID)
+		Hex("chunk_id", logging.ID(status.ExecutionResult.Chunks[chunkIndex].ID())).Logger()
+	removed := e.pendingChunks.Rem(chunkIndex, resultID)
 
 	e.chunkConsumerNotifier.Notify(status.ChunkLocatorID())
 	lg.Info().
