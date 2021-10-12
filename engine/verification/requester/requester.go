@@ -191,13 +191,18 @@ func (e *Engine) handleChunkDataPack(originID flow.Identifier, chunkDataPack *fl
 	e.metrics.OnChunkDataPackResponseReceivedFromNetworkByRequester()
 
 	// makes sure we still need this chunk, and we will not process duplicate chunk data packs.
-	removed := e.pendingRequests.Rem(chunkID)
+	status, removed := e.pendingRequests.GetAndRemove(chunkID)
 	if !removed {
 		lg.Debug().Msg("chunk request status not found in mempool to be removed, dropping chunk")
 		return
 	}
 
-	e.handler.HandleChunkDataPack(originID, chunkDataPack)
+	response := verification.ChunkDataPackResponse{
+		Locator: status.Locator,
+		Cdp:     chunkDataPack,
+	}
+
+	e.handler.HandleChunkDataPack(originID, &response)
 
 	e.metrics.OnChunkDataPackSentToFetcher()
 	lg.Info().Msg("successfully sent the chunk data pack to the handler")
@@ -258,14 +263,17 @@ func (e *Engine) handleChunkDataPackRequestWithTracing(request *verification.Chu
 // The return value determines number of times this request has been dispatched.
 func (e *Engine) handleChunkDataPackRequest(ctx context.Context, request *verification.ChunkDataPackRequest, lastSealedHeight uint64) uint64 {
 	lg := e.log.With().
-		Hex("chunk_id", logging.ID(request.ID())).
+		Hex("locator_id", logging.ID(request.ID())).
+		Hex("chunk_id", logging.ID(request.ChunkID)).
+		Uint64("chunk_index", request.Index).
+		Hex("result_id", logging.ID(request.ResultID)).
 		Uint64("block_height", request.Height).
 		Logger()
 
 	// if block has been sealed, then we can finish
 	if request.Height <= lastSealedHeight {
 		removed := e.pendingRequests.Rem(request.ID())
-		e.handler.NotifyChunkDataPackSealed(request.ID())
+		e.handler.NotifyChunkDataPackSealed(request.Index, request.ResultID)
 		lg.Info().
 			Bool("removed", removed).
 			Msg("drops requesting chunk of a sealed block")
