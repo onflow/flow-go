@@ -1,6 +1,7 @@
 package verification
 
 import (
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
@@ -8,6 +9,7 @@ import (
 // ChunkDataPackRequest is an internal data structure in fetcher engine that is passed between the engine
 // and requester module. It conveys required information for requesting a chunk data pack.
 type ChunkDataPackRequest struct {
+	chunks.Locator
 	ChunkID   flow.Identifier
 	Height    uint64              // block height of execution result of the chunk, used to drop chunk requests of sealed heights.
 	Agrees    flow.IdentifierList // execution node ids that generated the result of chunk.
@@ -16,11 +18,11 @@ type ChunkDataPackRequest struct {
 }
 
 func (c ChunkDataPackRequest) ID() flow.Identifier {
-	return c.ChunkID
+	return c.Locator.ID()
 }
 
 func (c ChunkDataPackRequest) Checksum() flow.Identifier {
-	return c.ChunkID
+	return c.Locator.ID()
 }
 
 type ChunkDataPackRequestList []*ChunkDataPackRequest
