@@ -114,7 +114,7 @@ func (e *EventHandlerV2) OnReceiveProposal(proposal *model.Proposal) error {
 		}
 	}
 
-	// notify vote aggregator about a new block, so that it can start verifiying
+	// notify vote aggregator about a new block, so that it can start verifying
 	// votes for it.
 	err := e.voteAggregator.AddBlock(proposal)
 	if err != nil {
