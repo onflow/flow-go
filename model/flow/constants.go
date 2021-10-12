@@ -8,6 +8,10 @@ import (
 // GenesisTime defines the timestamp of the genesis block.
 var GenesisTime = time.Date(2018, time.December, 19, 22, 32, 30, 42, time.UTC)
 
+// DefaultProtocolVersion is the default protocol version, indicating none was
+// explicitly set during bootstrapping.
+const DefaultProtocolVersion = 0
+
 // DefaultTransactionExpiry is the default expiry for transactions, measured
 // in blocks. Equivalent to 10 minutes for a 1-second block time.
 const DefaultTransactionExpiry = 10 * 60
