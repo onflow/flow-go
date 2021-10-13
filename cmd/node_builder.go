@@ -50,7 +50,7 @@ type NodeBuilder interface {
 	InitIDProviders()
 
 	// EnqueueNetworkInit enqueues the default network component with the given context
-	EnqueueNetworkInit(ctx context.Context)
+	EnqueueNetworkInit()
 
 	// EnqueueMetricsServerInit enqueues the metrics component
 	EnqueueMetricsServerInit()
@@ -150,7 +150,7 @@ type NodeConfig struct {
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
 	Middleware        network.Middleware
-	Network           module.ReadyDoneAwareNetwork
+	Network           network.Network
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey

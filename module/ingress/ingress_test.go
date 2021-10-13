@@ -12,12 +12,12 @@ import (
 
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestSubmitTransaction(t *testing.T) {
-	engine := mock.Engine{}
+	engine := mocknetwork.Engine{}
 
 	h := handler{
 		chainID: flow.Testnet,
