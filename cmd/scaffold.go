@@ -173,9 +173,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 				}
 				return head.Height, nil
 			},
-			HotstuffViewFun: func() (uint64, error) {
-				return 0, nil
-			},
+			HotstuffViewFun: nil, // set in next code block, depending on role
 		}
 
 		// only consensus roles will need to report hotstuff view
@@ -190,6 +188,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 				}
 
 				return curView, nil
+			}
+		} else {
+			// non-consensus will not report any hotstuff view
+			pingProvider.HotstuffViewFun = func() (uint64, error) {
+				return 0, fmt.Errorf("non-consensus nodes do not report hotstuff view in ping")
 			}
 		}
 
