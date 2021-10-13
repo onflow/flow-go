@@ -144,7 +144,7 @@ func (s *Suite) TestEpochJoin() {
 
 	// make sure node info we generated matches what we get from the flow staking table
 	nodeID := string(nodeInfo.Fields[0].(cadence.String))
-	require.Equal(s.T(), info.NodeID.String(), nodeID, "expected node ID generated in test to equal node ID node ID from staking table ")
+	require.Equal(s.T(), info.NodeID.String(), nodeID, "expected node ID generated in test to equal node ID from staking table ")
 
 	result := s.SetApprovedNodesScript(ctx, env, info.NodeID)
 	require.NoError(s.T(), result.Error)
