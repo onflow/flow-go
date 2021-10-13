@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
@@ -74,16 +75,17 @@ func (s *CombinedVoteProcessorTestSuite) SetupTest() {
 		return s.rbSharesTotal >= s.minRequiredShares
 	}).Maybe()
 
-	s.processor = newCombinedVoteProcessor(
-		unittest.Logger(),
-		s.proposal.Block,
-		s.stakingAggregator,
-		s.rbSigAggregator,
-		s.reconstructor,
-		s.onQCCreated,
-		s.packer,
-		s.minRequiredStake,
-	)
+	s.processor = &CombinedVoteProcessor{
+		log:              unittest.Logger(),
+		block:            s.proposal.Block,
+		stakingSigAggtor: s.stakingAggregator,
+		rbSigAggtor:      s.rbSigAggregator,
+		rbRector:         s.reconstructor,
+		onQCCreated:      s.onQCCreated,
+		packer:           s.packer,
+		minRequiredStake: s.minRequiredStake,
+		done:             *atomic.NewBool(false),
+	}
 }
 
 // TestInitialState tests that Block() and Status() return correct values after calling constructor
@@ -234,16 +236,17 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 		rbSigAggregator *mockhotstuff.WeightedSignatureAggregator,
 		rbReconstructor *mockhotstuff.RandomBeaconReconstructor,
 		packer *mockhotstuff.Packer) *CombinedVoteProcessor {
-		return newCombinedVoteProcessor(
-			unittest.Logger(),
-			s.proposal.Block,
-			stakingAggregator,
-			rbSigAggregator,
-			rbReconstructor,
-			s.onQCCreated,
-			packer,
-			s.minRequiredStake,
-		)
+		return &CombinedVoteProcessor{
+			log:              unittest.Logger(),
+			block:            s.proposal.Block,
+			stakingSigAggtor: stakingAggregator,
+			rbSigAggtor:      rbSigAggregator,
+			rbRector:         reconstructor,
+			onQCCreated:      s.onQCCreated,
+			packer:           packer,
+			minRequiredStake: s.minRequiredStake,
+			done:             *atomic.NewBool(false),
+		}
 	}
 
 	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
