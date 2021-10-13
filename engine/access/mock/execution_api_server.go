@@ -60,6 +60,29 @@ func (_m *ExecutionAPIServer) GetAccountAtBlockID(_a0 context.Context, _a1 *exec
 	return r0, r1
 }
 
+// GetBlockHeaderByID provides a mock function with given fields: _a0, _a1
+func (_m *ExecutionAPIServer) GetBlockHeaderByID(_a0 context.Context, _a1 *execution.GetBlockHeaderByIDRequest) (*execution.BlockHeaderResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *execution.BlockHeaderResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetBlockHeaderByIDRequest) *execution.BlockHeaderResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.BlockHeaderResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetBlockHeaderByIDRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetEventsForBlockIDs provides a mock function with given fields: _a0, _a1
 func (_m *ExecutionAPIServer) GetEventsForBlockIDs(_a0 context.Context, _a1 *execution.GetEventsForBlockIDsRequest) (*execution.GetEventsForBlockIDsResponse, error) {
 	ret := _m.Called(_a0, _a1)
@@ -75,6 +98,29 @@ func (_m *ExecutionAPIServer) GetEventsForBlockIDs(_a0 context.Context, _a1 *exe
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetEventsForBlockIDsRequest) error); ok {
+		r1 = rf(_a0, _a1)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetLatestBlockHeader provides a mock function with given fields: _a0, _a1
+func (_m *ExecutionAPIServer) GetLatestBlockHeader(_a0 context.Context, _a1 *execution.GetLatestBlockHeaderRequest) (*execution.BlockHeaderResponse, error) {
+	ret := _m.Called(_a0, _a1)
+
+	var r0 *execution.BlockHeaderResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetLatestBlockHeaderRequest) *execution.BlockHeaderResponse); ok {
+		r0 = rf(_a0, _a1)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.BlockHeaderResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetLatestBlockHeaderRequest) error); ok {
 		r1 = rf(_a0, _a1)
 	} else {
 		r1 = ret.Error(1)

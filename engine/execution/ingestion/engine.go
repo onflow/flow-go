@@ -1050,7 +1050,7 @@ func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, controller, ke
 
 	data, err := blockView.Get(string(owner), string(controller), string(key))
 	if err != nil {
-		return nil, fmt.Errorf("failed to get the register : %w", err)
+		return nil, fmt.Errorf("failed to get the register (owner : %s, controller: %s, key: %s): %w", hex.EncodeToString(owner), hex.EncodeToString(owner), string(key), err)
 	}
 
 	return data, nil

@@ -2,6 +2,7 @@ package rpc
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -20,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/engine/common/rpc/convert"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/grpcutils"
 )
@@ -29,7 +31,6 @@ type Config struct {
 	ListenAddr        string
 	MaxMsgSize        int  // In bytes
 	RpcMetricsEnabled bool // enable GRPC metrics reporting
-
 }
 
 // Engine implements a gRPC server with a simplified version of the Observation API.
@@ -47,6 +48,8 @@ func New(
 	config Config,
 	e *ingestion.Engine,
 	blocks storage.Blocks,
+	headers storage.Headers,
+	state protocol.State,
 	events storage.Events,
 	exeResults storage.ExecutionResults,
 	txResults storage.TransactionResults,
@@ -76,6 +79,8 @@ func New(
 			engine:             e,
 			chain:              chainID,
 			blocks:             blocks,
+			headers:            headers,
+			state:              state,
 			events:             events,
 			exeResults:         exeResults,
 			transactionResults: txResults,
@@ -132,6 +137,8 @@ type handler struct {
 	engine             ingestion.IngestRPC
 	chain              flow.ChainID
 	blocks             storage.Blocks
+	headers            storage.Headers
+	state              protocol.State
 	events             storage.Events
 	exeResults         storage.ExecutionResults
 	transactionResults storage.TransactionResults
@@ -177,10 +184,13 @@ func (h *handler) GetRegisterAtBlockID(
 		return nil, err
 	}
 
-	value, err := h.engine.GetRegisterAtBlockID(ctx, req.GetRegisterOwner(), req.GetRegisterController(), req.GetRegisterKey(), blockID)
+	owner := req.GetRegisterOwner()
+	controller := req.GetRegisterController()
+	key := req.GetRegisterKey()
+	value, err := h.engine.GetRegisterAtBlockID(ctx, owner, controller, key, blockID)
 
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "failed to collect register: %v", err)
+		return nil, status.Errorf(codes.Internal, "failed to collect register  (owner : %s, controller: %s, key: %s): %v", hex.EncodeToString(owner), hex.EncodeToString(owner), string(key), err)
 	}
 
 	res := &execution.GetRegisterAtBlockIDResponse{
@@ -354,4 +364,54 @@ func (h *handler) GetAccountAtBlockID(
 
 	return res, nil
 
+}
+
+// GetLatestBlockHeader gets the latest sealed or finalized block header.
+func (h *handler) GetLatestBlockHeader(
+	ctx context.Context,
+	req *execution.GetLatestBlockHeaderRequest,
+) (*execution.BlockHeaderResponse, error) {
+	var header *flow.Header
+	var err error
+
+	if req.GetIsSealed() {
+		// get the latest seal header from storage
+		header, err = h.state.Sealed().Head()
+	} else {
+		// get the finalized header from state
+		header, err = h.state.Final().Head()
+	}
+
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "not found: %w", err)
+	}
+	return blockHeaderResponse(header)
+}
+
+// GetBlockHeaderByID gets a block header by ID.
+func (h *handler) GetBlockHeaderByID(
+	ctx context.Context,
+	req *execution.GetBlockHeaderByIDRequest,
+) (*execution.BlockHeaderResponse, error) {
+	id, err := convert.BlockID(req.GetId())
+	if err != nil {
+		return nil, err
+	}
+	header, err := h.headers.ByBlockID(id)
+	if err != nil {
+		return nil, status.Errorf(codes.NotFound, "not found: %w", err)
+	}
+
+	return blockHeaderResponse(header)
+}
+
+func blockHeaderResponse(header *flow.Header) (*execution.BlockHeaderResponse, error) {
+	msg, err := convert.BlockHeaderToMessage(header)
+	if err != nil {
+		return nil, err
+	}
+
+	return &execution.BlockHeaderResponse{
+		Block: msg,
+	}, nil
 }
