@@ -168,7 +168,7 @@ func fingerPrint(blockID flow.Identifier, resultID flow.Identifier, alpha int) (
 	hasher := hash.NewSHA3_256()
 
 	// encodes alpha parameteer
-	encAlpha, err := json.NewMarshaler.Marshal(alpha)
+	encAlpha, err := json.NewMarshaler().Marshal(alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode alpha: %w", err)
 	}
