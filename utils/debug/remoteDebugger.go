@@ -59,21 +59,18 @@ func (d *RemoteDebugger) RunTransaction(txBody *flow.TransactionBody) (txErr, pr
 // RunTransaction runs the transaction and tries to collect the registers at the given blockID
 // note that it would be very likely that block is far in the past and you can't find the trie to
 // read the registers from
-func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, blockID flow.Identifier) (txErr, processError error) {
+// if regCachePath is empty, the register values won't be cached
+func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, blockID flow.Identifier, regCachePath string) (txErr, processError error) {
 	view := NewRemoteView(d.grpcAddress, WithBlockID(blockID))
+	if len(regCachePath) > 0 {
+		view.Cache = newFileRegisterCache(regCachePath)
+	}
 	tx := fvm.Transaction(txBody, 0)
 	err := d.vm.Run(d.ctx, tx, view, programs.NewEmptyPrograms())
 	if err != nil {
 		return nil, err
 	}
-	return tx.Err, nil
-}
-
-// RunTransactionWithFileCache runs the transaction using values cached inside a file
-func (d *RemoteDebugger) RunTransactionWithFileCache(txBody *flow.TransactionBody, filePath string) (txErr, processError error) {
-	view := NewRemoteView(d.grpcAddress, WithCache(newFileRegisterCache(filePath)))
-	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(d.ctx, tx, view, programs.NewEmptyPrograms())
+	err = view.Cache.Persist()
 	if err != nil {
 		return nil, err
 	}

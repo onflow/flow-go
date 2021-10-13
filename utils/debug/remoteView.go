@@ -24,13 +24,13 @@ type RemoteView struct {
 	executionAPIclient execution.ExecutionAPIClient
 }
 
-// An Option sets a configuration parameter for the remote view
-type Option func(view *RemoteView) *RemoteView
+// A RemoteViewOption sets a configuration parameter for the remote view
+type RemoteViewOption func(view *RemoteView) *RemoteView
 
 // WithFileCache sets the output path to store
 // register values so can be fetched from a file cache
 // it loads the values from the cache upon object construction
-func WithCache(cache registerCache) Option {
+func WithCache(cache registerCache) RemoteViewOption {
 	return func(view *RemoteView) *RemoteView {
 		view.Cache = cache
 		return view
@@ -39,14 +39,14 @@ func WithCache(cache registerCache) Option {
 
 // WithBlockID sets the blockID for the remote view, if not used
 // remote view will use the latest sealed block
-func WithBlockID(blockID flow.Identifier) Option {
+func WithBlockID(blockID flow.Identifier) RemoteViewOption {
 	return func(view *RemoteView) *RemoteView {
 		view.blockID = blockID[:]
 		return view
 	}
 }
 
-func NewRemoteView(grpcAddress string, opts ...Option) *RemoteView {
+func NewRemoteView(grpcAddress string, opts ...RemoteViewOption) *RemoteView {
 	conn, err := grpc.Dial(grpcAddress, grpc.WithInsecure())
 	if err != nil {
 		panic(err)
