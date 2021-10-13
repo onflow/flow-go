@@ -41,11 +41,12 @@ func (i *TransactionInvoker) Process(
 	programs *programs.Programs,
 ) (processErr error) {
 
+	txIDStr := proc.ID.String()
 	var span opentracing.Span
 	if ctx.Tracer != nil && proc.TraceSpan != nil {
 		span = ctx.Tracer.StartSpanFromParent(proc.TraceSpan, trace.FVMExecuteTransaction)
 		span.LogFields(
-			traceLog.String("transaction.ID", proc.ID.String()),
+			traceLog.String("transaction_id", txIDStr),
 		)
 		defer span.Finish()
 	}
@@ -71,7 +72,7 @@ func (i *TransactionInvoker) Process(
 			// error transaction
 			msg := "child state doesn't match the active state on the state holder"
 			i.logger.Error().
-				Str("txHash", proc.ID.String()).
+				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
 				Msg(msg)
 
@@ -97,7 +98,7 @@ func (i *TransactionInvoker) Process(
 			programs.ForceCleanup()
 
 			i.logger.Warn().
-				Str("txHash", proc.ID.String()).
+				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
 				Int("retries_count", numberOfRetries).
 				Uint64("ledger_interaction_used", sth.State().InteractionUsed()).
@@ -175,7 +176,7 @@ func (i *TransactionInvoker) Process(
 		programs.Cleanup(nil)
 		// log transaction as failed
 		i.logger.Info().
-			Str("txHash", proc.ID.String()).
+			Str("txHash", txIDStr).
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Msg("transaction executed with error")
@@ -197,7 +198,7 @@ func (i *TransactionInvoker) Process(
 			childState.View().DropDelta()
 			programs.Cleanup(nil)
 			i.logger.Info().
-				Str("txHash", proc.ID.String()).
+				Str("txHash", txIDStr).
 				Uint64("blockHeight", blockHeight).
 				Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 				Msg("transaction fee deduction executed with error")
@@ -207,7 +208,7 @@ func (i *TransactionInvoker) Process(
 	} else {
 		// transaction is ok, log as successful
 		i.logger.Info().
-			Str("txHash", proc.ID.String()).
+			Str("txHash", txIDStr).
 			Uint64("blockHeight", blockHeight).
 			Uint64("ledgerInteractionUsed", sth.State().InteractionUsed()).
 			Int("retried", proc.Retried).

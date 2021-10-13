@@ -52,43 +52,38 @@ func (vmt vmTest) withContextOptions(opts ...fvm.Option) vmTest {
 	return vmt
 }
 
-func (vmt vmTest) setupVM(t testing.TB) (vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, p *programs.Programs) {
-	rt := fvm.NewInterpreterRuntime()
-
-	chain = flow.Testnet.Chain()
-
-	vm = fvm.NewVirtualMachine(rt)
-
-	baseOpts := []fvm.Option{
-		fvm.WithChain(chain),
-	}
-
-	opts := append(baseOpts, vmt.contextOptions...)
-
-	ctx = fvm.NewContext(zerolog.Nop(), opts...)
-
-	view = utils.NewSimpleView()
-
-	baseBootstrapOpts := []fvm.BootstrapProcedureOption{
-		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
-	}
-
-	p = programs.NewEmptyPrograms()
-
-	bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
-
-	err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view, p)
-	require.NoError(t, err)
-
-	return
-}
-
 func (vmt vmTest) run(
 	f func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs),
 ) func(t *testing.T) {
 	return func(t *testing.T) {
-		vm, chain, ctx, view, p := vmt.setupVM(t)
-		f(t, vm, chain, ctx, view, p)
+		rt := fvm.NewInterpreterRuntime()
+
+		chain := flow.Testnet.Chain()
+
+		vm := fvm.NewVirtualMachine(rt)
+
+		baseOpts := []fvm.Option{
+			fvm.WithChain(chain),
+		}
+
+		opts := append(baseOpts, vmt.contextOptions...)
+
+		ctx := fvm.NewContext(zerolog.Nop(), opts...)
+
+		view := utils.NewSimpleView()
+
+		baseBootstrapOpts := []fvm.BootstrapProcedureOption{
+			fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply),
+		}
+
+		programs := programs.NewEmptyPrograms()
+
+		bootstrapOpts := append(baseBootstrapOpts, vmt.bootstrapOptions...)
+
+		err := vm.Run(ctx, fvm.Bootstrap(unittest.ServiceAccountPublicKey, bootstrapOpts...), view, programs)
+		require.NoError(t, err)
+
+		f(t, vm, chain, ctx, view, programs)
 	}
 }
 

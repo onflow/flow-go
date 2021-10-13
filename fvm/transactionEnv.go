@@ -36,7 +36,7 @@ type TransactionEnv struct {
 	ctx              Context
 	sth              *state.StateHolder
 	programs         *handler.ProgramsHandler
-	accounts         *state.Accounts
+	accounts         state.Accounts
 	uuidGenerator    *state.UUIDGenerator
 	contracts        *handler.ContractHandler
 	accountKeys      *handler.AccountKeyHandler
@@ -675,7 +675,6 @@ func (e *TransactionEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, e
 	return runtimeBlockFromHeader(header), true, nil
 }
 
-// TODO (ramtin): check with Janez about not passing env
 func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.Address, err error) {
 
 	if e.isTraceable() {

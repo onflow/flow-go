@@ -240,7 +240,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 	builder.Component("follower core", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
-		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState)
+		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
 
 		// initialize the staking & beacon verifiers, signature joiner
 		staking := signature.NewAggregationVerifier(encoding.ConsensusVoteTag)
@@ -282,6 +282,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 			conCache,
 			builder.FollowerCore,
 			builder.SyncCore,
+			node.Tracer,
 		)
 		if err != nil {
 			return nil, fmt.Errorf("could not create follower engine: %w", err)
@@ -591,7 +592,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		builder.Logger,
 		codec,
 		nodeID,
-		builder.Middleware,
+		func() (network.Middleware, error) { return builder.Middleware, nil },
 		p2p.DefaultCacheSize,
 		topology,
 		p2p.NewChannelSubscriptionManager(middleware),

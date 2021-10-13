@@ -30,6 +30,10 @@ import (
 	"github.com/onflow/flow-go/utils/dsl"
 )
 
+const (
+	DefaultSeedFixtureLength = 64
+)
+
 func AddressFixture() flow.Address {
 	return flow.Testnet.Chain().ServiceAddress()
 }
@@ -875,15 +879,17 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	return &identity
 }
 
+// IdentityFixture returns a node identity and networking private key
+func IdentityWithNetworkingKeyFixture(opts ...func(*flow.Identity)) (*flow.Identity, crypto.PrivateKey) {
+	networkKey := NetworkingPrivKeyFixture()
+	opts = append(opts, WithNetworkingKey(networkKey.PublicKey()))
+	id := IdentityFixture(opts...)
+	return id, networkKey
+}
+
 func WithKeys(identity *flow.Identity) {
-	staking, err := StakingKey()
-	if err != nil {
-		panic(err)
-	}
-	networking, err := NetworkingKey()
-	if err != nil {
-		panic(err)
-	}
+	staking := StakingPrivKeyFixture()
+	networking := NetworkingPrivKeyFixture()
 	identity.StakingPubKey = staking.PublicKey()
 	identity.NetworkPubKey = networking.PublicKey()
 }
@@ -1729,18 +1735,29 @@ func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 	}
 }
 
-func PrivateKeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
-	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(64))
+// PrivateKeyFixture returns a random private key with specified signature algorithm and seed length
+func PrivateKeyFixture(algo crypto.SigningAlgorithm, seedLength int) crypto.PrivateKey {
+	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(seedLength))
 	if err != nil {
 		panic(err)
 	}
 	return sk
 }
 
+// NetworkingPrivKeyFixture returns random ECDSAP256 private key
+func NetworkingPrivKeyFixture() crypto.PrivateKey {
+	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
+}
+
+//StakingPrivKeyFixture returns a random BLS12381 private keyf
+func StakingPrivKeyFixture() crypto.PrivateKey {
+	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
+}
+
 func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
 	return bootstrap.NodeMachineAccountInfo{
 		Address:           RandomAddressFixture().String(),
-		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256).Encode(),
+		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256, DefaultSeedFixtureLength).Encode(),
 		HashAlgorithm:     bootstrap.DefaultMachineAccountHashAlgo,
 		SigningAlgorithm:  bootstrap.DefaultMachineAccountSignAlgo,
 		KeyIndex:          bootstrap.DefaultMachineAccountKeyIndex,

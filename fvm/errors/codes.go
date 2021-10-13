@@ -29,7 +29,8 @@ const (
 	// ErrCodeTxValidationError         ErrorCode = 1000 - reserved
 	ErrCodeInvalidTxByteSizeError     ErrorCode = 1001
 	ErrCodeInvalidReferenceBlockError ErrorCode = 1002
-	// ErrCodeExpiredTransactionError       ErrorCode = 1003
+	// Deprecated: ErrCodeExpiredTransactionError
+	ErrCodeExpiredTransactionError       ErrorCode = 1003
 	ErrCodeInvalidScriptError            ErrorCode = 1004
 	ErrCodeInvalidGasLimitError          ErrorCode = 1005
 	ErrCodeInvalidProposalSignatureError ErrorCode = 1006
@@ -52,7 +53,8 @@ const (
 	ErrCodeCadenceRunTimeError      ErrorCode = 1101
 	ErrCodeEncodingUnsupportedValue ErrorCode = 1102
 	ErrCodeStorageCapacityExceeded  ErrorCode = 1103
-	// ErrCodeGasLimitExceededError              ErrorCode = 1104
+	//  Deprecated: ErrCodeGasLimitExceededError
+	ErrCodeGasLimitExceededError              ErrorCode = 1104
 	ErrCodeEventLimitExceededError            ErrorCode = 1105
 	ErrCodeLedgerIntractionLimitExceededError ErrorCode = 1106
 	ErrCodeStateKeySizeLimitError             ErrorCode = 1107

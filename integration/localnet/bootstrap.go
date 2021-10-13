@@ -153,21 +153,7 @@ func main() {
 
 	fmt.Println("Node bootstrapping data generated...")
 
-	var secureAccessNodeID string
-	for i, c := range containers {
-		fmt.Printf("%d: %s", i+1, c.Identity().String())
-		if c.Unstaked {
-			fmt.Printf(" (unstaked)")
-		}
-
-		if c.Role == flow.RoleAccess && !c.Unstaked {
-			secureAccessNodeID = c.NodeID.String()
-		}
-
-		fmt.Println()
-	}
-
-	services := prepareServices(containers, secureAccessNodeID)
+	services := prepareServices(containers)
 
 	err = writeDockerComposeConfig(services)
 	if err != nil {
@@ -251,7 +237,7 @@ type Build struct {
 	Target     string
 }
 
-func prepareServices(containers []testnet.ContainerConfig, secureAccessNodeID string) Services {
+func prepareServices(containers []testnet.ContainerConfig) Services {
 	services := make(Services)
 
 	var (
@@ -268,16 +254,12 @@ func prepareServices(containers []testnet.ContainerConfig, secureAccessNodeID st
 			services[container.ContainerName] = prepareConsensusService(
 				container,
 				numConsensus,
-				"access_1:9001",
-				secureAccessNodeID,
 			)
 			numConsensus++
 		case flow.RoleCollection:
 			services[container.ContainerName] = prepareCollectionService(
 				container,
 				numCollection,
-				"access_1:9001",
-				secureAccessNodeID,
 			)
 			numCollection++
 		case flow.RoleExecution:
@@ -316,9 +298,12 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 		Command: []string{
 			fmt.Sprintf("--nodeid=%s", container.NodeID),
 			"--bootstrapdir=/bootstrap",
-			"--datadir=/data",
+			"--datadir=/data/protocol",
+			"--secretsdir=/data/secret",
 			"--loglevel=DEBUG",
 			fmt.Sprintf("--profiler-enabled=%t", profiler),
+			// TODO change it to flag
+			fmt.Sprintf("--tracer-enabled=%t", true),
 			"--profiler-dir=/profiler",
 			"--profiler-interval=2m",
 		},
@@ -367,7 +352,8 @@ func prepareService(container testnet.ContainerConfig, i int) Service {
 	return service
 }
 
-func prepareConsensusService(container testnet.ContainerConfig, i int, accessAddress, secureAccessNodeID string) Service {
+// NOTE: accessNodeIDS is a comma separated list of access node IDS
+func prepareConsensusService(container testnet.ContainerConfig, i int) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + consensusDelay
@@ -378,9 +364,8 @@ func prepareConsensusService(container testnet.ContainerConfig, i int, accessAdd
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--chunk-alpha=1"),
 		fmt.Sprintf("--emergency-sealing-active=false"),
-		fmt.Sprintf("--access-address=%s", accessAddress),
 		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprintf("--secure-access-node-id=%s", secureAccessNodeID),
+		fmt.Sprint("--access-node-ids=*"),
 	)
 
 	return service
@@ -397,7 +382,8 @@ func prepareVerificationService(container testnet.ContainerConfig, i int) Servic
 	return service
 }
 
-func prepareCollectionService(container testnet.ContainerConfig, i int, accessAddress, secureAccessNodeID string) Service {
+// NOTE: accessNodeIDS is a comma separated list of access node IDS
+func prepareCollectionService(container testnet.ContainerConfig, i int) Service {
 	service := prepareService(container, i)
 
 	timeout := 1200*time.Millisecond + collectionDelay
@@ -407,9 +393,8 @@ func prepareCollectionService(container testnet.ContainerConfig, i int, accessAd
 		fmt.Sprintf("--hotstuff-timeout=%s", timeout),
 		fmt.Sprintf("--hotstuff-min-timeout=%s", timeout),
 		fmt.Sprintf("--ingress-addr=%s:%d", container.ContainerName, RPCPort),
-		fmt.Sprintf("--access-address=%s", accessAddress),
 		fmt.Sprintf("--insecure-access-api=false"),
-		fmt.Sprintf("--secure-access-node-id=%s", secureAccessNodeID),
+		fmt.Sprint("--access-node-ids=*"),
 	)
 
 	return service

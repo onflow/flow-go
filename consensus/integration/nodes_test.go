@@ -210,7 +210,7 @@ func createNode(
 	require.NoError(t, err)
 
 	// initialize the block finalizer
-	final := finalizer.NewFinalizer(db, headersDB, fullState)
+	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
 
 	// initialize the persister
 	persist := persister.New(db, rootHeader.ChainID)

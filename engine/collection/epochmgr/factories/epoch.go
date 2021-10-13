@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/cluster/badger"
 	"github.com/onflow/flow-go/state/protocol"
@@ -49,8 +50,8 @@ func (factory *EpochComponentsFactory) Create(
 	epoch protocol.Epoch,
 ) (
 	state cluster.State,
-	proposal module.Engine,
-	sync module.Engine,
+	proposal network.Engine,
+	sync network.Engine,
 	hotstuff module.HotStuff,
 	err error,
 ) {

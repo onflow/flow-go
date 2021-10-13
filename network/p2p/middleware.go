@@ -5,6 +5,7 @@ package p2p
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -13,17 +14,19 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
-	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/validator"
+	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -61,12 +64,13 @@ const (
 	LargeMsgUnicastTimeout = 1000 * time.Second
 )
 
+var _ network.Middleware = (*Middleware)(nil)
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
 	ctx                        context.Context
-	cancel                     context.CancelFunc
 	log                        zerolog.Logger
 	ov                         network.Overlay
 	wg                         *sync.WaitGroup
@@ -74,7 +78,7 @@ type Middleware struct {
 	libP2PNodeFactory          LibP2PFactoryFunc
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
-	rootBlockID                string
+	rootBlockID                flow.Identifier
 	validators                 []network.MessageValidator
 	peerManagerFactory         PeerManagerFactoryFunc
 	peerManager                *PeerManager
@@ -83,7 +87,7 @@ type Middleware struct {
 	idTranslator               IDTranslator
 	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
-	stakedTopicValidator       *StakedValidator
+	*component.ComponentManager
 }
 
 type MiddlewareOption func(*Middleware)
@@ -120,13 +124,12 @@ func NewMiddleware(
 	libP2PNodeFactory LibP2PFactoryFunc,
 	flowID flow.Identifier,
 	metrics module.NetworkMetrics,
-	rootBlockID string,
+	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
 	connectionGating bool,
 	idTranslator IDTranslator,
 	opts ...MiddlewareOption,
 ) *Middleware {
-	ctx, cancel := context.WithCancel(context.Background())
 
 	if unicastMessageTimeout <= 0 {
 		unicastMessageTimeout = DefaultUnicastTimeout
@@ -134,8 +137,6 @@ func NewMiddleware(
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		ctx:                   ctx,
-		cancel:                cancel,
 		log:                   log,
 		wg:                    &sync.WaitGroup{},
 		me:                    flowID,
@@ -152,6 +153,21 @@ func NewMiddleware(
 	for _, opt := range opts {
 		opt(mw)
 	}
+
+	mw.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// TODO: refactor to avoid storing ctx altogether
+			mw.ctx = ctx
+
+			if err := mw.start(ctx); err != nil {
+				ctx.Throw(err)
+			}
+
+			ready()
+
+			<-ctx.Done()
+			mw.stop()
+		}).Build()
 
 	return mw
 }
@@ -229,24 +245,29 @@ func (m *Middleware) UpdateNodeAddresses() {
 	m.previousProtocolStatePeers = newInfos
 }
 
-// Start will start the middleware.
-func (m *Middleware) Start(ov network.Overlay) error {
+func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
-	libP2PNode, err := m.libP2PNodeFactory()
+}
 
-	if m.idProvider == nil {
-		m.idProvider = NewPeerstoreIdentifierProvider(m.log, libP2PNode.host, m.idTranslator)
+// start will start the middleware.
+func (m *Middleware) start(ctx context.Context) error {
+	if m.ov == nil {
+		return errors.New("overlay must be configured by calling SetOverlay before middleware can be started")
 	}
 
+	libP2PNode, err := m.libP2PNodeFactory(ctx)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}
+
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
 
-	m.UpdateNodeAddresses()
+	if m.idProvider == nil {
+		m.idProvider = NewPeerstoreIdentifierProvider(m.log, m.libP2PNode.host, m.idTranslator)
+	}
 
-	m.stakedTopicValidator = &StakedValidator{m.ov.Identity}
+	m.UpdateNodeAddresses()
 
 	if m.connectionGating {
 		m.libP2PNode.UpdateAllowList(m.allPeers())
@@ -271,8 +292,8 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	return nil
 }
 
-// Stop will end the execution of the middleware and wait for it to end.
-func (m *Middleware) Stop() {
+// stop will end the execution of the middleware and wait for it to end.
+func (m *Middleware) stop() {
 	mgr, found := m.peerMgr()
 	if found {
 		// stops peer manager
@@ -288,9 +309,6 @@ func (m *Middleware) Stop() {
 		<-done
 		m.log.Debug().Msg("libp2p node successfully stopped")
 	}
-
-	// cancel the context (this also signals any lingering libp2p go routines to exit)
-	m.cancel()
 
 	// wait for the readConnection and readSubscription routines to stop
 	m.wg.Wait()
@@ -390,10 +408,10 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 
 	topic := engine.TopicFromChannel(channel, m.rootBlockID)
 
-	var validators []pubsub.ValidatorEx
-	if !engine.UnstakedChannels().Contains(channel) {
+	var validators []psValidator.MessageValidator
+	if !engine.PublicChannels().Contains(channel) {
 		// for channels used by the staked nodes, add the topic validator to filter out messages from non-staked nodes
-		validators = append(validators, m.stakedTopicValidator.Validate)
+		validators = append(validators, psValidator.StakedValidator(m.ov.Identity))
 	}
 
 	s, err := m.libP2PNode.Subscribe(m.ctx, topic, validators...)
@@ -429,7 +447,7 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 }
 
 // processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
-// In particular, it checks the claim of protocol authorship situated in the message against `peerID`
+// In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
 // The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
 // this requirement is fulfilled by e.g. the output of readConnection and readSubscription
 func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID) {
@@ -439,13 +457,7 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 		return
 	}
 
-	// check the origin of the message corresponds to the one claimed in the OriginID
-	originID := flow.HashToID(msg.OriginID)
-
-	if flowID != originID {
-		m.log.Warn().Msgf("received message claiming to be from nodeID %v was actually from %v and dropped", originID, flowID)
-		return
-	}
+	msg.OriginID = flowID[:]
 
 	m.processMessage(msg)
 }
