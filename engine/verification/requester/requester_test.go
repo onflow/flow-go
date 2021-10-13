@@ -65,7 +65,7 @@ func setupTest() *RequesterEngineTestSuite {
 
 // newRequesterEngine returns a requester engine for testing.
 func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.Engine {
-	net := &mock.Network{}
+	net := &mocknetwork.Network{}
 	// mocking the network registration of the engine
 	net.On("Register", engine.RequestChunks, testifymock.Anything).
 		Return(s.con, nil).

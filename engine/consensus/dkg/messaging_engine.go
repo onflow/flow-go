@@ -37,7 +37,7 @@ type MessagingEngine struct {
 // NewMessagingEngine returns a new engine.
 func NewMessagingEngine(
 	logger zerolog.Logger,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	tunnel *dkg.BrokerTunnel) (*MessagingEngine, error) {
 

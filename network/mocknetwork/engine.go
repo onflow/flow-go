@@ -14,6 +14,22 @@ type Engine struct {
 	mock.Mock
 }
 
+// Done provides a mock function with given fields:
+func (_m *Engine) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
 // Process provides a mock function with given fields: channel, originID, event
 func (_m *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	ret := _m.Called(channel, originID, event)
@@ -37,6 +53,22 @@ func (_m *Engine) ProcessLocal(event interface{}) error {
 		r0 = rf(event)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Ready provides a mock function with given fields:
+func (_m *Engine) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
 	}
 
 	return r0

@@ -57,11 +57,11 @@ const (
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
-type LibP2PFactoryFunc func() (*Node, error)
+type LibP2PFactoryFunc func(context.Context) (*Node, error)
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
-func DefaultLibP2PNodeFactory(ctx context.Context,
+func DefaultLibP2PNodeFactory(
 	log zerolog.Logger,
 	me flow.Identifier,
 	address string,
@@ -91,7 +91,7 @@ func DefaultLibP2PNodeFactory(ctx context.Context,
 		})
 	}
 
-	return func() (*Node, error) {
+	return func(ctx context.Context) (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
 			SetRootBlockID(rootBlockID).
 			SetConnectionGater(connGater).

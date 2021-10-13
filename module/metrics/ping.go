@@ -34,7 +34,7 @@ func NewPingCollector() *PingCollector {
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
 			Help:      "the hotstuff current view",
-		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo}),
+		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeInfo}),
 	}
 
 	return pc
@@ -65,11 +65,17 @@ func (pc *PingCollector) NodeInfo(node *flow.Identity, nodeInfo string, version 
 		LabelNodeVersion: version}).
 		Set(float64(sealedHeight))
 
-	pc.hotstuffCurView.With(prometheus.Labels{
-		LabelNodeID:      node.NodeID.String(),
-		LabelNodeAddress: node.Address,
-		LabelNodeRole:    node.Role.String(),
-		LabelNodeInfo:    nodeInfo,
-	}).
-		Set(float64(hotstuffCurView))
+	// we only need this metrics from consensus nodes.
+	// since non-consensus nodes will report this metrics as well, and the value will always be 0,
+	// we can exclude metrics from non-consensus nodes by checking if the value is above 0.
+	// consensus nodes will start this metrics value with 0 as well, and won't report, but that's
+	// OK, because their hotstuff view will quickly go up and start reporting.
+	if hotstuffCurView > 0 {
+		pc.hotstuffCurView.With(prometheus.Labels{
+			LabelNodeID:      node.NodeID.String(),
+			LabelNodeAddress: node.Address,
+			LabelNodeInfo:    nodeInfo,
+		}).
+			Set(float64(hotstuffCurView))
+	}
 }
