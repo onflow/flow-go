@@ -40,7 +40,6 @@ type EventHandlerV2Suite struct {
 
 	initView    uint64
 	endView     uint64
-	vote        *model.Vote
 	votingBlock *model.Block
 	qc          *flow.QuorumCertificate
 	newview     *model.NewViewEvent
@@ -83,12 +82,6 @@ func (es *EventHandlerV2Suite) SetupTest() {
 	es.endView = curView
 	// voting block is a block for the current view, which will trigger view change
 	es.votingBlock = createBlockWithQC(es.paceMaker.CurView(), es.paceMaker.CurView()-1)
-	es.vote = &model.Vote{
-		BlockID:  es.votingBlock.BlockID,
-		View:     es.votingBlock.View,
-		SignerID: flow.ZeroID,
-		SigData:  nil,
-	}
 	es.qc = &flow.QuorumCertificate{
 		BlockID:   es.votingBlock.BlockID,
 		View:      es.votingBlock.View,
@@ -98,6 +91,157 @@ func (es *EventHandlerV2Suite) SetupTest() {
 	es.newview = &model.NewViewEvent{
 		View: es.votingBlock.View + 1, // the vote for the voting blocks will trigger a view change to the next view
 	}
+}
+
+func (es *EventHandlerV2Suite) TestQCBuiltViewChanged() {
+	// voting block exists
+	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+
+	// a qc is built
+	qc := createQC(es.votingBlock)
+
+	// new qc is added to forks
+	// view changed
+	// I'm not the next leader
+	// haven't received block for next view
+	// goes to the new view
+	es.endView++
+	// not the leader of the newview
+	// don't have block for the newview
+	// over
+
+	err := es.eventhandler.OnQCConstructed(qc)
+	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
+		"and the QC triggered a view change, then start new view")
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+}
+
+// in the newview, I'm not the leader, and I have the cur block,
+// and the block is not a safe node, and I'm the next leader, and no qc built for this block.
+func (es *EventHandlerV2Suite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeader_NoQC() {
+	// voting block exists
+	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+	// a qc is built
+	qc := createQC(es.votingBlock)
+	// viewchanged
+	es.endView++
+	// not leader for newview
+
+	// has block for newview
+	newviewblock := createBlockWithQC(es.newview.View, es.newview.View-1)
+	es.forks.blocks[newviewblock.BlockID] = newviewblock
+
+	// not to vote for the new view block
+
+	// I'm the next leader
+	es.committee.leaders[es.newview.View+1] = struct{}{}
+
+	// no QC for the new view
+	err := es.eventhandler.OnQCConstructed(qc)
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+}
+
+// TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeader_QCBuilt_NoViewChange doesn't exist
+// in the newview, I'm not the leader, and I have the cur block,
+// and the block is not a safe node, and I'm the next leader, and a qc is built for this block,
+// and the qc triggered view change.
+func (es *EventHandlerV2Suite) TestInNewView_NotLeader_HasBlock_NoVote_IsNextLeader_QCBuilt_ViewChanged() {
+	// voting block exists
+	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+	// a qc is built
+	qc := createQC(es.votingBlock)
+	// viewchanged
+	es.endView++
+	// not leader for newview
+
+	// has block for newview
+	newviewblock := createBlockWithQC(es.newview.View, es.newview.View-1)
+	es.forks.blocks[newviewblock.BlockID] = newviewblock
+
+	// not to vote for the new view block
+
+	// I'm the next leader
+	es.committee.leaders[es.newview.View+1] = struct{}{}
+
+	// qc built for the new view block
+	nextQC := createQC(newviewblock)
+	// view change by this qc
+	es.endView++
+
+	err := es.eventhandler.OnQCConstructed(qc)
+	require.NoError(es.T(), err)
+
+	// no broadcast shouldn't be made with first qc because we are not a leader
+	es.communicator.AssertNotCalled(es.T(), "BroadcastProposalWithDelay")
+
+	err = es.eventhandler.OnQCConstructed(nextQC)
+	require.NoError(es.T(), err)
+
+	lastCall := es.communicator.Calls[len(es.communicator.Calls)-1]
+	// the last call is BroadcastProposal
+	require.Equal(es.T(), "BroadcastProposalWithDelay", lastCall.Method)
+	header, ok := lastCall.Arguments[0].(*flow.Header)
+	require.True(es.T(), ok)
+	// it should broadcast a header as the same as endView
+	require.Equal(es.T(), es.endView, header.View)
+}
+
+// in the newview, I'm not the leader, and I have the cur block,
+// and the block is a safe node to vote, and I'm the next leader, and no qc is built for this block.
+func (es *EventHandlerV2Suite) TestInNewView_NotLeader_HasBlock_NotSafeNode_IsNextLeader_Voted_NoQC() {
+	// voting block exists
+	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+	// a qc is built
+	qc := createQC(es.votingBlock)
+	// viewchanged by new qc
+	es.endView++
+	// not leader for newview
+
+	// has block for newview
+	newviewblock := createBlockWithQC(es.newview.View, es.newview.View-1)
+	es.forks.blocks[newviewblock.BlockID] = newviewblock
+
+	// not to vote for the new view block
+
+	// I'm the next leader
+	es.committee.leaders[es.newview.View+1] = struct{}{}
+
+	// no qc for the newview block
+
+	// should not trigger view change
+	err := es.eventhandler.OnQCConstructed(qc)
+	require.NoError(es.T(), err)
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
+}
+
+// in the newview, I'm not the leader, and I have the cur block,
+// and the block is not a safe node to vote, and I'm not the next leader
+func (es *EventHandlerV2Suite) TestInNewView_NotLeader_HasBlock_NotSafeNode_NotNextLeader() {
+	// voting block exists
+	es.forks.blocks[es.votingBlock.BlockID] = es.votingBlock
+	// a qc is built
+	qc := createQC(es.votingBlock)
+	// viewchanged by new qc
+	es.endView++
+
+	// view changed to newview
+	// I'm not the leader for newview
+
+	// have received block for cur view
+	newviewblock := createBlockWithQC(es.newview.View, es.newview.View-1)
+	es.forks.blocks[newviewblock.BlockID] = newviewblock
+
+	// I'm not the next leader
+	// no vote for this block
+	// goes to the next view
+	es.endView++
+	// not leader for next view
+
+	err := es.eventhandler.OnQCConstructed(qc)
+	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
+		"and the QC triggered a view change, then start new view")
+	require.Equal(es.T(), es.endView, es.paceMaker.CurView(), "incorrect view change")
 }
 
 // receiving an invalid proposal should not trigger view change
