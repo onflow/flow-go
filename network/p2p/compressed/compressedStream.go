@@ -5,8 +5,8 @@ import (
 	"io"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p-core/network"
-	"go.uber.org/multierr"
 
 	flownet "github.com/onflow/flow-go/network"
 )
@@ -47,7 +47,8 @@ func (c *compressedStream) Write(b []byte) (int, error) {
 	defer c.writeLock.Unlock()
 
 	n, err := c.w.Write(b)
-	return n, multierr.Combine(err, c.w.Flush())
+
+	return n, multierror.Append(err, c.w.Flush())
 }
 
 func (c *compressedStream) Read(b []byte) (int, error) {
@@ -74,5 +75,5 @@ func (c *compressedStream) Close() error {
 	c.writeLock.Lock()
 	defer c.writeLock.Unlock()
 
-	return multierr.Combine(c.w.Close(), c.Stream.Close())
+	return multierror.Append(c.w.Close(), c.Stream.Close())
 }
