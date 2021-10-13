@@ -12,6 +12,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -1506,6 +1507,18 @@ func VoteForBlockFixture(block *hotstuff.Block, opts ...func(vote *hotstuff.Vote
 	}
 
 	return vote
+}
+
+func VoteWithStakingSig() func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeStaking)}, vote.SigData...)
+	}
+}
+
+func VoteWithThresholdSig() func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeRandomBeacon)}, vote.SigData...)
+	}
 }
 
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
