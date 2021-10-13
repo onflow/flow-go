@@ -275,7 +275,7 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt)
 	return c
 }
 
-func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64,  opts ...NetworkConfigOpt) NetworkConfig {
+func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
 	c := NetworkConfig{
 		Nodes:                 nodes,
 		Name:                  name,
@@ -513,13 +513,6 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 				nodeContainer.addFlag("access-node-ids", "*")
 			}
 		}
-	}
-
-	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
-
-	// add each follower to the network
-	for _, followerConf := range networkConf.ConsensusFollowers {
-		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
 
 	rootProtocolSnapshotPath := filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot)
