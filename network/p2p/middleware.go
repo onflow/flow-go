@@ -5,6 +5,7 @@ package p2p
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -18,7 +19,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
@@ -61,12 +64,13 @@ const (
 	LargeMsgUnicastTimeout = 1000 * time.Second
 )
 
+var _ network.Middleware = (*Middleware)(nil)
+
 // Middleware handles the input & output on the direct connections we have to
 // our neighbours on the peer-to-peer network.
 type Middleware struct {
 	sync.Mutex
 	ctx                        context.Context
-	cancel                     context.CancelFunc
 	log                        zerolog.Logger
 	ov                         network.Overlay
 	wg                         *sync.WaitGroup
@@ -83,6 +87,7 @@ type Middleware struct {
 	idTranslator               IDTranslator
 	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
+	*component.ComponentManager
 }
 
 type MiddlewareOption func(*Middleware)
@@ -125,7 +130,6 @@ func NewMiddleware(
 	idTranslator IDTranslator,
 	opts ...MiddlewareOption,
 ) *Middleware {
-	ctx, cancel := context.WithCancel(context.Background())
 
 	if unicastMessageTimeout <= 0 {
 		unicastMessageTimeout = DefaultUnicastTimeout
@@ -133,8 +137,6 @@ func NewMiddleware(
 
 	// create the node entity and inject dependencies & config
 	mw := &Middleware{
-		ctx:                   ctx,
-		cancel:                cancel,
 		log:                   log,
 		wg:                    &sync.WaitGroup{},
 		me:                    flowID,
@@ -151,6 +153,21 @@ func NewMiddleware(
 	for _, opt := range opts {
 		opt(mw)
 	}
+
+	mw.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// TODO: refactor to avoid storing ctx altogether
+			mw.ctx = ctx
+
+			if err := mw.start(ctx); err != nil {
+				ctx.Throw(err)
+			}
+
+			ready()
+
+			<-ctx.Done()
+			mw.stop()
+		}).Build()
 
 	return mw
 }
@@ -228,10 +245,17 @@ func (m *Middleware) UpdateNodeAddresses() {
 	m.previousProtocolStatePeers = newInfos
 }
 
-// Start will start the middleware.
-func (m *Middleware) Start(ov network.Overlay) error {
+func (m *Middleware) SetOverlay(ov network.Overlay) {
 	m.ov = ov
-	libP2PNode, err := m.libP2PNodeFactory()
+}
+
+// start will start the middleware.
+func (m *Middleware) start(ctx context.Context) error {
+	if m.ov == nil {
+		return errors.New("overlay must be configured by calling SetOverlay before middleware can be started")
+	}
+
+	libP2PNode, err := m.libP2PNodeFactory(ctx)
 	if err != nil {
 		return fmt.Errorf("could not create libp2p node: %w", err)
 	}
@@ -268,8 +292,8 @@ func (m *Middleware) Start(ov network.Overlay) error {
 	return nil
 }
 
-// Stop will end the execution of the middleware and wait for it to end.
-func (m *Middleware) Stop() {
+// stop will end the execution of the middleware and wait for it to end.
+func (m *Middleware) stop() {
 	mgr, found := m.peerMgr()
 	if found {
 		// stops peer manager
@@ -285,9 +309,6 @@ func (m *Middleware) Stop() {
 		<-done
 		m.log.Debug().Msg("libp2p node successfully stopped")
 	}
-
-	// cancel the context (this also signals any lingering libp2p go routines to exit)
-	m.cancel()
 
 	// wait for the readConnection and readSubscription routines to stop
 	m.wg.Wait()
