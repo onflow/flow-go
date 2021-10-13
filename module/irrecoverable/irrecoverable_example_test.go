@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
@@ -17,11 +17,12 @@ var ErrNoRestart = errors.New("fatal, no restarts")
 func Example() {
 	// a context is mandatory in order to call RunComponent
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// module.ComponentFactory encapsulates all of the component building logic
+	// component.ComponentFactory encapsulates all of the component building logic
 	// required before running Start()
 	starts := 0
-	componentFactory := func() (module.Component, error) {
+	componentFactory := func() (component.Component, error) {
 		starts++
 		return NewExampleComponent(starts), nil
 	}
@@ -30,24 +31,23 @@ func Example() {
 	// handling behaviors, e.g. restarting the component, firing an alert to pagerduty, etc ...
 	// the shutdown of the component is handled for you by RunComponent, but you may consider
 	// performing additional cleanup here
-	onError := func(err error, triggerRestart func()) {
+	onError := func(err error) component.ErrorHandlingResult {
 		// check the error type to decide whether to restart or shutdown
 		if errors.Is(err, ErrTriggerRestart) {
 			fmt.Printf("Restarting component after fatal error: %v\n", err)
-			triggerRestart()
-			return
+			return component.ErrorHandlingRestart
 		} else {
-			fmt.Printf("An unrecoverable error occurred: %v\n", err)
+			fmt.Printf("An irrecoverable error occurred: %v\n", err)
 			// shutdown other components. it might also make sense to just panic here
 			// depending on the circumstances
-			cancel()
+			return component.ErrorHandlingStop
 		}
 
 	}
 
 	// run the component. this is a blocking call, and will return with an error if the
 	// first startup or any subsequent restart attempts fails or the context is canceled
-	err := module.RunComponent(ctx, componentFactory, onError)
+	err := component.RunComponent(ctx, componentFactory, onError)
 	if err != nil {
 		fmt.Printf("Error returned from RunComponent: %v\n", err)
 	}
@@ -58,8 +58,8 @@ func Example() {
 	// Restarting component after fatal error: restart me
 	// [Component 2] Starting up
 	// [Component 2] Shutting down
-	// An unrecoverable error occurred: fatal, no restarts
-	// Error returned from RunComponent: context canceled
+	// An irrecoverable error occurred: fatal, no restarts
+	// Error returned from RunComponent: fatal, no restarts
 }
 
 // ExampleComponent is an example of a typical component

@@ -60,15 +60,9 @@ func WriteInternalFiles(nodeInfos []model.NodeInfo, bootDir string) (string, str
 	configs := make([]model.NodeConfig, len(nodeInfos))
 	for i, node := range nodeInfos {
 
-		netPriv, err := unittest.NetworkingKey()
-		if err != nil {
-			return "", "", fmt.Errorf("could not generate networking key: %w", err)
-		}
+		netPriv := unittest.NetworkingPrivKeyFixture()
 
-		stakePriv, err := unittest.StakingKey()
-		if err != nil {
-			return "", "", fmt.Errorf("could not generate staking key: %w", err)
-		}
+		stakePriv := unittest.StakingPrivKeyFixture()
 
 		nodePrivInfos[i] = model.NodeInfoPriv{
 			Role:    node.Role,

@@ -19,6 +19,8 @@ import (
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	realcluster "github.com/onflow/flow-go/state/cluster"
 	cluster "github.com/onflow/flow-go/state/cluster/mock"
 	realprotocol "github.com/onflow/flow-go/state/protocol"
@@ -31,8 +33,8 @@ import (
 // mockComponents is a container for the mocked version of epoch components.
 type mockComponents struct {
 	state    *cluster.State
-	prop     *module.Engine
-	sync     *module.Engine
+	prop     *mocknetwork.Engine
+	sync     *mocknetwork.Engine
 	hotstuff *module.HotStuff
 }
 
@@ -40,8 +42,8 @@ func newMockComponents() *mockComponents {
 
 	components := &mockComponents{
 		state:    new(cluster.State),
-		prop:     new(module.Engine),
-		sync:     new(module.Engine),
+		prop:     new(mocknetwork.Engine),
+		sync:     new(mocknetwork.Engine),
 		hotstuff: new(module.HotStuff),
 	}
 	unittest.ReadyDoneify(components.prop)
@@ -103,8 +105,8 @@ func (suite *Suite) SetupTest() {
 		}).
 		Return(
 			func(epoch realprotocol.Epoch) realcluster.State { return suite.ComponentsForEpoch(epoch).state },
-			func(epoch realprotocol.Epoch) realmodule.Engine { return suite.ComponentsForEpoch(epoch).prop },
-			func(epoch realprotocol.Epoch) realmodule.Engine { return suite.ComponentsForEpoch(epoch).sync },
+			func(epoch realprotocol.Epoch) network.Engine { return suite.ComponentsForEpoch(epoch).prop },
+			func(epoch realprotocol.Epoch) network.Engine { return suite.ComponentsForEpoch(epoch).sync },
 			func(epoch realprotocol.Epoch) realmodule.HotStuff { return suite.ComponentsForEpoch(epoch).hotstuff },
 			func(epoch realprotocol.Epoch) error { return nil },
 		)

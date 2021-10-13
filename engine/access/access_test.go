@@ -45,7 +45,7 @@ type Suite struct {
 	snapshot   *protocol.Snapshot
 	epochQuery *protocol.EpochQuery
 	log        zerolog.Logger
-	net        *module.Network
+	net        *mocknetwork.Network
 	request    *module.Requester
 	collClient *accessmock.AccessAPIClient
 	execClient *accessmock.ExecutionAPIClient
@@ -63,7 +63,7 @@ func TestAccess(t *testing.T) {
 
 func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(os.Stderr)
-	suite.net = new(module.Network)
+	suite.net = new(mocknetwork.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 
