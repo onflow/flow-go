@@ -1,11 +1,14 @@
 package state_synchronization
 
 import (
+	"encoding/xml"
 	"io/fs"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/fxamacker/cbor/v2"
 	datastore "github.com/ipfs/go-datastore/examples"
@@ -33,38 +36,97 @@ func makeBlockstore(t *testing.T, name string) (blockstore.Blockstore, func()) {
 	}
 }
 
+const BUCKET_URL = "https://flow_public_mainnet14_execution_state.storage.googleapis.com/"
+
+type ListBucketResult struct {
+	XMLName  xml.Name  `xml:"ListBucketResult"`
+	Contents []Content `xml:"Contents"`
+}
+
+type Content struct {
+	XMLName xml.Name `xml:"Contents"`
+	Key     string   `xml:"Key"`
+	Size    uint64   `xml:"Size"`
+}
+
 func TestStateDiffStorer(t *testing.T) {
-	bstore, cleanup := makeBlockstore(t, "state-diff-storer-test")
-	defer cleanup()
+	// this test is intended to be run locally
+	t.Skip()
 
-	sdp, err := NewStateDiffStorer(&cborcodec.Codec{}, compressor.NewLz4Compressor(), bstore)
-	require.NoError(t, err)
+	var bucketContents ListBucketResult
+	func() {
+		var client http.Client
+		resp, err := client.Get(BUCKET_URL)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		require.Equal(t, resp.StatusCode, http.StatusOK)
+		require.NoError(t, xml.NewDecoder(resp.Body).Decode(&bucketContents))
+	}()
 
-	file, err := os.Open("/Users/smnzhu/Downloads/8aeb01b08a446434ea4746aaaec1c458fd24922e26a13e94842bafb74e681670.cbor")
-	require.NoError(t, err)
+	var maxFileSize uint64
+	var maxCollectionsLength int
+	var maxEventsLength int
 
-	var blockData uploader.BlockData
+	for _, content := range bucketContents.Contents {
+		func() {
+			t.Logf("downloading file: %v [%v bytes]", content.Key, content.Size)
 
-	decoder := cbor.NewDecoder(file)
-	require.NoError(t, decoder.Decode(&blockData))
+			if content.Size > maxFileSize {
+				maxFileSize = content.Size
+			}
 
-	var collections []*flow.Collection
-	for _, c := range blockData.Collections {
-		collections = append(collections, &flow.Collection{Transactions: c.Transactions})
+			var client http.Client
+			resp, err := client.Get(BUCKET_URL + content.Key)
+			require.NoError(t, err)
+			defer resp.Body.Close()
+
+			bstore, cleanup := makeBlockstore(t, "state-diff-storer-test")
+			defer cleanup()
+
+			sdp, err := NewStateDiffStorer(&cborcodec.Codec{}, compressor.NewLz4Compressor(), bstore)
+			require.NoError(t, err)
+
+			var blockData uploader.BlockData
+
+			decoder := cbor.NewDecoder(resp.Body)
+			require.NoError(t, decoder.Decode(&blockData))
+
+			var collections []*flow.Collection
+			for _, c := range blockData.Collections {
+				collections = append(collections, &flow.Collection{Transactions: c.Transactions})
+			}
+
+			if len(collections) > maxCollectionsLength {
+				maxCollectionsLength = len(collections)
+			}
+			if len(blockData.Events) > maxEventsLength {
+				maxEventsLength = len(blockData.Events)
+			}
+
+			sd := &ExecutionStateDiff{
+				Collections:        collections,
+				TransactionResults: blockData.TxResults,
+				Events:             blockData.Events,
+				TrieUpdate:         blockData.TrieUpdates,
+			}
+
+			start := time.Now()
+			cid, err := sdp.Store(sd)
+			duration := time.Since(start)
+			require.NoError(t, err)
+			t.Logf("time to store state diff: %v", duration)
+
+			start = time.Now()
+			sd2, err := sdp.Load(cid)
+			duration = time.Since(start)
+			require.NoError(t, err)
+			t.Logf("time to load state diff: %v", duration)
+
+			assert.True(t, reflect.DeepEqual(sd, sd2))
+		}()
 	}
 
-	sd := &ExecutionStateDiff{
-		Collections:        collections,
-		TransactionResults: blockData.TxResults,
-		Events:             blockData.Events,
-		TrieUpdate:         blockData.TrieUpdates,
-	}
-
-	cid, err := sdp.Store(sd)
-	require.NoError(t, err)
-
-	sd2, err := sdp.Load(cid)
-	require.NoError(t, err)
-
-	assert.True(t, reflect.DeepEqual(sd, sd2))
+	t.Logf("largest file: %v bytes", maxFileSize)
+	t.Logf("max collections length: %v", maxCollectionsLength)
+	t.Logf("max events length: %v", maxEventsLength)
 }
