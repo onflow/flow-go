@@ -50,7 +50,7 @@ type NodeBuilder interface {
 	InitIDProviders()
 
 	// EnqueueNetworkInit enqueues the default network component with the given context
-	EnqueueNetworkInit(ctx context.Context)
+	EnqueueNetworkInit()
 
 	// EnqueueMetricsServerInit enqueues the metrics component
 	EnqueueMetricsServerInit()
@@ -104,14 +104,15 @@ type NodeBuilder interface {
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
 	nodeIDHex             string
-	adminAddr             string
-	adminCert             string
-	adminKey              string
-	adminClientCAs        string
+	AdminAddr             string
+	AdminCert             string
+	AdminKey              string
+	AdminClientCAs        string
 	BindAddr              string
 	NodeRole              string
-	timeout               time.Duration
 	datadir               string
+	secretsdir            string
+	secretsDBEnabled      bool
 	level                 string
 	metricsPort           uint
 	BootstrapDir          string
@@ -143,11 +144,12 @@ type NodeConfig struct {
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
+	SecretsDB         *badger.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
 	Middleware        network.Middleware
-	Network           module.ReadyDoneAwareNetwork
+	Network           network.Network
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey
@@ -171,16 +173,18 @@ type NodeConfig struct {
 func DefaultBaseConfig() *BaseConfig {
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
+
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
-		adminAddr:             NotSet,
-		adminCert:             NotSet,
-		adminKey:              NotSet,
-		adminClientCAs:        NotSet,
+		AdminAddr:             NotSet,
+		AdminCert:             NotSet,
+		AdminKey:              NotSet,
+		AdminClientCAs:        NotSet,
 		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
-		timeout:               1 * time.Minute,
 		datadir:               datadir,
+		secretsdir:            NotSet,
+		secretsDBEnabled:      true,
 		level:                 "info",
 		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
