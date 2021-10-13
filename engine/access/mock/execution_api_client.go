@@ -76,6 +76,36 @@ func (_m *ExecutionAPIClient) GetAccountAtBlockID(ctx context.Context, in *execu
 	return r0, r1
 }
 
+// GetBlockHeaderByID provides a mock function with given fields: ctx, in, opts
+func (_m *ExecutionAPIClient) GetBlockHeaderByID(ctx context.Context, in *execution.GetBlockHeaderByIDRequest, opts ...grpc.CallOption) (*execution.BlockHeaderResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *execution.BlockHeaderResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetBlockHeaderByIDRequest, ...grpc.CallOption) *execution.BlockHeaderResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.BlockHeaderResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetBlockHeaderByIDRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetEventsForBlockIDs provides a mock function with given fields: ctx, in, opts
 func (_m *ExecutionAPIClient) GetEventsForBlockIDs(ctx context.Context, in *execution.GetEventsForBlockIDsRequest, opts ...grpc.CallOption) (*execution.GetEventsForBlockIDsResponse, error) {
 	_va := make([]interface{}, len(opts))
@@ -98,6 +128,36 @@ func (_m *ExecutionAPIClient) GetEventsForBlockIDs(ctx context.Context, in *exec
 
 	var r1 error
 	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetEventsForBlockIDsRequest, ...grpc.CallOption) error); ok {
+		r1 = rf(ctx, in, opts...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// GetLatestBlockHeader provides a mock function with given fields: ctx, in, opts
+func (_m *ExecutionAPIClient) GetLatestBlockHeader(ctx context.Context, in *execution.GetLatestBlockHeaderRequest, opts ...grpc.CallOption) (*execution.BlockHeaderResponse, error) {
+	_va := make([]interface{}, len(opts))
+	for _i := range opts {
+		_va[_i] = opts[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx, in)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
+
+	var r0 *execution.BlockHeaderResponse
+	if rf, ok := ret.Get(0).(func(context.Context, *execution.GetLatestBlockHeaderRequest, ...grpc.CallOption) *execution.BlockHeaderResponse); ok {
+		r0 = rf(ctx, in, opts...)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*execution.BlockHeaderResponse)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, *execution.GetLatestBlockHeaderRequest, ...grpc.CallOption) error); ok {
 		r1 = rf(ctx, in, opts...)
 	} else {
 		r1 = ret.Error(1)
