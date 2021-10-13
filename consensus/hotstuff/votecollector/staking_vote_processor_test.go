@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
@@ -31,14 +32,14 @@ type StakingVoteProcessorTestSuite struct {
 
 func (s *StakingVoteProcessorTestSuite) SetupTest() {
 	s.VoteProcessorTestSuiteBase.SetupTest()
-
-	s.processor = newStakingVoteProcessor(
-		unittest.Logger(),
-		s.proposal.Block,
-		s.stakingAggregator,
-		s.onQCCreated,
-		s.minRequiredStake,
-	)
+	s.processor = &StakingVoteProcessor{
+		log:              unittest.Logger(),
+		block:            s.proposal.Block,
+		stakingSigAggtor: s.stakingAggregator,
+		onQCCreated:      s.onQCCreated,
+		minRequiredStake: s.minRequiredStake,
+		done:             *atomic.NewBool(false),
+	}
 }
 
 // TestInitialState tests that Block() and Status() return correct values after calling constructor
@@ -96,10 +97,8 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_TrustedAddError() {
 // TestProcess_BuildQCError tests error path during process of building QC.
 // Building QC is a one time operation, we need to make sure that failing in one of the steps leads to exception.
 func (s *StakingVoteProcessorTestSuite) TestProcess_BuildQCError() {
-
 	// In this test we will mock all dependencies for happy path, and replace some branches with unhappy path
 	// to simulate errors along the branches.
-
 	vote := unittest.VoteForBlockFixture(s.proposal.Block)
 
 	// in this test case we aren't able to aggregate staking signature
@@ -110,8 +109,8 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_BuildQCError() {
 	stakingSigAggregator.On("TotalWeight").Return(s.minRequiredStake)
 	stakingSigAggregator.On("Aggregate").Return(nil, nil, exception)
 
-	processor := newStakingVoteProcessor(unittest.Logger(), s.proposal.Block, stakingSigAggregator, s.onQCCreated, s.minRequiredStake)
-	err := processor.Process(vote)
+	s.processor.stakingSigAggtor = stakingSigAggregator
+	err := s.processor.Process(vote)
 	require.ErrorIs(s.T(), err, exception)
 }
 

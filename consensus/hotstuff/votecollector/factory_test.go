@@ -21,7 +21,7 @@ func TestVoteProcessorFactory_CreateWithValidProposal(t *testing.T) {
 	proposal := helper.MakeProposal()
 	mockedProcessor := &mockhotstuff.VerifyingVoteProcessor{}
 	mockedProcessor.On("Process", proposal.ProposerVote()).Return(nil).Once()
-	mockedFactory.On("Create", proposal).Return(mockedProcessor, nil).Once()
+	mockedFactory.On("Create", proposal.Block).Return(mockedProcessor, nil).Once()
 
 	processor, err := voteProcessorFactory.Create(proposal)
 	require.NoError(t, err)
@@ -41,7 +41,7 @@ func TestVoteProcessorFactory_CreateWithInvalidVote(t *testing.T) {
 		proposal := helper.MakeProposal()
 		mockedProcessor := &mockhotstuff.VerifyingVoteProcessor{}
 		mockedProcessor.On("Process", proposal.ProposerVote()).Return(model.NewInvalidVoteErrorf(proposal.ProposerVote(), "")).Once()
-		mockedFactory.On("Create", proposal).Return(mockedProcessor, nil).Once()
+		mockedFactory.On("Create", proposal.Block).Return(mockedProcessor, nil).Once()
 
 		processor, err := voteProcessorFactory.Create(proposal)
 		require.Error(t, err)
@@ -55,7 +55,7 @@ func TestVoteProcessorFactory_CreateWithInvalidVote(t *testing.T) {
 		mockedProcessor := &mockhotstuff.VerifyingVoteProcessor{}
 		exception := errors.New("process-exception")
 		mockedProcessor.On("Process", proposal.ProposerVote()).Return(exception).Once()
-		mockedFactory.On("Create", proposal).Return(mockedProcessor, nil).Once()
+		mockedFactory.On("Create", proposal.Block).Return(mockedProcessor, nil).Once()
 
 		processor, err := voteProcessorFactory.Create(proposal)
 		require.ErrorIs(t, err, exception)
@@ -75,7 +75,7 @@ func TestVoteProcessorFactory_CreateProcessException(t *testing.T) {
 
 	proposal := helper.MakeProposal()
 	exception := errors.New("create-exception")
-	mockedFactory.On("Create", proposal).Return(nil, exception).Once()
+	mockedFactory.On("Create", proposal.Block).Return(nil, exception).Once()
 
 	processor, err := voteProcessorFactory.Create(proposal)
 	require.ErrorIs(t, err, exception)

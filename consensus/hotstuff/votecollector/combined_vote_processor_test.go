@@ -241,7 +241,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 			block:            s.proposal.Block,
 			stakingSigAggtor: stakingAggregator,
 			rbSigAggtor:      rbSigAggregator,
-			rbRector:         reconstructor,
+			rbRector:         rbReconstructor,
 			onQCCreated:      s.onQCCreated,
 			packer:           packer,
 			minRequiredStake: s.minRequiredStake,
