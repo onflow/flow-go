@@ -9,20 +9,19 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector/mocks"
 )
 
 // TestVoteProcessorFactory_CreateWithValidProposal checks if VoteProcessorFactory checks the proposer vote
 // based on submitted proposal
 func TestVoteProcessorFactory_CreateWithValidProposal(t *testing.T) {
-	mockedFactory := &mockhotstuff.VoteProcessorFactory{}
-	voteProcessorFactory := &VoteProcessorFactory{
-		base: mockedFactory,
-	}
+	mockedFactory := mocks.MockBaseFactory{}
+	voteProcessorFactory := &VoteProcessorFactory{mockedFactory.Create}
 
 	proposal := helper.MakeProposal()
 	mockedProcessor := &mockhotstuff.VerifyingVoteProcessor{}
 	mockedProcessor.On("Process", proposal.ProposerVote()).Return(nil).Once()
-	mockedFactory.On("Create", proposal).Return(mockedProcessor, nil).Once()
+	mockedFactory.On("Create", proposal.Block).Return(mockedProcessor, nil).Once()
 
 	processor, err := voteProcessorFactory.Create(proposal)
 	require.NoError(t, err)
@@ -35,16 +34,14 @@ func TestVoteProcessorFactory_CreateWithValidProposal(t *testing.T) {
 // TestVoteProcessorFactory_CreateWithInvalidVote tests that processing proposal with invalid vote doesn't return
 // vote processor and returns correct error(sentinel or exception).
 func TestVoteProcessorFactory_CreateWithInvalidVote(t *testing.T) {
-	mockedFactory := &mockhotstuff.VoteProcessorFactory{}
-	voteProcessorFactory := &VoteProcessorFactory{
-		base: mockedFactory,
-	}
+	mockedFactory := mocks.MockBaseFactory{}
+	voteProcessorFactory := &VoteProcessorFactory{mockedFactory.Create}
 
 	t.Run("invalid-vote", func(t *testing.T) {
 		proposal := helper.MakeProposal()
 		mockedProcessor := &mockhotstuff.VerifyingVoteProcessor{}
 		mockedProcessor.On("Process", proposal.ProposerVote()).Return(model.NewInvalidVoteErrorf(proposal.ProposerVote(), "")).Once()
-		mockedFactory.On("Create", proposal).Return(mockedProcessor, nil).Once()
+		mockedFactory.On("Create", proposal.Block).Return(mockedProcessor, nil).Once()
 
 		processor, err := voteProcessorFactory.Create(proposal)
 		require.Error(t, err)
@@ -58,7 +55,7 @@ func TestVoteProcessorFactory_CreateWithInvalidVote(t *testing.T) {
 		mockedProcessor := &mockhotstuff.VerifyingVoteProcessor{}
 		exception := errors.New("process-exception")
 		mockedProcessor.On("Process", proposal.ProposerVote()).Return(exception).Once()
-		mockedFactory.On("Create", proposal).Return(mockedProcessor, nil).Once()
+		mockedFactory.On("Create", proposal.Block).Return(mockedProcessor, nil).Once()
 
 		processor, err := voteProcessorFactory.Create(proposal)
 		require.ErrorIs(t, err, exception)
@@ -73,14 +70,12 @@ func TestVoteProcessorFactory_CreateWithInvalidVote(t *testing.T) {
 // TestVoteProcessorFactory_CreateProcessException tests that VoteProcessorFactory correctly handles exception
 // while creating processor for requested proposal.
 func TestVoteProcessorFactory_CreateProcessException(t *testing.T) {
-	mockedFactory := &mockhotstuff.VoteProcessorFactory{}
-	voteProcessorFactory := &VoteProcessorFactory{
-		base: mockedFactory,
-	}
+	mockedFactory := mocks.MockBaseFactory{}
+	voteProcessorFactory := &VoteProcessorFactory{mockedFactory.Create}
 
 	proposal := helper.MakeProposal()
 	exception := errors.New("create-exception")
-	mockedFactory.On("Create", proposal).Return(nil, exception).Once()
+	mockedFactory.On("Create", proposal.Block).Return(nil, exception).Once()
 
 	processor, err := voteProcessorFactory.Create(proposal)
 	require.ErrorIs(t, err, exception)

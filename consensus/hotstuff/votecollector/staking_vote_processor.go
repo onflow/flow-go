@@ -4,6 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
@@ -12,6 +16,53 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
 )
+
+/* ***************** Base-Factory for StakingVoteProcessor ****************** */
+
+// stakingVoteProcessorFactoryBase implements a factory for creating StakingVoteProcessor
+// holds needed dependencies to initialize StakingVoteProcessor.
+// stakingVoteProcessorFactoryBase is used in collector cluster.
+// CAUTION:
+// this base factory only creates the VerifyingVoteProcessor for the given block.
+// It does _not_ check the proposer's vote for its own block, i.e. it does _not_
+// implement `hotstuff.VoteProcessorFactory`. This base factory should be wrapped
+// by `votecollector.VoteProcessorFactory` which adds the logic to verify
+// the proposer's vote (decorator pattern).
+type stakingVoteProcessorFactoryBase struct {
+	log         zerolog.Logger
+	committee   hotstuff.Committee
+	onQCCreated hotstuff.OnQCCreated
+}
+
+// Create creates StakingVoteProcessor for processing votes for the given block.
+// Caller must treat all errors as exceptions
+func (f *stakingVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
+	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
+	}
+
+	// message that has to be verified against aggregated signature
+	msg := verification.MakeVoteMessage(block.View, block.BlockID)
+
+	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.CollectorVoteTag)
+	if err != nil {
+		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
+	}
+
+	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
+
+	return &StakingVoteProcessor{
+		log:              f.log,
+		block:            block,
+		stakingSigAggtor: stakingSigAggtor,
+		onQCCreated:      f.onQCCreated,
+		minRequiredStake: minRequiredStake,
+		done:             *atomic.NewBool(false),
+	}, nil
+}
+
+/* ****************** StakingVoteProcessor Implementation ******************* */
 
 // StakingVoteProcessor implements the hotstuff.VerifyingVoteProcessor interface.
 // It processes hotstuff votes from a collector cluster, where participants vote
@@ -24,25 +75,6 @@ type StakingVoteProcessor struct {
 	onQCCreated      hotstuff.OnQCCreated
 	minRequiredStake uint64
 	done             atomic.Bool
-}
-
-// newStakingVoteProcessor is a helper function to perform object construction
-// no extra logic for validating proposal wasn't added
-func newStakingVoteProcessor(
-	log zerolog.Logger,
-	block *model.Block,
-	stakingSigAggtor hotstuff.WeightedSignatureAggregator,
-	onQCCreated hotstuff.OnQCCreated,
-	minRequiredStake uint64,
-) *StakingVoteProcessor {
-	return &StakingVoteProcessor{
-		log:              log,
-		block:            block,
-		stakingSigAggtor: stakingSigAggtor,
-		onQCCreated:      onQCCreated,
-		minRequiredStake: minRequiredStake,
-		done:             *atomic.NewBool(false),
-	}
 }
 
 // Block returns block that is part of proposal that we are processing votes for.
