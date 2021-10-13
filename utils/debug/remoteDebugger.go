@@ -75,14 +75,7 @@ func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, b
 	if err != nil {
 		return nil, err
 	}
-	return tx.Err, nil
-}
-
-// RunTransactionWithFileCache runs the transaction using values cached inside a file
-func (d *RemoteDebugger) RunTransactionWithFileCache(txBody *flow.TransactionBody, filePath string) (txErr, processError error) {
-	view := NewRemoteView(d.grpcAddress, WithCache(newFileRegisterCache(filePath)))
-	tx := fvm.Transaction(txBody, 0)
-	err := d.vm.Run(d.ctx, tx, view, programs.NewEmptyPrograms())
+	err = view.Cache.Persist()
 	if err != nil {
 		return nil, err
 	}

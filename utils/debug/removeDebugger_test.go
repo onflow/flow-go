@@ -15,7 +15,7 @@ import (
 func TestDebugger_RunTransaction(t *testing.T) {
 
 	// this code is mostly a sample code so we skip by default
-	// t.Skip()
+	t.Skip()
 
 	grpcAddress := "localhost:3600"
 	chain := flow.Emulator.Chain()
@@ -45,18 +45,23 @@ func TestDebugger_RunTransaction(t *testing.T) {
 	require.NoError(t, err)
 
 	// Run with blockID (use the file cache)
-	blockId, _ := flow.HexStringToIdentifier("3a8281395e2c1aaa3b8643d148594b19e2acb477611a8e0cab8a55c46c40b563")
-	txErr, err = debugger.RunTransactionAtBlockID(txBody, blockId)
+	blockId, err := flow.HexStringToIdentifier("3a8281395e2c1aaa3b8643d148594b19e2acb477611a8e0cab8a55c46c40b563")
+	require.NoError(t, err)
+	txErr, err = debugger.RunTransactionAtBlockID(txBody, blockId, "")
 	require.NoError(t, txErr)
 	require.NoError(t, err)
 
-	// // the first run would cache the results
-	// txErr, err = debugger.RunTransactionWithFileCache(txBody, "registerCache")
-	// require.NoError(t, txErr)
-	// require.NoError(t, err)
+	testCacheFile := "test.cache"
+	defer os.Remove(testCacheFile)
+	// the first run would cache the results
+	txErr, err = debugger.RunTransactionAtBlockID(txBody, blockId, testCacheFile)
+	require.NoError(t, txErr)
+	require.NoError(t, err)
 
-	// // second one should only use the cache
-	// txErr, err = debugger.RunTransactionWithFileCache(txBody, "registerCache")
-	// require.NoError(t, txErr)
-	// require.NoError(t, err)
+	// second one should only use the cache
+	// make blockId invalid so if it endsup looking up by id it should fail
+	blockId = flow.Identifier{}
+	txErr, err = debugger.RunTransactionAtBlockID(txBody, blockId, testCacheFile)
+	require.NoError(t, txErr)
+	require.NoError(t, err)
 }
