@@ -31,8 +31,7 @@ func TestFilterSubscribe(t *testing.T) {
 	node1 := createNode(t, identity1.NodeID, privateKey1, rootBlockID, createSubscriptionFilterPubsubOption(t, ids))
 	node2 := createNode(t, identity2.NodeID, privateKey2, rootBlockID, createSubscriptionFilterPubsubOption(t, ids))
 
-	unstakedKey, err := unittest.NetworkingKey()
-	require.NoError(t, err)
+	unstakedKey := unittest.NetworkingPrivKeyFixture()
 	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, rootBlockID)
 
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.Host())))

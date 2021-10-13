@@ -39,11 +39,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -128,7 +128,7 @@ type CollectionNode struct {
 }
 
 func (n CollectionNode) Ready() <-chan struct{} {
-	return lifecycle.AllReady(
+	return util.AllReady(
 		n.PusherEngine,
 		n.ProviderEngine,
 		n.IngestionEngine,
@@ -139,7 +139,7 @@ func (n CollectionNode) Ready() <-chan struct{} {
 func (n CollectionNode) Done() <-chan struct{} {
 	done := make(chan struct{})
 	go func() {
-		<-lifecycle.AllDone(
+		<-util.AllDone(
 			n.PusherEngine,
 			n.ProviderEngine,
 			n.IngestionEngine,
@@ -210,7 +210,7 @@ type ExecutionNode struct {
 }
 
 func (en ExecutionNode) Ready() {
-	<-lifecycle.AllReady(
+	<-util.AllReady(
 		en.Ledger,
 		en.ReceiptsEngine,
 		en.IngestionEngine,
@@ -222,7 +222,7 @@ func (en ExecutionNode) Ready() {
 }
 
 func (en ExecutionNode) Done() {
-	lifecycle.AllDone(
+	util.AllDone(
 		en.IngestionEngine,
 		en.IngestionEngine,
 		en.ReceiptsEngine,
