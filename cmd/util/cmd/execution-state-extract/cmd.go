@@ -2,11 +2,15 @@ package extract
 
 import (
 	"encoding/hex"
+	"os"
+	"path"
 
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/cobra"
 
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
+	"github.com/onflow/flow-go/ledger/common/hash"
+	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/storage/badger"
@@ -20,6 +24,7 @@ var (
 	flagDatadir           string
 	flagNoMigration       bool
 	flagNoReport          bool
+	flagCleanupStorage    bool
 )
 
 var Cmd = &cobra.Command{
@@ -51,6 +56,9 @@ func init() {
 
 	Cmd.Flags().BoolVar(&flagNoReport, "no-report", false,
 		"don't report the state")
+
+	Cmd.Flags().BoolVar(&flagCleanupStorage, "cleanup-storage", false,
+		"cleanup storage by removing broken contracts")
 }
 
 func run(*cobra.Command, []string) {
@@ -91,9 +99,36 @@ func run(*cobra.Command, []string) {
 		}
 	}
 
+	if len(flagBlockHash) == 0 && len(flagStateCommitment) == 0 {
+		// read state commitment from root checkpoint
+
+		f, err := os.Open(path.Join(flagExecutionStateDir, bootstrap.FilenameWALRootCheckpoint))
+		if err != nil {
+			log.Fatal().Err(err).Msg("invalid root checkpoint")
+		}
+		const crcLength = 4
+		_, err = f.Seek(-(hash.HashLen + crcLength), 2 /* relative from end */)
+		if err != nil {
+			log.Fatal().Err(err).Msg("invalid root checkpoint")
+		}
+
+		n, err := f.Read(stateCommitment[:])
+		if err != nil || n != hash.HashLen {
+			log.Fatal().Err(err).Msg("failed to read state commitment from root checkpoint")
+		}
+	}
+
 	log.Info().Msgf("Block state commitment: %s", hex.EncodeToString(stateCommitment[:]))
 
-	err := extractExecutionState(flagExecutionStateDir, stateCommitment, flagOutputDir, log.Logger, !flagNoMigration, !flagNoReport)
+	err := extractExecutionState(
+		flagExecutionStateDir,
+		stateCommitment,
+		flagOutputDir,
+		log.Logger,
+		!flagNoMigration,
+		!flagNoReport,
+		flagCleanupStorage,
+	)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}

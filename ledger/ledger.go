@@ -27,7 +27,7 @@ type Ledger interface {
 	Get(query *Query) (values []Value, err error)
 
 	// Update updates a list of keys with new values at specific state (update) and returns a new state
-	Set(update *Update) (newState State, err error)
+	Set(update *Update) (newState State, trieUpdate *TrieUpdate, err error)
 
 	// Prove returns proofs for the given keys at specific state
 	Prove(query *Query) (proof Proof, err error)
@@ -248,7 +248,7 @@ func (kp *KeyPart) Equals(other *KeyPart) bool {
 // DeepCopy returns a deep copy of the key part
 func (kp *KeyPart) DeepCopy() *KeyPart {
 	newV := make([]byte, 0, len(kp.Value))
-	newV = append(newV, []byte(kp.Value)...)
+	newV = append(newV, kp.Value...)
 	return &KeyPart{Type: kp.Type, Value: newV}
 }
 

@@ -20,8 +20,6 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const DefaultRecipientCount uint = 3
-
 // Engine is the collection pusher engine, which provides access to resources
 // held by the collection node.
 type Engine struct {
@@ -34,21 +32,18 @@ type Engine struct {
 	state        protocol.State
 	collections  storage.Collections
 	transactions storage.Transactions
-
-	recipientCount uint // number of consensus nodes to push to
 }
 
 func New(log zerolog.Logger, net module.Network, state protocol.State, engMetrics module.EngineMetrics, colMetrics module.CollectionMetrics, me module.Local, collections storage.Collections, transactions storage.Transactions) (*Engine, error) {
 	e := &Engine{
-		unit:           engine.NewUnit(),
-		log:            log.With().Str("engine", "pusher").Logger(),
-		engMetrics:     engMetrics,
-		colMetrics:     colMetrics,
-		me:             me,
-		state:          state,
-		collections:    collections,
-		transactions:   transactions,
-		recipientCount: DefaultRecipientCount,
+		unit:         engine.NewUnit(),
+		log:          log.With().Str("engine", "pusher").Logger(),
+		engMetrics:   engMetrics,
+		colMetrics:   colMetrics,
+		me:           me,
+		state:        state,
+		collections:  collections,
+		transactions: transactions,
 	}
 
 	conduit, err := net.Register(engine.PushGuarantees, e)
@@ -73,13 +68,18 @@ func (e *Engine) Done() <-chan struct{} {
 
 // SubmitLocal submits an event originating on the local node.
 func (e *Engine) SubmitLocal(event interface{}) {
-	e.Submit(e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), event)
+		if err != nil {
+			engine.LogError(e.log, err)
+		}
+	})
 }
 
 // Submit submits the given event from the node with the given origin ID
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
-func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
+func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
 		err := e.process(originID, event)
 		if err != nil {
@@ -90,12 +90,14 @@ func (e *Engine) Submit(originID flow.Identifier, event interface{}) {
 
 // ProcessLocal processes an event originating on the local node.
 func (e *Engine) ProcessLocal(event interface{}) error {
-	return e.Process(e.me.NodeID(), event)
+	return e.unit.Do(func() error {
+		return e.process(e.me.NodeID(), event)
+	})
 }
 
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
-func (e *Engine) Process(originID flow.Identifier, event interface{}) error {
+func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.unit.Do(func() error {
 		return e.process(originID, event)
 	})
@@ -123,21 +125,16 @@ func (e *Engine) onSubmitCollectionGuarantee(originID flow.Identifier, req *mess
 	return e.SubmitCollectionGuarantee(&req.Guarantee)
 }
 
-// SubmitCollectionGuarantee submits the collection guarantee to all
-// consensus nodes.
+// SubmitCollectionGuarantee submits the collection guarantee to all consensus nodes.
 func (e *Engine) SubmitCollectionGuarantee(guarantee *flow.CollectionGuarantee) error {
-
 	consensusNodes, err := e.state.Final().Identities(filter.HasRole(flow.RoleConsensus))
 	if err != nil {
 		return fmt.Errorf("could not get consensus nodes: %w", err)
 	}
 
-	// TODO: We actually only need to send to a small subset of consensus engines, as
-	// they propagate the guarantee within the consensus committee. We can reduce
-	// network usage significantly by implementing a simple retry mechanism here and
-	// only sending to a single consensus node.
-	// => https://github.com/dapperlabs/flow-go/issues/4358
-	err = e.conduit.Multicast(guarantee, e.recipientCount, consensusNodes.NodeIDs()...)
+	// NOTE: Consensus nodes do not broadcast guarantees among themselves, so it needs that
+	// at least one collection node make a publish to all of them.
+	err = e.conduit.Publish(guarantee, consensusNodes.NodeIDs()...)
 	if err != nil {
 		return fmt.Errorf("could not submit collection guarantee: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"math"
 	"time"
 
+	"github.com/opentracing/opentracing-go/log"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -141,11 +142,16 @@ func (c *Core) ProcessReceipt(receipt *flow.ExecutionReceipt) error {
 //   internal state might be corrupted. Hence, returned errors should be treated as fatal.
 func (c *Core) processReceipt(receipt *flow.ExecutionReceipt) (bool, error) {
 	startTime := time.Now()
-	receiptSpan := c.tracer.StartSpan(receipt.ID(), trace.CONMatchProcessReceipt)
 	defer func() {
 		c.metrics.OnReceiptProcessingDuration(time.Since(startTime))
-		receiptSpan.Finish()
 	}()
+
+	receiptSpan, _, isSampled := c.tracer.StartBlockSpan(context.Background(), receipt.ExecutionResult.BlockID, trace.CONMatchProcessReceipt)
+	if isSampled {
+		receiptSpan.LogFields(log.String("result_id", receipt.ExecutionResult.ID().String()))
+		receiptSpan.LogFields(log.String("executor", receipt.ExecutorID.String()))
+	}
+	defer receiptSpan.Finish()
 
 	// setup logger to capture basic information about the receipt
 	log := c.log.With().
@@ -290,12 +296,6 @@ func (c *Core) requestPendingReceipts() (int, uint64, error) {
 	// heights would stop the sealing.
 	missingBlocksOrderedByHeight := make([]flow.Identifier, 0, c.config.MaxResultsToRequest)
 
-	// set of blocks for which we have a candidate seal:
-	blocksWithCandidateSeal := make(map[flow.Identifier]struct{})
-	for _, s := range c.seals.All() {
-		blocksWithCandidateSeal[s.Seal.BlockID] = struct{}{}
-	}
-
 	var firstMissingHeight uint64 = math.MaxUint64
 	// traverse each unsealed and finalized block with height from low to high,
 	// if the result is missing, then add the blockID to a missing block list in
@@ -314,45 +314,16 @@ HEIGHT_LOOP:
 		}
 		blockID := header.ID()
 
-		// if we have already a candidate seal, we skip any further processing
-		// CAUTION: this is not BFT, as the existence of a candidate seal
-		//          does _not_ imply that all parent results are sealable.
-		// TODO: update for full BFT
-		if _, hasCandidateSeal := blocksWithCandidateSeal[blockID]; hasCandidateSeal {
-			continue
-		}
-
-		// Without the logic below, the sealing engine would produce IncorporatedResults
-		// only from receipts received directly from ENs. sealing Core would not know about
-		// Receipts that are incorporated by other nodes in their blocks blocks (but never
-		// received directly from the EN). Also, Receipt might have been lost from the
-		// mempool during a node crash. Hence we check also if we have the receipts in
-		// storage (which also persists receipts pre-crash or when received from other
-		// nodes as part of a block proposal).
-		// Currently, the index is only added when the block which includes the receipts
-		// get finalized, so the returned receipts must be from finalized blocks.
-		// Therefore, the return receipts must be incorporated receipts, which
-		// are safe to be added to the mempool
-		// ToDo: this logic should eventually be moved in the engine's
-		// OnBlockIncorporated callback planned for phase 3 of the S&V roadmap,
-		// and that the IncorporatedResult's IncorporatedBlockID should be set
-		// correctly.
 		receipts, err := c.receiptsDB.ByBlockID(blockID)
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)
 		}
 
-		for _, receipt := range receipts {
-			_, err = c.receipts.AddReceipt(receipt, header)
-			if err != nil {
-				return 0, 0, fmt.Errorf("could not add receipt to receipts mempool %v, %w", receipt.ID(), err)
-			}
-		}
-
 		// We require at least 2 consistent receipts from different ENs to seal a block. If don't need to fetching receipts.
 		// CAUTION: This is a temporary shortcut incompatible with the mature BFT protocol!
 		// There might be multiple consistent receipts that commit to a wrong result. To guarantee
-		// sealing liveness, we need to fetch receipts from those ENs, whose receipts we don't have yet,
+		// sealing liveness, we need to fetch receipts from those ENs, whose receipts we don't have yet.
+		// TODO: update for full BFT
 		for _, receiptsForResult := range receipts.GroupByResultID() {
 			if receiptsForResult.GroupByExecutorID().NumberGroups() >= 2 {
 				continue HEIGHT_LOOP
@@ -373,19 +344,33 @@ HEIGHT_LOOP:
 	return len(missingBlocksOrderedByHeight), firstMissingHeight, nil
 }
 
-func (c *Core) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
+func (c *Core) OnBlockFinalization() error {
 	startTime := time.Now()
-	requestReceiptsSpan, _ := c.tracer.StartSpanFromContext(context.Background(), trace.CONMatchRequestPendingReceipts)
+
 	// request execution receipts for unsealed finalized blocks
 	pendingReceiptRequests, firstMissingHeight, err := c.requestPendingReceipts()
-	requestReceiptsSpan.Finish()
-
 	if err != nil {
 		return fmt.Errorf("could not request pending block results: %w", err)
 	}
 
+	// Prune Execution Tree
+	lastSealed, err := c.state.Sealed().Head()
+	if err != nil {
+		return fmt.Errorf("could not retrieve last sealed block : %w", err)
+	}
+	err = c.receipts.PruneUpToHeight(lastSealed.Height)
+	if err != nil {
+		return fmt.Errorf("failed to prune execution tree up to latest sealed and finalized block %v, height: %v: %w",
+			lastSealed.ID(), lastSealed.Height, err)
+	}
+
+	err = c.pendingReceipts.PruneUpToHeight(lastSealed.Height)
+	if err != nil {
+		return fmt.Errorf("failed to prune pending receipts mempool up to latest sealed and finalized block %v, height: %v: %w",
+			lastSealed.ID(), lastSealed.Height, err)
+	}
+
 	c.log.Info().
-		Hex("finalized_block_id", finalizedBlockID[:]).
 		Uint64("first_height_missing_result", firstMissingHeight).
 		Uint("seals_size", c.seals.Size()).
 		Uint("receipts_size", c.receipts.Size()).

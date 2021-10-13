@@ -22,7 +22,7 @@ func NewLedgerViewCommitter(ldg ledger.Ledger, tracer module.Tracer) *LedgerView
 	return &LedgerViewCommitter{ldg: ldg, tracer: tracer}
 }
 
-func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, proof []byte, err error) {
+func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, proof []byte, trieUpdate *ledger.TrieUpdate, err error) {
 	var err1, err2 error
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -31,7 +31,7 @@ func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCo
 		wg.Done()
 	}()
 
-	newCommit, err1 = s.commitView(view, baseState)
+	newCommit, trieUpdate, err1 = s.commitView(view, baseState)
 	wg.Wait()
 
 	if err1 != nil {
@@ -43,15 +43,16 @@ func (s *LedgerViewCommitter) CommitView(view state.View, baseState flow.StateCo
 	return
 }
 
-func (s *LedgerViewCommitter) commitView(view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, err error) {
+func (s *LedgerViewCommitter) commitView(view state.View, baseState flow.StateCommitment) (newCommit flow.StateCommitment, update *ledger.TrieUpdate, err error) {
 	return execState.CommitDelta(s.ldg, view, baseState)
 }
 
 func (s *LedgerViewCommitter) collectProofs(view state.View, baseState flow.StateCommitment) (proof []byte, err error) {
+	// get all deduplicated register IDs
 	allIds := view.AllRegisters()
-	keys := make([]ledger.Key, len(allIds))
-	for i, id := range allIds {
-		keys[i] = execState.RegisterIDToKey(id)
+	keys := make([]ledger.Key, 0, len(allIds))
+	for _, id := range allIds {
+		keys = append(keys, execState.RegisterIDToKey(id))
 	}
 
 	query, err := ledger.NewQuery(ledger.State(baseState), keys)

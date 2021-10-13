@@ -16,10 +16,10 @@ import (
 func StorageLayer(t testing.TB, db *badger.DB) (*storage.Headers, *storage.Guarantees, *storage.Seals, *storage.Index, *storage.Payloads, *storage.Blocks, *storage.EpochSetups, *storage.EpochCommits, *storage.EpochStatuses, *storage.ExecutionResults) {
 	metrics := metrics.NewNoopCollector()
 	headers := storage.NewHeaders(metrics, db)
-	guarantees := storage.NewGuarantees(metrics, db)
+	guarantees := storage.NewGuarantees(metrics, db, storage.DefaultCacheSize)
 	seals := storage.NewSeals(metrics, db)
 	results := storage.NewExecutionResults(metrics, db)
-	receipts := storage.NewExecutionReceipts(metrics, db, results)
+	receipts := storage.NewExecutionReceipts(metrics, db, results, storage.DefaultCacheSize)
 	index := storage.NewIndex(metrics, db)
 	payloads := storage.NewPayloads(db, index, guarantees, seals, receipts, results)
 	blocks := storage.NewBlocks(db, headers, payloads)

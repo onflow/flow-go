@@ -3,6 +3,7 @@ package queue_test
 import (
 	"context"
 	"math/rand"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -41,17 +42,20 @@ func testWorkers(t *testing.T, maxPriority int, messageCnt int, workerCnt int) {
 	},
 		metrics.NewNoopCollector())
 
+	var l sync.Mutex                                // protect comparisons with expectedPriority
 	messagesPerPriority := messageCnt / maxPriority // messages per priority
 	expectedPriority := maxPriority - 1             // when dequeing, the priority can be the current highest priority or one less
 	var callbackCnt int64                           //count the number of times the callback gets called
 	// callback checks if message is of expected priority
 	callback := func(data interface{}) {
 		actual := data.(int)
+		l.Lock()
 		assert.LessOrEqual(t, expectedPriority, actual)
 		atomic.AddInt64(&callbackCnt, 1)
 		if callbackCnt%int64(messagesPerPriority) == 0 {
 			expectedPriority--
 		}
+		l.Unlock()
 	}
 
 	// the queue is populated with messageCnt number of messages

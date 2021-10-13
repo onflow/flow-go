@@ -75,7 +75,7 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 	}
 	go func() {
 		for msg := range con.queue {
-			engine.Submit(msg.originID, msg.event)
+			engine.Submit(channel, msg.originID, msg.event)
 		}
 	}()
 	n.conduits[channel] = con

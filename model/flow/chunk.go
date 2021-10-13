@@ -31,13 +31,17 @@ func (ch *Chunk) Checksum() Identifier {
 	return MakeID(ch)
 }
 
-// ChunkDataPack holds all register touches (any read, or write)
-// note that we have to capture a read proof for each write before updating the registers
+// ChunkDataPack holds all register touches (any read, or write).
+//
+// Note that we have to capture a read proof for each write before updating the registers.
+// `Proof` includes proofs for all registers read to execute the chunck.
+// Register proofs order must not be correlated to the order of register reads during
+// the chunk execution in order to enforce the SPoCK secret high entropy.
 type ChunkDataPack struct {
-	ChunkID      Identifier
-	StartState   StateCommitment
-	Proof        StorageProof
-	CollectionID Identifier
+	ChunkID    Identifier
+	StartState StateCommitment
+	Proof      StorageProof
+	Collection *Collection
 }
 
 // ID returns the unique identifier for the concrete view, which is the ID of

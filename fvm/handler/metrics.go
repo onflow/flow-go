@@ -8,12 +8,11 @@ import (
 
 // MetricsReporter captures and reports metrics to back to the execution environment
 // it is a setup passed to the context.
-//
-// TODO expand this to more metrics
 type MetricsReporter interface {
-	TransactionParsed(time.Duration)
-	TransactionChecked(time.Duration)
-	TransactionInterpreted(time.Duration)
+	RuntimeTransactionParsed(time.Duration)
+	RuntimeTransactionChecked(time.Duration)
+	RuntimeTransactionInterpreted(time.Duration)
+	RuntimeSetNumberOfAccounts(count uint64)
 }
 
 // A MetricsHandler accumulates performance metrics reported by the Cadence runtime.
@@ -42,7 +41,7 @@ func (m *MetricsHandler) ProgramParsed(location common.Location, duration time.D
 	}
 	if _, ok := location.(common.TransactionLocation); ok {
 		m.TimeSpentOnParsing = duration
-		m.Reporter.TransactionParsed(duration)
+		m.Reporter.RuntimeTransactionParsed(duration)
 	}
 }
 
@@ -54,7 +53,7 @@ func (m *MetricsHandler) ProgramChecked(location common.Location, duration time.
 	}
 	if _, ok := location.(common.TransactionLocation); ok {
 		m.TimeSpentOnChecking = duration
-		m.Reporter.TransactionChecked(duration)
+		m.Reporter.RuntimeTransactionChecked(duration)
 	}
 }
 
@@ -66,8 +65,13 @@ func (m *MetricsHandler) ProgramInterpreted(location common.Location, duration t
 	}
 	if _, ok := location.(common.TransactionLocation); ok {
 		m.TimeSpentOnInterpreting = duration
-		m.Reporter.TransactionInterpreted(duration)
+		m.Reporter.RuntimeTransactionInterpreted(duration)
 	}
+}
+
+// SetNumberOfAccounts captures total number of accounts on the network
+func (m *MetricsHandler) SetNumberOfAccounts(count uint64) {
+	m.Reporter.RuntimeSetNumberOfAccounts(count)
 }
 
 // ValueEncoded accumulates time spend on runtime value encoding
@@ -83,11 +87,14 @@ func (m *MetricsHandler) ValueDecoded(duration time.Duration) {
 // NoopMetricsReporter is a MetricReporter that does nothing.
 type NoopMetricsReporter struct{}
 
-// TransactionParsed is a noop
-func (NoopMetricsReporter) TransactionParsed(time.Duration) {}
+// RuntimeTransactionParsed is a noop
+func (NoopMetricsReporter) RuntimeTransactionParsed(time.Duration) {}
 
-// TransactionChecked is a noop
-func (NoopMetricsReporter) TransactionChecked(time.Duration) {}
+// RuntimeTransactionChecked is a noop
+func (NoopMetricsReporter) RuntimeTransactionChecked(time.Duration) {}
 
-// TransactionInterpreted is a noop
-func (NoopMetricsReporter) TransactionInterpreted(time.Duration) {}
+// RuntimeTransactionInterpreted is a noop
+func (NoopMetricsReporter) RuntimeTransactionInterpreted(time.Duration) {}
+
+// RuntimeSetNumberOfAccounts is a noop
+func (NoopMetricsReporter) RuntimeSetNumberOfAccounts(count uint64) {}

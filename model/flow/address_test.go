@@ -133,9 +133,9 @@ func testAddressGeneration(t *testing.T) {
 		state := chain.NewAddressGenerator()
 		expectedIndex := uint64(0)
 		for i := 0; i < loop; i++ {
+			expectedIndex++
 			address, err := state.NextAddress()
 			require.NoError(t, err)
-			expectedIndex++
 			expectedAddress, err := chain.AddressAtIndex(expectedIndex)
 			require.NoError(t, err)
 			assert.Equal(t, address, expectedAddress)
@@ -191,6 +191,7 @@ func testAddressGeneration(t *testing.T) {
 		check := chain.IsValid(invalidAddress)
 		assert.False(t, check, "account address format should be invalid")
 		r = uint64(rand.Intn(maxIndex - loop))
+
 		state = chain.newAddressGeneratorAtIndex(r)
 		for i := 0; i < loop; i++ {
 			address, err := state.NextAddress()

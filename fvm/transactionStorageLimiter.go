@@ -6,78 +6,33 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
-	"github.com/onflow/flow-go/fvm/programs"
-	"github.com/onflow/flow-go/fvm/state"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-type TransactionStorageLimiter struct {
-	// A function to create a function to get storage capacity from an address. This is to make this easily testable.
-	GetStorageCapacityFuncFactory func(
-		vm *VirtualMachine,
-		ctx Context,
-		tp *TransactionProcedure,
-		sth *state.StateHolder,
-		programs *programs.Programs,
-	) (func(address common.Address) (value uint64, err error), error)
-}
-
-func getStorageCapacityFuncFactory(
-	vm *VirtualMachine,
-	ctx Context,
-	_ *TransactionProcedure,
-	sth *state.StateHolder,
-	programs *programs.Programs,
-) (func(address common.Address) (value uint64, err error), error) {
-	env := newEnvironment(ctx, vm, sth, programs)
-	return func(address common.Address) (value uint64, err error) {
-		return env.GetStorageCapacity(common.BytesToAddress(address.Bytes()))
-	}, nil
-}
+type TransactionStorageLimiter struct{}
 
 func NewTransactionStorageLimiter() *TransactionStorageLimiter {
-	return &TransactionStorageLimiter{
-		GetStorageCapacityFuncFactory: getStorageCapacityFuncFactory,
-	}
+	return &TransactionStorageLimiter{}
 }
 
-func (d *TransactionStorageLimiter) Process(
-	vm *VirtualMachine,
-	ctx *Context,
-	tp *TransactionProcedure,
-	sth *state.StateHolder,
-	programs *programs.Programs,
+func (d *TransactionStorageLimiter) CheckLimits(
+	env Environment,
+	addresses []flow.Address,
 ) error {
-	if !ctx.LimitAccountStorage {
+	if !env.Context().LimitAccountStorage {
 		return nil
 	}
 
-	getCapacity, err := d.GetStorageCapacityFuncFactory(vm, *ctx, tp, sth, programs)
-
-	if err != nil {
-		return fmt.Errorf("storage limit check failed: %w", err)
-	}
-
-	accounts := state.NewAccounts(sth)
-
-	addresses := sth.State().UpdatedAddresses()
-
+	// iterating through a map in a non-deterministic order! Do not exit the loop early.
 	for _, address := range addresses {
+		commonAddress := common.BytesToAddress(address.Bytes())
 
-		// does it exist?
-		exists, err := accounts.Exists(address)
-		if err != nil {
-			return fmt.Errorf("storage limit check failed: %w", err)
-		}
-		if !exists {
-			continue
-		}
-
-		capacity, err := getCapacity(common.BytesToAddress(address.Bytes()))
+		capacity, err := env.GetStorageCapacity(commonAddress)
 		if err != nil {
 			return fmt.Errorf("storage limit check failed: %w", err)
 		}
 
-		usage, err := accounts.GetStorageUsed(address)
+		usage, err := env.GetStorageUsed(commonAddress)
 		if err != nil {
 			return fmt.Errorf("storage limit check failed: %w", err)
 		}
@@ -86,5 +41,6 @@ func (d *TransactionStorageLimiter) Process(
 			return errors.NewStorageCapacityExceededError(address, usage, capacity)
 		}
 	}
+
 	return nil
 }

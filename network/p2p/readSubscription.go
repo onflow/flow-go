@@ -5,11 +5,14 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network/message"
+	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
 // readSubscription reads the messages coming in on the subscription and calls the given callback until
@@ -19,13 +22,13 @@ type readSubscription struct {
 	log      zerolog.Logger
 	sub      *pubsub.Subscription
 	metrics  module.NetworkMetrics
-	callback func(msg *message.Message)
+	callback func(msg *message.Message, peerID peer.ID)
 }
 
 // newReadSubscription reads the messages coming in on the subscription
 func newReadSubscription(ctx context.Context,
 	sub *pubsub.Subscription,
-	callback func(msg *message.Message),
+	callback func(msg *message.Message, peerID peer.ID),
 	log zerolog.Logger,
 	metrics module.NetworkMetrics) *readSubscription {
 
@@ -76,18 +79,18 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 			return
 		}
 
-		var msg message.Message
-		// convert the incoming raw message payload to Message type
-		err = msg.Unmarshal(rawMsg.Data)
-		if err != nil {
-			r.log.Err(err).Str("topic_message", msg.String()).Msg("failed to unmarshal message")
+		validatorData, ok := rawMsg.ValidatorData.(validator.ValidatorData)
+		if !ok {
+			r.log.Error().Str("raw_msg", rawMsg.String()).Msg("[BUG] validator data missing!")
 			return
 		}
+
+		msg := validatorData.Message
 
 		// log metrics
 		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID, msg.Type)
 
 		// call the callback
-		r.callback(&msg)
+		r.callback(msg, validatorData.From)
 	}
 }

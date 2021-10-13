@@ -193,7 +193,7 @@ func TestRaceCondition(t *testing.T) {
 // and evaluates that size of the map stays within the limit.
 func TestCapacity(t *testing.T) {
 	const (
-		limit = 10
+		limit = 20
 		swarm = 20
 	)
 	idMap, err := NewIdentifierMap(limit)

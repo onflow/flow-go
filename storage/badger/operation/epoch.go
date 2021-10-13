@@ -1,9 +1,9 @@
 package operation
 
 import (
-	"github.com/onflow/flow-go/model/flow"
-
 	"github.com/dgraph-io/badger/v2"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func InsertEpochSetup(eventID flow.Identifier, event *flow.EpochSetup) func(*badger.Txn) error {

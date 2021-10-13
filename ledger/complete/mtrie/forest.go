@@ -178,10 +178,14 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 		return emptyHash, fmt.Errorf("adding updated trie to forest failed: %w", err)
 	}
 
-	return ledger.RootHash(newTrie.RootHash()), nil
+	return newTrie.RootHash(), nil
 }
 
-// Proofs returns a batch proof for the given paths
+// Proofs returns a batch proof for the given paths.
+//
+// Proves are generally _not_ provided in the register order of the query.
+// In the current implementation, input paths in the TrieRead `r` are sorted in an ascendent order,
+// The output proofs are provided following the order of the sorted paths.
 func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 
 	// no path, empty batchproof
@@ -195,24 +199,13 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		return nil, err
 	}
 
-	deduplicatedPaths := make([]ledger.Path, 0)
 	notFoundPaths := make([]ledger.Path, 0)
 	notFoundPayloads := make([]ledger.Payload, 0)
-	pathOrgIndex := make(map[ledger.Path][]int)
 	for i, path := range r.Paths {
-		// only collect duplicated keys once
-		if _, ok := pathOrgIndex[path]; !ok {
-			deduplicatedPaths = append(deduplicatedPaths, path)
-			pathOrgIndex[path] = []int{i}
-
-			// add it only once if is empty
-			if retPayloads[i].IsEmpty() {
-				notFoundPaths = append(notFoundPaths, path)
-				notFoundPayloads = append(notFoundPayloads, *ledger.EmptyPayload())
-			}
-		} else {
-			// handles duplicated keys
-			pathOrgIndex[path] = append(pathOrgIndex[path], i)
+		// add if empty
+		if retPayloads[i].IsEmpty() {
+			notFoundPaths = append(notFoundPaths, path)
+			notFoundPayloads = append(notFoundPayloads, *ledger.EmptyPayload())
 		}
 	}
 
@@ -235,24 +228,8 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 		stateTrie = newTrie
 	}
 
-	bp := ledger.NewTrieBatchProofWithEmptyProofs(len(deduplicatedPaths))
-
-	for _, p := range bp.Proofs {
-		p.Flags = make([]byte, ledger.PathLen)
-		p.Inclusion = false
-	}
-
-	stateTrie.UnsafeProofs(deduplicatedPaths, bp.Proofs)
-
-	// reconstruct the proofs in the same key order that called the method
-	retbp := ledger.NewTrieBatchProofWithEmptyProofs(len(r.Paths))
-	for i, p := range deduplicatedPaths {
-		for _, j := range pathOrgIndex[p] {
-			retbp.Proofs[j] = bp.Proofs[i]
-		}
-	}
-
-	return retbp, nil
+	bp := stateTrie.UnsafeProofs(r.Paths)
+	return bp, nil
 }
 
 // GetTrie returns trie at specific rootHash
@@ -266,7 +243,7 @@ func (f *Forest) GetTrie(rootHash ledger.RootHash) (*trie.MTrie, error) {
 		}
 		return trie, nil
 	}
-	return nil, fmt.Errorf("trie with the given rootHash [%x] not found", rootHash)
+	return nil, fmt.Errorf("trie with the given rootHash %s not found", rootHash)
 }
 
 // GetTries returns list of currently cached tree root hashes

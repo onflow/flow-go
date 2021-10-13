@@ -35,17 +35,32 @@ func NewEvents(collector module.CacheMetrics, db *badger.DB) *Events {
 	}
 }
 
-func (e *Events) BatchStore(blockID flow.Identifier, events []flow.Event, batch storage.BatchStorage) error {
+func (e *Events) BatchStore(blockID flow.Identifier, blockEvents []flow.EventsList, batch storage.BatchStorage) error {
 	writeBatch := batch.GetWriter()
-	for _, event := range events {
-		err := operation.BatchInsertEvent(blockID, event)(writeBatch)
-		if err != nil {
-			return fmt.Errorf("cannot batch insert event: %w", err)
+
+	// pre-allocating and indexing slice is faster than appending
+	sliceSize := 0
+	for _, b := range blockEvents {
+		sliceSize += len(b)
+	}
+
+	combinedEvents := make([]flow.Event, sliceSize)
+
+	eventIndex := 0
+
+	for _, events := range blockEvents {
+		for _, event := range events {
+			err := operation.BatchInsertEvent(blockID, event)(writeBatch)
+			if err != nil {
+				return fmt.Errorf("cannot batch insert event: %w", err)
+			}
+			combinedEvents[eventIndex] = event
+			eventIndex++
 		}
 	}
 
 	callback := func() {
-		e.cache.Insert(blockID, events)
+		e.cache.Insert(blockID, combinedEvents)
 	}
 	batch.OnSucceed(callback)
 	return nil

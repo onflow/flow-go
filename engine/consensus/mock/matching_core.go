@@ -12,13 +12,13 @@ type MatchingCore struct {
 	mock.Mock
 }
 
-// ProcessFinalizedBlock provides a mock function with given fields: finalizedBlockID
-func (_m *MatchingCore) ProcessFinalizedBlock(finalizedBlockID flow.Identifier) error {
-	ret := _m.Called(finalizedBlockID)
+// OnBlockFinalization provides a mock function with given fields:
+func (_m *MatchingCore) OnBlockFinalization() error {
+	ret := _m.Called()
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(flow.Identifier) error); ok {
-		r0 = rf(finalizedBlockID)
+	if rf, ok := ret.Get(0).(func() error); ok {
+		r0 = rf()
 	} else {
 		r0 = ret.Error(0)
 	}

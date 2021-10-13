@@ -6,10 +6,12 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/trace"
 	mockprot "github.com/onflow/flow-go/state/protocol/mock"
 	storage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/storage/badger/operation"
@@ -28,7 +30,8 @@ func TestNewFinalizer(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		headers := &mockstor.Headers{}
 		state := &mockprot.MutableState{}
-		fin := NewFinalizer(db, headers, state)
+		tracer := trace.NewNoopTracer()
+		fin := NewFinalizer(db, headers, state, tracer)
 		assert.Equal(t, fin.db, db)
 		assert.Equal(t, fin.headers, headers)
 		assert.Equal(t, fin.state, state)
@@ -64,7 +67,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 	cutoff := total - 3
 	var lastID flow.Identifier
 	for i := 0; i < cutoff; i++ {
-		state.On("Finalize", pending[i].ID()).Return(nil)
+		state.On("Finalize", mock.Anything, pending[i].ID()).Return(nil)
 		lastID = pending[i].ID()
 	}
 
@@ -97,6 +100,7 @@ func TestMakeFinalValidChain(t *testing.T) {
 			db:      db,
 			headers: storage.NewHeaders(metrics, db),
 			state:   state,
+			tracer:  trace.NewNoopTracer(),
 			cleanup: LogCleanup(&list),
 		}
 		err = fin.MakeFinal(lastID)
@@ -152,6 +156,7 @@ func TestMakeFinalInvalidHeight(t *testing.T) {
 			db:      db,
 			headers: storage.NewHeaders(metrics, db),
 			state:   state,
+			tracer:  trace.NewNoopTracer(),
 			cleanup: LogCleanup(&list),
 		}
 		err = fin.MakeFinal(pending.ID())
@@ -199,6 +204,7 @@ func TestMakeFinalDuplicate(t *testing.T) {
 			db:      db,
 			headers: storage.NewHeaders(metrics, db),
 			state:   state,
+			tracer:  trace.NewNoopTracer(),
 			cleanup: LogCleanup(&list),
 		}
 		err = fin.MakeFinal(final.ID())

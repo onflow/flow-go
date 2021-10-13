@@ -75,6 +75,11 @@ func NewThresholdProvider(tag string, priv crypto.PrivateKey) *ThresholdProvider
 // Sign will use the internal private key share to generate a threshold signature
 // share.
 func (tp *ThresholdProvider) Sign(msg []byte) (crypto.Signature, error) {
+
+	// return invalid signature if the private key is nil
+	if tp.priv == nil {
+		return crypto.BLSInvalidSignature(), nil
+	}
 	return tp.priv.Sign(msg, tp.hasher)
 }
 
@@ -95,7 +100,6 @@ func EnoughThresholdShares(size int, shares int) (bool, error) {
 // signature for the group of the given size. The indices represent the index for ech signature share
 // within the DKG algorithm.
 func (tp *ThresholdProvider) Reconstruct(size uint, shares []crypto.Signature, indices []uint) (crypto.Signature, error) {
-
 	// check that we have sufficient shares to reconstruct the threshold signature
 	enoughShares, err := EnoughThresholdShares(int(size), len(shares))
 	if err != nil {

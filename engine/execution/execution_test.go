@@ -22,7 +22,7 @@ import (
 )
 
 func sendBlock(exeNode *testmock.ExecutionNode, from flow.Identifier, proposal *messages.BlockProposal) error {
-	return exeNode.FollowerEngine.Process(from, proposal)
+	return exeNode.FollowerEngine.Process(engine.ReceiveBlocks, from, proposal)
 }
 
 // Test when the ingestion engine receives a block, it will
@@ -37,10 +37,22 @@ func TestExecutionFlow(t *testing.T) {
 
 	chainID := flow.Testnet
 
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	verID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	colID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleCollection),
+		unittest.WithKeys,
+	)
+	conID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithKeys,
+	)
+	exeID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleExecution),
+		unittest.WithKeys,
+	)
+	verID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleVerification),
+		unittest.WithKeys,
+	)
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exeID, verID)
 
@@ -94,21 +106,21 @@ func TestExecutionFlow(t *testing.T) {
 
 	child := unittest.BlockWithParentAndProposerFixture(block.Header, conID.NodeID)
 
-	collectionNode := testutil.GenericNode(t, hub, colID, identities, chainID)
+	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
-	verificationNode := testutil.GenericNode(t, hub, verID, identities, chainID)
+	verificationNode := testutil.GenericNodeFromParticipants(t, hub, verID, identities, chainID)
 	defer verificationNode.Done()
-	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
+	consensusNode := testutil.GenericNodeFromParticipants(t, hub, conID, identities, chainID)
 	defer consensusNode.Done()
 
 	// create collection node that can respond collections to execution node
 	// check collection node received the collection request from execution node
 	providerEngine := new(mocknetwork.Engine)
 	provConduit, _ := collectionNode.Net.Register(engine.ProvideCollections, providerEngine)
-	providerEngine.On("Submit", exeID.NodeID, mock.Anything).
+	providerEngine.On("Submit", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			originID := args.Get(0).(flow.Identifier)
-			req := args.Get(1).(*messages.EntityRequest)
+			originID := args.Get(1).(flow.Identifier)
+			req := args.Get(2).(*messages.EntityRequest)
 
 			var entities []flow.Entity
 			for _, entityID := range req.EntityIDs {
@@ -141,9 +153,9 @@ func TestExecutionFlow(t *testing.T) {
 	// check the verification engine received the ER from execution node
 	verificationEngine := new(mocknetwork.Engine)
 	_, _ = verificationNode.Net.Register(engine.ReceiveReceipts, verificationEngine)
-	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
+	verificationEngine.On("Submit", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			receipt, _ = args[1].(*flow.ExecutionReceipt)
+			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 		}).
@@ -154,9 +166,9 @@ func TestExecutionFlow(t *testing.T) {
 	// check the consensus engine has received the result from execution node
 	consensusEngine := new(mocknetwork.Engine)
 	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
-	consensusEngine.On("Submit", exeID.NodeID, mock.Anything).
+	consensusEngine.On("Submit", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
-			receipt, _ = args[1].(*flow.ExecutionReceipt)
+			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 			assert.Equal(t, len(collections), len(receipt.ExecutionResult.Chunks)-1) // don't count system chunk
@@ -284,18 +296,29 @@ func makeSuccessBlock(t *testing.T, conID *flow.Identity, colID *flow.Identity, 
 func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
-	chainID := flow.Mainnet
+	chainID := flow.Emulator
 
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exe1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	// exe2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	colID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleCollection),
+		unittest.WithKeys,
+	)
+	conID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithKeys,
+	)
+	exe1ID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleExecution),
+		unittest.WithKeys,
+	)
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exe1ID)
+	key, err := unittest.NetworkingKey()
+	require.NoError(t, err)
+	identities[3].NetworkPubKey = key.PublicKey()
 
-	collectionNode := testutil.GenericNode(t, hub, colID, identities, chainID)
+	collectionNode := testutil.GenericNodeFromParticipants(t, hub, colID, identities, chainID)
 	defer collectionNode.Done()
-	consensusNode := testutil.GenericNode(t, hub, conID, identities, chainID)
+	consensusNode := testutil.GenericNodeFromParticipants(t, hub, conID, identities, chainID)
 	defer consensusNode.Done()
 	exe1Node := testutil.ExecutionNode(t, hub, exe1ID, identities, 27, chainID)
 	exe1Node.Ready()
@@ -331,11 +354,11 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 
 	consensusEngine := new(mocknetwork.Engine)
 	_, _ = consensusNode.Net.Register(engine.ReceiveReceipts, consensusEngine)
-	consensusEngine.On("Submit", mock.Anything, mock.Anything).
+	consensusEngine.On("Submit", mock.AnythingOfType("network.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			receiptsReceived++
-			originID := args[0].(flow.Identifier)
-			receipt := args[1].(*flow.ExecutionReceipt)
+			originID := args[1].(flow.Identifier)
+			receipt := args[2].(*flow.ExecutionReceipt)
 			finalState, _ := receipt.ExecutionResult.FinalStateCommitment()
 			consensusNode.Log.Debug().
 				Hex("origin", originID[:]).
@@ -383,7 +406,9 @@ func TestExecutionStateSyncMultipleExecutionNodes(t *testing.T) {
 	// verify state commitment of block 2 is the same as block 1, since tx failed on seq number verification
 	scExe1Block2, err := exe1Node.ExecutionState.StateCommitmentByBlockID(context.Background(), block2.ID())
 	assert.NoError(t, err)
-	assert.Equal(t, scExe1Block1, scExe1Block2)
+	// TODO this is no longer valid because the system chunk can change the state
+	//assert.Equal(t, scExe1Block1, scExe1Block2)
+	_ = scExe1Block2
 
 	collectionEngine.AssertExpectations(t)
 	consensusEngine.AssertExpectations(t)
@@ -399,10 +424,10 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 		blob, _ := msgpack.Marshal(col)
 		colMap[col.ID()] = blob
 	}
-	collectionEngine.On("Submit", mock.Anything, mock.Anything).
+	collectionEngine.On("Submit", mock.AnythingOfType("network.Channel"), mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
-			originID := args[0].(flow.Identifier)
-			req := args[1].(*messages.EntityRequest)
+			originID := args[1].(flow.Identifier)
+			req := args[2].(*messages.EntityRequest)
 			blob, ok := colMap[req.EntityIDs[0]]
 			if !ok {
 				assert.FailNow(t, "requesting unexpected collection", req.EntityIDs[0])
@@ -420,13 +445,28 @@ func mockCollectionEngineToReturnCollections(t *testing.T, collectionNode *testm
 func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	hub := stub.NewNetworkHub()
 
-	chainID := flow.Mainnet
+	chainID := flow.Emulator
 
-	colID := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
-	conID := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	exeID := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
-	ver1ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
-	ver2ID := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
+	colID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleCollection),
+		unittest.WithKeys,
+	)
+	conID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleConsensus),
+		unittest.WithKeys,
+	)
+	exeID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleExecution),
+		unittest.WithKeys,
+	)
+	ver1ID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleVerification),
+		unittest.WithKeys,
+	)
+	ver2ID := unittest.IdentityFixture(
+		unittest.WithRole(flow.RoleVerification),
+		unittest.WithKeys,
+	)
 
 	identities := unittest.CompleteIdentitySet(colID, conID, exeID, ver1ID, ver2ID)
 
@@ -434,9 +474,9 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	exeNode.Ready()
 	defer exeNode.Done()
 
-	verification1Node := testutil.GenericNode(t, hub, ver1ID, identities, chainID)
+	verification1Node := testutil.GenericNodeFromParticipants(t, hub, ver1ID, identities, chainID)
 	defer verification1Node.Done()
-	verification2Node := testutil.GenericNode(t, hub, ver2ID, identities, chainID)
+	verification2Node := testutil.GenericNodeFromParticipants(t, hub, ver2ID, identities, chainID)
 	defer verification2Node.Done()
 
 	genesis, err := exeNode.State.AtHeight(0).Head()
@@ -456,10 +496,10 @@ func TestBroadcastToMultipleVerificationNodes(t *testing.T) {
 	verificationEngine := new(mocknetwork.Engine)
 	_, _ = verification1Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
 	_, _ = verification2Node.Net.Register(engine.ReceiveReceipts, verificationEngine)
-	verificationEngine.On("Submit", exeID.NodeID, mock.Anything).
+	verificationEngine.On("Submit", mock.AnythingOfType("network.Channel"), exeID.NodeID, mock.Anything).
 		Run(func(args mock.Arguments) {
 			actualCalls++
-			receipt, _ = args[1].(*flow.ExecutionReceipt)
+			receipt, _ = args[2].(*flow.ExecutionReceipt)
 
 			assert.Equal(t, block.ID(), receipt.ExecutionResult.BlockID)
 		}).

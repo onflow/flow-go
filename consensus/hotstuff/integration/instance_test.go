@@ -159,7 +159,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				PayloadHash: unittest.IdentifierFixture(),
 				Timestamp:   time.Now().UTC(),
 			}
-			setter(header)
+			require.NoError(t, setter(header))
 			in.headers.Store(header.ID(), header)
 			return header
 		},

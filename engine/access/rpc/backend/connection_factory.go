@@ -11,7 +11,7 @@ import (
 	"github.com/onflow/flow/protobuf/go/flow/execution"
 	"google.golang.org/grpc"
 
-	grpcutils "github.com/onflow/flow-go/utils/grpc"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // the default timeout used when making a GRPC request to a collection node or an execution node
@@ -21,6 +21,19 @@ const defaultClientTimeout = 3 * time.Second
 type ConnectionFactory interface {
 	GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error)
 	GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error)
+}
+
+type ProxyConnectionFactory struct {
+	ConnectionFactory
+	targetAddress string
+}
+
+func (p *ProxyConnectionFactory) GetAccessAPIClient(address string) (access.AccessAPIClient, io.Closer, error) {
+	return p.ConnectionFactory.GetAccessAPIClient(p.targetAddress)
+}
+
+func (p *ProxyConnectionFactory) GetExecutionAPIClient(address string) (execution.ExecutionAPIClient, io.Closer, error) {
+	return p.ConnectionFactory.GetExecutionAPIClient(p.targetAddress)
 }
 
 type ConnectionFactoryImpl struct {

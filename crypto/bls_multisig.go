@@ -133,12 +133,10 @@ func AggregateBLSPrivateKeys(keys []PrivateKey) (PrivateKey, error) {
 	}
 
 	var sum scalar
+	C.bn_new_wrapper((*C.bn_st)(&sum))
 	C.bn_sum_vector((*C.bn_st)(&sum), (*C.bn_st)(&scalars[0]),
 		(C.int)(len(scalars)))
-	return &PrKeyBLSBLS12381{
-		pk:     nil,
-		scalar: sum,
-	}, nil
+	return newPrKeyBLSBLS12381(&sum), nil
 }
 
 // AggregateBLSPublicKeys aggregate multiple BLS public keys into one.
@@ -167,16 +165,14 @@ func AggregateBLSPublicKeys(keys []PublicKey) (PublicKey, error) {
 	var sum pointG2
 	C.ep2_sum_vector((*C.ep2_st)(&sum), (*C.ep2_st)(&points[0]),
 		(C.int)(len(points)))
-	return &PubKeyBLSBLS12381{
-		point: sum,
-	}, nil
+	return newPubKeyBLSBLS12381(&sum), nil
 }
 
 func NeutralBLSPublicKey() PublicKey {
 	// set BLS context
 	blsInstance.reInit()
 
-	var neutralPk PubKeyBLSBLS12381
+	neutralPk := *newPubKeyBLSBLS12381(nil)
 	// set the point to infinity
 	C.ep2_set_infty((*C.ep2_st)(&neutralPk.point))
 	return &neutralPk
@@ -217,9 +213,7 @@ func RemoveBLSPublicKeys(aggKey PublicKey, keysToRemove []PublicKey) (PublicKey,
 	C.ep2_subtract_vector((*C.ep2_st)(&resultKey), (*C.ep2_st)(&aggPKBLS.point),
 		(*C.ep2_st)(&pointsToSubtract[0]), (C.int)(len(pointsToSubtract)))
 
-	return &PubKeyBLSBLS12381{
-		point: resultKey,
-	}, nil
+	return newPubKeyBLSBLS12381(&resultKey), nil
 }
 
 // VerifyBLSSignatureOneMessage is a multi-signature verification that verifies a
@@ -446,7 +440,7 @@ func BatchVerifyBLSSignaturesOneMessage(pks []PublicKey, sigs []Signature,
 	flatSigs := make([]byte, 0, signatureLengthBLSBLS12381*len(sigs))
 	// an invalid signature with an incorrect header but correct length
 	invalidSig := make([]byte, signatureLengthBLSBLS12381)
-	invalidSig[0] = 0xC1 // incorrect header
+	invalidSig[0] = invalidBLSSignatureHeader // incorrect header
 	for _, sig := range sigs {
 		if len(sig) == signatureLengthBLSBLS12381 {
 			flatSigs = append(flatSigs, sig...)

@@ -15,9 +15,41 @@ type AssignedChunkProcessor struct {
 	mock.Mock
 }
 
+// Done provides a mock function with given fields:
+func (_m *AssignedChunkProcessor) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
 // ProcessAssignedChunk provides a mock function with given fields: locator
 func (_m *AssignedChunkProcessor) ProcessAssignedChunk(locator *chunks.Locator) {
 	_m.Called(locator)
+}
+
+// Ready provides a mock function with given fields:
+func (_m *AssignedChunkProcessor) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
 }
 
 // WithChunkConsumerNotifier provides a mock function with given fields: notifier

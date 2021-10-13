@@ -12,9 +12,9 @@ type ChunkDataPackHandler struct {
 	mock.Mock
 }
 
-// HandleChunkDataPack provides a mock function with given fields: originID, chunkDataPack, collection
-func (_m *ChunkDataPackHandler) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack, collection *flow.Collection) {
-	_m.Called(originID, chunkDataPack, collection)
+// HandleChunkDataPack provides a mock function with given fields: originID, chunkDataPack
+func (_m *ChunkDataPackHandler) HandleChunkDataPack(originID flow.Identifier, chunkDataPack *flow.ChunkDataPack) {
+	_m.Called(originID, chunkDataPack)
 }
 
 // NotifyChunkDataPackSealed provides a mock function with given fields: chunkID

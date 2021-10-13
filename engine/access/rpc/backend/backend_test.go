@@ -10,6 +10,7 @@ import (
 	entitiesproto "github.com/onflow/flow/protobuf/go/flow/entities"
 	execproto "github.com/onflow/flow/protobuf/go/flow/execution"
 	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -39,6 +40,7 @@ type Suite struct {
 	collections            *storagemock.Collections
 	transactions           *storagemock.Transactions
 	receipts               *storagemock.ExecutionReceipts
+	results                *storagemock.ExecutionResults
 	colClient              *access.AccessAPIClient
 	execClient             *access.ExecutionAPIClient
 	historicalAccessClient *access.AccessAPIClient
@@ -65,6 +67,7 @@ func (suite *Suite) SetupTest() {
 	suite.transactions = new(storagemock.Transactions)
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
+	suite.results = new(storagemock.ExecutionResults)
 	suite.colClient = new(access.AccessAPIClient)
 	suite.execClient = new(access.ExecutionAPIClient)
 	suite.chainID = flow.Testnet
@@ -84,7 +87,7 @@ func (suite *Suite) TestPing() {
 	backend := New(
 		suite.state,
 		suite.colClient,
-		nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -108,7 +111,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 
 	backend := New(
 		suite.state,
-		nil, nil, nil, nil, nil, nil, nil,
+		nil, nil, nil, nil, nil, nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -140,7 +143,7 @@ func (suite *Suite) TestGetLatestProtocolStateSnapshot() {
 	backend := New(
 		suite.state,
 		nil, nil, nil, nil,
-		nil, nil, nil,
+		nil, nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -171,7 +174,7 @@ func (suite *Suite) TestGetLatestSealedBlockHeader() {
 	backend := New(
 		suite.state,
 		nil, nil, nil, nil,
-		nil, nil, nil,
+		nil, nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -209,7 +212,7 @@ func (suite *Suite) TestGetTransaction() {
 		suite.state,
 		nil, nil, nil, nil, nil,
 		suite.transactions,
-		nil,
+		nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -243,6 +246,7 @@ func (suite *Suite) TestGetCollection() {
 		nil, nil, nil, nil,
 		suite.collections,
 		suite.transactions,
+		nil,
 		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
@@ -323,6 +327,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 		suite.collections,
 		suite.transactions,
 		suite.receipts,
+		suite.results,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		connFactory,
@@ -438,6 +443,7 @@ func (suite *Suite) TestTransactionExpiredStatusTransition() {
 		suite.headers,
 		suite.collections,
 		suite.transactions,
+		nil,
 		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
@@ -593,6 +599,7 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 		suite.collections,
 		suite.transactions,
 		suite.receipts,
+		suite.results,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		connFactory,
@@ -648,6 +655,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 		nil,
 		suite.transactions,
 		nil,
+		nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -687,7 +695,7 @@ func (suite *Suite) TestGetLatestFinalizedBlock() {
 		suite.state,
 		nil, nil,
 		suite.blocks,
-		nil, nil, nil, nil,
+		nil, nil, nil, nil, nil,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		nil,
@@ -810,6 +818,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			nil,
 			suite.headers, nil, nil,
 			suite.receipts,
+			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
@@ -836,6 +845,7 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 			nil,
 			suite.headers, nil, nil,
 			receipts,
+			nil,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory, // the connection factory should be used to get the execution node client
@@ -852,6 +862,89 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 		require.Empty(suite.T(), resp)
 	})
 
+	suite.assertAllExpectations()
+}
+func (suite *Suite) TestGetExecutionResultByBlockID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	validExecutorIdentities := flow.IdentityList{}
+	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+
+	blockID := unittest.IdentifierFixture()
+	executionResult := unittest.ExecutionResultFixture(
+		unittest.WithExecutionResultBlockID(blockID),
+		unittest.WIthServiceEvents(2))
+
+	ctx := context.Background()
+
+	nonexistingBlockID := unittest.IdentifierFixture()
+
+	results := new(storagemock.ExecutionResults)
+	results.
+		On("ByBlockID", nonexistingBlockID).
+		Return(nil, storage.ErrNotFound)
+
+	results.
+		On("ByBlockID", blockID).
+		Return(executionResult, nil)
+
+	suite.Run("nonexisting execution results", func() {
+
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, nil,
+			nil,
+			suite.headers, nil, nil,
+			suite.receipts,
+			results,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
+			suite.log,
+		)
+
+		// execute request
+		_, err := backend.GetExecutionResultForBlockID(ctx, nonexistingBlockID)
+
+		assert.Error(suite.T(), err)
+	})
+
+	suite.Run("existing execution results", func() {
+
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, nil,
+			nil,
+			suite.headers, nil, nil,
+			nil,
+			results,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			validENIDs.Strings(),
+			suite.log,
+		)
+
+		// execute request
+		er, err := backend.GetExecutionResultForBlockID(ctx, blockID)
+		suite.checkResponse(er, err)
+
+		require.Equal(suite.T(), executionResult, er)
+	})
+
+	results.AssertExpectations(suite.T())
 	suite.assertAllExpectations()
 }
 
@@ -976,6 +1069,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.state,
 			nil, nil, nil, suite.headers, nil, nil,
 			suite.receipts,
+			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory,
@@ -1010,6 +1104,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.headers,
 			nil, nil,
 			suite.receipts,
+			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory,
@@ -1043,6 +1138,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.headers,
 			nil, nil,
 			suite.receipts,
+			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory,
@@ -1075,6 +1171,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.headers,
 			nil, nil,
 			suite.receipts,
+			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory,
@@ -1107,6 +1204,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 			suite.headers,
 			nil, nil,
 			suite.receipts,
+			suite.results,
 			suite.chainID,
 			metrics.NewNoopCollector(),
 			connFactory,
@@ -1177,6 +1275,7 @@ func (suite *Suite) TestGetAccount() {
 		suite.headers,
 		nil, nil,
 		suite.receipts,
+		suite.results,
 		suite.chainID,
 		metrics.NewNoopCollector(),
 		connFactory,
@@ -1251,6 +1350,7 @@ func (suite *Suite) TestGetAccountAtBlockHeight() {
 		suite.headers,
 		nil, nil,
 		suite.receipts,
+		suite.results,
 		flow.Testnet,
 		metrics.NewNoopCollector(),
 		connFactory,
@@ -1280,7 +1380,7 @@ func (suite *Suite) TestGetNetworkParameters() {
 
 	backend := New(
 		nil, nil, nil, nil, nil, nil, nil,
-		nil,
+		nil, nil,
 		flow.Mainnet,
 		metrics.NewNoopCollector(),
 		nil,

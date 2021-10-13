@@ -29,6 +29,41 @@ func (_m *ComplianceMetrics) BlockSealed(_a0 *flow.Block) {
 	_m.Called(_a0)
 }
 
+// CommittedEpochFinalView provides a mock function with given fields: view
+func (_m *ComplianceMetrics) CommittedEpochFinalView(view uint64) {
+	_m.Called(view)
+}
+
+// CurrentDKGPhase1FinalView provides a mock function with given fields: view
+func (_m *ComplianceMetrics) CurrentDKGPhase1FinalView(view uint64) {
+	_m.Called(view)
+}
+
+// CurrentDKGPhase2FinalView provides a mock function with given fields: view
+func (_m *ComplianceMetrics) CurrentDKGPhase2FinalView(view uint64) {
+	_m.Called(view)
+}
+
+// CurrentDKGPhase3FinalView provides a mock function with given fields: view
+func (_m *ComplianceMetrics) CurrentDKGPhase3FinalView(view uint64) {
+	_m.Called(view)
+}
+
+// CurrentEpochCounter provides a mock function with given fields: counter
+func (_m *ComplianceMetrics) CurrentEpochCounter(counter uint64) {
+	_m.Called(counter)
+}
+
+// CurrentEpochFinalView provides a mock function with given fields: view
+func (_m *ComplianceMetrics) CurrentEpochFinalView(view uint64) {
+	_m.Called(view)
+}
+
+// CurrentEpochPhase provides a mock function with given fields: phase
+func (_m *ComplianceMetrics) CurrentEpochPhase(phase flow.EpochPhase) {
+	_m.Called(phase)
+}
+
 // FinalizedHeight provides a mock function with given fields: height
 func (_m *ComplianceMetrics) FinalizedHeight(height uint64) {
 	_m.Called(height)

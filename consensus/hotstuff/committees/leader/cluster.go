@@ -23,6 +23,7 @@ func SelectionForCluster(cluster protocol.Cluster, epoch protocol.Epoch) (*Leade
 	identities := cluster.Members()
 	seed, err := epoch.Seed(indices.ProtocolCollectorClusterLeaderSelection(cluster.Index())...)
 	if err != nil {
+		return nil, fmt.Errorf("could not get leader selection seed for cluster (index: %v) at epoch: %v: %w", cluster.Index(), counter, err)
 	}
 	firstView := cluster.RootBlock().Header.View
 	// TODO what is a good value here?

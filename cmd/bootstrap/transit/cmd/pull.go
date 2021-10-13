@@ -114,11 +114,11 @@ func pull(cmd *cobra.Command, args []string) {
 		}
 	}
 
-	// calculate MD5 of rootsnapshot
+	// calculate SHA256 of rootsnapshot
 	rootFile := filepath.Join(flagBootDir, model.PathRootProtocolStateSnapshot)
-	rootMD5, err := getFileMD5(rootFile)
+	rootSHA256, err := getFileSHA256(rootFile)
 	if err != nil {
-		log.Fatal().Err(err).Str("file", rootFile).Msg("failed to calculate md5")
+		log.Fatal().Err(err).Str("file", rootFile).Msg("failed to calculate SHA256 of root file")
 	}
-	log.Info().Str("md5", rootMD5).Msg("calculated MD5 of protocol snapshot")
+	log.Info().Str("sha256", rootSHA256).Msg("calculated SHA256 of protocol snapshot")
 }

@@ -51,6 +51,9 @@ const (
 
 	// testing
 	CodeEcho
+
+	// DKG
+	CodeDKGMessage
 )
 
 // Envelope is a wrapper to convey type information with JSON encoding without

@@ -30,8 +30,8 @@ type ChunkDataPacksSuite struct {
 
 func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 
-	// wait for first finalized block, called blockA
-	blockA := gs.BlockState.WaitForFirstFinalized(gs.T())
+	// wait for next height finalized (potentially first height), called blockA
+	blockA := gs.BlockState.WaitForHighestFinalizedProgress(gs.T())
 	gs.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())
 
 	// wait for execution receipt for blockA from execution node 1
@@ -49,7 +49,7 @@ func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
 	require.NoError(gs.T(), err, "could not deploy counter")
 
 	// wait until we see a different state commitment for a finalized block, call that block blockB
-	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(gs.T(), &gs.BlockState, &gs.ReceiptState)
+	blockB, _ := common.WaitUntilFinalizedStateCommitmentChanged(gs.T(), gs.BlockState, gs.ReceiptState)
 	gs.T().Logf("got blockB height %v ID %v", blockB.Header.Height, blockB.Header.ID())
 
 	// wait for execution receipt for blockB from execution node 1

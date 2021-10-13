@@ -151,7 +151,7 @@ func (f *Finalizer) MakeFinal(blockID flow.Identifier) error {
 					CollectionID:     payload.Collection.ID(),
 					ReferenceBlockID: payload.ReferenceBlockID,
 					SignerIDs:        step.ParentVoterIDs,
-					Signature:        step.ParentVoterSig,
+					Signature:        step.ParentVoterSigData,
 				},
 			})
 		}
