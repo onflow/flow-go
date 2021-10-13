@@ -359,10 +359,7 @@ func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, env templates.Envi
 }
 
 // SetApprovedNodesScript adds a node the the approved node list, this must be done when a node joins the protocol during the epoch staking phase
-func (s *Suite) SetApprovedNodesScript(ctx context.Context, env templates.Environment, nodes ...flow.Identifier) *sdk.TransactionResult {
-	identities := s.net.Identities().NodeIDs()
-	identities = append(identities, nodes...)
-
+func (s *Suite) SetApprovedNodesScript(ctx context.Context, env templates.Environment, identities ...flow.Identifier) *sdk.TransactionResult {
 	ids := make([]cadence.Value, 0)
 	for _, id := range identities {
 		idCDC, err := cadence.NewString(id.String())

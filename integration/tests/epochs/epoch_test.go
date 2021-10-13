@@ -146,7 +146,7 @@ func (s *Suite) TestEpochJoin() {
 	nodeID := string(nodeInfo.Fields[0].(cadence.String))
 	require.Equal(s.T(), info.NodeID.String(), nodeID, "expected node ID generated in test to equal node ID from staking table ")
 
-	result := s.SetApprovedNodesScript(ctx, env, info.NodeID)
+	result := s.SetApprovedNodesScript(ctx, env, append(s.net.Identities().NodeIDs(), info.NodeID)...)
 	require.NoError(s.T(), result.Error)
 
 	s.net.StopContainers()
