@@ -178,7 +178,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
-			fnb.RootBlock.ID(), // TODO
+			fnb.SporkID,
 			fnb.IdentityProvider,
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
