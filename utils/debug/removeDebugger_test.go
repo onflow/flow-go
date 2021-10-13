@@ -12,12 +12,12 @@ import (
 	"github.com/onflow/flow-go/utils/debug"
 )
 
-func TestDebugger(t *testing.T) {
+func TestDebugger_RunTransaction(t *testing.T) {
 
 	// this code is mostly a sample code so we skip by default
-	t.Skip()
+	// t.Skip()
 
-	grpcAddress := "localhost:3569"
+	grpcAddress := "localhost:3600"
 	chain := flow.Emulator.Chain()
 	debugger := debug.NewRemoteDebugger(grpcAddress, chain, zerolog.New(os.Stdout).With().Logger())
 
@@ -44,10 +44,19 @@ func TestDebugger(t *testing.T) {
 	require.NoError(t, txErr)
 	require.NoError(t, err)
 
-	// Run with blockID
-	blockId, _ := flow.HexStringToIdentifier("93752591f84f90ca91c707413dfb0ce8ba346929fba66fe58ebd7f97f5f84f57")
+	// Run with blockID (use the file cache)
+	blockId, _ := flow.HexStringToIdentifier("3a8281395e2c1aaa3b8643d148594b19e2acb477611a8e0cab8a55c46c40b563")
 	txErr, err = debugger.RunTransactionAtBlockID(txBody, blockId)
 	require.NoError(t, txErr)
 	require.NoError(t, err)
 
+	// // the first run would cache the results
+	// txErr, err = debugger.RunTransactionWithFileCache(txBody, "registerCache")
+	// require.NoError(t, txErr)
+	// require.NoError(t, err)
+
+	// // second one should only use the cache
+	// txErr, err = debugger.RunTransactionWithFileCache(txBody, "registerCache")
+	// require.NoError(t, txErr)
+	// require.NoError(t, err)
 }

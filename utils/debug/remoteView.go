@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow/protobuf/go/flow/access"
+	"github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 // RemoteView provides a view connected to a live execution node to read the registers
@@ -16,16 +16,26 @@ import (
 //
 // TODO implement register touches
 type RemoteView struct {
-	Parent          *RemoteView
-	Delta           map[string]flow.RegisterValue
-	Cache           map[string]flow.RegisterValue
-	connection      *grpc.ClientConn
-	blockID         []byte
-	accessAPIclient access.AccessAPIClient
+	Parent             *RemoteView
+	Delta              map[string]flow.RegisterValue
+	Cache              registerCache
+	connection         *grpc.ClientConn
+	blockID            []byte
+	executionAPIclient execution.ExecutionAPIClient
 }
 
 // An Option sets a configuration parameter for the remote view
 type Option func(view *RemoteView) *RemoteView
+
+// WithFileCache sets the output path to store
+// register values so can be fetched from a file cache
+// it loads the values from the cache upon object construction
+func WithCache(cache registerCache) Option {
+	return func(view *RemoteView) *RemoteView {
+		view.Cache = cache
+		return view
+	}
+}
 
 // WithBlockID sets the blockID for the remote view, if not used
 // remote view will use the latest sealed block
@@ -43,10 +53,10 @@ func NewRemoteView(grpcAddress string, opts ...Option) *RemoteView {
 	}
 
 	view := &RemoteView{
-		connection:      conn,
-		accessAPIclient: access.NewAccessAPIClient(conn),
-		Delta:           make(map[string]flow.RegisterValue),
-		Cache:           make(map[string]flow.RegisterValue),
+		connection:         conn,
+		executionAPIclient: execution.NewExecutionAPIClient(conn),
+		Delta:              make(map[string]flow.RegisterValue),
+		Cache:              newMemRegisterCache(),
 	}
 
 	view.blockID, err = view.getLatestBlockID()
@@ -65,11 +75,11 @@ func (v *RemoteView) Done() {
 }
 
 func (v *RemoteView) getLatestBlockID() ([]byte, error) {
-	req := &access.GetLatestBlockHeaderRequest{
+	req := &execution.GetLatestBlockHeaderRequest{
 		IsSealed: true,
 	}
 
-	resp, err := v.accessAPIclient.GetLatestBlockHeader(context.Background(), req)
+	resp, err := v.executionAPIclient.GetLatestBlockHeader(context.Background(), req)
 	if err != nil {
 		return nil, err
 	}
@@ -79,10 +89,11 @@ func (v *RemoteView) getLatestBlockID() ([]byte, error) {
 
 func (v *RemoteView) NewChild() state.View {
 	return &RemoteView{
-		Parent:          v,
-		accessAPIclient: v.accessAPIclient,
-		connection:      v.connection,
-		Delta:           make(map[string][]byte),
+		Parent:             v,
+		executionAPIclient: v.executionAPIclient,
+		connection:         v.connection,
+		Cache:              newMemRegisterCache(),
+		Delta:              make(map[string][]byte),
 	}
 }
 
@@ -117,7 +128,7 @@ func (v *RemoteView) Get(owner, controller, key string) (flow.RegisterValue, err
 	}
 
 	// then check the read cache
-	value, found = v.Cache[owner+"~"+controller+"~"+key]
+	value, found = v.Cache.Get(owner, controller, key)
 	if found {
 		return value, nil
 	}
@@ -128,7 +139,7 @@ func (v *RemoteView) Get(owner, controller, key string) (flow.RegisterValue, err
 	}
 
 	// last use the grpc api the
-	req := &access.GetRegisterAtBlockIDRequest{
+	req := &execution.GetRegisterAtBlockIDRequest{
 		BlockId:            []byte(v.blockID),
 		RegisterOwner:      []byte(owner),
 		RegisterController: []byte(controller),
@@ -136,11 +147,15 @@ func (v *RemoteView) Get(owner, controller, key string) (flow.RegisterValue, err
 	}
 
 	// TODO use a proper context for timeouts
-	resp, err := v.accessAPIclient.GetRegisterAtBlockID(context.Background(), req)
+	resp, err := v.executionAPIclient.GetRegisterAtBlockID(context.Background(), req)
 	if err != nil {
 		return nil, err
 	}
-	v.Cache[owner+"~"+controller+"~"+key] = resp.Value
+
+	v.Cache.Set(owner, controller, key, resp.Value)
+
+	// append value to the file cache
+
 	return resp.Value, nil
 }
 
