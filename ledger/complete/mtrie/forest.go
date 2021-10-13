@@ -163,7 +163,7 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	// TODO rename metrics names
 	f.metrics.UpdateValuesSize(uint64(totalPayloadSize))
 
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads)
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads, true)
 	if err != nil {
 		return emptyHash, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -216,7 +216,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 
 	// if we have to insert empty values
 	if len(notFoundPaths) > 0 {
-		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads)
+		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads, false)
 		if err != nil {
 			return nil, err
 		}

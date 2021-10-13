@@ -1,6 +1,7 @@
 package node
 
 import (
+	"bytes"
 	"encoding/hex"
 	"fmt"
 
@@ -126,6 +127,52 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 // stores the result in the nodes internal `hashValue` field
 func (n *Node) computeAndStoreHash() {
 	n.hashValue = n.computeHash()
+}
+
+// BubbleUp would increment the hight of the node and updates
+// the hash values (keeping same path and payload)
+func (n *Node) BubbleUp(isLeft bool) *Node {
+	nn := &Node{
+		maxDepth: 0,
+		regCount: uint64(1),
+	}
+	nn.height = n.height + 1
+	if n.IsLeaf() {
+		if isLeft {
+			nn.hashValue = hash.HashInterNode(n.hashValue, ledger.GetDefaultHashForHeight(n.height))
+		} else {
+			nn.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(n.height), n.hashValue)
+		}
+		// its okey to reuse the pointer to the payload
+		// since we are not going to change it
+		nn.payload = n.payload
+		nn.path = n.path
+		return nn
+	}
+
+	var lMaxDepth, rMaxDepth uint16
+	var lRegCount, rRegCount uint64
+	if n.lChild != nil {
+		nn.lChild = n.lChild.BubbleUp(true)
+		lMaxDepth = nn.lChild.maxDepth
+		lRegCount = nn.lChild.regCount
+	}
+	if n.rChild != nil {
+		nn.rChild = n.rChild.BubbleUp(false)
+		rMaxDepth = nn.rChild.maxDepth
+		rRegCount = nn.rChild.regCount
+	}
+
+	nn.hashValue = hash.HashInterNode(nn.lChild.hashValue, nn.rChild.hashValue)
+	nn.maxDepth = utils.MaxUint16(lMaxDepth, rMaxDepth) + 1
+	nn.regCount = lRegCount + rRegCount
+	return nn
+}
+
+func (n *Node) IsADefaultNode() bool {
+	// TODO make this optimize by caching if the node is a default node
+	defaultHashValue := ledger.GetDefaultHashForHeight(n.height)
+	return bytes.Equal(n.hashValue[:], defaultHashValue[:])
 }
 
 // computeHash returns the hashValue of the node

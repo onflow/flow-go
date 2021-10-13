@@ -182,9 +182,9 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 //   * requires _all_ paths to have a length of mt.Height bits.
 // CAUTION: `updatedPaths` and `updatedPayloads` are permuted IN-PLACE for optimized processing.
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
-func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
+func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload, prune bool) (*MTrie, error) {
 	parentRoot := parentTrie.root
-	updatedRoot := update(ledger.NodeMaxHeight, parentRoot, updatedPaths, updatedPayloads, nil)
+	updatedRoot := update(ledger.NodeMaxHeight, parentRoot, updatedPaths, updatedPayloads, nil, prune)
 	updatedTrie, err := NewMTrie(updatedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
@@ -201,6 +201,7 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 func update(
 	nodeHeight int, parentNode *node.Node,
 	paths []ledger.Path, payloads []ledger.Payload, compactLeaf *node.Node,
+	prune bool,
 ) *node.Node {
 	// No new paths to write
 	if len(paths) == 0 {
@@ -279,17 +280,17 @@ func update(
 	parallelRecursionThreshold := 16
 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
 		// runtime optimization: if there are _no_ updates for either left or right sub-tree, proceed single-threaded
-		lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
-		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
+		lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
+		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune)
 	} else {
 		// runtime optimization: process the left child is a separate thread
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
+			lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
 		}()
-		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
+		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune)
 		wg.Wait()
 	}
 
@@ -298,6 +299,30 @@ func update(
 	if lChild == lchildParent && rChild == rchildParent {
 		return parentNode
 	}
+
+	if prune {
+		lChildEmpty := true
+		rChildEmpty := true
+		if lChild != nil {
+			lChildEmpty = lChild.IsADefaultNode()
+		}
+		if rChild != nil {
+			rChildEmpty = rChild.IsADefaultNode()
+		}
+		// prune trie for default nodes
+		if !lChildEmpty && rChildEmpty {
+			return lChild.BubbleUp(true)
+		}
+		if lChildEmpty && !rChildEmpty {
+			return rChild.BubbleUp(false)
+		}
+		// // if both children are default node then just return the parent
+		// if lChildEmpty && rChildEmpty {
+		// 	return node.NewLeaf()
+		// }
+		// if one node is now the default node make parent a compact node of the child payload
+	}
+
 	return node.NewInterimNode(nodeHeight, lChild, rChild)
 }
 
