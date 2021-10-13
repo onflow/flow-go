@@ -3,10 +3,11 @@ package votecollector
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	"github.com/rs/zerolog"
 )
 
 // baseFactory instantiates VerifyingVoteProcessors. Depending on the specific signing

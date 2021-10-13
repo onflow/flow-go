@@ -4,16 +4,16 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
