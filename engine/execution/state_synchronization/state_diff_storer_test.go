@@ -1,20 +1,22 @@
 package state_synchronization
 
 import (
-	"encoding/xml"
+	"context"
 	"io/fs"
-	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 
+	"cloud.google.com/go/storage"
 	"github.com/fxamacker/cbor/v2"
 	datastore "github.com/ipfs/go-datastore/examples"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/iterator"
+	"google.golang.org/api/option"
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
@@ -36,97 +38,97 @@ func makeBlockstore(t *testing.T, name string) (blockstore.Blockstore, func()) {
 	}
 }
 
-const BUCKET_URL = "https://flow_public_mainnet14_execution_state.storage.googleapis.com/"
-
-type ListBucketResult struct {
-	XMLName  xml.Name  `xml:"ListBucketResult"`
-	Contents []Content `xml:"Contents"`
-}
-
-type Content struct {
-	XMLName xml.Name `xml:"Contents"`
-	Key     string   `xml:"Key"`
-	Size    uint64   `xml:"Size"`
-}
+const BUCKET_NAME = "flow_public_mainnet14_execution_state"
 
 func TestStateDiffStorer(t *testing.T) {
 	// this test is intended to be run locally
 	t.Skip()
 
-	var bucketContents ListBucketResult
-	func() {
-		var client http.Client
-		resp, err := client.Get(BUCKET_URL)
-		require.NoError(t, err)
-		defer resp.Body.Close()
-		require.Equal(t, resp.StatusCode, http.StatusOK)
-		require.NoError(t, xml.NewDecoder(resp.Body).Decode(&bucketContents))
-	}()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	var maxFileSize uint64
+	client, err := storage.NewClient(ctx, option.WithoutAuthentication())
+	require.NoError(t, err)
+	bucket := client.Bucket(BUCKET_NAME)
+
+	var maxFileSize int64
 	var maxCollectionsLength int
 	var maxEventsLength int
+	var maxStoreTime time.Duration
+	var maxLoadTime time.Duration
 
-	for _, content := range bucketContents.Contents {
-		func() {
-			t.Logf("downloading file: %v [%v bytes]", content.Key, content.Size)
+	it := bucket.Objects(ctx, &storage.Query{Prefix: ""})
+	for {
+		attrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		require.NoError(t, err)
 
-			if content.Size > maxFileSize {
-				maxFileSize = content.Size
-			}
+		t.Logf("reading object: %v [%v bytes]\n", attrs.Name, attrs.Size)
+		if attrs.Size > maxFileSize {
+			maxFileSize = attrs.Size
+		}
 
-			var client http.Client
-			resp, err := client.Get(BUCKET_URL + content.Key)
-			require.NoError(t, err)
-			defer resp.Body.Close()
+		reader, err := bucket.Object(attrs.Name).NewReader(ctx)
+		require.NoError(t, err)
+		defer reader.Close()
 
-			bstore, cleanup := makeBlockstore(t, "state-diff-storer-test")
-			defer cleanup()
+		bstore, cleanup := makeBlockstore(t, "state-diff-storer-test")
+		defer cleanup()
 
-			sdp, err := NewStateDiffStorer(&cborcodec.Codec{}, compressor.NewLz4Compressor(), bstore)
-			require.NoError(t, err)
+		sdp, err := NewStateDiffStorer(&cborcodec.Codec{}, compressor.NewLz4Compressor(), bstore)
+		require.NoError(t, err)
 
-			var blockData uploader.BlockData
+		var blockData uploader.BlockData
 
-			decoder := cbor.NewDecoder(resp.Body)
-			require.NoError(t, decoder.Decode(&blockData))
+		decoder := cbor.NewDecoder(reader)
+		require.NoError(t, decoder.Decode(&blockData))
 
-			var collections []*flow.Collection
-			for _, c := range blockData.Collections {
-				collections = append(collections, &flow.Collection{Transactions: c.Transactions})
-			}
+		var collections []*flow.Collection
+		for _, c := range blockData.Collections {
+			collections = append(collections, &flow.Collection{Transactions: c.Transactions})
+		}
 
-			if len(collections) > maxCollectionsLength {
-				maxCollectionsLength = len(collections)
-			}
-			if len(blockData.Events) > maxEventsLength {
-				maxEventsLength = len(blockData.Events)
-			}
+		if len(collections) > maxCollectionsLength {
+			maxCollectionsLength = len(collections)
+		}
+		if len(blockData.Events) > maxEventsLength {
+			maxEventsLength = len(blockData.Events)
+		}
 
-			sd := &ExecutionStateDiff{
-				Collections:        collections,
-				TransactionResults: blockData.TxResults,
-				Events:             blockData.Events,
-				TrieUpdate:         blockData.TrieUpdates,
-			}
+		sd := &ExecutionStateDiff{
+			Collections:        collections,
+			TransactionResults: blockData.TxResults,
+			Events:             blockData.Events,
+			TrieUpdate:         blockData.TrieUpdates,
+		}
 
-			start := time.Now()
-			cid, err := sdp.Store(sd)
-			duration := time.Since(start)
-			require.NoError(t, err)
-			t.Logf("time to store state diff: %v", duration)
+		start := time.Now()
+		cid, err := sdp.Store(sd)
+		duration := time.Since(start)
+		require.NoError(t, err)
+		t.Logf("time to store state diff: %v\n", duration)
+		if duration > maxStoreTime {
+			maxStoreTime = duration
+		}
 
-			start = time.Now()
-			sd2, err := sdp.Load(cid)
-			duration = time.Since(start)
-			require.NoError(t, err)
-			t.Logf("time to load state diff: %v", duration)
+		start = time.Now()
+		sd2, err := sdp.Load(cid)
+		duration = time.Since(start)
+		require.NoError(t, err)
+		t.Logf("time to load state diff: %v\n", duration)
+		if maxLoadTime > duration {
+			maxLoadTime = duration
+		}
 
-			assert.True(t, reflect.DeepEqual(sd, sd2))
-		}()
+		assert.True(t, reflect.DeepEqual(sd, sd2))
 	}
 
-	t.Logf("largest file: %v bytes", maxFileSize)
-	t.Logf("max collections length: %v", maxCollectionsLength)
-	t.Logf("max events length: %v", maxEventsLength)
+	t.Log()
+	t.Logf("largest file: %v bytes\n", maxFileSize)
+	t.Logf("max collections length: %v\n", maxCollectionsLength)
+	t.Logf("max events length: %v\n", maxEventsLength)
+	t.Logf("max store time: %v\n", maxStoreTime)
+	t.Logf("max load time: %v\n", maxLoadTime)
 }
