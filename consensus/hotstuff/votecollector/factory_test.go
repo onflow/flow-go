@@ -60,6 +60,8 @@ func TestVoteProcessorFactory_CreateWithInvalidVote(t *testing.T) {
 		processor, err := voteProcessorFactory.Create(proposal)
 		require.ErrorIs(t, err, exception)
 		require.Nil(t, processor)
+		// an unexpected exception should _not_ be interpreted as the block being invalid
+		require.False(t, model.IsInvalidBlockError(err))
 
 		mockedProcessor.AssertExpectations(t)
 	})
@@ -80,6 +82,8 @@ func TestVoteProcessorFactory_CreateProcessException(t *testing.T) {
 	processor, err := voteProcessorFactory.Create(proposal)
 	require.ErrorIs(t, err, exception)
 	require.Nil(t, processor)
+	// an unexpected exception should _not_ be interpreted as the block being invalid
+	require.False(t, model.IsInvalidBlockError(err))
 
 	mockedFactory.AssertExpectations(t)
 }

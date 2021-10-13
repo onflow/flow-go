@@ -53,8 +53,12 @@ func (s *StakingVoteProcessorTestSuite) TestInitialState() {
 func (s *StakingVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
 	require.ErrorAs(s.T(), err, &VoteForIncompatibleBlockError)
+	require.False(s.T(), model.IsInvalidVoteError(err))
+
 	err = s.processor.Process(unittest.VoteFixture(unittest.WithVoteBlockID(s.proposal.Block.BlockID)))
 	require.ErrorAs(s.T(), err, &VoteForIncompatibleViewError)
+	require.False(s.T(), model.IsInvalidVoteError(err))
+
 	s.stakingAggregator.AssertNotCalled(s.T(), "Verify")
 }
 
@@ -92,6 +96,7 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_TrustedAddError() {
 	err := s.processor.Process(stakingVote)
 	require.ErrorIs(s.T(), err, exception)
 	require.False(s.T(), model.IsInvalidVoteError(err))
+	s.stakingAggregator.AssertExpectations(s.T())
 }
 
 // TestProcess_BuildQCError tests error path during process of building QC.
@@ -104,32 +109,28 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_BuildQCError() {
 	// in this test case we aren't able to aggregate staking signature
 	exception := errors.New("staking-aggregate-exception")
 	stakingSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
-	stakingSigAggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
-	stakingSigAggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredStake, nil)
-	stakingSigAggregator.On("TotalWeight").Return(s.minRequiredStake)
-	stakingSigAggregator.On("Aggregate").Return(nil, nil, exception)
+	stakingSigAggregator.On("Verify", mock.Anything, mock.Anything).Return(nil).Once()
+	stakingSigAggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredStake, nil).Once()
+	stakingSigAggregator.On("Aggregate").Return(nil, nil, exception).Once()
 
 	s.processor.stakingSigAggtor = stakingSigAggregator
 	err := s.processor.Process(vote)
 	require.ErrorIs(s.T(), err, exception)
+	stakingSigAggregator.AssertExpectations(s.T())
 }
 
 // TestProcess_NotEnoughStakingWeight tests a scenario where we first don't have enough stake,
 // then we iteratively increase it to the point where we have enough staking weight. No QC should be created.
 func (s *StakingVoteProcessorTestSuite) TestProcess_NotEnoughStakingWeight() {
-	for i := uint64(0); ; i += s.sigWeight {
-		if s.minRequiredStake >= i {
-			break
-		}
-
+	for i := s.sigWeight; i < s.minRequiredStake; i += s.sigWeight {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block)
-		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
+		s.stakingAggregator.On("Verify", vote.SignerID, crypto.Signature(vote.SigData)).Return(nil).Once()
 		err := s.processor.Process(vote)
 		require.NoError(s.T(), err)
 	}
-
 	require.False(s.T(), s.processor.done.Load())
 	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
+	s.stakingAggregator.AssertExpectations(s.T())
 }
 
 // TestProcess_CreatingQC tests a scenario when we have collected enough staking weight
@@ -141,8 +142,6 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_CreatingQC() {
 
 	// setup aggregator
 	*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
-
-	// mock expected calls to aggregator
 	expectedSigData := unittest.RandomBytes(128)
 	s.stakingAggregator.On("Aggregate").Return(stakingSigners, expectedSigData, nil).Once()
 

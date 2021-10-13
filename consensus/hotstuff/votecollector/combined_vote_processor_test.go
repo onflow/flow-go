@@ -100,8 +100,12 @@ func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
 func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
 	require.ErrorAs(s.T(), err, &VoteForIncompatibleBlockError)
+	require.False(s.T(), model.IsInvalidVoteError(err))
+
 	err = s.processor.Process(unittest.VoteFixture(unittest.WithVoteBlockID(s.proposal.Block.BlockID)))
 	require.ErrorAs(s.T(), err, &VoteForIncompatibleViewError)
+	require.False(s.T(), model.IsInvalidVoteError(err))
+
 	s.stakingAggregator.AssertNotCalled(s.T(), "Verify")
 	s.rbSigAggregator.AssertNotCalled(s.T(), "Verify")
 }
@@ -431,7 +435,6 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
 	err := s.processor.Process(vote)
 	require.NoError(s.T(), err)
-
 	s.onQCCreatedState.AssertExpectations(s.T())
 }
 
