@@ -3,7 +3,6 @@ package debug
 import (
 	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 
@@ -33,10 +32,10 @@ func (c *memRegisterCache) Set(owner, controller, key string, value []byte) {
 	c.data[owner+"~"+controller+"~"+key] = value
 }
 func (c *memRegisterCache) Persist() error {
-	return errors.New("MemRegisterCache doesn't implement a persist option, try using a fileRegisterCache")
+	// No-op
+	return nil
 }
 
-// TODO optimize this to not be append only operation
 type fileRegisterCache struct {
 	filePath string
 	data     map[string]flow.RegisterEntry
