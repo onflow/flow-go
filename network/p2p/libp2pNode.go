@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
+	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
@@ -426,6 +427,62 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 	return stream, nil
 }
 
+func (n *Node) filterKnownUndialables(p peer.ID, swm *swarm.Swarm) {
+	addrs := swm.Peerstore().Addrs(p)
+
+	lisAddrs, _ := swm.InterfaceListenAddresses()
+	lg := n.logger.With().
+		Str("peer_id", p.String()).
+		Str("dialing_address", fmt.Sprintf("%v", addrs)).
+		Logger()
+
+	lg.Info().
+		Str("listen_addrs", fmt.Sprintf("%v", lisAddrs)).
+		Msg("interface listen addresses")
+
+	var ourAddrs []multiaddr.Multiaddr
+	for _, addr := range lisAddrs {
+		protos := addr.Protocols()
+		n.logger.Info().
+			Str("address", addr.String()).
+			Str("protocols", fmt.Sprintf("%v", protos)).
+			Msg("protocols supporting address")
+		// we're only sure about filtering out /ip4 and /ip6 addresses, so far
+		if protos[0].Code == multiaddr.P_IP4 || protos[0].Code == multiaddr.P_IP6 {
+			ourAddrs = append(ourAddrs, addr)
+		}
+	}
+
+	lg.Info().
+		Str("our_addresses", fmt.Sprintf("%v", ourAddrs)).
+		Msg("filtered our address based on ip support")
+
+	filteredAddrs := addrutil.FilterAddrs(addrs, addrutil.SubtractFilter(ourAddrs...))
+	lg.Info().
+		Str("filtered_addresses", fmt.Sprintf("%v", filteredAddrs)).
+		Msg("filtered addresses subtracting our addresses")
+
+	filteredAddrs = addrutil.FilterAddrs(addrs, func(addr multiaddr.Multiaddr) bool {
+		t := swm.TransportForDialing(addr)
+		return t != nil && t.CanDial(addr)
+	})
+	lg.Info().
+		Str("filtered_addresses", fmt.Sprintf("%v", filteredAddrs)).
+		Msg("filtered addresses checking can dial")
+
+	filteredAddrs = addrutil.FilterAddrs(addrs, addrutil.AddrOverNonLocalIP)
+	lg.Info().
+		Str("filtered_addresses", fmt.Sprintf("%v", filteredAddrs)).
+		Msg("filtered addresses checking can non overlap local IP")
+
+	filteredAddrs = addrutil.FilterAddrs(addrs, func(addr multiaddr.Multiaddr) bool {
+		return n.connGater.InterceptAddrDial(p, addr)
+	})
+	lg.Info().
+		Str("filtered_addresses", fmt.Sprintf("%v", filteredAddrs)).
+		Msg("filtered addresses intercepting address dial")
+}
+
 // tryCreateNewStream makes at most maxAttempts to create a stream with the peer.
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
 // remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
@@ -456,6 +513,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		network := n.host.Network()
 		if swm, ok := network.(*swarm.Swarm); ok {
 			swm.Backoff().Clear(peerID)
+			n.filterKnownUndialables(peerID, swm)
 		}
 
 		// if this is a retry attempt, wait for some time before retrying
