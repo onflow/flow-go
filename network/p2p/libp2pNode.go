@@ -419,6 +419,8 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 			n.logger.Info().Str("peerID", peerID.Pretty()).Msg("addresses found")
 		}
 	}
+
+	n.logger.Info().Str("peerID", peerID.Pretty()).Msg("about to create new stream")
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
 	stream, err := n.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
 	if err != nil {
@@ -496,6 +498,9 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 	var errs error
 	var s libp2pnet.Stream
 	var retries = 0
+
+	n.logger.Info().Str("peerID", peerID.Pretty()).Msg("about to start attempt 1")
+
 	for ; retries < maxAttempts; retries++ {
 		select {
 		case <-ctx.Done():
@@ -518,6 +523,8 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 			n.logger.Error().Msg("network interface is not a swarm")
 		}
 
+
+
 		// if this is a retry attempt, wait for some time before retrying
 		if retries > 0 {
 			// choose a random interval between 0 to 5
@@ -526,6 +533,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
+		n.logger.Info().Str("peerID", peerID.Pretty()).Msg("about to add peer")
 		err := n.AddPeer(ctx, peer.AddrInfo{ID: peerID})
 		if err != nil {
 
