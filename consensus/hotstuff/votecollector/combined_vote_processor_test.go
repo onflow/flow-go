@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
@@ -25,47 +26,30 @@ func TestCombinedVoteProcessor(t *testing.T) {
 
 // CombinedVoteProcessorTestSuite is a test suite that holds mocked state for isolated testing of CombinedVoteProcessor.
 type CombinedVoteProcessorTestSuite struct {
-	suite.Suite
+	VoteProcessorTestSuiteBase
 
-	sigWeight            uint64
-	stakingTotalWeight   uint64
 	thresholdTotalWeight uint64
 	rbSharesTotal        uint64
-	onQCCreatedState     mock.Mock
 
-	packer            *mockhotstuff.Packer
-	stakingAggregator *mockhotstuff.WeightedSignatureAggregator
-	rbSigAggregator   *mockhotstuff.WeightedSignatureAggregator
-	reconstructor     *mockhotstuff.RandomBeaconReconstructor
-	minRequiredStake  uint64
+	packer *mockhotstuff.Packer
+
+	rbSigAggregator *mockhotstuff.WeightedSignatureAggregator
+	reconstructor   *mockhotstuff.RandomBeaconReconstructor
+
 	minRequiredShares uint64
-	proposal          *model.Proposal
 	processor         *CombinedVoteProcessor
 }
 
 func (s *CombinedVoteProcessorTestSuite) SetupTest() {
-	s.stakingAggregator = &mockhotstuff.WeightedSignatureAggregator{}
+	s.VoteProcessorTestSuiteBase.SetupTest()
+
 	s.rbSigAggregator = &mockhotstuff.WeightedSignatureAggregator{}
 	s.reconstructor = &mockhotstuff.RandomBeaconReconstructor{}
 	s.packer = &mockhotstuff.Packer{}
 	s.proposal = helper.MakeProposal()
-	// let's assume we have 19 nodes each with stake 100
-	s.sigWeight = 100
-	s.minRequiredStake = 1300 // we require at least 13 sigs to collect min weight
-	s.minRequiredShares = 9   // we require 9 RB shares to reconstruct signature
-	s.thresholdTotalWeight, s.stakingTotalWeight, s.rbSharesTotal = 0, 0, 0
 
-	// setup staking signature aggregator
-	s.stakingAggregator.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		s.stakingTotalWeight += s.sigWeight
-	}).Return(func(signerID flow.Identifier, sig crypto.Signature) uint64 {
-		return s.stakingTotalWeight
-	}, func(signerID flow.Identifier, sig crypto.Signature) error {
-		return nil
-	}).Maybe()
-	s.stakingAggregator.On("TotalWeight").Return(func() uint64 {
-		return s.stakingTotalWeight
-	}).Maybe()
+	s.minRequiredShares = 9 // we require 9 RB shares to reconstruct signature
+	s.thresholdTotalWeight, s.rbSharesTotal = 0, 0
 
 	// setup threshold signature aggregator
 	s.rbSigAggregator.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -91,23 +75,17 @@ func (s *CombinedVoteProcessorTestSuite) SetupTest() {
 		return s.rbSharesTotal >= s.minRequiredShares
 	}).Maybe()
 
-	s.processor = newCombinedVoteProcessor(
-		unittest.Logger(),
-		s.proposal.Block,
-		s.stakingAggregator,
-		s.rbSigAggregator,
-		s.reconstructor,
-		s.onQCCreated,
-		s.packer,
-		s.minRequiredStake,
-	)
-}
-
-// onQCCreated is a special function that registers call in mocked state.
-// ATTENTION: don't change name of this function since the same name is used in:
-// s.onQCCreatedState.On("onQCCreated") statements
-func (s *CombinedVoteProcessorTestSuite) onQCCreated(qc *flow.QuorumCertificate) {
-	s.onQCCreatedState.Called(qc)
+	s.processor = &CombinedVoteProcessor{
+		log:              unittest.Logger(),
+		block:            s.proposal.Block,
+		stakingSigAggtor: s.stakingAggregator,
+		rbSigAggtor:      s.rbSigAggregator,
+		rbRector:         s.reconstructor,
+		onQCCreated:      s.onQCCreated,
+		packer:           s.packer,
+		minRequiredStake: s.minRequiredStake,
+		done:             *atomic.NewBool(false),
+	}
 }
 
 // TestInitialState tests that Block() and Status() return correct values after calling constructor
@@ -122,8 +100,12 @@ func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
 func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
 	require.ErrorAs(s.T(), err, &VoteForIncompatibleBlockError)
+	require.False(s.T(), model.IsInvalidVoteError(err))
+
 	err = s.processor.Process(unittest.VoteFixture(unittest.WithVoteBlockID(s.proposal.Block.BlockID)))
 	require.ErrorAs(s.T(), err, &VoteForIncompatibleViewError)
+	require.False(s.T(), model.IsInvalidVoteError(err))
+
 	s.stakingAggregator.AssertNotCalled(s.T(), "Verify")
 	s.rbSigAggregator.AssertNotCalled(s.T(), "Verify")
 }
@@ -258,16 +240,17 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 		rbSigAggregator *mockhotstuff.WeightedSignatureAggregator,
 		rbReconstructor *mockhotstuff.RandomBeaconReconstructor,
 		packer *mockhotstuff.Packer) *CombinedVoteProcessor {
-		return newCombinedVoteProcessor(
-			unittest.Logger(),
-			s.proposal.Block,
-			stakingAggregator,
-			rbSigAggregator,
-			rbReconstructor,
-			s.onQCCreated,
-			packer,
-			s.minRequiredStake,
-		)
+		return &CombinedVoteProcessor{
+			log:              unittest.Logger(),
+			block:            s.proposal.Block,
+			stakingSigAggtor: stakingAggregator,
+			rbSigAggtor:      rbSigAggregator,
+			rbRector:         rbReconstructor,
+			onQCCreated:      s.onQCCreated,
+			packer:           packer,
+			minRequiredStake: s.minRequiredStake,
+			done:             *atomic.NewBool(false),
+		}
 	}
 
 	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
@@ -452,7 +435,6 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
 	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
 	err := s.processor.Process(vote)
 	require.NoError(s.T(), err)
-
 	s.onQCCreatedState.AssertExpectations(s.T())
 }
 
