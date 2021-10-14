@@ -10,20 +10,18 @@ import (
 const keyUUID = "uuid"
 
 type UUIDGenerator struct {
-	EnforceLimit bool
-	stateHolder  *StateHolder
+	stateHolder *StateHolder
 }
 
 func NewUUIDGenerator(stateHolder *StateHolder) *UUIDGenerator {
 	return &UUIDGenerator{
-		EnforceLimit: true,
-		stateHolder:  stateHolder,
+		stateHolder: stateHolder,
 	}
 }
 
 // GetUUID reads uint64 byte value for uuid from the state
 func (u *UUIDGenerator) GetUUID() (uint64, error) {
-	stateBytes, err := u.stateHolder.State().Get("", "", keyUUID, u.EnforceLimit)
+	stateBytes, err := u.stateHolder.State().Get("", "", keyUUID, u.stateHolder.EnforceLimit)
 	if err != nil {
 		return 0, fmt.Errorf("cannot get uuid byte from state: %w", err)
 	}
@@ -36,7 +34,7 @@ func (u *UUIDGenerator) GetUUID() (uint64, error) {
 func (u *UUIDGenerator) SetUUID(uuid uint64) error {
 	bytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(bytes, uuid)
-	err := u.stateHolder.State().Set("", "", keyUUID, bytes, u.EnforceLimit)
+	err := u.stateHolder.State().Set("", "", keyUUID, bytes, u.stateHolder.EnforceLimit)
 	if err != nil {
 		return fmt.Errorf("cannot set uuid byte to state: %w", err)
 	}
