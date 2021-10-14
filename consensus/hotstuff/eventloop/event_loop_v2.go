@@ -57,7 +57,7 @@ func (el *EventLoopV2) loop() {
 	// hotstuff will run in an event loop to process all events synchronously. And this is what will happen when hitting errors:
 	// if hotstuff hits a known critical error, it will exit the loop (for instance, there is a conflicting block with a QC against finalized blocks
 	// if hotstuff hits a known error indicating some assumption between components is broken, it will exit the loop (for instance, hotstuff receives a block whose parent is missing)
-	// if hotstuff hits a known error that is safe to be ignored, it will not exit the loop (for instance, double voting/invalid vote)
+	// if hotstuff hits a known error that is safe to be ignored, it will not exit the loop (for instance, invalid proposal)
 	// if hotstuff hits any unknown error, it will exit the loop
 
 	for {
@@ -102,7 +102,7 @@ func (el *EventLoopV2) loop() {
 
 		idleStart := time.Now()
 
-		// select for block headers/votes here
+		// select for block headers/QCs here
 		select {
 
 		// same as before
@@ -143,7 +143,7 @@ func (el *EventLoopV2) loop() {
 				el.log.Fatal().Err(err).Msg("could not process proposal")
 			}
 
-		// if we have a new vote, process it
+		// if we have a new QC, process it
 		case qc := <-el.quorumCertificates:
 			// measure how long the event loop was idle waiting for an
 			// incoming event
@@ -153,11 +153,11 @@ func (el *EventLoopV2) loop() {
 
 			err := el.eventHandler.OnQCConstructed(qc)
 
-			// measure how long it takes for a vote to be processed
+			// measure how long it takes for a QC to be processed
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnQc)
 
 			if err != nil {
-				el.log.Fatal().Err(err).Msg("could not process vote")
+				el.log.Fatal().Err(err).Msg("could not process QC")
 			}
 		}
 	}
