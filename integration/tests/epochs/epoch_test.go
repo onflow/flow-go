@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/stretchr/testify/suite"
-	"log"
 	"testing"
 
 	"github.com/onflow/flow-go/integration/testnet"
@@ -149,13 +148,25 @@ func (s *Suite) TestEpochJoin() {
 	nodeID := string(nodeInfo.Fields[0].(cadence.String))
 	require.Equal(s.T(), info.NodeID.String(), nodeID, "expected generated in test to equal node ID node ID from staking table ")
 
-	nodeConfig := testnet.NewNodeConfig(role)
+	nodeConfig := testnet.NewNodeConfig(role, testnet.WithID(info.NodeID))
 	testContainerConfig := testnet.NewContainerConfig("epochs-test-container", nodeConfig, info.NetworkingKey, info.StakingAccountKey)
 	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey})
-	testContainer, err := s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
-	require.NoError(s.T(), err, "failed to add container to network")
-	log.Println("THIS IS A IMAGE MAN", testContainer.Image)
 	require.NoError(s.T(), err)
 
-	s.net.StopContainers()
+	// download root snapshot from access node
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+
+	// write updated root snapshot
+	s.net.WriteRootSnapshot(snapshot)
+
+	// add our container to the network
+	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
+	require.NoError(s.T(), err, "failed to add container to network")
+
+	// start our test container
+	testContainer := s.net.ContainerByID(info.NodeID)
+	testContainer.Container.Start(ctx)
+
+	//s.net.StopContainers()
 }

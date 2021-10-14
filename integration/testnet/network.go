@@ -507,7 +507,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// add each node to the network
 	for _, nodeConf := range confs {
-		_, err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
+		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
 
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
@@ -593,7 +593,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 
 // AddNode creates a node container with the given config and adds it to the
 // network.
-func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf ContainerConfig) (*testingdock.Container, error) {
+func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf ContainerConfig) error {
 
 	opts := &testingdock.ContainerOpts{
 		ForcePull: false,
@@ -617,7 +617,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	// instead.
 	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-integration-node")
 	if err != nil {
-		return nil, fmt.Errorf("could not get tmp dir: %w", err)
+		return fmt.Errorf("could not get tmp dir: %w", err)
 	}
 
 	nodeContainer := &Container{
@@ -759,7 +759,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			// therefore the ghost node will deny incoming connections from all consensus
 			// followers. A flag for the ghost node will need to be created to enable
 			// overriding the default behavior (see: https://github.com/dapperlabs/flow-go/issues/5696).
-			return nil, fmt.Errorf("currently ghost node for an access node which supports unstaked node is not implemented")
+			return fmt.Errorf("currently ghost node for an access node which supports unstaked node is not implemented")
 		}
 	}
 
@@ -778,7 +778,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 	} else {
 		net.network.After(suiteContainer)
 	}
-	return suiteContainer, nil
+	return nil
 }
 
 func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
