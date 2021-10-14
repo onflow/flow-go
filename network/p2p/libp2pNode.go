@@ -403,7 +403,7 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 	// certainly fail. If this Node was configure with a DHT, we can try to lookup the address of
 	// the peer in the DHT as a last resort.
 	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.dht != nil {
-		n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address not found in peerstore, searching for peer in dht")
+		n.logger.Warn().Str("peerID", peerID.Pretty()).Msg("address not found in peerstore, searching for peer in dht")
 
 		var err error
 		func() {
@@ -420,7 +420,7 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 		}
 	}
 
-	n.logger.Info().Str("peerID", peerID.Pretty()).Msg("about to create new stream")
+	n.logger.Warn().Str("peerID", peerID.Pretty()).Msg("about to create new stream")
 	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
 	stream, err := n.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
 	if err != nil {
@@ -438,14 +438,14 @@ func (n *Node) filterKnownUndialables(p peer.ID, swm *swarm.Swarm) {
 		Str("dialing_address", fmt.Sprintf("%v", addrs)).
 		Logger()
 
-	lg.Info().
+	lg.Warn().
 		Str("listen_addrs", fmt.Sprintf("%v", lisAddrs)).
 		Msg("interface listen addresses")
 
 	var ourAddrs []multiaddr.Multiaddr
 	for _, addr := range lisAddrs {
 		protos := addr.Protocols()
-		n.logger.Info().
+		n.logger.Warn().
 			Str("address", addr.String()).
 			Str("protocols", fmt.Sprintf("%v", protos)).
 			Msg("protocols supporting address")
@@ -455,12 +455,12 @@ func (n *Node) filterKnownUndialables(p peer.ID, swm *swarm.Swarm) {
 		}
 	}
 
-	lg.Info().
+	lg.Warn().
 		Str("our_addresses", fmt.Sprintf("%v", ourAddrs)).
 		Msg("filtered our address based on ip support")
 
 	filteredAddrs := addrutil.FilterAddrs(addrs, addrutil.SubtractFilter(ourAddrs...))
-	lg.Info().
+	lg.Warn().
 		Str("filtered_addresses", fmt.Sprintf("%v", filteredAddrs)).
 		Msg("filtered addresses subtracting our addresses")
 
@@ -468,19 +468,19 @@ func (n *Node) filterKnownUndialables(p peer.ID, swm *swarm.Swarm) {
 		t := swm.TransportForDialing(addr)
 		return t != nil && t.CanDial(addr)
 	})
-	lg.Info().
+	lg.Warn().
 		Str("filtered_addresses", fmt.Sprintf("%v", filteredAddrs)).
 		Msg("filtered addresses checking can dial")
 
 	filteredAddrs = addrutil.FilterAddrs(addrs, addrutil.AddrOverNonLocalIP)
-	lg.Info().
+	lg.Warn().
 		Str("filtered_addresses", fmt.Sprintf("%v", filteredAddrs)).
 		Msg("filtered addresses checking can non overlap local IP")
 
 	filteredAddrs = addrutil.FilterAddrs(addrs, func(addr multiaddr.Multiaddr) bool {
 		return n.connGater.InterceptAddrDial(p, addr)
 	})
-	lg.Info().
+	lg.Warn().
 		Str("filtered_addresses", fmt.Sprintf("%v", filteredAddrs)).
 		Msg("filtered addresses intercepting address dial")
 }
@@ -499,7 +499,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 	var s libp2pnet.Stream
 	var retries = 0
 
-	n.logger.Info().Str("peerID", peerID.Pretty()).Msg("about to start attempt 1")
+	n.logger.Warn().Str("peerID", peerID.Pretty()).Msg("about to start attempt 1")
 
 	for ; retries < maxAttempts; retries++ {
 		select {
@@ -533,7 +533,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
-		n.logger.Info().Str("peerID", peerID.Pretty()).Msg("about to add peer")
+		n.logger.Warn().Str("peerID", peerID.Pretty()).Msg("about to add peer")
 		err := n.AddPeer(ctx, peer.AddrInfo{ID: peerID})
 		if err != nil {
 
