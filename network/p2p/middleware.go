@@ -207,6 +207,7 @@ func (m *Middleware) UpdateNodeAddresses() {
 	m.log.Info().Msg("Updating protocol state node addresses")
 
 	ids := m.ov.Identities()
+	m.log.Info().Interface("Identities", ids).Msg("UpdateNodeAddresses identities")
 	newInfos, invalid := peerInfosFromIDs(ids)
 
 	for id, err := range invalid {
