@@ -125,12 +125,13 @@ func NewNetwork(
 
 	o.ComponentManager = component.NewComponentManagerBuilder().
 		AddWorker(o.runMiddleware).
-		AddWorker(o.processRegisterRequests).Build()
+		AddWorker(o.processRegisterEngineRequests).
+		AddWorker(o.processRegisterBlockExchangeRequests).Build()
 
 	return o, nil
 }
 
-func (n *Network) processRegisterRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	<-n.mw.Ready()
 	ready()
 
@@ -148,6 +149,18 @@ func (n *Network) processRegisterRequests(parent irrecoverable.SignalerContext, 
 				return
 			case req.respChan <- resp:
 			}
+		case <-parent.Done():
+			return
+		}
+	}
+}
+
+func (n *Network) processRegisterBlockExchangeRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	<-n.mw.Ready()
+	ready()
+
+	for {
+		select {
 		case req := <-n.registerBlockExchangeRequests:
 			blockExchange, err := n.handleRegisterBlockExchangeRequest(parent, req.channel, req.bstore)
 			resp := &registerBlockExchangeResp{
