@@ -180,8 +180,8 @@ func (el *EventLoopV2) SubmitProposal(proposalHeader *flow.Header, parentView ui
 	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnProposal)
 }
 
-// SubmitQC pushes the received QC to the quorumCertificates channel
-func (el *EventLoopV2) SubmitQC(qc *flow.QuorumCertificate) {
+// SubmitTrustedQC pushes the received QC to the quorumCertificates channel
+func (el *EventLoopV2) SubmitTrustedQC(qc *flow.QuorumCertificate) {
 	received := time.Now()
 
 	select {
