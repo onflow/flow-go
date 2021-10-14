@@ -6,8 +6,9 @@ package state
 // the state it is recommended that such services wraps
 // an state manager instead of an state itself.
 type StateHolder struct {
-	startState  *State
-	activeState *State
+	EnforceLimit bool
+	startState   *State
+	activeState  *State
 }
 
 // NewStateHolder constructs a new state manager
