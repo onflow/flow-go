@@ -14,8 +14,9 @@ type StateHolder struct {
 // NewStateHolder constructs a new state manager
 func NewStateHolder(startState *State) *StateHolder {
 	return &StateHolder{
-		startState:  startState,
-		activeState: startState,
+		EnforceLimit: true,
+		startState:   startState,
+		activeState:  startState,
 	}
 }
 
