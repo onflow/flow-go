@@ -214,7 +214,7 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
 }
 
-// Topology returns the identitiess of a uniform subset of nodes in protocol state using the topology provided earlier.
+// Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
 // Independent invocations of Topology on different nodes collectively constructs a connected network graph.
 func (n *Network) Topology() (flow.IdentityList, error) {
 	n.Lock()

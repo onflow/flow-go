@@ -75,7 +75,7 @@ func (c *ConnManager) Notifee() network.Notifiee {
 	return c.n
 }
 
-// called by libp2p when network starts listening on an addr
+// ListenNotifee is called by libp2p when network starts listening on an addr
 func (c *ConnManager) ListenNotifee(n network.Network, m multiaddr.Multiaddr) {
 	c.log.Debug().Str("multiaddress", m.String()).Msg("listen started")
 }
@@ -87,13 +87,13 @@ func (c *ConnManager) ListenCloseNotifee(n network.Network, m multiaddr.Multiadd
 	c.log.Debug().Str("multiaddress", m.String()).Msg("listen stopped ")
 }
 
-// called by libp2p when a connection opened
+// Connected is called by libp2p when a connection opened
 func (c *ConnManager) Connected(n network.Network, con network.Conn) {
 	c.logConnectionUpdate(n, con, "connection established")
 	c.updateConnectionMetric(n)
 }
 
-// called by libp2p when a connection closed
+// Disconnected is called by libp2p when a connection closed
 func (c *ConnManager) Disconnected(n network.Network, con network.Conn) {
 	c.logConnectionUpdate(n, con, "connection removed")
 	c.updateConnectionMetric(n)
