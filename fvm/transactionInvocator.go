@@ -177,6 +177,9 @@ func (i *TransactionInvocator) Process(
 	if txError != nil {
 		// drop delta since transaction failed
 		childState.View().DropDelta()
+		// reset the ledger interactions
+		childState.TotalBytesRead = 0
+		childState.TotalBytesWritten = 0
 		// if tx fails just do clean up
 		programs.Cleanup(nil)
 		// log transaction as failed
