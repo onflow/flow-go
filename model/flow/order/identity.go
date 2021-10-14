@@ -3,7 +3,7 @@
 package order
 
 import (
-	"bytes"
+	"encoding/binary"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -12,7 +12,35 @@ import (
 var Canonical = ByNodeIDAsc
 
 func ByNodeIDAsc(identity1 *flow.Identity, identity2 *flow.Identity) bool {
-	return bytes.Compare(identity1.NodeID[:], identity2.NodeID[:]) < 0
+	num1 := identity1.NodeID[:]
+	num2 := identity2.NodeID[:]
+	first := binary.BigEndian.Uint64(num1)
+	second := binary.BigEndian.Uint64(num2)
+
+	if first == second {
+		num1 = num1[8:]
+		num2 = num2[8:]
+		first = binary.BigEndian.Uint64(num1)
+		second = binary.BigEndian.Uint64(num2)
+
+		if first == second {
+			num1 = num1[8:]
+			num2 = num2[8:]
+			first = binary.BigEndian.Uint64(num1)
+			second = binary.BigEndian.Uint64(num2)
+
+			if first == second {
+				num1 = num1[8:]
+				num2 = num2[8:]
+				first = binary.BigEndian.Uint64(num1)
+				second = binary.BigEndian.Uint64(num2)
+				return first < second
+			}
+			return first < second
+		}
+		return first < second
+	}
+	return first < second
 }
 
 func ByReferenceOrder(nodeIDs []flow.Identifier) func(*flow.Identity, *flow.Identity) bool {
