@@ -174,7 +174,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		}
 
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(ctx,
-			fnb.Logger.Level(zerolog.ErrorLevel),
+			fnb.Logger.Level(zerolog.InfoLevel),
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
