@@ -92,6 +92,7 @@ func (i *TransactionInvocator) Process(
 			processErr = fmt.Errorf("transaction invocation failed: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
+		sth.EnforceLimit = true
 	}()
 
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
