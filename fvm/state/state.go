@@ -36,6 +36,7 @@ type State struct {
 	WriteCounter          uint64
 	TotalBytesRead        uint64
 	TotalBytesWritten     uint64
+	Limiter               *InteractionLimiter
 }
 
 func defaultState(view View) *State {
@@ -46,11 +47,23 @@ func defaultState(view View) *State {
 		maxKeySizeAllowed:     DefaultMaxKeySize,
 		maxValueSizeAllowed:   DefaultMaxValueSize,
 		maxInteractionAllowed: DefaultMaxInteractionSize,
+		Limiter:               &InteractionLimiter{},
 	}
 }
 
 func (s *State) View() View {
 	return s.view
+}
+
+type InteractionLimiter struct {
+	InteractionLimitDisabled bool
+}
+
+func (l *InteractionLimiter) check(s *State) error {
+	if !l.InteractionLimitDisabled && s.InteractionUsed() > s.maxInteractionAllowed {
+		return errors.NewLedgerIntractionLimitExceededError(s.InteractionUsed(), s.maxInteractionAllowed)
+	}
+	return nil
 }
 
 type StateOption func(st *State) *State
@@ -84,6 +97,14 @@ func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
 func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
 	return func(st *State) *State {
 		st.maxInteractionAllowed = limit
+		return st
+	}
+}
+
+// WithInteractionLimiter sets the interaction limiter
+func WithInteractionLimiter(limiter *InteractionLimiter) func(st *State) *State {
+	return func(st *State) *State {
+		st.Limiter = limiter
 		return st
 	}
 }
@@ -169,6 +190,7 @@ func (s *State) NewChild() *State {
 		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
 		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
 		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
+		WithInteractionLimiter(s.Limiter),
 	)
 }
 
@@ -221,10 +243,7 @@ func (s *State) UpdatedAddresses() []flow.Address {
 }
 
 func (s *State) checkMaxInteraction() error {
-	if s.InteractionUsed() > s.maxInteractionAllowed {
-		return errors.NewLedgerIntractionLimitExceededError(s.InteractionUsed(), s.maxInteractionAllowed)
-	}
-	return nil
+	return s.Limiter.check(s)
 }
 
 func (s *State) checkSize(owner, controller, key string, value flow.RegisterValue) error {

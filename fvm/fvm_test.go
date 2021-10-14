@@ -24,7 +24,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/blueprints"
 	crypto2 "github.com/onflow/flow-go/fvm/crypto"
-	errors "github.com/onflow/flow-go/fvm/errors"
+	"github.com/onflow/flow-go/fvm/errors"
 	fvmmock "github.com/onflow/flow-go/fvm/mock"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
@@ -865,6 +865,68 @@ func TestBlockContext_ExecuteTransaction_StorageLimit(t *testing.T) {
 
 				require.NoError(t, tx.Err)
 			}))
+}
+
+func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
+	t.Parallel()
+
+	b := make([]byte, 1000000) // 1MB
+	_, err := rand.Read(b)
+	require.NoError(t, err)
+	longString := base64.StdEncoding.EncodeToString(b) // ~1.3 times 1MB
+
+	// save a really large contract to an account should fail because of interaction limit reached
+	script := fmt.Sprintf(`
+			access(all) contract Container {
+				access(all) resource Counter {
+					pub var longString: String
+					init() {
+						self.longString = "%s"
+					}
+				}
+			}`, longString)
+
+	bootstrapOptions := []fvm.BootstrapProcedureOption{
+		fvm.WithTransactionFee(fvm.DefaultTransactionFees),
+	}
+
+	t.Run("Using to much interaction fails", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
+		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
+		run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				ctx.MaxStateInteractionSize = 100000
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				require.NoError(t, err)
+
+				txBody := testutil.CreateContractDeploymentTransaction(
+					"Container",
+					script,
+					accounts[0],
+					chain)
+
+				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+				txBody.SetPayer(chain.ServiceAddress())
+
+				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
+			}))
+
 }
 
 var createAccountScript = []byte(`
@@ -2249,6 +2311,7 @@ func TestBlockContext_ExecuteTransaction_FailingTransactions(t *testing.T) {
 			}),
 	)
 }
+
 func TestSigningWithTags(t *testing.T) {
 
 	checkWithTag := func(tag []byte, shouldWork bool) func(t *testing.T) {
@@ -2319,7 +2382,6 @@ func TestSigningWithTags(t *testing.T) {
 		}
 		t.Run(fmt.Sprintf("Signing Transactions %d: with %s %s", i, c.name, works), checkWithTag(c.tag, c.shouldWok))
 	}
-
 }
 
 func TestTransactionFeeDeduction(t *testing.T) {
