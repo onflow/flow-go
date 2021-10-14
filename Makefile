@@ -119,6 +119,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=engine/execution/state -case=underscore -output="./engine/execution/state/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/consensus -case=underscore -output="./engine/consensus/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=engine/consensus/approvals -case=underscore -output="./engine/consensus/approvals/mock" -outpkg="mock"
+	GO111MODULE=on mockery -name '.*' -dir=consensus/hotstuff/votecollector/mocks/ -case=underscore -inpkg
 	GO111MODULE=on mockery -name '.*' -dir=fvm -case=underscore -output="./fvm/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=fvm/state -case=underscore -output="./fvm/mock/state" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=ledger -case=underscore -output="./ledger/mock" -outpkg="mock"
