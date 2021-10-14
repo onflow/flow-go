@@ -53,15 +53,13 @@ func (s *EventLoopV2TestSuite) TearDownTest() {
 // TestReadyDone tests if event loop stops internal worker thread
 func (s *EventLoopV2TestSuite) TestReadyDone() {
 	time.Sleep(1 * time.Second)
-	var wg sync.WaitGroup
-	wg.Add(1)
+	done := atomic.NewBool(false)
 	go func() {
 		<-s.eventLoop.Done()
-		wg.Done()
+		done.Store(true)
 	}()
 
-	// wait until Wait returns
-	wg.Wait()
+	require.Eventually(s.T(), done.Load, time.Millisecond*100, time.Millisecond*10)
 }
 
 // Test_SubmitQC tests that submitted proposal is eventually sent to event handler for processing
