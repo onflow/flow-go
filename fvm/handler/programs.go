@@ -77,7 +77,7 @@ func (h *ProgramsHandler) mergeState(state *state.State) error {
 		h.masterState.SetActiveState(h.viewsStack[len(h.viewsStack)-1].state)
 	}
 
-	return h.masterState.State().MergeState(state)
+	return h.masterState.State().MergeState(state, h.masterState.EnforceLimit)
 }
 
 func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool) {
@@ -131,13 +131,13 @@ func (h *ProgramsHandler) Cleanup() error {
 
 	for i := stackLen - 1; i > 0; i-- {
 		entry := h.viewsStack[i]
-		err := h.viewsStack[i-1].state.MergeState(entry.state)
+		err := h.viewsStack[i-1].state.MergeState(entry.state, h.masterState.EnforceLimit)
 		if err != nil {
 			return fmt.Errorf("cannot merge state while cleanup: %w", err)
 		}
 	}
 
-	err := h.initialState.MergeState(h.viewsStack[0].state)
+	err := h.initialState.MergeState(h.viewsStack[0].state, h.masterState.EnforceLimit)
 	if err != nil {
 		return err
 	}

@@ -88,7 +88,7 @@ func (i *TransactionInvocator) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		if mergeError := parentState.MergeState(childState); mergeError != nil {
+		if mergeError := parentState.MergeState(childState, sth.EnforceLimit); mergeError != nil {
 			processErr = fmt.Errorf("transaction invocation failed: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
@@ -154,6 +154,8 @@ func (i *TransactionInvocator) Process(
 	// }
 
 	// try to deduct fees even if there is an error.
+	// reset the ledger interactions
+	sth.EnforceLimit = false
 	feesError := i.deductTransactionFees(env, proc)
 	if feesError != nil {
 		txError = feesError
@@ -177,9 +179,6 @@ func (i *TransactionInvocator) Process(
 	if txError != nil {
 		// drop delta since transaction failed
 		childState.View().DropDelta()
-		// reset the ledger interactions
-		childState.TotalBytesRead = 0
-		childState.TotalBytesWritten = 0
 		// if tx fails just do clean up
 		programs.Cleanup(nil)
 		// log transaction as failed
