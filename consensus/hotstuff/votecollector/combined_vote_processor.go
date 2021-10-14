@@ -10,9 +10,70 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	msig "github.com/onflow/flow-go/module/signature"
 )
+
+/* **************** Base-Factory for CombinedVoteProcessors ***************** */
+
+// combinedVoteProcessorFactoryBase is a `votecollector.baseFactory` for creating
+// CombinedVoteProcessors, holding all needed dependencies.
+// combinedVoteProcessorFactoryBase is intended to be used for the main consensus.
+// CAUTION:
+// this base factory only creates the VerifyingVoteProcessor for the given block.
+// It does _not_ check the proposer's vote for its own block, i.e. it does _not_
+// implement `hotstuff.VoteProcessorFactory`. This base factory should be wrapped
+// by `votecollector.VoteProcessorFactory` which adds the logic to verify
+// the proposer's vote (decorator pattern).
+type combinedVoteProcessorFactoryBase struct {
+	log         zerolog.Logger
+	committee   hotstuff.Committee
+	onQCCreated hotstuff.OnQCCreated
+	packer      hotstuff.Packer
+}
+
+// Create creates CombinedVoteProcessor for processing votes for the given block.
+// Caller must treat all errors as exceptions
+func (f *combinedVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
+	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving consensus participants at block %v: %w", block.BlockID, err)
+	}
+
+	// message that has to be verified against aggregated signature
+	msg := verification.MakeVoteMessage(block.View, block.BlockID)
+
+	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.ConsensusVoteTag)
+	if err != nil {
+		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
+	}
+
+	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.ConsensusVoteTag)
+	if err != nil {
+		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
+	}
+
+	rbRector := &signature.RandomBeaconReconstructor{} // TODO: initialize properly when ready
+
+	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
+
+	return &CombinedVoteProcessor{
+		log:              f.log,
+		block:            block,
+		stakingSigAggtor: stakingSigAggtor,
+		rbSigAggtor:      rbSigAggtor,
+		rbRector:         rbRector,
+		onQCCreated:      f.onQCCreated,
+		packer:           f.packer,
+		minRequiredStake: minRequiredStake,
+		done:             *atomic.NewBool(false),
+	}, nil
+}
+
+/* ****************** CombinedVoteProcessor Implementation ****************** */
 
 // CombinedVoteProcessor implements the hotstuff.VerifyingVoteProcessor interface.
 // It processes votes from the main consensus committee, where participants vote in
@@ -33,31 +94,6 @@ type CombinedVoteProcessor struct {
 }
 
 var _ hotstuff.VoteProcessor = &CombinedVoteProcessor{}
-
-// newCombinedVoteProcessor is a helper function to perform object construction
-// no extra logic for validating proposal wasn't added
-func newCombinedVoteProcessor(
-	log zerolog.Logger,
-	block *model.Block,
-	stakingSigAggtor hotstuff.WeightedSignatureAggregator,
-	rbSigAggtor hotstuff.WeightedSignatureAggregator,
-	rbRector hotstuff.RandomBeaconReconstructor,
-	onQCCreated hotstuff.OnQCCreated,
-	packer hotstuff.Packer,
-	minRequiredStake uint64,
-) *CombinedVoteProcessor {
-	return &CombinedVoteProcessor{
-		log:              log,
-		block:            block,
-		stakingSigAggtor: stakingSigAggtor,
-		rbSigAggtor:      rbSigAggtor,
-		rbRector:         rbRector,
-		onQCCreated:      onQCCreated,
-		packer:           packer,
-		minRequiredStake: minRequiredStake,
-		done:             *atomic.NewBool(false),
-	}
-}
 
 // Block returns block that is part of proposal that we are processing votes for.
 func (p *CombinedVoteProcessor) Block() *model.Block {
