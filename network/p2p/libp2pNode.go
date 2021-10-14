@@ -514,6 +514,8 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		if swm, ok := network.(*swarm.Swarm); ok {
 			swm.Backoff().Clear(peerID)
 			n.filterKnownUndialables(peerID, swm)
+		} else {
+			n.logger.Error().Msg("network interface is not a swarm")
 		}
 
 		// if this is a retry attempt, wait for some time before retrying
