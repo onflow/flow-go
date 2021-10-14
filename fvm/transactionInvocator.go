@@ -155,7 +155,7 @@ func (i *TransactionInvocator) Process(
 	// }
 
 	// try to deduct fees even if there is an error.
-	// reset the ledger interactions
+	// disable the limit checks on states
 	sth.EnforceLimit = false
 	feesError := i.deductTransactionFees(env, proc)
 	if feesError != nil {
