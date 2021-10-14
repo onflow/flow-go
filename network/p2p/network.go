@@ -124,7 +124,7 @@ func NewNetwork(
 	o.mw.SetOverlay(o)
 
 	o.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(o.startMiddleware).
+		AddWorker(o.runMiddleware).
 		AddWorker(o.processRegisterRequests).Build()
 
 	return o, nil
@@ -166,7 +166,7 @@ func (n *Network) processRegisterRequests(parent irrecoverable.SignalerContext, 
 	}
 }
 
-func (n *Network) startMiddleware(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	// setup the message queue
 	// create priority queue
 	n.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, n.metrics)
@@ -178,6 +178,8 @@ func (n *Network) startMiddleware(ctx irrecoverable.SignalerContext, ready compo
 	<-n.mw.Ready()
 
 	ready()
+
+	<-n.mw.Done()
 }
 
 func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel network.Channel, engine network.Engine) (network.Conduit, error) {
