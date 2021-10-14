@@ -127,8 +127,10 @@ func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.Regi
 
 // Set updates state delta with a register update
 func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enforceLimit bool) error {
-	if err := s.checkSize(owner, controller, key, value); err != nil {
-		return err
+	if enforceLimit {
+		if err := s.checkSize(owner, controller, key, value); err != nil {
+			return err
+		}
 	}
 
 	if err := s.view.Set(owner, controller, key, value); err != nil {
