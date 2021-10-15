@@ -221,6 +221,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier
 			SetPubsubOptions(psOpts...).
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
+			SetStreamCompressor(p2p.WithGzipCompression).
 			Build(ctx)
 		if err != nil {
 			return nil, err

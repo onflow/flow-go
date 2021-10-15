@@ -279,7 +279,6 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
 func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
-
 	count := 2
 	ch := make(chan string, count)
 
@@ -533,7 +532,7 @@ func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
 			require.NoError(suite.T(), err)
 		}(s)
 		// wait for stream to be closed
-		wg.Wait()
+		unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second, "could not close stream")
 
 		// wait for the message to be received
 		unittest.RequireReturnsBefore(suite.T(),
@@ -715,6 +714,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
 		SetTopicValidation(false).
+		SetStreamCompressor(WithGzipCompression).
 		SetLogger(log)
 
 	if allowList {

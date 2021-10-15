@@ -183,6 +183,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 			SetDHTOptions(dhtOptions...).
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
+			SetStreamCompressor(p2p.WithGzipCompression).
 			Build(ctx)
 		if err != nil {
 			return nil, err

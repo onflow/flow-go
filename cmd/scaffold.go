@@ -40,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -148,10 +147,11 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminKey, "admin-key", defaultConfig.AdminKey, "admin key file (for TLS)")
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminClientCAs, "admin-client-certs", defaultConfig.AdminClientCAs, "admin client certs (for mutual TLS)")
 
-	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", dns.DefaultTimeToLive, "time-to-live for dns cache")
+	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
+	fnb.flags.StringVar(&fnb.BaseConfig.LibP2PStreamCompression, "stream-compression", p2p.NoCompression,
+		"networking stream compression mechanism")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
-
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
@@ -199,6 +199,11 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			}
 		}
 
+		streamFactory, err := p2p.LibP2PStreamCompressorFactoryFunc(fnb.BaseConfig.LibP2PStreamCompression)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert stream factory: %w", err)
+		}
+
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
 			fnb.Logger.Level(zerolog.ErrorLevel),
 			fnb.Me.NodeID(),
@@ -211,7 +216,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Metrics.Network,
 			pingProvider,
 			fnb.BaseConfig.DNSCacheTTL,
-			fnb.BaseConfig.NodeRole)
+			fnb.BaseConfig.NodeRole,
+			streamFactory)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
