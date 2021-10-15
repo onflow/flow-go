@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -38,6 +39,7 @@ type MutableIdentityTableSuite struct {
 	state            *mockprotocol.State
 	snapshot         *mockprotocol.Snapshot
 	logger           zerolog.Logger
+	cancels          []context.CancelFunc
 }
 
 // testNode encapsulates the node state which includes its identity, middleware, network,
@@ -148,6 +150,9 @@ func (suite *MutableIdentityTableSuite) SetupTest() {
 
 // TearDownTest closes all the networks within a specified timeout
 func (suite *MutableIdentityTableSuite) TearDownTest() {
+	for _, cancel := range suite.cancels {
+		cancel()
+	}
 	networks := append(suite.testNodes.networks(), suite.removedTestNodes.networks()...)
 	stopNetworks(suite.T(), networks, 3*time.Second)
 }
@@ -172,7 +177,8 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 func (suite *MutableIdentityTableSuite) addNodes(count int) {
 
 	// create the ids, middlewares and networks
-	ids, mws, nets, _ := GenerateIDsMiddlewaresNetworks(suite.T(), count, suite.logger, 100, nil, !DryRun)
+	ids, mws, nets, _, cancel := GenerateIDsMiddlewaresNetworks(suite.T(), count, suite.logger, 100, nil, !DryRun)
+	suite.cancels = append(suite.cancels, cancel)
 
 	// create the engines for the new nodes
 	engines := GenerateEngines(suite.T(), nets)
