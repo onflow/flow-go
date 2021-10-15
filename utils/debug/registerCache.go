@@ -61,7 +61,6 @@ func newFileRegisterCache(filePath string) *fileRegisterCache {
 			if err != nil && err != io.EOF {
 				break
 			}
-			fmt.Println(string(s))
 			if len(s) > 0 {
 				var d flow.RegisterEntry
 				if err := json.Unmarshal([]byte(s), &d); err != nil {
