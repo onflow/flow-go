@@ -444,9 +444,11 @@ func (n *Node) RemovePeer(ctx context.Context, peerID peer.ID) error {
 }
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
-func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
+//
+// The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
+func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	// If we do not currently have any addresses for the given peer, stream creation will almost
-	// certainly fail. If this Node was configure with a DHT, we can try to lookup the address of
+	// certainly fail. If this Node was configured with a DHT, we can try to look up the address of
 	// the peer in the DHT as a last resort.
 	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.dht != nil {
 		n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address not found in peerstore, searching for peer in dht")
@@ -465,31 +467,33 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 			n.logger.Info().Str("peerID", peerID.Pretty()).Msg("addresses found")
 		}
 	}
-	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
-	stream, err := n.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
+	stream, dialAddrs, err := n.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
 	if err != nil {
-		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s): %w", peerID, err))
+		return nil, dialAddrs, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s): %w", peerID, err))
 	}
-	return stream, nil
+	return stream, dialAddrs, nil
 }
 
-// tryCreateNewStream makes at most maxAttempts to create a stream with the peer.
+// tryCreateNewStream makes at most `maxAttempts` to create a stream with the peer.
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
-// remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
-func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, error) {
+// remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'.
+//
+// Note that in case an existing TCP connection underneath to `peerID` exists, that connection is utilized for creating a new stream.
+// The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
+func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
-	// connection creation is being attempted
+	// connection creation is being attempted, and remove it from protected list once stream created.
 	n.connMgr.ProtectPeer(peerID)
-	// unprotect it once done
 	defer n.connMgr.UnprotectPeer(peerID)
 
 	var errs error
 	var s libp2pnet.Stream
 	var retries = 0
+	var dialAddr []multiaddr.Multiaddr // address on which we dial peerID
 	for ; retries < maxAttempts; retries++ {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", retries, errs)
+			return nil, nil, fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", retries, errs)
 		default:
 		}
 
@@ -503,6 +507,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		network := n.host.Network()
 		if swm, ok := network.(*swarm.Swarm); ok {
 			swm.Backoff().Clear(peerID)
+			dialAddr = swm.Peerstore().Addrs(peerID)
 		}
 
 		// if this is a retry attempt, wait for some time before retrying
@@ -518,12 +523,12 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 
 			// if the connection was rejected due to invalid node id, skip the re-attempt
 			if strings.Contains(err.Error(), "failed to negotiate security protocol") {
-				return s, fmt.Errorf("invalid node id: %w", err)
+				return s, dialAddr, fmt.Errorf("invalid node id: %w", err)
 			}
 
 			// if the connection was rejected due to allowlisting, skip the re-attempt
 			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
-				return s, fmt.Errorf("target node is not on the approved list of nodes: %w", err)
+				return s, dialAddr, fmt.Errorf("target node is not on the approved list of nodes: %w", err)
 			}
 
 			errs = multierror.Append(errs, err)
@@ -535,7 +540,8 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		if err != nil {
 			// if the stream creation failed due to invalid protocol id, skip the re-attempt
 			if strings.Contains(err.Error(), "protocol not supported") {
-				return nil, fmt.Errorf("remote node is running on a different spork: %w, protocol attempted: %s", err, n.flowLibP2PProtocolID)
+				return nil, dialAddr, fmt.Errorf("remote node is running on a different spork: %w, protocol attempted: %s", err,
+					n.flowLibP2PProtocolID)
 			}
 			errs = multierror.Append(errs, err)
 			continue
@@ -545,15 +551,15 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 	}
 
 	if retries == maxAttempts {
-		return s, errs
+		return s, dialAddr, errs
 	}
 
 	s, err := n.compressedStream(s)
 	if err != nil {
-		return nil, fmt.Errorf("could not create compressed stream: %w", err)
+		return nil, dialAddr, fmt.Errorf("could not create compressed stream: %w", err)
 	}
 
-	return s, nil
+	return s, dialAddr, nil
 }
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
