@@ -444,15 +444,13 @@ func (n *Node) RemovePeer(ctx context.Context, peerID peer.ID) error {
 }
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
-//
-// The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
-func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
+	lg := n.logger.With().Str("peerID", peerID.Pretty()).Logger()
+
 	// If we do not currently have any addresses for the given peer, stream creation will almost
 	// certainly fail. If this Node was configured with a DHT, we can try to look up the address of
 	// the peer in the DHT as a last resort.
 	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.dht != nil {
-		n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address not found in peerstore, searching for peer in dht")
-
 		var err error
 		func() {
 			timedCtx, cancel := context.WithTimeout(ctx, findPeerQueryTimeout)
@@ -462,16 +460,19 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 		}()
 
 		if err != nil {
-			n.logger.Warn().Err(err).Str("peerID", peerID.Pretty()).Msg("could not find addresses")
+			lg.Info().Err(err).Msg("address not found in both peer store and dht")
 		} else {
-			n.logger.Info().Str("peerID", peerID.Pretty()).Msg("addresses found")
+			lg.Info().Msg("address not found in peer store, but found in dht search")
 		}
 	}
 	stream, dialAddrs, err := n.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
 	if err != nil {
-		return nil, dialAddrs, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s): %w", peerID, err))
+		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
+			dialAddrs, err))
 	}
-	return stream, dialAddrs, nil
+
+	lg.Debug().Str("dial_address", fmt.Sprintf("%v", dialAddrs)).Msg("stream successfully created to remote peer")
+	return stream, nil
 }
 
 // tryCreateNewStream makes at most `maxAttempts` to create a stream with the peer.
