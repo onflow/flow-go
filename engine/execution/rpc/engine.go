@@ -383,7 +383,7 @@ func (h *handler) GetLatestBlockHeader(
 	}
 
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "not found: %w", err)
+		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
 	return blockHeaderResponse(header)
 }
@@ -399,7 +399,7 @@ func (h *handler) GetBlockHeaderByID(
 	}
 	header, err := h.headers.ByBlockID(id)
 	if err != nil {
-		return nil, status.Errorf(codes.NotFound, "not found: %w", err)
+		return nil, status.Errorf(codes.NotFound, "not found: %v", err)
 	}
 
 	return blockHeaderResponse(header)
