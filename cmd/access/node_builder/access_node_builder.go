@@ -70,11 +70,8 @@ import (
 type AccessNodeBuilder interface {
 	cmd.NodeBuilder
 
-	// IsStaked returns True is this is a staked Access Node, False otherwise
+	// IsStaked returns True if this is a staked Access Node, False otherwise
 	IsStaked() bool
-
-	// Build defines all of the Access node's components and modules.
-	Build() AccessNodeBuilder
 }
 
 // AccessNodeConfig defines all the user defined parameters required to bootstrap an access node
@@ -163,7 +160,7 @@ type FlowAccessNodeBuilder struct {
 	Finalized                  *flow.Header
 	Pending                    []*flow.Header
 	FollowerCore               module.HotStuffFollower
-	// for the untsaked access node, the sync engine participants provider is the libp2p peer store which is not
+	// for the unstaked access node, the sync engine participants provider is the libp2p peer store which is not
 	// available until after the network has started. Hence, a factory function that needs to be called just before
 	// creating the sync engine
 	SyncEngineParticipantsProviderFactory func() id.IdentifierProvider
@@ -181,7 +178,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 		// If we ever support different implementations, the following can be replaced by a type-aware factory
 		state, ok := node.State.(*badgerState.State)
 		if !ok {
-			return fmt.Errorf("only implementations of type badger.State are currenlty supported but read-only state has type %T", node.State)
+			return fmt.Errorf("only implementations of type badger.State are currently supported but read-only state has type %T", node.State)
 		}
 
 		followerState, err := badgerState.NewFollowerState(
@@ -237,7 +234,7 @@ func (builder *FlowAccessNodeBuilder) buildLatestHeader() *FlowAccessNodeBuilder
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder {
-	builder.Component("follower core", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.CriticalComponent("follower core", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
@@ -264,7 +261,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
-	builder.Component("follower engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.CriticalComponent("follower engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		// initialize cleaner for DB
 		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 		conCache := buffer.NewPendingBlocks()
@@ -296,7 +293,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 }
 
 func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuilder {
-	builder.Component("finalized snapshot", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.CriticalComponent("finalized snapshot", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
 		if err != nil {
 			return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
@@ -310,7 +307,7 @@ func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuil
 }
 
 func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
-	builder.Component("sync engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.CriticalComponent("sync engine", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
@@ -347,7 +344,7 @@ func (builder *FlowAccessNodeBuilder) BuildConsensusFollower() AccessNodeBuilder
 	return builder
 }
 
-func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
+func (anb *FlowAccessNodeBuilder) Build() cmd.NodeBuilder {
 	anb.
 		BuildConsensusFollower().
 		Module("collection node client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -430,7 +427,7 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 			anb.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
 			return nil
 		}).
-		Component("RPC engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("RPC engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			anb.RpcEng = rpc.New(
 				node.Logger,
 				node.State,
@@ -454,7 +451,7 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 			)
 			return anb.RpcEng, nil
 		}).
-		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
 			anb.RequestEng, err = requester.New(
@@ -481,12 +478,13 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 
 			return anb.IngestEng, nil
 		}).
-		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
 			return anb.RequestEng, nil
 		})
+	anb.FlowNodeBuilder.Build()
 
 	return anb
 }

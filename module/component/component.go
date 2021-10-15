@@ -200,7 +200,13 @@ type ComponentManager struct {
 	done           chan struct{}
 	shutdownSignal <-chan struct{}
 
+	serial  bool
 	workers []ComponentWorker
+}
+
+// SetSerial configures Start to run ComponentWorker functions serially in the order they were added
+func (c *ComponentManager) SetSerial(serial bool) {
+	c.serial = serial
 }
 
 // Start initiates the ComponentManager by launching all worker routines.
@@ -237,12 +243,12 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 
 		var workersReady sync.WaitGroup
 		var workersDone sync.WaitGroup
-		workersReady.Add(len(c.workers))
 		workersDone.Add(len(c.workers))
 
 		// launch workers
 		for _, worker := range c.workers {
 			worker := worker
+			workersReady.Add(1)
 			go func() {
 				defer workersDone.Done()
 				var readyOnce sync.Once
@@ -252,6 +258,9 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 					})
 				})
 			}()
+			if c.serial {
+				workersReady.Wait()
+			}
 		}
 
 		// launch goroutine to close ready channel

@@ -2,90 +2,106 @@ package node_builder
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network/p2p"
 )
 
-// upstreamConnector tries to connect the unstaked AN with atleast one of the configured bootstrap access nodes
+var _ component.Component = (*upstreamConnector)(nil)
+
+// upstreamConnector tries to connect the unstaked AN with at least one of the configured bootstrap access nodes
 type upstreamConnector struct {
-	lm                  *lifecycle.LifecycleManager
 	bootstrapIdentities flow.IdentityList
 	logger              zerolog.Logger
 	unstakedNode        *p2p.Node
-	cancel              context.CancelFunc
+	*component.ComponentManager
 }
 
 func newUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p2p.Node, logger zerolog.Logger) *upstreamConnector {
-	return &upstreamConnector{
-		lm:                  lifecycle.NewLifecycleManager(),
+
+	connector := &upstreamConnector{
 		bootstrapIdentities: bootstrapIdentities,
 		unstakedNode:        unstakedNode,
 		logger:              logger,
 	}
-}
-func (connector *upstreamConnector) Ready() <-chan struct{} {
-	connector.lm.OnStart(func() {
-		// eventually, context will be passed in to Start method: https://github.com/dapperlabs/flow-go/issues/5730
-		ctx, cancel := context.WithCancel(context.TODO())
-		connector.cancel = cancel
 
-		bootstrapPeerCnt := len(connector.bootstrapIdentities)
-		resultChan := make(chan result, bootstrapPeerCnt)
-		defer close(resultChan)
-
-		// a shorter context for the connection worker
-		workerCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		defer cancel()
-
-		// spawn a connect worker for each bootstrap node
-		for _, b := range connector.bootstrapIdentities {
-			go connector.connect(workerCtx, *b, resultChan)
-		}
-
-		var successfulConnects []string
-		var errors *multierror.Error
-
-		// wait for all connect workers to finish or the context to be done
-		for i := 0; i < bootstrapPeerCnt; i++ {
+	connector.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			select {
-			// gather all successes
-			case result := <-resultChan:
-				if result.err != nil {
-					connector.logger.Error().Str("bootstap_node", result.id.String()).Err(result.err).Msg("failed to connect")
-					// gather all the errors
-					errors = multierror.Append(errors, result.err)
-				} else {
-					// gather all the successes
-					successfulConnects = append(successfulConnects, result.id.String())
-				}
-
-				// premature exits if needed
-			case <-workerCtx.Done():
-				connector.logger.Warn().Msg("timed out before connections to bootstrap nodes could be established")
+			case <-ctx.Done():
 				return
+			default:
 			}
-		}
 
-		// if there was at least one successful connect, then return no error
-		if len(successfulConnects) > 0 {
-			connector.logger.Info().Strs("bootstrap_peers", successfulConnects).Msg("successfully connected to bootstrap node")
+			go connector.onStart(ctx)
+
+			ready()
+
+			<-ctx.Done()
+		}).Build()
+
+	return connector
+}
+
+func (connector *upstreamConnector) onStart(parent irrecoverable.SignalerContext) {
+
+	bootstrapPeerCnt := len(connector.bootstrapIdentities)
+	resultChan := make(chan result, bootstrapPeerCnt)
+	defer close(resultChan)
+
+	// a shorter context for the connection worker
+	workerCtx, workerCancel := context.WithTimeout(parent, 30*time.Second)
+	defer workerCancel()
+
+	// spawn a connect worker for each bootstrap node
+	for _, b := range connector.bootstrapIdentities {
+		go connector.connect(workerCtx, *b, resultChan)
+	}
+
+	var successfulConnects []string
+	var errors *multierror.Error
+
+	// wait for all connect workers to finish or the context to be done
+	for i := 0; i < bootstrapPeerCnt; i++ {
+		select {
+		// gather all successes
+		case result := <-resultChan:
+			if result.err != nil {
+				connector.logger.Error().Str("bootstap_node", result.id.String()).Err(result.err).Msg("failed to connect")
+				// gather all the errors
+				errors = multierror.Append(errors, result.err)
+			} else {
+				// gather all the successes
+				successfulConnects = append(successfulConnects, result.id.String())
+			}
+
+			// premature exits if needed
+		case <-workerCtx.Done():
+			connector.logger.Warn().Msg("timed out or cancelled before connections to bootstrap nodes could be established")
 			return
 		}
+	}
 
-		err := errors.ErrorOrNil()
-		// log fatal as there is no point continuing further  the unstaked AN cannot connect to any of the bootstrap peers
-		connector.logger.Fatal().Err(err).
-			Msg("Failed to connect to a bootstrap node. " +
-				"Please ensure the network address and public key of the bootstrap access node are correct " +
-				"and that the node is running and reachable.")
-	})
-	return connector.lm.Started()
+	// if there was at least one successful connect, then return no error
+	if len(successfulConnects) > 0 {
+		connector.logger.Info().Strs("bootstrap_peers", successfulConnects).Msg("successfully connected to bootstrap node")
+		return
+	}
+
+	err := errors.ErrorOrNil()
+	// no point continuing further since the unstaked AN cannot connect to any of the bootstrap peers
+
+	parent.Throw(irrecoverable.NewRecoverableError(fmt.Errorf("Failed to connect to a bootstrap node. "+
+		"Please ensure the network address and public key of the bootstrap access node are correct "+
+		"and that the node is running and reachable. error: %w", err)))
+
 }
 
 // result is the result returned by the connect worker. The ID is the ID of the bootstrap peer that was attempted,
@@ -121,14 +137,4 @@ func (connector *upstreamConnector) connect(ctx context.Context, bootstrapPeer f
 		id:  bootstrapPeer,
 		err: err,
 	}
-
-}
-
-func (connector *upstreamConnector) Done() <-chan struct{} {
-	connector.lm.OnStop(func() {
-		// this function will only be executed if connector.lm.OnStart was previously called,
-		// in which case connector.cancel != nil
-		connector.cancel()
-	})
-	return connector.lm.Stopped()
 }

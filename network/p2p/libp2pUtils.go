@@ -178,7 +178,7 @@ func generatePingProtcolID(rootBlockID flow.Identifier) protocol.ID {
 func PeerAddressInfo(identity flow.Identity) (peer.AddrInfo, error) {
 	ip, port, key, err := networkingInfo(identity)
 	if err != nil {
-		return peer.AddrInfo{}, fmt.Errorf("could not get translate identity to networking info %s: %w", identity.NodeID.String(), err)
+		return peer.AddrInfo{}, fmt.Errorf("could not translate identity to networking info %s: %w", identity.NodeID.String(), err)
 	}
 
 	addr := MultiAddressStr(ip, port)

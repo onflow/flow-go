@@ -70,7 +70,7 @@ func (c *ConnManager) ListenNotifee(n network.Network, m multiaddr.Multiaddr) {
 // * This is never called back by libp2p currently and may be a bug on their side
 func (c *ConnManager) ListenCloseNotifee(n network.Network, m multiaddr.Multiaddr) {
 	// just log the multiaddress  on which we listen
-	c.log.Debug().Str("multiaddress", m.String()).Msg("listen stopped ")
+	c.log.Debug().Str("multiaddress", m.String()).Msg("listen stopped")
 }
 
 // Connected is called by libp2p when a connection opened

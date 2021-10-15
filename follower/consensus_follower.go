@@ -12,6 +12,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 // ConsensusFollower is a standalone module run by third parties which provides
@@ -128,7 +130,7 @@ func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessN
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
 	}
-	nodeBuilder.BuildConsensusFollower()
+	nodeBuilder.Build()
 
 	return nodeBuilder, nil
 }
@@ -137,6 +139,7 @@ type ConsensusFollowerImpl struct {
 	NodeBuilder *access.UnstakedAccessNodeBuilder
 	consumersMu sync.RWMutex
 	consumers   []pubsub.OnBlockFinalizedConsumer
+	*component.ComponentManager
 }
 
 // NewConsensusFollower creates a new consensus follower.
@@ -168,6 +171,33 @@ func NewConsensusFollower(
 
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
 
+	consensusFollower.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			go anb.Start(ctx)
+
+			select {
+			case <-anb.Ready():
+				anb.Logger.Info().Msg("Access node startup complete")
+			case <-ctx.Done():
+				anb.Logger.Info().Msg("Access node startup aborted")
+				return
+			}
+
+			ready()
+
+			<-anb.ShutdownSignal()
+			anb.Logger.Info().Msg("Access node shutting down")
+			<-anb.Done()
+			anb.Logger.Info().Msg("Access node shutdown complete")
+		}).Build()
+	consensusFollower.ComponentManager.SetSerial(true)
+
 	return consensusFollower, nil
 }
 
@@ -190,26 +220,17 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 }
 
 // Run starts the consensus follower.
+// This is kept for backwards compatibility. Typical implementations will implement the following
+// code and call follower.Start() directly. This allows the implementor to inspect the irrecoverable
+// error returned on the error channel and restart if desired.
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
-	runAccessNode(ctx, cf.NodeBuilder)
-}
 
-func runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {
-	select {
-	case <-ctx.Done():
-		return
-	default:
-	}
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go cf.Start(signalerCtx)
 
 	select {
-	case <-anb.Ready():
-		anb.Logger.Info().Msg("Access node startup complete")
-	case <-ctx.Done():
-		anb.Logger.Info().Msg("Access node startup aborted")
+	case err := <-errChan:
+		cf.NodeBuilder.Logger.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
+	case <-cf.Done():
 	}
-
-	<-ctx.Done()
-	anb.Logger.Info().Msg("Access node shutting down")
-	<-anb.Done()
-	anb.Logger.Info().Msg("Access node shutdown complete")
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network"
@@ -67,7 +68,9 @@ type NodeBuilder interface {
 	// When the node is run, this component will be started with `Ready`. When the
 	// node is stopped, we will wait for the component to exit gracefully with
 	// `Done`.
-	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
+	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder
+
+	CriticalComponent(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
 
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder
@@ -76,6 +79,10 @@ type NodeBuilder interface {
 	// If the error is nil, returns a nil log event (which acts as a no-op).
 	// If the error is not nil, returns a fatal log event containing the error.
 	MustNot(err error) *zerolog.Event
+
+	// Build finalizes the node configuration in preparation for start.
+	// this signals that all components are registered.
+	Build() NodeBuilder
 
 	// Run initiates all common components (logger, database, protocol state etc.)
 	// then starts each component. It also sets up a channel to gracefully shut

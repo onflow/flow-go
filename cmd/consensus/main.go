@@ -379,7 +379,7 @@ func main() {
 
 			return nil
 		}).
-		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
 			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
@@ -394,7 +394,7 @@ func main() {
 			)
 			return validator, err
 		}).
-		Component("sealing engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("sealing engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
@@ -430,7 +430,7 @@ func main() {
 
 			return e, err
 		}).
-		Component("matching engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("matching engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -485,7 +485,7 @@ func main() {
 
 			return e, err
 		}).
-		Component("provider engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("provider engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			prov, err = provider.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -496,7 +496,7 @@ func main() {
 			)
 			return prov, err
 		}).
-		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			ing, err := ingestion.New(
 				node.Logger,
 				node.Tracer,
@@ -511,7 +511,7 @@ func main() {
 			)
 			return ing, err
 		}).
-		Component("consensus components", func(nodebuilder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("consensus components", func(nodebuilder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
@@ -674,7 +674,7 @@ func main() {
 			comp = comp.WithConsensus(hot)
 			return comp, nil
 		}).
-		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
@@ -682,7 +682,7 @@ func main() {
 
 			return finalizedHeader, nil
 		}).
-		Component("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -700,11 +700,11 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("receipt requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("receipt requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// created with sealing engine
 			return receiptRequester, nil
 		}).
-		Component("DKG messaging engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("DKG messaging engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// brokerTunnel is used to forward messages between the DKG
 			// messaging engine and the DKG broker/controller
@@ -724,7 +724,7 @@ func main() {
 
 			return messagingEngine, nil
 		}).
-		Component("DKG reactor engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		CriticalComponent("DKG reactor engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// the viewsObserver is used by the reactor engine to subscribe to
 			// new views being finalized
 			viewsObserver := gadgets.NewViews()
@@ -758,7 +758,7 @@ func main() {
 
 			return reactorEngine, nil
 		}).
-		Run()
+		Build().Run()
 }
 
 func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPriv, error) {

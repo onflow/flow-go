@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -15,7 +16,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -115,6 +118,8 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() error {
 	if err := anb.initNodeInfo(); err != nil {
 		return err
 	}
+
+	anb.InitComponentBuilder()
 
 	anb.InitIDProviders()
 
@@ -286,15 +291,16 @@ func (anb *UnstakedAccessNodeBuilder) enqueueMiddleware() {
 
 // Build enqueues the sync engine and the follower engine for the unstaked access node.
 // Currently, the unstaked AN only runs the follower engine.
-func (anb *UnstakedAccessNodeBuilder) Build() AccessNodeBuilder {
+func (anb *UnstakedAccessNodeBuilder) Build() cmd.NodeBuilder {
 	anb.FlowAccessNodeBuilder.BuildConsensusFollower()
+	anb.FlowNodeBuilder.Build()
 	return anb
 }
 
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
 func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	anb.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	anb.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (component.Component, error) {
 
 		// Network Metrics
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
@@ -314,7 +320,7 @@ func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		anb.ProtocolEvents.AddConsumer(idEvents)
 
 		return anb.Network, nil
-	})
+	}, nil)
 }
 
 // enqueueConnectWithStakedAN enqueues the upstream connector component which connects the libp2p host of the unstaked
@@ -324,9 +330,25 @@ func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 // discovered by other unstaked ANs if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (anb *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
-	anb.Component("upstream connector", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+
+	maxAttempts := 3
+	retryBackoffSeconds := 30
+	attempts := 0
+	errHandler := func(err error) component.ErrorHandlingResult {
+		attempts++
+		// use incremental backoff and limit the max retry attempts
+		if _, ok := err.(*irrecoverable.RecoverableError); ok && attempts < maxAttempts {
+			anb.Logger.Debug().Msg("retrying upstream connector")
+			time.Sleep(time.Duration(attempts*retryBackoffSeconds) * time.Second)
+			return component.ErrorHandlingRestart
+		}
+
+		return component.ErrorHandlingStop
+	}
+
+	anb.Component("upstream connector", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (component.Component, error) {
 		return newUpstreamConnector(anb.bootstrapIdentities, anb.LibP2PNode, anb.Logger), nil
-	})
+	}, errHandler)
 }
 
 // initMiddleware creates the network.Middleware implementation with the libp2p factory function, metrics, peer update

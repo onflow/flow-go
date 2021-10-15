@@ -89,7 +89,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 	return nil
 }
 
-func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
+func (anb *StakedAccessNodeBuilder) Build() cmd.NodeBuilder {
 	anb.FlowAccessNodeBuilder.Build()
 
 	if anb.supportsUnstakedFollower {
@@ -97,7 +97,7 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 		var proxyEngine *splitter.Engine
 
 		anb.
-			Component("unstaked sync request proxy", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			CriticalComponent("unstaked sync request proxy", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				proxyEngine = splitter.New(node.Logger, engine.PublicSyncCommittee)
 
 				// register the proxy engine with the unstaked network
@@ -109,7 +109,7 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 
 				return proxyEngine, nil
 			}).
-			Component("unstaked sync request handler", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			CriticalComponent("unstaked sync request handler", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				syncRequestHandler := synceng.NewRequestHandlerEngine(
 					node.Logger.With().Bool("unstaked", true).Logger(),
 					unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
@@ -130,7 +130,7 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 			})
 	}
 
-	anb.Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	anb.CriticalComponent("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		ping, err := pingeng.New(
 			node.Logger,
 			node.State,
@@ -146,13 +146,15 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 		return ping, nil
 	})
 
+	anb.FlowNodeBuilder.Build()
+
 	return anb
 }
 
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
 func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.CriticalComponent("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 		libP2PFactory := builder.initLibP2PFactory(builder.NodeID, builder.NodeConfig.NetworkKey)
 
