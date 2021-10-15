@@ -99,7 +99,6 @@ func DefaultLibP2PNodeFactory(
 	address string,
 	flowKey fcrypto.PrivateKey,
 	rootBlockID flow.Identifier,
-	chainID flow.ChainID,
 	idProvider id.IdentityProvider,
 	maxPubSubMsgSize int,
 	metrics module.NetworkMetrics,
