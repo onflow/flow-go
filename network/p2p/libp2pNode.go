@@ -450,6 +450,8 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 	// certainly fail. If this Node was configured with a DHT, we can try to look up the address of
 	// the peer in the DHT as a last resort.
 	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.dht != nil {
+		lg.Info().Msg("address not found in peer store, searching for peer in dht")
+
 		var err error
 		func() {
 			timedCtx, cancel := context.WithTimeout(ctx, findPeerQueryTimeout)
@@ -459,7 +461,7 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 		}()
 
 		if err != nil {
-			lg.Info().Err(err).Msg("address not found in both peer store and dht")
+			lg.Warn().Err(err).Msg("address not found in both peer store and dht")
 		} else {
 			lg.Info().Msg("address not found in peer store, but found in dht search")
 		}
