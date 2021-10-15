@@ -64,18 +64,20 @@ func TestMintingTestNetIssue(t *testing.T) {
 		SetGasLimit(9999).
 		SetScript([]byte(txScript)).
 		SetPayer(flow.HexToAddress("fd0383dc0eafaacb")).
-		SetProposalKey(add, 88, 1).
+		SetProposalKey(add, 88, 3).
 		AddAuthorizer(add).
 		AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(add[:]))).
 		AddArgument(jsoncdc.MustEncode(cadence.UInt64(17))).
 		AddArgument(jsoncdc.MustEncode(cadence.UInt64(250))).
 		AddArgument(jsoncdc.MustEncode(dataArg))
 
-	grpcAddress := "localhost:3600"
-	chain := flow.Emulator.Chain()
+	grpcAddress := "35.208.109.249:9000"
+	chain := flow.Testnet.Chain()
 	debugger := debug.NewRemoteDebugger(grpcAddress, chain, zerolog.New(os.Stdout).With().Logger())
 
-	blockId, err := flow.HexStringToIdentifier("3a8281395e2c1aaa3b8643d148594b19e2acb477611a8e0cab8a55c46c40b563")
+	// TODO update the blockID
+
+	blockId, err := flow.HexStringToIdentifier("8c2d264d12a64c17664126e55d42c605d1a0b787211b5d872f62ad15fe7beadd")
 	require.NoError(t, err)
 	txErr, err := debugger.RunTransactionAtBlockID(txBody, blockId, "MintingTestNetCache")
 	require.NoError(t, txErr)
