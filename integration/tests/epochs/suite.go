@@ -392,3 +392,11 @@ func (s *Suite) SetApprovedNodesScript(ctx context.Context, env templates.Enviro
 
 	return result
 }
+
+// ExecuteReadApprovedNodesScript executes the return proposal table script and returns a list of approved nodes
+func (s *Suite) ExecuteReadApprovedNodesScript(ctx context.Context, env templates.Environment) cadence.Value {
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
+	require.NoError(s.T(), err)
+
+	return v
+}
