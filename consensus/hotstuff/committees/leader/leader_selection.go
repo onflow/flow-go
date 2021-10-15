@@ -169,17 +169,21 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16
 // - items in `arr` must be in non-decreasing order
 // - `value` must be less than the last item in `arr`
 func binarySearch(value uint64, arr []uint64) int {
-	return bsearch(0, len(arr)-1, value, arr)
-}
+	l := 0
+	arrayLen := len(arr)
+	r := arrayLen - 1
+	h := int(uint(arrayLen) >> 1)
+	for {
+		if arr[h] <= value {
+			l = h + 1
+		} else {
+			r = h
+		}
 
-func bsearch(left, right int, value uint64, arr []uint64) int {
-	if left == right {
-		return left
-	}
+		if l >= r {
+			return l
+		}
 
-	mid := (left + right) / 2
-	if value < arr[mid] {
-		return bsearch(left, mid, value, arr)
+		h = int(uint(l+r) >> 1)
 	}
-	return bsearch(mid+1, right, value, arr)
 }
