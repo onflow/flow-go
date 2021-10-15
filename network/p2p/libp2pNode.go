@@ -444,7 +444,7 @@ func (n *Node) RemovePeer(ctx context.Context, peerID peer.ID) error {
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
 func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
-	lg := n.logger.With().Str("peerID", peerID.Pretty()).Logger()
+	lg := n.logger.With().Str("peer_id", peerID.Pretty()).Logger()
 
 	// If we do not currently have any addresses for the given peer, stream creation will almost
 	// certainly fail. If this Node was configured with a DHT, we can try to look up the address of
