@@ -1,6 +1,9 @@
 # Name of the cover profile
 COVER_PROFILE := cover.out
 
+# The short Git commit hash
+export SHORT_COMMIT := $(shell git rev-parse --short HEAD)
+
 # Run unit tests for test utilities in this module
 .PHONY: test
 test:

@@ -55,7 +55,11 @@ func (c *ContainerConfig) ImageName() string {
 	if c.Debug {
 		debugSuffix = "-debug"
 	}
-	return fmt.Sprintf("%s/%s%s:latest", defaultRegistry, c.Role.String(), debugSuffix)
+	commitSha := os.Getenv("SHORT_COMMIT")
+	if commitSha == "" {
+		commitSha = "latest"
+	}
+	return fmt.Sprintf("%s/%s%s:%s", defaultRegistry, c.Role.String(), debugSuffix, commitSha)
 }
 
 // Container represents a test Docker container for a generic Flow node.
