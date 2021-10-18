@@ -68,7 +68,7 @@ func TestMintingTestNetIssue(t *testing.T) {
 		AddAuthorizer(add).
 		AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(add[:]))).
 		AddArgument(jsoncdc.MustEncode(cadence.UInt64(17))).
-		AddArgument(jsoncdc.MustEncode(cadence.UInt64(250))).
+		AddArgument(jsoncdc.MustEncode(cadence.UInt64(2))). //250
 		AddArgument(jsoncdc.MustEncode(dataArg))
 
 	grpcAddress := "35.208.109.249:9000"
@@ -77,11 +77,12 @@ func TestMintingTestNetIssue(t *testing.T) {
 
 	// TODO update the blockID
 
-	blockId, err := flow.HexStringToIdentifier("8c2d264d12a64c17664126e55d42c605d1a0b787211b5d872f62ad15fe7beadd")
+	blockId, err := flow.HexStringToIdentifier("f06f6dec3248b41615af9fa390b938685ddae61514cb088042b7499dc58eb2bd")
 	require.NoError(t, err)
 	txErr, err := debugger.RunTransactionAtBlockID(txBody, blockId, "MintingTestNetCache")
 	require.NoError(t, txErr)
 	require.NoError(t, err)
+	t.Fatal("XXXXXX")
 }
 
 func TestDebugger_RunTransaction(t *testing.T) {
