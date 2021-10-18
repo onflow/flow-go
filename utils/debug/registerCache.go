@@ -139,5 +139,7 @@ func (c *fileRegisterCache) Persist() error {
 	if err != nil {
 		return err
 	}
+	w.Flush()
+	f.Sync()
 	return nil
 }
