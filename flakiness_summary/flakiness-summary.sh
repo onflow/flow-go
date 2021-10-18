@@ -49,6 +49,4 @@ case $TEST_CATEGORY in
     ;;
 esac
 
-cat test-results.json
-
 gsutil cp test-results.json gs://$GCS_BUCKET/$COMMIT_SHA-$JOB_STARTED-$TEST_CATEGORY.json
