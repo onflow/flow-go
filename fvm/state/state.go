@@ -13,9 +13,9 @@ import (
 // TODO we started with high numbers here and we might
 // tune (reduce) them when we have more data
 const (
-	DefaultMaxKeySize         = 16_000        // ~16KB
-	DefaultMaxValueSize       = 256_000_000   // ~256MB
-	DefaultMaxInteractionSize = 2_000_000_000 // ~2GB
+	DefaultMaxKeySize         = 16_000      // ~16KB
+	DefaultMaxValueSize       = 256_000_000 // ~256MB
+	DefaultMaxInteractionSize = 20_000_000  // ~20MB
 )
 
 type mapKey struct {
@@ -94,12 +94,14 @@ func (s *State) InteractionUsed() uint64 {
 }
 
 // Get returns a register value given owner, controller and key
-func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
+func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.RegisterValue, error) {
 	var value []byte
 	var err error
 
-	if err = s.checkSize(owner, controller, key, []byte{}); err != nil {
-		return nil, err
+	if enforceLimit {
+		if err = s.checkSize(owner, controller, key, []byte{}); err != nil {
+			return nil, err
+		}
 	}
 
 	if value, err = s.view.Get(owner, controller, key); err != nil {
@@ -116,13 +118,19 @@ func (s *State) Get(owner, controller, key string) (flow.RegisterValue, error) {
 			len(controller) + len(key) + len(value))
 	}
 
-	return value, s.checkMaxInteraction()
+	if enforceLimit {
+		return value, s.checkMaxInteraction()
+	}
+
+	return value, nil
 }
 
 // Set updates state delta with a register update
-func (s *State) Set(owner, controller, key string, value flow.RegisterValue) error {
-	if err := s.checkSize(owner, controller, key, value); err != nil {
-		return err
+func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enforceLimit bool) error {
+	if enforceLimit {
+		if err := s.checkSize(owner, controller, key, value); err != nil {
+			return err
+		}
 	}
 
 	if err := s.view.Set(owner, controller, key, value); err != nil {
@@ -132,8 +140,10 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 		return fmt.Errorf("failed to update key %s on account %s: %w", key, hex.EncodeToString([]byte(owner)), setError)
 	}
 
-	if err := s.checkMaxInteraction(); err != nil {
-		return err
+	if enforceLimit {
+		if err := s.checkMaxInteraction(); err != nil {
+			return err
+		}
 	}
 
 	if address, isAddress := addressFromOwner(owner); isAddress {
@@ -154,8 +164,8 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue) err
 	return nil
 }
 
-func (s *State) Delete(owner, controller, key string) error {
-	return s.Set(owner, controller, key, nil)
+func (s *State) Delete(owner, controller, key string, enforceLimit bool) error {
+	return s.Set(owner, controller, key, nil, enforceLimit)
 }
 
 // We don't need this later, it should be invisible to the cadence
@@ -173,7 +183,7 @@ func (s *State) NewChild() *State {
 }
 
 // MergeState applies the changes from a the given view to this view.
-func (s *State) MergeState(other *State) error {
+func (s *State) MergeState(other *State, enforceLimit bool) error {
 	err := s.view.MergeView(other.view)
 	if err != nil {
 		return errors.NewStateMergeFailure(err)
@@ -196,7 +206,10 @@ func (s *State) MergeState(other *State) error {
 	s.TotalBytesWritten += other.TotalBytesWritten
 
 	// check max interaction as last step
-	return s.checkMaxInteraction()
+	if enforceLimit {
+		return s.checkMaxInteraction()
+	}
+	return nil
 }
 
 type sortedAddresses []flow.Address
