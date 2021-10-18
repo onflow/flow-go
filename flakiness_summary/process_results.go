@@ -51,12 +51,12 @@ func (testRun *TestRun) save() {
 
 // models test result of an entire package which can have multiple tests
 type PackageResult struct {
-	Package string       `json:"package"`
-	Result  string       `json:"result"`
-	Elapsed float64      `json:"elapsed"`
-	Output  []string     `json:"output"`
-	Tests   []TestResult `json:"tests"`
-	TestMap map[string][]TestResult
+	Package string                  `json:"package"`
+	Result  string                  `json:"result"`
+	Elapsed float64                 `json:"elapsed"`
+	Output  []string                `json:"output"`
+	Tests   []TestResult            `json:"tests"`
+	TestMap map[string][]TestResult `json:"-"`
 }
 
 // models result of a single test that's part of a larger package result
