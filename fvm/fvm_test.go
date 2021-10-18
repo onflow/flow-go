@@ -1778,8 +1778,7 @@ func TestSignatureVerification(t *testing.T) {
 	}, hashAlgorithm{
 		"KMAC128_BLS_BLS12_381",
 		func() hash.Hasher {
-			return nil
-			//return crypto.NewBLSKMAC(flow.UserTagString)
+			return crypto.NewBLSKMAC(flow.UserTagString)
 		},
 	})
 }
@@ -2790,7 +2789,7 @@ func TestStorageUsed(t *testing.T) {
 	script := fvm.Script(code)
 
 	err = vm.Run(ctx, script, simpleView, programs.NewEmptyPrograms())
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	assert.Equal(t, cadence.NewUInt64(5), script.Value)
 }
