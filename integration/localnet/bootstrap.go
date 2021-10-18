@@ -37,6 +37,7 @@ const (
 	DefaultConsensusDelay      = 800 * time.Millisecond
 	DefaultCollectionDelay     = 950 * time.Millisecond
 	AccessAPIPort              = 3569
+	ExecutionAPIPort           = 3600
 	MetricsPort                = 8080
 	RPCPort                    = 9000
 	SecuredRPCPort             = 9001
@@ -189,6 +190,10 @@ func main() {
 	for i := 0; i < accessCount; i++ {
 		fmt.Printf("Access API %d will be accessible at localhost:%d\n", i+1, AccessAPIPort+i)
 	}
+	for i := 0; i < executionCount; i++ {
+		fmt.Printf("Execution API %d will be accessible at localhost:%d\n", i+1, ExecutionAPIPort+i)
+	}
+
 	fmt.Println()
 
 	fmt.Print("Run \"make start\" to launch the network.\n")
@@ -446,6 +451,11 @@ func prepareExecutionService(container testnet.ContainerConfig, i int) Service {
 		service.Volumes,
 		fmt.Sprintf("%s:/trie:z", trieDir),
 	)
+
+	service.Ports = []string{
+		fmt.Sprintf("%d:%d", ExecutionAPIPort+2*i, RPCPort),
+		fmt.Sprintf("%d:%d", ExecutionAPIPort+(2*i+1), SecuredRPCPort),
+	}
 
 	return service
 }
