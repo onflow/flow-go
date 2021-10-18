@@ -1,10 +1,8 @@
 package flow
 
 import (
-	"bytes"
+	"encoding/binary"
 	"math/rand"
-
-	"github.com/rs/zerolog/log"
 )
 
 // IdentifierList defines a sortable list of identifiers
@@ -29,16 +27,35 @@ func (il IdentifierList) Lookup() map[Identifier]struct{} {
 // Otherwise it returns true.
 // It satisfies the sort.Interface making the IdentifierList sortable.
 func (il IdentifierList) Less(i, j int) bool {
-	// bytes package already implements Comparable for []byte.
-	switch bytes.Compare(il[i][:], il[j][:]) {
-	case -1:
-		return true
-	case 0, 1:
-		return false
-	default:
-		log.Error().Msg("not fail-able with `bytes.Comparable` bounded [-1, 1].")
-		return false
+	num1 := il[i][:]
+	num2 := il[j][:]
+	first := binary.BigEndian.Uint64(num1)
+	second := binary.BigEndian.Uint64(num2)
+
+	if first == second {
+		num1 = num1[8:]
+		num2 = num2[8:]
+		first = binary.BigEndian.Uint64(num1)
+		second = binary.BigEndian.Uint64(num2)
+
+		if first == second {
+			num1 = num1[8:]
+			num2 = num2[8:]
+			first = binary.BigEndian.Uint64(num1)
+			second = binary.BigEndian.Uint64(num2)
+
+			if first == second {
+				num1 = num1[8:]
+				num2 = num2[8:]
+				first = binary.BigEndian.Uint64(num1)
+				second = binary.BigEndian.Uint64(num2)
+				return first < second
+			}
+			return first < second
+		}
+		return first < second
 	}
+	return first < second
 }
 
 // Swap swaps the element i and j in the IdentifierList.
