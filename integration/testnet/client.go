@@ -51,11 +51,11 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 	mySigner := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
 
 	tc := &Client{
-		client: flowClient,
-		key:    accountKey,
-		signer: mySigner,
-		Chain:  chain,
-		seqNo:  accountKey.SequenceNumber,
+		client:  flowClient,
+		key:     accountKey,
+		signer:  mySigner,
+		Chain:   chain,
+		seqNo:   accountKey.SequenceNumber,
 		account: acc,
 	}
 	return tc, nil
@@ -295,7 +295,7 @@ func (c *Client) CreateAccount(
 	payerAccount *sdk.Account,
 	payer sdk.Address,
 	latestBlockID sdk.Identifier,
-	) (sdk.Address, error) {
+) (sdk.Address, error) {
 
 	payerKey := payerAccount.Keys[0]
 	tx := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
