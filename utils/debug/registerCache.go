@@ -99,11 +99,14 @@ func (f *fileRegisterCache) Get(owner, controller, key string) ([]byte, bool) {
 }
 
 func (f *fileRegisterCache) Set(owner, controller, key string, value []byte) {
+	valueCopy := make([]byte, len(value))
+	copy(valueCopy, value)
+	fmt.Println(hex.EncodeToString([]byte(owner)), hex.EncodeToString([]byte(key)), len(value))
 	f.data[owner+"~"+controller+"~"+key] = flow.RegisterEntry{
 		Key: flow.NewRegisterID(hex.EncodeToString([]byte(owner)),
 			hex.EncodeToString([]byte(controller)),
 			hex.EncodeToString([]byte(key))),
-		Value: flow.RegisterValue(value),
+		Value: flow.RegisterValue(valueCopy),
 	}
 }
 

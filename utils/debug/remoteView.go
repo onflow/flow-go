@@ -101,7 +101,7 @@ func (v *RemoteView) MergeView(o state.View) error {
 	var other *RemoteView
 	var ok bool
 	if other, ok = o.(*RemoteView); !ok {
-		return fmt.Errorf("can not merge: view type mismatch (given: %T, expected:SimpleView)", o)
+		return fmt.Errorf("can not merge: view type mismatch (given: %T, expected:RemoteView)", o)
 	}
 
 	for k, value := range other.Delta {
