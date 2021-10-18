@@ -33,11 +33,13 @@ type PingService struct {
 type PingInfoProvider interface {
 	SoftwareVersion() string
 	SealedBlockHeight() uint64
+	HotstuffView() uint64
 }
 
 type PingInfoProviderImpl struct {
 	SoftwareVersionFun   func() string
 	SealedBlockHeightFun func() (uint64, error)
+	HotstuffViewFun      func() (uint64, error)
 }
 
 func (p PingInfoProviderImpl) SoftwareVersion() string {
@@ -50,6 +52,14 @@ func (p PingInfoProviderImpl) SealedBlockHeight() uint64 {
 		return uint64(0)
 	}
 	return height
+}
+
+func (p PingInfoProviderImpl) HotstuffView() uint64 {
+	view, err := p.HotstuffViewFun()
+	if err != nil {
+		return uint64(0)
+	}
+	return view
 }
 
 func NewPingService(h host.Host, pingProtocolID protocol.ID, pingInfoProvider PingInfoProvider, logger zerolog.Logger) *PingService {
@@ -115,10 +125,14 @@ func (ps *PingService) PingHandler(s network.Stream) {
 	// query for the lastest finalized block height
 	blockHeight := ps.pingInfoProvider.SealedBlockHeight()
 
+	// query for the hotstuff view
+	hotstuffView := ps.pingInfoProvider.HotstuffView()
+
 	// create a PingResponse
 	pingResponse := &message.PingResponse{
-		Version:     version,
-		BlockHeight: blockHeight,
+		Version:      version,
+		BlockHeight:  blockHeight,
+		HotstuffView: hotstuffView,
 	}
 
 	// send the PingResponse

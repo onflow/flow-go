@@ -44,7 +44,7 @@ func addFinalListFlags() {
 
 func finalList(cmd *cobra.Command, args []string) {
 	// read public partner node infos
-	log.Info().Msgf("reading parnter public node information: %s", flagPartnerNodeInfoDir)
+	log.Info().Msgf("reading partner public node information: %s", flagPartnerNodeInfoDir)
 	partnerNodes := assemblePartnerNodesWithoutStake()
 
 	// read internal private node infos

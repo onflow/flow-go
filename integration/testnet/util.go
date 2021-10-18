@@ -104,7 +104,11 @@ func WriteJSON(path string, data interface{}) error {
 		return err
 	}
 
-	err = ioutil.WriteFile(path, marshaled, 0644)
+	return WriteFile(path, marshaled)
+}
+
+func WriteFile(path string, data []byte) error {
+	err := ioutil.WriteFile(path, data, 0644)
 	return err
 }
 

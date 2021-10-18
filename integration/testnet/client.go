@@ -3,6 +3,7 @@ package testnet
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go-sdk/templates"
 	"time"
 
 	"google.golang.org/grpc"
@@ -24,11 +25,12 @@ import (
 // NOTE: we use integration/client rather than sdk/client as a stopgap until
 // the SDK client is updated with the latest protobuf definitions.
 type Client struct {
-	client *client.Client
-	key    *sdk.AccountKey
-	signer sdkcrypto.InMemorySigner
-	seqNo  uint64
-	Chain  flow.Chain
+	client  *client.Client
+	key     *sdk.AccountKey
+	signer  sdkcrypto.InMemorySigner
+	seqNo   uint64
+	Chain   flow.Chain
+	account *sdk.Account
 }
 
 // NewClientWithKey returns a new client to an Access API listening at the given
@@ -54,6 +56,7 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 		signer: mySigner,
 		Chain:  chain,
 		seqNo:  accountKey.SequenceNumber,
+		account: acc,
 	}
 	return tc, nil
 }
@@ -159,8 +162,25 @@ func (c *Client) ExecuteScript(ctx context.Context, script dsl.Main) (cadence.Va
 	return res, nil
 }
 
+func (c *Client) ExecuteScriptBytes(ctx context.Context, script []byte, args []cadence.Value) (cadence.Value, error) {
+	res, err := c.client.ExecuteScriptAtLatestBlock(ctx, script, args)
+	if err != nil {
+		return nil, fmt.Errorf("could not execute script: %w", err)
+	}
+
+	return res, nil
+}
+
 func (c *Client) SDKServiceAddress() sdk.Address {
 	return sdk.Address(c.Chain.ServiceAddress())
+}
+
+func (c *Client) Accountkey() *sdk.AccountKey {
+	return c.key
+}
+
+func (c *Client) Account() *sdk.Account {
+	return c.account
 }
 
 func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.TransactionResult, error) {
@@ -188,7 +208,7 @@ func (c *Client) WaitForSealed(ctx context.Context, id sdk.Identifier) (*sdk.Tra
 	}
 
 	fmt.Println()
-	fmt.Printf("Transaction %s sealed\n", id)
+	fmt.Printf("(Wait for Seal) Transaction %s sealed\n", id)
 
 	return result, err
 }
@@ -217,4 +237,87 @@ func (c *Client) GetLatestBlockID(ctx context.Context) (flow.Identifier, error) 
 	var id flow.Identifier
 	copy(id[:], header.ID[:])
 	return id, nil
+}
+
+func (c *Client) UserAddress(txResp *sdk.TransactionResult) (sdk.Address, bool) {
+	var (
+		address sdk.Address
+		found   bool
+	)
+
+	// For account creation transactions that create multiple accounts, assume the last
+	// created account is the user account. This is specifically the case for the
+	// locked token shared account creation transactions.
+	for _, event := range txResp.Events {
+		if event.Type == sdk.EventAccountCreated {
+			accountCreatedEvent := sdk.AccountCreatedEvent(event)
+			address = accountCreatedEvent.Address()
+			found = true
+		}
+	}
+
+	return address, found
+}
+
+func (c *Client) TokenAmountByRole(role flow.Role) (string, error) {
+	if role == flow.RoleCollection {
+		return "250000.0", nil
+	}
+	if role == flow.RoleConsensus {
+		return "500000.0", nil
+	}
+	if role == flow.RoleExecution {
+		return "1250000.0", nil
+	}
+	if role == flow.RoleVerification {
+		return "135000.0", nil
+	}
+	if role == flow.RoleAccess {
+		return "0.0", nil
+	}
+
+	return "", fmt.Errorf("could not get token amount by role: %v", role)
+}
+
+func (c *Client) GetAccount(accountAddress sdk.Address) (*sdk.Account, error) {
+	ctx := context.Background()
+	account, err := c.client.GetAccount(ctx, accountAddress)
+	if err != nil {
+		return nil, fmt.Errorf("could not get account: %w", err)
+	}
+
+	return account, nil
+}
+
+func (c *Client) CreateAccount(
+	ctx context.Context,
+	accountKey *sdk.AccountKey,
+	payerAccount *sdk.Account,
+	payer sdk.Address,
+	latestBlockID sdk.Identifier,
+	) (sdk.Address, error) {
+
+	payerKey := payerAccount.Keys[0]
+	tx := templates.CreateAccount([]*sdk.AccountKey{accountKey}, nil, payer)
+	tx.SetGasLimit(1000).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(payer, 0, payerKey.SequenceNumber).
+		SetPayer(payer)
+
+	payerKey.SequenceNumber++
+	err := c.SignAndSendTransaction(ctx, tx)
+	if err != nil {
+		return sdk.Address{}, fmt.Errorf("failed to sign and send create account transaction %w", err)
+	}
+
+	result, err := c.WaitForSealed(ctx, tx.ID())
+	if err != nil {
+		return sdk.Address{}, fmt.Errorf("failed to wait for create account transaction to seal %w", err)
+	}
+
+	if address, ok := c.UserAddress(result); ok {
+		return address, nil
+	}
+
+	return sdk.Address{}, fmt.Errorf("failed to get account address of the created flow account")
 }
