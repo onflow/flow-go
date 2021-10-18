@@ -367,7 +367,7 @@ func (c *balanceProcessor) isDapper(address flow.Address) (bool, error) {
 			Identifier: "dapperUtilityCoinReceiver",
 		})
 
-	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key)
+	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key, false)
 	if err != nil {
 		return false, fmt.Errorf("could not load dapper receiver at %s: %w", address, err)
 	}
@@ -381,7 +381,7 @@ func (c *balanceProcessor) hasReceiver(address flow.Address) (bool, error) {
 			Identifier: "flowTokenReceiver",
 		})
 
-	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key)
+	receiver, err := c.st.Get(id.Owner, id.Controller, id.Key, false)
 	if err != nil {
 		return false, fmt.Errorf("could not load receiver at %s: %w", address, err)
 	}
