@@ -30,25 +30,22 @@ make crypto/relic/build
 
 case $TEST_CATEGORY in
     unit)
-        cd $GOPATH
-        GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v1.1.2
-        GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1
-        cd -
+        make install-mock-generators
         make generate-mocks
-        GO111MODULE=on go test -json -count $NUM_RUNS --tags relic ./... | $process_results
+        JSON_OUTPUT=true make -s unittest-main | $process_results
     ;;
     crypto-unit)
         cd ./crypto
-        GO111MODULE=on go test -json -count $NUM_RUNS --tags relic ./... | $process_results
+        JSON_OUTPUT=true make -s test | $process_results
     ;;
     integration-unit)
         cd ./integration
-        GO111MODULE=on go test -json -count $NUM_RUNS --tags relic `go list ./... | grep -v -e integration/tests -e integration/benchmark` | $process_results
+        JSON_OUTPUT=true make -s test | $process_results
     ;;
     integration)
         make docker-build-flow
-        cd ./integration/tests
-        GO111MODULE=on go test -json -count $NUM_RUNS --tags relic ./... | $process_results
+        cd ./integration
+        JSON_OUTPUT=true make -s integration-test | $process_results
     ;;
 esac
 

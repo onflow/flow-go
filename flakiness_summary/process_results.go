@@ -16,14 +16,14 @@ type RawTestStep struct {
 	Package string    `json:"Package"`
 	Test    string    `json:"Test"`
 	Output  string    `json:"Output"`
-	Elapsed float32   `json:"Elapsed"`
+	Elapsed float64   `json:"Elapsed"`
 }
 
 // models full summary of a test run from "go test -json"
 type TestRun struct {
 	CommitSha      string          `json:"commit_sha"`
-	CommitDate     string          `json:"commit_date"`
-	JobRunDate     string          `json:"job_run_date"`
+	CommitDate     time.Time       `json:"commit_date"`
+	JobRunDate     time.Time       `json:"job_run_date"`
 	PackageResults []PackageResult `json:"results"`
 }
 
@@ -53,7 +53,7 @@ func (testRun *TestRun) save() {
 type PackageResult struct {
 	Package string       `json:"package"`
 	Result  string       `json:"result"`
-	Elapsed float32      `json:"elapsed"`
+	Elapsed float64      `json:"elapsed"`
 	Output  []string     `json:"output"`
 	Tests   []TestResult `json:"tests"`
 	TestMap map[string][]TestResult
@@ -65,7 +65,7 @@ type TestResult struct {
 	Package string   `json:"package"`
 	Output  []string `json:"output"`
 	Result  string   `json:"result"`
-	Elapsed float32  `json:"elapsed"`
+	Elapsed float64  `json:"elapsed"`
 }
 
 // this interface gives us the flexibility to read test results in multiple ways - from stdin (for production) and from a local file (for testing)
@@ -245,9 +245,9 @@ func finalizeTestRun(packageResultMap map[string]*PackageResult) TestRun {
 	}
 
 	var testRun TestRun
-	testRun.CommitDate = commitDate.Format(time.RFC1123Z)
+	testRun.CommitDate = commitDate
 	testRun.CommitSha = commitSha
-	testRun.JobRunDate = jobStarted.Format(time.RFC1123Z)
+	testRun.JobRunDate = jobStarted
 
 	// add all the package results to the test run
 	for _, pr := range packageResultMap {
