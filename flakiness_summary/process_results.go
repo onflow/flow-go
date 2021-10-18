@@ -245,9 +245,9 @@ func finalizeTestRun(packageResultMap map[string]*PackageResult) TestRun {
 	}
 
 	var testRun TestRun
-	testRun.CommitDate = commitDate
+	testRun.CommitDate = commitDate.UTC()
 	testRun.CommitSha = commitSha
-	testRun.JobRunDate = jobStarted
+	testRun.JobRunDate = jobStarted.UTC()
 
 	// add all the package results to the test run
 	for _, pr := range packageResultMap {
