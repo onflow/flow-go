@@ -6,7 +6,6 @@ on:
       - master
 
 env:
-  NUM_RUNS: 10
   GCS_BUCKET: production_ddp_flow_test_metrics
   COMMIT_SHA: ${{ github.sha }}
 
@@ -30,4 +29,5 @@ jobs:
       run: ./flakiness-summary.sh
       env:
         TEST_CATEGORY: integration
+        NUM_RUNS: 1
   
