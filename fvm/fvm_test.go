@@ -1644,7 +1644,8 @@ func TestSignatureVerification(t *testing.T) {
 	}, hashAlgorithm{
 		"KMAC128_BLS_BLS12_381",
 		func() hash.Hasher {
-			return crypto.NewBLSKMAC(flow.UserTagString)
+			return nil
+			//return crypto.NewBLSKMAC(flow.UserTagString)
 		},
 	})
 }
@@ -2617,7 +2618,7 @@ func TestStorageUsed(t *testing.T) {
 	)
 
 	code := []byte(`
-        pub fun main() {
+        pub fun main(): UInt64 {
 
             var addresses: [Address]= [
                 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731,
@@ -2633,11 +2634,13 @@ func TestStorageUsed(t *testing.T) {
                 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731, 0x2a3c4c2581cef731
             ]
 
-            var count = 0
+            var storageUsed: UInt64 = 0
             for address in addresses {
                 let account = getAccount(address)
-                var x = account.storageUsed
+                storageUsed = account.storageUsed
             }
+
+            return storageUsed
         }
 	`)
 
@@ -2645,7 +2648,7 @@ func TestStorageUsed(t *testing.T) {
 	require.NoError(t, err)
 
 	storageUsed := make([]byte, 8)
-	binary.BigEndian.PutUint64(storageUsed, 0)
+	binary.BigEndian.PutUint64(storageUsed, 5)
 
 	simpleView := utils.NewSimpleView()
 	simpleView.Set(string(address), "", state.KeyStorageUsed, storageUsed)
@@ -2654,4 +2657,6 @@ func TestStorageUsed(t *testing.T) {
 
 	err = vm.Run(ctx, script, simpleView, programs.NewEmptyPrograms())
 	assert.NoError(t, err)
+
+	assert.Equal(t, cadence.NewUInt64(5), script.Value)
 }
