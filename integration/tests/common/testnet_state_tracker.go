@@ -100,7 +100,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 				finalState, err := m.ExecutionResult.FinalStateCommitment()
 				require.NoError(t, err)
 
-				tst.ReceiptState.Add(t, m)
+				tst.ReceiptState.Add(m)
 				t.Logf("execution receipts received from %s for block ID %x by executor ID %x with SC %x resultID %x\n",
 					sender,
 					m.ExecutionResult.BlockID,
