@@ -88,7 +88,7 @@ func (l LeaderSelection) newInvalidViewError(view uint64) InvalidViewError {
 // seed - the random seed for leader selection
 // count - the number of leader selections to be pre-generated and cached.
 // identities - the identities that contain the stake info, which is used as weight for the chance of
-// 							the identity to be selected as leader.
+//							the identity to be selected as leader.
 func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, identities flow.IdentityList) (*LeaderSelection, error) {
 
 	if count < 1 {
