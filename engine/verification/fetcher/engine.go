@@ -359,8 +359,14 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 	result *flow.ExecutionResult) error {
 
 	chunk := result.Chunks[chunkIndex]
+	// 1. chunk ID of chunk data pack should map the chunk ID on execution result
+	expectedChunkID := result.Chunks[chunkIndex].ID()
+	if chunkDataPack.ChunkID != expectedChunkID {
+		return fmt.Errorf("chunk ID of chunk data pack does not match corresponding chunk on execution result, expected: %x, got:%x",
+			expectedChunkID, chunkDataPack.ChunkID)
+	}
 
-	// 1. sender must be a staked execution node at that block
+	// 2. sender must be a staked execution node at that block
 	blockID := chunk.BlockID
 	staked := e.validateStakedExecutionNodeAtBlockID(senderID, blockID)
 	if !staked {
@@ -370,7 +376,7 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 			chunk.ID())
 	}
 
-	// 2. start state must match
+	// 3. start state must match
 	if chunkDataPack.StartState != chunk.ChunkBody.StartState {
 		return engine.NewInvalidInputErrorf("expecting chunk data pack's start state: %x, but got: %x, block ID: %x, resultID: %x, chunk ID: %x",
 			chunk.ChunkBody.StartState,
