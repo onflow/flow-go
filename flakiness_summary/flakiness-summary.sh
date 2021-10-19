@@ -35,17 +35,14 @@ case $TEST_CATEGORY in
         JSON_OUTPUT=true make -s unittest-main | $process_results
     ;;
     crypto-unit)
-        cd ./crypto
-        JSON_OUTPUT=true make -s test | $process_results
+        JSON_OUTPUT=true make -C crypto -s test | $process_results
     ;;
     integration-unit)
-        cd ./integration
-        JSON_OUTPUT=true make -s test | $process_results
+        JSON_OUTPUT=true make -C integration -s test | $process_results
     ;;
     integration)
         make docker-build-flow
-        cd ./integration
-        JSON_OUTPUT=true make -s all-integration-tests | $process_results
+        JSON_OUTPUT=true make -C integration -s all-integration-tests | $process_results
     ;;
 esac
 
