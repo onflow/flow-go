@@ -418,7 +418,7 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	responses, _ := verifiableChunkFixture(t, statuses.Chunks(), block, result, collMap)
 
 	// mocks there is no pending status for this chunk at fetcher engine.
-	s.pendingChunks.On("ByID", chunkID).Return(nil, false)
+	s.pendingChunks.On("Get", chunk.Index, result.ID()).Return(nil, false)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(responses))
 	e.HandleChunkDataPack(unittest.IdentifierFixture(), responses[chunkID])
