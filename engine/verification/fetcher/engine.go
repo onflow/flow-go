@@ -197,8 +197,7 @@ func (e *Engine) processAssignedChunk(chunk *flow.Chunk, result *flow.ExecutionR
 	}
 	added := e.pendingChunks.Add(status)
 	if !added {
-		// chunk locators are deduplicated by consumer, reaching this point hints failing deduplication on consumer.
-		return false, blockHeight, fmt.Errorf("data race detected, received a duplicate chunk locator")
+		return false, blockHeight, nil
 	}
 
 	err = e.requestChunkDataPack(chunk.Index, chunkID, result.ID(), chunk.BlockID)

@@ -786,10 +786,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	// TODO: currently just stashing a dummy key as staking key to prevent the nodeinfo.Type() function from
 	// returning an error. Eventually, a new key type NodeInfoTypePrivateUnstaked needs to be defined
 	// (see issue: https://github.com/onflow/flow-go/issues/1214)
-	dummyStakingKey, err := unittest.StakingKey()
-	if err != nil {
-		return nil, err
-	}
+	dummyStakingKey := unittest.StakingPrivKeyFixture()
 
 	for _, conf := range confs {
 		info := bootstrap.NewPrivateNodeInfo(
@@ -1009,16 +1006,10 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 	roleCounter := make(map[flow.Role]int)
 
 	// get networking keys for all nodes
-	networkKeys, err := unittest.NetworkingKeys(nNodes)
-	if err != nil {
-		return nil, err
-	}
+	networkKeys := unittest.NetworkingKeys(nNodes)
 
 	// get staking keys for all nodes
-	stakingKeys, err := unittest.StakingKeys(nNodes)
-	if err != nil {
-		return nil, err
-	}
+	stakingKeys := unittest.StakingKeys(nNodes)
 
 	// create node container configs and corresponding public identities
 	confs := make([]ContainerConfig, 0, nNodes)

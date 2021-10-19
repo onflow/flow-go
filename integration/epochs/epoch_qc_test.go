@@ -61,8 +61,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 	// create cluster nodes with voter resource
 	for _, node := range nodes {
 		nodeID := node.NodeID
-		stakingPrivKey, err := unittest.StakingKey()
-		s.Require().NoError(err)
+		stakingPrivKey := unittest.StakingPrivKeyFixture()
 
 		// find cluster and create root block
 		cluster, _, _ := clustering.ByNodeID(node.NodeID)
