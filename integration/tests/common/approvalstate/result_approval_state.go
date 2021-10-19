@@ -66,7 +66,7 @@ func (r *ResultApprovalState) WaitForResultApproval(t *testing.T, verNodeID, res
 		return false
 
 	}, resultApprovalTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive result approval for chunk %d of result ID %x from %x",
+		fmt.Sprintf("did not receive result approval for chunk %d of result ID %x from %x \n",
 			chunkIndex,
 			resultID,
 			verNodeID))
