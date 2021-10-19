@@ -507,9 +507,9 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 
 		// cancel the dial back off (if any), since we want to connect immediately
 		network := n.host.Network()
+		dialAddr = network.Peerstore().Addrs(peerID)
 		if swm, ok := network.(*swarm.Swarm); ok {
 			swm.Backoff().Clear(peerID)
-			dialAddr = swm.Peerstore().Addrs(peerID)
 		}
 
 		// if this is a retry attempt, wait for some time before retrying
