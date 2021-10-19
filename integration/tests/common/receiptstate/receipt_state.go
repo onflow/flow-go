@@ -47,7 +47,7 @@ func (rs *ReceiptState) WaitForReceiptFromAny(t *testing.T, blockID flow.Identif
 
 		return len(rs.receipts[blockID]) > 0
 	}, ReceiptTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive execution receipt for block ID %x from any node within %v seconds", blockID,
+		fmt.Sprintf("did not receive execution receipt for block ID %x from any node within %v seconds \n", blockID,
 			ReceiptTimeout))
 	for _, r := range rs.receipts[blockID] {
 		return r
@@ -66,7 +66,7 @@ func (rs *ReceiptState) WaitForReceiptFrom(t *testing.T, blockID, executorID flo
 		r, ok = rs.receipts[blockID][executorID]
 		return ok
 	}, ReceiptTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive execution receipt for block ID %x from %x within %v seconds", blockID, executorID,
+		fmt.Sprintf("did not receive execution receipt for block ID %x from %x within %v seconds \n", blockID, executorID,
 			ReceiptTimeout))
 	return r
 }
