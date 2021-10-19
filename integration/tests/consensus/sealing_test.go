@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -55,25 +56,25 @@ func (ss *SealingSuite) SetupTest() {
 	var nodeConfigs []testnet.NodeConfig
 
 	// need one dummy collection node (unused ghost)
-	colConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.AsGhost())
+	colConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, colConfig)
 
 	// need three real consensus nodes
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(conID))
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithID(conID))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 		ss.conIDs = append(ss.conIDs, conID)
 	}
 
 	// need one controllable execution node (used ghost)
 	ss.exeID = unittest.IdentifierFixture()
-	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithID(ss.exeID), testnet.AsGhost())
+	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.exeID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
 	// need one controllable verification node (used ghost)
 	ss.verID = unittest.IdentifierFixture()
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithID(ss.verID), testnet.AsGhost())
+	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.verID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
 
 	// generate the network config
