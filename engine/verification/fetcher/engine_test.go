@@ -789,7 +789,11 @@ func chunkDataPackResponseFixture(t *testing.T,
 
 // verifiableChunkFixture is a test helper that creates verifiable chunks, chunk data packs,
 // and collection fixtures for the given chunks list.
-func verifiableChunkFixture(t *testing.T, chunks flow.ChunkList, block *flow.Block, result *flow.ExecutionResult, collMap map[flow.Identifier]*flow.Collection) (
+func verifiableChunkFixture(t *testing.T,
+	chunks flow.ChunkList,
+	block *flow.Block,
+	result *flow.ExecutionResult,
+	collMap map[flow.Identifier]*flow.Collection) (
 	map[flow.Identifier]*verification.ChunkDataPackResponse,
 	map[flow.Identifier]*verification.VerifiableChunkData) {
 
@@ -881,7 +885,7 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 			// system-chunk should have a nil collection
 			continue
 		}
-		collMap[status.ID()] = collections[status.ChunkIndex]
+		collMap[status.ChunkID()] = collections[status.ChunkIndex]
 	}
 
 	return block, result, statuses, locators, collMap
