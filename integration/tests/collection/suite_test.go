@@ -26,7 +26,7 @@ import (
 
 const (
 	// the default timeout for individual actions (eg. send a transaction)
-	defaultTimeout = 45 * time.Second
+	defaultTimeout = 30 * time.Second
 )
 
 // CollectorSuite represents a test suite for collector nodes.
@@ -73,8 +73,8 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 		conNode,
 		exeNode,
 		verNode,
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 	}
 	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection,
 		testnet.WithLogLevel(zerolog.WarnLevel),
