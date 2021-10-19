@@ -578,19 +578,21 @@ func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 func mockPendingChunksRem(t *testing.T, pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus, removed bool) {
 	mu := &sync.Mutex{}
 
-	pendingChunks.On("Rem", mock.Anything).
+	pendingChunks.On("Rem", mock.Anything, mock.Anything).
 		Run(func(args mock.Arguments) {
 			// to provide mutual exclusion under concurrent invocations.
 			mu.Lock()
 			defer mu.Unlock()
 
-			actual, ok := args[0].(flow.Identifier)
+			actualIndex, ok := args[0].(uint64)
+			require.True(t, ok)
+
+			actualResultID, ok := args[1].(flow.Identifier)
 			require.True(t, ok)
 
 			// there should be a matching chunk status with the received one.
 			for _, expected := range list {
-				expectedID := expected.ID()
-				if expectedID == actual {
+				if expected.ChunkIndex == actualIndex && expected.ExecutionResult.ID() == actualResultID {
 					return
 				}
 			}
@@ -599,7 +601,7 @@ func mockPendingChunksRem(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 		}).Return(removed).Times(len(list))
 }
 
-// mockPendingChunksGet mocks the ByID method of pending chunks for expecting only the specified list of chunk statuses.
+// mockPendingChunksGet mocks the Get method of pending chunks for expecting only the specified list of chunk statuses.
 func mockPendingChunksGet(pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus) {
 	mu := &sync.Mutex{}
 
