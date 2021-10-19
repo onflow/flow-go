@@ -41,7 +41,7 @@ func (t *LogTracer) StartBlockSpan(
 	blockID flow.Identifier,
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
-	sp := NewLogSpan(spanName)
+	sp := NewLogSpan(t, spanName)
 	ctx = context.WithValue(ctx, "activeSpan", sp.spanID)
 	return sp, ctx, true
 }
@@ -51,7 +51,7 @@ func (t *LogTracer) StartCollectionSpan(
 	collectionID flow.Identifier,
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
-	sp := NewLogSpan(spanName)
+	sp := NewLogSpan(t, spanName)
 	ctx = context.WithValue(ctx, "activeSpan", sp.spanID)
 	return sp, ctx, true
 }
@@ -63,7 +63,7 @@ func (t *LogTracer) StartTransactionSpan(
 	transactionID flow.Identifier,
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
-	sp := NewLogSpan(spanName)
+	sp := NewLogSpan(t, spanName)
 	ctx = context.WithValue(ctx, "activeSpan", sp.spanID)
 	return sp, ctx, true
 }
@@ -74,7 +74,7 @@ func (t *LogTracer) StartSpanFromContext(
 	opts ...opentracing.StartSpanOption,
 ) (opentracing.Span, context.Context) {
 	parentSpanID := ctx.Value("activeSpan").(uint64)
-	sp := NewLogSpanWithParent(operationName, parentSpanID)
+	sp := NewLogSpanWithParent(t, operationName, parentSpanID)
 	ctx = context.WithValue(ctx, "activeSpan", sp.spanID)
 	return sp, opentracing.ContextWithSpan(ctx, sp)
 }
@@ -85,7 +85,7 @@ func (t *LogTracer) StartSpanFromParent(
 	opts ...opentracing.StartSpanOption,
 ) opentracing.Span {
 	parentSpan := span.(*LogSpan)
-	return NewLogSpanWithParent(operationName, parentSpan.spanID)
+	return NewLogSpanWithParent(t, operationName, parentSpan.spanID)
 }
 
 func (t *LogTracer) RecordSpanFromParent(
@@ -96,7 +96,7 @@ func (t *LogTracer) RecordSpanFromParent(
 	opts ...opentracing.StartSpanOption,
 ) {
 	parentSpan := span.(*LogSpan)
-	sp := NewLogSpanWithParent(operationName, parentSpan.spanID)
+	sp := NewLogSpanWithParent(t, operationName, parentSpan.spanID)
 	sp.start = time.Now().Add(-duration)
 	sp.Finish()
 }
@@ -114,6 +114,7 @@ func (t *LogTracer) WithSpanFromContext(ctx context.Context,
 }
 
 type LogSpan struct {
+	tracer        *LogTracer
 	spanID        uint64
 	parentID      uint64
 	operationName SpanName
@@ -122,8 +123,9 @@ type LogSpan struct {
 	tags          map[string]interface{}
 }
 
-func NewLogSpan(operationName SpanName) *LogSpan {
+func NewLogSpan(tracer *LogTracer, operationName SpanName) *LogSpan {
 	return &LogSpan{
+		tracer:        tracer,
 		spanID:        rand.Uint64(),
 		operationName: operationName,
 		start:         time.Now(),
@@ -131,18 +133,28 @@ func NewLogSpan(operationName SpanName) *LogSpan {
 	}
 }
 
-func NewLogSpanWithParent(operationName SpanName, parentSpanID uint64) *LogSpan {
-	sp := NewLogSpan(operationName)
+func NewLogSpanWithParent(tracer *LogTracer, operationName SpanName, parentSpanID uint64) *LogSpan {
+	sp := NewLogSpan(tracer, operationName)
 	sp.parentID = parentSpanID
 	return sp
 }
 
+func (s *LogSpan) ProduceLog() {
+	s.tracer.log.Info().
+		Uint64("spanID", s.spanID).
+		Uint64("parent", s.parentID).
+		Time("start", s.start).
+		Time("end", s.end).
+		Msgf("Span %s (duration %d ms)", s.operationName, s.end.Sub(s.start).Milliseconds())
+}
+
 func (s *LogSpan) Finish() {
 	s.end = time.Now()
+	s.ProduceLog()
 }
 func (s *LogSpan) FinishWithOptions(opts opentracing.FinishOptions) {
 	// TODO support finish options
-	s.end = time.Now()
+	s.Finish()
 }
 func (s *LogSpan) Context() opentracing.SpanContext {
 	return &NoopSpanContext{}
