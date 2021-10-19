@@ -497,7 +497,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
 		}
 	}
-	require.True(t, len(accessNodeIDS) > 1, "at-least 2 access node that is not a ghost must be configured for test suite")
+	// require.True(t, len(accessNodeIDS) > 1, "at-least 2 access node that is not a ghost must be configured for test suite")
 
 	// add each node to the network
 	for _, nodeConf := range confs {
