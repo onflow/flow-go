@@ -45,7 +45,7 @@ case $TEST_CATEGORY in
     integration)
         make docker-build-flow
         cd ./integration
-        JSON_OUTPUT=true make -s integration-test | $process_results
+        JSON_OUTPUT=true make -s all-integration-tests | $process_results
     ;;
 esac
 

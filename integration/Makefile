@@ -6,6 +6,10 @@ COVER_PROFILE := cover.out
 test:
 	GO111MODULE=on go test $(if $(VERBOSE),-v,) -tags relic -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests -e integration/benchmark`
 
+.PHONY: all-integration-tests
+all-integration-tests: 
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/...
+
 # Run the integration test suite
 .PHONY: integration-test
 integration-test: access-tests common-tests execution-tests verification-tests collection-tests consensus-tests epoch-tests
