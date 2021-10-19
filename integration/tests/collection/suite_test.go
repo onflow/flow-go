@@ -40,6 +40,8 @@ type CollectorSuite struct {
 	net       *testnet.FlowNetwork
 	nClusters uint
 
+	serviceAccountIdx uint64
+
 	// account info
 	acct struct {
 		key    *sdk.AccountKey
@@ -62,14 +64,22 @@ func TestCollectorSuite(t *testing.T) {
 // NOTE: This must be called explicitly by each test, since nodes/clusters vary
 //       between test cases.
 func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
-
-	// default set of non-collector nodes
 	var (
 		conNode = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 		exeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
 	)
-	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection, testnet.WithAdditionalFlag("--block-rate-delay=1ms"))
+	nodes := []testnet.NodeConfig{
+		conNode,
+		exeNode,
+		verNode,
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.ErrorLevel)),
+	}
+	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection,
+		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithAdditionalFlag("--block-rate-delay=1ms"),
+	)
 
 	suite.nClusters = nClusters
 
@@ -77,8 +87,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	suite.ghostID = conNode.Identifier
 
 	// instantiate the network
-	nodes := append(colNodes, conNode, exeNode, verNode)
-	nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess), testnet.NewNodeConfig(flow.RoleAccess))
+	nodes = append(nodes, colNodes...)
 	conf := testnet.NewNetworkConfig(name, nodes, testnet.WithClusters(nClusters))
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
 
@@ -88,6 +97,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 
 	// create an account to use for sending transactions
 	suite.acct.addr, suite.acct.key, suite.acct.signer = common.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	suite.serviceAccountIdx = 2
 
 	// subscribe to the ghost
 	for attempts := 0; ; attempts++ {
@@ -162,8 +172,11 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
+		serviceAccountAddr, err := suite.net.Root().Header.ChainID.Chain().AddressAtIndex(suite.serviceAccountIdx)
+		suite.Require().NoError(err)
+		suite.serviceAccountIdx++
 		tx.SetScript(append(tx.Script, '/', '/'))
-		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Testnet), acct.key.Index, acct.signer)
+		err = tx.SignEnvelope(sdk.Address(serviceAccountAddr), acct.key.Index, acct.signer)
 		require.Nil(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
@@ -180,7 +193,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 
 	blocks := make([]cluster.Block, 0, n)
-	suite.T().Logf("awaiting %d cluster blocks", n)
+	suite.T().Logf("awaiting %d cluster blocks\n", n)
 
 	waitFor := defaultTimeout + time.Duration(n)*2*time.Second
 	deadline := time.Now().Add(waitFor)
@@ -188,7 +201,7 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 
 		_, msg, err := suite.reader.Next()
 		suite.Require().Nil(err, "could not read next message")
-		suite.T().Logf("ghost recv: %T", msg)
+		suite.T().Logf("ghost recv: %T\n", msg)
 
 		switch val := msg.(type) {
 		case *messages.ClusterBlockProposal:
@@ -203,7 +216,7 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 		}
 	}
 
-	suite.T().Logf("timed out waiting for blocks (timeout=%s, saw=%d, expected=%d)", waitFor.String(), len(blocks), n)
+	suite.T().Logf("timed out waiting for blocks (timeout=%s, saw=%d, expected=%d)\n", waitFor.String(), len(blocks), n)
 	suite.T().FailNow()
 	return nil
 }
@@ -224,9 +237,9 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		lookup[txID] = struct{}{}
 	}
 
-	suite.T().Logf("awaiting %d transactions included", len(txIDs))
+	suite.T().Logf("awaiting %d transactions included\n", len(txIDs))
 
-	waitFor := defaultTimeout + time.Duration(len(lookup))*100*time.Millisecond
+	waitFor := 2*defaultTimeout + time.Duration(len(lookup))*200*time.Millisecond
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
@@ -237,7 +250,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		case *messages.ClusterBlockProposal:
 			header := val.Header
 			collection := val.Payload.Collection
-			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
+			suite.T().Logf("got proposal height=%d col_id=%x size=%d\n", header.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
 				for _, txID := range collection.Light().Transactions {
 					finalized[txID] = struct{}{}
@@ -253,11 +266,11 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		case *flow.CollectionGuarantee:
 			finalizedTxIDs, ok := proposals[val.CollectionID]
 			if !ok {
-				suite.T().Logf("got unseen guarantee (id=%x)", val.CollectionID)
+				suite.T().Logf("got unseen guarantee (id=%x)\n", val.CollectionID)
 				guarantees[val.CollectionID] = true
 				continue
 			} else {
-				suite.T().Logf("got guarantee (id=%x)", val.CollectionID)
+				suite.T().Logf("got guarantee (id=%x)\n", val.CollectionID)
 			}
 			for _, txID := range finalizedTxIDs {
 				finalized[txID] = struct{}{}
@@ -273,7 +286,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	}
 
 	suite.T().Logf(
-		"timed out waiting for inclusion (timeout=%s, finalized=%d, expected=%d)",
+		"timed out waiting for inclusion (timeout=%s, finalized=%d, expected=%d)\n",
 		waitFor.String(), len(finalized), len(lookup),
 	)
 	var missing []flow.Identifier
@@ -282,7 +295,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 			missing = append(missing, id)
 		}
 	}
-	suite.T().Logf("missing: %v", missing)
+	suite.T().Logf("missing: %v\n", missing)
 	suite.T().FailNow()
 }
 
