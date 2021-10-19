@@ -22,7 +22,7 @@ import (
 func TestNetwork(t *testing.T) {
 
 	// define what nodes and how many instances of each need to be created (role => count e.g. consensus = 3, creates 3 ghost consensus nodes)
-	nodeCounts := map[flow.Role]int{flow.RoleCollection: 1, flow.RoleConsensus: 3, flow.RoleExecution: 2, flow.RoleVerification: 1}
+	nodeCounts := map[flow.Role]int{flow.RoleAccess: 2, flow.RoleCollection: 1, flow.RoleConsensus: 3, flow.RoleExecution: 2, flow.RoleVerification: 1}
 
 	var nodes []testnet.NodeConfig
 	id := uint(1)
