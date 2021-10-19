@@ -146,6 +146,7 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithDebugImage(false)),
+		testnet.NewNodeConfig(flow.RoleAccess),
 		stakedConfig,
 	}
 

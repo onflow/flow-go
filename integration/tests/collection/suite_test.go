@@ -78,6 +78,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 
 	// instantiate the network
 	nodes := append(colNodes, conNode, exeNode, verNode)
+	nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess), testnet.NewNodeConfig(flow.RoleAccess))
 	conf := testnet.NewNetworkConfig(name, nodes, testnet.WithClusters(nClusters))
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
 

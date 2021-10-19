@@ -59,7 +59,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	blocks storage.Blocks,
 	comp network.Engine,
@@ -380,7 +380,7 @@ func (e *Engine) sendRequests(participants flow.IdentifierList, ranges []flow.Ra
 			errs = multierror.Append(errs, fmt.Errorf("could not submit range request: %w", err))
 			continue
 		}
-		e.log.Debug().
+		e.log.Info().
 			Uint64("range_from", req.FromHeight).
 			Uint64("range_to", req.ToHeight).
 			Uint64("range_nonce", req.Nonce).
