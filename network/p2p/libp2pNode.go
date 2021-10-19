@@ -463,7 +463,7 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 		if err != nil {
 			lg.Warn().Err(err).Msg("address not found in both peer store and dht")
 		} else {
-			lg.Info().Msg("address not found in peer store, but found in dht search")
+			lg.Debug().Msg("address not found in peer store, but found in dht search")
 		}
 	}
 	stream, dialAddrs, err := n.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
