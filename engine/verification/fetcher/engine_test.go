@@ -138,7 +138,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	mockBlocksStorage(s.blocks, s.headers, block)
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
-	mockPendingChunksByID(s.pendingChunks, statuses)
+	mockPendingChunksGet(s.pendingChunks, statuses)
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
@@ -196,7 +196,7 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockBlocksStorage(s.blocks, s.headers, block)
-	mockPendingChunksByID(s.pendingChunks, statuses)
+	mockPendingChunksGet(s.pendingChunks, statuses)
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees)
 
 	// trying to remove the pending status fails.
@@ -237,7 +237,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
-	mockPendingChunksByID(s.pendingChunks, statuses)
+	mockPendingChunksGet(s.pendingChunks, statuses)
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
@@ -375,7 +375,7 @@ func testInvalidChunkDataResponse(t *testing.T,
 	_, _, agrees, _ := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
 
 	// mocks resources on fetcher engine side.
-	mockPendingChunksByID(s.pendingChunks, statuses)
+	mockPendingChunksGet(s.pendingChunks, statuses)
 	mockBlocksStorage(s.blocks, s.headers, block)
 
 	chunk := statuses.Chunks()[0]
@@ -599,28 +599,26 @@ func mockPendingChunksRem(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 		}).Return(removed).Times(len(list))
 }
 
-// mockPendingChunksByID mocks the ByID method of pending chunks for expecting only the specified list of chunk statuses.
-func mockPendingChunksByID(pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus) {
+// mockPendingChunksGet mocks the ByID method of pending chunks for expecting only the specified list of chunk statuses.
+func mockPendingChunksGet(pendingChunks *mempool.ChunkStatuses, list []*verification.ChunkStatus) {
 	mu := &sync.Mutex{}
 
-	pendingChunks.On("ByID", mock.Anything).Return(
-		func(chunkID flow.Identifier) *verification.ChunkStatus {
+	pendingChunks.On("Get", mock.Anything, mock.Anything).Return(
+		func(chunkIndex uint64, resultID flow.Identifier) *verification.ChunkStatus {
 			// to provide mutual exclusion under concurrent invocations.
 			mu.Lock()
 			defer mu.Unlock()
 
 			for _, expected := range list {
-				expectedID := expected.ID()
-				if expectedID == chunkID {
+				if expected.ChunkIndex == chunkIndex && expected.ExecutionResult.ID() == resultID {
 					return expected
 				}
 			}
 			return nil
 		},
-		func(chunkID flow.Identifier) bool {
+		func(chunkIndex uint64, resultID flow.Identifier) bool {
 			for _, expected := range list {
-				expectedID := expected.ID()
-				if expectedID == chunkID {
+				if expected.ChunkIndex == chunkIndex && expected.ExecutionResult.ID() == resultID {
 					return true
 				}
 			}
