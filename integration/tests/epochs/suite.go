@@ -366,7 +366,6 @@ func (s *Suite) SetApprovedNodesScript(ctx context.Context, env templates.Enviro
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-
 	idTableAddress := sdk.HexToAddress(env.IDTableAddress)
 	tx := sdk.NewTransaction().
 		SetScript(templates.GenerateSetApprovedNodesScript(env)).

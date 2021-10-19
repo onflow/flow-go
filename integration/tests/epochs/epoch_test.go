@@ -154,9 +154,9 @@ func (s *Suite) TestEpochJoin() {
 
 	found := false
 	for _, val := range approvedNodes.(cadence.Array).Values {
-			if string(val.(cadence.String)) == info.NodeID.String() {
-				found = true
-			}
+		if string(val.(cadence.String)) == info.NodeID.String() {
+			found = true
+		}
 	}
 
 	require.True(s.T(), found, "node id for new node not found in approved list after setting the approved list")

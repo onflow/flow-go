@@ -148,7 +148,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	// fetcher engine should request chunk data for received (assigned) chunk locators
 	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(requests))
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataPacks))
-	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks, collMap,
+	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks,
 		func(originID flow.Identifier, response *verification.ChunkDataPackResponse) {
 
 			// mocks replying to the requests by sending a chunk data pack.
@@ -248,7 +248,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	// as the response it receives a notification that chunk belongs to a sealed block.
 	// we mock this as the block is getting sealed after request dispatch.
 	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(requests))
-	requesterWg := mockRequester(t, s.requester, requests, responses, collMap, func(originID flow.Identifier,
+	requesterWg := mockRequester(t, s.requester, requests, responses, func(originID flow.Identifier,
 		response *verification.ChunkDataPackResponse) {
 		e.NotifyChunkDataPackSealed(response.Index, response.ResultID)
 	})
@@ -727,7 +727,6 @@ func mockBlocksStorage(blocks *storage.Blocks, headers *storage.Headers, block *
 func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 	requests map[flow.Identifier]*verification.ChunkDataPackRequest,
 	responses map[flow.Identifier]*verification.ChunkDataPackResponse,
-	collections map[flow.Identifier]*flow.Collection,
 	handler func(flow.Identifier, *verification.ChunkDataPackResponse)) *sync.WaitGroup {
 
 	mu := sync.Mutex{}
