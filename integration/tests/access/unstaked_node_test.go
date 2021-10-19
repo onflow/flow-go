@@ -121,13 +121,13 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		flow.RoleAccess,
 		testnet.WithID(suite.stakedID),
 		testnet.SupportsUnstakedNodes(),
-		testnet.WithLogLevel(zerolog.TraceLevel),
+		testnet.WithLogLevel(zerolog.WarnLevel),
 	)
 
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -135,19 +135,19 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
 	net := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithDebugImage(false)),
-		testnet.NewNodeConfig(flow.RoleAccess),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		stakedConfig,
 	}
 
@@ -157,8 +157,8 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 	require.NoError(suite.T(), err)
 
 	followerConfigs := []testnet.ConsensusFollowerConfig{
-		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey1, suite.stakedID, consensus_follower.WithLogLevel("debug")),
-		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey2, suite.stakedID, consensus_follower.WithLogLevel("debug")),
+		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey1, suite.stakedID, consensus_follower.WithLogLevel("warn")),
+		testnet.NewConsensusFollowerConfig(suite.T(), unstakedKey2, suite.stakedID, consensus_follower.WithLogLevel("warn")),
 	}
 
 	// consensus followers
