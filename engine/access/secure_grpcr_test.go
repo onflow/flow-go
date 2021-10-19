@@ -21,6 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	module "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/network"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/grpcutils"
@@ -34,7 +35,7 @@ type SecureGRPCTestSuite struct {
 	snapshot   *protocol.Snapshot
 	epochQuery *protocol.EpochQuery
 	log        zerolog.Logger
-	net        *module.Network
+	net        *network.Network
 	request    *module.Requester
 	collClient *accessmock.AccessAPIClient
 	execClient *accessmock.ExecutionAPIClient
@@ -54,7 +55,7 @@ type SecureGRPCTestSuite struct {
 
 func (suite *SecureGRPCTestSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stdout)
-	suite.net = new(module.Network)
+	suite.net = new(network.Network)
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
 
@@ -91,8 +92,7 @@ func (suite *SecureGRPCTestSuite) SetupTest() {
 	}
 
 	// generate a server certificate that will be served by the GRPC server
-	networkingKey, err := unittest.NetworkingKey()
-	assert.NoError(suite.T(), err)
+	networkingKey := unittest.NetworkingPrivKeyFixture()
 	x509Certificate, err := grpcutils.X509Certificate(networkingKey)
 	assert.NoError(suite.T(), err)
 	tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
@@ -133,11 +133,10 @@ func (suite *SecureGRPCTestSuite) TestAPICallUsingSecureGRPC() {
 	})
 
 	suite.Run("happy path - connection fails with an incorrect public key", func() {
-		newKey, err := unittest.NetworkingKey()
-		assert.NoError(suite.T(), err)
+		newKey := unittest.NetworkingPrivKeyFixture()
 		client, closer := suite.secureGRPCClient(newKey.PublicKey())
 		defer closer.Close()
-		_, err = client.Ping(ctx, req)
+		_, err := client.Ping(ctx, req)
 		assert.Error(suite.T(), err)
 	})
 }

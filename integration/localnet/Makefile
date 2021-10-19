@@ -2,7 +2,7 @@ COLLECTION = 3
 CONSENSUS = 3
 EXECUTION = 2
 VERIFICATION = 1
-ACCESS = 1
+ACCESS = 2
 UNSTAKED_ACCESS = 0
 NCLUSTERS=1
 EPOCHLEN=10000   # 0 means use default
@@ -39,6 +39,11 @@ init:
 .PHONY: init-light
 init-light:
 	$(MAKE) -e COLLECTION=1 CONSENSUS=1 EXECUTION=1 VERIFICATION=1 ACCESS=1 NCLUSTERS=1 init
+
+# Creates a version of localnet configured with short epochs
+.PHONY: init-short-epochs
+init-short-epochs:
+	$(MAKE) -e EPOCHLEN=200 STAKINGLEN=10 DKGLEN=50 init
 
 .PHONY: start
 start:

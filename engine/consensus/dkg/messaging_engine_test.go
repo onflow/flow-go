@@ -20,7 +20,7 @@ import (
 func createTestEngine(t *testing.T) *MessagingEngine {
 	// setup mock conduit
 	conduit := &mocknetwork.Conduit{}
-	network := new(module.Network)
+	network := new(mocknetwork.Network)
 	network.On("Register", mock.Anything, mock.Anything).
 		Return(conduit, nil).
 		Once()

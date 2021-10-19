@@ -64,10 +64,9 @@ func (s *Suite) MetricsPort() string {
 func (s *Suite) SetupSuite() {
 	blockRateFlag := "--block-rate-delay=1ms"
 
-	// generates one access node
-	acsConfig := testnet.NewNodeConfig(flow.RoleAccess,
-		testnet.WithLogLevel(zerolog.FatalLevel))
-	s.nodeConfigs = append(s.nodeConfigs, acsConfig)
+	// setup two access nodes, minimum needed for LN/SN access API and fallback
+	anConfigs := []testnet.NodeConfig{testnet.NewNodeConfig(flow.RoleAccess), testnet.NewNodeConfig(flow.RoleAccess)}
+	s.nodeConfigs = append(s.nodeConfigs, anConfigs...)
 
 	// generate the four consensus identities
 	s.nodeIDs = unittest.IdentifierListFixture(4)
