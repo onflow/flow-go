@@ -246,7 +246,7 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	suite.AwaitTransactionsIncluded(txIDs...)
 
 	// stop one of the nodes
-	suite.T().Logf("stopping COL1")
+	suite.T().Log("stopping COL1")
 	col1 := suite.Collector(0, 0)
 	err = col1.Disconnect()
 	suite.Require().Nil(err)
@@ -271,7 +271,7 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	suite.AwaitTransactionsIncluded(txIDs...)
 
 	// stop another node
-	suite.T().Logf("stopping COL2")
+	suite.T().Log("stopping COL2")
 	col2 := suite.Collector(0, 1)
 	err = col2.Disconnect()
 	suite.Require().Nil(err)
@@ -300,11 +300,11 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	}
 
 	// restart the paused collectors
-	suite.T().Logf("restarting COL1")
+	suite.T().Log("restarting COL1")
 	err = col1.Connect()
 	suite.Require().Nil(err)
 
-	suite.T().Logf("restarting COL2")
+	suite.T().Log("restarting COL2")
 	err = col2.Connect()
 	suite.Require().Nil(err)
 
