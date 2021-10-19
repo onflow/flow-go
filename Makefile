@@ -72,8 +72,7 @@ unittest-main:
 	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
 
 .PHONY: unittest
-unittest:
-	unittest-main
+unittest: unittest-main
 	$(MAKE) -C crypto test
 	$(MAKE) -C crypto cross-blst-test
 	$(MAKE) -C integration test
@@ -190,17 +189,6 @@ docker-ci:
 		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
 		make ci
 
-# This command is should only be used by Team City (for linux)
-# Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
-.PHONY: docker-ci-team-city
-docker-ci-team-city:
-	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
-		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
-		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
-		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
-		make ci
-
 # Runs integration tests in Docker  (for mac)
 .PHONY: docker-ci-integration
 docker-ci-integration:
@@ -214,37 +202,6 @@ docker-ci-integration:
 		-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
 		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
 		make ci-integration
-
-# This command is should only be used by Team City (for linux)
-# Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
-.PHONY: docker-ci-integration-team-city
-docker-ci-integration-team-city:
-	docker run \
-		--env DOCKER_API_VERSION='1.39' \
-		--network host \
-		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
-		-v /tmp:/tmp \
-		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
-		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
-		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
-		make ci-integration
-
-# This command is should only be used by Team City (for linux)
-# Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
-.PHONY: docker-ci-benchmark-team-city
-docker-ci-benchmark-team-city:
-	docker run \
-		--env DOCKER_API_VERSION='1.39' \
-		--network host \
-		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
-		-v /tmp:/tmp \
-		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
-		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
-		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
-		make ci-benchmark
-	cat /tmp/tx_per_second_test_teamcity.txt
 
 .PHONY: docker-build-collection
 docker-build-collection:
