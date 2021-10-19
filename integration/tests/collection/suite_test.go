@@ -26,7 +26,7 @@ import (
 
 const (
 	// the default timeout for individual actions (eg. send a transaction)
-	defaultTimeout = 30 * time.Second
+	defaultTimeout = 45 * time.Second
 )
 
 // CollectorSuite represents a test suite for collector nodes.
@@ -66,8 +66,8 @@ func TestCollectorSuite(t *testing.T) {
 func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	var (
 		conNode = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
-		exeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
-		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
+		exeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 	)
 	nodes := []testnet.NodeConfig{
 		conNode,
@@ -239,7 +239,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 	suite.T().Logf("awaiting %d transactions included\n", len(txIDs))
 
-	waitFor := 2*defaultTimeout + time.Duration(len(lookup))*200*time.Millisecond
+	waitFor := defaultTimeout + time.Duration(len(lookup))*200*time.Millisecond
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
@@ -331,7 +331,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 
 	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock)
 	suite.NoError(err)
-	clusterState, err := clusterstateimpl.Bootstrap(db, clusterStateRoot)
+	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID())
 	require.NoError(suite.T(), err, "could not get cluster state")
 
 	return clusterState
