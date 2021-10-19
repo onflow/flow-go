@@ -6,17 +6,13 @@ COVER_PROFILE := cover.out
 test:
 	GO111MODULE=on go test $(if $(VERBOSE),-v,) -tags relic -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) `go list ./... | grep -v -e integration/tests -e integration/benchmark`
 
-.PHONY: all-integration-tests
-all-integration-tests: 
-	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/...
-
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: access-tests common-tests execution-tests verification-tests collection-tests consensus-tests epoch-tests
+integration-test: access-tests common-tests execution-tests verification-tests collection-tests epoch-tests network-tests # consensus-tests 
 
 # NOTE: Currently skipping collection and consensus tests due to them not passing properly on CI
 .PHONY: ci-integration-test
-ci-integration-test: access-tests common-tests execution-tests epoch-tests verification-tests # collection-tests # consensus-tests
+ci-integration-test: access-tests common-tests execution-tests epoch-tests verification-tests network-tests # collection-tests # consensus-tests
 
 .PHONY: access-tests
 access-tests:
@@ -45,6 +41,10 @@ execution-tests:
 .PHONY: verification-tests
 verification-tests:
 	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/verification
+
+.PHONY: network-tests
+network-tests:
+	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/network
 
 .PHONY: benchmark
 benchmark:
