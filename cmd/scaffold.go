@@ -424,10 +424,11 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 		fnb.Metrics = Metrics{
-			Network:        metrics.NewNetworkCollector(),
-			Engine:         metrics.NewEngineCollector(),
-			Compliance:     metrics.NewComplianceCollector(),
-			Cache:          metrics.NewCacheCollector(fnb.RootChainID),
+			Network:    metrics.NewNetworkCollector(),
+			Engine:     metrics.NewEngineCollector(),
+			Compliance: metrics.NewComplianceCollector(),
+			// Cache:          metrics.NewCacheCollector(fnb.RootChainID),
+			Cache:          metrics.NewNoopCollector(),
 			CleanCollector: metrics.NewCleanerCollector(),
 			Mempool:        mempools,
 		}
