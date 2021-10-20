@@ -1,15 +1,20 @@
 package debug
 
 import (
+	"context"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/trace"
 	"github.com/rs/zerolog"
 )
 
 type RemoteDebugger struct {
 	vm          *fvm.VirtualMachine
+	tracer      module.Tracer
 	ctx         fvm.Context
 	grpcAddress string
 }
@@ -22,11 +27,13 @@ func NewRemoteDebugger(grpcAddress string,
 	logger zerolog.Logger) *RemoteDebugger {
 	vm := fvm.NewVirtualMachine(fvm.NewInterpreterRuntime())
 
+	tr := trace.NewLogTracer(logger)
 	// no signature processor here
 	// TODO Maybe we add fee-deduction step as well
 	ctx := fvm.NewContext(
 		logger,
 		fvm.WithChain(chain),
+		fvm.WithTracer(tr),
 		fvm.WithTransactionProcessors(
 			fvm.NewTransactionAccountFrozenChecker(),
 			fvm.NewTransactionSequenceNumberChecker(),
@@ -37,6 +44,7 @@ func NewRemoteDebugger(grpcAddress string,
 
 	return &RemoteDebugger{
 		ctx:         ctx,
+		tracer:      tr,
 		vm:          vm,
 		grpcAddress: grpcAddress,
 	}
@@ -49,6 +57,8 @@ func NewRemoteDebugger(grpcAddress string,
 func (d *RemoteDebugger) RunTransaction(txBody *flow.TransactionBody) (txErr, processError error) {
 	view := NewRemoteView(d.grpcAddress)
 	tx := fvm.Transaction(txBody, 0)
+	span, _, _ := d.tracer.StartTransactionSpan(context.Background(), tx.ID, "RunTransaction")
+	tx.TraceSpan = span
 	err := d.vm.Run(d.ctx, tx, view, programs.NewEmptyPrograms())
 	if err != nil {
 		return nil, err
@@ -66,6 +76,8 @@ func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, b
 		view.Cache = newFileRegisterCache(regCachePath)
 	}
 	tx := fvm.Transaction(txBody, 0)
+	span, _, _ := d.tracer.StartTransactionSpan(context.Background(), tx.ID, "RunTransactionAtBlockID")
+	tx.TraceSpan = span
 	err := d.vm.Run(d.ctx, tx, view, programs.NewEmptyPrograms())
 	if err != nil {
 		return nil, err
