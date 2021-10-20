@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/model/flow/order"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
@@ -311,8 +312,11 @@ func (e *Engine) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 
 	// ensure the guarantors are from the same cluster
 	clusterLookup := cluster.Lookup()
+
+	clusterLookup := cluster.Sort(order.ByNodeIDAsc)
+
 	for _, guarantorID := range guarantors {
-		_, exists := clusterLookup[guarantorID]
+		exists := clusterLookup.Exists(guarantorID, order.ByNodeIDAsc)
 		if !exists {
 			return engine.NewInvalidInputError("inconsistent guarantors from different clusters")
 		}

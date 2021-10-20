@@ -508,3 +508,28 @@ func (il IdentityList) EqualTo(other IdentityList) bool {
 	}
 	return true
 }
+
+// Exists takes a previously sorted Identity list and searches it for the target value
+// target:  value to search for
+// less:    the algorithm to use as a comparator
+func (il IdentityList) Exists(target Identity, less IdentityOrder) bool {
+	left := 0
+	lenList := len(il)
+	right := lenList - 1
+	mid := int(uint(lenList) >> 1)
+	for {
+		if less(il[mid], target) {
+			left = mid + 1
+		} else if il[mid].NodeID == target.NodeID {
+			return true
+		} else {
+			right = mid
+		}
+
+		if left > right {
+			return false
+		}
+
+		mid = int(uint(left+right) >> 1)
+	}
+}
