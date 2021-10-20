@@ -137,29 +137,98 @@ func Test_VerifyCachedHash(t *testing.T) {
 	require.True(t, n5.VerifyCachedHash())
 }
 
-func Test_BubbleUp(t *testing.T) {
+// Cases
+// no prune is needed if several single thread nodes in between but in the last level two nodes
+// if a end level leaf is empty (left or right)
+// if a middle level leaf is empty  (left or right)
+// if both  has empty
+// for all check the hash values to match
+func Test_Prunning(t *testing.T) {
 	path := utils.PathByUint16(1)
 	payload1 := utils.LightPayload(2, 3)
 	payload2 := utils.LightPayload(2, 4)
 	emptyPayload := &ledger.Payload{}
-	//       n5
-	//     /    \
-	//    n4    n3
-	//   / \
-	//  n1 n2
-	n1 := node.NewLeaf(path, payload1, 0)
-	n2 := node.NewLeaf(path, emptyPayload, 0)
-	n3 := node.NewLeaf(path, payload2, 1)
-	n4 := node.NewInterimNode(1, n1, n2)
-	n5 := node.NewInterimNode(2, n4, n3)
-	fmt.Println(n5.FmtStr(" ", " "))
-	// require.True(t, n5.VerifyCachedHash())
-	nn5, _ := n5.Prunned()
-	fmt.Println(nn5.FmtStr(" ", " "))
 
+	t.Run("should not be prunned", func(t *testing.T) {
+		//          n5
+		//       /     \
+		//      n4      n3(-)
+		//   /    \
+		//  n1(p1) n2(p2)
+		//
+		// eventhough n3 is empty it should not be prunned
+		// we avoid empty leaf prunnings for performance reasons
+		// while keeping it would only add one extra lookup, removing
+		// it requires the whole branch to change to the top
+		n1 := node.NewLeaf(path, payload1, 0)
+		n2 := node.NewLeaf(path, payload2, 0)
+		n3 := node.NewLeaf(path, emptyPayload, 1)
+		n4 := node.NewInterimNode(1, n1, n2)
+		n5 := node.NewInterimNode(2, n4, n3)
+
+		nn5, prunned := n5.Prunned()
+		require.False(t, prunned)
+		require.True(t, nn5.VerifyCachedHash())
+		require.Equal(t, nn5, n5)
+	})
+
+	t.Run("lowest level right leaf be empty", func(t *testing.T) {
+		//          n5
+		//       /     \
+		//      n4      n3(p2)
+		//   /    \
+		//  n1(p1) n2(-)
+		//
+		// n2 is set to nil value
+		// prunning should result in
+		//
+		//          nn5
+		//       /     \
+		//     nn4(p1)  n3(p2)
+		n1 := node.NewLeaf(path, payload1, 0)
+		n2 := node.NewLeaf(path, emptyPayload, 0)
+		n3 := node.NewLeaf(path, payload2, 1)
+		n4 := node.NewInterimNode(1, n1, n2)
+		n5 := node.NewInterimNode(2, n4, n3)
+
+		nn5, prunned := n5.Prunned()
+		require.True(t, prunned)
+		require.True(t, nn5.VerifyCachedHash())
+		require.Equal(t, nn5.Hash(), n5.Hash())
+		require.Equal(t, nn5.LeftChild().Payload(), payload1)
+		require.Equal(t, nn5.RightChild().Payload(), payload2)
+	})
+
+	t.Run("lowest level left leaf be empty", func(t *testing.T) {
+		//          n5
+		//       /     \
+		//      n4      n3(p2)
+		//   /    \
+		//  n1(-) n2(p1)
+		//
+		// n1 is set to nil value
+		// prunning should result in
+		//          nn5
+		//       /     \
+		//     nn4(p1)  n3(p2)
+		n1 := node.NewLeaf(path, emptyPayload, 0)
+		n2 := node.NewLeaf(path, payload1, 0)
+		n3 := node.NewLeaf(path, payload2, 1)
+		n4 := node.NewInterimNode(1, n1, n2)
+		n5 := node.NewInterimNode(2, n4, n3)
+		fmt.Println(n5.FmtStr(" ", " "))
+		nn5, prunned := n5.Prunned()
+		require.True(t, prunned)
+		fmt.Println(nn5.FmtStr(" ", " "))
+		require.True(t, nn5.VerifyCachedHash())
+		require.Equal(t, nn5.Hash(), n5.Hash())
+		require.Equal(t, nn5.LeftChild().Payload(), payload1)
+		require.Equal(t, nn5.RightChild().Payload(), payload2)
+
+	})
+	t.Fatal("XXX")
 	// it should be no change
 
-	t.Fatal("XXX")
 }
 
 func hashToString(hash hash.Hash) string {
