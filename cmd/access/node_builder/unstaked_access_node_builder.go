@@ -342,7 +342,6 @@ func (anb *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
 			time.Sleep(time.Duration(attempts*retryBackoffSeconds) * time.Second)
 			return component.ErrorHandlingRestart
 		}
-
 		return component.ErrorHandlingStop
 	}
 

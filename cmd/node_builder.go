@@ -62,15 +62,22 @@ type NodeBuilder interface {
 	// Module enables setting up dependencies of the engine with the builder context
 	Module(name string, f func(builder NodeBuilder, node *NodeConfig) error) NodeBuilder
 
-	// Component adds a new component to the node that conforms to the ReadyDone
-	// interface.
+	// CriticalComponent adds a new component to the node that conforms to the ReadyDone
+	// interface, and throws a Fatal() when an irrecoverable error is encountered
+	// Use CriticalComponent if the component cannot be restarted when an irrecoverable error is encountered
+	// and the node should crash.
 	//
 	// When the node is run, this component will be started with `Ready`. When the
 	// node is stopped, we will wait for the component to exit gracefully with
 	// `Done`.
-	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder
-
 	CriticalComponent(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
+
+	// Component adds a new component to the node that conforms to the ReadyDone
+	// interface, and calls the provided error handler when an irrecoverable error is encountered.
+	// Use Component if the component can/should be restarted when an irrecoverable error is encountered
+	//
+	// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
+	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder
 
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder

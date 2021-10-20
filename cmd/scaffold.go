@@ -743,9 +743,6 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 }
 
 func (fnb *FlowNodeBuilder) handleModule(ctx irrecoverable.SignalerContext, v namedModuleFunc) {
-	log := fnb.Logger.With().Str("module", v.name).Logger()
-	log.Debug().Msgf("running module")
-
 	if err := v.fn(fnb, fnb.NodeConfig); err != nil {
 		ctx.Throw(fmt.Errorf("module %s initialization failed: %w", v.name, err))
 	}
@@ -839,7 +836,6 @@ func (fnb *FlowNodeBuilder) CriticalComponent(name string, f func(builder NodeBu
 func (fnb *FlowNodeBuilder) Component(name string, f func(builder NodeBuilder, node *NodeConfig) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder {
 
 	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-
 		log := fnb.Logger.With().Str("component", name).Logger()
 
 		componentFactory := func() (component.Component, error) {
@@ -1001,7 +997,6 @@ func (fnb *FlowNodeBuilder) InitComponentBuilder() {
 			// run pre-start initializations
 			fnb.onStart(ctx)
 			ready()
-			// don't wait for fnb.Done(). it's redundant
 		})
 }
 
@@ -1026,7 +1021,7 @@ func (fnb *FlowNodeBuilder) Run() {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go fnb.Start(signalerCtx)
 

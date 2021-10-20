@@ -57,8 +57,8 @@ func (connector *upstreamConnector) onStart(parent irrecoverable.SignalerContext
 	defer close(resultChan)
 
 	// a shorter context for the connection worker
-	workerCtx, workerCancel := context.WithTimeout(parent, 30*time.Second)
-	defer workerCancel()
+	workerCtx, cancel := context.WithTimeout(parent, 30*time.Second)
+	defer cancel()
 
 	// spawn a connect worker for each bootstrap node
 	for _, b := range connector.bootstrapIdentities {
