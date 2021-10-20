@@ -20,7 +20,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// Core represents the ingestion engine, used to funnel collections from a
+// Core represents core logic of the ingestion engine, used to funnel collections from a
 // cluster of collection nodes to the set of consensus nodes. It represents the
 // link between collection nodes and consensus nodes and has a counterpart with
 // the same engine ID in the collection node.
@@ -34,7 +34,7 @@ type Core struct {
 	pool    mempool.Guarantees    // used to keep pending guarantees in pool
 }
 
-// New creates a new collection propagation engine.
+// NewCore creates a new collection propagation core.
 func NewCore(
 	log zerolog.Logger,
 	tracer module.Tracer,

@@ -15,18 +15,17 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	mockstorage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestIngestion(t *testing.T) {
-	suite.Run(t, new(IngestionSuite))
+func TestIngestionCore(t *testing.T) {
+	suite.Run(t, new(IngestionCoreSuite))
 }
 
-type IngestionSuite struct {
+type IngestionCoreSuite struct {
 	suite.Suite
 
 	con1ID flow.Identifier
@@ -46,12 +45,11 @@ type IngestionSuite struct {
 	epoch   *mockprotocol.Epoch
 	headers *mockstorage.Headers
 	pool    *mockmempool.Guarantees
-	conduit *mocknetwork.Conduit
 
-	ingest *Engine
+	ingest *Core
 }
 
-func (suite *IngestionSuite) SetupTest() {
+func (suite *IngestionCoreSuite) SetupTest() {
 
 	head := unittest.BlockHeaderFixture()
 	head.Height = 2 * flow.DefaultTransactionExpiry
@@ -84,7 +82,6 @@ func (suite *IngestionSuite) SetupTest() {
 	headers := &mockstorage.Headers{}
 	me := &mockmodule.Local{}
 	pool := &mockmempool.Guarantees{}
-	con := &mocknetwork.Conduit{}
 
 	// this state basically works like a normal protocol state
 	// returning everything correctly, using the created header
@@ -139,16 +136,13 @@ func (suite *IngestionSuite) SetupTest() {
 	// only used for metrics, nobody cares
 	pool.On("Size").Return(uint(0))
 
-	ingest := &Engine{
+	ingest := &Core{
 		tracer:  tracer,
-		metrics: metrics,
-		spans:   metrics,
 		mempool: metrics,
 		state:   state,
 		headers: headers,
 		me:      me,
 		pool:    pool,
-		con:     con,
 	}
 
 	suite.head = &head
@@ -156,11 +150,10 @@ func (suite *IngestionSuite) SetupTest() {
 	suite.ref = ref
 	suite.headers = headers
 	suite.pool = pool
-	suite.conduit = con
 	suite.ingest = ingest
 }
 
-func (suite *IngestionSuite) TestOnGuaranteeNewFromCollection() {
+func (suite *IngestionCoreSuite) TestOnGuaranteeNewFromCollection() {
 
 	guarantee := suite.validGuarantee()
 
@@ -169,18 +162,15 @@ func (suite *IngestionSuite) TestOnGuaranteeNewFromCollection() {
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error on new guarantee from collection node")
 
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
-	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
-func (suite *IngestionSuite) TestOnGuaranteeUnstaked() {
+func (suite *IngestionCoreSuite) TestOnGuaranteeUnstaked() {
 
 	guarantee := suite.validGuarantee()
 
@@ -192,18 +182,15 @@ func (suite *IngestionSuite) TestOnGuaranteeUnstaked() {
 	suite.finalIdentities = suite.finalIdentities.Filter(filter.Not(filter.HasNodeID(suite.con1ID)))
 
 	// submit the guarantee
-	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error on guarantee when unstaked")
 
 	// the guarantee should be added to the mempool
 	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
-	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
-func (suite *IngestionSuite) TestOnGuaranteeNewFromConsensus() {
+func (suite *IngestionCoreSuite) TestOnGuaranteeNewFromConsensus() {
 
 	guarantee := suite.validGuarantee()
 
@@ -212,18 +199,15 @@ func (suite *IngestionSuite) TestOnGuaranteeNewFromConsensus() {
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := suite.ingest.onGuarantee(suite.con1ID, guarantee)
+	err := suite.ingest.OnGuarantee(suite.con1ID, guarantee)
 	suite.Assert().NoError(err, "should not error on new guarantee from consensus node")
 
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
-	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
-func (suite *IngestionSuite) TestOnGuaranteeOld() {
+func (suite *IngestionCoreSuite) TestOnGuaranteeOld() {
 
 	guarantee := suite.validGuarantee()
 
@@ -232,18 +216,15 @@ func (suite *IngestionSuite) TestOnGuaranteeOld() {
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error on old guarantee")
 
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
-	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
-func (suite *IngestionSuite) TestOnGuaranteeNotAdded() {
+func (suite *IngestionCoreSuite) TestOnGuaranteeNotAdded() {
 
 	guarantee := suite.validGuarantee()
 
@@ -252,18 +233,15 @@ func (suite *IngestionSuite) TestOnGuaranteeNotAdded() {
 	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error when guarantee was already added")
 
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
 
-	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
-func (suite *IngestionSuite) TestOnGuaranteeNoGuarantor() {
+func (suite *IngestionCoreSuite) TestOnGuaranteeNoGuarantor() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
@@ -275,19 +253,16 @@ func (suite *IngestionSuite) TestOnGuaranteeNoGuarantor() {
 	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with missing guarantor")
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
-	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
-func (suite *IngestionSuite) TestOnGuaranteeInvalidRole() {
+func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidRole() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
@@ -299,19 +274,16 @@ func (suite *IngestionSuite) TestOnGuaranteeInvalidRole() {
 	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with missing guarantor")
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
-	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
-func (suite *IngestionSuite) TestOnGuaranteeExpired() {
+func (suite *IngestionCoreSuite) TestOnGuaranteeExpired() {
 
 	// create an alternative block
 	header := unittest.BlockHeaderFixture()
@@ -328,16 +300,13 @@ func (suite *IngestionSuite) TestOnGuaranteeExpired() {
 	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with expired collection")
 	suite.Assert().True(engine.IsOutdatedInputError(err))
 
-	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
-func (suite *IngestionSuite) TestOnGuaranteeInvalidGuarantor() {
+func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidGuarantor() {
 
 	// create a guarantee signed by the collection node and referencing the
 	// current head of the protocol state
@@ -349,19 +318,16 @@ func (suite *IngestionSuite) TestOnGuaranteeInvalidGuarantor() {
 	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with invalid guarantor")
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
-	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 // test that just after an epoch boundary we still accept guarantees from collectors
 // in clusters from the previous epoch (and collectors which are leaving the network
 // at this epoch boundary).
-func (suite *IngestionSuite) TestOnGuaranteeEpochEnd() {
+func (suite *IngestionCoreSuite) TestOnGuaranteeEpochEnd() {
 
 	// in the finalized state the collectors has 0 stake but is not ejected
 	// this is what happens when we finalize the final block of the epoch during
@@ -378,18 +344,14 @@ func (suite *IngestionSuite) TestOnGuaranteeEpochEnd() {
 
 	// submit the guarantee as if it was sent by the collection node which
 	// is leaving at the current epoch boundary
-	err := suite.ingest.onGuarantee(suite.collID, guarantee)
+	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error with collector from ending epoch")
 
 	// check that the guarantee has been added to the mempool
 	suite.pool.AssertExpectations(suite.T())
-
-	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
-func (suite *IngestionSuite) TestOnGuaranteeUnknownOrigin() {
+func (suite *IngestionCoreSuite) TestOnGuaranteeUnknownOrigin() {
 
 	guarantee := suite.validGuarantee()
 
@@ -398,19 +360,16 @@ func (suite *IngestionSuite) TestOnGuaranteeUnknownOrigin() {
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee with an unknown origin
-	err := suite.ingest.onGuarantee(unittest.IdentifierFixture(), guarantee)
+	err := suite.ingest.OnGuarantee(unittest.IdentifierFixture(), guarantee)
 	suite.Assert().Error(err)
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
-	// we should not propagate the guarantee
-	suite.conduit.AssertNotCalled(suite.T(), "Multicast", guarantee, mock.Anything, mock.Anything)
-	suite.conduit.AssertNotCalled(suite.T(), "Publish", guarantee, mock.Anything)
 }
 
 // validGuarantee returns a valid collection guarantee based on the suite state.
-func (suite *IngestionSuite) validGuarantee() *flow.CollectionGuarantee {
+func (suite *IngestionCoreSuite) validGuarantee() *flow.CollectionGuarantee {
 	guarantee := unittest.CollectionGuaranteeFixture()
 	guarantee.SignerIDs = []flow.Identifier{suite.collID}
 	guarantee.ReferenceBlockID = suite.head.ID()
