@@ -46,7 +46,7 @@ type IngestionCoreSuite struct {
 	headers *mockstorage.Headers
 	pool    *mockmempool.Guarantees
 
-	ingest *Core
+	core *Core
 }
 
 func (suite *IngestionCoreSuite) SetupTest() {
@@ -150,7 +150,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	suite.ref = ref
 	suite.headers = headers
 	suite.pool = pool
-	suite.ingest = ingest
+	suite.core = ingest
 }
 
 func (suite *IngestionCoreSuite) TestOnGuaranteeNewFromCollection() {
@@ -162,7 +162,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNewFromCollection() {
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
+	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error on new guarantee from collection node")
 
 	// check that the guarantee has been added to the mempool
@@ -182,7 +182,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeUnstaked() {
 	suite.finalIdentities = suite.finalIdentities.Filter(filter.Not(filter.HasNodeID(suite.con1ID)))
 
 	// submit the guarantee
-	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
+	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error on guarantee when unstaked")
 
 	// the guarantee should be added to the mempool
@@ -199,7 +199,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNewFromConsensus() {
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := suite.ingest.OnGuarantee(suite.con1ID, guarantee)
+	err := suite.core.OnGuarantee(suite.con1ID, guarantee)
 	suite.Assert().NoError(err, "should not error on new guarantee from consensus node")
 
 	// check that the guarantee has been added to the mempool
@@ -216,7 +216,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeOld() {
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
+	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error on old guarantee")
 
 	// check that the guarantee has been added to the mempool
@@ -233,7 +233,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNotAdded() {
 	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
+	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error when guarantee was already added")
 
 	// check that the guarantee has been added to the mempool
@@ -253,7 +253,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNoGuarantor() {
 	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
+	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with missing guarantor")
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
@@ -274,7 +274,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidRole() {
 	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
+	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with missing guarantor")
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
@@ -300,7 +300,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeExpired() {
 	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a consensus node
-	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
+	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with expired collection")
 	suite.Assert().True(engine.IsOutdatedInputError(err))
 
@@ -318,7 +318,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidGuarantor() {
 	suite.pool.On("Add", guarantee).Return(false)
 
 	// submit the guarantee as if it was sent by a collection node
-	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
+	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with invalid guarantor")
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
@@ -344,7 +344,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeEpochEnd() {
 
 	// submit the guarantee as if it was sent by the collection node which
 	// is leaving at the current epoch boundary
-	err := suite.ingest.OnGuarantee(suite.collID, guarantee)
+	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error with collector from ending epoch")
 
 	// check that the guarantee has been added to the mempool
@@ -360,7 +360,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeUnknownOrigin() {
 	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee with an unknown origin
-	err := suite.ingest.OnGuarantee(unittest.IdentifierFixture(), guarantee)
+	err := suite.core.OnGuarantee(unittest.IdentifierFixture(), guarantee)
 	suite.Assert().Error(err)
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
