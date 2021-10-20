@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -477,19 +478,70 @@ func (il IdentityList) SamplePct(pct float64) IdentityList {
 // either `il`, or `other`, or both. There are no duplicates in the output,
 // where duplicates are identities with the same node ID.
 func (il IdentityList) Union(other IdentityList) IdentityList {
+	if (len(il) + len(other)) == 0 {
+		return IdentityList{}
+	}
 
-	// stores the output, the union of the two lists
-	union := make(IdentityList, 0, len(il)+len(other))
-	// efficient lookup to avoid duplicates
-	lookup := make(map[Identifier]struct{})
+	// add all identities together
+	union := append(other, il...)
 
-	// add all identities, omitted duplicates
-	for _, identity := range append(il.Copy(), other...) {
-		if _, exists := lookup[identity.NodeID]; exists {
-			continue
+	sort.Slice(union, func(p, q int) bool {
+		num1 := union[p][:]
+		num2 := union[q][:]
+		first := binary.LittleEndian.Uint64(num1)
+		second := binary.LittleEndian.Uint64(num2)
+
+		if first == second {
+			num1 = union[p][8:]
+			num2 = union[q][8:]
+			first = binary.LittleEndian.Uint64(num1)
+			second = binary.LittleEndian.Uint64(num2)
+
+			if first == second {
+				num1 = union[p][16:]
+				num2 = union[q][16:]
+				first = binary.LittleEndian.Uint64(num1)
+				second = binary.LittleEndian.Uint64(num2)
+
+				if first == second {
+					num1 = union[p][24:]
+					num2 = union[q][24:]
+					first = binary.LittleEndian.Uint64(num1)
+					second = binary.LittleEndian.Uint64(num2)
+					return first < second
+				}
+				return first < second
+			}
+			return first < second
 		}
-		union = append(union, identity)
-		lookup[identity.NodeID] = struct{}{}
+		return first < second
+	})
+
+	// at this point, 'union' has a sorted slice of identities, with duplicates
+	lenUnion := len(union)
+
+	// counter
+	i := 1
+
+	// check for duplicates, there can only be duplicates if lenUnion > 1
+	for ; i < lenUnion; i++ {
+		// detect a duplicate, only allocate 'retval' if necessary
+		if *union[i] == *union[i-1] {
+			retval := make(IdentityList, 0, len(il)+len(other))
+			retval = append(retval, union[0:i-1]...)
+
+			i++
+
+			// loop over the rest of the slice, appending non-duplicates
+			for ; i < lenUnion; i++ {
+				if *union[i] == *union[i-1] {
+					continue
+				}
+				retval = append(retval, union[i])
+			}
+			// time to return
+			return retval
+		}
 	}
 
 	return union
