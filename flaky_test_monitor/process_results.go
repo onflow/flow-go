@@ -28,14 +28,12 @@ type TestRun struct {
 }
 
 // save TestRun to local JSON file
-func (testRun *TestRun) save() {
+func (testRun *TestRun) save(fileName string) {
 	testRunBytes, err := json.MarshalIndent(testRun, "", "  ")
 
 	if err != nil {
 		panic("error marshalling json" + err.Error())
 	}
-
-	fileName := os.Args[1]
 
 	file, err := os.Create(fileName)
 	if err != nil {
@@ -72,6 +70,9 @@ type TestResult struct {
 type ResultReader interface {
 	getReader() *os.File
 	close()
+
+	// where to save results - will be different for tests vs production
+	getResultsFileName() string
 }
 
 type StdinResultReader struct {
@@ -84,6 +85,10 @@ func (stdinResultReader StdinResultReader) getReader() *os.File {
 
 // nothing to close when reading from stdin
 func (stdinResultReader StdinResultReader) close() {
+}
+
+func (stdinResultReader StdinResultReader) getResultsFileName() string {
+	return os.Args[1]
 }
 
 func processTestRun(resultReader ResultReader) TestRun {
@@ -102,7 +107,7 @@ func processTestRun(resultReader ResultReader) TestRun {
 	postProcessTestRun(packageResultMap)
 
 	testRun := finalizeTestRun(packageResultMap)
-	testRun.save()
+	testRun.save(resultReader.getResultsFileName())
 
 	return testRun
 }

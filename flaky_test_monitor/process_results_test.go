@@ -7,7 +7,9 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -135,4 +137,10 @@ func (fileResultReader *FileResultReader) close() {
 	if err != nil {
 		log.Fatal("error closing file: " + err.Error())
 	}
+}
+
+// tests will create their own local result file based on time stamp vs production which uses a supplied result file name
+func (fileResultReader FileResultReader) getResultsFileName() string {
+	t := time.Now()
+	return "test-run-" + strings.ReplaceAll(t.Format("2006-01-02-15-04-05.0000"), ".", "-") + ".json"
 }
