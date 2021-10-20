@@ -83,15 +83,19 @@ func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.Sto
 	newIndexBytes := index.Next()
 
 	// store nil so that the setValue for new allocated slabs would be faster (faster old value lookup from storage_used computations)
-	err = a.stateHolder.State().Set(string(address.Bytes()), "", string(atree.SlabIndexToLedgerKey(index)), []byte{}, false)
+	key := string(atree.SlabIndexToLedgerKey(index))
+	err = a.stateHolder.State().Set(string(address.Bytes()), "", key, []byte{}, false)
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("failed to store empty value for newly allocated storage index: %w", err)
 	}
-
-	err = a.stateHolder.State().Set(string(address.Bytes()), "", KeyStorageIndex, newIndexBytes[:], a.stateHolder.EnforceLimit)
+	oldSize, err := a.GetStorageUsed(address)
 	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("failed to store the key storage index: %w", err)
+		return atree.StorageIndex{}, fmt.Errorf("failed to store empty value for newly allocated storage index: %w", err)
 	}
+	// update the storage_used for keys
+	a.setStorageUsed(address, oldSize+uint64(RegisterSize(address, false, key, []byte{})))
+
+	err = a.setValue(address, false, KeyStorageIndex, newIndexBytes[:])
 	return index, nil
 }
 
