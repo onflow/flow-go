@@ -25,7 +25,7 @@ import (
 type Suite struct {
 	suite.Suite
 
-	net      *module.Network
+	net      *mocknetwork.Network
 	con      *mocknetwork.Conduit
 	me       *module.Local
 	cleaner  *storage.Cleaner
@@ -42,7 +42,7 @@ type Suite struct {
 
 func (suite *Suite) SetupTest() {
 
-	suite.net = new(module.Network)
+	suite.net = new(mocknetwork.Network)
 	suite.con = new(mocknetwork.Conduit)
 	suite.me = new(module.Local)
 	suite.cleaner = new(storage.Cleaner)

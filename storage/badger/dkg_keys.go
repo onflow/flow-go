@@ -1,6 +1,8 @@
 package badger
 
 import (
+	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/dkg"
@@ -16,7 +18,12 @@ type DKGKeys struct {
 	cache *Cache
 }
 
-func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) *DKGKeys {
+func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) (*DKGKeys, error) {
+
+	err := operation.EnsureSecretDB(db)
+	if err != nil {
+		return nil, fmt.Errorf("cannot instantiate key storage in non-secret db: %w", err)
+	}
 
 	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		epochCounter := key.(uint64)
@@ -33,7 +40,7 @@ func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) *DKGKeys {
 		}
 	}
 
-	k := &DKGKeys{
+	dkgKeys := &DKGKeys{
 		db: db,
 		cache: newCache(collector,
 			metrics.ResourceDKGKey,
@@ -42,7 +49,7 @@ func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) *DKGKeys {
 			withRetrieve(retrieve)),
 	}
 
-	return k
+	return dkgKeys, nil
 }
 
 func (k *DKGKeys) storeTx(epochCounter uint64, info *dkg.DKGParticipantPriv) func(tx *transaction.Tx) error {

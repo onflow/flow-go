@@ -30,6 +30,22 @@ func (_m *ProviderEngine) BroadcastExecutionReceipt(_a0 context.Context, _a1 *fl
 	return r0
 }
 
+// Done provides a mock function with given fields:
+func (_m *ProviderEngine) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
 // Process provides a mock function with given fields: channel, originID, event
 func (_m *ProviderEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
 	ret := _m.Called(channel, originID, event)
@@ -53,6 +69,22 @@ func (_m *ProviderEngine) ProcessLocal(event interface{}) error {
 		r0 = rf(event)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Ready provides a mock function with given fields:
+func (_m *ProviderEngine) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
 	}
 
 	return r0
