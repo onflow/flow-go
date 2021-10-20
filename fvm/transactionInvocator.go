@@ -153,6 +153,8 @@ func (i *TransactionInvocator) Process(
 	// 	panic(err)
 	// }
 
+	childState.Limiter.SetInteractionLimit(false)
+	defer func() { childState.Limiter.SetInteractionLimit(true) }()
 	// try to deduct fees even if there is an error.
 	feesError := i.deductTransactionFees(env, proc)
 	if feesError != nil {

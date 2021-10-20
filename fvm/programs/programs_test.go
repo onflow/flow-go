@@ -20,7 +20,7 @@ func Test_Programs(t *testing.T) {
 	}
 	someLocation := common.IdentifierLocation("some")
 
-	newState := state.NewState(utils.NewSimpleView())
+	newState := state.NewState(utils.NewSimpleView(), state.NewInteractionLimiter(state.WithInteractionLimit(false)))
 
 	addressLocation := common.AddressLocation{
 		Address: common.BytesToAddress([]byte{2, 3, 4}),

@@ -14,7 +14,7 @@ import (
 )
 
 func TestContract_ChildMergeFunctionality(t *testing.T) {
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
+	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView(), state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 	accounts := state.NewAccounts(sth)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)
@@ -66,7 +66,7 @@ func TestContract_ChildMergeFunctionality(t *testing.T) {
 }
 
 func TestContract_AuthorizationFunctionality(t *testing.T) {
-	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView()))
+	sth := state.NewStateHolder(state.NewState(utils.NewSimpleView(), state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 	accounts := state.NewAccounts(sth)
 	address := flow.HexToAddress("01")
 	rAdd := runtime.Address(address)

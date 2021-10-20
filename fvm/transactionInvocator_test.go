@@ -84,10 +84,11 @@ func TestSafetyCheck(t *testing.T) {
 
 			sth := state.NewStateHolder(state.NewState(
 				view,
-				state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
-				state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-			))
+				state.NewInteractionLimiter(
+					state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
+					state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
+					state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
+				)))
 
 			err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 			require.Error(t, err)
@@ -154,10 +155,11 @@ func TestSafetyCheck(t *testing.T) {
 
 		sth := state.NewStateHolder(state.NewState(
 			view,
-			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
-			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		))
+			state.NewInteractionLimiter(
+				state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
+				state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
+				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
+			)))
 
 		err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
@@ -186,10 +188,11 @@ func TestSafetyCheck(t *testing.T) {
 
 		sth := state.NewStateHolder(state.NewState(
 			view,
-			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
-			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		))
+			state.NewInteractionLimiter(
+				state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
+				state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
+				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
+			)))
 
 		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
@@ -219,10 +222,11 @@ func TestSafetyCheck(t *testing.T) {
 
 		sth := state.NewStateHolder(state.NewState(
 			view,
-			state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
-			state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
-			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
-		))
+			state.NewInteractionLimiter(
+				state.WithMaxKeySizeAllowed(context.MaxStateKeySize),
+				state.WithMaxValueSizeAllowed(context.MaxStateValueSize),
+				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
+			)))
 
 		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
@@ -269,7 +273,7 @@ func TestSafetyCheck(t *testing.T) {
 		header := unittest.BlockHeaderFixture()
 		context := fvm.NewContext(log, fvm.WithBlockHeader(&header))
 
-		sth := state.NewStateHolder(state.NewState(view))
+		sth := state.NewStateHolder(state.NewState(view, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 
 		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		assert.Error(t, err)

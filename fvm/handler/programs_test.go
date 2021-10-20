@@ -111,7 +111,7 @@ func Test_Programs(t *testing.T) {
 		return nil, nil
 	})
 
-	sth := state.NewStateHolder(state.NewState(mainView))
+	sth := state.NewStateHolder(state.NewState(mainView, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)

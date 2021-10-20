@@ -17,7 +17,7 @@ import (
 func TestTransactionSequenceNumProcess(t *testing.T) {
 	t.Run("sequence number update (happy path)", func(t *testing.T) {
 		ledger := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(ledger))
+		sth := state.NewStateHolder(state.NewState(ledger, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 		accounts := state.NewAccounts(sth)
 
 		// create an account
@@ -42,7 +42,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 	})
 	t.Run("invalid sequence number", func(t *testing.T) {
 		ledger := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(ledger))
+		sth := state.NewStateHolder(state.NewState(ledger, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 		accounts := state.NewAccounts(sth)
 
 		// create an account
@@ -69,7 +69,7 @@ func TestTransactionSequenceNumProcess(t *testing.T) {
 	})
 	t.Run("invalid address", func(t *testing.T) {
 		ledger := utils.NewSimpleView()
-		sth := state.NewStateHolder(state.NewState(ledger))
+		sth := state.NewStateHolder(state.NewState(ledger, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 		accounts := state.NewAccounts(sth)
 
 		// create an account

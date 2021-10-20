@@ -23,7 +23,7 @@ import (
 func makeTwoAccounts(t *testing.T, aPubKeys []flow.AccountPublicKey, bPubKeys []flow.AccountPublicKey) (flow.Address, flow.Address, *state.StateHolder) {
 
 	ledger := utils.NewSimpleView()
-	sth := state.NewStateHolder(state.NewState(ledger))
+	sth := state.NewStateHolder(state.NewState(ledger, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 
 	a := flow.HexToAddress("1234")
 	b := flow.HexToAddress("5678")
@@ -388,7 +388,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, tx.Err)
 
-		accountsService := state.NewAccounts(state.NewStateHolder(state.NewState(ledger)))
+		accountsService := state.NewAccounts(state.NewStateHolder(state.NewState(ledger, state.NewInteractionLimiter(state.WithInteractionLimit(false)))))
 
 		frozen, err := accountsService.GetAccountFrozen(address)
 		require.NoError(t, err)
@@ -416,7 +416,7 @@ func TestAccountFreezing(t *testing.T) {
 		require.NoError(t, err)
 		require.Error(t, tx.Err)
 
-		accountsService = state.NewAccounts(state.NewStateHolder(state.NewState(ledger)))
+		accountsService = state.NewAccounts(state.NewStateHolder(state.NewState(ledger, state.NewInteractionLimiter(state.WithInteractionLimit(false)))))
 
 		frozen, err = accountsService.GetAccountFrozen(serviceAddress)
 		require.NoError(t, err)

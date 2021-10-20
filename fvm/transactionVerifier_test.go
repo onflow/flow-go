@@ -16,7 +16,7 @@ import (
 
 func TestTransactionVerification(t *testing.T) {
 	ledger := utils.NewSimpleView()
-	sth := state.NewStateHolder(state.NewState(ledger))
+	sth := state.NewStateHolder(state.NewState(ledger, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 	accounts := state.NewAccounts(sth)
 
 	// create an account

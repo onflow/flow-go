@@ -26,26 +26,22 @@ type mapKey struct {
 // it holds draft of updates and captures
 // all register touches
 type State struct {
-	view                  View
-	updatedAddresses      map[flow.Address]struct{}
-	updateSize            map[mapKey]uint64
-	maxKeySizeAllowed     uint64
-	maxValueSizeAllowed   uint64
-	maxInteractionAllowed uint64
-	ReadCounter           uint64
-	WriteCounter          uint64
-	TotalBytesRead        uint64
-	TotalBytesWritten     uint64
+	view              View
+	updatedAddresses  map[flow.Address]struct{}
+	updateSize        map[mapKey]uint64
+	ReadCounter       uint64
+	WriteCounter      uint64
+	TotalBytesRead    uint64
+	TotalBytesWritten uint64
+	Limiter           *InteractionLimiter
 }
 
-func defaultState(view View) *State {
+func defaultState(view View, l *InteractionLimiter) *State {
 	return &State{
-		view:                  view,
-		updatedAddresses:      make(map[flow.Address]struct{}),
-		updateSize:            make(map[mapKey]uint64),
-		maxKeySizeAllowed:     DefaultMaxKeySize,
-		maxValueSizeAllowed:   DefaultMaxValueSize,
-		maxInteractionAllowed: DefaultMaxInteractionSize,
+		view:             view,
+		updatedAddresses: make(map[flow.Address]struct{}),
+		updateSize:       make(map[mapKey]uint64),
+		Limiter:          l,
 	}
 }
 
@@ -53,39 +49,81 @@ func (s *State) View() View {
 	return s.view
 }
 
-type StateOption func(st *State) *State
+type InteractionLimiter struct {
+	interactionLimit      bool
+	maxKeySizeAllowed     uint64
+	maxValueSizeAllowed   uint64
+	maxInteractionAllowed uint64
+}
+
+// NewInteractionLimiter constructs a new interaction limiter
+func NewInteractionLimiter(options ...InteractionLimiterOption) *InteractionLimiter {
+	l := defaultInteractionLimiter()
+
+	for _, o := range options {
+		l = o(l)
+	}
+	return l
+}
+
+func defaultInteractionLimiter() *InteractionLimiter {
+	return &InteractionLimiter{
+		interactionLimit:      true,
+		maxKeySizeAllowed:     DefaultMaxKeySize,
+		maxValueSizeAllowed:   DefaultMaxValueSize,
+		maxInteractionAllowed: DefaultMaxInteractionSize,
+	}
+}
+
+func (l *InteractionLimiter) check(s *State) error {
+	if l.interactionLimit && s.InteractionUsed() > l.maxInteractionAllowed {
+		return errors.NewLedgerIntractionLimitExceededError(s.InteractionUsed(), l.maxInteractionAllowed)
+	}
+	return nil
+}
+
+type InteractionLimiterOption func(st *InteractionLimiter) *InteractionLimiter
 
 // NewState constructs a new state
-func NewState(view View, opts ...StateOption) *State {
-	ctx := defaultState(view)
-	for _, applyOption := range opts {
-		ctx = applyOption(ctx)
-	}
+func NewState(view View, l *InteractionLimiter) *State {
+	ctx := defaultState(view, l)
 	return ctx
 }
 
 // WithMaxKeySizeAllowed sets limit on max key size
-func WithMaxKeySizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
+func WithMaxKeySizeAllowed(limit uint64) func(st *InteractionLimiter) *InteractionLimiter {
+	return func(st *InteractionLimiter) *InteractionLimiter {
 		st.maxKeySizeAllowed = limit
 		return st
 	}
 }
 
 // WithMaxValueSizeAllowed sets limit on max value size
-func WithMaxValueSizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
+func WithMaxValueSizeAllowed(limit uint64) func(st *InteractionLimiter) *InteractionLimiter {
+	return func(st *InteractionLimiter) *InteractionLimiter {
 		st.maxValueSizeAllowed = limit
 		return st
 	}
 }
 
+// WithInteractionLimitDisabled sets limit on max value size
+func WithInteractionLimit(enabled bool) func(st *InteractionLimiter) *InteractionLimiter {
+	return func(st *InteractionLimiter) *InteractionLimiter {
+		st.interactionLimit = enabled
+		return st
+	}
+}
+
 // WithMaxInteractionSizeAllowed sets limit on total byte interaction with ledger
-func WithMaxInteractionSizeAllowed(limit uint64) func(st *State) *State {
-	return func(st *State) *State {
+func WithMaxInteractionSizeAllowed(limit uint64) func(st *InteractionLimiter) *InteractionLimiter {
+	return func(st *InteractionLimiter) *InteractionLimiter {
 		st.maxInteractionAllowed = limit
 		return st
 	}
+}
+
+func (l *InteractionLimiter) SetInteractionLimit(enabled bool) {
+	l.interactionLimit = enabled
 }
 
 // InteractionUsed returns the amount of ledger interaction (total ledger byte read + total ledger byte written)
@@ -166,9 +204,7 @@ func (s *State) Touch(owner, controller, key string) error {
 // NewChild generates a new child state
 func (s *State) NewChild() *State {
 	return NewState(s.view.NewChild(),
-		WithMaxKeySizeAllowed(s.maxKeySizeAllowed),
-		WithMaxValueSizeAllowed(s.maxValueSizeAllowed),
-		WithMaxInteractionSizeAllowed(s.maxInteractionAllowed),
+		s.Limiter,
 	)
 }
 
@@ -221,20 +257,17 @@ func (s *State) UpdatedAddresses() []flow.Address {
 }
 
 func (s *State) checkMaxInteraction() error {
-	if s.InteractionUsed() > s.maxInteractionAllowed {
-		return errors.NewLedgerIntractionLimitExceededError(s.InteractionUsed(), s.maxInteractionAllowed)
-	}
-	return nil
+	return s.Limiter.check(s)
 }
 
 func (s *State) checkSize(owner, controller, key string, value flow.RegisterValue) error {
 	keySize := uint64(len(owner) + len(controller) + len(key))
 	valueSize := uint64(len(value))
-	if keySize > s.maxKeySizeAllowed {
-		return errors.NewStateKeySizeLimitError(owner, controller, key, keySize, s.maxKeySizeAllowed)
+	if keySize > s.Limiter.maxKeySizeAllowed {
+		return errors.NewStateKeySizeLimitError(owner, controller, key, keySize, s.Limiter.maxKeySizeAllowed)
 	}
-	if valueSize > s.maxValueSizeAllowed {
-		return errors.NewStateValueSizeLimitError(value, valueSize, s.maxValueSizeAllowed)
+	if valueSize > s.Limiter.maxValueSizeAllowed {
+		return errors.NewStateValueSizeLimitError(value, valueSize, s.Limiter.maxValueSizeAllowed)
 	}
 	return nil
 }

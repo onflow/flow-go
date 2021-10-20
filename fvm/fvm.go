@@ -40,9 +40,10 @@ func NewVirtualMachine(rt runtime.Runtime) *VirtualMachine {
 func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, programs *programs.Programs) (err error) {
 
 	st := state.NewState(v,
-		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
-		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+		state.NewInteractionLimiter(
+			state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
+			state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
+			state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize)))
 	sth := state.NewStateHolder(st)
 
 	defer func() {
@@ -71,9 +72,10 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 // GetAccount returns an account by address or an error if none exists.
 func (vm *VirtualMachine) GetAccount(ctx Context, address flow.Address, v state.View, programs *programs.Programs) (*flow.Account, error) {
 	st := state.NewState(v,
-		state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
-		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
-		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
+		state.NewInteractionLimiter(
+			state.WithMaxKeySizeAllowed(ctx.MaxStateKeySize),
+			state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
+			state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize)))
 
 	sth := state.NewStateHolder(st)
 	account, err := getAccount(vm, ctx, sth, programs, address)

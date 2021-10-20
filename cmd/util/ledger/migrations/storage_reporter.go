@@ -53,7 +53,7 @@ func (r StorageReporter) Report(payload []ledger.Payload) error {
 	}()
 
 	l := newView(payload)
-	st := state.NewState(l)
+	st := state.NewState(l, state.NewInteractionLimiter(state.WithInteractionLimit(false)))
 
 	for _, p := range payload {
 		id, err := keyToRegisterID(p.Key)

@@ -11,7 +11,7 @@ import (
 
 func TestUUIDs_GetAndSetUUID(t *testing.T) {
 	view := utils.NewSimpleView()
-	sth := state.NewStateHolder(state.NewState(view))
+	sth := state.NewStateHolder(state.NewState(view, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 	uuidsA := state.NewUUIDGenerator(sth)
 
 	uuid, err := uuidsA.GetUUID() // start from zero
@@ -31,7 +31,7 @@ func TestUUIDs_GetAndSetUUID(t *testing.T) {
 
 func Test_GenerateUUID(t *testing.T) {
 	view := utils.NewSimpleView()
-	sth := state.NewStateHolder(state.NewState(view))
+	sth := state.NewStateHolder(state.NewState(view, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 	genA := state.NewUUIDGenerator(sth)
 
 	uuidA, err := genA.GenerateUUID()

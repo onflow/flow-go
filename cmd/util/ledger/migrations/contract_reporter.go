@@ -49,7 +49,7 @@ func (r ContractReporter) Report(payload []ledger.Payload) error {
 	}()
 
 	l := newView(payload)
-	st := state.NewState(l)
+	st := state.NewState(l, state.NewInteractionLimiter(state.WithInteractionLimit(false)))
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
 

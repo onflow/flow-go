@@ -174,7 +174,7 @@ func (m StorageFormatV5Migration) getContractsOnlyAccounts(payloads []ledger.Pay
 	}
 
 	l := newView(filteredPayloads)
-	st := state.NewState(l)
+	st := state.NewState(l, state.NewInteractionLimiter(state.WithInteractionLimit(false)))
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
 	return accounts

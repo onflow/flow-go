@@ -581,7 +581,7 @@ func Test_FreezeAccountChecksAreIncluded(t *testing.T) {
 	view := delta.NewView(func(owner, controller, key string) (flow.RegisterValue, error) {
 		return ledger.Get(owner, controller, key)
 	})
-	sth := state.NewStateHolder(state.NewState(view))
+	sth := state.NewStateHolder(state.NewState(view, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 	accounts := state.NewAccounts(sth)
 
 	// account creation, signing of transaction and bootstrapping ledger should not be required for this test

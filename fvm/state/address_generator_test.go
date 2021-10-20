@@ -13,7 +13,7 @@ import (
 func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
-	sth := state.NewStateHolder(state.NewState(view))
+	sth := state.NewStateHolder(state.NewState(view, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 	env := state.NewStateBoundAddressGenerator(sth, chain)
 	require.NotNil(t, env)
 }
@@ -21,7 +21,7 @@ func Test_NewStateBoundAddressGenerator_NoError(t *testing.T) {
 func Test_NewStateBoundAddressGenerator_GeneratingUpdatesState(t *testing.T) {
 	view := utils.NewSimpleView()
 	chain := flow.MonotonicEmulator.Chain()
-	sth := state.NewStateHolder(state.NewState(view))
+	sth := state.NewStateHolder(state.NewState(view, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 	generator := state.NewStateBoundAddressGenerator(sth, chain)
 	_, err := generator.NextAddress()
 	require.NoError(t, err)
@@ -38,7 +38,7 @@ func Test_NewStateBoundAddressGenerator_UsesLedgerState(t *testing.T) {
 	require.NoError(t, err)
 
 	chain := flow.MonotonicEmulator.Chain()
-	sth := state.NewStateHolder(state.NewState(view))
+	sth := state.NewStateHolder(state.NewState(view, state.NewInteractionLimiter(state.WithInteractionLimit(false))))
 	generator := state.NewStateBoundAddressGenerator(sth, chain)
 
 	_, err = generator.NextAddress()

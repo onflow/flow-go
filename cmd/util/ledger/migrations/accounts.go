@@ -12,7 +12,7 @@ import (
 
 func AddMissingKeysMigration(payloads []ledger.Payload) ([]ledger.Payload, error) {
 	l := newView(payloads)
-	st := state.NewState(l)
+	st := state.NewState(l, state.NewInteractionLimiter(state.WithInteractionLimit(false)))
 	sth := state.NewStateHolder(st)
 	a := state.NewAccounts(sth)
 
