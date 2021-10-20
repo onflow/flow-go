@@ -3,10 +3,11 @@ package approvals
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
 )
 
 // CachingAssignmentCollector is an AssignmentCollectorState with the fixed `ProcessingStatus` of `CachingApprovals`.
