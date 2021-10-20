@@ -3,7 +3,9 @@
 package ingestion
 
 import (
+	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/rs/zerolog"
@@ -15,8 +17,10 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
+// maximum capacity of pending events queue, everything above will be dropped
 const defaultGuaranteeQueueCapacity = 1000
 
+// defaultIngestionEngineWorkers number of goroutines engine will use for processing events
 const defaultIngestionEngineWorkers = 3
 
 // Engine represents the ingestion engine, used to funnel collections from a
@@ -25,54 +29,54 @@ const defaultIngestionEngineWorkers = 3
 // the same engine ID in the collection node.
 type Engine struct {
 	*component.ComponentManager
-	log               zerolog.Logger          // used to log relevant actions with context
-	tracer            module.Tracer           // used for tracing
-	metrics           module.EngineMetrics    // used to track sent & received messages
-	mempool           module.MempoolMetrics   // used to track mempool metrics
-	spans             module.ConsensusMetrics // used to track consensus spans
-	me                module.Local            // used to access local node information
-	con               network.Conduit         // conduit to receive/send guarantees
-	pendingGuarantees engine.MessageStore
-	messageHandler    *engine.MessageHandler
+	log               zerolog.Logger         // used to log relevant actions with context
+	me                module.Local           // used to access local node information
+	con               network.Conduit        // conduit to receive/send guarantees
+	core              *Core                  // core logic of processing guarantees
+	pendingGuarantees engine.MessageStore    // message store of pending events
+	messageHandler    *engine.MessageHandler // message handler for incoming events
 }
 
 // New creates a new collection propagation engine.
 func New(
 	log zerolog.Logger,
-	tracer module.Tracer,
-	metrics module.EngineMetrics,
-	spans module.ConsensusMetrics,
-	mempool module.MempoolMetrics,
+	engineMetrics module.EngineMetrics,
 	net network.Network,
 	me module.Local,
+	core *Core,
 ) (*Engine, error) {
 
-	//guaranteesQueue, err := fifoqueue.NewFifoQueue(
-	//	fifoqueue.WithCapacity(defaultGuaranteeQueueCapacity),
-	//)
+	logger := log.With().Str("ingestion", "engine").Logger()
 
-	//handler := engine.NewMessageHandler(
-	//	log.With().Str("ingestion", "engine").Logger(),
-	//	engine.NewNotifier(),
-	//	engine.Pattern{
-	//		Match: func(msg *engine.Message) bool {
-	//			_, ok := msg.Payload.(*messages.BlockProposal)
-	//			if ok {
-	//				core.metrics.MessageReceived(metrics.EngineCompliance, metrics.MessageBlockProposal)
-	//			}
-	//			return ok
-	//		},
-	//		Store: pendingBlocks,
-	//	},
+	guaranteesQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultGuaranteeQueueCapacity),
+	)
+	pendingGuarantees := &engine.FifoMessageStore{
+		FifoQueue: guaranteesQueue,
+	}
+
+	handler := engine.NewMessageHandler(
+		logger,
+		engine.NewNotifier(),
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*flow.CollectionGuarantee)
+				if ok {
+					engineMetrics.MessageReceived(metrics.EngineConsensusIngestion, metrics.MessageCollectionGuarantee)
+				}
+				return ok
+			},
+			Store: pendingGuarantees,
+		},
+	)
 
 	// initialize the propagation engine with its dependencies
 	e := &Engine{
-		log:     log.With().Str("engine", "ingestion").Logger(),
-		tracer:  tracer,
-		metrics: metrics,
-		mempool: mempool,
-		spans:   spans,
-		me:      me,
+		log:               logger,
+		me:                me,
+		core:              core,
+		pendingGuarantees: pendingGuarantees,
+		messageHandler:    handler,
 	}
 
 	componentManagerBuilder := component.NewComponentManagerBuilder()
@@ -80,10 +84,14 @@ func New(
 	for i := 0; i < defaultIngestionEngineWorkers; i++ {
 		componentManagerBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
-			err := e.loop()
-			ctx.Throw(err)
+			err := e.loop(ctx)
+			if err != nil {
+				ctx.Throw(err)
+			}
 		})
 	}
+
+	e.ComponentManager = componentManagerBuilder.Build()
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.ReceiveGuarantees, e)
@@ -123,39 +131,42 @@ func (e *Engine) Process(_ network.Channel, originID flow.Identifier, event inte
 	return e.messageHandler.Process(originID, event)
 }
 
-// process processes the given ingestion engine event. Events that are given
-// to this function originate within the expulsion engine on the node with the
-// given origin ID.
-func (e *Engine) process(originID flow.Identifier, event interface{}) error {
-	switch ev := event.(type) {
-	case *flow.CollectionGuarantee:
-		e.metrics.MessageReceived(metrics.EngineConsensusIngestion, metrics.MessageCollectionGuarantee)
-		err := e.onGuarantee(originID, ev)
-		if err != nil {
-			if engine.IsInvalidInputError(err) {
-				e.log.Error().Str("origin", originID.String()).Err(err).Msg("received invalid collection guarantee")
-				return nil
+// processAvailableMessages processes the given ingestion engine event.
+func (e *Engine) processAvailableMessages() error {
+	for {
+		msg, ok := e.pendingGuarantees.Get()
+		if ok {
+			originID := msg.OriginID
+			err := e.core.OnGuarantee(originID, msg.Payload.(*flow.CollectionGuarantee))
+			if err != nil {
+				if engine.IsInvalidInputError(err) {
+					e.log.Error().Str("origin", originID.String()).Err(err).Msg("received invalid collection guarantee")
+					return nil
+				}
+				if engine.IsOutdatedInputError(err) {
+					e.log.Warn().Str("origin", originID.String()).Err(err).Msg("received outdated collection guarantee")
+					return nil
+				}
+				if engine.IsUnverifiableInputError(err) {
+					e.log.Warn().Str("origin", originID.String()).Err(err).Msg("received unverifiable collection guarantee")
+					return nil
+				}
+				return fmt.Errorf("processing collection guarantee unexpected err: %w", err)
 			}
-			if engine.IsOutdatedInputError(err) {
-				e.log.Warn().Str("origin", originID.String()).Err(err).Msg("received outdated collection guarantee")
-				return nil
-			}
-			if engine.IsUnverifiableInputError(err) {
-				e.log.Warn().Str("origin", originID.String()).Err(err).Msg("received unverifiable collection guarantee")
-				return nil
-			}
-			return err
 		}
-		return nil
-	default:
-		return fmt.Errorf("input with incompatible type %T: %w", event, engine.IncompatibleInputTypeError)
 	}
 }
 
-func (e *Engine) processAvailableMessages() error {
-
-}
-
-func (e *Engine) loop() error {
-
+func (e *Engine) loop(ctx context.Context) error {
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-e.messageHandler.GetNotifier():
+			err := e.processAvailableMessages()
+			if err != nil {
+				return fmt.Errorf("internal error processing queued message: %w", err)
+			}
+		}
+	}
 }
