@@ -68,6 +68,11 @@ func (is *InclusionSuite) SetupTest() {
 	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(is.collID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, collConfig)
 
+	nodeConfigs = append(nodeConfigs,
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+	)
+
 	// generate the network config
 	netConfig := testnet.NewNetworkConfig("consensus_collection_guarantee_inclusion", nodeConfigs)
 
