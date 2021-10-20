@@ -352,3 +352,46 @@ func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, env templates.Envi
 
 	return v
 }
+
+// SetApprovedNodesScript adds a node the the approved node list, this must be done when a node joins the protocol during the epoch staking phase
+func (s *Suite) SetApprovedNodesScript(ctx context.Context, env templates.Environment, identities ...flow.Identifier) *sdk.TransactionResult {
+	ids := make([]cadence.Value, 0)
+	for _, id := range identities {
+		idCDC, err := cadence.NewString(id.String())
+		require.NoError(s.T(), err)
+
+		ids = append(ids, idCDC)
+	}
+
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
+
+
+	idTableAddress := sdk.HexToAddress(env.IDTableAddress)
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateSetApprovedNodesScript(env)).
+		SetGasLimit(9999).
+		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
+		SetProposalKey(s.client.SDKServiceAddress(), 0, s.client.Account().Keys[0].SequenceNumber).
+		SetPayer(s.client.SDKServiceAddress()).
+		AddAuthorizer(idTableAddress)
+
+	err = tx.AddArgument(cadence.NewArray(ids))
+	require.NoError(s.T(), err)
+
+	err = s.client.SignAndSendTransaction(ctx, tx)
+	require.NoError(s.T(), err)
+
+	result, err := s.client.WaitForSealed(ctx, tx.ID())
+	require.NoError(s.T(), err)
+
+	return result
+}
+
+// ExecuteReadApprovedNodesScript executes the return proposal table script and returns a list of approved nodes
+func (s *Suite) ExecuteReadApprovedNodesScript(ctx context.Context, env templates.Environment) cadence.Value {
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
+	require.NoError(s.T(), err)
+
+	return v
+}
