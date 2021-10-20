@@ -98,13 +98,14 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	response := unittest.ChunkDataResponseFixture(unittest.IdentifierFixture())
+	response := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture())
+	request := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(response.ChunkDataPack.ChunkID))
 	originID := unittest.IdentifierFixture()
 
 	// we remove pending request on receiving this response
-	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(true).Once()
+	s.pendingRequests.On("GetAndRemove", response.ChunkDataPack.ChunkID).Return(request, true).Once()
 
-	s.handler.On("HandleChunkDataPack", originID, &response.ChunkDataPack).Return().Once()
+	s.handler.On("HandleChunkDataPack", originID, response).Return().Once()
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
 
@@ -123,7 +124,7 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 
 	// creates list of chunk data pack responses
 	count := 10
-	responses := unittest.ChunkDataResponsesFixture(count)
+	responses := unittest.ChunkDataResponseMessageListFixture(count)
 	originID := unittest.IdentifierFixture()
 	chunkIDs := toChunkIDs(t, responses)
 
@@ -150,7 +151,7 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	response := unittest.ChunkDataResponseFixture(unittest.IdentifierFixture())
+	response := unittest.ChunkDataResponseMsgFixture(unittest.IdentifierFixture())
 	originID := unittest.IdentifierFixture()
 
 	// however by the time we try remove it, the request has gone.
@@ -214,7 +215,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 		unittest.WithHeightGreaterThan(sealedHeight),
 		unittest.WithAgrees(agrees),
 		unittest.WithDisagrees(disagrees))
-	response := unittest.ChunkDataResponseFixture(requests[0].ChunkID)
+	response := unittest.ChunkDataResponseMsgFixture(requests[0].ChunkID)
 
 	// mocks the requester pipeline
 	vertestutils.MockLastSealedHeight(s.state, sealedHeight)
