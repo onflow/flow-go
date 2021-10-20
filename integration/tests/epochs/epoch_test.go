@@ -3,9 +3,11 @@ package epochs
 import (
 	"context"
 
+	"fmt"
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/stretchr/testify/suite"
 	"testing"
 
@@ -140,6 +142,7 @@ func (s *Suite) TestEpochJoin() {
 	role := flow.RoleConsensus
 	// stake a new node
 	info := s.StakeNode(ctx, env, role)
+	testContainerName := fmt.Sprintf("epochs-test-join-%s-%s",info.Role, info.NodeID)
 
 	// get node info from staking table
 	nodeInfoCDC := s.ExecuteGetNodeInfoScript(ctx, env, info.NodeID)
@@ -166,24 +169,38 @@ func (s *Suite) TestEpochJoin() {
 	require.True(s.T(), found, "node id for new node not found in approved list after setting the approved list")
 
 	nodeConfig := testnet.NewNodeConfig(role, testnet.WithID(info.NodeID))
-	testContainerConfig := testnet.NewContainerConfig("epochs-test-container", nodeConfig, info.NetworkingKey, info.StakingAccountKey)
+	testContainerConfig := testnet.NewContainerConfig(testContainerName, nodeConfig, info.NetworkingKey, info.StakingAccountKey)
 	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey})
 	require.NoError(s.T(), err)
 
-	// download root snapshot from access node
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
+	// download root snapshot from access node, wait until we are in the epoch setup phase
+	var snapshot *inmem.Snapshot
+	for  {
+		snapshot, err = s.client.GetLatestProtocolSnapshot(ctx)
+		require.NoError(s.T(), err)
+
+		currentPhase, err := snapshot.Phase()
+		require.NoError(s.T(), err)
+		if currentPhase == flow.EpochPhaseSetup {
+			break
+		}
+
+		epoch := snapshot.Epochs().Current()
+		v, err := epoch.FirstView()
+		require.NoError(s.T(), err)
+		s.BlockState.WaitForSealedView(s.T(), v)
+	}
 
 	// write updated root snapshot
 	s.net.WriteRootSnapshot(snapshot)
 
 	// add our container to the network
-	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
-	require.NoError(s.T(), err, "failed to add container to network")
-
-	// start our test container
-	testContainer := s.net.ContainerByID(info.NodeID)
-	testContainer.Container.Start(ctx)
-
-	//s.net.StopContainers()
+	//err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
+	//require.NoError(s.T(), err, "failed to add container to network")
+	//
+	//// start our test container
+	//testContainer := s.net.ContainerByID(info.NodeID)
+	//testContainer.WriteRootSnapshot(snapshot)
+	//testContainer.Container.Start(ctx)
+	s.net.StopContainers()
 }
