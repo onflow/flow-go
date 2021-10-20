@@ -131,9 +131,17 @@ func (n *Node) deepCopy() *Node {
 	var p ledger.Path
 	copy(p[:], n.path[:])
 
+	var lChildCopy, rChildCopy *Node
+	if n.lChild != nil {
+		lChildCopy = n.lChild.deepCopy()
+	}
+	if n.rChild != nil {
+		rChildCopy = n.rChild.deepCopy()
+	}
+
 	return &Node{
-		lChild:    n.lChild,
-		rChild:    n.rChild,
+		lChild:    lChildCopy,
+		rChild:    rChildCopy,
 		height:    n.height,
 		path:      p,
 		payload:   n.payload.DeepCopy(),
@@ -170,9 +178,9 @@ func (n *Node) bubbleUp(isLeft bool) {
 // and return n itself most of the case
 // BubbleUp would increment the hight of the node and updates
 // the hash values (keeping same path and payload)
-func (n *Node) Prunned() *Node {
+func (n *Node) Prunned() (*Node, bool) {
 	if n.IsLeaf() {
-		return n.deepCopy()
+		return n, false
 	}
 
 	// if leaf return it as if
@@ -180,33 +188,41 @@ func (n *Node) Prunned() *Node {
 	lChildEmpty := true
 	rChildEmpty := true
 	var prunnedLChild, prunnedRChild *Node
+	var lChildChanged, rChildChanged bool
 	if n.lChild != nil {
-		prunnedLChild = n.lChild.Prunned()
+		prunnedLChild, lChildChanged = n.lChild.Prunned()
 		lChildEmpty = prunnedLChild.IsADefaultNode()
 	}
 	if n.rChild != nil {
-		prunnedRChild = n.rChild.Prunned()
+		prunnedRChild, rChildChanged = n.rChild.Prunned()
 		rChildEmpty = prunnedRChild.IsADefaultNode()
 	}
 	if rChildEmpty && lChildEmpty {
 		// is like a leaf
-		return NewLeaf(ledger.Path{}, ledger.EmptyPayload(), n.height)
+		return NewLeaf(ledger.Path{}, ledger.EmptyPayload(), n.height), true
 	}
 
 	// if childNode is non empty
 	if !lChildEmpty && rChildEmpty && prunnedLChild.IsLeaf() {
-		prunnedLChild.bubbleUp(true)
+		// TODO merge these two methods
+		l := prunnedLChild.deepCopy()
+		l.bubbleUp(true)
 		// bubble up all children and return as parent
-		return prunnedLChild
+		return l, true
 	}
 	if lChildEmpty && !rChildEmpty && prunnedRChild.IsLeaf() {
-		prunnedRChild.bubbleUp(false)
+		// TODO merge these two methods
+		r := prunnedRChild.deepCopy()
+		r.bubbleUp(false)
 		// bubble up all children and return as parent
-		return prunnedRChild
+		return r, true
 	}
 
+	if lChildChanged || rChildChanged {
+		return NewInterimNode(n.height, prunnedLChild, prunnedRChild), true
+	}
 	// else no change needed
-	return NewInterimNode(n.height, prunnedLChild, prunnedRChild)
+	return n, false
 }
 
 func (n *Node) IsADefaultNode() bool {

@@ -154,7 +154,7 @@ func Test_BubbleUp(t *testing.T) {
 	n5 := node.NewInterimNode(2, n4, n3)
 	fmt.Println(n5.FmtStr(" ", " "))
 	// require.True(t, n5.VerifyCachedHash())
-	nn5 := n5.Prunned()
+	nn5, _ := n5.Prunned()
 	fmt.Println(nn5.FmtStr(" ", " "))
 
 	// it should be no change
