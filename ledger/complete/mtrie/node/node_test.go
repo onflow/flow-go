@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
@@ -138,23 +139,25 @@ func Test_VerifyCachedHash(t *testing.T) {
 
 func Test_BubbleUp(t *testing.T) {
 	path := utils.PathByUint16(1)
-	payload := utils.LightPayload(2, 3)
-	emptyPayload := utils.LightPayload(2, 4)
-	emptyPayload.Value = nil
+	payload1 := utils.LightPayload(2, 3)
+	payload2 := utils.LightPayload(2, 4)
+	emptyPayload := &ledger.Payload{}
 	//       n5
 	//     /    \
 	//    n4    n3
 	//   / \
 	//  n1 n2
-	n1 := node.NewLeaf(path, payload, 0)
-	n2 := node.NewLeaf(path, payload, 0)
-	n3 := node.NewLeaf(path, emptyPayload, 0)
+	n1 := node.NewLeaf(path, payload1, 0)
+	n2 := node.NewLeaf(path, emptyPayload, 0)
+	n3 := node.NewLeaf(path, payload2, 1)
 	n4 := node.NewInterimNode(1, n1, n2)
-	n5 := node.NewInterimNode(1, n4, n3)
+	n5 := node.NewInterimNode(2, n4, n3)
 	fmt.Println(n5.FmtStr(" ", " "))
-	require.True(t, n5.VerifyCachedHash())
-	nn5 := n5.BubbleUp(true)
+	// require.True(t, n5.VerifyCachedHash())
+	nn5 := n5.Prunned()
 	fmt.Println(nn5.FmtStr(" ", " "))
+
+	// it should be no change
 
 	t.Fatal("XXX")
 }

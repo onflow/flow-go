@@ -300,30 +300,13 @@ func update(
 		return parentNode
 	}
 
+	n := node.NewInterimNode(nodeHeight, lChild, rChild)
+
 	if prune {
-		lChildEmpty := true
-		rChildEmpty := true
-		if lChild != nil {
-			lChildEmpty = lChild.IsADefaultNode()
-		}
-		if rChild != nil {
-			rChildEmpty = rChild.IsADefaultNode()
-		}
-		// prune trie for default nodes
-		if !lChildEmpty && rChildEmpty {
-			return lChild.BubbleUp(true)
-		}
-		if lChildEmpty && !rChildEmpty {
-			return rChild.BubbleUp(false)
-		}
-		// // if both children are default node then just return the parent
-		// if lChildEmpty && rChildEmpty {
-		// 	return node.NewLeaf()
-		// }
-		// if one node is now the default node make parent a compact node of the child payload
+		return n.Prunned()
 	}
 
-	return node.NewInterimNode(nodeHeight, lChild, rChild)
+	return n
 }
 
 // UnsafeProofs provides proofs for the given paths.

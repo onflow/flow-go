@@ -123,50 +123,90 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	return n
 }
 
+// deepCopy
+func (n *Node) deepCopy() *Node {
+	var h hash.Hash
+	copy(h[:], n.hashValue[:])
+
+	var p ledger.Path
+	copy(p[:], n.path[:])
+
+	return &Node{
+		lChild:    n.lChild,
+		rChild:    n.rChild,
+		height:    n.height,
+		path:      p,
+		payload:   n.payload.DeepCopy(),
+		maxDepth:  n.maxDepth,
+		regCount:  n.regCount,
+		hashValue: h,
+	}
+}
+
 // computeAndStoreHash computes the node's hash value and
 // stores the result in the nodes internal `hashValue` field
 func (n *Node) computeAndStoreHash() {
 	n.hashValue = n.computeHash()
 }
 
-// BubbleUp would increment the hight of the node and updates
-// the hash values (keeping same path and payload)
-func (n *Node) BubbleUp(isLeft bool) *Node {
-	nn := &Node{
-		maxDepth: 0,
-		regCount: uint64(1),
-	}
-	nn.height = n.height + 1
-	if n.IsLeaf() {
-		if isLeft {
-			nn.hashValue = hash.HashInterNode(n.hashValue, ledger.GetDefaultHashForHeight(n.height))
-		} else {
-			nn.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(n.height), n.hashValue)
-		}
-		// its okey to reuse the pointer to the payload
-		// since we are not going to change it
-		nn.payload = n.payload
-		nn.path = n.path
-		return nn
-	}
-
-	var lMaxDepth, rMaxDepth uint16
-	var lRegCount, rRegCount uint64
+func (n *Node) bubbleUp(isLeft bool) {
 	if n.lChild != nil {
-		nn.lChild = n.lChild.BubbleUp(true)
-		lMaxDepth = nn.lChild.maxDepth
-		lRegCount = nn.lChild.regCount
+		n.lChild.bubbleUp(true)
 	}
 	if n.rChild != nil {
-		nn.rChild = n.rChild.BubbleUp(false)
-		rMaxDepth = nn.rChild.maxDepth
-		rRegCount = nn.rChild.regCount
+		n.rChild.bubbleUp(false)
+	}
+	// TODO n.height might be off
+	if isLeft {
+		n.hashValue = hash.HashInterNode(n.hashValue, ledger.GetDefaultHashForHeight(n.height))
+	} else {
+		n.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(n.height), n.hashValue)
+	}
+	n.height = n.height + 1
+	n.maxDepth = n.maxDepth - 1
+}
+
+// This is working but very ineffent, we should only deep copy a branch of nodes if needed
+// and return n itself most of the case
+// BubbleUp would increment the hight of the node and updates
+// the hash values (keeping same path and payload)
+func (n *Node) Prunned() *Node {
+	if n.IsLeaf() {
+		return n.deepCopy()
 	}
 
-	nn.hashValue = hash.HashInterNode(nn.lChild.hashValue, nn.rChild.hashValue)
-	nn.maxDepth = utils.MaxUint16(lMaxDepth, rMaxDepth) + 1
-	nn.regCount = lRegCount + rRegCount
-	return nn
+	// if leaf return it as if
+	// if non leaf bubble up
+	lChildEmpty := true
+	rChildEmpty := true
+	var prunnedLChild, prunnedRChild *Node
+	if n.lChild != nil {
+		prunnedLChild = n.lChild.Prunned()
+		lChildEmpty = prunnedLChild.IsADefaultNode()
+	}
+	if n.rChild != nil {
+		prunnedRChild = n.rChild.Prunned()
+		rChildEmpty = prunnedRChild.IsADefaultNode()
+	}
+	if rChildEmpty && lChildEmpty {
+		// is like a leaf
+		return NewLeaf(ledger.Path{}, ledger.EmptyPayload(), n.height)
+	}
+
+	// if childNode is non empty
+	if !lChildEmpty && rChildEmpty && prunnedLChild.IsLeaf() {
+		prunnedLChild.bubbleUp(true)
+		// bubble up all children and return as parent
+		return prunnedLChild
+	}
+	if lChildEmpty && !rChildEmpty && prunnedRChild.IsLeaf() {
+		prunnedRChild.bubbleUp(false)
+		// bubble up all children and return as parent
+		return prunnedRChild
+	}
+
+	// else no change needed
+	return NewInterimNode(n.height, prunnedLChild, prunnedRChild)
 }
 
 func (n *Node) IsADefaultNode() bool {
