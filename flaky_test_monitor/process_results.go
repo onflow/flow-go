@@ -22,7 +22,7 @@ type RawTestStep struct {
 // models full summary of a test run from "go test -json"
 type TestRun struct {
 	CommitSha      string          `json:"commit_sha"`
-	CommitDate     string          `json:"commit_date"`
+	CommitDate     time.Time       `json:"commit_date"`
 	JobRunDate     string          `json:"job_run_date"`
 	PackageResults []PackageResult `json:"results"`
 }
@@ -49,12 +49,12 @@ func (testRun *TestRun) save(fileName string) {
 
 // models test result of an entire package which can have multiple tests
 type PackageResult struct {
-	Package string       `json:"package"`
-	Result  string       `json:"result"`
-	Elapsed float32      `json:"elapsed"`
-	Output  []string     `json:"output"`
-	Tests   []TestResult `json:"tests"`
-	TestMap map[string][]TestResult
+	Package string                  `json:"package"`
+	Result  string                  `json:"result"`
+	Elapsed float32                 `json:"elapsed"`
+	Output  []string                `json:"output"`
+	Tests   []TestResult            `json:"tests"`
+	TestMap map[string][]TestResult `json:"-"`
 }
 
 // models result of a single test that's part of a larger package result
@@ -250,7 +250,7 @@ func finalizeTestRun(packageResultMap map[string]*PackageResult) TestRun {
 	}
 
 	var testRun TestRun
-	testRun.CommitDate = commitDate.Format(time.RFC1123Z)
+	testRun.CommitDate = commitDate.UTC()
 	testRun.CommitSha = commitSha
 	testRun.JobRunDate = jobStarted.Format(time.RFC1123Z)
 
