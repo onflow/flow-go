@@ -6,12 +6,14 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/rs/zerolog"
 )
 
 // CachingAssignmentCollector is an AssignmentCollectorState with the fixed `ProcessingStatus` of `CachingApprovals`.
 type CachingAssignmentCollector struct {
 	AssignmentCollectorBase
 
+	log            zerolog.Logger
 	approvalsCache *ApprovalsCache           // in-memory cache of approvals (not-verified)
 	incResCache    *IncorporatedResultsCache // in-memory cache for incorporated results that were processed
 }
@@ -19,6 +21,7 @@ type CachingAssignmentCollector struct {
 func NewCachingAssignmentCollector(collectorBase AssignmentCollectorBase) *CachingAssignmentCollector {
 	return &CachingAssignmentCollector{
 		AssignmentCollectorBase: collectorBase,
+		log:                     collectorBase.log.With().Str("component", "caching_assignment_collector").Logger(),
 		approvalsCache:          NewApprovalsCache(0),
 		incResCache:             NewIncorporatedResultsCache(0),
 	}
@@ -60,6 +63,11 @@ func (ac *CachingAssignmentCollector) ProcessIncorporatedResult(incorporatedResu
 //  * engine.InvalidInputError if the result approval is invalid
 //  * any other errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *CachingAssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
+	ac.log.Debug().
+		Str("result_id", approval.Body.ExecutionResultID.String()).
+		Str("verifier_id", approval.Body.ApproverID.String()).
+		Msg("processing result approval")
+
 	// check that approval is for the expected result to reject incompatible inputs
 	if approval.Body.ExecutionResultID != ac.ResultID() {
 		return fmt.Errorf("this CachingAssignmentCollector processes only approvals for result (%x) but got an approval for (%x)", ac.resultID, approval.Body.ExecutionResultID)
