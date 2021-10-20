@@ -23,7 +23,7 @@ type RawTestStep struct {
 type TestRun struct {
 	CommitSha      string          `json:"commit_sha"`
 	CommitDate     time.Time       `json:"commit_date"`
-	JobRunDate     string          `json:"job_run_date"`
+	JobRunDate     time.Time       `json:"job_run_date"`
 	PackageResults []PackageResult `json:"results"`
 }
 
@@ -252,7 +252,7 @@ func finalizeTestRun(packageResultMap map[string]*PackageResult) TestRun {
 	var testRun TestRun
 	testRun.CommitDate = commitDate.UTC()
 	testRun.CommitSha = commitSha
-	testRun.JobRunDate = jobStarted.Format(time.RFC1123Z)
+	testRun.JobRunDate = jobStarted.UTC()
 
 	// add all the package results to the test run
 	for _, pr := range packageResultMap {

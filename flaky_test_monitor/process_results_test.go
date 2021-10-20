@@ -51,6 +51,7 @@ func runProcessTestRun(t *testing.T, jsonExpectedActualFile string) {
 	// convert to UTC to remove any local time zone settings -
 	// even though the time stamp in the test json can be in UTC (or not), there will still be a local time zone set that will fail equality check - this removes the timezone setting
 	expectedTestRun.CommitDate = expectedTestRun.CommitDate.UTC()
+	expectedTestRun.JobRunDate = expectedTestRun.JobRunDate.UTC()
 
 	// sort all package results alphabetically
 	sort.SliceStable(expectedTestRun.PackageResults, func(i, j int) bool {
@@ -69,7 +70,7 @@ func runProcessTestRun(t *testing.T, jsonExpectedActualFile string) {
 
 	require.NoError(t, os.Setenv("COMMIT_DATE", "2021-09-21T18:06:25+00:00"))
 	require.NoError(t, os.Setenv("COMMIT_SHA", "46baf6c6be29af9c040bc14195e195848598bbae"))
-	require.NoError(t, os.Setenv("JOB_STARTED", "2021-09-21T21:06:25-07:00"))
+	require.NoError(t, os.Setenv("JOB_STARTED", "2021-09-21T21:06:25+00:00"))
 
 	// simulate generating raw "go test -json" output by loading output from saved file
 	resultReader := FileResultReader{
