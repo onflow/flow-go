@@ -13,6 +13,7 @@ import (
 	mockfetcher "github.com/onflow/flow-go/engine/verification/fetcher/mock"
 	"github.com/onflow/flow-go/engine/verification/requester"
 	vertestutils "github.com/onflow/flow-go/engine/verification/utils/unittest"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
@@ -105,7 +106,13 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	// we remove pending request on receiving this response
 	s.pendingRequests.On("GetAndRemove", response.ChunkDataPack.ChunkID).Return(request, true).Once()
 
-	s.handler.On("HandleChunkDataPack", originID, response).Return().Once()
+	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
+		Locator: chunks.Locator{
+			ResultID: request.ResultID,
+			Index:    request.Index,
+		},
+		Cdp: &response.ChunkDataPack,
+	}).Return().Once()
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Once()
 
