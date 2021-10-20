@@ -174,10 +174,9 @@ func (n *Node) bubbleUp(isLeft bool) {
 	n.maxDepth = n.maxDepth - 1
 }
 
-// This is working but very ineffent, we should only deep copy a branch of nodes if needed
-// and return n itself most of the case
-// BubbleUp would increment the hight of the node and updates
-// the hash values (keeping same path and payload)
+// Prunned would look at the child of a node and if it can be prunned
+// it constructs a new subtrie and return that one instead of n
+// otherwise it would return the node itself if no change is required
 func (n *Node) Prunned() (*Node, bool) {
 	if n.IsLeaf() {
 		return n, false
