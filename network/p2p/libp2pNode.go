@@ -116,7 +116,7 @@ func DefaultLibP2PNodeFactory(
 
 	psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
 
-	if chainID == flow.Mainnet {
+	if role != "ghost" {
 		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
 			return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(
 				h.ID(), rootBlockID, idProvider,
