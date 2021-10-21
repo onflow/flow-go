@@ -68,6 +68,9 @@ func runProcessTestRun(t *testing.T, jsonExpectedActualFile string) {
 		expectedTestRun.PackageResults[k].TestMap = make(map[string][]TestResult)
 	}
 
+	// these hard coded values simulate a real test run that would obtain these environment variables dynamically
+	// we are simulating this scenario by setting the environment variables explicitly in the test before calling the main processing script which will look for them
+	// these values are uses in testdata/expected/*.json files
 	require.NoError(t, os.Setenv("COMMIT_DATE", "2021-09-21T18:06:25+00:00"))
 	require.NoError(t, os.Setenv("COMMIT_SHA", "46baf6c6be29af9c040bc14195e195848598bbae"))
 	require.NoError(t, os.Setenv("JOB_STARTED", "2021-09-21T21:06:25+00:00"))
@@ -90,31 +93,34 @@ func checkTestRuns(t *testing.T, expectedTestRun TestRun, actualTestRun TestRun)
 
 	// check each package
 	for packageIndex := range expectedTestRun.PackageResults {
-		require.Equal(t, expectedTestRun.PackageResults[packageIndex].Elapsed, actualTestRun.PackageResults[packageIndex].Elapsed)
-		require.Equal(t, expectedTestRun.PackageResults[packageIndex].Package, actualTestRun.PackageResults[packageIndex].Package)
-		require.Equal(t, expectedTestRun.PackageResults[packageIndex].Result, actualTestRun.PackageResults[packageIndex].Result)
-		require.Empty(t, expectedTestRun.PackageResults[packageIndex].TestMap, actualTestRun.PackageResults[packageIndex].TestMap)
+		expectedPackageResults := expectedTestRun.PackageResults[packageIndex]
+		actualPackageResults := actualTestRun.PackageResults[packageIndex]
+
+		require.Equal(t, expectedPackageResults.Elapsed, actualPackageResults.Elapsed)
+		require.Equal(t, expectedPackageResults.Package, actualPackageResults.Package)
+		require.Equal(t, expectedPackageResults.Result, actualPackageResults.Result)
+		require.Empty(t, expectedPackageResults.TestMap, actualPackageResults.TestMap)
 
 		// check outputs of each package result
-		require.Equal(t, len(expectedTestRun.PackageResults[packageIndex].Output), len(actualTestRun.PackageResults[packageIndex].Output))
-		for packageOutputIndex := range expectedTestRun.PackageResults[packageIndex].Output {
-			require.Equal(t, expectedTestRun.PackageResults[packageIndex].Output[packageOutputIndex], actualTestRun.PackageResults[packageIndex].Output[packageOutputIndex])
+		require.Equal(t, len(expectedPackageResults.Output), len(actualPackageResults.Output))
+		for packageOutputIndex := range expectedPackageResults.Output {
+			require.Equal(t, expectedPackageResults.Output[packageOutputIndex], actualPackageResults.Output[packageOutputIndex])
 		}
 
 		// check all tests results of each package
-		require.Equal(t, len(expectedTestRun.PackageResults[packageIndex].Tests), len(actualTestRun.PackageResults[packageIndex].Tests))
-		for testResultIndex := range expectedTestRun.PackageResults[packageIndex].Tests {
+		require.Equal(t, len(expectedPackageResults.Tests), len(actualPackageResults.Tests))
+		for testResultIndex := range expectedPackageResults.Tests {
 
 			// check all outputs of each test result
-			require.Equal(t, len(expectedTestRun.PackageResults[packageIndex].Tests[testResultIndex].Output), len(actualTestRun.PackageResults[packageIndex].Tests[testResultIndex].Output), fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestRun.PackageResults[packageIndex].Tests[testResultIndex].Test))
-			for testResultOutputIndex := range expectedTestRun.PackageResults[packageIndex].Tests[testResultIndex].Output {
-				require.Equal(t, expectedTestRun.PackageResults[packageIndex].Tests[testResultIndex].Output[testResultOutputIndex], actualTestRun.PackageResults[packageIndex].Tests[testResultIndex].Output[testResultOutputIndex], fmt.Sprintf("PackageResult[%d] TestResult[%d] Output[%d]", packageIndex, testResultIndex, testResultOutputIndex))
+			require.Equal(t, len(expectedPackageResults.Tests[testResultIndex].Output), len(actualPackageResults.Tests[testResultIndex].Output), fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualPackageResults.Tests[testResultIndex].Test))
+			for testResultOutputIndex := range expectedPackageResults.Tests[testResultIndex].Output {
+				require.Equal(t, expectedPackageResults.Tests[testResultIndex].Output[testResultOutputIndex], actualPackageResults.Tests[testResultIndex].Output[testResultOutputIndex], fmt.Sprintf("PackageResult[%d] TestResult[%d] Output[%d]", packageIndex, testResultIndex, testResultOutputIndex))
 			}
 
-			require.Equal(t, expectedTestRun.PackageResults[packageIndex].Tests[testResultIndex].Package, actualTestRun.PackageResults[packageIndex].Tests[testResultIndex].Package)
-			require.Equal(t, expectedTestRun.PackageResults[packageIndex].Tests[testResultIndex].Test, actualTestRun.PackageResults[packageIndex].Tests[testResultIndex].Test)
-			require.Equal(t, expectedTestRun.PackageResults[packageIndex].Tests[testResultIndex].Elapsed, actualTestRun.PackageResults[packageIndex].Tests[testResultIndex].Elapsed, fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestRun.PackageResults[packageIndex].Tests[testResultIndex].Test))
-			require.Equal(t, expectedTestRun.PackageResults[packageIndex].Tests[testResultIndex].Result, actualTestRun.PackageResults[packageIndex].Tests[testResultIndex].Result)
+			require.Equal(t, expectedPackageResults.Tests[testResultIndex].Package, actualPackageResults.Tests[testResultIndex].Package)
+			require.Equal(t, expectedPackageResults.Tests[testResultIndex].Test, actualPackageResults.Tests[testResultIndex].Test)
+			require.Equal(t, expectedPackageResults.Tests[testResultIndex].Elapsed, actualPackageResults.Tests[testResultIndex].Elapsed, fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualPackageResults.Tests[testResultIndex].Test))
+			require.Equal(t, expectedPackageResults.Tests[testResultIndex].Result, actualPackageResults.Tests[testResultIndex].Result)
 		}
 	}
 	// finally, compare the entire actual test run against what's expected - if there were any discrepancies they should have been caught by now

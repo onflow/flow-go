@@ -160,6 +160,7 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*PackageResult 
 			case "run":
 				var newTestResult TestResult
 				newTestResult.Test = rawTestStep.Test
+				newTestResult.Package = rawTestStep.Package
 
 				// store outputs as a slice of strings - that's how "go test -json" outputs each output string on a separate line
 				// for passing tests, there are usually 2 outputs for a passing test and more outputs for a failing test
@@ -167,8 +168,6 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*PackageResult 
 
 				// append to test result slice, whether it's the first or subsequent test result
 				packageResult.TestMap[rawTestStep.Test] = append(packageResult.TestMap[rawTestStep.Test], newTestResult)
-				lastTestResultIndex = len(packageResult.TestMap[rawTestStep.Test]) - 1
-				packageResult.TestMap[rawTestStep.Test][lastTestResultIndex].Package = rawTestStep.Package
 
 			case "output":
 				testResults, ok := packageResult.TestMap[rawTestStep.Test]
