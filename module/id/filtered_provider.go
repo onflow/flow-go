@@ -4,17 +4,30 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// FilteredIdentifierProvider implements an IdentifierProvider which provides the identifiers
+// IdentityFilterIdentifierProvider implements an IdentifierProvider which provides the identifiers
 // resulting from applying a filter to an IdentityProvider.
-type FilteredIdentifierProvider struct {
+type IdentityFilterIdentifierProvider struct {
 	filter           flow.IdentityFilter
 	identityProvider IdentityProvider
 }
 
-func NewFilteredIdentifierProvider(filter flow.IdentityFilter, identityProvider IdentityProvider) *FilteredIdentifierProvider {
-	return &FilteredIdentifierProvider{filter, identityProvider}
+func NewIdentityFilterIdentifierProvider(filter flow.IdentityFilter, identityProvider IdentityProvider) *IdentityFilterIdentifierProvider {
+	return &IdentityFilterIdentifierProvider{filter, identityProvider}
+}
+
+func (p *IdentityFilterIdentifierProvider) Identifiers() flow.IdentifierList {
+	return p.identityProvider.Identities(p.filter).NodeIDs()
+}
+
+type FilteredIdentifierProvider struct {
+	filter   flow.IdentifierFilter
+	provider IdentifierProvider
+}
+
+func NewFilteredIdentifierProvider(filter flow.IdentifierFilter, provider IdentifierProvider) *FilteredIdentifierProvider {
+	return &FilteredIdentifierProvider{filter, provider}
 }
 
 func (p *FilteredIdentifierProvider) Identifiers() flow.IdentifierList {
-	return p.identityProvider.Identities(p.filter).NodeIDs()
+	return p.provider.Identifiers().Filter(p.filter)
 }

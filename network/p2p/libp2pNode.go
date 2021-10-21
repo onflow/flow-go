@@ -425,12 +425,7 @@ func (n *Node) Stop() (chan struct{}, error) {
 
 // AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
 func (n *Node) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
-	err := n.host.Connect(ctx, peerInfo)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return n.host.Connect(ctx, peerInfo)
 }
 
 // RemovePeer closes the connection with the peer.
@@ -819,19 +814,20 @@ func DefaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Optio
 // PubsubOption generates a libp2p pubsub.Option from the given context and host
 type PubsubOption func(ctx context.Context, host host.Host) (pubsub.Option, error)
 
-func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
-	pubSubOptionFunc := func(option pubsub.Option) PubsubOption {
-		return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
-			return option, nil
-		}
+func PubSubOptionWrapper(option pubsub.Option) PubsubOption {
+	return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
+		return option, nil
 	}
+}
+
+func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 	return []PubsubOption{
 		// skip message signing
-		pubSubOptionFunc(pubsub.WithMessageSigning(true)),
+		PubSubOptionWrapper(pubsub.WithMessageSigning(true)),
 		// skip message signature
-		pubSubOptionFunc(pubsub.WithStrictSignatureVerification(true)),
+		PubSubOptionWrapper(pubsub.WithStrictSignatureVerification(true)),
 		// set max message size limit for 1-k PubSub messaging
-		pubSubOptionFunc(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
+		PubSubOptionWrapper(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
 		// no discovery
 	}
 }
