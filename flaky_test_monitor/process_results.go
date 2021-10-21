@@ -112,6 +112,13 @@ func processTestRun(resultReader ResultReader) TestRun {
 	return testRun
 }
 
+// Raw JSON result step from `go test -json` execution
+// Sequence of result steps (specified by Action value) per test:
+// 1. run (once)
+// 2. output (one to many)
+// 3. pause (zero or once) - for tests using t.Parallel()
+// 4. cont (zero or once) - for tests using t.Parallel()
+// 5. pass OR fail OR skip (once)
 func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*PackageResult {
 	packageResultMap := make(map[string]*PackageResult)
 	// reuse the same package result over and over
@@ -141,23 +148,8 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*PackageResult 
 		// most raw test steps will have Test value - only package specific steps won't
 		if rawTestStep.Test != "" {
 
-			lastTestResultIndex := len(packageResult.TestMap[rawTestStep.Test]) - 1
-			if lastTestResultIndex < 0 {
-				lastTestResultIndex = 0
-			}
-
-			// subsequent raw json outputs will have different data about the test - whether it passed/failed, what the test output was, etc
-			switch rawTestStep.Action {
-
-			// Raw JSON result step from `go test -json` execution
-			// Sequence of result steps (specified by Action value) per test:
-			// 1. run (once)
-			// 2. output (one to many)
-			// 3. pause (zero or once) - for tests using t.Parallel()
-			// 4. cont (zero or once) - for tests using t.Parallel()
-			// 5. pass OR fail OR skip (once)
-
-			case "run":
+			// "run" is the very first test step and it needs special treatment - to create all the data structures that will be used by subsequent test steps for the same test
+			if rawTestStep.Action == "run" {
 				var newTestResult TestResult
 				newTestResult.Test = rawTestStep.Test
 				newTestResult.Package = rawTestStep.Package
@@ -168,17 +160,28 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*PackageResult 
 
 				// append to test result slice, whether it's the first or subsequent test result
 				packageResult.TestMap[rawTestStep.Test] = append(packageResult.TestMap[rawTestStep.Test], newTestResult)
+				continue
+			}
 
+			lastTestResultIndex := len(packageResult.TestMap[rawTestStep.Test]) - 1
+			if lastTestResultIndex < 0 {
+				lastTestResultIndex = 0
+			}
+
+			testResults, ok := packageResult.TestMap[rawTestStep.Test]
+			if !ok {
+				panic(fmt.Sprintf("no test result for test %s", rawTestStep.Test))
+			}
+			lastTestResultPointer := &testResults[lastTestResultIndex]
+
+			// subsequent raw json outputs will have different data about the test - whether it passed/failed, what the test output was, etc
+			switch rawTestStep.Action {
 			case "output":
-				testResults, ok := packageResult.TestMap[rawTestStep.Test]
-				if !ok {
-					panic(fmt.Sprintf("no test result for test %s", rawTestStep.Test))
-				}
-				packageResult.TestMap[rawTestStep.Test][lastTestResultIndex].Output = append(testResults[lastTestResultIndex].Output, rawTestStep.Output)
+				lastTestResultPointer.Output = append(lastTestResultPointer.Output, rawTestStep.Output)
 
 			case "pass", "fail", "skip":
-				packageResult.TestMap[rawTestStep.Test][lastTestResultIndex].Result = rawTestStep.Action
-				packageResult.TestMap[rawTestStep.Test][lastTestResultIndex].Elapsed = rawTestStep.Elapsed
+				lastTestResultPointer.Result = rawTestStep.Action
+				lastTestResultPointer.Elapsed = rawTestStep.Elapsed
 
 			case "pause", "cont":
 				// tests using t.Parallel() will have these values
