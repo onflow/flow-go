@@ -390,7 +390,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	log := fnb.Logger.With().
 		Timestamp().
 		Str("node_role", fnb.BaseConfig.NodeRole).
-		Str("node_id", fnb.BaseConfig.nodeIDHex).
+		Str("node_id", fnb.NodeID.String()).
 		Logger()
 
 	log.Info().Msgf("flow %s node starting up", fnb.BaseConfig.NodeRole)
