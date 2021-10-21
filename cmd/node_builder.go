@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
+	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
@@ -40,7 +41,7 @@ type NodeBuilder interface {
 	ParseAndPrintFlags()
 
 	// Initialize performs all the initialization needed at the very start of a node
-	Initialize() NodeBuilder
+	Initialize() error
 
 	// PrintBuildVersionDetails prints the node software build version
 	PrintBuildVersionDetails()
@@ -49,7 +50,7 @@ type NodeBuilder interface {
 	InitIDProviders()
 
 	// EnqueueNetworkInit enqueues the default network component with the given context
-	EnqueueNetworkInit(ctx context.Context)
+	EnqueueNetworkInit()
 
 	// EnqueueMetricsServerInit enqueues the metrics component
 	EnqueueMetricsServerInit()
@@ -67,6 +68,9 @@ type NodeBuilder interface {
 	// node is stopped, we will wait for the component to exit gracefully with
 	// `Done`.
 	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
+
+	// AdminCommand registers a new admin command with the admin server
+	AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder
 
 	// MustNot asserts that the given error must not occur.
 	// If the error is nil, returns a nil log event (which acts as a no-op).
@@ -88,7 +92,7 @@ type NodeBuilder interface {
 	PostInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder
 
 	// RegisterBadgerMetrics registers all badger related metrics
-	RegisterBadgerMetrics()
+	RegisterBadgerMetrics() error
 
 	// ValidateFlags is an extra method called after parsing flags, intended for extra check of flag validity
 	// for example where certain combinations aren't allowed
@@ -100,10 +104,15 @@ type NodeBuilder interface {
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
 	nodeIDHex             string
+	AdminAddr             string
+	AdminCert             string
+	AdminKey              string
+	AdminClientCAs        string
 	BindAddr              string
 	NodeRole              string
-	timeout               time.Duration
 	datadir               string
+	secretsdir            string
+	secretsDBEnabled      bool
 	level                 string
 	metricsPort           uint
 	BootstrapDir          string
@@ -135,11 +144,12 @@ type NodeConfig struct {
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics
 	DB                *badger.DB
+	SecretsDB         *badger.DB
 	Storage           Storage
 	ProtocolEvents    *events.Distributor
 	State             protocol.State
 	Middleware        network.Middleware
-	Network           module.ReadyDoneAwareNetwork
+	Network           network.Network
 	MsgValidators     []network.MessageValidator
 	FvmOptions        []fvm.Option
 	StakingKey        crypto.PrivateKey
@@ -163,12 +173,18 @@ type NodeConfig struct {
 func DefaultBaseConfig() *BaseConfig {
 	homedir, _ := os.UserHomeDir()
 	datadir := filepath.Join(homedir, ".flow", "database")
+
 	return &BaseConfig{
 		nodeIDHex:             NotSet,
+		AdminAddr:             NotSet,
+		AdminCert:             NotSet,
+		AdminKey:              NotSet,
+		AdminClientCAs:        NotSet,
 		BindAddr:              NotSet,
 		BootstrapDir:          "bootstrap",
-		timeout:               1 * time.Minute,
 		datadir:               datadir,
+		secretsdir:            NotSet,
+		secretsDBEnabled:      true,
 		level:                 "info",
 		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
 		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,

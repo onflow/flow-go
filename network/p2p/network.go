@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -15,7 +16,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
@@ -46,11 +49,18 @@ type Network struct {
 	metrics          module.NetworkMetrics
 	rcache           *RcvCache // used to deduplicate incoming messages
 	queue            network.MessageQueue
-	ctx              context.Context
-	cancel           context.CancelFunc
 	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
 	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
+	registerRequests chan *registerRequest
+	*component.ComponentManager
 }
+
+type registerRequest struct {
+	channel  network.Channel
+	respChan chan *Conduit
+}
+
+var ErrNetworkShutdown = errors.New("network has already shutdown")
 
 // NewNetwork creates a new naive overlay network, using the given middleware to
 // communicate to direct peers, using the given codec for serialization, and
@@ -60,7 +70,7 @@ func NewNetwork(
 	log zerolog.Logger,
 	codec network.Codec,
 	me module.Local,
-	mw network.Middleware,
+	mwFactory func() (network.Middleware, error),
 	csize int,
 	top network.Topology,
 	sm network.SubscriptionManager,
@@ -71,6 +81,11 @@ func NewNetwork(
 	rcache, err := newRcvCache(csize)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize cache: %w", err)
+	}
+
+	mw, err := mwFactory()
+	if err != nil {
+		return nil, fmt.Errorf("could not create middleware: %w", err)
 	}
 
 	o := &Network{
@@ -84,41 +99,71 @@ func NewNetwork(
 		subMngr:          sm,
 		lifecycleManager: lifecycle.NewLifecycleManager(),
 		identityProvider: identityProvider,
+		registerRequests: make(chan *registerRequest),
 	}
-	o.ctx, o.cancel = context.WithCancel(context.Background())
 
-	// setup the message queue
-	// create priority queue
-	o.queue = queue.NewMessageQueue(o.ctx, queue.GetEventPriority, metrics)
+	o.mw.SetOverlay(o)
 
-	// create workers to read from the queue and call queueSubmitFunc
-	queue.CreateQueueWorkers(o.ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
+	o.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// setup the message queue
+			// create priority queue
+			o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, metrics)
+
+			// create workers to read from the queue and call queueSubmitFunc
+			queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
+
+			o.mw.Start(ctx)
+			<-o.mw.Ready()
+
+			ready()
+		}).
+		AddWorker(func(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+
+			for {
+				select {
+				case req := <-o.registerRequests:
+					// TODO: remove ctx field from Conduit
+
+					// create a cancellable child context
+					ctx, cancel := context.WithCancel(parent)
+
+					// create the conduit
+					conduit := &Conduit{
+						ctx:       ctx,
+						cancel:    cancel,
+						channel:   req.channel,
+						publish:   o.publish,
+						unicast:   o.unicast,
+						multicast: o.multicast,
+						close:     o.unregister,
+					}
+
+					select {
+					case <-ctx.Done():
+						return
+					case req.respChan <- conduit:
+					}
+				case <-parent.Done():
+					return
+				}
+			}
+		}).Build()
 
 	return o, nil
-}
-
-// Ready returns a channel that will close when the network stack is ready.
-func (n *Network) Ready() <-chan struct{} {
-	n.lifecycleManager.OnStart(func() {
-		err := n.mw.Start(n)
-		if err != nil {
-			n.logger.Fatal().Err(err).Msg("failed to start middleware")
-		}
-	})
-	return n.lifecycleManager.Started()
-}
-
-// Done returns a channel that will close when shutdown is complete.
-func (n *Network) Done() <-chan struct{} {
-	n.cancel()
-	n.lifecycleManager.OnStop(n.mw.Stop)
-	return n.lifecycleManager.Stopped()
 }
 
 // Register will register the given engine with the given unique engine engineID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
 func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return nil, ErrNetworkShutdown
+	default:
+	}
+
 	if !channels.Exists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
@@ -132,21 +177,23 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 		Str("channel_id", channel.String()).
 		Msg("channel successfully registered")
 
-	// create a cancellable child context
-	ctx, cancel := context.WithCancel(n.ctx)
+	respChan := make(chan *Conduit)
 
-	// create the conduit
-	conduit := &Conduit{
-		ctx:       ctx,
-		cancel:    cancel,
-		channel:   channel,
-		publish:   n.publish,
-		unicast:   n.unicast,
-		multicast: n.multicast,
-		close:     n.unregister,
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return nil, ErrNetworkShutdown
+	case n.registerRequests <- &registerRequest{
+		channel:  channel,
+		respChan: respChan,
+	}:
 	}
 
-	return conduit, nil
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return nil, ErrNetworkShutdown
+	case conduit := <-respChan:
+		return conduit, nil
+	}
 }
 
 // unregister unregisters the engine for the specified channel. The engine will no longer be able to send or

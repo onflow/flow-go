@@ -163,12 +163,12 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-func generateFlowProtocolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID)
+func generateFlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID.String())
 }
 
-func generatePingProtcolID(rootBlockID string) protocol.ID {
-	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID)
+func generatePingProtcolID(rootBlockID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID.String())
 }
 
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.

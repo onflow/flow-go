@@ -17,13 +17,14 @@ require (
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.19.1-0.20210915143754-16d477f6d7d6
+	github.com/onflow/cadence v0.19.1-0.20210920215340-75c54c6c01eb
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
 	github.com/onflow/flow-emulator v0.20.3
+	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.21.0
-	github.com/onflow/flow-go/crypto v0.18.0 // replaced by version on-disk
+	github.com/onflow/flow-go/crypto v0.21.3 // replaced by version on-disk
 	github.com/onflow/flow/protobuf/go/flow v0.2.2
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/common v0.20.0 // indirect
@@ -32,7 +33,7 @@ require (
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/vmihailenco/msgpack/v4 v4.3.12 // indirect
 	github.com/vmihailenco/tagparser v0.1.2 // indirect
-	google.golang.org/grpc v1.38.0
+	google.golang.org/grpc v1.40.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 

@@ -21,7 +21,7 @@ type AuthorizedAccountsForContractDeploymentFunc func() []common.Address
 // only commit them when called so smart contract
 // updates can be delayed until end of the tx execution
 type ContractHandler struct {
-	accounts                    *state.Accounts
+	accounts                    state.Accounts
 	draftUpdates                map[programs.ContractUpdateKey]programs.ContractUpdate
 	restrictedDeploymentEnabled bool
 	authorizedAccounts          AuthorizedAccountsForContractDeploymentFunc
@@ -31,7 +31,7 @@ type ContractHandler struct {
 	lock sync.Mutex
 }
 
-func NewContractHandler(accounts *state.Accounts,
+func NewContractHandler(accounts *state.StatefulAccounts,
 	restrictedDeploymentEnabled bool,
 	authorizedAccounts AuthorizedAccountsForContractDeploymentFunc) *ContractHandler {
 	return &ContractHandler{

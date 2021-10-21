@@ -37,7 +37,7 @@ type MessagingEngine struct {
 // NewMessagingEngine returns a new engine.
 func NewMessagingEngine(
 	logger zerolog.Logger,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	tunnel *dkg.BrokerTunnel) (*MessagingEngine, error) {
 
@@ -76,22 +76,36 @@ func (e *MessagingEngine) Done() <-chan struct{} {
 
 // SubmitLocal implements the network Engine interface
 func (e *MessagingEngine) SubmitLocal(event interface{}) {
-	e.Submit(engine.DKGCommittee, e.me.NodeID(), event)
+	e.unit.Launch(func() {
+		err := e.process(e.me.NodeID(), event)
+		if err != nil {
+			e.log.Fatal().Err(err).Str("origin", e.me.NodeID().String()).Msg("failed to submit local message")
+		}
+	})
 }
 
 // Submit implements the network Engine interface
 func (e *MessagingEngine) Submit(_ network.Channel, originID flow.Identifier, event interface{}) {
 	e.unit.Launch(func() {
-		err := e.Process(engine.DKGCommittee, originID, event)
-		if err != nil {
-			engine.LogError(e.log, err)
+		err := e.process(originID, event)
+		if engine.IsInvalidInputError(err) {
+			e.log.Error().Err(err).Str("origin", originID.String()).Msg("failed to submit dropping invalid input message")
+		} else if err != nil {
+			e.log.Fatal().Err(err).Str("origin", originID.String()).Msg("failed to submit message unknown error")
 		}
 	})
 }
 
 // ProcessLocal implements the network Engine interface
 func (e *MessagingEngine) ProcessLocal(event interface{}) error {
-	return e.Process(engine.DKGCommittee, e.me.NodeID(), event)
+	return e.unit.Do(func() error {
+		err := e.process(e.me.NodeID(), event)
+		if err != nil {
+			e.log.Fatal().Err(err).Str("origin", e.me.NodeID().String()).Msg("failed to process local message")
+		}
+
+		return nil
+	})
 }
 
 // Process implements the network Engine interface
@@ -104,40 +118,62 @@ func (e *MessagingEngine) Process(_ network.Channel, originID flow.Identifier, e
 func (e *MessagingEngine) process(originID flow.Identifier, event interface{}) error {
 	switch v := event.(type) {
 	case *msg.DKGMessage:
+		// messages are forwarded async rather than sync, because otherwise the message queue
+		// might get full when it's slow to process DKG messages synchronously and impact
+		// block rate.
+		e.forwardInboundMessageAsync(originID, v)
+		return nil
+	default:
+		return engine.NewInvalidInputErrorf("expecting input with type msg.DKGMessage, but got %T", event)
+	}
+}
+
+func (e *MessagingEngine) forwardInboundMessageAsync(originID flow.Identifier, message *msg.DKGMessage) {
+	e.unit.Launch(func() {
 		e.tunnel.SendIn(
 			msg.PrivDKGMessageIn{
-				DKGMessage: *v,
+				DKGMessage: *message,
 				OriginID:   originID,
 			},
 		)
-		return nil
-	default:
-		return fmt.Errorf("invalid event type (%T)", event)
-	}
+	})
 }
 
 func (e *MessagingEngine) forwardOutgoingMessages() {
 	for {
 		select {
 		case msg := <-e.tunnel.MsgChOut:
-			expRetry, err := retry.NewExponential(retryMilliseconds)
-			if err != nil {
-				e.log.Fatal().Err(err).Msg("failed to create retry mechanism")
-			}
-
-			maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
-			err = retry.Do(e.unit.Ctx(), maxedExpRetry, func(ctx context.Context) error {
-				err := e.conduit.Unicast(&msg.DKGMessage, msg.DestID)
-				if err != nil {
-					e.log.Err(err).Msg("error sending dkg message retrying")
-				}
-				return retry.RetryableError(err)
-			})
-			if err != nil {
-				e.log.Error().Err(err).Msg("error sending dkg message")
-			}
+			e.forwardOutboundMessageAsync(msg)
 		case <-e.unit.Quit():
 			return
 		}
 	}
+}
+
+func (e *MessagingEngine) forwardOutboundMessageAsync(message msg.PrivDKGMessageOut) {
+	e.unit.Launch(func() {
+		expRetry, err := retry.NewExponential(retryMilliseconds)
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("failed to create retry mechanism")
+		}
+
+		maxedExpRetry := retry.WithMaxRetries(retryMax, expRetry)
+		attempts := 1
+		err = retry.Do(e.unit.Ctx(), maxedExpRetry, func(ctx context.Context) error {
+			err := e.conduit.Unicast(&message.DKGMessage, message.DestID)
+			if err != nil {
+				e.log.Warn().Err(err).Msgf("error sending dkg message retrying (%x)", attempts)
+			}
+
+			attempts++
+			return retry.RetryableError(err)
+		})
+
+		// Various network can conditions can result in errors while forwarding outbound messages,
+		// because failure to send an individual DKG message doesn't necessarily result in local or global DKG failure
+		// it is acceptable to log the error and move on.
+		if err != nil {
+			e.log.Error().Err(err).Msg("error sending dkg message")
+		}
+	})
 }

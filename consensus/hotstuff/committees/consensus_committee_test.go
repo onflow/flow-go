@@ -140,6 +140,14 @@ func TestConsensus_LeaderForView(t *testing.T) {
 
 		t.Run("after current epoch", func(t *testing.T) {
 			t.SkipNow()
+			// REASON FOR SKIPPING TEST:
+			// We have a temporary fallback to continue with the current consensus committee, if the
+			// setup for the next epoch failed (aka emergency epoch chain continuation -- EECC).
+			// This test covers with behaviour _without_ EECC and is therefore skipped.
+			// The behaviour _with EECC_ is covered by the following test:
+			// "after current epoch - with emergency epoch chain continuation"
+			// TODO: for the mature implementation, remove EECC, enable this test, and remove the following test
+
 			// get leader for view in next epoch when it is not set up yet
 			_, err := committee.LeaderForView(250)
 			assert.Error(t, err)
@@ -147,6 +155,10 @@ func TestConsensus_LeaderForView(t *testing.T) {
 		})
 
 		t.Run("after current epoch - with emergency epoch chain continuation", func(t *testing.T) {
+			// This test covers the TEMPORARY emergency epoch chain continuation (EECC) fallback
+			// TODO: for the mature implementation, remove this test,
+			//       enable the previous test "after current epoch"
+
 			// get leader for view in next epoch when it is not set up yet
 			_, err := committee.LeaderForView(250)
 			// emergency epoch chain continuation should kick in and return a valid leader

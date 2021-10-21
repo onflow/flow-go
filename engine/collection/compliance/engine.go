@@ -50,7 +50,7 @@ type Engine struct {
 
 func NewEngine(
 	log zerolog.Logger,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	state protocol.State,
 	payloads storage.ClusterPayloads,

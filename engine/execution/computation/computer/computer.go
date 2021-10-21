@@ -306,7 +306,8 @@ func (e *blockComputer) executeCollection(
 	}
 	res.AddStateSnapshot(collectionView.(*delta.View).Interactions())
 	e.log.Info().Str("collectionID", collection.Guarantee.CollectionID.String()).
-		Str("blockID", collection.Guarantee.ReferenceBlockID.String()).
+		Str("referenceBlockID", collection.Guarantee.ReferenceBlockID.String()).
+		Hex("blockID", logging.Entity(blockCtx.BlockHeader)).
 		Int("numberOfTransactions", len(collection.Transactions)).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
 		Msg("collection executed")
