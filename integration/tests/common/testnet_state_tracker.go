@@ -48,7 +48,7 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 			var err error
 			reader, err = ghost.Subscribe(context.Background())
 			if err != nil {
-				t.Logf("error subscribing to ghost: %v \n", err)
+				t.Logf("error subscribing to ghost: %v", err)
 			} else {
 				retry = false
 			}
