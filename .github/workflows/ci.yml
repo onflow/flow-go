@@ -26,11 +26,12 @@ jobs:
     - name: Build relic
       run: make crypto/relic/build
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v2.3.0
+      uses: golangci/golangci-lint-action@v2
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
         version: v1.41
         args: -v --build-tags relic
+        skip-pkg-cache: true
     - name: Run ShellCheck
       uses: ludeeus/action-shellcheck@master
       with:
