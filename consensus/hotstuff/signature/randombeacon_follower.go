@@ -89,7 +89,7 @@ func (r *randomBeaconFollower) TrustedAdd(signerIndex int, share crypto.Signatur
 			return false, engine.NewInvalidInputErrorf("trusted add failed: %w", err)
 		} else {
 			// other exceptions
-			return false, fmt.Errorf("trusted add failed: %w", err)
+			return false, fmt.Errorf("trusted add failed because of an exception: %w", err)
 		}
 	}
 	if ok {

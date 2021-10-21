@@ -380,7 +380,7 @@ func (s *blsThresholdSignatureFollower) ThresholdSignature() (Signature, error) 
 // reconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
 func (s *blsThresholdSignatureFollower) reconstructThresholdSignature() (Signature, error) {
 	// sanity check
-	if len(s.shares) != s.threshold+1 {
+	if !s.enoughShares() {
 		return nil, fmt.Errorf("number of signature shares %d is not enough, %d are required",
 			len(s.shares), s.threshold+1)
 	}
