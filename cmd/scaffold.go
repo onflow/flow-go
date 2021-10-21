@@ -224,9 +224,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
 
-		mwOpts := []p2p.MiddlewareOption{
-			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
-		}
+		var mwOpts []p2p.MiddlewareOption
 		if len(fnb.MsgValidators) > 0 {
 			mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 		}
@@ -588,7 +586,6 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		node.IdentityProvider = idCache
 		node.IDTranslator = idCache
-		node.NetworkingIdentifierProvider = id.NewIdentityFilterIdentifierProvider(p2p.NotEjectedFilter, idCache)
 		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),

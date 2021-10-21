@@ -18,16 +18,3 @@ func NewIdentityFilterIdentifierProvider(filter flow.IdentityFilter, identityPro
 func (p *IdentityFilterIdentifierProvider) Identifiers() flow.IdentifierList {
 	return p.identityProvider.Identities(p.filter).NodeIDs()
 }
-
-type FilteredIdentifierProvider struct {
-	filter   flow.IdentifierFilter
-	provider IdentifierProvider
-}
-
-func NewFilteredIdentifierProvider(filter flow.IdentifierFilter, provider IdentifierProvider) *FilteredIdentifierProvider {
-	return &FilteredIdentifierProvider{filter, provider}
-}
-
-func (p *FilteredIdentifierProvider) Identifiers() flow.IdentifierList {
-	return p.provider.Identifiers().Filter(p.filter)
-}

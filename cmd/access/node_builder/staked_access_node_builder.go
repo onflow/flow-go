@@ -61,10 +61,6 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 
 		fnb.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
 
-		if !fnb.supportsUnstakedFollower {
-			fnb.NetworkingIdentifierProvider = id.NewIdentityFilterIdentifierProvider(p2p.NotEjectedFilter, idCache)
-		}
-
 		return nil
 	})
 }
