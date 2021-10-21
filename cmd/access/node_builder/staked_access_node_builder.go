@@ -49,7 +49,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 		fnb.IdentityProvider = idCache
 
 		fnb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
-			return id.NewFilteredIdentifierProvider(
+			return id.NewIdentityFilterIdentifierProvider(
 				filter.And(
 					filter.HasRole(flow.RoleConsensus),
 					filter.Not(filter.HasNodeID(node.Me.NodeID())),
@@ -62,7 +62,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 		fnb.IDTranslator = p2p.NewHierarchicalIDTranslator(idCache, p2p.NewUnstakedNetworkIDTranslator())
 
 		if !fnb.supportsUnstakedFollower {
-			fnb.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
+			fnb.NetworkingIdentifierProvider = id.NewIdentityFilterIdentifierProvider(p2p.NotEjectedFilter, idCache)
 		}
 
 		return nil
