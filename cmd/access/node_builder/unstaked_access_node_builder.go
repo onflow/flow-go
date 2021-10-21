@@ -77,20 +77,10 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 
 		// use the default identifier provider
 		anb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
-			// use the middleware that should have now been initialized
-			middleware, ok := anb.Middleware.(*p2p.Middleware)
-			if !ok {
-				anb.Logger.Fatal().Msg("middleware was of unexpected type")
-			}
-
-			pstore := middleware.Node().Host().Peerstore()
-			protocolID := p2p.FlowProtocolID(anb.RootBlock.ID())
-
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
 				var result flow.IdentifierList
 
-				// get all peers with addresses from the peerstore
-				pids := pstore.PeersWithAddrs()
+				pids := anb.LibP2PNode.GetPeersForProtocol(p2p.FlowProtocolID(anb.RootBlock.ID()))
 
 				for _, pid := range pids {
 					// exclude own Identifier
@@ -98,17 +88,10 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 						continue
 					}
 
-					pidLogger := anb.Logger.With().Str("peer", pid.Pretty()).Logger()
-
-					// only include peers who support the Flow protocol ID
-					if supports, err := pstore.SupportsProtocols(pid, string(protocolID)); err != nil {
-						pidLogger.Err(err).Msg("encountered error while getting supported protocols for peer")
-					} else if len(supports) > 0 {
-						if flowID, err := anb.IDTranslator.GetFlowID(pid); err != nil {
-							pidLogger.Err(err).Msg("failed to translate to Flow ID")
-						} else {
-							result = append(result, flowID)
-						}
+					if flowID, err := anb.IDTranslator.GetFlowID(pid); err != nil {
+						anb.Logger.Err(err).Str("peer", pid.Pretty()).Msg("failed to translate to Flow ID")
+					} else {
+						result = append(result, flowID)
 					}
 				}
 
