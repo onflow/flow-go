@@ -475,6 +475,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 // a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 // effort.
 func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
+	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
 
 	// convert the message to bytes to be put on the wire.
 	//bs := binstat.EnterTime(binstat.BinNet + ":wire<4message2protobuf")

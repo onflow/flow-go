@@ -399,6 +399,12 @@ func (n *Network) removeSelfFilter() flow.IdentifierFilter {
 
 // sendOnChannel sends the message on channel to targets.
 func (n *Network) sendOnChannel(channel network.Channel, message interface{}, targetIDs []flow.Identifier) error {
+	n.logger.Debug().
+		Interface("message", message).
+		Str("channel", channel.String()).
+		Str("target_ids", fmt.Sprintf("%v", targetIDs)).
+		Msg("sending new message on channel")
+
 	// generate network message (encoding) based on list of recipients
 	msg, err := n.genNetworkMessage(channel, message, targetIDs...)
 	if err != nil {
