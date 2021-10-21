@@ -100,7 +100,7 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 
 					pidLogger := anb.Logger.With().Str("peer", pid.Pretty()).Logger()
 
-					// only include peers who support the Flow protocol ID,
+					// only include peers who support the Flow protocol ID
 					if supports, err := pstore.SupportsProtocols(pid, string(protocolID)); err != nil {
 						pidLogger.Err(err).Msg("encountered error while getting supported protocols for peer")
 					} else if len(supports) > 0 {
