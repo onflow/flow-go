@@ -199,6 +199,10 @@ func (m *Middleware) Me() flow.Identifier {
 	return m.me
 }
 
+func (m *Middleware) Node() *Node {
+	return m.libP2PNode
+}
+
 // GetIPPort returns the ip address and port number associated with the middleware
 func (m *Middleware) GetIPPort() (string, string, error) {
 	return m.libP2PNode.GetIPPort()
