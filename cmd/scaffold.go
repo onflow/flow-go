@@ -236,7 +236,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		mwOpts = append(mwOpts, p2p.WithPeerManager(peerManagerFactory))
 
 		fnb.Middleware = p2p.NewMiddleware(
-			fnb.Logger.Level(zerolog.ErrorLevel),
+			fnb.Logger,
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
