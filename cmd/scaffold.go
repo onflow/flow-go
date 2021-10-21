@@ -994,8 +994,23 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 func (fnb *FlowNodeBuilder) InitComponentBuilder() {
 	fnb.componentBuilder = component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// run pre-start initializations
 			fnb.onStart(ctx)
+			ready()
+
+			<-ctx.Done()
+			go func() {
+				// run after all child components shutdown
+				// this must be run inside a goroutine since Done() also depends on this
+				// worker exiting
+				<-fnb.Done()
+				fnb.closeDatabase()
+			}()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			// run all modules
+			for _, f := range fnb.modules {
+				fnb.handleModule(ctx, f)
+			}
 			ready()
 		})
 }
@@ -1060,12 +1075,6 @@ func (fnb *FlowNodeBuilder) Run() {
 
 func (fnb *FlowNodeBuilder) onStart(ctx irrecoverable.SignalerContext) {
 
-	// setup shutdown handler
-	go func() {
-		<-ctx.Done()
-		fnb.closeDatabase()
-	}()
-
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
 
@@ -1095,11 +1104,6 @@ func (fnb *FlowNodeBuilder) onStart(ctx irrecoverable.SignalerContext) {
 
 	for _, f := range fnb.postInitFns {
 		fnb.handlePostInit(f)
-	}
-
-	// run all modules
-	for _, f := range fnb.modules {
-		fnb.handleModule(ctx, f)
 	}
 }
 
