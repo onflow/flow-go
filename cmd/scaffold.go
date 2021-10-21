@@ -591,8 +591,8 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		node.IdentityProvider = idCache
 		node.IDTranslator = idCache
-		node.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
-		node.SyncEngineIdentifierProvider = id.NewFilteredIdentifierProvider(
+		node.NetworkingIdentifierProvider = id.NewIdentityFilterIdentifierProvider(p2p.NotEjectedFilter, idCache)
+		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),

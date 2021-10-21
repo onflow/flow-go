@@ -5,13 +5,16 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
+	fid "github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
@@ -80,7 +83,9 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 			if !ok {
 				anb.Logger.Fatal().Msg("middleware was of unexpected type")
 			}
-			return middleware.IdentifierProvider()
+
+			// use the default IdentifierProvider, but exclude own Identifier to avoid sending requests to oneself
+			return id.NewFilteredIdentifierProvider(fid.Not(fid.Is(anb.NodeID)), middleware.IdentifierProvider())
 		}
 
 		return nil
@@ -174,6 +179,28 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 
 	resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 
+	var pis []peer.AddrInfo
+	for _, b := range builder.bootstrapIdentities {
+		pi, err := p2p.PeerAddressInfo(*b)
+		if err != nil {
+			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
+		}
+		pis = append(pis, pi)
+	}
+
+	psOpts := p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)
+	psOpts = append(psOpts,
+		func(_ context.Context, h host.Host) (pubsub.Option, error) {
+			return pubsub.WithSubscriptionFilter(p2p.NewRoleBasedFilter(
+				h.ID(), builder.RootBlock.ID(), builder.IdentityProvider,
+			)), nil
+		},
+		// Note: using the WithDirectPeers option will automatically store these addresses
+		// as permanent addresses in the Peerstore and try to connect to them when the
+		// PubSubRouter starts up
+		p2p.PubSubOptionWrapper(pubsub.WithDirectPeers(pis)),
+	)
+
 	return func(ctx context.Context) (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
 			SetRootBlockID(builder.RootBlock.ID()).
@@ -181,6 +208,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 			// unlike the staked side of the network where currently all the node addresses are known upfront,
 			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
 			SetDHTOptions(dhtOptions...).
+			SetPubsubOptions(psOpts...).
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
 			Build(ctx)
