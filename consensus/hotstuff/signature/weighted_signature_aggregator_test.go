@@ -19,14 +19,14 @@ import (
 
 func createAggregationData(t *testing.T, signersNumber int) (
 	hotstuff.WeightedSignatureAggregator,
-	[]flow.Identity,
+	flow.IdentityList,
 	[]crypto.Signature,
 	[]byte,
 	string) {
 	// create identities
-	ids := make([]flow.Identity, 0, signersNumber)
+	ids := make([]*flow.Identity, 0, signersNumber)
 	for i := 0; i < signersNumber; i++ {
-		ids = append(ids, *unittest.IdentityFixture())
+		ids = append(ids, unittest.IdentityFixture())
 	}
 
 	// create message and tag
@@ -56,7 +56,7 @@ func createAggregationData(t *testing.T, signersNumber int) (
 }
 
 func verifyAggregate(signers []flow.Identifier,
-	ids []flow.Identity,
+	ids flow.IdentityList,
 	sig []byte,
 	msg []byte,
 	tag string) (bool, error) {
@@ -65,7 +65,7 @@ func verifyAggregate(signers []flow.Identifier,
 	getIdentity := func(signer flow.Identifier) *flow.Identity {
 		for _, id := range ids {
 			if id.NodeID == signer {
-				return &id
+				return id
 			}
 		}
 		return nil
@@ -95,7 +95,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 
 		signer := unittest.IdentityFixture()
 		// identity with empty key
-		_, err := NewWeightedSignatureAggregator([]flow.Identity{*signer}, msg, tag)
+		_, err := NewWeightedSignatureAggregator(flow.IdentityList{signer}, msg, tag)
 		assert.Error(t, err)
 		assert.True(t, engine.IsInvalidInputError(err))
 		// wrong key types
@@ -105,11 +105,11 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 		require.NoError(t, err)
 		signer.StakingPubKey = sk.PublicKey()
-		_, err = NewWeightedSignatureAggregator([]flow.Identity{*signer}, msg, tag)
+		_, err = NewWeightedSignatureAggregator(flow.IdentityList{signer}, msg, tag)
 		assert.Error(t, err)
 		assert.True(t, engine.IsInvalidInputError(err))
 		// empty signers
-		_, err = NewWeightedSignatureAggregator([]flow.Identity{}, msg, tag)
+		_, err = NewWeightedSignatureAggregator(flow.IdentityList{}, msg, tag)
 		assert.Error(t, err)
 		assert.True(t, engine.IsInvalidInputError(err))
 	})
