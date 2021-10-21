@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"context"
+	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"testing"
 
@@ -60,8 +61,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 	// create cluster nodes with voter resource
 	for _, node := range nodes {
 		nodeID := node.NodeID
-		stakingPrivKey, err := unittest.StakingKey()
-		s.Require().NoError(err)
+		stakingPrivKey := unittest.StakingPrivKeyFixture()
 
 		// find cluster and create root block
 		cluster, _, _ := clustering.ByNodeID(node.NodeID)
@@ -96,7 +96,7 @@ func (s *Suite) TestEpochQuorumCertificate() {
 		state.On("Final").Return(snapshot)
 
 		// create QC voter object to be used for voting for the root QC contract
-		voter := epochs.NewRootQCVoter(zerolog.Logger{}, local, hotSigner, state, client)
+		voter := epochs.NewRootQCVoter(zerolog.Logger{}, local, hotSigner, state, []module.QCContractClient{client})
 
 		// create voter resource
 		s.CreateVoterResource(address, nodeID, stakingPrivKey.PublicKey(), signer)

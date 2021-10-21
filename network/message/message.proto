@@ -4,13 +4,13 @@ package message;
 
 // Run protoc --gofast_out=. message.proto to generate message.pb.go
 
-// Message models a single message that is supposed to get exchanged by the gossip network
+// Message models a single message that is supposed to get exchanged by the
+// gossip network
 message Message {
-    string ChannelID = 1;
-    bytes EventID = 2;
-    bytes OriginID = 3;
-    repeated bytes TargetIDs = 4;
-    bytes Payload = 5;
-    string Type = 6;
+  string ChannelID = 1;
+  bytes EventID = 2;
+  bytes OriginID = 3 [deprecated = true];
+  repeated bytes TargetIDs = 4;
+  bytes Payload = 5;
+  string Type = 6;
 }
-

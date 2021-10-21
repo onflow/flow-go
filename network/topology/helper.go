@@ -148,22 +148,6 @@ func uniquenessCheck(t *testing.T, ids flow.IdentityList) {
 	}
 }
 
-// clusterChannels is a test helper method that returns all cluster-based channel.
-func clusterChannels(t *testing.T) network.ChannelList {
-	channels := make(network.ChannelList, 0)
-	for _, channel := range engine.Channels() {
-		if _, ok := engine.ClusterChannel(channel); !ok {
-			// skips non-cluster channels
-			continue
-		}
-
-		channels = append(channels, channel)
-	}
-
-	require.NotEmpty(t, channels, "empty cluster-based channels")
-	return channels
-}
-
 // connectedByCluster is a test helper that checks `all` nodes belong to a cluster are connected.
 func connectedByCluster(t *testing.T, adjMap map[flow.Identifier]flow.IdentityList, all flow.IdentityList, cluster flow.IdentityList) {
 	Connected(t, adjMap, all, filter.In(cluster))
