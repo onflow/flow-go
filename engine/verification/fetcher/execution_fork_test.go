@@ -28,20 +28,20 @@ func TestProcessDuplicateChunksWithDifferentResults(t *testing.T) {
 
 	// creates two results
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
-	block, result, statuses, locators, collMap := completeChunkStatusListFixture(t, 1, 1)
-	_, _, agrees, disagrees := mockReceiptsBlockID(t, block.ID(), s.receipts, result, 2, 2)
+	block, resultA, statusA, resultB, statusB, collMap := executionResultForkFixture(t)
+	_, _, executorsA, executorsB := mockReceiptsBlockIDForConflictingResults(block.ID(), s.receipts, resultA, 2, resultB, 2)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
 
 	// the chunks belong to an unsealed block.
 	mockBlockSealingStatus(s.state, s.headers, block, false)
 
 	// mocks resources on fetcher engine side.
-	mockResultsByIDs(s.results, []*flow.ExecutionResult{result})
+	mockResultsByIDs(s.results, results)
 	mockBlocksStorage(s.blocks, s.headers, block)
 	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
 	mockPendingChunksGet(s.pendingChunks, statuses)
-	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
+	mockStateAtBlockIDForIdentities(s.state, block.ID(), executorsA.Union(executorsB))
 
 	// generates and mocks requesting chunk data pack fixture
 	requests := chunkRequestFixture(result.ID(), statuses.Chunks(), block.Header.Height, agrees, disagrees)
@@ -85,9 +85,10 @@ func TestProcessDuplicateChunksWithDifferentResults(t *testing.T) {
 //
 // It returns the block, results, assigned chunk statuses, their corresponding locators, and a map between chunks to their collections.
 func executionResultForkFixture(t *testing.T) (*flow.Block,
-	[]*flow.ExecutionResult,
-	verification.ChunkStatusList,
-	chunks.LocatorList,
+	*flow.ExecutionResult,
+	*verification.ChunkStatus,
+	*flow.ExecutionResult,
+	*verification.ChunkStatus,
 	map[flow.Identifier]*flow.Collection) {
 
 	// collection and block
@@ -115,39 +116,35 @@ func executionResultForkFixture(t *testing.T) (*flow.Block,
 	// creates chunk statuses for shared chunk of result A and B.
 	// this imitates that both identical chunks on execution fork are assigned to
 	// verification node.
-	statuses := verification.ChunkStatusList{
-		&verification.ChunkStatus{
-			ChunkIndex:      0,
-			ExecutionResult: resultA,
-			BlockHeight:     block.Header.Height,
-		},
-		&verification.ChunkStatus{
-			ChunkIndex:      0,
-			ExecutionResult: resultB,
-			BlockHeight:     block.Header.Height,
-		},
+	statusA := &verification.ChunkStatus{
+		ChunkIndex:      0,
+		ExecutionResult: resultA,
+		BlockHeight:     block.Header.Height,
 	}
-
-	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
+	statusB := &verification.ChunkStatus{
+		ChunkIndex:      0,
+		ExecutionResult: resultB,
+		BlockHeight:     block.Header.Height,
+	}
 
 	// keeps collections of assigned chunks
 	collMap := make(map[flow.Identifier]*flow.Collection)
-	for _, status := range statuses {
-		collMap[status.ChunkID()] = collections[0]
-	}
+	collMap[statusA.ChunkID()] = collections[0]
+	collMap[statusB.ChunkID()] = collections[1]
 
-	return block, []*flow.ExecutionResult{resultA, resultB}, statuses, locators, collMap
+	return block, resultA, statusA, resultB, statusB, collMap
 }
 
-func mockReceiptsBlockIDForConflictingResults(blockID flow.Identifier,
+func mockReceiptsBlockIDForConflictingResults(t *testing.T,
+	blockID flow.Identifier,
 	receipts *storage.ExecutionReceipts,
 	resultA *flow.ExecutionResult,
-	executorsA int,
 	resultB *flow.ExecutionResult,
-	executorsB int) (flow.ExecutionReceiptList, flow.ExecutionReceiptList, flow.IdentityList, flow.IdentityList) {
+) (flow.ExecutionReceiptList, flow.ExecutionReceiptList, flow.IdentityList, flow.IdentityList) {
 
-	executorIdsA := unittest.IdentityListFixture(executorsA, unittest.WithRole(flow.RoleExecution))
-	executorIdsB := unittest.IdentityListFixture(executorsB, unittest.WithRole(flow.RoleExecution))
+	executorIdsA := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	executorIdsB := unittest.IdentityListFixture(2, unittest.WithRole(flow.RoleExecution))
+	require.Len(t, executorIdsA.Union(executorIdsB), 4) // no overlap must be between executor ids
 
 	receiptsA := receiptsForResultFixture(resultA, executorIdsA.NodeIDs())
 	receiptsB := receiptsForResultFixture(resultB, executorIdsB.NodeIDs())
