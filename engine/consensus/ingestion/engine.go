@@ -153,7 +153,13 @@ func (e *Engine) processAvailableMessages() error {
 				}
 				return fmt.Errorf("processing collection guarantee unexpected err: %w", err)
 			}
+
+			continue
 		}
+
+		// when there is no more messages in the queue, back to the loop to wait
+		// for the next incoming message to arrive.
+		return nil
 	}
 }
 
