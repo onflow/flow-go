@@ -32,7 +32,7 @@ make crypto/relic/build
 
 export JSON_OUTPUT=true
 
-if [[ $TEST_CATEGORY =~ "^integration-(common|network|epochs|access|collection|consensus|execution|verification)$" ]]
+if [[ $TEST_CATEGORY =~ integration-(common|network|epochs|access|collection|consensus|execution|verification)$ ]]
 then
     make docker-build-flow
     make -C integration -s ${BASH_REMATCH[1]}-tests | $process_results
