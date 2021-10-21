@@ -4,19 +4,21 @@ package ingestion
 
 import (
 	"context"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
+
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
-	"go.uber.org/atomic"
-	"sync"
-	"testing"
-	"time"
 )
 
 func TestIngestionEngine(t *testing.T) {

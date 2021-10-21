@@ -5,14 +5,15 @@ package ingestion
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/common/fifoqueue"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
+
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 )
@@ -51,6 +52,10 @@ func New(
 	guaranteesQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultGuaranteeQueueCapacity),
 	)
+	if err != nil {
+		return nil, fmt.Errorf("could not create guarantees queue: %w", err)
+	}
+
 	pendingGuarantees := &engine.FifoMessageStore{
 		FifoQueue: guaranteesQueue,
 	}
@@ -126,7 +131,7 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 }
 
 // Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
+// a blocking manner. It returns error only in unexpected scenario.
 func (e *Engine) Process(_ network.Channel, originID flow.Identifier, event interface{}) error {
 	return e.messageHandler.Process(originID, event)
 }
