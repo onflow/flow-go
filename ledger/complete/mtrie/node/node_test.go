@@ -275,13 +275,13 @@ func Test_Prunning(t *testing.T) {
 
 	t.Run("long chain", func(t *testing.T) {
 		//                    n7
-		// 		             / \
+		//                   / \
 		//                 /     \
-		// 		        n5         n6 (path2/-) // 1000
+		//             n5         n6 (path2/-) // 1000
 		//            /  \
-		// 	        /      \
+		//          /      \
 		//         /         \
-		// 	      n3          n4 (path1/-) // 01100...
+		//        n3          n4 (path1/-) // 01100...
 		//      /     \
 		//    /          \
 		//  /              \
