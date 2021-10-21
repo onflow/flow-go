@@ -137,3 +137,17 @@ func executionResultForkFixture(t *testing.T) (*flow.Block,
 
 	return block, []*flow.ExecutionResult{resultA, resultB}, statuses, locators, collMap
 }
+
+func receiptsForResultFixture(result *flow.ExecutionResult, executors flow.IdentifierList) flow.ExecutionReceiptList {
+	receipts := flow.ExecutionReceiptList{}
+
+	for _, executor := range executors {
+		receipt := unittest.ExecutionReceiptFixture(
+			unittest.WithResult(result),
+			unittest.WithExecutorID(executor))
+
+		receipts = append(receipts, receipt)
+	}
+
+	return receipts
+}
