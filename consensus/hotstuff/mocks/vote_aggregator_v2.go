@@ -27,17 +27,8 @@ func (_m *VoteAggregatorV2) AddBlock(block *model.Proposal) error {
 }
 
 // AddVote provides a mock function with given fields: vote
-func (_m *VoteAggregatorV2) AddVote(vote *model.Vote) error {
-	ret := _m.Called(vote)
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func(*model.Vote) error); ok {
-		r0 = rf(vote)
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
+func (_m *VoteAggregatorV2) AddVote(vote *model.Vote) {
+	_m.Called(vote)
 }
 
 // InvalidBlock provides a mock function with given fields: block

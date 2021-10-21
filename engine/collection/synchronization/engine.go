@@ -60,7 +60,7 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	metrics module.EngineMetrics,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	participants flow.IdentityList,
 	state cluster.State,

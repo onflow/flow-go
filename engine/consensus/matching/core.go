@@ -327,7 +327,8 @@ HEIGHT_LOOP:
 		// We require at least 2 consistent receipts from different ENs to seal a block. If don't need to fetching receipts.
 		// CAUTION: This is a temporary shortcut incompatible with the mature BFT protocol!
 		// There might be multiple consistent receipts that commit to a wrong result. To guarantee
-		// sealing liveness, we need to fetch receipts from those ENs, whose receipts we don't have yet,
+		// sealing liveness, we need to fetch receipts from those ENs, whose receipts we don't have yet.
+		// TODO: update for full BFT
 		for _, receiptsForResult := range receipts.GroupByResultID() {
 			if receiptsForResult.GroupByExecutorID().NumberGroups() >= 2 {
 				continue HEIGHT_LOOP

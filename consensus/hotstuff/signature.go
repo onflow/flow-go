@@ -97,9 +97,15 @@ type BlockSignatureData struct {
 type Packer interface {
 	// blockID is the block that the aggregated signature is for.
 	// sig is the aggregated signature data.
+	// Expected error returns during normal operations:
+	//  * none; all errors are symptoms of inconsistent input data or corrupted internal state.
 	Pack(blockID flow.Identifier, sig *BlockSignatureData) ([]flow.Identifier, []byte, error)
 
+	// Unpack de-serializes the provided signature data.
 	// blockID is the block that the aggregated sig is signed for
 	// sig is the aggregated signature data
+	// It returns:
+	//  - (sigData, nil) if successfully unpacked the signature data
+	//  - (nil, signature.ErrInvalidFormat) if failed to unpack the signature data
 	Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
 }

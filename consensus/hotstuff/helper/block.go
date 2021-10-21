@@ -2,7 +2,6 @@ package helper
 
 import (
 	"math/rand"
-	"testing"
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -10,7 +9,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func MakeBlock(t *testing.T, options ...func(*model.Block)) *model.Block {
+func MakeBlock(options ...func(*model.Block)) *model.Block {
 	view := rand.Uint64()
 	block := model.Block{
 		View:        view,
@@ -18,7 +17,7 @@ func MakeBlock(t *testing.T, options ...func(*model.Block)) *model.Block {
 		PayloadHash: unittest.IdentifierFixture(),
 		ProposerID:  unittest.IdentifierFixture(),
 		Timestamp:   time.Now().UTC(),
-		QC:          MakeQC(t, WithQCView(view-1)),
+		QC:          MakeQC(WithQCView(view - 1)),
 	}
 	for _, option := range options {
 		option(&block)
@@ -51,9 +50,9 @@ func WithParentSigners(signerIDs []flow.Identifier) func(*model.Block) {
 	}
 }
 
-func MakeProposal(t *testing.T, options ...func(*model.Proposal)) *model.Proposal {
+func MakeProposal(options ...func(*model.Proposal)) *model.Proposal {
 	proposal := &model.Proposal{
-		Block:   MakeBlock(t),
+		Block:   MakeBlock(),
 		SigData: unittest.SignatureFixture(),
 	}
 	for _, option := range options {

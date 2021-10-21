@@ -34,7 +34,7 @@ type ComplianceSuite struct {
 	myID       flow.Identifier
 	cluster    flow.IdentityList
 	me         *module.Local
-	net        *module.Network
+	net        *mocknetwork.Network
 	payloads   *storage.ClusterPayloads
 	protoState *protocol.MutableState
 	con        *mocknetwork.Conduit
@@ -118,7 +118,7 @@ func (cs *ComplianceSuite) SetupTest() {
 	cs.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
 	// set up network module mock
-	cs.net = &module.Network{}
+	cs.net = &mocknetwork.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
 		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
 			return cs.con

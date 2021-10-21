@@ -13,15 +13,15 @@ import (
 
 // signerInfo holds information about a signer, its stake and index
 type signerInfo struct {
-	weight uint64 //nolint:unused
+	weight uint64
 	index  int
 }
 
 // WeightedSignatureAggregator implements consensus/hotstuff.WeightedSignatureAggregator
 type WeightedSignatureAggregator struct {
 	aggregator   *signature.SignatureAggregatorSameMessage // low level crypto BLS aggregator, agnostic of weights and flow IDs
-	ids          []flow.Identity                           //nolint:unused (only gets updated by constructor)
-	idToInfo     map[flow.Identifier]signerInfo            // (only gets updated by constructor)
+	ids          []flow.Identity                           // all possible ids (only gets updated by constructor)
+	idToInfo     map[flow.Identifier]signerInfo            // auxiliary map to lookup signer weight and index by ID (only gets updated by constructor)
 	totalWeight  uint64                                    // weight collected (gets updated)
 	collectedIDs map[flow.Identifier]struct{}              // map of collected IDs (gets updated)
 	lock         sync.RWMutex                              // lock for atomic updates to totalWeight and collectedIDs
