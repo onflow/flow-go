@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
+	storage "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -136,6 +137,25 @@ func executionResultForkFixture(t *testing.T) (*flow.Block,
 	}
 
 	return block, []*flow.ExecutionResult{resultA, resultB}, statuses, locators, collMap
+}
+
+func mockReceiptsBlockIDForConflictingResults(blockID flow.Identifier,
+	receipts *storage.ExecutionReceipts,
+	resultA *flow.ExecutionResult,
+	executorsA int,
+	resultB *flow.ExecutionResult,
+	executorsB int) (flow.ExecutionReceiptList, flow.ExecutionReceiptList, flow.IdentityList, flow.IdentityList) {
+
+	executorIdsA := unittest.IdentityListFixture(executorsA, unittest.WithRole(flow.RoleExecution))
+	executorIdsB := unittest.IdentityListFixture(executorsB, unittest.WithRole(flow.RoleExecution))
+
+	receiptsA := receiptsForResultFixture(resultA, executorIdsA.NodeIDs())
+	receiptsB := receiptsForResultFixture(resultB, executorIdsB.NodeIDs())
+
+	all := append(receiptsA, receiptsB...)
+
+	receipts.On("ByBlockID", blockID).Return(all, nil)
+	return receiptsA, receiptsB, executorIdsA, executorIdsB
 }
 
 func receiptsForResultFixture(result *flow.ExecutionResult, executors flow.IdentifierList) flow.ExecutionReceiptList {
