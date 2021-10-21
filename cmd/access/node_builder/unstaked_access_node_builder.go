@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	fid "github.com/onflow/flow-go/model/flow/filter/id"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
@@ -29,6 +28,7 @@ import (
 
 type UnstakedAccessNodeBuilder struct {
 	*FlowAccessNodeBuilder
+	peerID peer.ID
 }
 
 func NewUnstakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *UnstakedAccessNodeBuilder {
@@ -48,12 +48,12 @@ func (anb *UnstakedAccessNodeBuilder) initNodeInfo() error {
 		return fmt.Errorf("could not load networking public key: %w", err)
 	}
 
-	peerID, err := peer.IDFromPublicKey(pubKey)
+	anb.peerID, err = peer.IDFromPublicKey(pubKey)
 	if err != nil {
 		return fmt.Errorf("could not get peer ID from public key: %w", err)
 	}
 
-	anb.NodeID, err = p2p.NewUnstakedNetworkIDTranslator().GetFlowID(peerID)
+	anb.NodeID, err = p2p.NewUnstakedNetworkIDTranslator().GetFlowID(anb.peerID)
 	if err != nil {
 		return fmt.Errorf("could not get flow node ID: %w", err)
 	}
@@ -77,15 +77,43 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 
 		// use the default identifier provider
 		anb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
-
 			// use the middleware that should have now been initialized
 			middleware, ok := anb.Middleware.(*p2p.Middleware)
 			if !ok {
 				anb.Logger.Fatal().Msg("middleware was of unexpected type")
 			}
 
-			// use the default IdentifierProvider, but exclude own Identifier to avoid sending requests to oneself
-			return id.NewFilteredIdentifierProvider(fid.Not(fid.Is(anb.NodeID)), middleware.IdentifierProvider())
+			pstore := middleware.Node().Host().Peerstore()
+			protocolID := p2p.FlowProtocolID(anb.RootBlock.ID())
+
+			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
+				var result flow.IdentifierList
+
+				// get all peers with addresses from the peerstore
+				pids := pstore.PeersWithAddrs()
+
+				for _, pid := range pids {
+					// exclude own Identifier
+					if pid == anb.peerID {
+						continue
+					}
+
+					pidLogger := anb.Logger.With().Str("peer", pid.Pretty()).Logger()
+
+					// only include peers who support the Flow protocol ID,
+					if supports, err := pstore.SupportsProtocols(pid, string(protocolID)); err != nil {
+						pidLogger.Err(err).Msg("encountered error while getting supported protocols for peer")
+					} else if len(supports) > 0 {
+						if flowID, err := anb.IDTranslator.GetFlowID(pid); err != nil {
+							pidLogger.Err(err).Msg("failed to translate to Flow ID")
+						} else {
+							result = append(result, flowID)
+						}
+					}
+				}
+
+				return result
+			})
 		}
 
 		return nil

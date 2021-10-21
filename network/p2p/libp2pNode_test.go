@@ -188,7 +188,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 
 	id2 := identities[1]
 
-	flowProtocolID := generateFlowProtocolID(rootBlockID)
+	flowProtocolID := FlowProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(suite.T(), 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 

@@ -20,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -85,18 +84,11 @@ type Middleware struct {
 	unicastMessageTimeout      time.Duration
 	connectionGating           bool
 	idTranslator               IDTranslator
-	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
 	*component.ComponentManager
 }
 
 type MiddlewareOption func(*Middleware)
-
-func WithIdentifierProvider(provider id.IdentifierProvider) MiddlewareOption {
-	return func(mw *Middleware) {
-		mw.idProvider = provider
-	}
-}
 
 func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOption {
 	return func(mw *Middleware) {
@@ -189,7 +181,7 @@ func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 }
 
 func (m *Middleware) allPeers() peer.IDSlice {
-	return m.peerIDs(m.idProvider.Identifiers())
+	return m.peerIDs(m.ov.Identities().NodeIDs())
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
@@ -213,6 +205,10 @@ func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
 // Me returns the flow identifier of the this middleware
 func (m *Middleware) Me() flow.Identifier {
 	return m.me
+}
+
+func (m *Middleware) Node() *Node {
+	return m.libP2PNode
 }
 
 // GetIPPort returns the ip address and port number associated with the middleware
@@ -262,10 +258,6 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
-
-	if m.idProvider == nil {
-		m.idProvider = NewPeerstoreIdentifierProvider(m.log, m.libP2PNode.host, m.idTranslator)
-	}
 
 	m.UpdateNodeAddresses()
 
@@ -534,10 +526,6 @@ func (m *Middleware) UpdateAllowList() {
 
 	// update peer connections if this middleware also does peer management
 	m.peerManagerUpdate()
-}
-
-func (m *Middleware) IdentifierProvider() id.IdentifierProvider {
-	return m.idProvider
 }
 
 // IsConnected returns true if this node is connected to the node with id nodeID.

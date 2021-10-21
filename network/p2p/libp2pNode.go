@@ -210,7 +210,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	if builder.rootBlockID == nil {
 		return nil, errors.New("root block ID must be provided")
 	}
-	node.flowLibP2PProtocolID = generateFlowProtocolID(*builder.rootBlockID)
+	node.flowLibP2PProtocolID = FlowProtocolID(*builder.rootBlockID)
 
 	var opts []config.Option
 

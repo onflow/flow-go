@@ -158,7 +158,6 @@ type NodeConfig struct {
 	// ID providers
 	IdentityProvider             id.IdentityProvider
 	IDTranslator                 p2p.IDTranslator
-	NetworkingIdentifierProvider id.IdentifierProvider
 	SyncEngineIdentifierProvider id.IdentifierProvider
 
 	// root state information
