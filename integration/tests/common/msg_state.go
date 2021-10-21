@@ -68,7 +68,7 @@ func (ms *MsgState) WaitForMsgFrom(t *testing.T, predicate func(msg interface{})
 
 		return false
 	}, msgStateTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive msg %s from %x within %v seconds \n", msg, node,
+		fmt.Sprintf("did not receive msg %s from %x within %v seconds", msg, node,
 			msgStateTimeout))
 	return m
 }
