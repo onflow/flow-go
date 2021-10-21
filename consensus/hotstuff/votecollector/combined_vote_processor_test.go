@@ -2,7 +2,6 @@ package votecollector
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/utils/concurrentqueue"
 	"sync"
 	"testing"
 
@@ -19,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/utils/concurrentqueue"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -627,8 +627,7 @@ func TestCombinedVoteProcessor_PropertyConcurrentCreatingQC(testifyT *testing.T)
 	maxParticipants := uint64(53)
 
 	rapid.Check(testifyT, func(t *rapid.T) {
-		// generate a new suite for each run
-
+		// draw participants in range 1 <= participants <= maxParticipants
 		participants := rapid.Uint64Range(1, maxParticipants).Draw(t, "participants").(uint64)
 		stakingSignersCount := rapid.Uint64Range(0, participants).Draw(t, "stakingSigners").(uint64)
 		beaconSignersCount := participants - stakingSignersCount
@@ -638,11 +637,13 @@ func TestCombinedVoteProcessor_PropertyConcurrentCreatingQC(testifyT *testing.T)
 		stakingSignersCount = 1
 		participants = 17
 
-		// setup how many votes we need to create a vote
+		// setup how many votes we need to create a QC
+		// 1 <= superMajority <= participants <= maxParticipants
 		superMajority := participants*2/3 + 1
 		sigWeight := uint64(100)
 		minRequiredStake := superMajority * sigWeight
 
+		// proposing block
 		block := helper.MakeBlock()
 
 		t.Logf("running conf\n\t"+
@@ -659,6 +660,7 @@ func TestCombinedVoteProcessor_PropertyConcurrentCreatingQC(testifyT *testing.T)
 		stakingSigners := unittest.IdentifierListFixture(int(stakingSignersCount))
 		beaconSigners := unittest.IdentifierListFixture(int(beaconSignersCount))
 
+		// lists to track signers that actually contributed their signatures
 		var (
 			aggregatedStakingSigners []flow.Identifier
 			aggregatedBeaconSigners  []flow.Identifier
@@ -730,10 +732,12 @@ func TestCombinedVoteProcessor_PropertyConcurrentCreatingQC(testifyT *testing.T)
 			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
 			func(flow.Identifier, *hotstuff.BlockSignatureData) error { return nil }).Once()
 
+		// track if QC was created
 		qcCreated := atomic.NewBool(false)
 
 		// expected QC
 		onQCCreated := func(qc *flow.QuorumCertificate) {
+			// QC should be created only once
 			if !qcCreated.CAS(false, true) {
 				t.Fatalf("QC created more than once")
 			}
@@ -796,6 +800,7 @@ func TestCombinedVoteProcessor_PropertyConcurrentCreatingQC(testifyT *testing.T)
 
 		workers := 5
 		var wg sync.WaitGroup
+		// process votes concurrently by multiple workers
 		for i := 0; i < workers; i++ {
 			wg.Add(1)
 			go func() {
