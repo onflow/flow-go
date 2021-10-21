@@ -120,7 +120,7 @@ func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.Bl
 		fmt.Printf("checking highest finalized: %d, highest proposed: %d\n", bs.highestFinalized, bs.highestProposed)
 		return bs.highestFinalized > currentFinalized
 	}, blockStateTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive progress on highest finalized height (%v) from (%v) within %v seconds \n",
+		fmt.Sprintf("did not receive progress on highest finalized height (%v) from (%v) within %v seconds",
 			bs.highestFinalized,
 			currentFinalized,
 			blockStateTimeout))
@@ -138,7 +138,7 @@ func (bs *BlockState) WaitUntilNextHeightFinalized(t *testing.T) *messages.Block
 
 		return bs.finalizedByHeight[currentProposed+1] != nil
 	}, blockStateTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive finalized block for next block height (%v) within %v seconds \n", currentProposed+1,
+		fmt.Sprintf("did not receive finalized block for next block height (%v) within %v seconds", currentProposed+1,
 			blockStateTimeout))
 
 	return bs.finalizedByHeight[currentProposed+1]
@@ -155,7 +155,7 @@ func (bs *BlockState) WaitForFinalizedChild(t *testing.T, parent *messages.Block
 		_, ok := bs.finalizedByHeight[parent.Header.Height+1]
 		return ok
 	}, blockStateTimeout, 100*time.Millisecond,
-		fmt.Sprintf("did not receive finalized child block for parent block height %v within %v seconds \n",
+		fmt.Sprintf("did not receive finalized child block for parent block height %v within %v seconds",
 			parent.Header.Height, blockStateTimeout))
 
 	return bs.finalizedByHeight[parent.Header.Height+1]
@@ -185,7 +185,7 @@ func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *messages.Block
 		},
 		blockStateTimeout,
 		100*time.Millisecond,
-		fmt.Sprintf("did not receive sealed block for height (%v) within %v seconds \n", height, blockStateTimeout))
+		fmt.Sprintf("did not receive sealed block for height (%v) within %v seconds", height, blockStateTimeout))
 
 	return bs.highestSealed
 }
@@ -208,7 +208,7 @@ func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *messages.Blo
 		},
 		timeout,
 		100*time.Millisecond,
-		fmt.Sprintf("did not receive sealed block for view (%v) within %v seconds \n", view, timeout))
+		fmt.Sprintf("did not receive sealed block for view (%v) within %v seconds", view, timeout))
 	return bs.highestSealed
 }
 
