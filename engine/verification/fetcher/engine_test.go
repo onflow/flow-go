@@ -142,7 +142,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
-	requests := chunkRequestsFixture(result.ID(), statuses.Chunks(), block.Header.Height, agrees, disagrees)
+	requests := chunkRequestsFixture(result.ID(), statuses, agrees, disagrees)
 	chunkDataPacks, verifiableChunks := verifiableChunkFixture(t, statuses.Chunks(), block, result, collMap)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
@@ -241,7 +241,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
-	requests := chunkRequestsFixture(result.ID(), statuses.Chunks(), block.Header.Height, agrees, disagrees)
+	requests := chunkRequestsFixture(result.ID(), statuses, agrees, disagrees)
 	responses, _ := verifiableChunkFixture(t, statuses.Chunks(), block, result, collMap)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
@@ -447,7 +447,7 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	// creates a single chunk locator, and mocks its corresponding block sealed.
 	block := unittest.BlockFixture()
 	result := unittest.ExecutionResultFixture(unittest.WithExecutionResultBlockID(block.ID()))
-	statuses := unittest.ChunkStatusListFixture(t, []*flow.ExecutionResult{result}, 1)
+	statuses := unittest.ChunkStatusListFixture(t, block.Header.Height, result, 1)
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Once()
 
@@ -824,36 +824,27 @@ func verifiableChunkFixture(t *testing.T,
 	return responses, verifiableChunks
 }
 
-// chunkRequestsFixture is a test helper creates and returns chunk data pack requests for given chunks that all belong to the
-// same block height.
+// chunkRequestsFixture is a test helper creates and returns chunk data pack requests for given result and chunk statuses.
 // Agrees and disagrees are the list of execution node identifiers that generate the same and contradicting execution result
 // with the execution result that chunks belong to, respectively.
 func chunkRequestsFixture(
 	resultID flow.Identifier,
-	chunkList flow.ChunkList,
-	height uint64,
+	statuses verification.ChunkStatusList,
 	agrees flow.IdentityList,
 	disagrees flow.IdentityList) map[flow.Identifier]*verification.ChunkDataPackRequest {
 
 	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
-	for _, chunk := range chunkList {
-		requests[chunk.ID()] = &verification.ChunkDataPackRequest{
-			Locator: chunks.Locator{
-				ResultID: resultID,
-				Index:    chunk.Index,
-			},
-			ChunkID:   chunk.ID(),
-			Height:    height,
-			Agrees:    agrees.NodeIDs(),
-			Disagrees: disagrees.NodeIDs(),
-			Targets:   agrees.Union(disagrees),
-		}
+	for _, status := range statuses {
+		requests[status.ChunkID()] = chunkRequestFixture(resultID, status, agrees, disagrees)
 	}
 
 	return requests
 }
 
 // chunkRequestFixture creates and returns a chunk request for given result and chunk status.
+//
+// Agrees and disagrees are the list of execution node identifiers that generate the same and contradicting execution result
+// with the execution result that chunks belong to, respectively.
 func chunkRequestFixture(resultID flow.Identifier,
 	status *verification.ChunkStatus,
 	agrees flow.IdentityList,
@@ -896,7 +887,7 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 	result := unittest.ExecutionResultFixture(
 		unittest.WithBlock(block),
 		unittest.WithChunks(uint(chunkCount)))
-	statuses := unittest.ChunkStatusListFixture(t, []*flow.ExecutionResult{result}, statusCount)
+	statuses := unittest.ChunkStatusListFixture(t, block.Header.Height, result, statusCount)
 	locators := unittest.ChunkStatusListToChunkLocatorFixture(statuses)
 
 	for _, status := range statuses {
