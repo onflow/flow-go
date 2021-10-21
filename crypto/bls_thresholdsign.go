@@ -100,9 +100,6 @@ func NewBLSThresholdSignatureFollower(
 			MinimumThreshold, size-1, threshold)
 	}
 
-	// set BLS settings
-	blsInstance.reInit()
-
 	// check keys are BLS keys
 	for i, pk := range sharePublicKeys {
 		if _, ok := pk.(*PubKeyBLSBLS12381); !ok {
@@ -261,12 +258,13 @@ func (s *blsThresholdSignatureFollower) enoughShares() bool {
 // HasShare checks whether the internal map contains the share of the given index.
 // This function is thread safe and write-blocking
 func (s *blsThresholdSignatureFollower) HasShare(orig int) (bool, error) {
-	s.lock.RLock()
-	defer s.lock.RUnlock()
-
+	// validate index
 	if err := s.validIndex(index(orig)); err != nil {
 		return false, err
 	}
+
+	s.lock.RLock()
+	defer s.lock.RUnlock()
 
 	return s.hasShare(index(orig)), nil
 }
@@ -302,10 +300,10 @@ func (s *blsThresholdSignatureFollower) TrustedAdd(orig int, share Signature) (b
 		return false, fmt.Errorf("share for %d was already added", orig)
 	}
 
-	enough := s.enoughShares()
-	if !enough {
-		s.shares[index(orig)] = share
+	if s.enoughShares() {
+		return true, nil
 	}
+	s.shares[index(orig)] = share
 	return s.enoughShares(), nil
 }
 
@@ -366,23 +364,25 @@ func (s *blsThresholdSignatureFollower) ThresholdSignature() (Signature, error) 
 		return s.thresholdSignature, nil
 	}
 
-	// reconstruct the threshold signature
-	if s.enoughShares() {
-		thresholdSignature, err := s.reconstructThresholdSignature()
-		if err != nil {
-			return nil, err
-		}
-		s.thresholdSignature = thresholdSignature
-		return thresholdSignature, nil
+	if !s.enoughShares() {
+		return nil, errors.New("there are not enough signatures shares")
 	}
-	return nil, errors.New("there are not enough signatures shares")
+
+	// reconstruct the threshold signature
+	thresholdSignature, err := s.reconstructThresholdSignature()
+	if err != nil {
+		return nil, err
+	}
+	s.thresholdSignature = thresholdSignature
+	return thresholdSignature, nil
 }
 
 // reconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
 func (s *blsThresholdSignatureFollower) reconstructThresholdSignature() (Signature, error) {
 	// sanity check
 	if len(s.shares) != s.threshold+1 {
-		return nil, errors.New("The number of signature shares is not matching the number of signers")
+		return nil, fmt.Errorf("number of signature shares %d is not enough, %d are required",
+			len(s.shares), s.threshold+1)
 	}
 	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
 
@@ -393,6 +393,9 @@ func (s *blsThresholdSignatureFollower) reconstructThresholdSignature() (Signatu
 		shares = append(shares, share...)
 		signers = append(signers, index)
 	}
+
+	// set BLS settings
+	blsInstance.reInit()
 
 	// Lagrange Interpolate at point 0
 	result := C.G1_lagrangeInterpolateAtZero(
