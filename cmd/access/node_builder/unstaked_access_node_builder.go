@@ -202,16 +202,19 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 	)
 
 	return func(ctx context.Context) (*p2p.Node, error) {
+		streamFactory, err := p2p.LibP2PStreamCompressorFactoryFunc(builder.BaseConfig.LibP2PStreamCompression)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert stream factory: %w", err)
+		}
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
 			SetRootBlockID(builder.RootBlock.ID()).
 			SetConnectionManager(connManager).
 			// unlike the staked side of the network where currently all the node addresses are known upfront,
 			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
 			SetDHTOptions(dhtOptions...).
-			SetPubsubOptions(psOpts...).
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
-			SetStreamCompressor(p2p.WithGzipCompression).
+			SetStreamCompressor(streamFactory).
 			Build(ctx)
 		if err != nil {
 			return nil, err
