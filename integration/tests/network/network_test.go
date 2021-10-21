@@ -68,7 +68,7 @@ func TestNetwork(t *testing.T) {
 	// kick off a read loop for each of the nodes (except the first)
 	for _, id := range targets {
 		wg.Add(1)
-		go readLoop(ctx, id, net, &wg, t, sender, event.Text)
+		launchReadLoop(ctx, id, net, &wg, t, sender, event.Text)
 	}
 
 	// get the sender container and relay an echo message via it to all the other nodes
@@ -85,18 +85,22 @@ func TestNetwork(t *testing.T) {
 	unittest.AssertReturnsBefore(t, wg.Wait, 5*time.Second, "timed out waiting for nodes to receive message")
 }
 
-func readLoop(ctx context.Context, id flow.Identifier, net *testnet.FlowNetwork, wg *sync.WaitGroup,
-	t *testing.T, expectedOrigin flow.Identifier, expectedMsg string) {
-	defer wg.Done()
+func launchReadLoop(
+	ctx context.Context,
+	id flow.Identifier,
+	net *testnet.FlowNetwork,
+	done *sync.WaitGroup,
+	t *testing.T,
+	expectedOrigin flow.Identifier,
+	expectedMsg string,
+) {
 
 	// get the ghost container
 	ghostContainer := net.ContainerByID(id)
 
 	// get a ghost client connected to the ghost node
 	ghostClient, err := common.GetGhostClient(ghostContainer)
-	if !assert.NoError(t, err) {
-		return
-	}
+	require.NoError(t, err)
 
 	// subscribe to all the events the ghost execution node will receive
 	var msgReader *ghostclient.FlowMessageStreamReader
@@ -106,31 +110,31 @@ func readLoop(ctx context.Context, id flow.Identifier, net *testnet.FlowNetwork,
 			break
 		}
 	}
+	require.NoError(t, err)
 
-	if !(assert.NoError(t, err) && assert.NotNil(t, msgReader)) {
-		return
-	}
+	go func() {
+		defer done.Done()
 
-	for {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
 
-		select {
-		case <-ctx.Done():
-			return
-		default:
+			actualOriginID, event, err := msgReader.Next()
+			if !assert.NoError(t, err) {
+				return
+			}
+
+			switch v := event.(type) {
+			case *message.TestMessage:
+				t.Logf("%s: %s: %s\n", id.String(), actualOriginID.String(), v.Text)
+				assert.Equal(t, expectedOrigin, actualOriginID)
+				assert.Equal(t, expectedMsg, v.Text)
+				return
+			default:
+			}
 		}
-
-		actualOriginID, event, err := msgReader.Next()
-		if !assert.NoError(t, err) {
-			return
-		}
-
-		switch v := event.(type) {
-		case *message.TestMessage:
-			t.Logf("%s: %s: %s", id.String(), actualOriginID.String(), v.Text)
-			assert.Equal(t, expectedOrigin, actualOriginID)
-			assert.Equal(t, expectedMsg, v.Text)
-			return
-		default:
-		}
-	}
+	}()
 }
