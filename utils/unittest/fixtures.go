@@ -1030,27 +1030,26 @@ func ChunkStatusListToChunkLocatorFixture(statuses []*verification.ChunkStatus) 
 	return locators
 }
 
-// ChunkStatusListFixture receives a set of execution results, and samples `n` chunk out of each result and
+// ChunkStatusListFixture receives an execution result, samples `n` chunks out of it and
 // creates a chunk status for them.
-// It returns the list of sampled chunk statuses for all results.
-func ChunkStatusListFixture(t *testing.T, results []*flow.ExecutionResult, n int) verification.ChunkStatusList {
+// It returns the list of sampled chunk statuses for the result.
+func ChunkStatusListFixture(t *testing.T, blockHeight uint64, result *flow.ExecutionResult, n int) verification.ChunkStatusList {
 	statuses := verification.ChunkStatusList{}
 
-	for _, result := range results {
-		// result should have enough chunk to sample
-		require.GreaterOrEqual(t, len(result.Chunks), n)
+	// result should have enough chunk to sample
+	require.GreaterOrEqual(t, len(result.Chunks), n)
 
-		chunkList := make(flow.ChunkList, n)
-		copy(chunkList, result.Chunks)
-		rand.Shuffle(len(chunkList), func(i, j int) { chunkList[i], chunkList[j] = chunkList[j], chunkList[i] })
+	chunkList := make(flow.ChunkList, n)
+	copy(chunkList, result.Chunks)
+	rand.Shuffle(len(chunkList), func(i, j int) { chunkList[i], chunkList[j] = chunkList[j], chunkList[i] })
 
-		for _, chunk := range chunkList[:n] {
-			status := &verification.ChunkStatus{
-				ChunkIndex:      chunk.Index,
-				ExecutionResult: result,
-			}
-			statuses = append(statuses, status)
+	for _, chunk := range chunkList[:n] {
+		status := &verification.ChunkStatus{
+			ChunkIndex:      chunk.Index,
+			BlockHeight:     blockHeight,
+			ExecutionResult: result,
 		}
+		statuses = append(statuses, status)
 	}
 
 	return statuses
