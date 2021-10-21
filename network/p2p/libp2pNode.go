@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/event"
 	"github.com/libp2p/go-libp2p-core/host"
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -294,6 +295,11 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 	node.host = libp2pHost
 
+	node.pCache, err = newProtocolPeerCache(node.logger, libp2pHost)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(builder.dhtOpts) != 0 {
 		kdht, err := NewDHT(ctx, node.host, builder.dhtOpts...)
 		if err != nil {
@@ -338,6 +344,78 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	return node, nil
 }
 
+// protocolPeerCache store a mapping from protocol ID to peers
+// who support that protocol
+type protocolPeerCache struct {
+	protocolPeers map[protocol.ID]map[peer.ID]struct{}
+	sync.RWMutex
+}
+
+func newProtocolPeerCache(logger zerolog.Logger, h host.Host) (*protocolPeerCache, error) {
+	sub, err := h.EventBus().
+		Subscribe([]interface{}{new(event.EvtPeerIdentificationCompleted), new(event.EvtPeerProtocolsUpdated)})
+	if err != nil {
+		return nil, fmt.Errorf("could not subscribe to peer protocol update events: %w", err)
+	}
+
+	p := &protocolPeerCache{protocolPeers: make(map[protocol.ID]map[peer.ID]struct{})}
+	go p.consumeSubscription(logger, h, sub)
+
+	return p, nil
+}
+
+func (p *protocolPeerCache) addProtocols(peerID peer.ID, protocols []protocol.ID) {
+	p.Lock()
+	defer p.Unlock()
+	for _, pid := range protocols {
+		peers, ok := p.protocolPeers[pid]
+		if !ok {
+			peers = make(map[peer.ID]struct{})
+			p.protocolPeers[pid] = peers
+		}
+		peers[peerID] = struct{}{}
+	}
+}
+
+func (p *protocolPeerCache) removeProtocols(peerID peer.ID, protocols []protocol.ID) {
+	p.Lock()
+	defer p.Unlock()
+	for _, pid := range protocols {
+		peers := p.protocolPeers[pid]
+		delete(peers, peerID)
+		if len(peers) == 0 {
+			delete(p.protocolPeers, pid)
+		}
+	}
+}
+
+func (p *protocolPeerCache) getPeers(pid protocol.ID) map[peer.ID]struct{} {
+	p.RLock()
+	defer p.RUnlock()
+	return p.protocolPeers[pid]
+}
+
+func (p *protocolPeerCache) consumeSubscription(logger zerolog.Logger, h host.Host, sub event.Subscription) {
+	defer sub.Close()
+	logger.Debug().Msg("starting peer protocol event subscription loop")
+	for e := range sub.Out() {
+		logger.Debug().Interface("event", e).Msg("received new peer protocol event")
+		switch evt := e.(type) {
+		case event.EvtPeerIdentificationCompleted:
+			protocols, err := h.Peerstore().GetProtocols(evt.Peer)
+			if err != nil {
+				logger.Err(err).Str("peer", evt.Peer.String()).Msg("failed to get protocols for peer")
+				continue
+			}
+			p.addProtocols(evt.Peer, protocol.ConvertFromStrings(protocols))
+		case event.EvtPeerProtocolsUpdated:
+			p.addProtocols(evt.Peer, evt.Added)
+			p.removeProtocols(evt.Peer, evt.Removed)
+		}
+	}
+	logger.Debug().Msg("exiting peer protocol event subscription loop")
+}
+
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	sync.Mutex
@@ -355,6 +433,7 @@ type Node struct {
 	connMgr              TagLessConnManager
 	dht                  *dht.IpfsDHT
 	topicValidation      bool
+	pCache               *protocolPeerCache
 }
 
 // Stop terminates the libp2p node.
@@ -435,6 +514,15 @@ func (n *Node) RemovePeer(ctx context.Context, peerID peer.ID) error {
 		return fmt.Errorf("failed to remove peer %s: %w", peerID, err)
 	}
 	return nil
+}
+
+func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
+	pMap := n.pCache.getPeers(pid)
+	peers := make(peer.IDSlice, 0, len(pMap))
+	for p := range pMap {
+		peers = append(peers, p)
+	}
+	return peers
 }
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
