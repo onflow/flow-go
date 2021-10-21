@@ -71,8 +71,8 @@ jobs:
       env:
         TEST_CATEGORY: integration-unit
 
-  integration:
-    name: Integration Tests
+  integration-access:
+    name: Integration Tests (Access)
     runs-on: ubuntu-latest
     steps:
     - name: Set up Cloud SDK
@@ -89,5 +89,144 @@ jobs:
       working-directory: ./flakiness_summary
       run: ./flakiness-summary.sh
       env:
-        TEST_CATEGORY: integration
-  
+        TEST_CATEGORY: integration-access
+
+  integration-common:
+    name: Integration Tests (Common)
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run flakiness summary script
+      working-directory: ./flakiness_summary
+      run: ./flakiness-summary.sh
+      env:
+        TEST_CATEGORY: integration-common
+
+  integration-execution:
+    name: Integration Tests (Execution)
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run flakiness summary script
+      working-directory: ./flakiness_summary
+      run: ./flakiness-summary.sh
+      env:
+        TEST_CATEGORY: integration-execution
+
+  integration-verification:
+    name: Integration Tests (Verification)
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run flakiness summary script
+      working-directory: ./flakiness_summary
+      run: ./flakiness-summary.sh
+      env:
+        TEST_CATEGORY: integration-verification
+
+  integration-collection:
+    name: Integration Tests (Collection)
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run flakiness summary script
+      working-directory: ./flakiness_summary
+      run: ./flakiness-summary.sh
+      env:
+        TEST_CATEGORY: integration-collection
+
+  integration-epochs:
+    name: Integration Tests (Epochs)
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run flakiness summary script
+      working-directory: ./flakiness_summary
+      run: ./flakiness-summary.sh
+      env:
+        TEST_CATEGORY: integration-epochs
+
+  integration-network:
+    name: Integration Tests (Network)
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run flakiness summary script
+      working-directory: ./flakiness_summary
+      run: ./flakiness-summary.sh
+      env:
+        TEST_CATEGORY: integration-network
+
+  integration-consensus:
+    name: Integration Tests (Consensus)
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run flakiness summary script
+      working-directory: ./flakiness_summary
+      run: ./flakiness-summary.sh
+      env:
+        TEST_CATEGORY: integration-consensus

@@ -8,11 +8,11 @@ test:
 
 # Run the integration test suite
 .PHONY: integration-test
-integration-test: access-tests common-tests execution-tests verification-tests collection-tests epoch-tests network-tests consensus-tests 
+integration-test: access-tests common-tests execution-tests verification-tests collection-tests epochs-tests network-tests consensus-tests 
 
 # NOTE: Currently skipping collection and consensus tests due to them not passing properly on CI
 .PHONY: ci-integration-test
-ci-integration-test: access-tests common-tests execution-tests epoch-tests verification-tests network-tests # collection-tests # consensus-tests
+ci-integration-test: access-tests common-tests execution-tests epochs-tests verification-tests network-tests # collection-tests # consensus-tests
 
 .PHONY: access-tests
 access-tests:
@@ -26,8 +26,8 @@ collection-tests:
 consensus-tests:
 	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/consensus
 
-.PHONY: epoch-tests
-epoch-tests:
+.PHONY: epochs-tests
+epochs-tests:
 	GO111MODULE=on go test $(if $(VERBOSE),-v,) $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) -tags relic ./tests/epochs
 
 .PHONY: common-tests
