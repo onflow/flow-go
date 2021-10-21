@@ -142,7 +142,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
-	requests := chunkRequestFixture(result.ID(), statuses.Chunks(), block.Header.Height, agrees, disagrees)
+	requests := chunkRequestsFixture(result.ID(), statuses.Chunks(), block.Header.Height, agrees, disagrees)
 	chunkDataPacks, verifiableChunks := verifiableChunkFixture(t, statuses.Chunks(), block, result, collMap)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
@@ -241,7 +241,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees.Union(disagrees))
 
 	// generates and mocks requesting chunk data pack fixture
-	requests := chunkRequestFixture(result.ID(), statuses.Chunks(), block.Header.Height, agrees, disagrees)
+	requests := chunkRequestsFixture(result.ID(), statuses.Chunks(), block.Header.Height, agrees, disagrees)
 	responses, _ := verifiableChunkFixture(t, statuses.Chunks(), block, result, collMap)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
@@ -824,11 +824,11 @@ func verifiableChunkFixture(t *testing.T,
 	return responses, verifiableChunks
 }
 
-// chunkRequestFixture is a test helper creates and returns chunk data pack requests for given chunks that all belong to the
+// chunkRequestsFixture is a test helper creates and returns chunk data pack requests for given chunks that all belong to the
 // same block height.
 // Agrees and disagrees are the list of execution node identifiers that generate the same and contradicting execution result
 // with the execution result that chunks belong to, respectively.
-func chunkRequestFixture(
+func chunkRequestsFixture(
 	resultID flow.Identifier,
 	chunkList flow.ChunkList,
 	height uint64,
@@ -851,6 +851,25 @@ func chunkRequestFixture(
 	}
 
 	return requests
+}
+
+// chunkRequestFixture creates and returns a chunk request for given result and chunk status.
+func chunkRequestFixture(resultID flow.Identifier,
+	status *verification.ChunkStatus,
+	agrees flow.IdentityList,
+	disagrees flow.IdentityList) *verification.ChunkDataPackRequest {
+
+	return &verification.ChunkDataPackRequest{
+		Locator: chunks.Locator{
+			ResultID: resultID,
+			Index:    status.ChunkIndex,
+		},
+		ChunkID:   status.ChunkID(),
+		Height:    status.BlockHeight,
+		Agrees:    agrees.NodeIDs(),
+		Disagrees: disagrees.NodeIDs(),
+		Targets:   agrees.Union(disagrees),
+	}
 }
 
 // completeChunkStatusListFixture creates a reference block with an execution result associated with it.
