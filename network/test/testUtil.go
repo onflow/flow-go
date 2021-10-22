@@ -152,9 +152,6 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			p2p.DefaultUnicastTimeout,
 			enablePeerManagementAndConnectionGating,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
-			p2p.WithIdentifierProvider(
-				idProviders[i],
-			),
 			p2p.WithPeerManager(peerManagerFactory),
 		)
 	}
