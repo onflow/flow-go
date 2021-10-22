@@ -1,4 +1,4 @@
-// Package libp2p encapsulates the libp2p library
+// Package p2p encapsulates the libp2p library
 package p2p
 
 import (
@@ -33,7 +33,9 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	flownet "github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/compressed"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
@@ -42,7 +44,7 @@ import (
 
 const (
 
-	// Maximum time to wait for a ping reply from a remote node
+	// PingTimeout is maximum time to wait for a ping reply from a remote node
 	PingTimeout = time.Second * 4
 
 	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
@@ -54,10 +56,40 @@ const (
 	// timeout for FindPeer queries to the DHT
 	// TODO: is this a sensible value?
 	findPeerQueryTimeout = 10 * time.Second
+
+	// stream compression factories
+	NoCompression   = "no-compression"
+	GzipCompression = "gzip-compression"
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func(context.Context) (*Node, error)
+
+// LibP2PStreamCompressorWrapperFunc is a wrapper function that plugs in compression for streams.
+type LibP2PStreamCompressorWrapperFunc func(libp2pnet.Stream) (libp2pnet.Stream, error)
+
+// WithoutCompression reflects the input stream without a compression.
+func WithoutCompression(s libp2pnet.Stream) (libp2pnet.Stream, error) {
+	return s, nil
+}
+
+// WithGzipCompression creates and returns a gzip-compressed stream out of input stream.
+func WithGzipCompression(s libp2pnet.Stream) (libp2pnet.Stream, error) {
+	return compressed.NewCompressedStream(s, compressor.GzipStreamCompressor{})
+}
+
+// LibP2PStreamCompressorFactoryFunc translates name of a stream factory to its corresponding stream compressor factory
+// function.
+func LibP2PStreamCompressorFactoryFunc(factory string) (LibP2PStreamCompressorWrapperFunc, error) {
+	switch factory {
+	case NoCompression:
+		return WithoutCompression, nil
+	case GzipCompression:
+		return WithGzipCompression, nil
+	default:
+		return nil, fmt.Errorf("unknown stream factory: %s", factory)
+	}
+}
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
@@ -67,13 +99,13 @@ func DefaultLibP2PNodeFactory(
 	address string,
 	flowKey fcrypto.PrivateKey,
 	rootBlockID flow.Identifier,
-	chainID flow.ChainID,
 	idProvider id.IdentityProvider,
 	maxPubSubMsgSize int,
 	metrics module.NetworkMetrics,
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
-	role string) (LibP2PFactoryFunc, error) {
+	role string,
+	streamFactory LibP2PStreamCompressorWrapperFunc) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
@@ -100,6 +132,7 @@ func DefaultLibP2PNodeFactory(
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			SetResolver(resolver).
+			SetStreamCompressor(streamFactory).
 			Build(ctx)
 	}, nil
 }
@@ -114,6 +147,7 @@ type NodeBuilder interface {
 	SetTopicValidation(bool) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
 	SetResolver(*dns.Resolver) NodeBuilder
+	SetStreamCompressor(LibP2PStreamCompressorWrapperFunc) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -125,6 +159,7 @@ type DefaultLibP2PNodeBuilder struct {
 	connMngr         TagLessConnManager
 	pingInfoProvider PingInfoProvider
 	resolver         *dns.Resolver
+	streamFactory    LibP2PStreamCompressorWrapperFunc
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
@@ -190,13 +225,19 @@ func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *dns.Resolver) Nod
 	return builder
 }
 
+func (builder *DefaultLibP2PNodeBuilder) SetStreamCompressor(streamFactory LibP2PStreamCompressorWrapperFunc) NodeBuilder {
+	builder.streamFactory = streamFactory
+	return builder
+}
+
 func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	node := &Node{
-		id:              builder.id,
-		topics:          make(map[flownet.Topic]*pubsub.Topic),
-		subs:            make(map[flownet.Topic]*pubsub.Subscription),
-		logger:          builder.logger,
-		topicValidation: builder.topicValidation,
+		id:               builder.id,
+		topics:           make(map[flownet.Topic]*pubsub.Topic),
+		subs:             make(map[flownet.Topic]*pubsub.Subscription),
+		logger:           builder.logger,
+		topicValidation:  builder.topicValidation,
+		compressedStream: WithoutCompression,
 	}
 
 	if builder.hostMaker == nil {
@@ -241,6 +282,10 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		}
 
 		opts = append(opts, libp2p.MultiaddrResolver(libp2pResolver))
+	}
+
+	if builder.streamFactory != nil {
+		node.compressedStream = builder.streamFactory
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -305,6 +350,7 @@ type Node struct {
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
+	compressedStream     LibP2PStreamCompressorWrapperFunc
 	pingService          *PingService
 	connMgr              TagLessConnManager
 	dht                  *dht.IpfsDHT
@@ -398,11 +444,13 @@ func (n *Node) RemovePeer(ctx context.Context, peerID peer.ID) error {
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
 func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
+	lg := n.logger.With().Str("peer_id", peerID.Pretty()).Logger()
+
 	// If we do not currently have any addresses for the given peer, stream creation will almost
-	// certainly fail. If this Node was configure with a DHT, we can try to lookup the address of
+	// certainly fail. If this Node was configured with a DHT, we can try to look up the address of
 	// the peer in the DHT as a last resort.
 	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.dht != nil {
-		n.logger.Info().Str("peerID", peerID.Pretty()).Msg("address not found in peerstore, searching for peer in dht")
+		lg.Info().Msg("address not found in peer store, searching for peer in dht")
 
 		var err error
 		func() {
@@ -413,36 +461,41 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 		}()
 
 		if err != nil {
-			n.logger.Warn().Err(err).Str("peerID", peerID.Pretty()).Msg("could not find addresses")
+			lg.Warn().Err(err).Msg("address not found in both peer store and dht")
 		} else {
-			n.logger.Info().Str("peerID", peerID.Pretty()).Msg("addresses found")
+			lg.Debug().Msg("address not found in peer store, but found in dht search")
 		}
 	}
-	// Open libp2p Stream with the remote peer (will use an existing TCP connection underneath if it exists)
-	stream, err := n.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
+	stream, dialAddrs, err := n.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
 	if err != nil {
-		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s): %w", peerID, err))
+		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
+			dialAddrs, err))
 	}
+
+	lg.Debug().Str("dial_address", fmt.Sprintf("%v", dialAddrs)).Msg("stream successfully created to remote peer")
 	return stream, nil
 }
 
-// tryCreateNewStream makes at most maxAttempts to create a stream with the peer.
+// tryCreateNewStream makes at most `maxAttempts` to create a stream with the peer.
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
-// remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'
-func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, error) {
+// remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'.
+//
+// Note that in case an existing TCP connection underneath to `peerID` exists, that connection is utilized for creating a new stream.
+// The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
+func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
-	// connection creation is being attempted
+	// connection creation is being attempted, and remove it from protected list once stream created.
 	n.connMgr.ProtectPeer(peerID)
-	// unprotect it once done
 	defer n.connMgr.UnprotectPeer(peerID)
 
 	var errs error
 	var s libp2pnet.Stream
 	var retries = 0
+	var dialAddr []multiaddr.Multiaddr // address on which we dial peerID
 	for ; retries < maxAttempts; retries++ {
 		select {
 		case <-ctx.Done():
-			return nil, fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", retries, errs)
+			return nil, nil, fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", retries, errs)
 		default:
 		}
 
@@ -454,6 +507,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 
 		// cancel the dial back off (if any), since we want to connect immediately
 		network := n.host.Network()
+		dialAddr = network.Peerstore().Addrs(peerID)
 		if swm, ok := network.(*swarm.Swarm); ok {
 			swm.Backoff().Clear(peerID)
 		}
@@ -471,23 +525,25 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 
 			// if the connection was rejected due to invalid node id, skip the re-attempt
 			if strings.Contains(err.Error(), "failed to negotiate security protocol") {
-				return s, fmt.Errorf("invalid node id: %w", err)
+				return s, dialAddr, fmt.Errorf("invalid node id: %w", err)
 			}
 
 			// if the connection was rejected due to allowlisting, skip the re-attempt
 			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
-				return s, fmt.Errorf("target node is not on the approved list of nodes: %w", err)
+				return s, dialAddr, fmt.Errorf("target node is not on the approved list of nodes: %w", err)
 			}
 
 			errs = multierror.Append(errs, err)
 			continue
 		}
 
+		// creates stream using stream factory
 		s, err = n.host.NewStream(ctx, peerID, n.flowLibP2PProtocolID)
 		if err != nil {
 			// if the stream creation failed due to invalid protocol id, skip the re-attempt
 			if strings.Contains(err.Error(), "protocol not supported") {
-				return nil, fmt.Errorf("remote node is running on a different spork: %w, protocol attempted: %s", err, n.flowLibP2PProtocolID)
+				return nil, dialAddr, fmt.Errorf("remote node is running on a different spork: %w, protocol attempted: %s", err,
+					n.flowLibP2PProtocolID)
 			}
 			errs = multierror.Append(errs, err)
 			continue
@@ -495,10 +551,17 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 
 		break
 	}
+
 	if retries == maxAttempts {
-		return s, errs
+		return s, dialAddr, errs
 	}
-	return s, nil
+
+	s, err := n.compressedStream(s)
+	if err != nil {
+		return nil, dialAddr, fmt.Errorf("could not create compressed stream: %w", err)
+	}
+
+	return s, dialAddr, nil
 }
 
 // GetIPPort returns the IP and Port the libp2p node is listening on.
@@ -653,12 +716,28 @@ func (n *Node) Host() host.Host {
 
 // SetFlowProtocolStreamHandler sets the stream handler of Flow libp2p Protocol
 func (n *Node) SetFlowProtocolStreamHandler(handler libp2pnet.StreamHandler) {
-	n.host.SetStreamHandler(n.flowLibP2PProtocolID, handler)
+	n.host.SetStreamHandler(n.flowLibP2PProtocolID, func(s libp2pnet.Stream) {
+		// converts incoming libp2p stream to a compressed stream
+		s, err := n.compressedStream(s)
+		if err != nil {
+			n.logger.Error().Err(err).Msg("could not create compressed stream")
+			return
+		}
+		handler(s)
+	})
 }
 
 // SetPingStreamHandler sets the stream handler for the Flow Ping protocol.
 func (n *Node) SetPingStreamHandler(handler libp2pnet.StreamHandler) {
-	n.host.SetStreamHandler(n.flowLibP2PProtocolID, handler)
+	n.host.SetStreamHandler(n.flowLibP2PProtocolID, func(s libp2pnet.Stream) {
+		// converts incoming libp2p stream to a compressed stream
+		s, err := n.compressedStream(s)
+		if err != nil {
+			n.logger.Error().Err(err).Msg("could not create compressed stream")
+			return
+		}
+		handler(s)
+	})
 }
 
 // IsConnected returns true is address is a direct peer of this node else false

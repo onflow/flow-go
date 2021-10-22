@@ -73,6 +73,7 @@ func (suite *PeerStoreProviderTestSuite) SetupTest() {
 }
 
 func (suite *PeerStoreProviderTestSuite) TestTranslationPeers() {
+	suite.T().Skip("flaky test - quarantining")
 
 	identifiers := suite.peerIDprovider.Identifiers()
 

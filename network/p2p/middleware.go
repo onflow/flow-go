@@ -30,14 +30,6 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-type communicationMode int
-
-const (
-	NoOp communicationMode = iota
-	OneToOne
-	OneToK
-)
-
 const (
 	_  = iota
 	kb = 1 << (10 * iota)
@@ -343,10 +335,10 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
-	// sent out the the receiver
+	// sent out the receiver
 	stream, err := m.libP2PNode.CreateStream(ctx, peerID)
 	if err != nil {
-		return fmt.Errorf("failed to create stream for %s :%w", targetID, err)
+		return fmt.Errorf("failed to create stream for %s: %w", targetID, err)
 	}
 
 	// create a gogo protobuf writer
@@ -383,7 +375,6 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 // handleIncomingStream handles an incoming stream from a remote peer
 // it is a callback that gets called for each incoming stream by libp2p with a new stream object
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
-
 	// qualify the logger with local and remote address
 	log := streamLogger(m.log, s)
 
@@ -398,7 +389,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	//create a new readConnection with the context of the middleware
 	conn := newReadConnection(m.ctx, s, m.processAuthenticatedMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize, isStaked)
 
-	// kick off the receive loop to continuously receive messages
+	// kick off the reception loop to continuously receive messages
 	m.wg.Add(1)
 	go conn.receiveLoop(m.wg)
 }
