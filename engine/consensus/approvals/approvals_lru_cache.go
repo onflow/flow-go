@@ -24,7 +24,7 @@ func NewApprovalsLRUCache(limit uint) *LruCache {
 	lru, _ := simplelru.NewLRU(int(limit), func(key interface{}, value interface{}) {
 		approval := value.(*flow.ResultApproval)
 		delete(byResultID[approval.Body.ExecutionResultID], approval.Body.PartialID())
-		if len(byResultID) == 0 {
+		if len(byResultID[approval.Body.ExecutionResultID]) == 0 {
 			delete(byResultID, approval.Body.ExecutionResultID)
 		}
 	})
