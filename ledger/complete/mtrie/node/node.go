@@ -157,23 +157,6 @@ func (n *Node) computeAndStoreHash() {
 	n.hashValue = n.computeHash()
 }
 
-func (n *Node) bubbleUp(isLeft bool) {
-	if n.lChild != nil {
-		n.lChild.bubbleUp(true)
-	}
-	if n.rChild != nil {
-		n.rChild.bubbleUp(false)
-	}
-	// TODO n.height might be off
-	if isLeft {
-		n.hashValue = hash.HashInterNode(n.hashValue, ledger.GetDefaultHashForHeight(n.height))
-	} else {
-		n.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(n.height), n.hashValue)
-	}
-	n.height = n.height + 1
-	n.maxDepth = n.maxDepth - 1
-}
-
 // Prunned would look at the child of a node and if it can be prunned
 // it constructs a new subtrie and return that one instead of n
 // otherwise it would return the node itself if no change is required
@@ -188,6 +171,7 @@ func (n *Node) Prunned() (*Node, bool) {
 	rChildEmpty := true
 	var prunnedLChild, prunnedRChild *Node
 	var lChildChanged, rChildChanged bool
+	// TODO We probably don't need to do this and for tests we need to update only
 	if n.lChild != nil {
 		prunnedLChild, lChildChanged = n.lChild.Prunned()
 		lChildEmpty = prunnedLChild.IsADefaultNode()
@@ -205,14 +189,19 @@ func (n *Node) Prunned() (*Node, bool) {
 	if !lChildEmpty && rChildEmpty && prunnedLChild.IsLeaf() {
 		// TODO merge these two methods
 		l := prunnedLChild.deepCopy()
-		l.bubbleUp(true)
+		l.hashValue = hash.HashInterNode(l.hashValue, ledger.GetDefaultHashForHeight(l.height))
+		l.height = l.height + 1
+		l.maxDepth = l.maxDepth - 1
+
 		// bubble up all children and return as parent
 		return l, true
 	}
 	if lChildEmpty && !rChildEmpty && prunnedRChild.IsLeaf() {
 		// TODO merge these two methods
 		r := prunnedRChild.deepCopy()
-		r.bubbleUp(false)
+		r.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(r.height), r.hashValue)
+		r.height = r.height + 1
+		r.maxDepth = r.maxDepth - 1
 		// bubble up all children and return as parent
 		return r, true
 	}

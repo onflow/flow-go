@@ -137,6 +137,7 @@ func Test_VerifyCachedHash(t *testing.T) {
 	require.True(t, n5.VerifyCachedHash())
 }
 
+// TODO update the tests
 func Test_Prunning(t *testing.T) {
 	// Paths are not acurate in this case which causes the compact value be wrong
 	path0 := utils.PathByUint16(0)             // 0000...
