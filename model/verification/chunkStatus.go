@@ -33,6 +33,10 @@ func (s ChunkStatus) ChunkLocatorID() flow.Identifier {
 	}.ID()
 }
 
+func (s ChunkStatus) Chunk() *flow.Chunk {
+	return s.ExecutionResult.Chunks[s.ChunkIndex]
+}
+
 func (s ChunkStatus) ChunkID() flow.Identifier {
 	return s.ExecutionResult.Chunks[s.ChunkIndex].ID()
 }
