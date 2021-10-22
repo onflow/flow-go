@@ -3,7 +3,7 @@ package trie_test
 import (
 	"bytes"
 	"encoding/hex"
-	"fmt"
+	"math"
 	"math/rand"
 	"sort"
 	"testing"
@@ -301,7 +301,6 @@ func TestSplitByPath(t *testing.T) {
 }
 
 func Test_Pruning(t *testing.T) {
-	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
 
 	path1 := utils.PathByUint16(1 << 12)       // 000100...
@@ -334,7 +333,6 @@ func Test_Pruning(t *testing.T) {
 
 	baseTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
-	fmt.Println(baseTrie.String())
 
 	t.Run("leaf update with prunning test", func(t *testing.T) {
 		trie1, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, []ledger.Payload{*emptyPayload}, false)
@@ -407,6 +405,81 @@ func Test_Pruning(t *testing.T) {
 		require.Equal(t, trie3.MaxDepth()-3, trie3withpruning.MaxDepth())
 	})
 
+	t.Run("smoke testing trie pruning", func(t *testing.T) {
+		t.Skip("skipping trie prunning smoke testing as its not needed to always run")
+
+		numberOfSteps := 1000
+		numberOfUpdates := 750
+		numberOfRemovals := 750
+
+		var err error
+		activeTrie := trie.NewEmptyMTrie()
+		activeTrieWithPruning := trie.NewEmptyMTrie()
+		allPaths := make(map[ledger.Path]ledger.Payload)
+
+		for step := 0; step < numberOfSteps; step++ {
+
+			updatePaths := make([]ledger.Path, 0)
+			updatePayloads := make([]ledger.Payload, 0)
+
+			for i := 0; i < numberOfUpdates; {
+				var path ledger.Path
+				rand.Read(path[:])
+				// deduplicate
+				if _, found := allPaths[path]; !found {
+					payload := utils.RandomPayload(1, 100)
+					updatePaths = append(updatePaths, path)
+					updatePayloads = append(updatePayloads, *payload)
+					i++
+				}
+			}
+
+			i := 0
+			samplesNeeded := int(math.Min(float64(numberOfRemovals), float64(len(allPaths))))
+			for p := range allPaths {
+				updatePaths = append(updatePaths, p)
+				updatePayloads = append(updatePayloads, *emptyPayload)
+				delete(allPaths, p)
+				i++
+				if i > samplesNeeded {
+					break
+				}
+			}
+
+			// only set it for the updates
+			for i := 0; i < numberOfUpdates; i++ {
+				allPaths[updatePaths[i]] = updatePayloads[i]
+			}
+
+			activeTrie, err = trie.NewTrieWithUpdatedRegisters(activeTrie, updatePaths, updatePayloads, false)
+			require.NoError(t, err)
+
+			activeTrieWithPruning, err = trie.NewTrieWithUpdatedRegisters(activeTrieWithPruning, updatePaths, updatePayloads, true)
+			require.NoError(t, err)
+
+			require.Equal(t, activeTrie.RootHash(), activeTrieWithPruning.RootHash())
+
+			// fetch all values and compare
+			queryPaths := make([]ledger.Path, 0)
+			for path := range allPaths {
+				queryPaths = append(queryPaths, path)
+			}
+
+			payloads := activeTrie.UnsafeRead(queryPaths)
+			for i, pp := range payloads {
+				expectedPayload := allPaths[queryPaths[i]]
+				require.True(t, pp.Equals(&expectedPayload))
+			}
+
+			payloads = activeTrieWithPruning.UnsafeRead(queryPaths)
+			for i, pp := range payloads {
+				expectedPayload := allPaths[queryPaths[i]]
+				require.True(t, pp.Equals(&expectedPayload))
+			}
+
+		}
+		require.Greater(t, activeTrie.MaxDepth(), activeTrieWithPruning.MaxDepth())
+	})
 }
 
 func hashToString(hash ledger.RootHash) string {
