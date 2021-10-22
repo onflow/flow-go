@@ -92,7 +92,7 @@ func (i *TransactionInvocator) Process(
 			processErr = fmt.Errorf("transaction invocation failed: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
-		sth.SetEnforceInteractionLimits(true)
+		sth.EnableLimitEnforcement()
 	}()
 
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
@@ -155,14 +155,14 @@ func (i *TransactionInvocator) Process(
 	// }
 
 	// disable the limit checks on states
-	sth.SetEnforceInteractionLimits(false)
+	sth.DisableLimitEnforcement()
 
 	// try to deduct fees even if there is an error.
 	feesError := i.deductTransactionFees(env, proc)
 	if feesError != nil {
 		txError = feesError
 	}
-	sth.SetEnforceInteractionLimits(true)
+	sth.EnableLimitEnforcement()
 
 	// applying contract changes
 	// this writes back the contract contents to accounts
@@ -180,7 +180,7 @@ func (i *TransactionInvocator) Process(
 
 	// it there was any transaction error clear changes and try to deduct fees again
 	if txError != nil {
-		sth.SetEnforceInteractionLimits(false)
+		sth.DisableLimitEnforcement()
 		// drop delta since transaction failed
 		childState.View().DropDelta()
 		// if tx fails just do clean up

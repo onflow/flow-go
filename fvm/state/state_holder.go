@@ -30,9 +30,14 @@ func (s *StateHolder) SetActiveState(st *State) {
 	s.activeState = st
 }
 
-// SetEnforceInteractionLimits sets weather the interaction limit should be enforced or not
-func (s *StateHolder) SetEnforceInteractionLimits(enforce bool) {
-	s.enforceInteractionLimits = enforce
+// EnableLimitEnforcement sets that the interaction limit should be enforced
+func (s *StateHolder) EnableLimitEnforcement() {
+	s.enforceInteractionLimits = true
+}
+
+// DisableLimitEnforcement sets that the interaction limit should not be enforced
+func (s *StateHolder) DisableLimitEnforcement() {
+	s.enforceInteractionLimits = false
 }
 
 // NewChild constructs a new child of active state
