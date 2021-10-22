@@ -148,14 +148,14 @@ func Test_Prunning(t *testing.T) {
 	payload2 := utils.LightPayload(2, 4)
 	emptyPayload := &ledger.Payload{}
 
-	t.Run("should not be prunned", func(t *testing.T) {
+	t.Run("should not be pruned", func(t *testing.T) {
 		//          n5
 		//       /     \
 		//      n3      n4(-)
 		//   /    \
 		//  n1(p1) n2(p2)
 		//
-		// eventhough n3 is empty it should not be prunned
+		// eventhough n3 is empty it should not be pruned
 		// we avoid empty leaf prunnings for performance reasons
 		// while keeping it would only add one extra lookup, removing
 		// it requires the whole branch to change to the top
@@ -165,8 +165,8 @@ func Test_Prunning(t *testing.T) {
 		n4 := node.NewLeaf(path2, emptyPayload, 255)
 		n5 := node.NewInterimNode(256, n3, n4)
 
-		nn5, prunned := n5.Prunned()
-		require.False(t, prunned)
+		nn5, pruned := n5.Pruned()
+		require.False(t, pruned)
 		require.True(t, nn5.VerifyCachedHash())
 		require.Equal(t, nn5, n5)
 	})
@@ -191,14 +191,14 @@ func Test_Prunning(t *testing.T) {
 		n4 := node.NewLeaf(path2, payload2, 255)
 		n5 := node.NewInterimNode(256, n3, n4)
 
-		nn3, prunned := n3.Prunned()
-		require.True(t, prunned)
+		nn3, pruned := n3.Pruned()
+		require.True(t, pruned)
 		require.True(t, nn3.VerifyCachedHash())
 		require.Equal(t, nn3.Hash(), n3.Hash())
 		require.Equal(t, nn3.Payload(), payload1)
 
-		_, prunned = n5.Prunned()
-		require.False(t, prunned)
+		_, pruned = n5.Pruned()
+		require.False(t, pruned)
 	})
 
 	t.Run("lowest level left leaf be empty", func(t *testing.T) {
@@ -220,14 +220,14 @@ func Test_Prunning(t *testing.T) {
 		n5 := node.NewInterimNode(256, n3, n4)
 		require.True(t, n2.VerifyCachedHash())
 
-		nn3, prunned := n3.Prunned()
-		require.True(t, prunned)
+		nn3, pruned := n3.Pruned()
+		require.True(t, pruned)
 		require.True(t, nn3.VerifyCachedHash())
 		require.Equal(t, nn3.Hash(), n3.Hash())
 		require.Equal(t, nn3.Payload(), payload1)
 
-		_, prunned = n5.Prunned()
-		require.False(t, prunned)
+		_, pruned = n5.Pruned()
+		require.False(t, pruned)
 	})
 
 	t.Run("lowest level left and right leaves be empty", func(t *testing.T) {
@@ -247,13 +247,13 @@ func Test_Prunning(t *testing.T) {
 		n5 := node.NewInterimNode(256, n3, n4)
 		require.True(t, n2.VerifyCachedHash())
 
-		nn3, prunned := n3.Prunned()
-		require.True(t, prunned)
+		nn3, pruned := n3.Pruned()
+		require.True(t, pruned)
 		require.True(t, nn3.VerifyCachedHash())
 		require.Equal(t, nn3.Hash(), n3.Hash())
 
-		nn5, prunned := n5.Prunned()
-		require.True(t, prunned)
+		nn5, pruned := n5.Pruned()
+		require.True(t, pruned)
 		require.True(t, nn5.VerifyCachedHash())
 		require.Equal(t, nn5.Hash(), n5.Hash())
 		require.Equal(t, nn5.Payload(), payload1)
@@ -286,8 +286,8 @@ func Test_Prunning(t *testing.T) {
 	// 	require.True(t, n7.VerifyCachedHash())
 	// 	fmt.Println(n7.FmtStr(" ", " "))
 
-	// 	nn7, prunned := n7.Prunned()
-	// 	require.True(t, prunned)
+	// 	nn7, pruned := n7.Pruned()
+	// 	require.True(t, pruned)
 	// 	fmt.Println(nn7.FmtStr(" ", " "))
 	// 	require.True(t, nn7.VerifyCachedHash())
 	// 	require.Equal(t, nn7.Hash(), n7.Hash())

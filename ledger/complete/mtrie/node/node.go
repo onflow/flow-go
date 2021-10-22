@@ -157,10 +157,10 @@ func (n *Node) computeAndStoreHash() {
 	n.hashValue = n.computeHash()
 }
 
-// Prunned would look at the child of a node and if it can be prunned
+// Pruned would look at the child of a node and if it can be pruned
 // it constructs a new subtrie and return that one instead of n
 // otherwise it would return the node itself if no change is required
-func (n *Node) Prunned() (*Node, bool) {
+func (n *Node) Pruned() (*Node, bool) {
 	if n.IsLeaf() {
 		return n, false
 	}
