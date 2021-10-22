@@ -21,7 +21,7 @@ func TestApprovalsCache_Get_Put_All(t *testing.T) {
 		require.Equal(t, approval, cache.Get(approval.Body.PartialID()))
 	}
 	require.ElementsMatch(t, approvals, cache.All())
-	require.Equal(t, int(numElements), len(cache.All()))
+	require.Len(t, cache.All(), int(numElements))
 }
 
 // TestIncorporatedResultsCache_Get_Put_All tests common use cases for incorporated results cache.
