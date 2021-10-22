@@ -324,6 +324,12 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
 	defer cancel()
 
+	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
+	// connection creation is being attempted, and remove it from protected list once stream created.
+	tag := fmt.Sprintf("%v:%v", msg.ChannelID, msg.Type)
+	m.libP2PNode.connMgr.Protect(peerID, tag)
+	defer m.libP2PNode.connMgr.Unprotect(peerID, tag)
+
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
