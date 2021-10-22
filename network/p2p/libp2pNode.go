@@ -299,8 +299,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	return node, nil
 }
 
-// protocolPeerCache store a mapping from protocol ID to peers
-// who support that protocol
+// protocolPeerCache store a mapping from protocol ID to peers who support that protocol
 type protocolPeerCache struct {
 	protocolPeers map[protocol.ID]map[peer.ID]struct{}
 	sync.RWMutex
@@ -312,11 +311,29 @@ func newProtocolPeerCache(logger zerolog.Logger, h host.Host) (*protocolPeerCach
 	if err != nil {
 		return nil, fmt.Errorf("could not subscribe to peer protocol update events: %w", err)
 	}
-
 	p := &protocolPeerCache{protocolPeers: make(map[protocol.ID]map[peer.ID]struct{})}
+	h.Network().Notify(&libp2pnet.NotifyBundle{
+		DisconnectedF: func(n libp2pnet.Network, c libp2pnet.Conn) {
+			peer := c.RemotePeer()
+			if len(n.ConnsToPeer(peer)) == 0 {
+				p.removePeer(peer)
+			}
+		},
+	})
 	go p.consumeSubscription(logger, h, sub)
 
 	return p, nil
+}
+
+func (p *protocolPeerCache) removePeer(peerID peer.ID) {
+	p.Lock()
+	defer p.Unlock()
+	for pid, peers := range p.protocolPeers {
+		delete(peers, peerID)
+		if len(peers) == 0 {
+			delete(p.protocolPeers, pid)
+		}
+	}
 }
 
 func (p *protocolPeerCache) addProtocols(peerID peer.ID, protocols []protocol.ID) {
