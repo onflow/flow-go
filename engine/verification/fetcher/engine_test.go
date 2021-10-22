@@ -809,7 +809,7 @@ func verifiableChunkFixture(t *testing.T,
 			collMap[chunkID] = &flow.Collection{Transactions: nil}
 		}
 
-		offsetForChunk, err := fetcher.TransactionOffsetForChunk(chunks, chunk.Index)
+		offsetForChunk, err := fetcher.TransactionOffsetForChunk(result.Chunks, chunk.Index)
 		require.NoError(t, err)
 
 		verifiableChunks[chunkID] = &verification.VerifiableChunkData{
