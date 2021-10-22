@@ -377,16 +377,15 @@ func testInvalidChunkDataResponse(t *testing.T,
 	mockPendingChunksGet(s.pendingChunks, statuses)
 	mockBlocksStorage(s.blocks, s.headers, block)
 
-	chunk := statuses.Chunks()[0]
-	chunkID := chunk.ID()
+	statusID := statuses[0].ID()
 	responses, _ := verifiableChunksFixture(t, statuses, block, result, collMap)
 
 	// alters chunk data pack so that it become invalid.
-	alterChunkDataResponse(responses[chunkID].Cdp)
+	alterChunkDataResponse(responses[statusID].Cdp)
 	mockStateFunc(*agrees[0], s.state, block.ID())
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(responses))
-	e.HandleChunkDataPack(agrees[0].NodeID, responses[chunkID])
+	e.HandleChunkDataPack(agrees[0].NodeID, responses[statusID])
 
 	mock.AssertExpectationsForObjects(t, s.pendingChunks, s.metrics)
 	// no verifiable chunk should be passed to verifier engine
