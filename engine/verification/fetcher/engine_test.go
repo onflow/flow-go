@@ -757,34 +757,43 @@ func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 	return wg
 }
 
-// chunkDataPackResponseFixture creates chunk data packs for given chunks.
-func chunkDataPackResponseFixture(t *testing.T,
-	chunkList flow.ChunkList,
+// chunkDataPackResponsesFixture creates chunk data packs for given chunks.
+func chunkDataPackResponsesFixture(t *testing.T,
+	statuses verification.ChunkStatusList,
 	collMap map[flow.Identifier]*flow.Collection,
 	result *flow.ExecutionResult,
 ) map[flow.Identifier]*verification.ChunkDataPackResponse {
 	responses := make(map[flow.Identifier]*verification.ChunkDataPackResponse)
 
-	for _, chunk := range chunkList {
-		chunkID := chunk.ID()
+	for _, status := range statuses {
+		chunkID := status.Chunk().ID()
 		coll, ok := collMap[chunkID]
 		// only non-system chunks must have a collection
-		require.Equal(t, ok, !fetcher.IsSystemChunk(chunk.Index, result))
-
-		response := verification.ChunkDataPackResponse{
-			Locator: chunks.Locator{
-				ResultID: result.ID(),
-				Index:    chunk.Index,
-			},
-			Cdp: unittest.ChunkDataPackFixture(chunkID,
-				unittest.WithStartState(chunk.StartState),
-				unittest.WithChunkDataPackCollection(coll)),
-		}
-
-		responses[chunkID] = &response
+		require.Equal(t, ok, !fetcher.IsSystemChunk(status.ChunkIndex, result))
+		responses[chunkID] = chunkDataPackResponseFixture(t, status, coll, result)
 	}
 
 	return responses
+}
+
+// chunkDataPackResponseFixture creates a chunk data pack response for given input.
+func chunkDataPackResponseFixture(t *testing.T,
+	status *verification.ChunkStatus,
+	collection *flow.Collection,
+	result *flow.ExecutionResult) *verification.ChunkDataPackResponse {
+
+	// only non-system chunks must have a collection
+	require.Equal(t, collection != nil, !fetcher.IsSystemChunk(status.ChunkIndex, result))
+
+	return &verification.ChunkDataPackResponse{
+		Locator: chunks.Locator{
+			ResultID: result.ID(),
+			Index:    status.ChunkIndex,
+		},
+		Cdp: unittest.ChunkDataPackFixture(status.Chunk().ID(),
+			unittest.WithStartState(status.Chunk().StartState),
+			unittest.WithChunkDataPackCollection(collection)),
+	}
 }
 
 // verifiableChunksFixture is a test helper that creates verifiable chunks, chunk data packs,
@@ -797,7 +806,7 @@ func verifiableChunksFixture(t *testing.T,
 	map[flow.Identifier]*verification.ChunkDataPackResponse,
 	map[flow.Identifier]*verification.VerifiableChunkData) {
 
-	responses := chunkDataPackResponseFixture(t, statuses.Chunks(), collMap, result)
+	responses := chunkDataPackResponsesFixture(t, statuses, collMap, result)
 
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
 	for _, status := range statuses {
