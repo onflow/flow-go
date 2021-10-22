@@ -216,6 +216,7 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 
 	// if we have to insert empty values
 	if len(notFoundPaths) > 0 {
+		// for proofs, we have to set the pruning to false, since wee need the trie to be expanded
 		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads, false)
 		if err != nil {
 			return nil, err

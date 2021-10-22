@@ -304,8 +304,6 @@ func update(
 
 	if prune {
 		nn, _ := n.Pruned()
-		// TODO we could add a safety measure here to compare the hash value
-		// of nn vs n and if it differs fallback to n and log a warning
 		return nn
 	}
 
