@@ -488,26 +488,26 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 	sort.Slice(union, func(p, q int) bool {
 		num1 := union[p][:]
 		num2 := union[q][:]
-		first := binary.LittleEndian.Uint64(num1)
-		second := binary.LittleEndian.Uint64(num2)
+		first := binary.BigEndian.Uint64(num1)
+		second := binary.BigEndian.Uint64(num2)
 
 		if first == second {
 			num1 = union[p][8:]
 			num2 = union[q][8:]
-			first = binary.LittleEndian.Uint64(num1)
-			second = binary.LittleEndian.Uint64(num2)
+			first = binary.BigEndian.Uint64(num1)
+			second = binary.BigEndian.Uint64(num2)
 
 			if first == second {
 				num1 = union[p][16:]
 				num2 = union[q][16:]
-				first = binary.LittleEndian.Uint64(num1)
-				second = binary.LittleEndian.Uint64(num2)
+				first = binary.BigEndian.Uint64(num1)
+				second = binary.BigEndian.Uint64(num2)
 
 				if first == second {
 					num1 = union[p][24:]
 					num2 = union[q][24:]
-					first = binary.LittleEndian.Uint64(num1)
-					second = binary.LittleEndian.Uint64(num2)
+					first = binary.BigEndian.Uint64(num1)
+					second = binary.BigEndian.Uint64(num2)
 					return first < second
 				}
 				return first < second
