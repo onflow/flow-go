@@ -26,13 +26,6 @@ func (s ChunkStatus) Checksum() flow.Identifier {
 	}.ID()
 }
 
-func (s ChunkStatus) ChunkLocatorID() flow.Identifier {
-	return chunks.Locator{
-		ResultID: s.ExecutionResult.ID(),
-		Index:    s.ChunkIndex,
-	}.ID()
-}
-
 func (s ChunkStatus) Chunk() *flow.Chunk {
 	return s.ExecutionResult.Chunks[s.ChunkIndex]
 }
