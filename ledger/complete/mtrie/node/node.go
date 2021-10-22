@@ -187,7 +187,6 @@ func (n *Node) Pruned() (*Node, bool) {
 		l := n.lChild.deepCopy()
 		l.hashValue = hash.HashInterNode(l.hashValue, ledger.GetDefaultHashForHeight(l.height))
 		l.height = l.height + 1
-		l.maxDepth = l.maxDepth - 1
 
 		// bubble up all children and return as parent
 		return l, true
@@ -197,7 +196,6 @@ func (n *Node) Pruned() (*Node, bool) {
 		r := n.rChild.deepCopy()
 		r.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(r.height), r.hashValue)
 		r.height = r.height + 1
-		r.maxDepth = r.maxDepth - 1
 		// bubble up all children and return as parent
 		return r, true
 	}
