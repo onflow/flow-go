@@ -259,40 +259,6 @@ func Test_Prunning(t *testing.T) {
 		require.Equal(t, nn5.Payload(), payload1)
 	})
 
-	// t.Run("long chain", func(t *testing.T) {
-	// 	//                    n7
-	// 	//                   / \
-	// 	//                 /     \
-	// 	//             n5         n6 (path2/-) // 1000
-	// 	//            /  \
-	// 	//          /      \
-	// 	//         /         \
-	// 	//        n3          n4 (path1/-) // 01100...
-	// 	//      /     \
-	// 	//    /          \
-	// 	//  /              \
-	// 	// n1 (path4/-)     n2 (path5/payload2)
-
-	// 	// n1, n4, n6 is set to nil value
-	// 	// prunning should result in
-	// 	//          nn5 (payload2)
-	// 	n1 := node.NewLeaf(path4, emptyPayload, 253)
-	// 	n2 := node.NewLeaf(path5, payload2, 253)
-	// 	n3 := node.NewInterimNode(254, n1, n2)
-	// 	n4 := node.NewLeaf(path1, emptyPayload, 254)
-	// 	n5 := node.NewInterimNode(255, n3, n4)
-	// 	n6 := node.NewLeaf(path2, emptyPayload, 255)
-	// 	n7 := node.NewInterimNode(256, n5, n6)
-	// 	require.True(t, n7.VerifyCachedHash())
-	// 	fmt.Println(n7.FmtStr(" ", " "))
-
-	// 	nn7, pruned := n7.Pruned()
-	// 	require.True(t, pruned)
-	// 	fmt.Println(nn7.FmtStr(" ", " "))
-	// 	require.True(t, nn7.VerifyCachedHash())
-	// 	require.Equal(t, nn7.Hash(), n7.Hash())
-	// 	require.Equal(t, nn7.Payload(), payload2)
-	// })
 }
 
 func hashToString(hash hash.Hash) string {

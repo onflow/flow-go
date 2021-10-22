@@ -3,6 +3,7 @@ package trie_test
 import (
 	"bytes"
 	"encoding/hex"
+	"fmt"
 	"math/rand"
 	"sort"
 	"testing"
@@ -297,6 +298,90 @@ func TestSplitByPath(t *testing.T) {
 	for i := index; i < len(paths); i++ {
 		assert.Equal(t, paths[i], sortedPaths[i])
 	}
+}
+
+func Test_Pruning(t *testing.T) {
+	// Make new Trie (independently of MForest):
+	emptyTrie := trie.NewEmptyMTrie()
+
+	path1 := utils.PathByUint16(1 << 12)       // 000100...
+	path2 := utils.PathByUint16(1 << 13)       // 001000...
+	path4 := utils.PathByUint16(1<<14 + 1<<13) // 01100...
+	path6 := utils.PathByUint16(1 << 15)       // 1000...
+
+	payload1 := utils.LightPayload(2, 1)
+	payload2 := utils.LightPayload(2, 2)
+	payload4 := utils.LightPayload(2, 4)
+	payload6 := utils.LightPayload(2, 6)
+	emptyPayload := ledger.EmptyPayload()
+
+	paths := []ledger.Path{path1, path2, path4, path6}
+	payloads := []ledger.Payload{*payload1, *payload2, *payload4, *payload6}
+
+	//                    n7
+	//                   / \
+	//                 /     \
+	//             n5         n6 (path6/payload6) // 1000
+	//            /  \
+	//          /      \
+	//         /         \
+	//        n3          n4 (path4/payload4) // 01100...
+	//      /     \
+	//    /          \
+	//  /              \
+	// n1 (path1,       n2 (path2)
+	//     payload1)        /payload2)
+
+	baseTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
+	require.NoError(t, err)
+	fmt.Println(baseTrie.String())
+
+	// leaf update test
+
+	trie1, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, []ledger.Payload{*emptyPayload}, false)
+	require.NoError(t, err)
+
+	// after pruning
+	//                    n7
+	//                   / \
+	//                 /     \
+	//             n5         n6 (path6/payload6) // 1000
+	//            /  \
+	//          /      \
+	//         /         \
+	//     n3 (path2       n4 (path4
+	//        /payload2)      /payload4) // 01100...
+
+	trie1withpruning, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, []ledger.Payload{*emptyPayload}, true)
+	require.NoError(t, err)
+	require.True(t, trie1withpruning.RootNode().VerifyCachedHash())
+
+	require.Equal(t, trie1.RootHash(), trie1withpruning.RootHash())
+	require.Equal(t, trie1.MaxDepth()-1, trie1withpruning.MaxDepth())
+
+	// middle leaf update (senario 2)
+	trie2, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, []ledger.Payload{*emptyPayload}, false)
+	require.NoError(t, err)
+
+	// this should not prune anything (non leaf example)
+	trie2withpruning, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, []ledger.Payload{*emptyPayload}, true)
+	require.NoError(t, err)
+	require.True(t, trie2withpruning.RootNode().VerifyCachedHash())
+
+	require.Equal(t, trie2.RootHash(), trie2withpruning.RootHash())
+	require.Equal(t, trie2.MaxDepth(), trie2withpruning.MaxDepth())
+
+	// now setting path2 to zero should do the pruning for two levels
+	trie22, err := trie.NewTrieWithUpdatedRegisters(trie2, []ledger.Path{path2}, []ledger.Payload{*emptyPayload}, false)
+	require.NoError(t, err)
+
+	trie22withpruning, err := trie.NewTrieWithUpdatedRegisters(trie2withpruning, []ledger.Path{path2}, []ledger.Payload{*emptyPayload}, true)
+	require.NoError(t, err)
+
+	require.Equal(t, trie22.RootHash(), trie22withpruning.RootHash())
+	require.True(t, trie22withpruning.RootNode().VerifyCachedHash())
+	require.Equal(t, trie22.MaxDepth()-2, trie22withpruning.MaxDepth())
+
 }
 
 func hashToString(hash ledger.RootHash) string {
