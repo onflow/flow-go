@@ -2,10 +2,11 @@ package epochs
 
 import (
 	"context"
+	"testing"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/stretchr/testify/suite"
-	"testing"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,6 +22,7 @@ func TestEpochs(t *testing.T) {
 // TestViewsProgress asserts epoch state transitions over two full epochs
 // without any nodes joining or leaving.
 func (s *Suite) TestViewsProgress() {
+	s.T().Skip("flaky test - quarantining")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -154,9 +156,9 @@ func (s *Suite) TestEpochJoin() {
 
 	found := false
 	for _, val := range approvedNodes.(cadence.Array).Values {
-			if string(val.(cadence.String)) == info.NodeID.String() {
-				found = true
-			}
+		if string(val.(cadence.String)) == info.NodeID.String() {
+			found = true
+		}
 	}
 
 	require.True(s.T(), found, "node id for new node not found in approved list after setting the approved list")

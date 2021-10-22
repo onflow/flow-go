@@ -335,10 +335,10 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
-	// sent out the the receiver
+	// sent out the receiver
 	stream, err := m.libP2PNode.CreateStream(ctx, peerID)
 	if err != nil {
-		return fmt.Errorf("failed to create stream for %s :%w", targetID, err)
+		return fmt.Errorf("failed to create stream for %s: %w", targetID, err)
 	}
 
 	// create a gogo protobuf writer
