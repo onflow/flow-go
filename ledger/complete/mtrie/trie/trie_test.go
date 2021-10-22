@@ -336,51 +336,76 @@ func Test_Pruning(t *testing.T) {
 	require.NoError(t, err)
 	fmt.Println(baseTrie.String())
 
-	// leaf update test
+	t.Run("leaf update with prunning test", func(t *testing.T) {
+		trie1, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, []ledger.Payload{*emptyPayload}, false)
+		require.NoError(t, err)
 
-	trie1, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, []ledger.Payload{*emptyPayload}, false)
-	require.NoError(t, err)
+		trie1withpruning, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, []ledger.Payload{*emptyPayload}, true)
+		require.NoError(t, err)
+		require.True(t, trie1withpruning.RootNode().VerifyCachedHash())
 
-	// after pruning
-	//                    n7
-	//                   / \
-	//                 /     \
-	//             n5         n6 (path6/payload6) // 1000
-	//            /  \
-	//          /      \
-	//         /         \
-	//     n3 (path2       n4 (path4
-	//        /payload2)      /payload4) // 01100...
+		// after pruning
+		//                    n7
+		//                   / \
+		//                 /     \
+		//             n5         n6 (path6/payload6) // 1000
+		//            /  \
+		//          /      \
+		//         /         \
+		//     n3 (path2       n4 (path4
+		//        /payload2)      /payload4) // 01100...
+		require.Equal(t, trie1.RootHash(), trie1withpruning.RootHash())
+		require.Equal(t, trie1.MaxDepth()-1, trie1withpruning.MaxDepth())
+	})
 
-	trie1withpruning, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, []ledger.Payload{*emptyPayload}, true)
-	require.NoError(t, err)
-	require.True(t, trie1withpruning.RootNode().VerifyCachedHash())
+	t.Run("leaf update with two level prunning test", func(t *testing.T) {
+		// setting path4 to zero from baseTrie
+		trie2, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, []ledger.Payload{*emptyPayload}, false)
+		require.NoError(t, err)
 
-	require.Equal(t, trie1.RootHash(), trie1withpruning.RootHash())
-	require.Equal(t, trie1.MaxDepth()-1, trie1withpruning.MaxDepth())
+		// this should not prune anything (non leaf example)
+		trie2withpruning, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, []ledger.Payload{*emptyPayload}, true)
+		require.NoError(t, err)
+		require.True(t, trie2withpruning.RootNode().VerifyCachedHash())
 
-	// middle leaf update (senario 2)
-	trie2, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, []ledger.Payload{*emptyPayload}, false)
-	require.NoError(t, err)
+		require.Equal(t, trie2.RootHash(), trie2withpruning.RootHash())
+		require.Equal(t, trie2.MaxDepth(), trie2withpruning.MaxDepth())
 
-	// this should not prune anything (non leaf example)
-	trie2withpruning, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, []ledger.Payload{*emptyPayload}, true)
-	require.NoError(t, err)
-	require.True(t, trie2withpruning.RootNode().VerifyCachedHash())
+		// now setting path2 to zero should do the pruning for two levels
+		trie22, err := trie.NewTrieWithUpdatedRegisters(trie2, []ledger.Path{path2}, []ledger.Payload{*emptyPayload}, false)
+		require.NoError(t, err)
 
-	require.Equal(t, trie2.RootHash(), trie2withpruning.RootHash())
-	require.Equal(t, trie2.MaxDepth(), trie2withpruning.MaxDepth())
+		trie22withpruning, err := trie.NewTrieWithUpdatedRegisters(trie2withpruning, []ledger.Path{path2}, []ledger.Payload{*emptyPayload}, true)
+		require.NoError(t, err)
 
-	// now setting path2 to zero should do the pruning for two levels
-	trie22, err := trie.NewTrieWithUpdatedRegisters(trie2, []ledger.Path{path2}, []ledger.Payload{*emptyPayload}, false)
-	require.NoError(t, err)
+		// after pruning
+		//                     n7
+		//                   /   \
+		//                 /       \
+		//             n5 (path1,   n6 (path6/payload6) // 1000
+		//                 /payload1)
 
-	trie22withpruning, err := trie.NewTrieWithUpdatedRegisters(trie2withpruning, []ledger.Path{path2}, []ledger.Payload{*emptyPayload}, true)
-	require.NoError(t, err)
+		require.Equal(t, trie22.RootHash(), trie22withpruning.RootHash())
+		require.True(t, trie22withpruning.RootNode().VerifyCachedHash())
+		require.Equal(t, trie22.MaxDepth()-2, trie22withpruning.MaxDepth())
 
-	require.Equal(t, trie22.RootHash(), trie22withpruning.RootHash())
-	require.True(t, trie22withpruning.RootNode().VerifyCachedHash())
-	require.Equal(t, trie22.MaxDepth()-2, trie22withpruning.MaxDepth())
+	})
+
+	t.Run("several updates at the same time", func(t *testing.T) {
+		// setting path4 to zero from baseTrie
+		trie3, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path2, path4, path6}, []ledger.Payload{*emptyPayload, *emptyPayload, *emptyPayload}, false)
+		require.NoError(t, err)
+
+		// this should prune two levels
+		trie3withpruning, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path2, path4, path6}, []ledger.Payload{*emptyPayload, *emptyPayload, *emptyPayload}, true)
+		require.NoError(t, err)
+
+		// after pruning
+		//                     n7  (path6/payload6) // 1000
+		require.Equal(t, trie3.RootHash(), trie3withpruning.RootHash())
+		require.True(t, trie3withpruning.RootNode().VerifyCachedHash())
+		require.Equal(t, trie3.MaxDepth()-3, trie3withpruning.MaxDepth())
+	})
 
 }
 
