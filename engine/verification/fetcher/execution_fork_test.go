@@ -29,23 +29,29 @@ func TestProcessDuplicateChunksWithDifferentResults(t *testing.T) {
 	// creates two results
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
 	block, resultA, statusA, resultB, statusB, collMap := executionResultForkFixture(t)
-	_, _, executorsA, executorsB := mockReceiptsBlockIDForConflictingResults(block.ID(), s.receipts, resultA, 2, resultB, 2)
-	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(len(locators))
+	_, _, executorsA, executorsB := mockReceiptsBlockIDForConflictingResults(t, block.ID(), s.receipts, resultA, resultB)
+	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(2)
+	assignedChunkStatuses := verification.ChunkStatusList{statusA, statusB}
 
 	// the chunks belong to an unsealed block.
 	mockBlockSealingStatus(s.state, s.headers, block, false)
 
 	// mocks resources on fetcher engine side.
-	mockResultsByIDs(s.results, results)
+	mockResultsByIDs(s.results, []*flow.ExecutionResult{resultA, resultB})
 	mockBlocksStorage(s.blocks, s.headers, block)
-	mockPendingChunksAdd(t, s.pendingChunks, statuses, true)
-	mockPendingChunksRem(t, s.pendingChunks, statuses, true)
-	mockPendingChunksGet(s.pendingChunks, statuses)
+	mockPendingChunksAdd(t, s.pendingChunks, assignedChunkStatuses, true)
+	mockPendingChunksRem(t, s.pendingChunks, assignedChunkStatuses, true)
+	mockPendingChunksGet(s.pendingChunks, assignedChunkStatuses)
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), executorsA.Union(executorsB))
 
 	// generates and mocks requesting chunk data pack fixture
-	requests := chunkRequestFixture(result.ID(), statuses.Chunks(), block.Header.Height, agrees, disagrees)
-	chunkDataPacks, verifiableChunks := verifiableChunkFixture(t, statuses.Chunks(), block, result, collMap)
+	requestA := chunkRequestFixture(resultA.ID(), statusA, executorsA, executorsB)
+	requestB := chunkRequestFixture(resultB.ID(), statusB, executorsB, executorsA)
+	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
+	requests[requestA.ID()] = requestA
+	requests[requestB.ID()] = requestB
+
+	chunkDataPacks, verifiableChunks := verifiableChunkFixture(t, flow.ChunkList{statusA.Chunk(), statusB.Chunk()}, block, result, collMap)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
 	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(requests))
@@ -61,16 +67,22 @@ func TestProcessDuplicateChunksWithDifferentResults(t *testing.T) {
 	// chunk data responses, and notify the consumer that it is done with processing chunk.
 	s.metrics.On("OnVerifiableChunkSentToVerifier").Return().Times(len(verifiableChunks))
 	verifierWG := mockVerifierEngine(t, s.verifier, verifiableChunks)
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators))
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(assignedChunkStatuses))
 
 	// passes chunk data requests in parallel.
 	processWG := &sync.WaitGroup{}
-	processWG.Add(len(locators))
-	for _, locator := range locators {
+	processWG.Add(len(assignedChunkStatuses))
+	for _, status := range assignedChunkStatuses {
+		locator := &chunks.Locator{
+			Index:    status.ChunkIndex,
+			ResultID: status.ExecutionResult.ID(),
+		}
+
 		go func(l *chunks.Locator) {
 			e.ProcessAssignedChunk(l)
 			processWG.Done()
 		}(locator)
+
 	}
 
 	unittest.RequireReturnsBefore(t, requesterWg.Wait, 1*time.Second, "could not handle received chunk data pack on time")
@@ -127,10 +139,14 @@ func executionResultForkFixture(t *testing.T) (*flow.Block,
 		BlockHeight:     block.Header.Height,
 	}
 
+	// although chunk statuses should have the same chunk ID,
+	// they should have distinct identifiers themselves.
+	require.Equal(t, statusA.ChunkID(), statusB.ChunkID())
+	require.NotEqual(t, statusA.ID(), statusB.ID())
+
 	// keeps collections of assigned chunks
 	collMap := make(map[flow.Identifier]*flow.Collection)
 	collMap[statusA.ChunkID()] = collections[0]
-	collMap[statusB.ChunkID()] = collections[1]
 
 	return block, resultA, statusA, resultB, statusB, collMap
 }
