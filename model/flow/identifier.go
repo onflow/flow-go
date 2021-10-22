@@ -110,7 +110,7 @@ func MakeID(entity interface{}) Identifier {
 	//binstat.LeaveVal(bs1, int64(len(data)))
 	//bs2 := binstat.EnterTimeVal(binstat.BinMakeID+".??lock.Hash", int64(len(data)))
 	var id Identifier
-	hash.ComputeSHA3_256(id[:], data)
+	hash.ComputeSHA3_256((*[32]byte)(&id), data)
 	//binstat.Leave(bs2)
 	return id
 }
@@ -119,7 +119,7 @@ func MakeID(entity interface{}) Identifier {
 func PublicKeyToID(pk crypto.PublicKey) (Identifier, error) {
 	var id Identifier
 	pkBytes := pk.Encode()
-	hash.ComputeSHA3_256(id[:], pkBytes)
+	hash.ComputeSHA3_256((*[32]byte)(&id), pkBytes)
 	return id, nil
 }
 

@@ -169,8 +169,9 @@ func TestSha3(t *testing.T) {
 			assert.Equal(t, expected[:], []byte(h))
 
 			// test hash computation using the light api
-			ComputeSHA3_256(h, value)
-			assert.Equal(t, expected[:], []byte(h))
+			var res [HashLenSha3_256]byte
+			ComputeSHA3_256(&res, value)
+			assert.Equal(t, expected[:], res[:])
 		}
 	})
 
@@ -221,10 +222,10 @@ func BenchmarkComputeHash(b *testing.B) {
 	})
 
 	b.Run("SHA3_256_light", func(b *testing.B) {
-		h := make([]byte, HashLenSha3_256)
+		var h [HashLenSha3_256]byte
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			ComputeSHA3_256(h, m)
+			ComputeSHA3_256(&h, m)
 		}
 		b.StopTimer()
 	})
