@@ -4,6 +4,9 @@ import (
 	"encoding/hex"
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+
 	"github.com/onflow/cadence"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -16,7 +19,7 @@ import (
 //	 HashAlgo:   hash.SHA2_256,
 // }
 
-const ServiceAccountPrivateKeyHex = "e3a08ae3d0461cfed6d6f49bfc25fa899351c39d1bd21fdba8c87595b6c49bb4cc430201"
+const ServiceAccountPrivateKeyHex = "8ae3d0461cfed6d6f49bfc25fa899351c39d1bd21fdba8c87595b6c49bb4cc43"
 
 // Pre-calculated state commitment with root account with the above private key
 const GenesisStateCommitmentHex = "0a05e884b52abd732a09a917b24138dffc1f83d1e92f9f6e2f2fb115381292af"
@@ -51,7 +54,12 @@ func init() {
 		panic("error while hex decoding hardcoded root key")
 	}
 
-	ServiceAccountPrivateKey, err = flow.DecodeAccountPrivateKey(serviceAccountPrivateKeyBytes)
+	ServiceAccountPrivateKey := flow.AccountPrivateKey{
+		SignAlgo: crypto.ECDSAP256,
+		HashAlgo: hash.SHA2_256,
+	}
+	ServiceAccountPrivateKey.PrivateKey, err = crypto.DecodePrivateKey(
+		ServiceAccountPrivateKey.SignAlgo, serviceAccountPrivateKeyBytes)
 	if err != nil {
 		panic("error while decoding hardcoded root key bytes")
 	}
