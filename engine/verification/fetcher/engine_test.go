@@ -202,12 +202,11 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 	// trying to remove the pending status fails.
 	mockPendingChunksRem(t, s.pendingChunks, statuses, false)
 
-	chunk := statuses.Chunks()[0]
-	chunkID := chunk.ID()
+	status := statuses[0]
 	chunkDataPacks, _ := verifiableChunksFixture(t, statuses, block, result, collMap)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Once()
-	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkID])
+	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[status.ID()])
 
 	// no verifiable chunk should be passed to verifier engine
 	// and chunk consumer should not get any notification
