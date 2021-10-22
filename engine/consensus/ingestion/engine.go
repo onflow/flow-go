@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-// maximum capacity of pending events queue, everything above will be dropped
+// defaultGuaranteeQueueCapacity maximum capacity of pending events queue, everything above will be dropped
 const defaultGuaranteeQueueCapacity = 1000
 
 // defaultIngestionEngineWorkers number of goroutines engine will use for processing events
@@ -51,6 +51,7 @@ func New(
 
 	guaranteesQueue, err := fifoqueue.NewFifoQueue(
 		fifoqueue.WithCapacity(defaultGuaranteeQueueCapacity),
+		fifoqueue.WithLengthObserver(func(len int) { core.mempool.MempoolEntries(metrics.ResourceCollectionGuaranteesQueue, uint(len)) }),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("could not create guarantees queue: %w", err)
