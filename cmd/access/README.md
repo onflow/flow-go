@@ -1,6 +1,6 @@
 # Access Node
 
-The access node provides a single point of contact to interact with the Flow network. It implements the [Access API](https://onflow.org/docs/access-api)
+The access node provides a single point of contact to interact with the Flow network. It implements the [Access API](https://docs.onflow.org/access-api/)
 
 It is a GRPC server which also connects to a collection node and an execution node via GRPC.
 
@@ -40,10 +40,10 @@ At a high level it does the following:
 ## Processes
 
 ### Transaction Lifecycle
-1. Transactions are received by the access node via the [SendTransaction API call](https://onflow.org/docs/access-api#sendtransaction).
+1. Transactions are received by the access node via the [SendTransaction API call](https://docs.onflow.org/access-api/#sendtransaction).
 2. The access node forwards the transaction to one of the Collection node in the Collection node cluster to which this transaction belongs to and stores it locally as well.
-3. If a [GetTransaction](https://onflow.org/docs/access-api#gettransaction) request is received, the transaction is read from local storage and returned if found.
-4. If a [GetTransactionResult](https://onflow.org/docs/access-api#gettransactionresult) request is received,
+3. If a [GetTransaction](https://docs.onflow.org/access-api/#gettransaction) request is received, the transaction is read from local storage and returned if found.
+4. If a [GetTransactionResult](https://docs.onflow.org/access-api/#gettransactionresult) request is received,
 an execution node is requested for events for the transaction and the transaction status is derived as follows:
     1. If the collection containing the transaction and the block containing that collection is found locally, but the transaction has expired then its status is returned as `expired`.
     2. If either the collection or the block is not found locally, but the transaction has not expired, then its status is returned as `pending`
@@ -73,7 +73,7 @@ The `requester` engine requests collections from the collection nodes on behalf 
 
 ### [RPC](../../engine/access/rpc)
 
-The `rpc` engine is the GRPC server which responds to the [Access API](https://onflow.org/docs/access-api) requests from clients.
+The `rpc` engine is the GRPC server which responds to the [Access API](https://docs.onflow.org/access-api/) requests from clients.
 It also supports GRPCWebproxy requests.
 
 ### [Ping](../../engine/access/ping)
