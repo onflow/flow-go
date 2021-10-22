@@ -311,12 +311,10 @@ func (e *Engine) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	// that the guarantors are all from the same cluster.
 
 	// ensure the guarantors are from the same cluster
-	clusterLookup := cluster.Lookup()
-
 	clusterLookup := cluster.Sort(order.ByNodeIDAsc)
 
 	for _, guarantorID := range guarantors {
-		exists := clusterLookup.Exists(guarantorID, order.ByNodeIDAsc)
+		exists := clusterLookup.IdentifierExists(guarantorID, order.ByIdentifierAsc)
 		if !exists {
 			return engine.NewInvalidInputError("inconsistent guarantors from different clusters")
 		}

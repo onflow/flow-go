@@ -278,6 +278,9 @@ type IdentityFilter func(*Identity) bool
 // IdentityOrder is a sort for identities.
 type IdentityOrder func(*Identity, *Identity) bool
 
+// IdentifierOrder is a sort for identifiers.
+type IdentifierOrder func(Identifier, Identifier) bool
+
 // IdentityMapFunc is a modifier function for map operations for identities.
 // Identities are COPIED from the source slice.
 type IdentityMapFunc func(Identity) Identity
@@ -512,15 +515,42 @@ func (il IdentityList) EqualTo(other IdentityList) bool {
 // Exists takes a previously sorted Identity list and searches it for the target value
 // target:  value to search for
 // less:    the algorithm to use as a comparator
-func (il IdentityList) Exists(target Identity, less IdentityOrder) bool {
+func (il IdentityList) Exists(target *Identity, less IdentityOrder) bool {
 	left := 0
 	lenList := len(il)
 	right := lenList - 1
 	mid := int(uint(lenList) >> 1)
 	for {
+		// use the 'less' function in the order package
 		if less(il[mid], target) {
 			left = mid + 1
 		} else if il[mid].NodeID == target.NodeID {
+			return true
+		} else {
+			right = mid
+		}
+
+		if left > right {
+			return false
+		}
+
+		mid = int(uint(left+right) >> 1)
+	}
+}
+
+// Exists takes a previously sorted Identity list and searches it for the target value
+// target:  value to search for
+// less:    the algorithm to use as a comparator
+func (il IdentityList) IdentifierExists(target Identifier, less IdentifierOrder) bool {
+	left := 0
+	lenList := len(il)
+	right := lenList - 1
+	mid := int(uint(lenList) >> 1)
+	for {
+		// use the 'less' function in the order package
+		if less(il[mid].NodeID, target) {
+			left = mid + 1
+		} else if il[mid].NodeID == target {
 			return true
 		} else {
 			right = mid
