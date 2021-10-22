@@ -169,16 +169,12 @@ func (n *Node) Prunned() (*Node, bool) {
 	// if non leaf bubble up
 	lChildEmpty := true
 	rChildEmpty := true
-	var prunnedLChild, prunnedRChild *Node
 	var lChildChanged, rChildChanged bool
-	// TODO We probably don't need to do this and for tests we need to update only
 	if n.lChild != nil {
-		prunnedLChild, lChildChanged = n.lChild.Prunned()
-		lChildEmpty = prunnedLChild.IsADefaultNode()
+		lChildEmpty = n.lChild.IsADefaultNode()
 	}
 	if n.rChild != nil {
-		prunnedRChild, rChildChanged = n.rChild.Prunned()
-		rChildEmpty = prunnedRChild.IsADefaultNode()
+		rChildEmpty = n.rChild.IsADefaultNode()
 	}
 	if rChildEmpty && lChildEmpty {
 		// is like a leaf
@@ -186,9 +182,9 @@ func (n *Node) Prunned() (*Node, bool) {
 	}
 
 	// if childNode is non empty
-	if !lChildEmpty && rChildEmpty && prunnedLChild.IsLeaf() {
+	if !lChildEmpty && rChildEmpty && n.lChild.IsLeaf() {
 		// TODO merge these two methods
-		l := prunnedLChild.deepCopy()
+		l := n.lChild.deepCopy()
 		l.hashValue = hash.HashInterNode(l.hashValue, ledger.GetDefaultHashForHeight(l.height))
 		l.height = l.height + 1
 		l.maxDepth = l.maxDepth - 1
@@ -196,9 +192,9 @@ func (n *Node) Prunned() (*Node, bool) {
 		// bubble up all children and return as parent
 		return l, true
 	}
-	if lChildEmpty && !rChildEmpty && prunnedRChild.IsLeaf() {
+	if lChildEmpty && !rChildEmpty && n.rChild.IsLeaf() {
 		// TODO merge these two methods
-		r := prunnedRChild.deepCopy()
+		r := n.rChild.deepCopy()
 		r.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(r.height), r.hashValue)
 		r.height = r.height + 1
 		r.maxDepth = r.maxDepth - 1
@@ -207,7 +203,7 @@ func (n *Node) Prunned() (*Node, bool) {
 	}
 
 	if lChildChanged || rChildChanged {
-		return NewInterimNode(n.height, prunnedLChild, prunnedRChild), true
+		return NewInterimNode(n.height, n.lChild, n.rChild), true
 	}
 	// else no change needed
 	return n, false
