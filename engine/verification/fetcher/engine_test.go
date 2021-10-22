@@ -413,15 +413,14 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
 	// also the chunk belongs to an unsealed block.
 	block, result, statuses, _, collMap := completeChunkStatusListFixture(t, 2, 1)
-	chunk := statuses.Chunks()[0]
-	chunkID := chunk.ID()
+	status := statuses[0]
 	responses, _ := verifiableChunksFixture(t, statuses, block, result, collMap)
 
 	// mocks there is no pending status for this chunk at fetcher engine.
-	s.pendingChunks.On("Get", chunk.Index, result.ID()).Return(nil, false)
+	s.pendingChunks.On("Get", status.ChunkIndex, result.ID()).Return(nil, false)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(responses))
-	e.HandleChunkDataPack(unittest.IdentifierFixture(), responses[chunkID])
+	e.HandleChunkDataPack(unittest.IdentifierFixture(), responses[status.ID()])
 
 	mock.AssertExpectationsForObjects(t, s.pendingChunks, s.metrics)
 
@@ -740,13 +739,13 @@ func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 			actualRequest, ok := args[0].(*verification.ChunkDataPackRequest)
 			require.True(t, ok)
 
-			expectedRequest, ok := requests[actualRequest.ChunkID]
+			expectedRequest, ok := requests[actualRequest.ID()]
 			require.True(t, ok, "requester received an unexpected chunk request")
 
 			require.Equal(t, *expectedRequest, *actualRequest)
 
 			go func() {
-				response, ok := responses[actualRequest.ChunkID]
+				response, ok := responses[actualRequest.ID()]
 				require.True(t, ok)
 
 				handler(actualRequest.Agrees[0], response)
@@ -770,7 +769,7 @@ func chunkDataPackResponsesFixture(t *testing.T,
 		coll, ok := collMap[chunkID]
 		// only non-system chunks must have a collection
 		require.Equal(t, ok, !fetcher.IsSystemChunk(status.ChunkIndex, result))
-		responses[chunkID] = chunkDataPackResponseFixture(t, status, coll, result)
+		responses[status.ID()] = chunkDataPackResponseFixture(t, status, coll, result)
 	}
 
 	return responses
@@ -811,9 +810,8 @@ func verifiableChunksFixture(t *testing.T,
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
 	for _, status := range statuses {
 		statusID := status.ID()
-		chunkID := status.Chunk().ID()
 
-		response, ok := responses[chunkID]
+		response, ok := responses[status.ID()]
 		require.True(t, ok, "missing chunk data pack")
 
 		// to account for duplicate chunks on execution result forks
@@ -858,7 +856,7 @@ func chunkRequestsFixture(
 
 	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
 	for _, status := range statuses {
-		requests[status.ChunkID()] = chunkRequestFixture(resultID, status, agrees, disagrees)
+		requests[status.ID()] = chunkRequestFixture(resultID, status, agrees, disagrees)
 	}
 
 	return requests
