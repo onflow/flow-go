@@ -21,4 +21,13 @@ func (c Locator) Checksum() flow.Identifier {
 	return flow.MakeID(c)
 }
 
+// ChunkLocatorID is a util function that returns identifier of corresponding chunk locator to
+// the specified result and chunk index.
+func ChunkLocatorID(resultID flow.Identifier, chunkIndex uint64) flow.Identifier {
+	return Locator{
+		ResultID: resultID,
+		Index:    chunkIndex,
+	}.ID()
+}
+
 type LocatorList []*Locator
