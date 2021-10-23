@@ -26,7 +26,7 @@ var (
 )
 
 func initCommittee(n int) (identities flow.IdentityList, locals []module.Local) {
-	privateStakingKeys, _ := unittest.StakingKeys(n)
+	privateStakingKeys := unittest.StakingKeys(n)
 	for i, key := range privateStakingKeys {
 		id := unittest.IdentityFixture(unittest.WithStakingPubKey(key.PublicKey()))
 		identities = append(identities, id)

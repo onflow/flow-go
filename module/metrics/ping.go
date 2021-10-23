@@ -10,8 +10,9 @@ import (
 )
 
 type PingCollector struct {
-	reachable    *prometheus.GaugeVec
-	sealedHeight *prometheus.GaugeVec
+	reachable       *prometheus.GaugeVec
+	sealedHeight    *prometheus.GaugeVec
+	hotstuffCurView *prometheus.GaugeVec
 }
 
 func NewPingCollector() *PingCollector {
@@ -28,6 +29,12 @@ func NewPingCollector() *PingCollector {
 			Subsystem: subsystemGossip,
 			Help:      "the last sealed height of a node",
 		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo, LabelNodeVersion}),
+		hotstuffCurView: promauto.NewGaugeVec(prometheus.GaugeOpts{
+			Name:      "hotstuff_curview",
+			Namespace: namespaceNetwork,
+			Subsystem: subsystemGossip,
+			Help:      "the hotstuff current view",
+		}, []string{LabelNodeID, LabelNodeAddress, LabelNodeRole, LabelNodeInfo}),
 	}
 
 	return pc
@@ -49,7 +56,7 @@ func (pc *PingCollector) NodeReachable(node *flow.Identity, nodeInfo string, rtt
 		Set(rttValue)
 }
 
-func (pc *PingCollector) NodeInfo(node *flow.Identity, nodeInfo string, version string, sealedHeight uint64) {
+func (pc *PingCollector) NodeInfo(node *flow.Identity, nodeInfo string, version string, sealedHeight uint64, hotstuffCurView uint64) {
 	pc.sealedHeight.With(prometheus.Labels{
 		LabelNodeID:      node.NodeID.String(),
 		LabelNodeAddress: node.Address,
@@ -57,4 +64,11 @@ func (pc *PingCollector) NodeInfo(node *flow.Identity, nodeInfo string, version 
 		LabelNodeInfo:    nodeInfo,
 		LabelNodeVersion: version}).
 		Set(float64(sealedHeight))
+
+	pc.hotstuffCurView.With(prometheus.Labels{
+		LabelNodeID:      node.NodeID.String(),
+		LabelNodeAddress: node.Address,
+		LabelNodeInfo:    nodeInfo,
+	}).
+		Set(float64(hotstuffCurView))
 }
