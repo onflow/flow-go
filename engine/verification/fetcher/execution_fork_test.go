@@ -1,6 +1,7 @@
 package fetcher_test
 
 import (
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -50,13 +51,23 @@ func TestProcessDuplicateChunksWithDifferentResults(t *testing.T) {
 	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
 	requests[requestA.ID()] = requestA
 	requests[requestB.ID()] = requestB
+	fmt.Printf("requestA: %v \n", requestA)
+	fmt.Printf("requestB: %v \n", requestB)
 
-	chunkDataPacks, verifiableChunks := verifiableChunkFixture(t, flow.ChunkList{statusA.Chunk(), statusB.Chunk()}, block, result, collMap)
+	// chunk data responses
+	chunkDataResponse := make(map[flow.Identifier]*verification.ChunkDataPackResponse)
+	chunkDataResponse[statusA.ID()] = chunkDataPackResponseFixture(t, statusA, collMap[statusA.Chunk().ID()], resultA)
+	chunkDataResponse[statusB.ID()] = chunkDataPackResponseFixture(t, statusB, collMap[statusA.Chunk().ID()], resultB)
+
+	// verifiable chunks
+	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
+	verifiableChunks[statusA.ID()] = verifiableChunkFixture(t, statusA.Chunk(), block, resultA, chunkDataResponse[statusA.ID()].Cdp)
+	verifiableChunks[statusB.ID()] = verifiableChunkFixture(t, statusA.Chunk(), block, resultB, chunkDataResponse[statusB.ID()].Cdp)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
 	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(requests))
-	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataPacks))
-	requesterWg := mockRequester(t, s.requester, requests, chunkDataPacks,
+	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataResponse))
+	requesterWg := mockRequester(t, s.requester, requests, chunkDataResponse,
 		func(originID flow.Identifier, response *verification.ChunkDataPackResponse) {
 
 			// mocks replying to the requests by sending a chunk data pack.
