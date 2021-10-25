@@ -105,7 +105,7 @@ func NewNetwork(
 	o.mw.SetOverlay(o)
 
 	o.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		AddWorker("start middleware", func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 			// setup the message queue
 			// create priority queue
 			o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, metrics)
@@ -118,7 +118,7 @@ func NewNetwork(
 
 			ready()
 		}).
-		AddWorker(func(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		AddWorker("register request handler", func(parent irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 			ready()
 
 			for {

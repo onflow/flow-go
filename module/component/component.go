@@ -152,42 +152,49 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 }
 
 type ReadyFunc func()
+type LookupFunc func(workerID string) (module.ReadyDoneAware, bool)
 
 // ComponentWorker represents a worker routine of a component.
 // It takes a SignalerContext which can be used to throw any irrecoverable errors it encouters,
 // as well as a ReadyFunc which must be called to signal that it is ready. The ComponentManager
 // waits until all workers have signaled that they are ready before closing its own Ready channel.
-type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
+type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc, lookup LookupFunc)
 
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
 	// AddWorker adds a worker routine for the ComponentManager
-	AddWorker(ComponentWorker) ComponentManagerBuilder
+	AddWorker(string, ComponentWorker) ComponentManagerBuilder
 
 	// Build builds and returns a new ComponentManager instance
 	Build() *ComponentManager
 }
 
 type componentManagerBuilderImpl struct {
-	workers []ComponentWorker
+	workers         []*worker
+	workersRegistry map[string]module.ReadyDoneAware
 }
 
 // NewComponentManagerBuilder returns a new ComponentManagerBuilder
 func NewComponentManagerBuilder() ComponentManagerBuilder {
-	return &componentManagerBuilderImpl{}
+	return &componentManagerBuilderImpl{
+		workersRegistry: make(map[string]module.ReadyDoneAware),
+	}
 }
 
-func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
+func (c *componentManagerBuilderImpl) AddWorker(id string, f ComponentWorker) ComponentManagerBuilder {
+	worker := newWorker(id, f)
 	c.workers = append(c.workers, worker)
+	c.workersRegistry[id] = worker
 	return c
 }
 
 func (c *componentManagerBuilderImpl) Build() *ComponentManager {
 	return &ComponentManager{
-		started: atomic.NewBool(false),
-		ready:   make(chan struct{}),
-		done:    make(chan struct{}),
-		workers: c.workers,
+		started:         atomic.NewBool(false),
+		ready:           make(chan struct{}),
+		done:            make(chan struct{}),
+		workers:         c.workers,
+		workersRegistry: c.workersRegistry,
 	}
 }
 
@@ -200,13 +207,8 @@ type ComponentManager struct {
 	done           chan struct{}
 	shutdownSignal <-chan struct{}
 
-	serial  bool
-	workers []ComponentWorker
-}
-
-// SetSerial configures Start to run ComponentWorker functions serially in the order they were added
-func (c *ComponentManager) SetSerial(serial bool) {
-	c.serial = serial
+	workers         []*worker
+	workersRegistry map[string]module.ReadyDoneAware
 }
 
 // Start initiates the ComponentManager by launching all worker routines.
@@ -244,23 +246,24 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 		var workersReady sync.WaitGroup
 		var workersDone sync.WaitGroup
 		workersDone.Add(len(c.workers))
+		workersReady.Add(len(c.workers))
 
 		// launch workers
 		for _, worker := range c.workers {
 			worker := worker
-			workersReady.Add(1)
 			go func() {
 				defer workersDone.Done()
 				var readyOnce sync.Once
-				worker(signalerCtx, func() {
-					readyOnce.Do(func() {
-						workersReady.Done()
-					})
-				})
+				worker.run(
+					signalerCtx,
+					func() {
+						readyOnce.Do(func() {
+							workersReady.Done()
+						})
+					},
+					c.lookupWorker,
+				)
 			}()
-			if c.serial {
-				workersReady.Wait()
-			}
 		}
 
 		// launch goroutine to close ready channel
@@ -271,6 +274,11 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	} else {
 		panic(module.ErrMultipleStartup)
 	}
+}
+
+func (c *ComponentManager) lookupWorker(id string) (module.ReadyDoneAware, bool) {
+	worker, exists := c.workersRegistry[id]
+	return worker, exists
 }
 
 func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
@@ -301,4 +309,44 @@ func (c *ComponentManager) Done() <-chan struct{} {
 // If this is called before Start, a nil channel will be returned.
 func (c *ComponentManager) ShutdownSignal() <-chan struct{} {
 	return c.shutdownSignal
+}
+
+type worker struct {
+	id    string
+	f     ComponentWorker
+	ready chan struct{}
+	done  chan struct{}
+}
+
+func newWorker(id string, f ComponentWorker) *worker {
+	return &worker{
+		id:    id,
+		f:     f,
+		ready: make(chan struct{}),
+		done:  make(chan struct{}),
+	}
+}
+
+// run call the worker's ComponentWorker function, and manages the ReadyDoneAware interface
+func (w *worker) run(ctx irrecoverable.SignalerContext, ready ReadyFunc, lookup LookupFunc) {
+	defer close(w.done)
+	var readyOnce sync.Once
+	w.f(ctx, func() {
+		readyOnce.Do(func() {
+			close(w.ready)
+			ready()
+		})
+	}, lookup)
+}
+
+// Ready returns a channel which is closed once all the worker routines have been launched and are ready.
+// If any worker routines exit before they indicate that they are ready, the channel returned from Ready will never close.
+func (w *worker) Ready() <-chan struct{} {
+	return w.ready
+}
+
+// Done returns a channel which is closed once the worker has shut down.
+// This happens when all worker routines have shut down (either gracefully or by throwing an error).
+func (w *worker) Done() <-chan struct{} {
+	return w.done
 }

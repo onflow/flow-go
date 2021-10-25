@@ -2,7 +2,6 @@ package node_builder
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
@@ -33,7 +32,7 @@ func newUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p
 	}
 
 	connector.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		AddWorker("main", func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 			select {
 			case <-ctx.Done():
 				return
@@ -43,8 +42,6 @@ func newUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p
 			go connector.onStart(ctx)
 
 			ready()
-
-			<-ctx.Done()
 		}).Build()
 
 	return connector
@@ -98,9 +95,9 @@ func (connector *upstreamConnector) onStart(parent irrecoverable.SignalerContext
 	err := errors.ErrorOrNil()
 	// no point continuing further since the unstaked AN cannot connect to any of the bootstrap peers
 
-	parent.Throw(irrecoverable.NewRecoverableError(fmt.Errorf("Failed to connect to a bootstrap node. "+
+	parent.Throw(irrecoverable.WrapRecoverable("Failed to connect to a bootstrap node. "+
 		"Please ensure the network address and public key of the bootstrap access node are correct "+
-		"and that the node is running and reachable. error: %w", err)))
+		"and that the node is running and reachable. error: %w", err))
 
 }
 

@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
@@ -130,7 +129,6 @@ func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessN
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
 	}
-	nodeBuilder.Build()
 
 	return nodeBuilder, nil
 }
@@ -139,7 +137,7 @@ type ConsensusFollowerImpl struct {
 	NodeBuilder *access.UnstakedAccessNodeBuilder
 	consumersMu sync.RWMutex
 	consumers   []pubsub.OnBlockFinalizedConsumer
-	*component.ComponentManager
+	node        cmd.Node
 }
 
 // NewConsensusFollower creates a new consensus follower.
@@ -166,39 +164,45 @@ func NewConsensusFollower(
 		return nil, err
 	}
 
-	consensusFollower := &ConsensusFollowerImpl{NodeBuilder: anb}
+	cf := &ConsensusFollowerImpl{NodeBuilder: anb}
 	anb.BaseConfig.NodeRole = "consensus_follower"
 
-	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
+	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(cf.onBlockFinalized)
 
-	consensusFollower.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-			}
+	cf.node = anb.Build().(*cmd.FlowNodeImp)
+	go func() {
+		select {
+		case <-cf.node.Ready():
+			anb.Logger.Info().Msg("Access node startup complete")
+		case <-cf.node.ShutdownSignal():
+			anb.Logger.Info().Msg("Access node startup aborted")
+			return
+		}
+	}()
+	go func() {
+		<-cf.node.ShutdownSignal()
+		anb.Logger.Info().Msg("Access node shutting down")
+		<-cf.node.Done()
+		anb.Logger.Info().Msg("Access node shutdown complete")
+	}()
 
-			go anb.Start(ctx)
+	return cf, nil
+}
 
-			select {
-			case <-anb.Ready():
-				anb.Logger.Info().Msg("Access node startup complete")
-			case <-ctx.Done():
-				anb.Logger.Info().Msg("Access node startup aborted")
-				return
-			}
+func (cf *ConsensusFollowerImpl) Start(parent irrecoverable.SignalerContext) {
+	cf.node.Start(parent)
+}
 
-			ready()
+func (cf *ConsensusFollowerImpl) Ready() <-chan struct{} {
+	return cf.node.Ready()
+}
 
-			<-anb.ShutdownSignal()
-			anb.Logger.Info().Msg("Access node shutting down")
-			<-anb.Done()
-			anb.Logger.Info().Msg("Access node shutdown complete")
-		}).Build()
-	consensusFollower.ComponentManager.SetSerial(true)
+func (cf *ConsensusFollowerImpl) Done() <-chan struct{} {
+	return cf.node.Done()
+}
 
-	return consensusFollower, nil
+func (cf *ConsensusFollowerImpl) ShutdownSignal() <-chan struct{} {
+	return cf.node.ShutdownSignal()
 }
 
 // onBlockFinalized relays the block finalization event to all registered consumers.

@@ -10,10 +10,8 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -80,7 +78,7 @@ type Storage struct {
 }
 
 type namedModuleFunc struct {
-	fn   func(builder NodeBuilder, nodeConfig *NodeConfig) error
+	fn   func(ctx irrecoverable.SignalerContext, nodeConfig *NodeConfig) error
 	name string
 }
 
@@ -95,11 +93,10 @@ type namedModuleFunc struct {
 // of the process in case of nodes such as the unstaked access node where the NodeInfo is not part of the genesis data
 type FlowNodeBuilder struct {
 	*NodeConfig
-	*component.ComponentManager
 	flags                    *pflag.FlagSet
 	modules                  []namedModuleFunc
-	preInitFns               []func(NodeBuilder, *NodeConfig)
-	postInitFns              []func(NodeBuilder, *NodeConfig)
+	preInitFns               []func(irrecoverable.SignalerContext, *NodeConfig)
+	postInitFns              []func(irrecoverable.SignalerContext, *NodeConfig)
 	extraFlagCheck           func() error
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
 	componentBuilder         component.ComponentManagerBuilder
@@ -144,7 +141,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.CriticalComponent("network", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+	fnb.CriticalComponent("network", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 		codec := cborcodec.NewCodec()
 
@@ -272,7 +269,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
-	fnb.CriticalComponent("metrics server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+	fnb.CriticalComponent("metrics server", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
 		return server, nil
 	})
@@ -285,7 +282,7 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
 		}
 		fnb.RegisterDefaultAdminCommands()
-		fnb.CriticalComponent("admin server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+		fnb.CriticalComponent("admin server", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			var opts []admin.CommandRunnerOption
 
 			if node.AdminCert != NotSet {
@@ -321,7 +318,7 @@ func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueTracer() {
-	fnb.CriticalComponent("tracer", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+	fnb.CriticalComponent("tracer", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		return fnb.Tracer, nil
 	})
 }
@@ -430,7 +427,7 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		}
 
 		// registers mempools as a CriticalComponent so that its Ready method is invoked upon startup
-		fnb.CriticalComponent("mempools metrics", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+		fnb.CriticalComponent("mempools metrics", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			return mempools, nil
 		})
 	}
@@ -447,7 +444,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 		fnb.BaseConfig.profilerDuration,
 	)
 	fnb.MustNot(err).Msg("could not initialize profiler")
-	fnb.CriticalComponent("profiler", func(node NodeBuilder, nodeConfig *NodeConfig) (module.ReadyDoneAware, error) {
+	fnb.CriticalComponent("profiler", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		return profiler, nil
 	})
 }
@@ -565,7 +562,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 }
 
 func (fnb *FlowNodeBuilder) InitIDProviders() {
-	fnb.Module("id providers", func(builder NodeBuilder, node *NodeConfig) error {
+	fnb.Module("id providers", func(ctx irrecoverable.SignalerContext, node *NodeConfig) error {
 		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
 			return err
@@ -743,7 +740,7 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 }
 
 func (fnb *FlowNodeBuilder) handleModule(ctx irrecoverable.SignalerContext, v namedModuleFunc) {
-	if err := v.fn(fnb, fnb.NodeConfig); err != nil {
+	if err := v.fn(ctx, fnb.NodeConfig); err != nil {
 		ctx.Throw(fmt.Errorf("module %s initialization failed: %w", v.name, err))
 	}
 
@@ -757,7 +754,7 @@ func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) NodeBuilder {
 }
 
 // Module enables setting up dependencies of the engine with the builder context.
-func (fnb *FlowNodeBuilder) Module(name string, f func(builder NodeBuilder, node *NodeConfig) error) NodeBuilder {
+func (fnb *FlowNodeBuilder) Module(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig) error) NodeBuilder {
 	fnb.modules = append(fnb.modules, namedModuleFunc{
 		fn:   f,
 		name: name,
@@ -791,12 +788,19 @@ func (fnb *FlowNodeBuilder) MustNot(err error) *zerolog.Event {
 // When the node is run, this component will be started with `Ready`. When the
 // node is stopped, we will wait for the component to exit gracefully with
 // `Done`.
-func (fnb *FlowNodeBuilder) CriticalComponent(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder {
+func (fnb *FlowNodeBuilder) CriticalComponent(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error)) NodeBuilder {
 
-	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	fnb.componentBuilder.AddWorker(name, func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
+		modules, _ := lookup("modules")
+		select {
+		case <-modules.Ready():
+		case <-ctx.Done():
+			return
+		}
+
 		log := fnb.Logger.With().Str("component", name).Logger()
 
-		readyAware, err := f(fnb, fnb.NodeConfig)
+		readyAware, err := f(ctx, fnb.NodeConfig, lookup)
 		if err != nil {
 			ctx.Throw(fmt.Errorf("component %s initialization failed: %w", name, err))
 		}
@@ -833,13 +837,20 @@ func (fnb *FlowNodeBuilder) CriticalComponent(name string, f func(builder NodeBu
 // Use Component if the component can/should be restarted when an irrecoverable error is encountered
 //
 // Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-func (fnb *FlowNodeBuilder) Component(name string, f func(builder NodeBuilder, node *NodeConfig) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder {
+func (fnb *FlowNodeBuilder) Component(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder {
 
-	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	fnb.componentBuilder.AddWorker(name, func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
+		modules, _ := lookup("modules")
+		select {
+		case <-modules.Ready():
+		case <-ctx.Done():
+			return
+		}
+
 		log := fnb.Logger.With().Str("component", name).Logger()
 
 		componentFactory := func() (component.Component, error) {
-			c, err := f(fnb, fnb.NodeConfig)
+			c, err := f(ctx, fnb.NodeConfig, lookup)
 			if err != nil {
 				return nil, err
 			}
@@ -882,12 +893,12 @@ func (fnb *FlowNodeBuilder) Component(name string, f func(builder NodeBuilder, n
 	return fnb
 }
 
-func (fnb *FlowNodeBuilder) PreInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder {
+func (fnb *FlowNodeBuilder) PreInit(f func(ctx irrecoverable.SignalerContext, node *NodeConfig)) NodeBuilder {
 	fnb.preInitFns = append(fnb.preInitFns, f)
 	return fnb
 }
 
-func (fnb *FlowNodeBuilder) PostInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder {
+func (fnb *FlowNodeBuilder) PostInit(f func(ctx irrecoverable.SignalerContext, node *NodeConfig)) NodeBuilder {
 	fnb.postInitFns = append(fnb.postInitFns, f)
 	return fnb
 }
@@ -993,20 +1004,27 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 
 func (fnb *FlowNodeBuilder) InitComponentBuilder() {
 	fnb.componentBuilder = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		AddWorker("main", func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 			fnb.onStart(ctx)
 			ready()
 
 			<-ctx.Done()
 			go func() {
-				// run after all child components shutdown
-				// this must be run inside a goroutine since Done() also depends on this
-				// worker exiting
-				<-fnb.Done()
+				// run after all child components shutdown. this must be run inside a goroutine
+				// since main.Done() also depends on this worker exiting
+				main, _ := lookup("main")
+				<-main.Done()
 				fnb.closeDatabase()
 			}()
 		}).
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		AddWorker("modules", func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
+			main, _ := lookup("main")
+			select {
+			case <-main.Ready():
+			case <-ctx.Done():
+				return
+			}
+
 			// run all modules
 			for _, f := range fnb.modules {
 				fnb.handleModule(ctx, f)
@@ -1015,62 +1033,16 @@ func (fnb *FlowNodeBuilder) InitComponentBuilder() {
 		})
 }
 
-func (fnb *FlowNodeBuilder) Build() NodeBuilder {
-	fnb.ComponentManager = fnb.componentBuilder.Build()
-	fnb.ComponentManager.SetSerial(true)
-	return fnb
+func (fnb *FlowNodeBuilder) Build() Node {
+	return &FlowNodeImp{
+		ComponentManager: fnb.componentBuilder.Build(),
+		NodeRole:         fnb.BaseConfig.NodeRole,
+		Logger:           fnb.Logger,
+	}
 }
 
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", common.SetLogLevelCommand.Handler, common.SetLogLevelCommand.Validator)
-}
-
-// Run calls Start() to start all the node modules and components. It also sets up a channel to gracefully shut
-// down each component if a SIGINT is received. Until a SIGINT is received, Run will block.
-// Since, Run is a blocking call it should only be used when running a node as it's own independent process.
-// Any unhandled irrecoverable errors thrown in child components will bubble up to here and result in a fatal
-// error
-func (fnb *FlowNodeBuilder) Run() {
-
-	// initialize signal catcher
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go fnb.Start(signalerCtx)
-
-	select {
-	case <-fnb.Ready():
-		fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.NodeRole)
-	case err := <-errChan:
-		fnb.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error during startup")
-	case <-sig:
-		fnb.Logger.Warn().Msg("node startup aborted")
-		os.Exit(1)
-	}
-
-	// block till a SIGINT is received or a fatal error is encountered
-	select {
-	case <-sig:
-	case err := <-errChan:
-		fnb.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
-	}
-
-	fnb.Logger.Info().Msgf("%s node shutting down", fnb.BaseConfig.NodeRole)
-	cancel()
-
-	select {
-	case <-fnb.Done():
-		fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.NodeRole)
-	case err := <-errChan:
-		fnb.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error during shutdown")
-	case <-sig:
-		fnb.Logger.Warn().Msg("node shutdown aborted")
-		os.Exit(1)
-	}
-
-	os.Exit(0)
 }
 
 func (fnb *FlowNodeBuilder) onStart(ctx irrecoverable.SignalerContext) {
@@ -1095,7 +1067,7 @@ func (fnb *FlowNodeBuilder) onStart(ctx irrecoverable.SignalerContext) {
 	fnb.initStorage()
 
 	for _, f := range fnb.preInitFns {
-		fnb.handlePreInit(f)
+		fnb.handlePreInit(ctx, f)
 	}
 
 	fnb.initState()
@@ -1103,16 +1075,16 @@ func (fnb *FlowNodeBuilder) onStart(ctx irrecoverable.SignalerContext) {
 	fnb.initFvmOptions()
 
 	for _, f := range fnb.postInitFns {
-		fnb.handlePostInit(f)
+		fnb.handlePostInit(ctx, f)
 	}
 }
 
-func (fnb *FlowNodeBuilder) handlePreInit(f func(builder NodeBuilder, node *NodeConfig)) {
-	f(fnb, fnb.NodeConfig)
+func (fnb *FlowNodeBuilder) handlePreInit(ctx irrecoverable.SignalerContext, f func(ctx irrecoverable.SignalerContext, node *NodeConfig)) {
+	f(ctx, fnb.NodeConfig)
 }
 
-func (fnb *FlowNodeBuilder) handlePostInit(f func(builder NodeBuilder, node *NodeConfig)) {
-	f(fnb, fnb.NodeConfig)
+func (fnb *FlowNodeBuilder) handlePostInit(ctx irrecoverable.SignalerContext, f func(ctx irrecoverable.SignalerContext, node *NodeConfig)) {
+	f(ctx, fnb.NodeConfig)
 }
 
 func (fnb *FlowNodeBuilder) closeDatabase() {
