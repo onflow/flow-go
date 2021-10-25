@@ -467,7 +467,7 @@ func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.Exec
 	}
 
 	// to be a valid fixture, results A and B must share first chunk.
-	require.Equal(t, resultA.Chunks[0], resultB.Chunks[0])
+	require.Equal(t, resultA.Chunks[0].ID(), resultB.Chunks[0].ID())
 	// and they must represent a fork
 	require.NotEqual(t, resultA.ID(), resultB.ID())
 
