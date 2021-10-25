@@ -877,7 +877,6 @@ func (fnb *FlowNodeBuilder) BackgroundComponent(name string, f func(ctx irrecove
 					}
 				}
 				log.Info().Msg("component startup complete")
-				ready()
 
 				<-ctx.Done()
 				log.Info().Msg("component shutdown started")
@@ -893,8 +892,13 @@ func (fnb *FlowNodeBuilder) BackgroundComponent(name string, f func(ctx irrecove
 			}
 		}
 
+		// Note: we're marking the component ready before we even attempt to start it.
+		// the idea behind a background component is that the system as a whole should
+		// not depend on it for safe operation, so the node does not need to wait for
+		// it to be ready.
+		ready()
 		err := component.RunComponent(ctx, componentFactory, errHandler)
-		if err != nil && err == ctx.Err() {
+		if err != nil && err != ctx.Err() {
 			ctx.Throw(fmt.Errorf("component %s shutdown unexpectedly: %w", name, err))
 		}
 
