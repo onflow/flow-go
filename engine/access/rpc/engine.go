@@ -19,6 +19,7 @@ import (
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/swagger"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -34,6 +35,7 @@ type Config struct {
 	SecureGRPCListenAddr      string                           // the secure GRPC server address as ip:port
 	TransportCredentials      credentials.TransportCredentials // the secure GRPC credentials
 	HTTPListenAddr            string                           // the HTTP web proxy address as ip:port
+	RESTListenAddr            string                           // the REST server address as ip:port
 	CollectionAddr            string                           // the address of the upstream collection node
 	HistoricalAccessAddrs     string                           // the list of all access nodes from previous spork
 	MaxMsgSize                int                              // GRPC max message size
@@ -54,9 +56,11 @@ type Engine struct {
 	unsecureGrpcServer  *grpc.Server     // the unsecure gRPC server
 	secureGrpcServer    *grpc.Server     // the secure gRPC server
 	httpServer          *http.Server
+	restServer          *http.Server
 	config              Config
 	unsecureGrpcAddress net.Addr
 	secureGrpcAddress   net.Addr
+	resetAPIAddress     net.Addr
 }
 
 // New returns a new RPC engine.
@@ -152,6 +156,9 @@ func New(log zerolog.Logger,
 		log,
 	)
 
+	restAPI := swagger.NewRestAPI(backend, log)
+	restServer := swagger.NewRestAPIServer(restAPI, config.RESTListenAddr)
+
 	eng := &Engine{
 		log:                log,
 		unit:               engine.NewUnit(),
@@ -159,6 +166,7 @@ func New(log zerolog.Logger,
 		unsecureGrpcServer: unsecureGrpcServer,
 		secureGrpcServer:   secureGrpcServer,
 		httpServer:         httpServer,
+		restServer:         restServer,
 		config:             config,
 	}
 
@@ -199,6 +207,7 @@ func (e *Engine) Ready() <-chan struct{} {
 	e.unit.Launch(e.serveUnsecureGRPC)
 	e.unit.Launch(e.serveSecureGRPC)
 	e.unit.Launch(e.serveGRPCWebProxy)
+	e.unit.Launch(e.serveREST)
 	return e.unit.Ready()
 }
 
@@ -212,6 +221,12 @@ func (e *Engine) Done() <-chan struct{} {
 			err := e.httpServer.Shutdown(context.Background())
 			if err != nil {
 				e.log.Error().Err(err).Msg("error stopping http server")
+			}
+		},
+		func() {
+			err := e.restServer.Shutdown(context.Background())
+			if err != nil {
+				e.log.Error().Err(err).Msg("error stopping http REST server")
 			}
 		})
 }
@@ -232,6 +247,10 @@ func (e *Engine) UnsecureGRPCAddress() net.Addr {
 
 func (e *Engine) SecureGRPCAddress() net.Addr {
 	return e.secureGrpcAddress
+}
+
+func (e *Engine) RestApiAddress() net.Addr {
+	return e.resetAPIAddress
 }
 
 // process processes the given ingestion engine event. Events that are given
@@ -305,5 +324,29 @@ func (e *Engine) serveGRPCWebProxy() {
 	}
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the http proxy server")
+	}
+}
+
+// serveREST starts the HTTP REST server
+func (e *Engine) serveREST() {
+
+	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
+
+	l, err := net.Listen("tcp", e.config.RESTListenAddr)
+	if err != nil {
+		e.log.Err(err).Msg("failed to start the REST server")
+		return
+	}
+
+	e.resetAPIAddress = l.Addr()
+
+	e.log.Debug().Str("rest_api_address", e.resetAPIAddress.String()).Msg("listening on port")
+
+	err = e.restServer.Serve(l) // blocking call
+	if err != nil {
+		if errors.Is(err, http.ErrServerClosed) {
+			return
+		}
+		e.log.Fatal().Err(err).Msg("fatal error in REST server")
 	}
 }
