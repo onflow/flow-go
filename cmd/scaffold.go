@@ -140,7 +140,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
-	fnb.CriticalComponent("network", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	fnb.Component("network", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 		codec := cborcodec.NewCodec()
 
@@ -268,7 +268,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
-	fnb.CriticalComponent("metrics server", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	fnb.Component("metrics server", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		server := metrics.NewServer(fnb.Logger, fnb.BaseConfig.metricsPort, fnb.BaseConfig.profilerEnabled)
 		return server, nil
 	})
@@ -281,7 +281,7 @@ func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
 			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
 		}
 		fnb.RegisterDefaultAdminCommands()
-		fnb.CriticalComponent("admin server", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		fnb.Component("admin server", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			var opts []admin.CommandRunnerOption
 
 			if node.AdminCert != NotSet {
@@ -317,7 +317,7 @@ func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
 }
 
 func (fnb *FlowNodeBuilder) EnqueueTracer() {
-	fnb.CriticalComponent("tracer", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	fnb.Component("tracer", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		return fnb.Tracer, nil
 	})
 }
@@ -425,8 +425,8 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 			Mempool:        mempools,
 		}
 
-		// registers mempools as a CriticalComponent so that its Ready method is invoked upon startup
-		fnb.CriticalComponent("mempools metrics", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		// registers mempools as a Component so that its Ready method is invoked upon startup
+		fnb.Component("mempools metrics", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			return mempools, nil
 		})
 	}
@@ -443,7 +443,7 @@ func (fnb *FlowNodeBuilder) initProfiler() {
 		fnb.BaseConfig.profilerDuration,
 	)
 	fnb.MustNot(err).Msg("could not initialize profiler")
-	fnb.CriticalComponent("profiler", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	fnb.Component("profiler", func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		return profiler, nil
 	})
 }
@@ -779,15 +779,15 @@ func (fnb *FlowNodeBuilder) MustNot(err error) *zerolog.Event {
 	return nil
 }
 
-// CriticalComponent adds a new component to the node that conforms to the ReadyDone
+// Component adds a new component to the node that conforms to the ReadyDoneAware
 // interface, and throws a Fatal() when an irrecoverable error is encountered
-// Use CriticalComponent if the component cannot be restarted when an irrecoverable error is encountered
+// Use Component if the component cannot be restarted when an irrecoverable error is encountered
 // and the node should crash.
 //
 // When the node is run, this component will be started with `Ready`. When the
 // node is stopped, we will wait for the component to exit gracefully with
 // `Done`.
-func (fnb *FlowNodeBuilder) CriticalComponent(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error)) NodeBuilder {
+func (fnb *FlowNodeBuilder) Component(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error)) NodeBuilder {
 
 	fnb.componentBuilder.AddWorker(name, func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 		modules, _ := lookup("modules")
@@ -838,12 +838,13 @@ func (fnb *FlowNodeBuilder) CriticalComponent(name string, f func(ctx irrecovera
 	return fnb
 }
 
-// Component adds a new component to the node that conforms to the ReadyDone
+// BackgroundComponent adds a new component to the node that conforms to the ReadyDoneAware
 // interface, and calls the provided error handler when an irrecoverable error is encountered.
-// Use Component if the component can/should be restarted when an irrecoverable error is encountered
+// Use BackgroundComponent if the component is not critical to the node's safe operation and
+// can/should be independently restarted when an irrecoverable error is encountered.
 //
 // Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-func (fnb *FlowNodeBuilder) Component(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder {
+func (fnb *FlowNodeBuilder) BackgroundComponent(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder {
 
 	fnb.componentBuilder.AddWorker(name, func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 		modules, _ := lookup("modules")

@@ -381,7 +381,7 @@ func main() {
 
 			return nil
 		}).
-		CriticalComponent("machine account config validator", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("machine account config validator", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
 			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
@@ -396,7 +396,7 @@ func main() {
 			)
 			return validator, err
 		}).
-		CriticalComponent("sealing engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("sealing engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
@@ -432,7 +432,7 @@ func main() {
 
 			return e, err
 		}).
-		CriticalComponent("matching engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("matching engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			receiptRequester, err = requester.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -487,7 +487,7 @@ func main() {
 
 			return e, err
 		}).
-		CriticalComponent("provider engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("provider engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			prov, err = provider.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -498,7 +498,7 @@ func main() {
 			)
 			return prov, err
 		}).
-		CriticalComponent("ingestion engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			ing, err := ingestion.New(
 				node.Logger,
 				node.Tracer,
@@ -513,7 +513,7 @@ func main() {
 			)
 			return ing, err
 		}).
-		CriticalComponent("consensus components", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("consensus components", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 			// TODO: we should probably find a way to initialize mutually dependent engines separately
 
@@ -676,7 +676,7 @@ func main() {
 			comp = comp.WithConsensus(hot)
 			return comp, nil
 		}).
-		CriticalComponent("finalized snapshot", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("finalized snapshot", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
@@ -684,7 +684,7 @@ func main() {
 
 			return finalizedHeader, nil
 		}).
-		CriticalComponent("sync engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("sync engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,
@@ -702,11 +702,11 @@ func main() {
 
 			return sync, nil
 		}).
-		CriticalComponent("receipt requester engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("receipt requester engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			// created with sealing engine
 			return receiptRequester, nil
 		}).
-		CriticalComponent("DKG messaging engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("DKG messaging engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 			// brokerTunnel is used to forward messages between the DKG
 			// messaging engine and the DKG broker/controller
@@ -726,7 +726,7 @@ func main() {
 
 			return messagingEngine, nil
 		}).
-		CriticalComponent("DKG reactor engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("DKG reactor engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			// the viewsObserver is used by the reactor engine to subscribe to
 			// new views being finalized
 			viewsObserver := gadgets.NewViews()

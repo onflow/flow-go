@@ -185,7 +185,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			anb.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
 			return nil
 		}).
-		CriticalComponent("RPC engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("RPC engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			anb.RpcEng = rpc.New(
 				node.Logger,
 				node.State,
@@ -209,7 +209,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			)
 			return anb.RpcEng, nil
 		}).
-		CriticalComponent("ingestion engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			var err error
 
 			anb.RequestEng, err = requester.New(
@@ -236,7 +236,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 
 			return anb.IngestEng, nil
 		}).
-		CriticalComponent("requester engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("requester engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
@@ -248,7 +248,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 		var proxyEngine *splitter.Engine
 
 		anb.
-			CriticalComponent("unstaked sync request proxy", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+			Component("unstaked sync request proxy", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 				proxyEngine = splitter.New(node.Logger, engine.PublicSyncCommittee)
 
 				// register the proxy engine with the unstaked network
@@ -260,7 +260,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 
 				return proxyEngine, nil
 			}).
-			CriticalComponent("unstaked sync request handler", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+			Component("unstaked sync request handler", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 				syncRequestHandler := synceng.NewRequestHandlerEngine(
 					node.Logger.With().Bool("unstaked", true).Logger(),
 					unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
@@ -281,7 +281,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			})
 	}
 
-	anb.CriticalComponent("ping engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	anb.Component("ping engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		ping, err := pingeng.New(
 			node.Logger,
 			node.State,
@@ -303,7 +303,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
 func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	builder.CriticalComponent("unstaked network", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	builder.Component("unstaked network", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 		libP2PFactory := builder.initLibP2PFactory(builder.NodeID, builder.NodeConfig.NetworkKey)
 

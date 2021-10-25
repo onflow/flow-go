@@ -61,22 +61,23 @@ type NodeBuilder interface {
 	// Module enables setting up dependencies of the engine with the builder context
 	Module(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig) error) NodeBuilder
 
-	// CriticalComponent adds a new component to the node that conforms to the ReadyDone
+	// Component adds a new component to the node that conforms to the ReadyDoneAware
 	// interface, and throws a Fatal() when an irrecoverable error is encountered
-	// Use CriticalComponent if the component cannot be restarted when an irrecoverable error is encountered
+	// Use Component if the component cannot be restarted when an irrecoverable error is encountered
 	// and the node should crash.
 	//
 	// When the node is run, this component will be started with `Ready`. When the
 	// node is stopped, we will wait for the component to exit gracefully with
 	// `Done`.
-	CriticalComponent(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error)) NodeBuilder
+	Component(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error)) NodeBuilder
 
-	// Component adds a new component to the node that conforms to the ReadyDone
+	// BackgroundComponent adds a new component to the node that conforms to the ReadyDoneAware
 	// interface, and calls the provided error handler when an irrecoverable error is encountered.
-	// Use Component if the component can/should be restarted when an irrecoverable error is encountered
+	// Use BackgroundComponent if the component is not critical to the node's safe operation and
+	// can/should be independently restarted when an irrecoverable error is encountered.
 	//
 	// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-	Component(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder
+	BackgroundComponent(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder
 
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder

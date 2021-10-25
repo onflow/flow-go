@@ -298,7 +298,7 @@ func (anb *UnstakedAccessNodeBuilder) Build() cmd.Node {
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
 func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	anb.CriticalComponent("unstaked network", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	anb.Component("unstaked network", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 		// Network Metrics
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
@@ -328,7 +328,7 @@ func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 // discovered by other unstaked ANs if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (anb *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
-	anb.CriticalComponent("upstream connector", func(ctx irrecoverable.SignalerContext, _ *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	anb.Component("upstream connector", func(ctx irrecoverable.SignalerContext, _ *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		network, _ := lookup("unstaked network")
 		select {
 		case <-network.Ready():
