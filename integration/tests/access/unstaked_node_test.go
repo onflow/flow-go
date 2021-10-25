@@ -209,10 +209,8 @@ func (fm *followerManager) startFollower(ctx context.Context) {
 	go func() {
 		fm.follower.Run(ctx)
 	}()
-	// get the underlying node builder
-	node := fm.follower.NodeBuilder
 	// wait for the follower to have completely started
-	unittest.RequireCloseBefore(fm.t, node.Ready(), 10*time.Second,
+	unittest.RequireCloseBefore(fm.t, fm.follower.Ready(), 10*time.Second,
 		"timed out while waiting for consensus follower to start")
 }
 
