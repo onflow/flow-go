@@ -25,8 +25,6 @@ func (c ChunkDataPackRequest) Checksum() flow.Identifier {
 	return c.Locator.ID()
 }
 
-type ChunkDataPackRequestList []*ChunkDataPackRequest
-
 // SampleTargets returns identifier of execution nodes that can be asked for the chunk data pack, based on
 // the agreeing and disagreeing execution nodes of the chunk data pack request.
 func (c ChunkDataPackRequest) SampleTargets(count int) flow.IdentifierList {
@@ -43,4 +41,17 @@ func (c ChunkDataPackRequest) SampleTargets(count int) flow.IdentifierList {
 
 	nonResponders := c.Targets.Filter(filter.Not(filter.HasNodeID(c.Disagrees...))).Sample(need).NodeIDs()
 	return append(c.Agrees, nonResponders...)
+}
+
+type ChunkDataPackRequestList []*ChunkDataPackRequest
+
+// Contains returns whether the list already contains a request for the same chunk index and result id.
+func (c ChunkDataPackRequestList) Contains(request *ChunkDataPackRequest) bool {
+	for _, existing := range c {
+		if existing.ResultID == request.ResultID && existing.Index == request.Index {
+			return true
+		}
+	}
+
+	return false
 }
