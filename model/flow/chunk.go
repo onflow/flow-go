@@ -55,7 +55,7 @@ func (c *ChunkDataPack) Checksum() Identifier {
 	return MakeID(c)
 }
 
-// Note that this is the basic version of the List, we need to substitute it with something like Merkel tree at some point
+// TODO: that this is the basic version of the list, we need to substitute it with something like Merkel tree at some point
 type ChunkList []*Chunk
 
 func (cl ChunkList) Fingerprint() Identifier {
