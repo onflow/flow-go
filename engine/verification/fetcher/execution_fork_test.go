@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	verificationtest "github.com/onflow/flow-go/engine/verification/utils/unittest"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
@@ -114,27 +115,7 @@ func executionResultForkFixture(t *testing.T) (*flow.Block,
 	*verification.ChunkStatus,
 	map[flow.Identifier]*flow.Collection) {
 
-	// collection and block
-	collections := unittest.CollectionListFixture(1)
-	block := unittest.BlockWithGuaranteesFixture(
-		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
-	)
-
-	// execution fork at block with resultA and resultB that share first chunk
-	resultA := unittest.ExecutionResultFixture(
-		unittest.WithBlock(block),
-		unittest.WithChunks(2))
-	resultB := &flow.ExecutionResult{
-		PreviousResultID: resultA.PreviousResultID,
-		BlockID:          resultA.BlockID,
-		Chunks:           append(flow.ChunkList{resultA.Chunks[0]}, unittest.ChunkListFixture(1, resultA.BlockID)...),
-		ServiceEvents:    nil,
-	}
-
-	// to be a valid fixture, results A and B must share first chunk.
-	require.Equal(t, resultA.Chunks[0], resultB.Chunks[0])
-	// and they must represent a fork
-	require.NotEqual(t, resultA.ID(), resultB.ID())
+	resultA, resultB, collection, block := verificationtest.ExecutionResultForkFixture(t)
 
 	// creates chunk statuses for shared chunk of result A and B.
 	// this imitates that both identical chunks on execution fork are assigned to
@@ -157,7 +138,7 @@ func executionResultForkFixture(t *testing.T) (*flow.Block,
 
 	// keeps collections of assigned chunks
 	collMap := make(map[flow.Identifier]*flow.Collection)
-	collMap[statusA.ChunkID()] = collections[0]
+	collMap[statusA.ChunkID()] = collection
 
 	return block, resultA, statusA, resultB, statusB, collMap
 }
