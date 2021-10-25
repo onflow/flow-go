@@ -32,68 +32,6 @@ func (_m *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 	return r0
 }
 
-// All provides a mock function with given fields:
-func (_m *ChunkRequests) All() []*verification.ChunkDataPackRequest {
-	ret := _m.Called()
-
-	var r0 []*verification.ChunkDataPackRequest
-	if rf, ok := ret.Get(0).(func() []*verification.ChunkDataPackRequest); ok {
-		r0 = rf()
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*verification.ChunkDataPackRequest)
-		}
-	}
-
-	return r0
-}
-
-// ByID provides a mock function with given fields: chunkID
-func (_m *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool) {
-	ret := _m.Called(chunkID)
-
-	var r0 *verification.ChunkDataPackRequest
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *verification.ChunkDataPackRequest); ok {
-		r0 = rf(chunkID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*verification.ChunkDataPackRequest)
-		}
-	}
-
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
-		r1 = rf(chunkID)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
-}
-
-// GetAndRemove provides a mock function with given fields: chunkID
-func (_m *ChunkRequests) GetAndRemove(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool) {
-	ret := _m.Called(chunkID)
-
-	var r0 *verification.ChunkDataPackRequest
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *verification.ChunkDataPackRequest); ok {
-		r0 = rf(chunkID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*verification.ChunkDataPackRequest)
-		}
-	}
-
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
-		r1 = rf(chunkID)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
-}
-
 // IncrementAttempt provides a mock function with given fields: chunkID
 func (_m *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	ret := _m.Called(chunkID)
@@ -106,6 +44,29 @@ func (_m *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	}
 
 	return r0
+}
+
+// PopAll provides a mock function with given fields: chunkID
+func (_m *ChunkRequests) PopAll(chunkID flow.Identifier) (verification.ChunkDataPackRequestList, bool) {
+	ret := _m.Called(chunkID)
+
+	var r0 verification.ChunkDataPackRequestList
+	if rf, ok := ret.Get(0).(func(flow.Identifier) verification.ChunkDataPackRequestList); ok {
+		r0 = rf(chunkID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(verification.ChunkDataPackRequestList)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(chunkID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
 }
 
 // Rem provides a mock function with given fields: chunkID
