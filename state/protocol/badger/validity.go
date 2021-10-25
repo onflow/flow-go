@@ -135,12 +135,12 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("could not latest sealed result: %w", err)
 	}
 
-	if len(segment) == 0 {
+	if len(segment.Blocks) == 0 {
 		return fmt.Errorf("invalid empty sealing segment")
 	}
 	// TAIL <- ... <- HEAD
-	head := segment[len(segment)-1] // reference block of the snapshot
-	tail := segment[0]              // last sealed block
+	head := segment.Blocks[len(segment.Blocks)-1] // reference block of the snapshot
+	tail := segment.Blocks[0]              // last sealed block
 	headID := head.ID()
 	tailID := tail.ID()
 

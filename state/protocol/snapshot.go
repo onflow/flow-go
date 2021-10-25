@@ -64,7 +64,11 @@ type Snapshot interface {
 	// the sealing segment has exactly one block (the root block for the spork).
 	// For all other snapshots, the sealing segment contains at least 2 blocks.
 	//
-	SealingSegment() ([]*flow.Block, error)
+	// NOTE 3: It is often the case that a block inside the segment will contain
+	// an execution receipt in it's payload that references an execution result
+	// missing from the payload. These missing execution results are stored on the
+	// flow.SealingSegment.ExecutionResults field.
+	SealingSegment() (*flow.SealingSegment, error)
 
 	// Descendants returns the IDs of all descendants of the Head block. The IDs
 	// are ordered such that parents are included before their children. These

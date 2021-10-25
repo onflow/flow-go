@@ -330,7 +330,7 @@ func TestBootstrap_DisconnectedSealingSegment(t *testing.T) {
 	encodable := rootSnapshot.Encodable()
 	// add an un-connected tail block to the sealing segment
 	tail := unittest.BlockFixture()
-	encodable.SealingSegment = append([]*flow.Block{&tail}, encodable.SealingSegment...)
+	encodable.SealingSegment.Blocks = append([]*flow.Block{&tail}, encodable.SealingSegment.Blocks...)
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
 	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {

@@ -196,9 +196,9 @@ func TestSealingSegment(t *testing.T) {
 			actual, err := state.AtBlockID(head.ID()).SealingSegment()
 			require.NoError(t, err)
 
-			assert.Len(t, actual, 1)
-			assert.Equal(t, len(expected), len(actual))
-			assert.Equal(t, expected[0].ID(), actual[0].ID())
+			assert.Len(t, actual.Blocks, 1)
+			assert.Equal(t, len(expected.Blocks), len(actual.Blocks))
+			assert.Equal(t, expected.Blocks[0].ID(), actual.Blocks[0].ID())
 		})
 	})
 
@@ -217,6 +217,7 @@ func TestSealingSegment(t *testing.T) {
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(seal1)))
+
 			err = state.Extend(context.Background(), &block2)
 			require.NoError(t, err)
 
@@ -225,9 +226,9 @@ func TestSealingSegment(t *testing.T) {
 
 			// sealing segment should contain B1 and B2
 			// B2 is reference of snapshot, B1 is latest sealed
-			assert.Len(t, segment, 2)
-			assert.Equal(t, block1.ID(), segment[0].ID())
-			assert.Equal(t, block2.ID(), segment[1].ID())
+			assert.Len(t, segment.Blocks, 2)
+			assert.Equal(t, block1.ID(), segment.Blocks[0].ID())
+			assert.Equal(t, block2.ID(), segment.Blocks[1].ID())
 		})
 	})
 
@@ -263,10 +264,10 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 
 			// sealing segment should cover range [B1, BN]
-			assert.Len(t, segment, 102)
+			assert.Len(t, segment.Blocks, 102)
 			// first and last blocks should be B1, BN
-			assert.Equal(t, block1.ID(), segment[0].ID())
-			assert.Equal(t, blockN.ID(), segment[101].ID())
+			assert.Equal(t, block1.ID(), segment.Blocks[0].ID())
+			assert.Equal(t, blockN.ID(), segment.Blocks[101].ID())
 		})
 	})
 
@@ -301,10 +302,10 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 
 			// sealing segment should be [B2, B3, B4]
-			assert.Len(t, segment, 3)
-			assert.Equal(t, block2.ID(), segment[0].ID())
-			assert.Equal(t, block3.ID(), segment[1].ID())
-			assert.Equal(t, block4.ID(), segment[2].ID())
+			assert.Len(t, segment.Blocks, 3)
+			assert.Equal(t, block2.ID(), segment.Blocks[0].ID())
+			assert.Equal(t, block3.ID(), segment.Blocks[1].ID())
+			assert.Equal(t, block4.ID(), segment.Blocks[2].ID())
 		})
 	})
 }
