@@ -302,6 +302,62 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.metrics)
 }
 
+func TestHandleChunkDataPack_DuplicateChunkIDs(t *testing.T) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
+
+	resultA, resultB, _, _ := vertestutils.ExecutionResultForkFixture(t)
+
+	responseA := unittest.ChunkDataResponseMsgFixture(resultA.Chunks[0].ID())
+	responseB := unittest.ChunkDataResponseMsgFixture(resultB.Chunks[0].ID())
+	requestA := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(responseA.ChunkDataPack.ChunkID))
+	requestB := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(responseB.ChunkDataPack.ChunkID))
+
+	originID := unittest.IdentifierFixture()
+
+	// we remove pending request on receiving this response
+	s.pendingRequests.On("GetAndRemove", responseA.ChunkDataPack.ChunkID).Return(requestA, true).Once()
+	s.pendingRequests.On("GetAndRemove", responseB.ChunkDataPack.ChunkID).Return(requestB, true).Once()
+
+	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
+		Locator: chunks.Locator{
+			ResultID: requestA.ResultID,
+			Index:    requestA.Index,
+		},
+		Cdp: &responseA.ChunkDataPack,
+	}).Return().Once()
+
+	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
+		Locator: chunks.Locator{
+			ResultID: requestB.ResultID,
+			Index:    requestB.Index,
+		},
+		Cdp: &responseB.ChunkDataPack,
+	}).Return().Once()
+
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Twice()
+	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Twice()
+
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+	go func() {
+		err := e.Process(engine.RequestChunks, originID, responseA)
+		require.Nil(t, err)
+
+		wg.Done()
+	}()
+
+	go func() {
+		err := e.Process(engine.RequestChunks, originID, responseB)
+		require.Nil(t, err)
+
+		wg.Done()
+	}()
+
+	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "could not process chunk responses on time")
+	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests, s.metrics)
+}
+
 // TestRequestPendingChunkDataPack evaluates happy path of having a single pending chunk requests.
 // The chunk belongs to a non-sealed block.
 // On timer interval, the chunk requests should be dispatched to the set of execution nodes agree with the execution
