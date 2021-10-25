@@ -11,7 +11,8 @@ import (
 
 func toBlock(flowBlock *flow.Block) *generated.Block {
 	return &generated.Block{
-		Header: toBlockHeader(flowBlock.Header),
+		Header:  toBlockHeader(flowBlock.Header),
+		Payload: toBlockPayload(flowBlock.Payload),
 	}
 }
 
@@ -22,5 +23,47 @@ func toBlockHeader(flowHeader *flow.Header) *generated.BlockHeader {
 		Height:               fmt.Sprint(flowHeader.Height),
 		Timestamp:            flowHeader.Timestamp,
 		ParentVoterSignature: fmt.Sprint(flowHeader.ParentVoterSigData),
+	}
+}
+
+func toBlockPayload(flowPayload *flow.Payload) *generated.BlockPayload {
+	return &generated.BlockPayload{
+		CollectionGuarantees: collectionGuarantees(flowPayload.Guarantees),
+		BlockSeals:           blockSeals(flowPayload.Seals),
+	}
+}
+
+func collectionGuarantees(flowCollGuarantee []*flow.CollectionGuarantee) []generated.CollectionGuarantee {
+	collectionGuarantees := make([]generated.CollectionGuarantee, len(flowCollGuarantee))
+	for i, flowCollGuarantee := range flowCollGuarantee {
+		collectionGuarantees[i] = collectionGuarantee(flowCollGuarantee)
+	}
+	return collectionGuarantees
+}
+
+func collectionGuarantee(flowCollGuarantee *flow.CollectionGuarantee) generated.CollectionGuarantee {
+	signerIDs := make([]string, len(flowCollGuarantee.SignerIDs))
+	for i, signerID := range flowCollGuarantee.SignerIDs {
+		signerIDs[i] = signerID.String()
+	}
+	return generated.CollectionGuarantee{
+		CollectionId: flowCollGuarantee.CollectionID.String(),
+		SignerIds:    signerIDs,
+		Signature:    flowCollGuarantee.Signature.String(),
+	}
+}
+
+func blockSeals(flowSeals []*flow.Seal) []generated.BlockSeal {
+	seals := make([]generated.BlockSeal, len(flowSeals))
+	for i, seal := range flowSeals {
+		seals[i] = blockSeal(seal)
+	}
+	return seals
+}
+
+func blockSeal(flowSeal *flow.Seal) generated.BlockSeal {
+	return generated.BlockSeal{
+		BlockId:  flowSeal.BlockID.String(),
+		ResultId: flowSeal.ResultID.String(),
 	}
 }
