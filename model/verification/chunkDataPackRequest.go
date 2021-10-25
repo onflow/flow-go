@@ -10,6 +10,10 @@ import (
 // and requester module. It conveys required information for requesting a chunk data pack.
 type ChunkDataPackRequest struct {
 	chunks.Locator
+	ChunkDataPackRequestInfo
+}
+
+type ChunkDataPackRequestInfo struct {
 	ChunkID   flow.Identifier
 	Height    uint64              // block height of execution result of the chunk, used to drop chunk requests of sealed heights.
 	Agrees    flow.IdentifierList // execution node ids that generated the result of chunk.
@@ -27,7 +31,7 @@ func (c ChunkDataPackRequest) Checksum() flow.Identifier {
 
 // SampleTargets returns identifier of execution nodes that can be asked for the chunk data pack, based on
 // the agreeing and disagreeing execution nodes of the chunk data pack request.
-func (c ChunkDataPackRequest) SampleTargets(count int) flow.IdentifierList {
+func (c ChunkDataPackRequestInfo) SampleTargets(count int) flow.IdentifierList {
 	// if there are enough receipts produced the same result (agrees), we sample from them.
 	if len(c.Agrees) >= count {
 		return c.Targets.Filter(filter.HasNodeID(c.Agrees...)).Sample(uint(count)).NodeIDs()
