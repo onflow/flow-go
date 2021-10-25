@@ -23,4 +23,13 @@ func TestChunkDataRequestList_Contain(t *testing.T) {
 			}))
 		}
 	})
+
+	t.Run("contains returns false for non-existing element", func(t *testing.T) {
+		require.False(t, list.Contains(&verification.ChunkDataPackRequest{
+			Locator: chunks.Locator{
+				ResultID: unittest.IdentifierFixture(),
+				Index:    uint64(10),
+			},
+		}))
+	})
 }
