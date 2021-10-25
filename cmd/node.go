@@ -6,9 +6,10 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/rs/zerolog"
 )
 
 type Node interface {
@@ -18,6 +19,8 @@ type Node interface {
 	// then starts each component. It also sets up a channel to gracefully shut
 	// down each component if a SIGINT is received.
 	Run()
+
+	// ShutdownSignal returns a channel that is closed when shutdown has commenced.
 	ShutdownSignal() <-chan struct{}
 }
 

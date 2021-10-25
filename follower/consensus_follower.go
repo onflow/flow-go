@@ -139,7 +139,6 @@ type ConsensusFollowerImpl struct {
 	NodeBuilder *access.UnstakedAccessNodeBuilder
 	consumersMu sync.RWMutex
 	consumers   []pubsub.OnBlockFinalizedConsumer
-	node        cmd.Node
 }
 
 // NewConsensusFollower creates a new consensus follower.
