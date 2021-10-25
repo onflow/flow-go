@@ -493,7 +493,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
 // In each test iteration we expect to create a valid QC with all provided data as part of constructed QC.
 func TestCombinedVoteProcessor_PropertyCreatingQC(testifyT *testing.T) {
 	totalParticipants := uint64(17)
-	maxBftParticipants := (totalParticipants - 1) / 3
+	maxOfflineParticipants := (totalParticipants - 1) / 3
 
 	rapid.Check(testifyT, func(t *rapid.T) {
 		// generate a new suite for each run
@@ -501,15 +501,15 @@ func TestCombinedVoteProcessor_PropertyCreatingQC(testifyT *testing.T) {
 		s.SetT(testifyT)
 		s.SetupTest()
 
-		f := rapid.Uint64Range(0, maxBftParticipants).Draw(t, "f").(uint64)
-		superMajority := totalParticipants - f
-		stakingSignersCount := rapid.Uint64Range(0, superMajority).Draw(t, "stakingSigners").(uint64)
-		beaconSignersCount := superMajority - stakingSignersCount
-		require.Equal(t, superMajority, stakingSignersCount+beaconSignersCount)
+		f := rapid.Uint64Range(0, maxOfflineParticipants).Draw(t, "f").(uint64)
+		honestParticipants := totalParticipants - f
+		stakingSignersCount := rapid.Uint64Range(0, honestParticipants).Draw(t, "stakingSigners").(uint64)
+		beaconSignersCount := honestParticipants - stakingSignersCount
+		require.Equal(t, honestParticipants, stakingSignersCount+beaconSignersCount)
 
 		// we could go here with 2f + 1, but it's simpler for test setup to require all signers to sign
 		// and consume their votes.
-		s.processor.minRequiredStake = superMajority * s.sigWeight
+		s.processor.minRequiredStake = honestParticipants * s.sigWeight
 		s.minRequiredShares = beaconSignersCount
 
 		t.Logf("running conf\n\t"+
@@ -556,18 +556,13 @@ func TestCombinedVoteProcessor_PropertyCreatingQC(testifyT *testing.T) {
 		packedSigData := unittest.RandomBytes(128)
 		s.packer.On("Pack", s.proposal.Block.BlockID, expectedBlockSigData).Return(mergedSignerIDs, packedSigData, nil).Once()
 
-		// expected QC
-		s.onQCCreatedState.On("onQCCreated", mock.Anything).Run(func(args mock.Arguments) {
-			qc := args.Get(0).(*flow.QuorumCertificate)
-			// ensure that QC contains correct field
-			expectedQC := &flow.QuorumCertificate{
-				View:      s.proposal.Block.View,
-				BlockID:   s.proposal.Block.BlockID,
-				SignerIDs: mergedSignerIDs,
-				SigData:   packedSigData,
-			}
-			require.Equalf(t, expectedQC, qc, "QC should be equal to what we expect")
-		}).Return(nil).Once()
+		expectedQC := &flow.QuorumCertificate{
+			View:      s.proposal.Block.View,
+			BlockID:   s.proposal.Block.BlockID,
+			SignerIDs: mergedSignerIDs,
+			SigData:   packedSigData,
+		}
+		s.onQCCreatedState.On("onQCCreated", expectedQC).Return(nil).Once()
 
 		// add votes
 		for _, signer := range stakingSigners {
@@ -621,7 +616,7 @@ func TestCombinedVoteProcessor_PropertyCreatingQC(testifyT *testing.T) {
 
 // TestCombinedVoteProcessor_PropertyConcurrentCreatingQC uses property testing to concurrent processing of votes.
 // We randomly draw a committee with some number of staking, random beacon and byzantine nodes.
-// Values are drawn in a way that 1 <= superMajority <= participants <= maxParticipants
+// Values are drawn in a way that 1 <= honestParticipants <= participants <= maxParticipants
 // In each test iteration we expect to create a valid QC with all provided data as part of constructed QC.
 func TestCombinedVoteProcessor_PropertyConcurrentCreatingQC(testifyT *testing.T) {
 	maxParticipants := uint64(53)
@@ -629,19 +624,15 @@ func TestCombinedVoteProcessor_PropertyConcurrentCreatingQC(testifyT *testing.T)
 	rapid.Check(testifyT, func(t *rapid.T) {
 		// draw participants in range 1 <= participants <= maxParticipants
 		participants := rapid.Uint64Range(1, maxParticipants).Draw(t, "participants").(uint64)
-		stakingSignersCount := rapid.Uint64Range(0, participants).Draw(t, "stakingSigners").(uint64)
-		beaconSignersCount := participants - stakingSignersCount
+		beaconSignersCount := rapid.Uint64Range(participants/2+1, participants).Draw(t, "beaconSigners").(uint64)
+		stakingSignersCount := participants - beaconSignersCount
 		require.Equal(t, participants, stakingSignersCount+beaconSignersCount)
 
-		beaconSignersCount = 12
-		stakingSignersCount = 1
-		participants = 17
-
 		// setup how many votes we need to create a QC
-		// 1 <= superMajority <= participants <= maxParticipants
-		superMajority := participants*2/3 + 1
+		// 1 <= honestParticipants <= participants <= maxParticipants
+		honestParticipants := participants*2/3 + 1
 		sigWeight := uint64(100)
-		minRequiredStake := superMajority * sigWeight
+		minRequiredStake := honestParticipants * sigWeight
 
 		// proposing block
 		block := helper.MakeBlock()
@@ -650,7 +641,7 @@ func TestCombinedVoteProcessor_PropertyConcurrentCreatingQC(testifyT *testing.T)
 			"staking signers: %v, beacon signers: %v\n\t"+
 			"required stake: %v", stakingSignersCount, beaconSignersCount, minRequiredStake)
 
-		stakingTotalWeight, thresholdTotalWeight := uint64(0), uint64(0)
+		stakingTotalWeight, thresholdTotalWeight, collectedShares := uint64(0), uint64(0), uint64(0)
 
 		// setup aggregators and reconstructor
 		stakingAggregator := &mockhotstuff.WeightedSignatureAggregator{}
@@ -677,7 +668,9 @@ func TestCombinedVoteProcessor_PropertyConcurrentCreatingQC(testifyT *testing.T)
 			return thresholdTotalWeight
 		})
 		// don't require shares
-		reconstructor.On("HasSufficientShares").Return(true)
+		reconstructor.On("HasSufficientShares").Return(func() bool {
+			return collectedShares >= beaconSignersCount
+		})
 
 		// mock expected calls to aggregators and reconstructor
 		combinedSigs := unittest.SignaturesFixture(3)
@@ -713,7 +706,7 @@ func TestCombinedVoteProcessor_PropertyConcurrentCreatingQC(testifyT *testing.T)
 			require.Subset(t, aggregatedStakingSigners, blockSigData.StakingSigners)
 			require.Subset(t, aggregatedBeaconSigners, blockSigData.RandomBeaconSigners)
 			require.GreaterOrEqual(t, uint64(len(blockSigData.StakingSigners)+len(blockSigData.RandomBeaconSigners)),
-				superMajority)
+				honestParticipants)
 
 			expectedBlockSigData := &hotstuff.BlockSignatureData{
 				StakingSigners:               blockSigData.StakingSigners,
@@ -772,29 +765,33 @@ func TestCombinedVoteProcessor_PropertyConcurrentCreatingQC(testifyT *testing.T)
 			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithStakingSig())
 			vote.SignerID = signer
 			expectedSig := crypto.Signature(vote.SigData[1:])
-			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
+			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil)
 			stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				signerID := args.Get(0).(flow.Identifier)
 				stakingAggregatorLock.Lock()
 				defer stakingAggregatorLock.Unlock()
 				stakingTotalWeight += sigWeight
 				aggregatedStakingSigners = append(aggregatedStakingSigners, signerID)
-			}).Return(uint64(0), nil).Maybe()
+			}).Return(uint64(0), nil)
 			votes.Push(vote)
 		}
 		for _, signer := range beaconSigners {
 			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithThresholdSig())
 			vote.SignerID = signer
 			expectedSig := crypto.Signature(vote.SigData[1:])
-			rbSigAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
+			rbSigAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil)
 			rbSigAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				signerID := args.Get(0).(flow.Identifier)
 				beaconAggregatorLock.Lock()
 				defer beaconAggregatorLock.Unlock()
 				thresholdTotalWeight += sigWeight
 				aggregatedBeaconSigners = append(aggregatedBeaconSigners, signerID)
-			}).Return(uint64(0), nil).Maybe()
-			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Return(true, nil).Maybe()
+			}).Return(uint64(0), nil)
+			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
+				beaconAggregatorLock.Lock()
+				defer beaconAggregatorLock.Unlock()
+				collectedShares++
+			}).Return(true, nil)
 			votes.Push(vote)
 		}
 
