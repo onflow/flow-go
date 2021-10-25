@@ -298,7 +298,7 @@ func (anb *UnstakedAccessNodeBuilder) Build() cmd.Node {
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
 func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	anb.Component("unstaked network", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (component.Component, error) {
+	anb.CriticalComponent("unstaked network", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 		// Network Metrics
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
@@ -318,7 +318,7 @@ func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 		anb.ProtocolEvents.AddConsumer(idEvents)
 
 		return anb.Network, nil
-	}, nil)
+	})
 }
 
 // enqueueConnectWithStakedAN enqueues the upstream connector component which connects the libp2p host of the unstaked
