@@ -97,8 +97,8 @@ func Bootstrap(
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
-		head := segment[len(segment)-1] // reference block of the snapshot
-		tail := segment[0]              // last sealed block
+		head := segment.Blocks[len(segment.Blocks)-1] // reference block of the snapshot
+		tail := segment.Blocks[0]              // last sealed block
 
 		// 2) insert the root execution result and seal into the database and index it
 		err = transaction.WithTx(state.bootstrapSealedResult(root))(tx)
@@ -136,7 +136,7 @@ func Bootstrap(
 		state.metrics.BlockSealed(tail)
 		state.metrics.SealedHeight(tail.Header.Height)
 		state.metrics.FinalizedHeight(head.Header.Height)
-		for _, block := range segment {
+		for _, block := range segment.Blocks {
 			state.metrics.BlockFinalized(block)
 		}
 
@@ -157,9 +157,9 @@ func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*transa
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
-		head := segment[len(segment)-1]
+		head := segment.Blocks[len(segment.Blocks)-1]
 
-		for i, block := range segment {
+		for i, block := range segment.Blocks {
 			blockID := block.ID()
 			height := block.Header.Height
 
@@ -236,8 +236,8 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
-		head := segment[len(segment)-1]
-		tail := segment[0]
+		head := segment.Blocks[len(segment.Blocks)-1]
+		tail := segment.Blocks[0]
 
 		// insert initial views for HotStuff
 		err = operation.InsertStartedView(head.Header.ChainID, head.Header.View)(tx)
@@ -391,7 +391,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress 
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
-		for _, block := range segment {
+		for _, block := range segment.Blocks {
 			blockID := block.ID()
 			err = state.epoch.statuses.StoreTx(blockID, status)(tx)
 			if err != nil {

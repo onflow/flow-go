@@ -12,7 +12,7 @@ type EncodableSnapshot struct {
 	Identities        flow.IdentityList
 	LatestSeal        *flow.Seal
 	LatestResult      *flow.ExecutionResult
-	SealingSegment    []*flow.Block
+	SealingSegment    *flow.SealingSegment
 	QuorumCertificate *flow.QuorumCertificate
 	Phase             flow.EpochPhase
 	Epochs            EncodableEpochs

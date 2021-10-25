@@ -5,6 +5,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -265,27 +266,51 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 	return result, seal, nil
 }
 
-func (s *Snapshot) SealingSegment() ([]*flow.Block, error) {
+// SealingSegment will walk through the chain backward until we reach the block referenced
+// by the latest seal and build a SealingSegment. As we visit each block we check each execution
+// receipt in the blocks payload to make sure we have a corresponding execution result, any execution
+// results missing from blocks are stored on the SealingSegment.ExecutionResults field.
+func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
+		return nil, fmt.Errorf("could not get seal for sealing seg: %w", err)
 	}
 
 	// walk through the chain backward until we reach the block referenced by
-	// the latest seal - the returned segment includes this block
-	var segment []*flow.Block
+	// the latest seal - the returned seg includes this block
+	segment := flow.NewSealingSegment()
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
 		if err != nil {
 			return fmt.Errorf("could not get block: %w", err)
 		}
-		segment = append(segment, block)
+
+		resultLookUp := block.Payload.Results.Lookup()
+
+		for _, receipt := range block.Payload.Receipts {
+			if segment.ContainsExecutionResult(receipt.ResultID) {
+				log.Println("ContainsExecutionResult")
+				continue
+			}
+
+			if _, ok := resultLookUp[receipt.ResultID]; !ok {
+				result, err := s.state.results.ByID(receipt.ResultID)
+				if err != nil {
+					return fmt.Errorf("could not get execution result (%s): %w", receipt.ResultID, err)
+				}
+
+				segment.AddExecutionResult(result)
+			}
+		}
+
+		segment.AddBlock(block)
 		return nil
 	}
+
 	err = fork.TraverseForward(s.state.headers, s.blockID, scraper, fork.IncludingBlock(seal.BlockID))
 	if err != nil {
-		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)
+		return nil, fmt.Errorf("could not traverse sealing seg: %w", err)
 	}
 
 	return segment, nil
