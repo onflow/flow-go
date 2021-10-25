@@ -1,4 +1,4 @@
-package vertestutils
+package verificationtest
 
 import (
 	"context"
@@ -442,4 +442,28 @@ func ContainerBlockFixture(parent *flow.Header, receipts []*flow.ExecutionReceip
 	containerBlock.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...)))
 
 	return &containerBlock
+}
+
+// ExecutionResultForkFixture creates two conflicting execution results out of the same block ID.
+// Each execution result has two chunks.
+// First chunks of both results are the same, i.e., have same ID.
+func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.ExecutionResult) {
+	// collection and block
+	collections := unittest.CollectionListFixture(1)
+	block := unittest.BlockWithGuaranteesFixture(
+		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	)
+
+	// execution fork at block with resultA and resultB that share first chunk
+	resultA := unittest.ExecutionResultFixture(
+		unittest.WithBlock(block),
+		unittest.WithChunks(2))
+	resultB := &flow.ExecutionResult{
+		PreviousResultID: resultA.PreviousResultID,
+		BlockID:          resultA.BlockID,
+		Chunks:           append(flow.ChunkList{resultA.Chunks[0]}, unittest.ChunkListFixture(1, resultA.BlockID)...),
+		ServiceEvents:    nil,
+	}
+
+	return resultA, resultB
 }
