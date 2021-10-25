@@ -83,6 +83,7 @@ func (suite *MeshEngineTestSuite) TestAllToAll_Publish() {
 // TestAllToAll_Multicast evaluates the network of mesh engines against allToAllScenario scenario.
 // Network instances during this test use their Multicast method to disseminate messages.
 func (suite *MeshEngineTestSuite) TestAllToAll_Multicast() {
+	suite.T().Skip("flaky test - quarantining")
 	suite.allToAllScenario(suite.Multicast)
 }
 
