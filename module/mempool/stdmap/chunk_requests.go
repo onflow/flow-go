@@ -32,19 +32,6 @@ func toChunkRequestStatus(entity flow.Entity) *chunkRequestStatus {
 	return status
 }
 
-// ByID returns a chunk request by its chunk ID.
-//
-// There is a one-to-one correspondence between the chunk requests in memory, and
-// their chunk ID.
-func (cs *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool) {
-	entity, exists := cs.Backend.ByID(chunkID)
-	if !exists {
-		return nil, false
-	}
-	request := toChunkRequestStatus(entity)
-	return request.ChunkDataPackRequest, true
-}
-
 // RequestHistory returns the number of times the chunk has been requested,
 // last time the chunk has been requested, and the retryAfter duration of the
 // underlying request status of this chunk.
@@ -112,8 +99,8 @@ func (cs *ChunkRequests) Rem(chunkID flow.Identifier) bool {
 	return cs.Backend.Rem(chunkID)
 }
 
-// GetAndRemove atomically removes chunk ID from the memory pool, while returning it.
-// Boolean return value indicates whether there is a request in the memory pool associated
+// PopAll atomically removes chunk ID from the memory pool, while returning all requests associated with it.
+// Boolean return value indicates whether there are requests in the memory pool associated
 // with chunk ID.
 func (cs *ChunkRequests) PopAll(chunkID flow.Identifier) (verification.ChunkDataPackRequestList, bool) {
 	var statuses verification.ChunkDataPackRequestList
