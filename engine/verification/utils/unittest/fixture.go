@@ -447,7 +447,8 @@ func ContainerBlockFixture(parent *flow.Header, receipts []*flow.ExecutionReceip
 // ExecutionResultForkFixture creates two conflicting execution results out of the same block ID.
 // Each execution result has two chunks.
 // First chunks of both results are the same, i.e., have same ID.
-func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.ExecutionResult) {
+// It returns both results, their shared block, and collection corresponding to their first chunk.
+func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.ExecutionResult, *flow.Collection, *flow.Block) {
 	// collection and block
 	collections := unittest.CollectionListFixture(1)
 	block := unittest.BlockWithGuaranteesFixture(
@@ -465,5 +466,10 @@ func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.Exec
 		ServiceEvents:    nil,
 	}
 
-	return resultA, resultB
+	// to be a valid fixture, results A and B must share first chunk.
+	require.Equal(t, resultA.Chunks[0], resultB.Chunks[0])
+	// and they must represent a fork
+	require.NotEqual(t, resultA.ID(), resultB.ID())
+
+	return resultA, resultB, collections[0], block
 }
