@@ -2,7 +2,9 @@ package verification
 
 import (
 	"fmt"
-	"sync"
+	"sync/atomic"
+	"unsafe"
+	_ "unsafe"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
@@ -68,22 +70,40 @@ func checkVotesValidity(votes []*model.Vote) error {
 	return nil
 }
 
+type aggregate struct {
+	lastStakingSigners map[flow.Identifier]*flow.Identity
+	lastStakingKey     crypto.PublicKey
+}
+
 // stakingKeysAggregator is a structure that aggregates the staking
 // public keys for QC verifications.
 type stakingKeysAggregator struct {
-	lastStakingSigners map[flow.Identifier]*flow.Identity
-	lastStakingKey     crypto.PublicKey
-	sync.RWMutex
+	current unsafe.Pointer // *aggregate type
+	inner   *aggregate
 }
 
 // creates a new staking keys aggregator
 func newStakingKeysAggregator() *stakingKeysAggregator {
-	aggregator := &stakingKeysAggregator{
+	aggregator := &stakingKeysAggregator{}
+
+	aggregator.inner = &aggregate{
 		lastStakingSigners: map[flow.Identifier]*flow.Identity{},
 		lastStakingKey:     NeutralBLSPublicKey(),
-		RWMutex:            sync.RWMutex{},
 	}
+
+	aggregator.current = unsafe.Pointer(aggregator.inner)
+
 	return aggregator
+}
+
+// use this function to obtain the current config
+func (s *stakingKeysAggregator) getCurrent() *aggregate {
+	return (*aggregate)(atomic.LoadPointer(&s.current))
+}
+
+// periodically and sets aggregate struct as current using this function.
+func (s *stakingKeysAggregator) updateCurrent(agg *aggregate) {
+	atomic.StorePointer(&s.current, unsafe.Pointer(agg))
 }
 
 // aggregatedStakingKey returns the aggregated public key of the input signers.
@@ -98,10 +118,10 @@ func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) 
 	// algorithm. The worst case happens when the 2/3 latest signers and the 2/3 new signers only
 	// have 1/3 in common (the minimum common ratio).
 
-	s.RLock()
-	lastSet := s.lastStakingSigners
-	lastKey := s.lastStakingKey
-	s.RUnlock()
+	inner := s.getCurrent()
+
+	lastSet := inner.lastStakingSigners
+	lastKey := inner.lastStakingKey
 
 	// get the signers delta and update the last list for the next comparison
 	newSignerKeys, missingSignerKeys, updatedSignerSet := identitiesDeltaKeys(signers, lastSet)
@@ -119,10 +139,15 @@ func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) 
 
 	// update the latest list and public key. The current thread may overwrite the result of another thread
 	// but the greedy algorithm remains valid.
-	s.Lock()
-	s.lastStakingSigners = updatedSignerSet
-	s.lastStakingKey = updatedKey
-	s.Unlock()
+
+	// create a new inner struct to hold the data, in a thread-safe way
+	nextInner := &aggregate{
+		lastStakingSigners: updatedSignerSet,
+		lastStakingKey:     updatedKey,
+	}
+
+	s.updateCurrent(nextInner)
+
 	return updatedKey, nil
 }
 
