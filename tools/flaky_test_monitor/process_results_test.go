@@ -20,10 +20,15 @@ func TestProcessTestRun(t *testing.T) {
 		"1 count all pass":                "test-result-crypto-hash-1-count-pass.json",
 		"1 count 1 fail the rest pass":    "test-result-crypto-hash-1-count-fail.json",
 		"1 count 2 skipped the rest pass": "test-result-crypto-hash-1-count-skip-pass.json",
-		"1 count skip all packages":       "test-result-crypto-hash-1-count-skip-all-packages.json", //raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
-		"2 count all pass":                "test-result-crypto-hash-2-count-pass.json",
-		"10 count all pass":               "test-result-crypto-hash-10-count-pass.json",
-		"10 count some failures":          "test-result-crypto-hash-10-count-fail.json",
+
+		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
+		"1 count skip all packages": "test-result-crypto-hash-1-count-skip-all-packages.json",
+		"2 count all pass":          "test-result-crypto-hash-2-count-pass.json",
+		"10 count all pass":         "test-result-crypto-hash-10-count-pass.json",
+		"10 count some failures":    "test-result-crypto-hash-10-count-fail.json",
+
+		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
+		//"1 count nil test": "test-result-nil-test-missing-result-1-count-pass.json",
 	}
 
 	for k, testJsonData := range testDataMap {
@@ -157,4 +162,9 @@ func (fileResultReader *FileResultReader) close() {
 func (fileResultReader FileResultReader) getResultsFileName() string {
 	t := time.Now()
 	return "test-run-" + strings.ReplaceAll(t.Format("2006-01-02-15-04-05.0000"), ".", "-") + ".json"
+}
+
+// don't want to save test result files when running unit tests in CI or locally
+func (fileResultReader FileResultReader) saveFiles() bool {
+	return false
 }

@@ -73,6 +73,10 @@ type ResultReader interface {
 
 	// where to save results - will be different for tests vs production
 	getResultsFileName() string
+
+	// for most unit testing and CI runs, not necessary to save results in json file
+	// only want to save result files in production when monitoring real tests
+	saveFiles() bool
 }
 
 type StdinResultReader struct {
@@ -91,6 +95,10 @@ func (stdinResultReader StdinResultReader) getResultsFileName() string {
 	return os.Args[1]
 }
 
+func (stdinResultReader StdinResultReader) saveFiles() bool {
+	return true
+}
+
 func processTestRun(resultReader ResultReader) TestRun {
 	reader := resultReader.getReader()
 	scanner := bufio.NewScanner(reader)
@@ -107,7 +115,10 @@ func processTestRun(resultReader ResultReader) TestRun {
 	postProcessTestRun(packageResultMap)
 
 	testRun := finalizeTestRun(packageResultMap)
-	testRun.save(resultReader.getResultsFileName())
+
+	if resultReader.saveFiles() {
+		testRun.save(resultReader.getResultsFileName())
+	}
 
 	return testRun
 }
