@@ -8,25 +8,27 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/access/swagger/generated"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type RestAPI struct {
+// RestAPIHandler provides the implementation of each of the REST API
+type RestAPIHandler struct {
 	backend *backend.Backend
 	logger  zerolog.Logger
 	encoder encoding.Encoder
 }
 
-func NewRestAPI(backend *backend.Backend, logger zerolog.Logger) *RestAPI {
-	return &RestAPI{
+func NewRestAPIHandler(backend *backend.Backend, logger zerolog.Logger) *RestAPIHandler {
+	return &RestAPIHandler{
 		backend: backend,
 		logger:  logger,
 		encoder: encoding.DefaultEncoder, //use the default JSON encoder
 	}
 }
 
-func (restAPI *RestAPI) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
+func (restAPI *RestAPIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	vars := mux.Vars(r)
 	idParam, ok := vars["id"]
@@ -40,10 +42,13 @@ func (restAPI *RestAPI) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 
 	ids := strings.Split(idParam, ",")
 
-	blocks := make([]*Block, len(ids))
+	blocks := make([]*generated.Block, len(ids))
 
 	for i, id := range ids {
 		flowID, err := flow.HexStringToIdentifier(id)
+		if err != nil {
+			restAPI.errorResponse(w, r, err)
+		}
 
 		flowBlock, err := restAPI.backend.GetBlockByID(r.Context(), flowID)
 		if err != nil {
@@ -56,11 +61,15 @@ func (restAPI *RestAPI) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		restAPI.errorResponse(w, r, err)
 	}
+
+	_, err = w.Write(encodedBlocks)
+	if err != nil {
+		restAPI.errorResponse(w, r, err)
+	}
 	w.WriteHeader(http.StatusOK)
-	w.Write(encodedBlocks)
 }
 
-func (restAPI *RestAPI) errorResponse(w http.ResponseWriter, r *http.Request, err error) {
+func (restAPI *RestAPIHandler) errorResponse(w http.ResponseWriter, r *http.Request, err error) {
 	w.WriteHeader(http.StatusInternalServerError)
 	encodedError, encodingErr := restAPI.encoder.Encode(err.Error())
 	if encodingErr != nil {
@@ -71,5 +80,4 @@ func (restAPI *RestAPI) errorResponse(w http.ResponseWriter, r *http.Request, er
 	if err != nil {
 		restAPI.logger.Err(err).Msg("failed to send error response")
 	}
-	return
 }

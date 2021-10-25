@@ -156,8 +156,8 @@ func New(log zerolog.Logger,
 		log,
 	)
 
-	restAPI := swagger.NewRestAPI(backend, log)
-	restServer := swagger.NewRestAPIServer(restAPI, config.RESTListenAddr)
+	restAPIHandler := swagger.NewRestAPIHandler(backend, log)
+	restServer := swagger.NewRestAPIServer(restAPIHandler, config.RESTListenAddr)
 
 	eng := &Engine{
 		log:                log,

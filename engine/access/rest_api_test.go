@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	"github.com/onflow/flow-go/crypto"
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
@@ -42,7 +41,6 @@ type RestAPITestSuite struct {
 	chainID    flow.ChainID
 	metrics    *metrics.NoopCollector
 	rpcEng     *rpc.Engine
-	publicKey  crypto.PublicKey
 
 	// storage
 	blocks       *storagemock.Blocks
