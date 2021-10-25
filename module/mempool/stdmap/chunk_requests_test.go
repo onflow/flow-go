@@ -9,7 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/verification/requester"
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -187,4 +189,52 @@ func TestFailingUpdater(t *testing.T) {
 		}(request.ID())
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish updating requests on time")
+}
+
+// TestAddingDuplicateChunkIDs evaluates adding duplicate chunk ID requests
+// that belong to an execution fork, i.e., same chunk ID appearing on two conflicting
+// execution results.
+func TestAddingDuplicateChunkIDs(t *testing.T) {
+	// initializations: creating mempool and populating it.
+	requests := stdmap.NewChunkRequests(10)
+
+	thisReq := unittest.ChunkDataPackRequestFixture()
+	require.True(t, requests.Add(thisReq))
+
+	// adding another request for the same tuple of (chunkID, resultID, chunkIndex)
+	// is deduplicated.
+	require.False(t, requests.Add(&verification.ChunkDataPackRequest{
+		Locator: chunks.Locator{
+			ResultID: thisReq.ResultID,
+			Index:    thisReq.Index,
+		},
+		ChunkID: thisReq.ChunkID,
+	}))
+
+	// adding another request for the same chunk ID but different result ID is stored.
+	otherReq := &verification.ChunkDataPackRequest{
+		Locator: chunks.Locator{
+			ResultID: unittest.IdentifierFixture(),
+			Index:    thisReq.Index,
+		},
+		ChunkID: thisReq.ChunkID,
+	}
+	require.True(t, requests.Add())
+
+	// mempool size is based on unique chunk ids, and we only store one
+	// chunk id.
+	require.Equal(t, requests.Size(), uint(1))
+
+	reqs, ok := requests.PopAll(thisReq.ChunkID)
+	require.True(t, ok)
+	require.True(t, reqs.Contains(thisReq))
+	require.True(t, reqs.Contains(otherReq))
+
+	// after poping all, mempool must be empty (since the requests for the only
+	// chunk id have been poped).
+	require.Equal(t, requests.Size(), uint(0))
+
+	_, ok = requests.PopAll(thisReq.ChunkID)
+	require.False(t, ok)
+
 }
