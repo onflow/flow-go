@@ -1220,7 +1220,7 @@ func ChunkDataResponseMessageListFixture(n int, opts ...func(*messages.ChunkData
 }
 
 // ChunkDataPackRequestListFixture creates and returns a list of chunk data pack requests fixtures.
-func ChunkDataPackRequestListFixture(n int, opts ...func(*verification.ChunkDataPackRequest)) []*verification.ChunkDataPackRequest {
+func ChunkDataPackRequestListFixture(n int, opts ...func(*verification.ChunkDataPackRequest)) verification.ChunkDataPackRequestList {
 	lst := make([]*verification.ChunkDataPackRequest, 0, n)
 	for i := 0; i < n; i++ {
 		lst = append(lst, ChunkDataPackRequestFixture(opts...))
