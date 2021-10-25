@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
@@ -813,16 +812,23 @@ func (fnb *FlowNodeBuilder) CriticalComponent(name string, f func(ctx irrecovera
 		}
 
 		select {
-		case <-ctx.Done():
-			log.Info().Msg("component startup aborted")
-			return
 		case <-readyAware.Ready():
-			log.Info().Msg("component startup complete")
+		case <-ctx.Done():
+			// address race condition caused by random selection when both select conditions
+			// are met at the same time
+			select {
+			case <-readyAware.Ready():
+			default:
+				log.Info().Msg("component startup aborted")
+				goto shutdown
+			}
 		}
 
+		log.Info().Msg("component startup complete")
 		ready()
-
 		<-ctx.Done()
+
+	shutdown:
 		log.Info().Msg("component shutdown started")
 
 		<-readyAware.Done()
@@ -857,19 +863,23 @@ func (fnb *FlowNodeBuilder) Component(name string, f func(ctx irrecoverable.Sign
 			log.Info().Msg("component initialization complete")
 
 			go func() {
-				select {
-				case <-ctx.Done():
-					log.Info().Msg("component startup aborted")
-					return
-				case <-c.Ready():
-					log.Info().Msg("component startup complete")
-				}
 
+				select {
+				case <-c.Ready():
+				case <-ctx.Done():
+					select {
+					case <-c.Ready():
+					default:
+						log.Info().Msg("component startup aborted")
+						log.Info().Msg("component shutdown started")
+						return
+					}
+				}
+				log.Info().Msg("component startup complete")
 				ready()
-				go func() {
-					<-ctx.Done()
-					log.Info().Msg("component shutdown started")
-				}()
+
+				<-ctx.Done()
+				log.Info().Msg("component shutdown started")
 			}()
 			return c, nil
 		}
@@ -883,7 +893,7 @@ func (fnb *FlowNodeBuilder) Component(name string, f func(ctx irrecoverable.Sign
 		}
 
 		err := component.RunComponent(ctx, componentFactory, errHandler)
-		if err != nil && !errors.Is(err, context.Canceled) {
+		if err != nil && err == ctx.Err() {
 			ctx.Throw(fmt.Errorf("component %s shutdown unexpectedly: %w", name, err))
 		}
 
@@ -1008,14 +1018,10 @@ func (fnb *FlowNodeBuilder) InitComponentBuilder() {
 			fnb.onStart(ctx)
 			ready()
 
-			<-ctx.Done()
-			go func() {
-				// run after all child components shutdown. this must be run inside a goroutine
-				// since main.Done() also depends on this worker exiting
-				main, _ := lookup("main")
-				<-main.Done()
-				fnb.closeDatabase()
-			}()
+			// runs after all other workers have completed
+			workers, _ := lookup("!main")
+			<-workers.Done()
+			fnb.closeDatabase()
 		}).
 		AddWorker("modules", func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 			main, _ := lookup("main")

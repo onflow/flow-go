@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 )
 
 // Component represents a component which can be started and stopped, and exposes
@@ -152,12 +153,23 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 }
 
 type ReadyFunc func()
+
+// LookupFunc returns a ReadyDoneAware interface for the worker identified by id, and a boolean
+// signalling if the worker exists.
+// id can be prefixed with ! to get a ReadyDoneAware interface for the collection of all workers
+// EXCEPT the id provided. This is particularly useful if there is a main worker that has shutdown
+// logic that should only run after all other workers have shutdown.
+//
+// Caution: waiting on workers can easily create deadlocks. use with care
 type LookupFunc func(workerID string) (module.ReadyDoneAware, bool)
 
 // ComponentWorker represents a worker routine of a component.
 // It takes a SignalerContext which can be used to throw any irrecoverable errors it encouters,
 // as well as a ReadyFunc which must be called to signal that it is ready. The ComponentManager
 // waits until all workers have signaled that they are ready before closing its own Ready channel.
+// It additionally takes a LookupFunc which allows the worker function to get a ReadyDoneAware
+// interface for any other worker routine. This provides a convenient interface for managing
+// inter worker dependencies.
 type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc, lookup LookupFunc)
 
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
@@ -276,7 +288,24 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	}
 }
 
+// lookupWorker returns a ReadyDoneAware interface for the worker specified by ID
+// prefix id with ! to get a ReadyDoneAware interface for the collection of all workers except the
+// provided id.
 func (c *ComponentManager) lookupWorker(id string) (module.ReadyDoneAware, bool) {
+	if id[0] == '!' {
+		workers := []module.ReadyDoneAware{}
+		for wid, w := range c.workersRegistry {
+			if wid != id[1:] {
+				workers = append(workers, w)
+			}
+		}
+		if len(workers) == 0 {
+			return nil, false
+		}
+
+		return module.NewCustomReadyDoneAware(util.AllReady(workers...), util.AllDone(workers...)), true
+	}
+
 	worker, exists := c.workersRegistry[id]
 	return worker, exists
 }
@@ -327,7 +356,7 @@ func newWorker(id string, f ComponentWorker) *worker {
 	}
 }
 
-// run call the worker's ComponentWorker function, and manages the ReadyDoneAware interface
+// run calls the worker's ComponentWorker function, and manages the ReadyDoneAware interface
 func (w *worker) run(ctx irrecoverable.SignalerContext, ready ReadyFunc, lookup LookupFunc) {
 	defer close(w.done)
 	var readyOnce sync.Once

@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
@@ -134,6 +135,7 @@ func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessN
 }
 
 type ConsensusFollowerImpl struct {
+	component.Component
 	NodeBuilder *access.UnstakedAccessNodeBuilder
 	consumersMu sync.RWMutex
 	consumers   []pubsub.OnBlockFinalizedConsumer
@@ -169,40 +171,9 @@ func NewConsensusFollower(
 
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(cf.onBlockFinalized)
 
-	cf.node = anb.Build().(*cmd.FlowNodeImp)
-	go func() {
-		select {
-		case <-cf.node.Ready():
-			anb.Logger.Info().Msg("Access node startup complete")
-		case <-cf.node.ShutdownSignal():
-			anb.Logger.Info().Msg("Access node startup aborted")
-			return
-		}
-	}()
-	go func() {
-		<-cf.node.ShutdownSignal()
-		anb.Logger.Info().Msg("Access node shutting down")
-		<-cf.node.Done()
-		anb.Logger.Info().Msg("Access node shutdown complete")
-	}()
+	cf.Component = anb.Build()
 
 	return cf, nil
-}
-
-func (cf *ConsensusFollowerImpl) Start(parent irrecoverable.SignalerContext) {
-	cf.node.Start(parent)
-}
-
-func (cf *ConsensusFollowerImpl) Ready() <-chan struct{} {
-	return cf.node.Ready()
-}
-
-func (cf *ConsensusFollowerImpl) Done() <-chan struct{} {
-	return cf.node.Done()
-}
-
-func (cf *ConsensusFollowerImpl) ShutdownSignal() <-chan struct{} {
-	return cf.node.ShutdownSignal()
 }
 
 // onBlockFinalized relays the block finalization event to all registered consumers.
@@ -228,13 +199,41 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 // code and call follower.Start() directly. This allows the implementor to inspect the irrecoverable
 // error returned on the error channel and restart if desired.
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
-
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go cf.Start(signalerCtx)
 
+	log := cf.NodeBuilder.Logger
+	go func() {
+		select {
+		case <-cf.Ready():
+		case <-signalerCtx.Done():
+			// startup may have completed at the same time
+			select {
+			case <-cf.Ready():
+			default:
+				log.Info().Msg("Access node startup aborted")
+				return
+			}
+		}
+		log.Info().Msg("Access node startup complete")
+	}()
+	go func() {
+		<-signalerCtx.Done()
+		log.Info().Msg("Access node shutting down")
+		<-cf.Done()
+		log.Info().Msg("Access node shutdown complete")
+	}()
+
 	select {
-	case err := <-errChan:
-		cf.NodeBuilder.Logger.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
 	case <-cf.Done():
+		// address race condition caused by random selection when both select conditions
+		// are met at the same time
+		select {
+		case err := <-errChan:
+			log.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
+		default:
+		}
+	case err := <-errChan:
+		log.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
 	}
 }

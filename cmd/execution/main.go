@@ -218,7 +218,7 @@ func main() {
 			// Since we don't have conditional component creation, we just use Noop one.
 			// It's functions will be once per startup/shutdown - non-measurable performance penalty
 			// blockDataUploader will stay nil and disable calling uploader at all
-			return &module.NoopReadDoneAware{}, nil
+			return &module.NoopReadyDoneAware{}, nil
 		}).
 		CriticalComponent("S3 block data uploader", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			if enableBlockDataUpload && s3BucketName != "" {
@@ -252,7 +252,7 @@ func main() {
 			// Since we don't have conditional component creation, we just use Noop one.
 			// It's functions will be once per startup/shutdown - non-measurable performance penalty
 			// blockDataUploader will stay nil and disable calling uploader at all
-			return &module.NoopReadDoneAware{}, nil
+			return &module.NoopReadyDoneAware{}, nil
 		}).
 		Module("state deltas mempool", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
