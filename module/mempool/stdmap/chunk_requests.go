@@ -73,13 +73,36 @@ func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.T
 }
 
 // Add provides insertion functionality into the memory pool.
-// The insertion is only successful if there is no duplicate chunk request with the same
-// chunk ID in the memory. Otherwise, it aborts the insertion and returns false.
+// The insertion is only successful if there is no duplicate chunk request for the same
+// tuple of (chunkID, resultID, chunkIndex).
 func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
-	status := &chunkRequestStatus{
-		ChunkDataPackRequest: request,
-	}
-	return cs.Backend.Add(status)
+	var result bool
+
+	_ = cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
+		entity, exists := backdata[request.ChunkID]
+
+		if !exists {
+			// no chunk request status exists for this chunk ID, hence initiating one.
+			status := &chunkRequestStatus{
+				ChunkDataPackRequestList: verification.ChunkDataPackRequestList{request},
+			}
+			result = cs.Backend.Add(status)
+			return nil
+		}
+
+		statuses := toChunkRequestStatus(entity)
+		if statuses.Contains(request) {
+			// chunk request status already exists for the tuple of (chunkID, resultID, chunkIndex)
+			// aborting insertion.
+			result = false
+			return nil
+		}
+
+		statuses.ChunkDataPackRequestList = append(statuses.ChunkDataPackRequestList, request)
+		return nil
+	})
+
+	return result
 }
 
 // Rem provides deletion functionality from the memory pool.
@@ -92,15 +115,15 @@ func (cs *ChunkRequests) Rem(chunkID flow.Identifier) bool {
 // GetAndRemove atomically removes chunk ID from the memory pool, while returning it.
 // Boolean return value indicates whether there is a request in the memory pool associated
 // with chunk ID.
-func (cs *ChunkRequests) GetAndRemove(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool) {
-	var status *verification.ChunkDataPackRequest
+func (cs *ChunkRequests) PopAll(chunkID flow.Identifier) (verification.ChunkDataPackRequestList, bool) {
+	var statuses verification.ChunkDataPackRequestList
 
 	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		entity, exists := backdata[chunkID]
 		if !exists {
 			return fmt.Errorf("not exist")
 		}
-		status = toChunkRequestStatus(entity).ChunkDataPackRequest
+		statuses = toChunkRequestStatus(entity).ChunkDataPackRequestList
 
 		delete(backdata, chunkID)
 
@@ -111,7 +134,7 @@ func (cs *ChunkRequests) GetAndRemove(chunkID flow.Identifier) (*verification.Ch
 		return nil, false
 	}
 
-	return status, true
+	return statuses, true
 }
 
 // IncrementAttempt increments the Attempt field of the corresponding status of the
@@ -171,17 +194,6 @@ func (cs *ChunkRequests) UpdateRequestHistory(chunkID flow.Identifier, updater m
 	return attempts, lastAttempt, retryAfter, err == nil
 }
 
-// All returns all chunk requests stored in this memory pool.
-func (cs *ChunkRequests) All() []*verification.ChunkDataPackRequest {
-	all := cs.Backend.All()
-	requests := make([]*verification.ChunkDataPackRequest, 0, len(all))
-	for _, entity := range all {
-		status := toChunkRequestStatus(entity)
-		requests = append(requests, status.ChunkDataPackRequest)
-	}
-	return requests
-}
-
 // Size returns total number of chunk requests in the memory pool.
 func (cs ChunkRequests) Size() uint {
 	return cs.Backend.Size()
@@ -190,16 +202,17 @@ func (cs ChunkRequests) Size() uint {
 // chunkRequestStatus is an internal data type for ChunkRequests mempool. It acts as a wrapper for ChunkDataRequests, maintaining
 // some auxiliary attributes that are internal to ChunkRequests.
 type chunkRequestStatus struct {
-	*verification.ChunkDataPackRequest
+	verification.ChunkDataPackRequestList
 	LastAttempt time.Time     // timestamp of last request dispatched for this chunk id.
 	RetryAfter  time.Duration // interval until request should be retried.
 	Attempt     uint64        // number of times this chunk request has been dispatched in the network.
 }
 
 func (c chunkRequestStatus) ID() flow.Identifier {
-	return c.ChunkID
+	// all requests in a chunk request status belong to the same chunk id.
+	return c.ChunkDataPackRequestList[0].ChunkID
 }
 
 func (c chunkRequestStatus) Checksum() flow.Identifier {
-	return c.ChunkID
+	return c.ChunkDataPackRequestList[0].ChunkID
 }
