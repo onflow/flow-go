@@ -146,6 +146,17 @@ func (cs *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	return err == nil
 }
 
+// All returns all chunk requests stored in this memory pool.
+func (cs *ChunkRequests) All() verification.ChunkDataPackRequestInfoList {
+	all := cs.Backend.All()
+	requestInfoList := verification.ChunkDataPackRequestInfoList{}
+	for _, entity := range all {
+		requestInfo := toChunkRequestStatus(entity).RequestInfo
+		requestInfoList = append(requestInfoList, &requestInfo)
+	}
+	return requestInfoList
+}
+
 // UpdateRequestHistory updates the request history of the specified chunk ID. If the update was successful, i.e.,
 // the updater returns true, the result of update is committed to the mempool, and the time stamp of the chunk request
 // is updated to the current time. Otherwise, it aborts and returns false.

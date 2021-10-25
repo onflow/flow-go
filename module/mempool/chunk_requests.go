@@ -61,7 +61,7 @@ type ChunkRequests interface {
 	// Add provides insertion functionality into the memory pool.
 	// The insertion is only successful if there is no duplicate chunk request with the same
 	// chunk ID in the memory. Otherwise, it aborts the insertion and returns false.
-	Add(request *verification.ChunkDataPackRequest) error
+	Add(request *verification.ChunkDataPackRequest) bool
 
 	// Rem provides deletion functionality from the memory pool.
 	// If there is a chunk request with this ID, Rem removes it and returns true.
@@ -89,6 +89,9 @@ type ChunkRequests interface {
 	//
 	// The updates under this method are atomic, thread-safe, and done in isolation.
 	UpdateRequestHistory(chunkID flow.Identifier, updater ChunkRequestHistoryUpdaterFunc) (uint64, time.Time, time.Duration, bool)
+
+	// All returns all chunk requests stored in this memory pool.
+	All() verification.ChunkDataPackRequestInfoList
 
 	// Size returns total number of chunk requests in the memory pool.
 	Size() uint
