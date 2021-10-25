@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"sync/atomic"
 	"unsafe"
-	_ "unsafe"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
