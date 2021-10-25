@@ -3,6 +3,7 @@ package mempool
 import (
 	"time"
 
+	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/verification"
 )
@@ -60,17 +61,18 @@ type ChunkRequests interface {
 	// Add provides insertion functionality into the memory pool.
 	// The insertion is only successful if there is no duplicate chunk request with the same
 	// chunk ID in the memory. Otherwise, it aborts the insertion and returns false.
-	Add(request *verification.ChunkDataPackRequest) bool
+	Add(request *verification.ChunkDataPackRequest) error
 
 	// Rem provides deletion functionality from the memory pool.
 	// If there is a chunk request with this ID, Rem removes it and returns true.
 	// Otherwise, it returns false.
 	Rem(chunkID flow.Identifier) bool
 
-	// GetAndRemove atomically removes chunk ID from the memory pool, while returning it.
-	// Boolean return value indicates whether there is a request in the memory pool associated
+	// PopAll atomically returns all locators associated with this chunk ID while clearing out the
+	// chunk request status for this chunk id.
+	// Boolean return value indicates whether there are requests in the memory pool associated
 	// with chunk ID.
-	PopAll(chunkID flow.Identifier) (verification.ChunkDataPackRequestList, bool)
+	PopAll(chunkID flow.Identifier) (chunks.LocatorList, bool)
 
 	// IncrementAttempt increments the Attempt field of the corresponding status of the
 	// chunk request in memory pool that has the specified chunk ID.
