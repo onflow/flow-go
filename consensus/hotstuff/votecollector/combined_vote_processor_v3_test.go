@@ -24,7 +24,7 @@ func TestCombinedVoteProcessor(t *testing.T) {
 	suite.Run(t, new(CombinedVoteProcessorTestSuite))
 }
 
-// CombinedVoteProcessorTestSuite is a test suite that holds mocked state for isolated testing of CombinedVoteProcessor.
+// CombinedVoteProcessorTestSuite is a test suite that holds mocked state for isolated testing of CombinedVoteProcessorV3.
 type CombinedVoteProcessorTestSuite struct {
 	VoteProcessorTestSuiteBase
 
@@ -37,7 +37,7 @@ type CombinedVoteProcessorTestSuite struct {
 	reconstructor   *mockhotstuff.RandomBeaconReconstructor
 
 	minRequiredShares uint64
-	processor         *CombinedVoteProcessor
+	processor         *CombinedVoteProcessorV3
 }
 
 func (s *CombinedVoteProcessorTestSuite) SetupTest() {
@@ -75,7 +75,7 @@ func (s *CombinedVoteProcessorTestSuite) SetupTest() {
 		return s.rbSharesTotal >= s.minRequiredShares
 	}).Maybe()
 
-	s.processor = &CombinedVoteProcessor{
+	s.processor = &CombinedVoteProcessorV3{
 		log:              unittest.Logger(),
 		block:            s.proposal.Block,
 		stakingSigAggtor: s.stakingAggregator,
@@ -94,7 +94,7 @@ func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.processor.Status())
 }
 
-// TestProcess_VoteNotForProposal tests that CombinedVoteProcessor accepts only votes for the block it was initialized with
+// TestProcess_VoteNotForProposal tests that CombinedVoteProcessorV3 accepts only votes for the block it was initialized with
 // according to interface specification of `VoteProcessor`, we expect dedicated sentinel errors for votes
 // for different views (`VoteForIncompatibleViewError`) _or_ block (`VoteForIncompatibleBlockError`).
 func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
@@ -123,7 +123,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignatureFormat() {
 	require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
 }
 
-// TestProcess_InvalidSignature tests that CombinedVoteProcessor doesn't collect signatures for votes with invalid signature.
+// TestProcess_InvalidSignature tests that CombinedVoteProcessorV3 doesn't collect signatures for votes with invalid signature.
 // Checks are made for cases where both staking and threshold signatures were submitted.
 func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 	exception := errors.New("unexpected-exception")
@@ -239,8 +239,8 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 	createProcessor := func(stakingAggregator *mockhotstuff.WeightedSignatureAggregator,
 		rbSigAggregator *mockhotstuff.WeightedSignatureAggregator,
 		rbReconstructor *mockhotstuff.RandomBeaconReconstructor,
-		packer *mockhotstuff.Packer) *CombinedVoteProcessor {
-		return &CombinedVoteProcessor{
+		packer *mockhotstuff.Packer) *CombinedVoteProcessorV3 {
+		return &CombinedVoteProcessorV3{
 			log:              unittest.Logger(),
 			block:            s.proposal.Block,
 			stakingSigAggtor: stakingAggregator,

@@ -35,7 +35,7 @@ type combinedVoteProcessorFactoryBase struct {
 	packer      hotstuff.Packer
 }
 
-// Create creates CombinedVoteProcessor for processing votes for the given block.
+// Create creates CombinedVoteProcessorV3 for processing votes for the given block.
 // Caller must treat all errors as exceptions
 func (f *combinedVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
 	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
@@ -60,7 +60,7 @@ func (f *combinedVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.
 
 	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
 
-	return &CombinedVoteProcessor{
+	return &CombinedVoteProcessorV3{
 		log:              f.log,
 		block:            block,
 		stakingSigAggtor: stakingSigAggtor,
@@ -73,15 +73,15 @@ func (f *combinedVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.
 	}, nil
 }
 
-/* ****************** CombinedVoteProcessor Implementation ****************** */
+/* ****************** CombinedVoteProcessorV3 Implementation ****************** */
 
-// CombinedVoteProcessor implements the hotstuff.VerifyingVoteProcessor interface.
+// CombinedVoteProcessorV3 implements the hotstuff.VerifyingVoteProcessor interface.
 // It processes votes from the main consensus committee, where participants vote in
 // favour of a block by proving either their staking key signature or their random
 // beacon signature. In the former case, the participant only contributes to HotStuff
 // progress; while in the latter case, the voter also contributes to running the
 // random beacon. Concurrency safe.
-type CombinedVoteProcessor struct {
+type CombinedVoteProcessorV3 struct {
 	log              zerolog.Logger
 	block            *model.Block
 	stakingSigAggtor hotstuff.WeightedSignatureAggregator
@@ -93,15 +93,15 @@ type CombinedVoteProcessor struct {
 	done             atomic.Bool
 }
 
-var _ hotstuff.VoteProcessor = &CombinedVoteProcessor{}
+var _ hotstuff.VoteProcessor = &CombinedVoteProcessorV3{}
 
 // Block returns block that is part of proposal that we are processing votes for.
-func (p *CombinedVoteProcessor) Block() *model.Block {
+func (p *CombinedVoteProcessorV3) Block() *model.Block {
 	return p.block
 }
 
 // Status returns status of this vote processor, it's always verifying.
-func (p *CombinedVoteProcessor) Status() hotstuff.VoteCollectorStatus {
+func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 	return hotstuff.VoteCollectorStatusVerifying
 }
 
@@ -114,7 +114,7 @@ func (p *CombinedVoteProcessor) Status() hotstuff.VoteCollectorStatus {
 // * VoteForIncompatibleViewError - submitted vote for incompatible view
 // * model.InvalidVoteError - submitted vote with invalid signature
 // All other errors should be treated as exceptions.
-func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
+func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
 		return fmt.Errorf("received incompatible vote %v: %w", vote.ID(), err)
@@ -207,7 +207,7 @@ func (p *CombinedVoteProcessor) Process(vote *model.Vote) error {
 // buildQC performs aggregation and reconstruction of signatures when we have collected enough weight
 // for building QC. This function is run only once by single worker.
 // Any error should be treated as exception.
-func (p *CombinedVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
+func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 	stakingSigners, aggregatedStakingSig, err := p.stakingSigAggtor.Aggregate()
 	if err != nil {
 		return nil, fmt.Errorf("could not aggregate staking signature: %w", err)
