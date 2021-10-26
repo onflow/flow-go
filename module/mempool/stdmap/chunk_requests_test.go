@@ -208,7 +208,6 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 			ResultID: thisReq.ResultID,
 			Index:    thisReq.Index,
 		},
-		ChunkID: thisReq.ChunkID,
 	}))
 
 	// adding another request for the same chunk ID but different result ID is stored.
@@ -217,18 +216,20 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 			ResultID: unittest.IdentifierFixture(),
 			Index:    thisReq.Index,
 		},
-		ChunkID: thisReq.ChunkID,
+		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+			ChunkID: thisReq.ChunkID,
+		},
 	}
-	require.True(t, requests.Add())
+	require.True(t, requests.Add(otherReq))
 
 	// mempool size is based on unique chunk ids, and we only store one
 	// chunk id.
 	require.Equal(t, requests.Size(), uint(1))
 
-	reqs, ok := requests.PopAll(thisReq.ChunkID)
+	locators, ok := requests.PopAll(thisReq.ChunkID)
 	require.True(t, ok)
-	require.True(t, reqs.Contains(thisReq))
-	require.True(t, reqs.Contains(otherReq))
+	require.True(t, locators.Contains(&thisReq.Locator))
+	require.True(t, locators.Contains(&otherReq.Locator))
 
 	// after poping all, mempool must be empty (since the requests for the only
 	// chunk id have been poped).

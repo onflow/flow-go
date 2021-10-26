@@ -877,11 +877,13 @@ func chunkRequestFixture(resultID flow.Identifier,
 			ResultID: resultID,
 			Index:    status.ChunkIndex,
 		},
-		ChunkID:   status.Chunk().ID(),
-		Height:    status.BlockHeight,
-		Agrees:    agrees.NodeIDs(),
-		Disagrees: disagrees.NodeIDs(),
-		Targets:   agrees.Union(disagrees),
+		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+			ChunkID:   status.Chunk().ID(),
+			Height:    status.BlockHeight,
+			Agrees:    agrees.NodeIDs(),
+			Disagrees: disagrees.NodeIDs(),
+			Targets:   agrees.Union(disagrees),
+		},
 	}
 }
 
