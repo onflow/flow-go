@@ -5,8 +5,6 @@ package badger
 import (
 	"errors"
 	"fmt"
-	"log"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/mapfunc"
@@ -277,7 +275,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	}
 
 	// walk through the chain backward until we reach the block referenced by
-	// the latest seal - the returned seg includes this block
+	// the latest seal - the returned segment includes this block
 	segment := flow.NewSealingSegment()
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
@@ -290,7 +288,6 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 
 		for _, receipt := range block.Payload.Receipts {
 			if segment.ContainsExecutionResult(receipt.ResultID) {
-				log.Println("ContainsExecutionResult")
 				continue
 			}
 
@@ -310,7 +307,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 
 	err = fork.TraverseForward(s.state.headers, s.blockID, scraper, fork.IncludingBlock(seal.BlockID))
 	if err != nil {
-		return nil, fmt.Errorf("could not traverse sealing seg: %w", err)
+		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)
 	}
 
 	return segment, nil
