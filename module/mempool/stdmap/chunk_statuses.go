@@ -54,7 +54,7 @@ func (cs ChunkStatuses) Get(chunkIndex uint64, resultID flow.Identifier) (*verif
 // The insertion is only successful if there is no duplicate status with the same
 // chunk ID in the memory. Otherwise, it aborts the insertion and returns false.
 func (cs *ChunkStatuses) Add(status *verification.ChunkStatus) bool {
-	return cs.Backend.Add(&storedChunkStatus{
+	return cs.Backend.Add(storedChunkStatus{
 		ChunkIndex:      status.ChunkIndex,
 		ExecutionResult: status.ExecutionResult,
 		BlockHeight:     status.BlockHeight,

@@ -199,14 +199,14 @@ func TestChunkResponse_RemovingStatusFails(t *testing.T) {
 	mockPendingChunksGet(s.pendingChunks, statuses)
 	mockStateAtBlockIDForIdentities(s.state, block.ID(), agrees)
 
+	chunkLocatorID := chunks.ChunkLocatorID(statuses[0].ExecutionResult.ID(), statuses[0].ChunkIndex)
 	// trying to remove the pending status fails.
 	mockPendingChunksRem(t, s.pendingChunks, statuses, false)
 
-	status := statuses[0]
 	chunkDataPacks, _ := verifiableChunksFixture(t, statuses, block, result, collMap)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Once()
-	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[status.ID()])
+	e.HandleChunkDataPack(agrees[0].NodeID, chunkDataPacks[chunkLocatorID])
 
 	// no verifiable chunk should be passed to verifier engine
 	// and chunk consumer should not get any notification
@@ -377,15 +377,15 @@ func testInvalidChunkDataResponse(t *testing.T,
 	mockPendingChunksGet(s.pendingChunks, statuses)
 	mockBlocksStorage(s.blocks, s.headers, block)
 
-	statusID := statuses[0].ID()
+	chunkLocatorID := chunks.ChunkLocatorID(statuses[0].ExecutionResult.ID(), statuses[0].ChunkIndex)
 	responses, _ := verifiableChunksFixture(t, statuses, block, result, collMap)
 
 	// alters chunk data pack so that it become invalid.
-	alterChunkDataResponse(responses[statusID].Cdp)
+	alterChunkDataResponse(responses[chunkLocatorID].Cdp)
 	mockStateFunc(*agrees[0], s.state, block.ID())
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(responses))
-	e.HandleChunkDataPack(agrees[0].NodeID, responses[statusID])
+	e.HandleChunkDataPack(agrees[0].NodeID, responses[chunkLocatorID])
 
 	mock.AssertExpectationsForObjects(t, s.pendingChunks, s.metrics)
 	// no verifiable chunk should be passed to verifier engine
@@ -414,11 +414,13 @@ func TestChunkResponse_MissingStatus(t *testing.T) {
 	status := statuses[0]
 	responses, _ := verifiableChunksFixture(t, statuses, block, result, collMap)
 
+	chunkLocatorID := chunks.ChunkLocatorID(statuses[0].ExecutionResult.ID(), statuses[0].ChunkIndex)
+
 	// mocks there is no pending status for this chunk at fetcher engine.
 	s.pendingChunks.On("Get", status.ChunkIndex, result.ID()).Return(nil, false)
 
 	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(responses))
-	e.HandleChunkDataPack(unittest.IdentifierFixture(), responses[status.ID()])
+	e.HandleChunkDataPack(unittest.IdentifierFixture(), responses[chunkLocatorID])
 
 	mock.AssertExpectationsForObjects(t, s.pendingChunks, s.metrics)
 
@@ -555,11 +557,11 @@ func mockPendingChunksAdd(t *testing.T, pendingChunks *mempool.ChunkStatuses, li
 			require.True(t, ok)
 
 			// there should be a matching chunk status with the received one.
-			statusID := actual.ID()
+			actualLocatorID := chunks.ChunkLocatorID(actual.ExecutionResult.ID(), actual.ChunkIndex)
 
 			for _, expected := range list {
-				expectedID := expected.ID()
-				if expectedID == statusID {
+				expectedLocatorID := chunks.ChunkLocatorID(expected.ExecutionResult.ID(), expected.ChunkIndex)
+				if expectedLocatorID == actualLocatorID {
 					require.Equal(t, expected.ExecutionResult, actual.ExecutionResult)
 					return
 				}
@@ -770,7 +772,9 @@ func chunkDataPackResponsesFixture(t *testing.T,
 		coll, ok := collMap[chunkID]
 		// only non-system chunks must have a collection
 		require.Equal(t, ok, !fetcher.IsSystemChunk(status.ChunkIndex, result))
-		responses[status.ID()] = chunkDataPackResponseFixture(t, status, coll, result)
+
+		chunkLocatorID := chunks.ChunkLocatorID(status.ExecutionResult.ID(), status.ChunkIndex)
+		responses[chunkLocatorID] = chunkDataPackResponseFixture(t, status, coll, result)
 	}
 
 	return responses
@@ -810,16 +814,16 @@ func verifiableChunksFixture(t *testing.T,
 
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
 	for _, status := range statuses {
-		statusID := status.ID()
+		chunkLocatorID := chunks.ChunkLocatorID(status.ExecutionResult.ID(), status.ChunkIndex)
 
-		response, ok := responses[status.ID()]
+		response, ok := responses[chunkLocatorID]
 		require.True(t, ok, "missing chunk data pack")
 
 		// to account for duplicate chunks on execution result forks
 		// we consider verifiable chunks distinct based on their chunk locator.
 		// so on an execution fork, we may have duplicate chunk IDs each belonging to a
 		// distinct result, and hence having a distinct verifiable chunk.
-		verifiableChunks[statusID] = verifiableChunkFixture(t, status.Chunk(), block, status.ExecutionResult, response.Cdp)
+		verifiableChunks[chunkLocatorID] = verifiableChunkFixture(t, status.Chunk(), block, status.ExecutionResult, response.Cdp)
 	}
 
 	return responses, verifiableChunks
@@ -857,7 +861,8 @@ func chunkRequestsFixture(
 
 	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
 	for _, status := range statuses {
-		requests[status.ID()] = chunkRequestFixture(resultID, status, agrees, disagrees)
+		chunkLocatorID := chunks.ChunkLocatorID(status.ExecutionResult.ID(), status.ChunkIndex)
+		requests[chunkLocatorID] = chunkRequestFixture(resultID, status, agrees, disagrees)
 	}
 
 	return requests
