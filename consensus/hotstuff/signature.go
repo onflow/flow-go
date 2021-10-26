@@ -9,7 +9,7 @@ import (
 // group signature with enough shares.
 type RandomBeaconReconstructor interface {
 	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message agreed about upfront.
-	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
+	Verify(signerID flow.Identifier, sig crypto.Signature) error
 
 	// TrustedAdd adds the signature share to the reconstructors internal
 	// state. Validity of signature is not checked. It is up to the

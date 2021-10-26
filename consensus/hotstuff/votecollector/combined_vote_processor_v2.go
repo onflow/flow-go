@@ -51,11 +51,6 @@ func (f *combinedVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.ConsensusVoteTag)
-	if err != nil {
-		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
-	}
-
 	rbRector := &signature.RandomBeaconReconstructor{} // TODO: initialize properly when ready
 
 	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
@@ -64,7 +59,6 @@ func (f *combinedVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.
 		log:              f.log,
 		block:            block,
 		stakingSigAggtor: stakingSigAggtor,
-		rbSigAggtor:      rbSigAggtor,
 		rbRector:         rbRector,
 		onQCCreated:      f.onQCCreated,
 		packer:           f.packer,
@@ -85,7 +79,6 @@ type CombinedVoteProcessorV2 struct {
 	log              zerolog.Logger
 	block            *model.Block
 	stakingSigAggtor hotstuff.WeightedSignatureAggregator
-	rbSigAggtor      hotstuff.WeightedSignatureAggregator
 	rbRector         hotstuff.RandomBeaconReconstructor
 	onQCCreated      hotstuff.OnQCCreated
 	packer           hotstuff.Packer
@@ -124,7 +117,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	if p.done.Load() {
 		return nil
 	}
-	sigType, sig, err := signature.DecodeSingleSig(vote.SigData)
+	stakingSig, randomBeaconSig, err := signature.DecodeDoubleSig(vote.SigData)
 	if err != nil {
 		if errors.Is(err, msig.ErrInvalidFormat) {
 			return model.NewInvalidVoteErrorf(vote, "could not decode signature: %w", err)
@@ -132,27 +125,23 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
 	}
 
-	switch sigType {
+	// verify staking sig
+	err = p.stakingSigAggtor.Verify(vote.SignerID, stakingSig)
+	if err != nil {
+		if errors.Is(err, msig.ErrInvalidFormat) {
+			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid staking signature: %w",
+				vote.ID(), vote.View, err)
+		}
+		return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
+	}
 
-	case hotstuff.SigTypeStaking:
-		err := p.stakingSigAggtor.Verify(vote.SignerID, sig)
-		if err != nil {
-			if errors.Is(err, msig.ErrInvalidFormat) {
-				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid staking signature: %w",
-					vote.ID(), vote.View, err)
-			}
-			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
-		}
-		if p.done.Load() {
-			return nil
-		}
-		_, err = p.stakingSigAggtor.TrustedAdd(vote.SignerID, sig)
-		if err != nil {
-			return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
-		}
+	if p.done.Load() {
+		return nil
+	}
 
-	case hotstuff.SigTypeRandomBeacon:
-		err := p.rbSigAggtor.Verify(vote.SignerID, sig)
+	// verify random beacon sig
+	if randomBeaconSig != nil {
+		err = p.rbRector.Verify(vote.SignerID, randomBeaconSig)
 		if err != nil {
 			if errors.Is(err, msig.ErrInvalidFormat) {
 				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid random beacon signature: %w",
@@ -160,25 +149,27 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 			}
 			return fmt.Errorf("internal error checking signature validity for vote %v: %w", vote.ID(), err)
 		}
+	}
 
-		if p.done.Load() {
-			return nil
-		}
-		_, err = p.rbSigAggtor.TrustedAdd(vote.SignerID, sig)
-		if err != nil {
-			return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
-		}
-		_, err = p.rbRector.TrustedAdd(vote.SignerID, sig)
+	if p.done.Load() {
+		return nil
+	}
+
+	// aggregate staking sig
+	_, err = p.stakingSigAggtor.TrustedAdd(vote.SignerID, stakingSig)
+	if err != nil {
+		return fmt.Errorf("adding the signature to staking aggregator failed for vote %v: %w", vote.ID(), err)
+	}
+	// aggregate random beacon sig
+	if randomBeaconSig != nil {
+		_, err = p.rbRector.TrustedAdd(vote.SignerID, randomBeaconSig)
 		if err != nil {
 			return fmt.Errorf("adding the signature to random beacon reconstructor failed for vote %v: %w", vote.ID(), err)
 		}
-
-	default:
-		return model.NewInvalidVoteErrorf(vote, "invalid signature type %d: %w", sigType, msig.ErrInvalidFormat)
 	}
 
 	// checking of conditions for building QC are satisfied
-	if p.stakingSigAggtor.TotalWeight()+p.rbSigAggtor.TotalWeight() < p.minRequiredStake {
+	if p.stakingSigAggtor.TotalWeight() < p.minRequiredStake {
 		return nil
 	}
 	if !p.rbRector.HasSufficientShares() {
@@ -212,10 +203,6 @@ func (p *CombinedVoteProcessorV2) buildQC() (*flow.QuorumCertificate, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not aggregate staking signature: %w", err)
 	}
-	beaconSigners, aggregatedRandomBeaconSig, err := p.rbSigAggtor.Aggregate()
-	if err != nil {
-		return nil, fmt.Errorf("could not aggregate random beacon signatures: %w", err)
-	}
 	reconstructedBeaconSig, err := p.rbRector.Reconstruct()
 	if err != nil {
 		return nil, fmt.Errorf("could not reconstruct random beacon group signature: %w", err)
@@ -223,9 +210,9 @@ func (p *CombinedVoteProcessorV2) buildQC() (*flow.QuorumCertificate, error) {
 
 	blockSigData := &hotstuff.BlockSignatureData{
 		StakingSigners:               stakingSigners,
-		RandomBeaconSigners:          beaconSigners,
+		RandomBeaconSigners:          nil,
 		AggregatedStakingSig:         aggregatedStakingSig,
-		AggregatedRandomBeaconSig:    aggregatedRandomBeaconSig,
+		AggregatedRandomBeaconSig:    nil,
 		ReconstructedRandomBeaconSig: reconstructedBeaconSig,
 	}
 
