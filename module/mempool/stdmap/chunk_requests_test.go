@@ -220,7 +220,9 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 			Index:    thisReq.Index,
 		},
 		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
-			ChunkID: thisReq.ChunkID,
+			ChunkID:   thisReq.ChunkID,
+			Agrees:    unittest.IdentifierListFixture(2),
+			Disagrees: unittest.IdentifierListFixture(2),
 		},
 	}
 	require.True(t, requests.Add(otherReq))
@@ -228,6 +230,14 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 	// mempool size is based on unique chunk ids, and we only store one
 	// chunk id.
 	require.Equal(t, requests.Size(), uint(1))
+
+	// All method must return request info, which is also bound by chunk id.
+	reqInfoList := requests.All()
+	require.Len(t, reqInfoList, 1)
+	require.Equal(t, thisReq.ChunkID, reqInfoList[0].ChunkID)
+	// agrees and disagrees must be union of all requests for that chunk ID.
+	require.ElementsMatch(t, thisReq.Agrees.Union(otherReq.Agrees), reqInfoList[0].Agrees)
+	require.ElementsMatch(t, thisReq.Disagrees.Union(otherReq.Disagrees), reqInfoList[0].Disagrees)
 
 	locators, ok := requests.PopAll(thisReq.ChunkID)
 	require.True(t, ok)
@@ -238,7 +248,9 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 	// chunk id have been poped).
 	require.Equal(t, requests.Size(), uint(0))
 
-	_, ok = requests.PopAll(thisReq.ChunkID)
+	// PopAll on a non-existing chunk ID must return false
+	locators, ok = requests.PopAll(thisReq.ChunkID)
 	require.False(t, ok)
+	require.Nil(t, locators)
 
 }
