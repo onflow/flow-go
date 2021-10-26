@@ -1,7 +1,6 @@
 package fetcher_test
 
 import (
-	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -52,18 +51,19 @@ func TestProcessDuplicateChunksWithDifferentResults(t *testing.T) {
 	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
 	requests[requestA.ID()] = requestA
 	requests[requestB.ID()] = requestB
-	fmt.Printf("requestA: %v \n", requestA)
-	fmt.Printf("requestB: %v \n", requestB)
+
+	chunkALocatorID := chunks.ChunkLocatorID(statusA.ExecutionResult.ID(), statusA.ChunkIndex)
+	chunkBLocatorID := chunks.ChunkLocatorID(statusB.ExecutionResult.ID(), statusB.ChunkIndex)
 
 	// chunk data responses
 	chunkDataResponse := make(map[flow.Identifier]*verification.ChunkDataPackResponse)
-	chunkDataResponse[statusA.ID()] = chunkDataPackResponseFixture(t, statusA, collMap[statusA.Chunk().ID()], resultA)
-	chunkDataResponse[statusB.ID()] = chunkDataPackResponseFixture(t, statusB, collMap[statusA.Chunk().ID()], resultB)
+	chunkDataResponse[chunkALocatorID] = chunkDataPackResponseFixture(t, statusA, collMap[statusA.Chunk().ID()], resultA)
+	chunkDataResponse[chunkBLocatorID] = chunkDataPackResponseFixture(t, statusB, collMap[statusA.Chunk().ID()], resultB)
 
 	// verifiable chunks
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
-	verifiableChunks[statusA.ID()] = verifiableChunkFixture(t, statusA.Chunk(), block, resultA, chunkDataResponse[statusA.ID()].Cdp)
-	verifiableChunks[statusB.ID()] = verifiableChunkFixture(t, statusA.Chunk(), block, resultB, chunkDataResponse[statusB.ID()].Cdp)
+	verifiableChunks[chunkALocatorID] = verifiableChunkFixture(t, statusA.Chunk(), block, resultA, chunkDataResponse[chunkALocatorID].Cdp)
+	verifiableChunks[chunkBLocatorID] = verifiableChunkFixture(t, statusA.Chunk(), block, resultB, chunkDataResponse[chunkBLocatorID].Cdp)
 
 	// fetcher engine should request chunk data for received (assigned) chunk locators
 	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(requests))
@@ -79,7 +79,7 @@ func TestProcessDuplicateChunksWithDifferentResults(t *testing.T) {
 	// chunk data responses, and notify the consumer that it is done with processing chunk.
 	s.metrics.On("OnVerifiableChunkSentToVerifier").Return().Times(len(verifiableChunks))
 	verifierWG := mockVerifierEngine(t, s.verifier, verifiableChunks)
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(assignedChunkStatuses))
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.IdentifierList{chunkALocatorID, chunkBLocatorID})
 
 	// passes chunk data requests in parallel.
 	processWG := &sync.WaitGroup{}
@@ -130,11 +130,6 @@ func executionResultForkFixture(t *testing.T) (*flow.Block,
 		ExecutionResult: resultB,
 		BlockHeight:     block.Header.Height,
 	}
-
-	// although chunk statuses should have the same chunk ID,
-	// they should have distinct identifiers themselves.
-	require.Equal(t, statusA.ChunkID(), statusB.ChunkID())
-	require.NotEqual(t, statusA.ID(), statusB.ID())
 
 	// keeps collections of assigned chunks
 	collMap := make(map[flow.Identifier]*flow.Collection)
