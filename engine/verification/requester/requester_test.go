@@ -104,7 +104,13 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	originID := unittest.IdentifierFixture()
 
 	// we remove pending request on receiving this response
-	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(request, true).Once()
+	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(
+		chunks.LocatorList{
+			&chunks.Locator{
+				ResultID: request.ResultID,
+				Index:    request.Index,
+			},
+		}, true).Once()
 
 	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
 		Locator: chunks.Locator{
