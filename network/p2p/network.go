@@ -380,7 +380,7 @@ func (n *Network) multicast(channel network.Channel, message interface{}, num ui
 		return network.EmptyTargetList
 	}
 
-	err := n.sendOnChannel(channel, message, targetIDs)
+	err := n.sendOnChannel(channel, message, selectedIDs)
 
 	// publishes the message to the selected targets
 	if err != nil {
