@@ -20,11 +20,15 @@ func NewChunkStatuses(limit uint) *ChunkStatuses {
 }
 
 func chunkStatus(entity flow.Entity) *verification.ChunkStatus {
-	chunk, ok := entity.(*verification.ChunkStatus)
+	status, ok := entity.(storedChunkStatus)
 	if !ok {
 		panic(fmt.Sprintf("could not convert the entity into chunk status from the mempool: %v", entity))
 	}
-	return chunk
+	return &verification.ChunkStatus{
+		ChunkIndex:      status.ChunkIndex,
+		ExecutionResult: status.ExecutionResult,
+		BlockHeight:     status.BlockHeight,
+	}
 }
 
 // ByID returns a chunk status by its chunk ID.
@@ -35,10 +39,13 @@ func (cs ChunkStatuses) Get(chunkIndex uint64, resultID flow.Identifier) (*verif
 		ResultID: resultID,
 		Index:    chunkIndex,
 	}.ID()
+
 	entity, exists := cs.Backend.ByID(locatorID)
+
 	if !exists {
 		return nil, false
 	}
+
 	status := chunkStatus(entity)
 	return status, true
 }
@@ -47,7 +54,11 @@ func (cs ChunkStatuses) Get(chunkIndex uint64, resultID flow.Identifier) (*verif
 // The insertion is only successful if there is no duplicate status with the same
 // chunk ID in the memory. Otherwise, it aborts the insertion and returns false.
 func (cs *ChunkStatuses) Add(status *verification.ChunkStatus) bool {
-	return cs.Backend.Add(status)
+	return cs.Backend.Add(&storedChunkStatus{
+		ChunkIndex:      status.ChunkIndex,
+		ExecutionResult: status.ExecutionResult,
+		BlockHeight:     status.BlockHeight,
+	})
 }
 
 // Rem provides deletion functionality from the memory pool based on the pair of
@@ -76,4 +87,32 @@ func (cs ChunkStatuses) All() []*verification.ChunkStatus {
 // Size returns total number of chunk statuses in the memory pool.
 func (cs ChunkStatuses) Size() uint {
 	return cs.Backend.Size()
+}
+
+// storedChunkStatus is an internal type for storing ChunkStatus in the mempool.
+//
+// It is the same as ChunkStatus, but additionally it implements an Entity type which
+// makes it storable in the mempool.
+// Note that as an entity, the ID of a storedChunkStatus is computed as the ID of the chunk locator
+// it represents. However, the usage of ID method is only confined to maintaining it on the mempool.
+// That is the motivation behind making it an internal type to make sure that no further decision out of
+// this package is taken based on ID of storedChunkStatus.
+type storedChunkStatus struct {
+	ChunkIndex      uint64
+	ExecutionResult *flow.ExecutionResult
+	BlockHeight     uint64
+}
+
+func (s storedChunkStatus) ID() flow.Identifier {
+	return chunks.Locator{
+		ResultID: s.ExecutionResult.ID(),
+		Index:    s.ChunkIndex,
+	}.ID()
+}
+
+func (s storedChunkStatus) Checksum() flow.Identifier {
+	return chunks.Locator{
+		ResultID: s.ExecutionResult.ID(),
+		Index:    s.ChunkIndex,
+	}.ID()
 }

@@ -1,7 +1,6 @@
 package verification
 
 import (
-	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -10,20 +9,6 @@ type ChunkStatus struct {
 	ChunkIndex      uint64
 	ExecutionResult *flow.ExecutionResult
 	BlockHeight     uint64
-}
-
-func (s ChunkStatus) ID() flow.Identifier {
-	return chunks.Locator{
-		ResultID: s.ExecutionResult.ID(),
-		Index:    s.ChunkIndex,
-	}.ID()
-}
-
-func (s ChunkStatus) Checksum() flow.Identifier {
-	return chunks.Locator{
-		ResultID: s.ExecutionResult.ID(),
-		Index:    s.ChunkIndex,
-	}.ID()
 }
 
 func (s ChunkStatus) Chunk() *flow.Chunk {
