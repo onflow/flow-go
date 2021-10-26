@@ -508,7 +508,9 @@ func main() {
 
 			return manager, err
 		}).
-		Build().Run()
+		SerialStart().
+		Build().
+		Run()
 }
 
 // createQCContractClient creates QC contract client

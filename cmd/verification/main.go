@@ -368,5 +368,7 @@ func main() {
 
 			return sync, nil
 		}).
-		Build().Run()
+		SerialStart().
+		Build().
+		Run()
 }

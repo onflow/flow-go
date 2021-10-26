@@ -40,5 +40,7 @@ func main() {
 			rpcEng, err := engine.New(node.Network, node.Logger, node.Me, node.State, rpcConf)
 			return rpcEng, err
 		}).
-		Build().Run()
+		SerialStart().
+		Build().
+		Run()
 }

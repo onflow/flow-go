@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 )
 
 // ConsensusFollower is a standalone module run by third parties which provides
@@ -203,16 +204,9 @@ func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 
 	log := cf.NodeBuilder.Logger
 	go func() {
-		select {
-		case <-cf.Ready():
-		case <-signalerCtx.Done():
-			// startup may have completed at the same time
-			select {
-			case <-cf.Ready():
-			default:
-				log.Info().Msg("Access node startup aborted")
-				return
-			}
+		if err := util.WaitReady(signalerCtx, cf.Ready()); err != nil {
+			log.Info().Msg("Access node startup aborted")
+			return
 		}
 		log.Info().Msg("Access node startup complete")
 	}()
@@ -223,16 +217,7 @@ func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 		log.Info().Msg("Access node shutdown complete")
 	}()
 
-	select {
-	case <-cf.Done():
-		// address race condition caused by random selection when both select conditions
-		// are met at the same time
-		select {
-		case err := <-errChan:
-			log.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
-		default:
-		}
-	case err := <-errChan:
+	if err := util.WaitError(errChan, cf.Done()); err != nil {
 		log.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
 	}
 }

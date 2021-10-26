@@ -87,6 +87,11 @@ type NodeBuilder interface {
 	// If the error is not nil, returns a fatal log event containing the error.
 	MustNot(err error) *zerolog.Event
 
+	// SerialStart configures the node to start components serially
+	// By default, components are started in parallel and must have explicit dependency checks.
+	// This allows using the order components were added to manage dependencies implicitly
+	SerialStart() NodeBuilder
+
 	// Build finalizes the node configuration in preparation for start and returns a Node
 	// object that can be run
 	Build() Node

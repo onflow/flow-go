@@ -152,6 +152,9 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 	}
 }
 
+// ReadyFunc is called within a ComponentWorker function to indicate that the worker is ready
+// ComponentManager's Ready channel is closed when all workers are ready. This is also the
+// signal used to indicate that the workers returned by lookup are ready.
 type ReadyFunc func()
 
 // LookupFunc returns a ReadyDoneAware interface for the worker identified by id, and a boolean
@@ -164,7 +167,7 @@ type ReadyFunc func()
 type LookupFunc func(workerID string) (module.ReadyDoneAware, bool)
 
 // ComponentWorker represents a worker routine of a component.
-// It takes a SignalerContext which can be used to throw any irrecoverable errors it encouters,
+// It takes a SignalerContext which can be used to throw any irrecoverable errors it encounters,
 // as well as a ReadyFunc which must be called to signal that it is ready. The ComponentManager
 // waits until all workers have signaled that they are ready before closing its own Ready channel.
 // It additionally takes a LookupFunc which allows the worker function to get a ReadyDoneAware
@@ -179,9 +182,17 @@ type ComponentManagerBuilder interface {
 
 	// Build builds and returns a new ComponentManager instance
 	Build() *ComponentManager
+
+	// SerialStart configures node to start components serially
+	// By default, components are started in parallel and must have explicit dependency checks.
+	// This allows using the order components were added to manage dependencies implicitly
+	SetSerialStart(bool) ComponentManagerBuilder
 }
 
 type componentManagerBuilderImpl struct {
+	built           *atomic.Bool
+	mu              *sync.Mutex
+	serialStart     bool
 	workers         []*worker
 	workersRegistry map[string]module.ReadyDoneAware
 }
@@ -189,22 +200,49 @@ type componentManagerBuilderImpl struct {
 // NewComponentManagerBuilder returns a new ComponentManagerBuilder
 func NewComponentManagerBuilder() ComponentManagerBuilder {
 	return &componentManagerBuilderImpl{
+		built:           atomic.NewBool(false),
+		mu:              &sync.Mutex{},
 		workersRegistry: make(map[string]module.ReadyDoneAware),
 	}
 }
 
 func (c *componentManagerBuilderImpl) AddWorker(id string, f ComponentWorker) ComponentManagerBuilder {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if _, exists := c.workersRegistry[id]; exists {
+		// worker ids must be unique. adding duplicate ids will break the lookupWorker function which
+		// may result in incorrect dependency ordering
+		panic(fmt.Sprintf("worker with id %s already exists", id))
+	}
+
 	worker := newWorker(id, f)
 	c.workers = append(c.workers, worker)
 	c.workersRegistry[id] = worker
 	return c
 }
 
+// SetSerialStart sets whether the workers should be started in serial or in parallel
+// Workers are started in the order they were added to the ComponentManagerBuilder. If enabled,
+// Start() will wait for the previous worker to call ready() before starting the next.
+func (c *componentManagerBuilderImpl) SetSerialStart(serial bool) ComponentManagerBuilder {
+	c.serialStart = serial
+	return c
+}
+
+// Build returns a new ComponentManager instance with the added workers
+// Build must be called exactly once. Calling it more than once may result in workers being started
+// multiple times.
 func (c *componentManagerBuilderImpl) Build() *ComponentManager {
+	if !c.built.CAS(false, true) {
+		panic("component manager builder can only be used once")
+	}
+
 	return &ComponentManager{
 		started:         atomic.NewBool(false),
 		ready:           make(chan struct{}),
 		done:            make(chan struct{}),
+		serialStart:     c.serialStart,
 		workers:         c.workers,
 		workersRegistry: c.workersRegistry,
 	}
@@ -219,6 +257,7 @@ type ComponentManager struct {
 	done           chan struct{}
 	shutdownSignal <-chan struct{}
 
+	serialStart     bool
 	workers         []*worker
 	workersRegistry map[string]module.ReadyDoneAware
 }
@@ -276,6 +315,11 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 					c.lookupWorker,
 				)
 			}()
+			if c.serialStart {
+				if err := util.WaitReady(parent, worker.Ready()); err != nil {
+					break
+				}
+			}
 		}
 
 		// launch goroutine to close ready channel
@@ -289,7 +333,7 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 }
 
 // lookupWorker returns a ReadyDoneAware interface for the worker specified by ID
-// prefix id with ! to get a ReadyDoneAware interface for the collection of all workers except the
+// Prefix id with ! to get a ReadyDoneAware interface for the collection of all workers except the
 // provided id.
 func (c *ComponentManager) lookupWorker(id string) (module.ReadyDoneAware, bool) {
 	if id[0] == '!' {

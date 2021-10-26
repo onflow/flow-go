@@ -760,7 +760,9 @@ func main() {
 
 			return reactorEngine, nil
 		}).
-		Build().Run()
+		SerialStart().
+		Build().
+		Run()
 }
 
 func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPriv, error) {

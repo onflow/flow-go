@@ -564,7 +564,9 @@ func main() {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, results, txResults, node.RootChainID)
 			return rpcEng, nil
 		}).
-		Build().Run()
+		SerialStart().
+		Build().
+		Run()
 }
 
 // copy the checkpoint files from the bootstrap folder to the execution state folder

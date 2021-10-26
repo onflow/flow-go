@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/converter"
 	"github.com/onflow/flow-go/network/p2p"
@@ -330,9 +331,7 @@ func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 func (anb *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
 	anb.Component("upstream connector", func(ctx irrecoverable.SignalerContext, _ *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		network, _ := lookup("unstaked network")
-		select {
-		case <-network.Ready():
-		case <-ctx.Done():
+		if err := util.WaitReady(ctx, network.Ready()); err != nil || util.CheckClosed(ctx.Done()) {
 			return nil, ctx.Err()
 		}
 

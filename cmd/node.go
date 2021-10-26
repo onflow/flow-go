@@ -3,13 +3,13 @@ package cmd
 import (
 	"context"
 	"os"
-	"os/signal"
 	"syscall"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 )
 
 type Node interface {
@@ -36,11 +36,6 @@ type FlowNodeImp struct {
 // Any unhandled irrecoverable errors thrown in child components will bubble up to here and result in a fatal
 // error
 func (node *FlowNodeImp) Run() {
-
-	// initialize signal catcher
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go node.Start(signalerCtx)
@@ -54,16 +49,8 @@ func (node *FlowNodeImp) Run() {
 	}()
 
 	// block till a SIGINT is received or a fatal error is encountered
-	select {
-	case <-sig:
-		// address race condition caused by random selection when both select conditions
-		// are met at the same time
-		select {
-		case err := <-errChan:
-			node.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
-		default:
-		}
-	case err := <-errChan:
+	sig := util.WrapSignal(os.Interrupt, syscall.SIGTERM)
+	if err := util.WaitError(errChan, sig); err != nil {
 		node.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
 	}
 

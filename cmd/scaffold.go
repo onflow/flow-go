@@ -33,6 +33,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
@@ -791,9 +792,7 @@ func (fnb *FlowNodeBuilder) Component(name string, f func(ctx irrecoverable.Sign
 
 	fnb.componentBuilder.AddWorker(name, func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 		modules, _ := lookup("modules")
-		select {
-		case <-modules.Ready():
-		case <-ctx.Done():
+		if err := util.WaitReady(ctx, modules.Ready()); err != nil || util.CheckClosed(ctx.Done()) {
 			return
 		}
 
@@ -811,24 +810,14 @@ func (fnb *FlowNodeBuilder) Component(name string, f func(ctx irrecoverable.Sign
 			go component.Start(ctx)
 		}
 
-		select {
-		case <-readyAware.Ready():
-		case <-ctx.Done():
-			// address race condition caused by random selection when both select conditions
-			// are met at the same time
-			select {
-			case <-readyAware.Ready():
-			default:
-				log.Info().Msg("component startup aborted")
-				goto shutdown
-			}
+		if err := util.WaitReady(ctx, readyAware.Ready()); err != nil {
+			log.Info().Msg("component startup aborted")
+		} else {
+			log.Info().Msg("component startup complete")
+			ready()
 		}
 
-		log.Info().Msg("component startup complete")
-		ready()
 		<-ctx.Done()
-
-	shutdown:
 		log.Info().Msg("component shutdown started")
 
 		<-readyAware.Done()
@@ -848,9 +837,7 @@ func (fnb *FlowNodeBuilder) BackgroundComponent(name string, f func(ctx irrecove
 
 	fnb.componentBuilder.AddWorker(name, func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 		modules, _ := lookup("modules")
-		select {
-		case <-modules.Ready():
-		case <-ctx.Done():
+		if err := util.WaitReady(ctx, modules.Ready()); err != nil || util.CheckClosed(ctx.Done()) {
 			return
 		}
 
@@ -864,19 +851,11 @@ func (fnb *FlowNodeBuilder) BackgroundComponent(name string, f func(ctx irrecove
 			log.Info().Msg("component initialization complete")
 
 			go func() {
-
-				select {
-				case <-c.Ready():
-				case <-ctx.Done():
-					select {
-					case <-c.Ready():
-					default:
-						log.Info().Msg("component startup aborted")
-						log.Info().Msg("component shutdown started")
-						return
-					}
+				if err := util.WaitReady(ctx, c.Ready()); err != nil {
+					log.Info().Msg("component startup aborted")
+				} else {
+					log.Info().Msg("component startup complete")
 				}
-				log.Info().Msg("component startup complete")
 
 				<-ctx.Done()
 				log.Info().Msg("component shutdown started")
@@ -1030,9 +1009,7 @@ func (fnb *FlowNodeBuilder) InitComponentBuilder() {
 		}).
 		AddWorker("modules", func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 			main, _ := lookup("main")
-			select {
-			case <-main.Ready():
-			case <-ctx.Done():
+			if err := util.WaitReady(ctx, main.Ready()); err != nil || util.CheckClosed(ctx.Done()) {
 				return
 			}
 
@@ -1042,6 +1019,15 @@ func (fnb *FlowNodeBuilder) InitComponentBuilder() {
 			}
 			ready()
 		})
+}
+
+// SerialStart configures the node to start components serially
+// Ideally, components should have explicit dependency checks to handle startup ordering. This is
+// here to ensure the existing assumption that components are started in order serially remains
+// true until we've fully transitioned to explicit dependency checks
+func (fnb *FlowNodeBuilder) SerialStart() NodeBuilder {
+	fnb.componentBuilder.SetSerialStart(true)
+	return fnb
 }
 
 func (fnb *FlowNodeBuilder) Build() Node {

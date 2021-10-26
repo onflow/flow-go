@@ -260,12 +260,9 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 
 func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
 	builder.Component("follower engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
-
 		network, _ := lookup("unstaked network")
 		followerCore, _ := lookup("follower core")
-		select {
-		case <-util.AllReady(network, followerCore):
-		case <-ctx.Done():
+		if err := util.WaitReady(ctx, util.AllReady(network, followerCore)); err != nil || util.CheckClosed(ctx.Done()) {
 			return nil, ctx.Err()
 		}
 
@@ -315,12 +312,9 @@ func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuil
 
 func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 	builder.Component("sync engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
-
 		network, _ := lookup("unstaked network")
 		snapshot, _ := lookup("finalized snapshot")
-		select {
-		case <-util.AllReady(network, snapshot):
-		case <-ctx.Done():
+		if err := util.WaitReady(ctx, util.AllReady(network, snapshot)); err != nil || util.CheckClosed(ctx.Done()) {
 			return nil, ctx.Err()
 		}
 
