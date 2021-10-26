@@ -208,6 +208,9 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 			ResultID: thisReq.ResultID,
 			Index:    thisReq.Index,
 		},
+		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+			ChunkID: thisReq.ChunkID,
+		},
 	}))
 
 	// adding another request for the same chunk ID but different result ID is stored.

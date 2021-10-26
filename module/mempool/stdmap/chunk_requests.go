@@ -73,24 +73,24 @@ func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 				Locators:    chunks.LocatorList{&request.Locator},
 				RequestInfo: request.ChunkDataPackRequestInfo,
 			}
-			if ok := cs.Backend.Add(status); !ok {
-				return fmt.Errorf("chunk request already exists")
-			}
+			backdata[request.ChunkID] = status
 			return nil
 		}
 
-		statuses := toChunkRequestStatus(entity)
-		if statuses.Locators.Contains(&request.Locator) {
+		status := toChunkRequestStatus(entity)
+		if status.Locators.Contains(&request.Locator) {
 			return fmt.Errorf("chunk request exists with same locator")
 		}
 
-		statuses.Locators = append(statuses.Locators, &request.Locator)
-		statuses.RequestInfo.Agrees.Union(request.Agrees)
-		statuses.RequestInfo.Disagrees.Union(request.Disagrees)
+		status.Locators = append(status.Locators, &request.Locator)
+		status.RequestInfo.Agrees.Union(request.Agrees)
+		status.RequestInfo.Disagrees.Union(request.Disagrees)
+
+		backdata[request.ChunkID] = status
 		return nil
 	})
 
-	return err != nil
+	return err == nil
 }
 
 // Rem provides deletion functionality from the memory pool.
