@@ -21,13 +21,13 @@ type ChunkDataPackRequestInfo struct {
 	Targets   flow.IdentityList   // list of all execution nodes identity at the block height of this chunk (including non-responders).
 }
 
-func (c ChunkDataPackRequest) ID() flow.Identifier {
-	return c.Locator.ID()
-}
-
-func (c ChunkDataPackRequest) Checksum() flow.Identifier {
-	return c.Locator.ID()
-}
+//func (c ChunkDataPackRequest) ID() flow.Identifier {
+//	return c.Locator.ID()
+//}
+//
+//func (c ChunkDataPackRequest) Checksum() flow.Identifier {
+//	return c.Locator.ID()
+//}
 
 // SampleTargets returns identifier of execution nodes that can be asked for the chunk data pack, based on
 // the agreeing and disagreeing execution nodes of the chunk data pack request.
