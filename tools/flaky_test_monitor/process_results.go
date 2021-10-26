@@ -49,12 +49,13 @@ func (testRun *TestRun) save(fileName string) {
 
 // models test result of an entire package which can have multiple tests
 type PackageResult struct {
-	Package string                  `json:"package"`
-	Result  string                  `json:"result"`
-	Elapsed float32                 `json:"elapsed"`
-	Output  []string                `json:"output"`
-	Tests   []TestResult            `json:"tests"`
-	TestMap map[string][]TestResult `json:"-"`
+	Package  string                  `json:"package"`
+	Result   string                  `json:"result"`
+	Elapsed  float32                 `json:"elapsed"`
+	Output   []string                `json:"output"`
+	Tests    []TestResult            `json:"tests"`
+	NilTests []TestResult            `json:"nil_tests"`
+	TestMap  map[string][]TestResult `json:"-"`
 }
 
 // models result of a single test that's part of a larger package result
@@ -95,6 +96,7 @@ func (stdinResultReader StdinResultReader) getResultsFileName() string {
 	return os.Args[1]
 }
 
+// always want to save files in production - these files will be used to produce a visual representation of test flakiness
 func (stdinResultReader StdinResultReader) saveFiles() bool {
 	return true
 }
@@ -229,6 +231,17 @@ func postProcessTestRun(packageResultMap map[string]*PackageResult) {
 		}
 
 		for _, testResults := range packageResult.TestMap {
+			for j, testResult := range testResults {
+				// found nil test - test with no result - due to `go test` bug
+				// see https://www.notion.so/dapperlabs/Tests-With-No-Result-2caa9ce6f69c4364a4df53f70ccb9255
+				if testResult.Result == "" {
+					// separate nil test results from regular test results
+					packageResult.NilTests = append(packageResult.NilTests, testResult)
+					// reslice test results without nil test
+					copy(testResults[j:], testResults[j+1:])
+					testResults = testResults[:len(testResults)-1]
+				}
+			}
 			packageResult.Tests = append(packageResult.Tests, testResults...)
 		}
 

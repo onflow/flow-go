@@ -1,0 +1,28 @@
+{
+  "commit_sha": "46baf6c6be29af9c040bc14195e195848598bbae",
+  "commit_date": "2021-09-21T18:06:25+00:00",
+  "job_run_date": "2021-09-21T21:06:25+00:00",
+  "results": [
+    {
+      "package": "github.com/onflow/flow-go/model/encodable",
+      "result":"pass",
+      "elapsed": 0.209,
+      "output": [
+        "PASS\n",
+        "ok  \tgithub.com/onflow/flow-go/model/encodable\t0.209s\n"
+      ],
+      "nil_tests": [
+        {
+          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+          "package": "github.com/onflow/flow-go/model/encodable",
+          "output": [
+            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
+            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
+          ],
+          "result": "",
+          "elapsed": 0
+        }
+      ]
+    }
+  ]
+}

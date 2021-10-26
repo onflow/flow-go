@@ -28,7 +28,7 @@ func TestProcessTestRun(t *testing.T) {
 		"10 count some failures":    "test-result-crypto-hash-10-count-fail.json",
 
 		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
-		//"1 count nil test": "test-result-nil-test-missing-result-1-count-pass.json",
+		"1 count nil test": "test-result-nil-test-missing-result-1-count-pass.json",
 	}
 
 	for k, testJsonData := range testDataMap {
@@ -112,27 +112,33 @@ func checkTestRuns(t *testing.T, expectedTestRun TestRun, actualTestRun TestRun)
 			require.Equal(t, expectedPackageResults.Output[packageOutputIndex], actualPackageResults.Output[packageOutputIndex])
 		}
 
-		// check all tests results of each package
-		require.Equal(t, len(expectedPackageResults.Tests), len(actualPackageResults.Tests))
-		for testResultIndex := range expectedPackageResults.Tests {
-
-			expectedTestResult := expectedPackageResults.Tests[testResultIndex]
-			actualTestResult := actualPackageResults.Tests[testResultIndex]
-
-			// check all outputs of each test result
-			require.Equal(t, len(expectedTestResult.Output), len(actualTestResult.Output), fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestResult.Test))
-			for testResultOutputIndex := range expectedTestResult.Output {
-				require.Equal(t, expectedTestResult.Output[testResultOutputIndex], actualTestResult.Output[testResultOutputIndex], fmt.Sprintf("PackageResult[%d] TestResult[%d] Output[%d]", packageIndex, testResultIndex, testResultOutputIndex))
-			}
-
-			require.Equal(t, expectedTestResult.Package, actualTestResult.Package)
-			require.Equal(t, expectedTestResult.Test, actualTestResult.Test)
-			require.Equal(t, expectedTestResult.Elapsed, actualTestResult.Elapsed, fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestResult.Test))
-			require.Equal(t, expectedTestResult.Result, actualTestResult.Result)
-		}
+		// check all regular and nil tests results of each package
+		checkTestResults(t, expectedPackageResults.Tests, actualPackageResults.Tests)
+		checkTestResults(t, expectedPackageResults.NilTests, actualPackageResults.NilTests)
 	}
 	// finally, compare the entire actual test run against what's expected - if there were any discrepancies they should have been caught by now
 	require.Equal(t, expectedTestRun, actualTestRun)
+}
+
+// checks regular and nil test results
+func checkTestResults(t *testing.T, expectedTestResults []TestResult, actualTestResults []TestResult) {
+	require.Equal(t, len(expectedTestResults), len(actualTestResults))
+	for testResultIndex := range expectedTestResults {
+
+		expectedTestResult := expectedTestResults[testResultIndex]
+		actualTestResult := actualTestResults[testResultIndex]
+
+		// check all outputs of each test result
+		require.Equal(t, len(expectedTestResult.Output), len(actualTestResult.Output), fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestResult.Test))
+		for testResultOutputIndex := range expectedTestResult.Output {
+			require.Equal(t, expectedTestResult.Output[testResultOutputIndex], actualTestResult.Output[testResultOutputIndex], fmt.Sprintf("TestResult[%d] Output[%d]", testResultIndex, testResultOutputIndex))
+		}
+
+		require.Equal(t, expectedTestResult.Package, actualTestResult.Package)
+		require.Equal(t, expectedTestResult.Test, actualTestResult.Test)
+		require.Equal(t, expectedTestResult.Elapsed, actualTestResult.Elapsed, fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestResult.Test))
+		require.Equal(t, expectedTestResult.Result, actualTestResult.Result)
+	}
 }
 
 // read raw results from local json file - for testing
@@ -165,6 +171,7 @@ func (fileResultReader FileResultReader) getResultsFileName() string {
 }
 
 // don't want to save test result files when running unit tests in CI or locally
+// can set this to true locally temporarily to make it easier to debug, so can see how test results are being processed
 func (fileResultReader FileResultReader) saveFiles() bool {
 	return false
 }
