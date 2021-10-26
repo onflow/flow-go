@@ -270,7 +270,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 		e.metrics.OnVerifiableChunkSentToVerifier()
 
 		// we need to report that the job has been finished eventually
-		e.chunkConsumerNotifier.Notify(status.ID())
+		e.chunkConsumerNotifier.Notify(chunks.ChunkLocatorID(resultID, status.ChunkIndex))
 		lg.Info().Msg("verifiable chunk pushed to verifier engine")
 	}
 
@@ -467,20 +467,10 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkIndex uint64, resultID flow.Iden
 		Uint64("chunk_index", chunkIndex).
 		Hex("result_id", logging.ID(resultID)).
 		Logger()
-	// we need to report that the job has been finished eventually
-	status, exists := e.pendingChunks.Get(chunkIndex, resultID)
-	if !exists {
-		lg.Debug().
-			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
-		return
-	}
 
-	lg = lg.With().
-		Uint64("block_height", status.BlockHeight).
-		Hex("chunk_id", logging.ID(status.ExecutionResult.Chunks[chunkIndex].ID())).Logger()
 	removed := e.pendingChunks.Rem(chunkIndex, resultID)
 
-	e.chunkConsumerNotifier.Notify(status.ID())
+	e.chunkConsumerNotifier.Notify(chunks.ChunkLocatorID(resultID, chunkIndex))
 	lg.Info().
 		Bool("removed", removed).
 		Msg("discards fetching chunk of an already sealed block and notified consumer")
