@@ -104,7 +104,7 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	originID := unittest.IdentifierFixture()
 
 	// we remove pending request on receiving this response
-	s.pendingRequests.On("GetAndRemove", response.ChunkDataPack.ChunkID).Return(request, true).Once()
+	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(request, true).Once()
 
 	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
 		Locator: chunks.Locator{
@@ -316,8 +316,8 @@ func TestHandleChunkDataPack_DuplicateChunkIDs(t *testing.T) {
 	originID := unittest.IdentifierFixture()
 
 	// we remove pending request on receiving this response
-	s.pendingRequests.On("GetAndRemove", responseA.ChunkDataPack.ChunkID).Return(requestA, true).Once()
-	s.pendingRequests.On("GetAndRemove", responseB.ChunkDataPack.ChunkID).Return(requestB, true).Once()
+	s.pendingRequests.On("PopAll", responseA.ChunkDataPack.ChunkID).Return(requestA, true).Once()
+	s.pendingRequests.On("PopAll", responseB.ChunkDataPack.ChunkID).Return(requestB, true).Once()
 
 	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
 		Locator: chunks.Locator{
