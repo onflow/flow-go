@@ -1269,10 +1269,12 @@ func ChunkDataPackRequestFixture(opts ...func(*verification.ChunkDataPackRequest
 			ResultID: IdentifierFixture(),
 			Index:    0,
 		},
-		ChunkID:   IdentifierFixture(),
-		Height:    0,
-		Agrees:    IdentifierListFixture(1),
-		Disagrees: IdentifierListFixture(1),
+		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+			ChunkID:   IdentifierFixture(),
+			Height:    0,
+			Agrees:    IdentifierListFixture(1),
+			Disagrees: IdentifierListFixture(1),
+		},
 	}
 
 	for _, opt := range opts {
