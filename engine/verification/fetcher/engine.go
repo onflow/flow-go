@@ -582,11 +582,13 @@ func (e *Engine) requestChunkDataPack(chunkIndex uint64, chunkID flow.Identifier
 			ResultID: resultID,
 			Index:    chunkIndex,
 		},
-		ChunkID:   chunkID,
-		Height:    header.Height,
-		Agrees:    agrees,
-		Disagrees: disagrees,
-		Targets:   allExecutors,
+		ChunkDataPackRequestInfo: verification.ChunkDataPackRequestInfo{
+			ChunkID:   chunkID,
+			Height:    header.Height,
+			Agrees:    agrees,
+			Disagrees: disagrees,
+			Targets:   allExecutors,
+		},
 	}
 
 	e.requester.Request(request)
