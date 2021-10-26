@@ -28,7 +28,12 @@ func TestProcessTestRun(t *testing.T) {
 		"10 count some failures":    "test-result-crypto-hash-10-count-fail.json",
 
 		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
-		"1 count nil test": "test-result-nil-test-missing-result-1-count-pass.json",
+		// this is a single unit test that produces a nil test result
+		"1 count single nil test": "test-result-nil-test-single-1-count-pass.json",
+
+		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
+		// this is a group of unit tests with a single nil test result
+		"3 count nil test with normal tests": "test-result-nil-test-others-normal-3-count-pass.json",
 	}
 
 	for k, testJsonData := range testDataMap {

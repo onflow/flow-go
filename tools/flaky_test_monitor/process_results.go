@@ -237,8 +237,11 @@ func postProcessTestRun(packageResultMap map[string]*PackageResult) {
 				if testResult.Result == "" {
 					// separate nil test results from regular test results
 					packageResult.NilTests = append(packageResult.NilTests, testResult)
-					// reslice test results without nil test
-					copy(testResults[j:], testResults[j+1:])
+					// reslice test results without nil test - need to be careful that testResults slice isn't too small to be resliced
+					if len(testResults) >= j+1 {
+						copy(testResults[j:], testResults[j+1:])
+					}
+					// truncate last test result to complete reslicing - if this was the last test result, slice will be empty
 					testResults = testResults[:len(testResults)-1]
 				}
 			}
