@@ -105,7 +105,7 @@ func Bootstrap(
 		tail := segment.Blocks[0]              // last sealed block
 
 		// bootstrap the sealing segment step 2:  insert segment blocks
-		err = state.bootstrapSealingSegmentBlocks(segment)(tx)
+		err = state.bootstrapSealingSegmentBlocks(segment, head)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
@@ -186,10 +186,8 @@ func (state *State) bootstrapSealingSegmentExeResults(segment *flow.SealingSegme
 
 // bootstrapSealingSegmentBlocks inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
-func (state *State) bootstrapSealingSegmentBlocks(segment *flow.SealingSegment) func(tx *transaction.Tx) error {
+func (state *State) bootstrapSealingSegmentBlocks(segment *flow.SealingSegment, head *flow.Block) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		head := segment.Blocks[len(segment.Blocks)-1]
-
 		for i, block := range segment.Blocks {
 			blockID := block.ID()
 			height := block.Header.Height
