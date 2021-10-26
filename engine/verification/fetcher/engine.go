@@ -468,6 +468,17 @@ func (e *Engine) NotifyChunkDataPackSealed(chunkIndex uint64, resultID flow.Iden
 		Hex("result_id", logging.ID(resultID)).
 		Logger()
 
+	// we need to report that the job has been finished eventually
+	status, exists := e.pendingChunks.Get(chunkIndex, resultID)
+	if !exists {
+		lg.Debug().
+			Msg("could not fetch pending status for sealed chunk from mempool, dropping chunk data")
+		return
+	}
+
+	lg = lg.With().
+		Uint64("block_height", status.BlockHeight).
+		Hex("result_id", logging.ID(status.ExecutionResult.ID())).Logger()
 	removed := e.pendingChunks.Rem(chunkIndex, resultID)
 
 	e.chunkConsumerNotifier.Notify(chunks.ChunkLocatorID(resultID, chunkIndex))
