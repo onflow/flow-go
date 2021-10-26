@@ -3,7 +3,9 @@
 package mempool
 
 import (
+	chunks "github.com/onflow/flow-go/model/chunks"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mempool "github.com/onflow/flow-go/module/mempool"
 
 	mock "github.com/stretchr/testify/mock"
@@ -32,6 +34,22 @@ func (_m *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 	return r0
 }
 
+// All provides a mock function with given fields:
+func (_m *ChunkRequests) All() verification.ChunkDataPackRequestInfoList {
+	ret := _m.Called()
+
+	var r0 verification.ChunkDataPackRequestInfoList
+	if rf, ok := ret.Get(0).(func() verification.ChunkDataPackRequestInfoList); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(verification.ChunkDataPackRequestInfoList)
+		}
+	}
+
+	return r0
+}
+
 // IncrementAttempt provides a mock function with given fields: chunkID
 func (_m *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	ret := _m.Called(chunkID)
@@ -47,15 +65,15 @@ func (_m *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 }
 
 // PopAll provides a mock function with given fields: chunkID
-func (_m *ChunkRequests) PopAll(chunkID flow.Identifier) (verification.ChunkDataPackRequestList, bool) {
+func (_m *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorList, bool) {
 	ret := _m.Called(chunkID)
 
-	var r0 verification.ChunkDataPackRequestList
-	if rf, ok := ret.Get(0).(func(flow.Identifier) verification.ChunkDataPackRequestList); ok {
+	var r0 chunks.LocatorList
+	if rf, ok := ret.Get(0).(func(flow.Identifier) chunks.LocatorList); ok {
 		r0 = rf(chunkID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(verification.ChunkDataPackRequestList)
+			r0 = ret.Get(0).(chunks.LocatorList)
 		}
 	}
 
