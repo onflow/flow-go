@@ -150,6 +150,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
 	fnb.flags.StringVar(&fnb.BaseConfig.LibP2PStreamCompression, "stream-compression", p2p.NoCompression,
 		"networking stream compression mechanism")
+	fnb.flags.IntVar(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultCacheSize,
+		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 }
@@ -262,7 +264,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			codec,
 			fnb.Me,
 			func() (network.Middleware, error) { return fnb.Middleware, nil },
-			p2p.DefaultCacheSize,
+			fnb.NetworkReceivedMessageCacheSize,
 			topologyCache,
 			subscriptionManager,
 			fnb.Metrics.Network,
