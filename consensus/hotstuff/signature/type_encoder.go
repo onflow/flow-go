@@ -35,3 +35,15 @@ func DecodeSingleSig(sigData []byte) (hotstuff.SigType, crypto.Signature, error)
 	sig := crypto.Signature(sigData[1:])
 	return sigType, sig, nil
 }
+
+func DecodeDoubleSig(sigData []byte) (hotstuff.SigType, crypto.Signature, crypto.Signature, error) {
+	sigLength := len(sigData)
+	switch sigLength {
+	case 48:
+		return hotstuff.SigTypeStaking, sigData[:48], nil, nil
+	case 96:
+		return hotstuff.SigTypeRandomBeacon, sigData[:48], sigData[48:], nil
+	}
+
+	return 0, nil, nil, fmt.Errorf("invalid sig data length %d: %w", sigLength, msig.ErrInvalidFormat)
+}
