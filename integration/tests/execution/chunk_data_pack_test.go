@@ -29,7 +29,7 @@ type ChunkDataPacksSuite struct {
 }
 
 func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
-	gs.T().Skip("flaky test - quarantined")
+	gs.Suite.T().Skip("flaky test - quarantined")
 
 	// wait for next height finalized (potentially first height), called blockA
 	blockA := gs.BlockState.WaitForHighestFinalizedProgress(gs.T())
