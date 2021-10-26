@@ -48,3 +48,4 @@ func (c ChunkDataPackRequestInfo) SampleTargets(count int) flow.IdentifierList {
 }
 
 type ChunkDataPackRequestList []*ChunkDataPackRequest
+type ChunkDataPackRequestInfoList []*ChunkDataPackRequestInfo
