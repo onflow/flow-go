@@ -119,19 +119,19 @@ func withUpdaterScenario(t *testing.T, chunks int, times int, updater mempool.Ch
 	wg.Add(times * chunks)
 	for _, request := range chunkReqs {
 		for i := 0; i < times; i++ {
-			go func(requestID flow.Identifier) {
-				_, _, _, ok := requests.UpdateRequestHistory(requestID, updater)
+			go func(chunkID flow.Identifier) {
+				_, _, _, ok := requests.UpdateRequestHistory(chunkID, updater)
 				require.True(t, ok)
 
 				wg.Done()
-			}(request.ID())
+			}(request.ChunkID)
 		}
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish updating requests on time")
 
 	// performs custom validation of test.
-	for _, chunk := range chunkReqs {
-		attempts, lastTried, retryAfter, ok := requests.RequestHistory(chunk.ID())
+	for _, request := range chunkReqs {
+		attempts, lastTried, retryAfter, ok := requests.RequestHistory(request.ChunkID)
 		require.True(t, ok)
 		validate(t, attempts, lastTried, retryAfter)
 	}
@@ -153,13 +153,13 @@ func TestFailingUpdater(t *testing.T) {
 	wg.Add(10)
 	updater := mempool.IncrementalAttemptUpdater()
 	for _, request := range chunkReqs {
-		go func(requestID flow.Identifier) {
-			attempts, _, _, ok := requests.UpdateRequestHistory(requestID, updater)
+		go func(chunkID flow.Identifier) {
+			attempts, _, _, ok := requests.UpdateRequestHistory(chunkID, updater)
 			require.True(t, ok)
 			require.Equal(t, uint64(1), attempts)
 
 			wg.Done()
-		}(request.ID())
+		}(request.ChunkID)
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish updating requests on time")
 
@@ -170,23 +170,23 @@ func TestFailingUpdater(t *testing.T) {
 	}
 	wg.Add(10)
 	for _, request := range chunkReqs {
-		go func(requestID flow.Identifier) {
+		go func(chunkID flow.Identifier) {
 			// takes request history before update
-			exAttempts, exLastTried, exRetryAfter, ok := requests.RequestHistory(requestID)
+			exAttempts, exLastTried, exRetryAfter, ok := requests.RequestHistory(chunkID)
 			require.True(t, ok)
 
 			// failing an update should not change request history
-			_, _, _, result := requests.UpdateRequestHistory(requestID, failingUpdater)
+			_, _, _, result := requests.UpdateRequestHistory(chunkID, failingUpdater)
 			require.False(t, result)
 
-			acAttempts, acLastTried, acRetryAfter, ok := requests.RequestHistory(requestID)
+			acAttempts, acLastTried, acRetryAfter, ok := requests.RequestHistory(chunkID)
 			require.True(t, ok)
 			require.Equal(t, exAttempts, acAttempts)
 			require.Equal(t, exLastTried, acLastTried)
 			require.Equal(t, exRetryAfter, acRetryAfter)
 
 			wg.Done()
-		}(request.ID())
+		}(request.ChunkID)
 	}
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not finish updating requests on time")
 }
