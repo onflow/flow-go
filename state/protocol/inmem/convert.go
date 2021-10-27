@@ -209,12 +209,12 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
-		Head:              root.Header,
-		Identities:        setup.Participants,
-		LatestSeal:        seal,
-		LatestResult:      result,
-		SealingSegment:    &flow.SealingSegment{
-			Blocks: []*flow.Block{root},
+		Head:         root.Header,
+		Identities:   setup.Participants,
+		LatestSeal:   seal,
+		LatestResult: result,
+		SealingSegment: &flow.SealingSegment{
+			Blocks:           []*flow.Block{root},
 			ExecutionResults: make(map[flow.Identifier]*flow.ExecutionResult),
 		},
 		QuorumCertificate: qc,

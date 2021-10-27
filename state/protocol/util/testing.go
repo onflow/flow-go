@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 
 	bstorage "github.com/onflow/flow-go/storage/badger"
-
 )
 
 // MockReceiptValidator returns a ReceiptValidator that accepts
