@@ -48,4 +48,27 @@ func (c ChunkDataPackRequestInfo) SampleTargets(count int) flow.IdentifierList {
 }
 
 type ChunkDataPackRequestList []*ChunkDataPackRequest
+
+// ContainsChunkID returns true if list contains a request for chunk ID.
+func (c ChunkDataPackRequestList) ContainsChunkID(chunkID flow.Identifier) bool {
+	for _, request := range c {
+		if request.ChunkID == chunkID {
+			return true
+		}
+	}
+
+	return false
+}
+
+// ContainsLocator returns true if list contains a request for the given resultID and chunkIndex.
+func (c ChunkDataPackRequestList) ContainsLocator(resultID flow.Identifier, chunkIndex uint64) bool {
+	for _, request := range c {
+		if request.ResultID == resultID && request.Index == chunkIndex {
+			return true
+		}
+	}
+
+	return false
+}
+
 type ChunkDataPackRequestInfoList []*ChunkDataPackRequestInfo
