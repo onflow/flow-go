@@ -140,7 +140,7 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	}
 	// TAIL <- ... <- HEAD
 	head := segment.Blocks[len(segment.Blocks)-1] // reference block of the snapshot
-	tail := segment.Blocks[0]              // last sealed block
+	tail := segment.Blocks[0]                     // last sealed block
 	headID := head.ID()
 	tailID := tail.ID()
 

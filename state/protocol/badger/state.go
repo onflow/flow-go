@@ -5,6 +5,7 @@ package badger
 import (
 	"errors"
 	"fmt"
+
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -94,15 +95,11 @@ func Bootstrap(
 	}
 
 	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
-		segment, err := root.SealingSegment()
-		if err != nil {
-			return fmt.Errorf("could not get sealing segment: %w", err)
-		}
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
 		head := segment.Blocks[len(segment.Blocks)-1] // reference block of the snapshot
-		tail := segment.Blocks[0]              // last sealed block
+		tail := segment.Blocks[0]                     // last sealed block
 
 		// bootstrap the sealing segment step 2:  insert segment blocks
 		err = state.bootstrapSealingSegmentBlocks(segment, head)(tx)

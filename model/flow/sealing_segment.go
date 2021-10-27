@@ -6,7 +6,7 @@ package flow
 // referenced by LatestSeal). The segment is in ascending height order.
 type SealingSegment struct {
 	// Blocks the chain segment blocks
-	Blocks           []*Block
+	Blocks []*Block
 
 	// ExecutionResults execution results referenced in segment block receipts
 	// but missing from the referencing block
@@ -15,7 +15,7 @@ type SealingSegment struct {
 }
 
 // AddBlock appends block to Blocks
-func (segment *SealingSegment) AddBlock(block *Block)  {
+func (segment *SealingSegment) AddBlock(block *Block) {
 	segment.Blocks = append(segment.Blocks, block)
 }
 
@@ -33,7 +33,7 @@ func (segment *SealingSegment) ContainsExecutionResult(resultID Identifier) bool
 // NewSealingSegment returns SealingSegment
 func NewSealingSegment() *SealingSegment {
 	return &SealingSegment{
-		Blocks: make([]*Block, 0),
+		Blocks:           make([]*Block, 0),
 		ExecutionResults: make(map[Identifier]*ExecutionResult),
 	}
 }
