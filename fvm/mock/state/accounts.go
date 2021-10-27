@@ -3,7 +3,9 @@
 package mock
 
 import (
+	atree "github.com/onflow/atree"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -13,14 +15,16 @@ type Accounts struct {
 }
 
 // AllocateStorageIndex provides a mock function with given fields: address
-func (_m *Accounts) AllocateStorageIndex(address flow.Address) (uint64, error) {
+func (_m *Accounts) AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error) {
 	ret := _m.Called(address)
 
-	var r0 uint64
-	if rf, ok := ret.Get(0).(func(flow.Address) uint64); ok {
+	var r0 atree.StorageIndex
+	if rf, ok := ret.Get(0).(func(flow.Address) atree.StorageIndex); ok {
 		r0 = rf(address)
 	} else {
-		r0 = ret.Get(0).(uint64)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(atree.StorageIndex)
+		}
 	}
 
 	var r1 error
@@ -98,6 +102,29 @@ func (_m *Accounts) Exists(address flow.Address) (bool, error) {
 		r0 = rf(address)
 	} else {
 		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Address) error); ok {
+		r1 = rf(address)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// Get provides a mock function with given fields: address
+func (_m *Accounts) Get(address flow.Address) (*flow.Account, error) {
+	ret := _m.Called(address)
+
+	var r0 *flow.Account
+	if rf, ok := ret.Get(0).(func(flow.Address) *flow.Account); ok {
+		r0 = rf(address)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*flow.Account)
+		}
 	}
 
 	var r1 error
