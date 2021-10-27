@@ -139,7 +139,7 @@ func (s *Suite) TestEpochJoin() {
 
 	env := utils.LocalnetEnv()
 
-	role := flow.RoleConsensus
+	role := flow.RoleAccess
 	// stake a new node
 	info := s.StakeNode(ctx, env, role)
 	testContainerName := fmt.Sprintf("epochs-test-join-%s-%s",info.Role, info.NodeID)
@@ -169,8 +169,8 @@ func (s *Suite) TestEpochJoin() {
 	require.True(s.T(), found, "node id for new node not found in approved list after setting the approved list")
 
 	nodeConfig := testnet.NewNodeConfig(role, testnet.WithID(info.NodeID))
-	testContainerConfig := testnet.NewContainerConfig(testContainerName, nodeConfig, info.NetworkingKey, info.StakingAccountKey)
-	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey})
+	testContainerConfig := testnet.NewContainerConfig(testContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
+	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
 	// download root snapshot from access node, wait until we are in the epoch setup phase
@@ -195,12 +195,12 @@ func (s *Suite) TestEpochJoin() {
 	s.net.WriteRootSnapshot(snapshot)
 
 	// add our container to the network
-	//err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
-	//require.NoError(s.T(), err, "failed to add container to network")
-	//
-	//// start our test container
-	//testContainer := s.net.ContainerByID(info.NodeID)
-	//testContainer.WriteRootSnapshot(snapshot)
-	//testContainer.Container.Start(ctx)
+	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
+	require.NoError(s.T(), err, "failed to add container to network")
+
+	// start our test container
+	testContainer := s.net.ContainerByID(info.NodeID)
+	testContainer.WriteRootSnapshot(snapshot)
+	testContainer.Container.Start(ctx)
 	s.net.StopContainers()
 }

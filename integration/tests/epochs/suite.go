@@ -82,11 +82,10 @@ func (s *Suite) SetupTest() {
 	s.net.Start(ctx)
 
 	// start tracking blocks
-	s.Track(s.T(), ctx, s.Ghost())
+	//s.Track(s.T(), ctx, s.Ghost())
 
-	client, err := testnet.NewClient(
-		fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort]),
-		s.net.Root().Header.ChainID.Chain())
+	addr := fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort])
+	client, err := testnet.NewClient(addr, s.net.Root().Header.ChainID.Chain())
 	require.NoError(s.T(), err)
 
 	s.client = client
@@ -100,7 +99,7 @@ func (s *Suite) Ghost() *client.GhostClient {
 }
 
 func (s *Suite) TearDownTest() {
-	s.net.Remove()
+	//s.net.Remove()
 	if s.cancel != nil {
 		s.cancel()
 	}
