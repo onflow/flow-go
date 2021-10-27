@@ -107,6 +107,7 @@ type FlowNetwork struct {
 	result             *flow.ExecutionResult
 	seal               *flow.Seal
 	bootstrapDir       string
+	allPorts           map[string]struct{}
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -487,6 +488,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		seal:               seal,
 		result:             result,
 		bootstrapDir:       bootstrapDir,
+		allPorts:           make(map[string]struct{}),
 	}
 
 	// check that at-least 2 full access nodes must be configure in your test suite
@@ -497,7 +499,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
 		}
 	}
-	// require.True(t, len(accessNodeIDS) > 1, "at-least 2 access node that is not a ghost must be configured for test suite")
+	require.True(t, len(accessNodeIDS) > 1, "at-least 2 access node that is not a ghost must be configured for test suite")
 
 	// add each node to the network
 	for _, nodeConf := range confs {
@@ -525,6 +527,16 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	return flowNetwork
 }
 
+func (net *FlowNetwork) getRandomPort(t *testing.T) string {
+	for {
+		port := testingdock.RandomPort(t)
+		if _, ok := net.allPorts[port]; !ok {
+			net.allPorts[port] = struct{}{}
+			return port
+		}
+	}
+}
+
 func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
 	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-consensus-follower")
 	require.NoError(t, err)
@@ -549,7 +561,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	require.NoError(t, err)
 
 	// consensus follower
-	bindPort := testingdock.RandomPort(t)
+	bindPort := net.getRandomPort(t)
 	bindAddr := fmt.Sprintf("0.0.0.0:%s", bindPort)
 	opts := append(
 		followerConf.Opts,
@@ -652,7 +664,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		switch nodeConf.Role {
 		case flow.RoleCollection:
 
-			hostPort := testingdock.RandomPort(t)
+			hostPort := net.getRandomPort(t)
 			containerPort := "9000/tcp"
 
 			nodeContainer.bindPort(hostPort, containerPort)
@@ -668,12 +680,12 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 		case flow.RoleExecution:
 
-			hostPort := testingdock.RandomPort(t)
+			hostPort := net.getRandomPort(t)
 			containerPort := "9000/tcp"
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
-			hostMetricsPort := testingdock.RandomPort(t)
+			hostMetricsPort := net.getRandomPort(t)
 			containerMetricsPort := "8080/tcp"
 
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
@@ -700,9 +712,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
 
 		case flow.RoleAccess:
-			hostGRPCPort := testingdock.RandomPort(t)
-			hostHTTPProxyPort := testingdock.RandomPort(t)
-			hostSecureGRPCPort := testingdock.RandomPort(t)
+			hostGRPCPort := net.getRandomPort(t)
+			hostHTTPProxyPort := net.getRandomPort(t)
+			hostSecureGRPCPort := net.getRandomPort(t)
 			containerGRPCPort := "9000/tcp"
 			containerSecureGRPCPort := "9001/tcp"
 			containerHTTPProxyPort := "8000/tcp"
@@ -722,7 +734,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 
 			if nodeConf.SupportsUnstakedNodes {
-				hostExternalNetworkPort := testingdock.RandomPort(t)
+				hostExternalNetworkPort := net.getRandomPort(t)
 				nodeContainer.bindPort(hostExternalNetworkPort, fmt.Sprintf("%s/tcp", strconv.Itoa(DefaultFlowPort)))
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
 				nodeContainer.addFlag("supports-unstaked-node", "true")
@@ -740,7 +752,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 		}
 	} else {
-		hostPort := testingdock.RandomPort(t)
+		hostPort := net.getRandomPort(t)
 		containerPort := "9000/tcp"
 
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
