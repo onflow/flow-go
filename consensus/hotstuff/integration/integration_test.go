@@ -2,6 +2,7 @@ package integration
 
 import (
 	"errors"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -97,7 +98,10 @@ func TestThreeInstances(t *testing.T) {
 }
 
 func TestSevenInstances(t *testing.T) {
-	t.Skip()
+	if os.Getenv("TEST_FLAKY") != "" {
+		t.Skip()
+	}
+
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
 	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
