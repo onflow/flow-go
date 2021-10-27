@@ -1,7 +1,6 @@
 package migrations
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/onflow/atree"
@@ -46,33 +45,33 @@ func registerIDToKey(registerID flow.RegisterID) ledger.Key {
 	return newKey
 }
 
-func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storagePayloads []ledger.Payload, slabPayloads []ledger.Payload) {
-	for _, p := range inp {
-		if fvmState.IsFVMStateKey(
-			string(p.Key.KeyParts[0].Value),
-			string(p.Key.KeyParts[1].Value),
-			string(p.Key.KeyParts[2].Value),
-		) {
-			fvmPayloads = append(fvmPayloads, p)
-			continue
-		}
-		if bytes.HasPrefix(p.Key.KeyParts[2].Value, []byte(atree.LedgerBaseStorageSlabPrefix)) {
-			slabPayloads = append(slabPayloads, p)
-			continue
-		}
-		// otherwise this is a storage payload
-		storagePayloads = append(storagePayloads, p)
-	}
-	return
-}
+//func splitPayloads(inp []ledger.Payload) (fvmPayloads []ledger.Payload, storagePayloads []ledger.Payload, slabPayloads []ledger.Payload) {
+//	for _, p := range inp {
+//		if fvmState.IsFVMStateKey(
+//			string(p.Key.KeyParts[0].Value),
+//			string(p.Key.KeyParts[1].Value),
+//			string(p.Key.KeyParts[2].Value),
+//		) {
+//			fvmPayloads = append(fvmPayloads, p)
+//			continue
+//		}
+//		if bytes.HasPrefix(p.Key.KeyParts[2].Value, []byte(atree.LedgerBaseStorageSlabPrefix)) {
+//			slabPayloads = append(slabPayloads, p)
+//			continue
+//		}
+//		// otherwise this is a storage payload
+//		storagePayloads = append(storagePayloads, p)
+//	}
+//	return
+//}
 
 type accountsAtreeLedger struct {
 	accounts fvmState.Accounts
 }
 
-func newAccountsAtreeLedger(accounts fvmState.Accounts) *accountsAtreeLedger {
-	return &accountsAtreeLedger{accounts: accounts}
-}
+//func newAccountsAtreeLedger(accounts fvmState.Accounts) *accountsAtreeLedger {
+//	return &accountsAtreeLedger{accounts: accounts}
+//}
 
 var _ atree.Ledger = &accountsAtreeLedger{}
 
