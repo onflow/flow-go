@@ -299,7 +299,6 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 					return fmt.Errorf("could not get execution result (%s): %w", receipt.ResultID, err)
 				}
 
-				segment.AddExecutionReceiptMeta(receipt)
 				segment.AddExecutionResult(result)
 			}
 		}
