@@ -10,10 +10,8 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	mockmempool "github.com/onflow/flow-go/module/mempool/mock"
 	"github.com/onflow/flow-go/module/metrics"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/state/protocol"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
@@ -28,12 +26,12 @@ func TestIngestionCore(t *testing.T) {
 type IngestionCoreSuite struct {
 	suite.Suite
 
-	con1ID flow.Identifier
-	con2ID flow.Identifier
-	con3ID flow.Identifier
-	collID flow.Identifier
-	execID flow.Identifier
-	head   *flow.Header
+	accessID flow.Identifier
+	collID   flow.Identifier
+	conID    flow.Identifier
+	execID   flow.Identifier
+	verifID  flow.Identifier
+	head     *flow.Header
 
 	finalIdentities flow.IdentityList // identities at finalized state
 	refIdentities   flow.IdentityList // identities at reference block state
@@ -54,21 +52,21 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	head := unittest.BlockHeaderFixture()
 	head.Height = 2 * flow.DefaultTransactionExpiry
 
-	con1 := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	con2 := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
-	con3 := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
+	access := unittest.IdentityFixture(unittest.WithRole(flow.RoleAccess))
+	con := unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 	coll := unittest.IdentityFixture(unittest.WithRole(flow.RoleCollection))
 	exec := unittest.IdentityFixture(unittest.WithRole(flow.RoleExecution))
+	verif := unittest.IdentityFixture(unittest.WithRole(flow.RoleVerification))
 
-	suite.con1ID = con1.NodeID
-	suite.con2ID = con2.NodeID
-	suite.con3ID = con3.NodeID
+	suite.accessID = access.NodeID
+	suite.conID = con.NodeID
 	suite.collID = coll.NodeID
 	suite.execID = exec.NodeID
+	suite.verifID = verif.NodeID
 
 	clusters := flow.ClusterList{flow.IdentityList{coll}}
 
-	identities := flow.IdentityList{con1, con2, con3, coll, exec}
+	identities := flow.IdentityList{access, con, coll, exec, verif}
 	suite.finalIdentities = identities.Copy()
 	suite.refIdentities = identities.Copy()
 
@@ -80,7 +78,6 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	suite.query = &mockprotocol.EpochQuery{}
 	suite.epoch = &mockprotocol.Epoch{}
 	headers := &mockstorage.Headers{}
-	me := &mockmodule.Local{}
 	pool := &mockmempool.Guarantees{}
 
 	// this state basically works like a normal protocol state
@@ -126,10 +123,6 @@ func (suite *IngestionCoreSuite) SetupTest() {
 		},
 	)
 
-	// we use the first consensus node as our local identity
-	me.On("NodeID").Return(suite.con1ID)
-	me.On("NotMeFilter").Return(filter.Not(filter.HasNodeID(suite.con1ID)))
-
 	// we need to return the head as it's also used as reference block
 	headers.On("ByBlockID", head.ID()).Return(&head, nil)
 
@@ -141,7 +134,6 @@ func (suite *IngestionCoreSuite) SetupTest() {
 		mempool: metrics,
 		state:   state,
 		headers: headers,
-		me:      me,
 		pool:    pool,
 	}
 
@@ -170,43 +162,6 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNewFromCollection() {
 
 }
 
-func (suite *IngestionCoreSuite) TestOnGuaranteeUnstaked() {
-
-	guarantee := suite.validGuarantee()
-
-	// the guarantee is not part of the memory pool yet
-	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee).Return(true)
-
-	// we are not staked
-	suite.finalIdentities = suite.finalIdentities.Filter(filter.Not(filter.HasNodeID(suite.con1ID)))
-
-	// submit the guarantee
-	err := suite.core.OnGuarantee(suite.collID, guarantee)
-	suite.Assert().NoError(err, "should not error on guarantee when unstaked")
-
-	// the guarantee should be added to the mempool
-	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
-
-}
-
-func (suite *IngestionCoreSuite) TestOnGuaranteeNewFromConsensus() {
-
-	guarantee := suite.validGuarantee()
-
-	// the guarantee is not part of the memory pool yet
-	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee).Return(true)
-
-	// submit the guarantee as if it was sent by a consensus node
-	err := suite.core.OnGuarantee(suite.con1ID, guarantee)
-	suite.Assert().NoError(err, "should not error on new guarantee from consensus node")
-
-	// check that the guarantee has been added to the mempool
-	suite.pool.AssertCalled(suite.T(), "Add", guarantee)
-
-}
-
 func (suite *IngestionCoreSuite) TestOnGuaranteeOld() {
 
 	guarantee := suite.validGuarantee()
@@ -219,7 +174,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeOld() {
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().NoError(err, "should not error on old guarantee")
 
-	// check that the guarantee has been added to the mempool
+	// check that the guarantee has _not_ been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 
 }
@@ -241,46 +196,47 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeNotAdded() {
 
 }
 
-func (suite *IngestionCoreSuite) TestOnGuaranteeNoGuarantor() {
-
-	// create a guarantee signed by the collection node and referencing the
-	// current head of the protocol state
+// TestOnGuaranteeNoGuarantors tests that a collection without any guarantors is rejected.
+// We expect an engine.InvalidInputError.
+func (suite *IngestionCoreSuite) TestOnGuaranteeNoGuarantors() {
+	// create a guarantee without any signers
 	guarantee := suite.validGuarantee()
 	guarantee.SignerIDs = nil
 
-	// the guarantee is part of the memory pool
+	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee).Return(false)
+	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a consensus node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with missing guarantor")
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
-	// check that the guarantee has been added to the mempool
+	// check that the guarantee has _not_ been added to the mempool
 	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
-
 }
 
+// TestOnGuaranteeInvalidRole verifies that a collection is rejected if any of
+// the signers has a role _different_ than collection.
+// We expect an engine.InvalidInputError.
 func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidRole() {
+	for _, invalidSigner := range []flow.Identifier{suite.accessID, suite.conID, suite.execID, suite.verifID} {
+		// add signer with role other than collector
+		guarantee := suite.validGuarantee()
+		guarantee.SignerIDs = append(guarantee.SignerIDs, invalidSigner)
 
-	// create a guarantee signed by the collection node and referencing the
-	// current head of the protocol state
-	guarantee := suite.validGuarantee()
-	guarantee.SignerIDs = append(guarantee.SignerIDs, suite.execID)
+		// the guarantee is not part of the memory pool
+		suite.pool.On("Has", guarantee.ID()).Return(false)
+		suite.pool.On("Add", guarantee).Return(true)
 
-	// the guarantee is part of the memory pool
-	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee).Return(false)
+		// submit the guarantee as if it was sent by a consensus node
+		err := suite.core.OnGuarantee(suite.collID, guarantee)
+		suite.Assert().Error(err, "should error with missing guarantor")
+		suite.Assert().True(engine.IsInvalidInputError(err))
 
-	// submit the guarantee as if it was sent by a consensus node
-	err := suite.core.OnGuarantee(suite.collID, guarantee)
-	suite.Assert().Error(err, "should error with missing guarantor")
-	suite.Assert().True(engine.IsInvalidInputError(err))
-
-	// check that the guarantee has been added to the mempool
-	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
-
+		// check that the guarantee has _not_ been added to the mempool
+		suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
+	}
 }
 
 func (suite *IngestionCoreSuite) TestOnGuaranteeExpired() {
@@ -295,9 +251,9 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeExpired() {
 	guarantee := suite.validGuarantee()
 	guarantee.ReferenceBlockID = header.ID()
 
-	// the guarantee is part of the memory pool
+	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee).Return(false)
+	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a consensus node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
@@ -306,22 +262,25 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeExpired() {
 
 }
 
+// TestOnGuaranteeInvalidGuarantor verifiers that collections with any _unknown_
+// signer are rejected.
 func (suite *IngestionCoreSuite) TestOnGuaranteeInvalidGuarantor() {
 
-	// create a guarantee signed by the collection node and referencing the
-	// current head of the protocol state
+	// create a guarantee  and add random (unknown) signer ID
 	guarantee := suite.validGuarantee()
 	guarantee.SignerIDs = append(guarantee.SignerIDs, unittest.IdentifierFixture())
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee).Return(false)
+	suite.pool.On("Add", guarantee).Return(true)
 
 	// submit the guarantee as if it was sent by a collection node
 	err := suite.core.OnGuarantee(suite.collID, guarantee)
 	suite.Assert().Error(err, "should error with invalid guarantor")
 	suite.Assert().True(engine.IsInvalidInputError(err))
 
+	// check that the guarantee has _not_ been added to the mempool
+	suite.pool.AssertNotCalled(suite.T(), "Add", guarantee)
 }
 
 // test that just after an epoch boundary we still accept guarantees from collectors
@@ -340,7 +299,7 @@ func (suite *IngestionCoreSuite) TestOnGuaranteeEpochEnd() {
 
 	// the guarantee is not part of the memory pool
 	suite.pool.On("Has", guarantee.ID()).Return(false)
-	suite.pool.On("Add", guarantee).Return(true)
+	suite.pool.On("Add", guarantee).Return(true).Once()
 
 	// submit the guarantee as if it was sent by the collection node which
 	// is leaving at the current epoch boundary

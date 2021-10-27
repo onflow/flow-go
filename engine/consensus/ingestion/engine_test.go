@@ -16,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	netint "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -49,13 +50,16 @@ func (s *IngestionSuite) SetupTest() {
 		nil,
 	)
 
+	// setup my own identity
+	me := &mockmodule.Local{}
+	me.On("NodeID").Return(s.conID) // we use the first consensus node as our local identity
+
 	ctx, cancel := context.WithCancel(context.Background())
 	s.cancel = cancel
-
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
 	metrics := metrics.NewNoopCollector()
-	ingest, err := New(unittest.Logger(), metrics, s.net, s.core.me, s.core)
+	ingest, err := New(unittest.Logger(), metrics, s.net, me, s.core)
 	require.NoError(s.T(), err)
 	s.ingest = ingest
 	s.ingest.Start(signalerCtx)

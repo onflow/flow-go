@@ -138,8 +138,14 @@ func (e *Engine) Process(_ network.Channel, originID flow.Identifier, event inte
 }
 
 // processAvailableMessages processes the given ingestion engine event.
-func (e *Engine) processAvailableMessages() error {
+func (e *Engine) processAvailableMessages(ctx context.Context) error {
 	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default: // fall through to business logic
+		}
+
 		msg, ok := e.pendingGuarantees.Get()
 		if ok {
 			originID := msg.OriginID
@@ -175,7 +181,7 @@ func (e *Engine) loop(ctx context.Context) error {
 		case <-ctx.Done():
 			return nil
 		case <-e.messageHandler.GetNotifier():
-			err := e.processAvailableMessages()
+			err := e.processAvailableMessages(ctx)
 			if err != nil {
 				return fmt.Errorf("internal error processing queued message: %w", err)
 			}
