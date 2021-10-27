@@ -17,7 +17,7 @@ esac
 
 process_results="go run $(realpath ./process_results.go) test-results.json"
 
-cd ..
+cd ../..
 
 # checkout specified commit
 if [[ -n $COMMIT_SHA ]]
