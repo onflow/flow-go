@@ -349,13 +349,19 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Len(t, segment.Blocks, 5)
-			assert.True(t, segment.ContainsExecutionResult(receipt1.Meta().ResultID))
+
+			_, found := segment.ExecutionResults.Lookup()[receipt1.Meta().ResultID]
+			assert.True(t, found)
+
+			_, found = segment.ExecutionReceipts.Lookup()[receipt1.ID()]
+			assert.True(t, found)
 
 			// no blocks in this segment have missing execution results
 			segment, err = state.AtBlockID(block4.ID()).SealingSegment()
 			require.NoError(t, err)
 
 			assert.Len(t, segment.Blocks, 3)
+			assert.Len(t, segment.ExecutionResults, 0, "expected none of the blocks to have missing results, ExecutionResults should be empty")
 			assert.Len(t, segment.ExecutionReceipts, 0, "expected none of the blocks to have missing results, ExecutionReceipts should be empty")
 		})
 	})
