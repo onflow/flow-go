@@ -162,7 +162,7 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-func generateFlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
+func FlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
 	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID.String())
 }
 

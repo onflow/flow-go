@@ -252,7 +252,7 @@ func (e *TransactionEnv) GetStorageUsed(address common.Address) (value uint64, e
 		defer sp.Finish()
 	}
 
-	value, err = e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
+	value, err = e.accounts.GetStorageUsed(flow.Address(address))
 	if err != nil {
 		return value, fmt.Errorf("getting storage used failed: %w", err)
 	}
@@ -397,7 +397,7 @@ func (e *TransactionEnv) GetCode(location runtime.Location) ([]byte, error) {
 		return nil, errors.NewInvalidLocationErrorf(location, "expecting an AddressLocation, but other location types are passed")
 	}
 
-	address := flow.BytesToAddress(contractLocation.Address.Bytes())
+	address := flow.Address(contractLocation.Address)
 
 	err := e.accounts.CheckAccountNotFrozen(address)
 	if err != nil {
@@ -418,7 +418,7 @@ func (e *TransactionEnv) GetAccountContractNames(address runtime.Address) ([]str
 		defer sp.Finish()
 	}
 
-	a := flow.BytesToAddress(address.Bytes())
+	a := flow.Address(address)
 
 	freezeError := e.accounts.CheckAccountNotFrozen(a)
 	if freezeError != nil {
@@ -435,7 +435,7 @@ func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Prog
 	}
 
 	if addressLocation, ok := location.(common.AddressLocation); ok {
-		address := flow.BytesToAddress(addressLocation.Address.Bytes())
+		address := flow.Address(addressLocation.Address)
 
 		freezeError := e.accounts.CheckAccountNotFrozen(address)
 		if freezeError != nil {
