@@ -503,7 +503,6 @@ func main() {
 				node.Metrics.Mempool,
 				node.State,
 				node.Storage.Headers,
-				node.Me,
 				guarantees,
 			)
 			if err != nil {

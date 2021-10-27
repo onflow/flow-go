@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/metrics"
@@ -28,7 +27,6 @@ type Core struct {
 	mempool module.MempoolMetrics // used to track mempool metrics
 	state   protocol.State        // used to access the protocol state
 	headers storage.Headers       // used to retrieve headers
-	me      module.Local          // used to access local node information
 	pool    mempool.Guarantees    // used to keep pending guarantees in pool
 }
 
@@ -38,7 +36,6 @@ func NewCore(
 	mempool module.MempoolMetrics,
 	state protocol.State,
 	headers storage.Headers,
-	me module.Local,
 	pool mempool.Guarantees,
 ) (*Core, error) {
 
@@ -49,7 +46,6 @@ func NewCore(
 		mempool: mempool,
 		state:   state,
 		headers: headers,
-		me:      me,
 		pool:    pool,
 	}
 
@@ -59,9 +55,10 @@ func NewCore(
 // OnGuarantee is used to process collection guarantees received
 // from nodes that are not consensus nodes (notably collection nodes).
 // Returns expected errors:
-// * InvalidInputError
-// * UnverifiableInputError
-// * OutdatedInputError
+//  * engine.InvalidInputError if the collection violates protocol rules
+//  * engine.UnverifiableInputError if the reference block of the collection is unknown
+//  * engine.OutdatedInputError if the collection is already expired
+// All other errors are unexpected and potential symptoms of internal state corruption.
 func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
 
 	span, _, isSampled := e.tracer.StartCollectionSpan(context.Background(), guarantee.CollectionID, trace.CONIngOnCollectionGuarantee)
@@ -77,7 +74,6 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 		Hex("collection_id", guaranteeID[:]).
 		Int("signers", len(guarantee.SignerIDs)).
 		Logger()
-
 	log.Info().Msg("collection guarantee received")
 
 	// skip collection guarantees that are already in our memory pool
@@ -87,20 +83,16 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 		return nil
 	}
 
-	// retrieve and validate the sender of the guarantee message
-	origin, err := e.validateOrigin(originID, guarantee)
+	// check collection guarantee's validity
+	err := e.validateOrigin(originID, guarantee) // retrieve and validate the sender of the collection guarantee
 	if err != nil {
 		return fmt.Errorf("origin validation error: %w", err)
 	}
-
-	// ensure that collection has not expired
-	err = e.validateExpiry(guarantee)
+	err = e.validateExpiry(guarantee) // ensure that collection has not expired
 	if err != nil {
 		return fmt.Errorf("expiry validation error: %w", err)
 	}
-
-	// ensure the guarantors are allowed to produce this collection
-	err = e.validateGuarantors(guarantee)
+	err = e.validateGuarantors(guarantee) // ensure the guarantors are allowed to produce this collection
 	if err != nil {
 		return fmt.Errorf("guarantor validation error: %w", err)
 	}
@@ -111,44 +103,19 @@ func (e *Core) OnGuarantee(originID flow.Identifier, guarantee *flow.CollectionG
 		log.Debug().Msg("discarding guarantee already in pool")
 		return nil
 	}
-
-	e.mempool.MempoolEntries(metrics.ResourceGuarantee, e.pool.Size())
-
 	log.Info().Msg("collection guarantee added to pool")
 
-	// if the collection guarantee stems from a collection node, we should propagate it
-	// to the other consensus nodes on the network; we no longer need to care about
-	// fan-out here, as libp2p will take care of the pub-sub pattern adequately
-	if origin.Role != flow.RoleCollection {
-		return nil
-	}
-
-	final := e.state.Final()
-
-	// don't propagate collection guarantees if we are not currently staked
-	staked, err := protocol.IsNodeStakedAt(final, e.me.NodeID())
-	if err != nil {
-		return fmt.Errorf("could not check my staked status: %w", err)
-	}
-	if !staked {
-		return nil
-	}
-
-	// NOTE: there are two ways to go about this:
-	// - expect the collection nodes to propagate the guarantee to all consensus nodes;
-	// - ensure that we take care of propagating guarantees to other consensus nodes.
-	// Currently, we go with first option as each collection node broadcasts a guarantee to
-	// all consensus nodes. So we expect all collections of a cluster to broadcast a guarantee to
-	// all consensus nodes. Even on an unhappy path, as long as only one collection node does it
-	// the guarantee must be delivered to all consensus nodes.
-
+	e.mempool.MempoolEntries(metrics.ResourceGuarantee, e.pool.Size())
 	return nil
 }
 
 // validateExpiry validates that the collection has not expired w.r.t. the local
 // latest finalized block.
+// Expected errors during normal operation:
+//  * engine.UnverifiableInputError if the reference block of the collection is unknown
+//  * engine.OutdatedInputError if the collection is already expired
+// All other errors are unexpected and potential symptoms of internal state corruption.
 func (e *Core) validateExpiry(guarantee *flow.CollectionGuarantee) error {
-
 	// get the last finalized header and the reference block header
 	final, err := e.state.Final().Head()
 	if err != nil {
@@ -174,10 +141,17 @@ func (e *Core) validateExpiry(guarantee *flow.CollectionGuarantee) error {
 // validateGuarantors validates that the guarantors of a collection are valid,
 // in that they are all from the same cluster and that cluster is allowed to
 // produce the given collection w.r.t. the guarantee's reference block.
+// Expected errors during normal operation:
+//  * engine.InvalidInputError if the origin violates any requirements
+//  * engine.UnverifiableInputError if the reference block of the collection is unknown
+// All other errors are unexpected and potential symptoms of internal state corruption.
+// TODO: Eventually we should check the signatures, ensure a quorum of the
+//	     cluster, and ensure HotStuff finalization rules. Likely a cluster-specific
+//	     version of the follower will be a good fit for this. For now, collection
+//	     nodes independently decide when a collection is finalized and we only check
+//	     that the guarantors are all from the same cluster. This implementation is NOT BFT.
 func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
-
 	guarantors := guarantee.SignerIDs
-
 	if len(guarantors) == 0 {
 		return engine.NewInvalidInputError("invalid collection guarantee with no guarantors")
 	}
@@ -196,12 +170,6 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 		return engine.NewInvalidInputErrorf("guarantor (id=%s) does not exist in any cluster", guarantors[0])
 	}
 
-	// NOTE: Eventually we should check the signatures, ensure a quorum of the
-	// cluster, and ensure HotStuff finalization rules. Likely a cluster-specific
-	// version of the follower will be a good fit for this. For now, collection
-	// nodes independently decide when a collection is finalized and we only check
-	// that the guarantors are all from the same cluster.
-
 	// ensure the guarantors are from the same cluster
 	clusterLookup := cluster.Lookup()
 	for _, guarantorID := range guarantors {
@@ -215,61 +183,29 @@ func (e *Core) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 }
 
 // validateOrigin validates that the message has a valid sender (origin). We
-// allow Guarantee messages either from collection nodes or from consensus nodes.
-// Collection nodes must be valid in the identity table w.r.t. the reference
-// block of the collection; consensus nodes must be valid w.r.t. the latest
-// finalized block.
+// only accept guarantees from an origin that is part of the identity table
+// at the collection's reference block. Furthermore, the origin must be
+// a staked, non-ejected collector node.
+// Expected errors during normal operation:
+//  * engine.InvalidInputError if the origin violates any requirements
+//  * engine.UnverifiableInputError if the reference block of the collection is unknown
+// All other errors are unexpected and potential symptoms of internal state corruption.
 //
-// Returns the origin identity as validated if validation passes.
-func (e *Core) validateOrigin(originID flow.Identifier, guarantee *flow.CollectionGuarantee) (*flow.Identity, error) {
-
-	refBlock := guarantee.ReferenceBlockID
-
-	// get the origin identity w.r.t. the collection reference block
-	origin, err := e.state.AtBlockID(refBlock).Identity(originID)
+// TODO: ultimately, the origin broadcasting a collection is irrelevant, as long as the
+//       collection itself is valid. The origin is only needed in case the guarantee is found
+//       to be invalid, in which case we might want to slash the origin.
+func (e *Core) validateOrigin(originID flow.Identifier, guarantee *flow.CollectionGuarantee) error {
+	refState := e.state.AtBlockID(guarantee.ReferenceBlockID)
+	valid, err := protocol.IsNodeStakedWithRoleAt(refState, originID, flow.RoleCollection)
 	if err != nil {
 		// collection with an unknown reference block is unverifiable
 		if errors.Is(err, storage.ErrNotFound) {
-			return nil, engine.NewUnverifiableInputError("could not get origin (id=%x) for unknown reference block (id=%x): %w", originID, refBlock, err)
+			return engine.NewUnverifiableInputError("could not get origin (id=%x) for unknown reference block (id=%x): %w", originID, guarantee.ReferenceBlockID, err)
 		}
-		// in case of identity not found, we continue and check the other case - all other errors are unexpected
-		if !protocol.IsIdentityNotFound(err) {
-			return nil, fmt.Errorf("could not get origin (id=%x) identity w.r.t. reference block (id=%x) : %w", originID, refBlock, err)
-		}
-	} else {
-		// if it is a collection node and a valid epoch participant, it is a valid origin
-		if filter.And(
-			filter.IsValidCurrentEpochParticipant,
-			filter.HasRole(flow.RoleCollection),
-		)(origin) {
-			return origin, nil
-		}
+		return fmt.Errorf("unexpected error checking collection origin %x at reference block %x: %w", originID, guarantee.ReferenceBlockID, err)
 	}
-
-	// At this point there are two cases:
-	// 1) origin was not found at reference block state
-	// 2) origin was found at reference block state, but isn't a collection node
-	//
-	// Now, check whether the origin is a valid consensus node using finalized state.
-	// This can happen when we have just passed an epoch boundary and a consensus
-	// node which has just joined sends us a guarantee referencing a block prior
-	// to the epoch boundary.
-
-	// get the origin identity w.r.t. the latest finalized block
-	origin, err = e.state.Final().Identity(originID)
-	if protocol.IsIdentityNotFound(err) {
-		return nil, engine.NewInvalidInputErrorf("unknown origin (id=%x): %w", originID, err)
+	if !valid {
+		return engine.NewInvalidInputErrorf("invalid collection origin (id=%x)", originID)
 	}
-	if err != nil {
-		return nil, fmt.Errorf("could not get origin (id=%x) w.r.t. finalized state: %w", originID, err)
-	}
-
-	if filter.And(
-		filter.IsValidCurrentEpochParticipant,
-		filter.HasRole(flow.RoleConsensus),
-	)(origin) {
-		return origin, nil
-	}
-
-	return nil, engine.NewInvalidInputErrorf("invalid origin (id=%x)", originID)
+	return nil
 }
