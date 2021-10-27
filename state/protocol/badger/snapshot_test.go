@@ -188,8 +188,8 @@ func TestSealingSegment(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
-
 	t.Run("root sealing segment", func(t *testing.T) {
+
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			expected, err := rootSnapshot.SealingSegment()
 			require.NoError(t, err)
@@ -222,7 +222,6 @@ func TestSealingSegment(t *testing.T) {
 
 			segment, err := state.AtBlockID(block2.ID()).SealingSegment()
 			require.NoError(t, err)
-
 			// sealing segment should contain B1 and B2
 			// B2 is reference of snapshot, B1 is latest sealed
 			assert.Len(t, segment.Blocks, 2)
@@ -307,6 +306,60 @@ func TestSealingSegment(t *testing.T) {
 			assert.Equal(t, block4.ID(), segment.Blocks[2].ID())
 		})
 	})
+
+	// test sealing segment where a block contains a ExecutionReceipt that
+	// references a ExecutionResult contained in a different block.
+	// the sealing segment should contain any ExecutionResults that were
+	// missing from a blocks payload in the SealingSegment.ExecutionResults field
+	// ROOT -> B1(Receipt_A) -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3 -> B4 -> B5 (Seal_B1)
+	// Expected sealing segment: SealingSegment{Blocks[B1, B2, B3, B4, B5] ExecutionResults{some_result_id:Result_A}}
+	t.Run("sealing segment decoupled execution results and receipts", func(t *testing.T) {
+		block1 := unittest.BlockWithParentFixture(head)
+		receipt1 := unittest.ReceiptForBlockFixture(&block1)
+		util.RunWithFollowerProtocolStateAndResults(t, rootSnapshot, []*flow.ExecutionResult{&receipt1.ExecutionResult}, func(db *badger.DB, state *bprotocol.FollowerState) {
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+			// simulate scenario where execution result is missing from block payload
+			// SealingSegment() should get result from results db and store it on ExecutionResults
+			// field on SealingSegment
+			block1.Payload.Results = []*flow.ExecutionResult{}
+			err = state.Extend(context.Background(), &block1)
+
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			err = state.Extend(context.Background(), &block2)
+			require.NoError(t, err)
+
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			err = state.Extend(context.Background(), &block3)
+			require.NoError(t, err)
+
+			block4 := unittest.BlockWithParentFixture(block3.Header)
+			receipt2, seal2 := unittest.ReceiptAndSealForBlock(&block2)
+			block4.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal2)))
+			err = state.Extend(context.Background(), &block4)
+			require.NoError(t, err)
+
+			// build the block sealing block 1
+			block5 := unittest.BlockWithParentFixture(block4.Header)
+			receipt2, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal1)))
+			err = state.Extend(context.Background(), &block5)
+			require.NoError(t, err)
+
+			segment, err := state.AtBlockID(block5.ID()).SealingSegment()
+			require.NoError(t, err)
+
+			assert.Len(t, segment.Blocks, 5)
+			assert.True(t, segment.ContainsExecutionResult(receipt1.Meta().ResultID))
+
+			// no blocks in this segment have missing execution results
+			segment, err = state.AtBlockID(block4.ID()).SealingSegment()
+			require.NoError(t, err)
+
+			assert.Len(t, segment.Blocks, 3)
+			assert.Len(t, segment.ExecutionResults, 0, "expected none of the blocks to have missing results, ExecutionResults should be empty")
+		})
+	})
+
 }
 
 func TestLatestSealedResult(t *testing.T) {
