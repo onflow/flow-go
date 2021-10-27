@@ -137,14 +137,15 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 
 	// creates list of chunk data pack responses
 	count := 10
-	responses := unittest.ChunkDataResponseMessageListFixture(count)
+	requests := unittest.ChunkDataPackRequestListFixture(count)
 	originID := unittest.IdentifierFixture()
-	chunkIDs := toChunkIDs(t, responses)
+	chunkIDs := toChunkIDs(t, requests)
+	responses := unittest.ChunkDataResponseMessageListFixture(chunkIDs)
 
 	// we remove pending request on receiving this response
-	mockPendingRequestsRem(t, s.pendingRequests, chunkIDs)
+	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 	// we pass each chunk data pack and its collection to chunk data pack handler
-	mockChunkDataPackHandler(t, s.handler, chunkIDs)
+	mockChunkDataPackHandler(t, s.handler, requests)
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Times(len(responses))
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(responses))
 
@@ -170,7 +171,7 @@ func TestHandleChunkDataPack_FailedRequestRemoval(t *testing.T) {
 	// however by the time we try remove it, the request has gone.
 	// this can happen when duplicate chunk data packs are coming concurrently.
 	// the concurrency is safe with pending requests mempool's mutex lock.
-	s.pendingRequests.On("Rem", response.ChunkDataPack.ChunkID).Return(false).Once()
+	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(nil, false).Once()
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 
 	err := e.Process(engine.RequestChunks, originID, response)
@@ -195,14 +196,14 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 		unittest.WithAgrees(agrees),
 		unittest.WithDisagrees(disagrees))
 	vertestutils.MockLastSealedHeight(s.state, 10)
-	s.pendingRequests.On("All").Return(requests)
+	s.pendingRequests.On("All").Return(requests.UniqueRequestInfo())
 	// check data pack request is never tried since its block has been sealed.
 	s.metrics.On("SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester", uint64(0)).Return().Once()
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
-	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(requests))
-	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(requests))
+	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
+	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, requests)
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 
 	// requester does not call publish to disseminate the request for this chunk.
@@ -232,13 +233,17 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 
 	// mocks the requester pipeline
 	vertestutils.MockLastSealedHeight(s.state, sealedHeight)
-	s.pendingRequests.On("All").Return(requests)
-	mockChunkDataPackHandler(t, s.handler, flow.IdentifierList{response.ChunkDataPack.ChunkID})
-	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(requests))
+	s.pendingRequests.On("All").Return(requests.UniqueRequestInfo())
+	mockChunkDataPackHandler(t, s.handler, requests)
+	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 
 	// makes all chunk requests being qualified for dispatch instantly
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
-		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
+		s.pendingRequests,
+		requests,
+		verification.ChunkDataPackRequestList{},
+		verification.ChunkDataPackRequestList{},
+		1)
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Times(len(requests))
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(requests))
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(requests))
@@ -283,11 +288,15 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	requests := append(sealedRequests, unsealedRequests...)
 
 	vertestutils.MockLastSealedHeight(s.state, sealedHeight)
-	s.pendingRequests.On("All").Return(requests)
+	s.pendingRequests.On("All").Return(requests.UniqueRequestInfo())
 
 	// makes all (unsealed) chunk requests being qualified for dispatch instantly
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
-		s.pendingRequests, flow.GetIDs(unsealedRequests), flow.IdentifierList{}, flow.IdentifierList{}, 1)
+		s.pendingRequests,
+		unsealedRequests,
+		verification.ChunkDataPackRequestList{},
+		verification.ChunkDataPackRequestList{},
+		1)
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(len(unsealedRequests))
 	// each unsealed height is requested only once, hence the maximum is updated only once from 0 -> 1
 	s.metrics.On("SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester", testifymock.Anything).Return().Once()
@@ -295,8 +304,8 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	// sealed requests should be removed and the handler should be notified.
-	mockPendingRequestsRem(t, s.pendingRequests, flow.GetIDs(sealedRequests))
-	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, flow.GetIDs(sealedRequests))
+	mockPendingRequestsPopAll(t, s.pendingRequests, sealedRequests)
+	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, sealedRequests)
 	// unsealed requests should be submitted to the network once
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedRequests, 1, func(*messages.ChunkDataRequest) {})
 
@@ -312,49 +321,28 @@ func TestHandleChunkDataPack_DuplicateChunkIDs(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
-	resultA, resultB, _, _ := vertestutils.ExecutionResultForkFixture(t)
+	resultA, _, _, _ := vertestutils.ExecutionResultForkFixture(t)
 
-	responseA := unittest.ChunkDataResponseMsgFixture(resultA.Chunks[0].ID())
-	responseB := unittest.ChunkDataResponseMsgFixture(resultB.Chunks[0].ID())
-	requestA := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(responseA.ChunkDataPack.ChunkID))
-	requestB := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(responseB.ChunkDataPack.ChunkID))
+	duplicateChunkID := resultA.Chunks[0].ID()
+	responseA := unittest.ChunkDataResponseMsgFixture(duplicateChunkID)
 
+	requestA := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(duplicateChunkID))
+	requestB := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(duplicateChunkID))
+
+	requests := verification.ChunkDataPackRequestList{requestA, requestB}
 	originID := unittest.IdentifierFixture()
 
 	// we remove pending request on receiving this response
-	s.pendingRequests.On("PopAll", responseA.ChunkDataPack.ChunkID).Return(requestA, true).Once()
-	s.pendingRequests.On("PopAll", responseB.ChunkDataPack.ChunkID).Return(requestB, true).Once()
+	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
+	mockChunkDataPackHandler(t, s.handler, requests)
 
-	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
-		Locator: chunks.Locator{
-			ResultID: requestA.ResultID,
-			Index:    requestA.Index,
-		},
-		Cdp: &responseA.ChunkDataPack,
-	}).Return().Once()
-
-	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
-		Locator: chunks.Locator{
-			ResultID: requestB.ResultID,
-			Index:    requestB.Index,
-		},
-		Cdp: &responseB.ChunkDataPack,
-	}).Return().Once()
-
-	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Twice()
+	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Twice()
 
 	wg := sync.WaitGroup{}
-	wg.Add(2)
+	wg.Add(1)
 	go func() {
 		err := e.Process(engine.RequestChunks, originID, responseA)
-		require.Nil(t, err)
-
-		wg.Done()
-	}()
-
-	go func() {
-		err := e.Process(engine.RequestChunks, originID, responseB)
 		require.Nil(t, err)
 
 		wg.Done()
@@ -391,11 +379,15 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 		unittest.WithAgrees(agrees),
 		unittest.WithDisagrees(disagrees))
 	vertestutils.MockLastSealedHeight(s.state, 5)
-	s.pendingRequests.On("All").Return(requests)
+	s.pendingRequests.On("All").Return(requests.UniqueRequestInfo())
 
 	// makes all chunk requests being qualified for dispatch instantly
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
-		s.pendingRequests, flow.GetIDs(requests), flow.IdentifierList{}, flow.IdentifierList{}, attempts)
+		s.pendingRequests,
+		requests,
+		verification.ChunkDataPackRequestList{},
+		verification.ChunkDataPackRequestList{},
+		attempts)
 
 	s.metrics.On("OnChunkDataPackRequestDispatchedInNetworkByRequester").Return().Times(count * attempts)
 	s.metrics.On("SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester", testifymock.Anything).Run(func(args testifymock.Arguments) {
@@ -433,7 +425,7 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	agrees := unittest.IdentifierListFixture(2)
 	disagrees := unittest.IdentifierListFixture(3)
 	vertestutils.MockLastSealedHeight(s.state, 5)
-	// models requests that are just added to the mempool and are ready to dispatch.
+	// models new requests that are just added to the mempool and are ready to dispatch.
 	instantQualifiedRequests := unittest.ChunkDataPackRequestListFixture(10,
 		unittest.WithHeightGreaterThan(5),
 		unittest.WithAgrees(agrees),
@@ -452,14 +444,14 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 
 	allRequests := append(instantQualifiedRequests, lateQualifiedRequests...)
 	allRequests = append(allRequests, disQualifiedRequests...)
-	s.pendingRequests.On("All").Return(allRequests)
+	s.pendingRequests.On("All").Return(allRequests.UniqueRequestInfo())
 
 	attempts := 10 // waits for 10 iterations of onTimer cycle in requester.
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests,
-		flow.GetIDs(instantQualifiedRequests),
-		flow.GetIDs(lateQualifiedRequests),
-		flow.GetIDs(disQualifiedRequests),
+		instantQualifiedRequests,
+		lateQualifiedRequests,
+		disQualifiedRequests,
 		attempts)
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
@@ -480,12 +472,12 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.metrics)
 }
 
-// toChunkIDs is a test helper that extracts chunk ids from chunk data pack responses.
-func toChunkIDs(t *testing.T, responses []*messages.ChunkDataResponse) flow.IdentifierList {
+// toChunkIDs is a test helper that extracts chunk ids from chunk data pack requests.
+func toChunkIDs(t *testing.T, requests verification.ChunkDataPackRequestList) flow.IdentifierList {
 	var chunkIDs flow.IdentifierList
-	for _, response := range responses {
-		require.NotContains(t, chunkIDs, response.ChunkDataPack.ChunkID, "duplicate chunk ID found in fixture")
-		chunkIDs = append(chunkIDs, response.ChunkDataPack.ChunkID)
+	for _, request := range requests {
+		require.NotContains(t, chunkIDs, request.ChunkID, "duplicate chunk ID found in fixture")
+		chunkIDs = append(chunkIDs, request.ChunkID)
 	}
 	return chunkIDs
 }
@@ -522,7 +514,7 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 			// also, it should not be repeated below a maximum threshold
 			req, ok := args[0].(*messages.ChunkDataRequest)
 			require.True(t, ok)
-			require.Contains(t, flow.GetIDs(reqList), req.ChunkID)
+			require.True(t, reqList.ContainsChunkID(req.ChunkID))
 			require.LessOrEqual(t, reqCount[req.ChunkID], count)
 			reqCount[req.ChunkID]++
 
@@ -545,49 +537,54 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 	return wg
 }
 
-// mockChunkDataPackHandler mocks chunk data pack handler for receiving a set of chunk ids.
-// It evaluates that, each chunk ID should be passed only once accompanied with specified collection.
-func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHandler, chunkIDs flow.IdentifierList) {
-	handledChunks := make(map[flow.Identifier]struct{})
+// mockChunkDataPackHandler mocks chunk data pack handler for receiving a set of chunk responses.
+// It evaluates that, each pair of (chunkIndex, resultID) should be passed exactly once.
+func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHandler, requests verification.ChunkDataPackRequestList) {
+	handledLocators := make(map[flow.Identifier]struct{})
 
 	handler.On("HandleChunkDataPack", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			_, ok := args[0].(flow.Identifier)
 			require.True(t, ok)
-			chunk, ok := args[1].(*flow.ChunkDataPack)
+			response, ok := args[1].(*verification.ChunkDataPackResponse)
 			require.True(t, ok)
 
 			// we should have already requested this chunk data pack.
-			chunkID := chunk.ID()
-			require.Contains(t, chunkIDs, chunkID)
+			require.True(t, requests.ContainsLocator(response.ResultID, response.Index))
+			require.True(t, requests.ContainsChunkID(response.Cdp.ChunkID))
 
 			// invocation should be distinct per chunk ID
-			_, ok = handledChunks[chunkID]
+			locatorID := chunks.ChunkLocatorID(response.ResultID, response.Index)
+			_, ok = handledLocators[locatorID]
 			require.False(t, ok)
-			handledChunks[chunkID] = struct{}{}
-		}).Return().Times(len(chunkIDs))
+
+			handledLocators[locatorID] = struct{}{}
+		}).Return().Times(len(requests))
 }
 
 // mockChunkDataPackHandler mocks chunk data pack handler for being notified that a set of chunk IDs are sealed.
 // It evaluates that, each chunk ID should be notified only once.
-func mockNotifyBlockSealedHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHandler,
-	chunkIDs flow.IdentifierList) *sync.WaitGroup {
+func mockNotifyBlockSealedHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHandler, requests verification.ChunkDataPackRequestList) *sync.WaitGroup {
 
 	wg := &sync.WaitGroup{}
-	wg.Add(len(chunkIDs))
-	sealedChunks := make(map[flow.Identifier]struct{})
-	handler.On("NotifyChunkDataPackSealed", testifymock.Anything).
+	wg.Add(len(requests))
+	// maps keep track of distinct invocations per chunk ID
+	seen := make(map[flow.Identifier]struct{})
+	handler.On("NotifyChunkDataPackSealed", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
-			chunkID, ok := args[0].(flow.Identifier)
+			chunkIndex, ok := args[0].(uint64)
+			require.True(t, ok)
+			resultID, ok := args[1].(flow.Identifier)
 			require.True(t, ok)
 
 			// we should have already requested this chunk data pack, and collection ID should be the same.
-			require.Contains(t, chunkIDs, chunkID)
+			require.True(t, requests.ContainsLocator(resultID, chunkIndex))
 
 			// invocation should be distinct per chunk ID
-			_, ok = sealedChunks[chunkID]
+			locatorID := chunks.ChunkLocatorID(resultID, chunkIndex)
+			_, ok = seen[locatorID]
 			require.False(t, ok)
-			sealedChunks[chunkID] = struct{}{}
+			seen[locatorID] = struct{}{}
 
 			wg.Done()
 		}).Return()
@@ -595,26 +592,42 @@ func mockNotifyBlockSealedHandler(t *testing.T, handler *mockfetcher.ChunkDataPa
 	return wg
 }
 
-// mockPendingRequestsRem mocks chunk requests mempool for being queried for affirmative removal of each chunk ID once.
-func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests, chunkIDs flow.IdentifierList) {
+// mockPendingRequestsPopAll mocks chunk requests mempool for being queried for returning all requests associated with a
+// chunk ID only once.
+func mockPendingRequestsPopAll(t *testing.T, pendingRequests *mempool.ChunkRequests, requests verification.ChunkDataPackRequestList) {
 	// maps keep track of distinct invocations per chunk ID
-	removedRequests := make(map[flow.Identifier]struct{})
+	seen := make(map[flow.Identifier]struct{})
 
-	// we remove pending request on receiving this response
-	pendingRequests.On("Rem", testifymock.Anything).
-		Run(func(args testifymock.Arguments) {
-			chunkID, ok := args[0].(flow.Identifier)
-			require.True(t, ok)
-			// we should have already requested this chunk data pack
-			require.Contains(t, chunkIDs, chunkID)
+	pendingRequests.On("PopAll", testifymock.Anything).
+		Return(
+			func(chunkID flow.Identifier) chunks.LocatorList {
+				locators := chunks.LocatorList{}
 
-			// invocation should be distinct per chunk ID
-			_, ok = removedRequests[chunkID]
-			require.False(t, ok)
-			removedRequests[chunkID] = struct{}{}
-		}).
-		Return(true).
-		Times(len(chunkIDs))
+				// chunk ID must not be seen
+				_, ok := seen[chunkID]
+				require.False(t, ok)
+
+				for _, request := range requests {
+					if request.ChunkID == chunkID {
+						locator := request.Locator
+						locators = append(locators, &locator)
+					}
+				}
+
+				seen[chunkID] = struct{}{}
+
+				return locators
+			},
+			func(chunkID flow.Identifier) bool {
+				for _, request := range requests {
+					if request.ChunkID == chunkID {
+						return true
+					}
+				}
+
+				return false
+			},
+		)
 }
 
 // mockPendingRequestInfoAndUpdate mocks pending requests mempool regarding three sets of chunk IDs: the instant, late, and disqualified ones.
@@ -627,9 +640,9 @@ func mockPendingRequestsRem(t *testing.T, pendingRequests *mempool.ChunkRequests
 // engine, and are no longer needed.
 func mockPendingRequestInfoAndUpdate(t *testing.T,
 	pendingRequests *mempool.ChunkRequests,
-	instantQualifiedReqs flow.IdentifierList,
-	lateQualifiedReqs flow.IdentifierList,
-	disQualifiedReqs flow.IdentifierList,
+	instantQualifiedReqs verification.ChunkDataPackRequestList,
+	lateQualifiedReqs verification.ChunkDataPackRequestList,
+	disQualifiedReqs verification.ChunkDataPackRequestList,
 	attempts int) *sync.WaitGroup {
 
 	wg := &sync.WaitGroup{}
@@ -647,16 +660,16 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 
 			// chunk ID should be one of the expected ones.
 			require.True(t,
-				instantQualifiedReqs.Contains(chunkID) ||
-					lateQualifiedReqs.Contains(chunkID) ||
-					disQualifiedReqs.Contains(chunkID))
+				instantQualifiedReqs.ContainsChunkID(chunkID) ||
+					lateQualifiedReqs.ContainsChunkID(chunkID) ||
+					disQualifiedReqs.ContainsChunkID(chunkID))
 
 			wg.Done()
 
 		}).Return(
 		// number of attempts
 		func(chunkID flow.Identifier) uint64 {
-			if instantQualifiedReqs.Contains(chunkID) || lateQualifiedReqs.Contains(chunkID) {
+			if instantQualifiedReqs.ContainsChunkID(chunkID) || lateQualifiedReqs.ContainsChunkID(chunkID) {
 				return uint64(1)
 			}
 
@@ -664,24 +677,24 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 
 		}, // last tried timestamp
 		func(chunkID flow.Identifier) time.Time {
-			if instantQualifiedReqs.Contains(chunkID) {
+			if instantQualifiedReqs.ContainsChunkID(chunkID) {
 				// mocks last tried long enough so they instantly get qualified.
 				return time.Now().Add(-1 * time.Hour)
 			}
 
-			if lateQualifiedReqs.Contains(chunkID) {
+			if lateQualifiedReqs.ContainsChunkID(chunkID) {
 				return time.Now()
 			}
 
 			return time.Time{}
 		}, // retry after duration
 		func(chunkID flow.Identifier) time.Duration {
-			if instantQualifiedReqs.Contains(chunkID) {
+			if instantQualifiedReqs.ContainsChunkID(chunkID) {
 				// mocks retry after very short so they instantly get qualified.
 				return 1 * time.Millisecond
 			}
 
-			if lateQualifiedReqs.Contains(chunkID) {
+			if lateQualifiedReqs.ContainsChunkID(chunkID) {
 				// mocks retry after long so they never qualify soon.
 				return time.Hour
 			}
@@ -690,7 +703,7 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 
 		}, // request info existence
 		func(chunkID flow.Identifier) bool {
-			if instantQualifiedReqs.Contains(chunkID) || lateQualifiedReqs.Contains(chunkID) {
+			if instantQualifiedReqs.ContainsChunkID(chunkID) || lateQualifiedReqs.ContainsChunkID(chunkID) {
 				return true
 			}
 
@@ -709,9 +722,9 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 
 			// checks only instantly qualified chunk requests should reach to this step,
 			// i.e., invocation of UpdateRequestHistory
-			require.Contains(t, instantQualifiedReqs, chunkID)
-			require.NotContains(t, lateQualifiedReqs, chunkID)
-			require.NotContains(t, disQualifiedReqs, chunkID)
+			require.True(t, instantQualifiedReqs.ContainsChunkID(chunkID))
+			require.False(t, lateQualifiedReqs.ContainsChunkID(chunkID))
+			require.False(t, disQualifiedReqs.ContainsChunkID(chunkID))
 
 		}). // makes chunk request instantly qualified for retry, i.e., can be
 		// retried anytime after on.

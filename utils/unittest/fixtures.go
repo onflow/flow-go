@@ -1211,10 +1211,10 @@ func ChunkDataResponseMsgFixture(chunkID flow.Identifier, opts ...func(*messages
 }
 
 // ChunkDataResponseMessageListFixture creates a list of chunk data response messages each with a single-transaction collection, and random chunk ID.
-func ChunkDataResponseMessageListFixture(n int, opts ...func(*messages.ChunkDataResponse)) []*messages.ChunkDataResponse {
-	lst := make([]*messages.ChunkDataResponse, 0, n)
-	for i := 0; i < n; i++ {
-		lst = append(lst, ChunkDataResponseMsgFixture(IdentifierFixture(), opts...))
+func ChunkDataResponseMessageListFixture(chunkIDs flow.IdentifierList) []*messages.ChunkDataResponse {
+	lst := make([]*messages.ChunkDataResponse, 0, len(chunkIDs))
+	for _, chunkID := range chunkIDs {
+		lst = append(lst, ChunkDataResponseMsgFixture(chunkID))
 	}
 	return lst
 }
@@ -1223,19 +1223,6 @@ func ChunkDataResponseMessageListFixture(n int, opts ...func(*messages.ChunkData
 func ChunkDataPackRequestListFixture(n int, opts ...func(*verification.ChunkDataPackRequest)) verification.ChunkDataPackRequestList {
 	lst := make([]*verification.ChunkDataPackRequest, 0, n)
 	for i := 0; i < n; i++ {
-		lst = append(lst, ChunkDataPackRequestFixture(opts...))
-	}
-	return lst
-}
-
-// ChunkDataPackRequestListForChunkIDsFixture creates and returns a list of chunk data pack requests fixtures for given chunk ids.
-func ChunkDataPackRequestListForChunkIDsFixture(
-	chunkIDs flow.IdentifierList,
-	opts ...func(*verification.ChunkDataPackRequest)) verification.ChunkDataPackRequestList {
-
-	lst := make([]*verification.ChunkDataPackRequest, 0, len(chunkIDs))
-	for _, chunkID := range chunkIDs {
-		opts := append(opts, WithChunkID(chunkID))
 		lst = append(lst, ChunkDataPackRequestFixture(opts...))
 	}
 	return lst
