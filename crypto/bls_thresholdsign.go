@@ -77,7 +77,7 @@ type blsThresholdSignatureParticipant struct {
 // If the key set or message change, a new structure needs to be instantiated.
 // Participants are defined by their public key share, and are indexed from 0 to n-1
 // where n is the length of the public key shares slice.
-// The function errors with engine.InvalidInputError if:
+// The function errors with InvalidInputsError if:
 //  - n is not between `ThresholdSignMinSize` and `ThresholdSignMaxSize`
 //  - threshold value is not between 0 and n-1
 //  - any input public key is not a BLS key
@@ -134,7 +134,7 @@ func NewBLSThresholdSignatureFollower(
 // Participants are defined by their public key share, and are indexed from 0 to n-1. The current
 // participant is indexed by `currentIndex` and holds the input private key
 // where n is the length of the public key shares slice.
-// The function errors with engine.InvalidInputError if:
+// The function errors with InvalidInputsError if:
 //  - n is not between `ThresholdSignMinSize` and `ThresholdSignMaxSize`
 //  - threshold value is not between 0 and n-1
 //  - any input key is not a BLS key
@@ -275,6 +275,27 @@ func (s *blsThresholdSignatureFollower) hasShare(orig index) bool {
 	return ok
 }
 
+// duplicatedSignerError is an error returned when TrustedAdd or VerifyAndAdd encounter
+// a signature share that has been already added to the internal state.
+type duplicatedSignerError struct {
+	message string
+}
+
+// duplicatedSignerErrorf constructs a new duplicatedSignerError
+func duplicatedSignerErrorf(msg string, args ...interface{}) error {
+	return &duplicatedSignerError{message: fmt.Sprintf(msg, args...)}
+}
+
+func (e duplicatedSignerError) Error() string {
+	return e.message
+}
+
+// IsduplicatedSignerError checks if the input error is a duplicatedSignerError
+func IsduplicatedSignerError(err error) bool {
+	var target *duplicatedSignerError
+	return errors.As(err, &target)
+}
+
 // TrustedAdd adds a signature share to the internal pool of shares
 // without verifying the signature against the message and the participant's
 // public key.
@@ -284,8 +305,8 @@ func (s *blsThresholdSignatureFollower) hasShare(orig index) bool {
 // The function returns:
 //  - (true, nil) if enough signature shares were already collected and no error occured
 //  - (false, nil) if not enough shares were collected and no error occured
-//  - (false, error) if index is invalid (InvalidInputsError) or already added (other error)
-// This function is thread safe and blocking.
+//  - (false, error) if index is invalid (InvalidInputsError) or already added (duplicatedSignerError)
+// This function is thread-safe and blocking.
 func (s *blsThresholdSignatureFollower) TrustedAdd(orig int, share Signature) (bool, error) {
 
 	// validate index
@@ -297,7 +318,7 @@ func (s *blsThresholdSignatureFollower) TrustedAdd(orig int, share Signature) (b
 	defer s.lock.Unlock()
 
 	if s.hasShare(index(orig)) {
-		return false, fmt.Errorf("share for %d was already added", orig)
+		return false, duplicatedSignerErrorf("share for %d was already added", orig)
 	}
 
 	if s.enoughShares() {
@@ -315,7 +336,8 @@ func (s *blsThresholdSignatureFollower) TrustedAdd(orig int, share Signature) (b
 // Thee function returns 3 outputs:
 //  - First boolean output is true if the share is valid and no error is returned, and false otherwise.
 //  - Second boolean output is true if enough shares were collected and no error is returned, and false otherwise.
-//  - error is IsInvalidInputsError if input index is invalid, and a random error if an exception occured.
+//  - error is IsInvalidInputsError if input index is invalid, duplicatedSignerError if signer was added,
+//    and a random error if an exception occured.
 //    (an invalid signature is not considered an invalid input, look at `VerifyShare` for details)
 // This function is thread safe and blocking.
 func (s *blsThresholdSignatureFollower) VerifyAndAdd(orig int, share Signature) (bool, bool, error) {
@@ -330,7 +352,7 @@ func (s *blsThresholdSignatureFollower) VerifyAndAdd(orig int, share Signature) 
 
 	// check share is new
 	if s.hasShare(index(orig)) {
-		return false, false, fmt.Errorf("share for %d was already added", orig)
+		return false, false, duplicatedSignerErrorf("share for %d was already added", orig)
 	}
 
 	// verify the share
@@ -350,10 +372,11 @@ func (s *blsThresholdSignatureFollower) VerifyAndAdd(orig int, share Signature) 
 // The threshold signature is reconstructed if this was not done in a previous call.
 //
 // In the case of reconstructing the threshold signature, the function errors
-// if not enough shares were collected and if any signature fails the deserialization.
+// with a non-sentinel error if not enough shares were collected, or with InvalidInputsError
+// if any signature is not a valid BLS signature.
 // It also performs a final verification against the stored message and group public key
-// and errors if the result is not valid. This is required for the function safety since
-// `TrustedAdd` allows adding invalid signatures.
+// and errors with a non-sentinel error if the result is not valid. This is required for the
+// function safety since `TrustedAdd` allows adding invalid signatures.
 // The function is thread-safe and blocking.
 func (s *blsThresholdSignatureFollower) ThresholdSignature() (Signature, error) {
 	s.lock.Lock()

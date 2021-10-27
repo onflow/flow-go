@@ -39,6 +39,6 @@ type RandomBeaconFollower interface {
 	// It also performs a final verification against the stored message and group public key
 	// and errors (without sentinel) if the result is not valid. This is required for the function safety since
 	// `TrustedAdd` allows adding invalid signatures.
-	// The function is thread-safe and blocking.
+	// The function is blocking.
 	Reconstruct() (crypto.Signature, error)
 }

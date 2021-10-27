@@ -9,14 +9,15 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// randomBeaconFollower implements hotstuff.RandomBeaconFollower interface
+// randomBeaconFollower implements hotstuff.RandomBeaconFollower interface.
+// All methods of this structure are thread-safe.
 type randomBeaconFollower struct {
 	follower crypto.ThresholdSignatureFollower
 }
 
 // NewRandomBeaconFollower returns a new Random Beacon follower instance.
 //
-// It errors with crypto.InvalidInputsError if any input is not valid.
+// It errors with engine.InvalidInputError if any input is not valid.
 func NewRandomBeaconFollower(
 	groupPublicKey crypto.PublicKey,
 	publicKeyShares []crypto.PublicKey,
@@ -32,7 +33,7 @@ func NewRandomBeaconFollower(
 		encoding.RandomBeaconTag)
 
 	if err != nil {
-		return nil, fmt.Errorf("create a new Random Beacon follower failed: %w", err)
+		return nil, engine.NewInvalidInputErrorf("create a new Random Beacon follower failed: %w", err)
 	}
 
 	return &randomBeaconFollower{
@@ -81,33 +82,28 @@ func (r *randomBeaconFollower) Verify(signerIndex int, share crypto.Signature) e
 // The function call is blocking.
 func (r *randomBeaconFollower) TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error) {
 
-	// check index and duplication
-	ok, err := r.follower.HasShare(signerIndex)
+	// Trusted add to the crypto layer
+	enough, err := r.follower.TrustedAdd(signerIndex, share)
+
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
 			// means index is invalid
 			return false, engine.NewInvalidInputErrorf("trusted add failed: %w", err)
+		} else if crypto.IsduplicatedSignerError(err) {
+			// signer was added
+			return false, engine.NewDuplicatedEntryErrorf("trusted add failed: %w", err)
 		} else {
 			// other exceptions
 			return false, fmt.Errorf("trusted add failed because of an exception: %w", err)
 		}
-	}
-	if ok {
-		// duplicate
-		return false, engine.NewDuplicatedEntryErrorf("signer %d was already added", signerIndex)
-	}
-
-	// Trusted add to the crypto layer
-	enough, err := r.follower.TrustedAdd(signerIndex, share)
-	// sanity check for error, although error should be nil here
-	if err != nil {
-		return false, fmt.Errorf("trusted add failed: %w", err)
 	}
 	return enough, nil
 }
 
 // EnoughShares indicates whether enough shares have been accumulated in order to reconstruct
 // a group signature.
+//
+// The function is write-blocking
 func (r *randomBeaconFollower) EnoughShares() bool {
 	return r.follower.EnoughShares()
 }
@@ -119,7 +115,7 @@ func (r *randomBeaconFollower) EnoughShares() bool {
 // It also performs a final verification against the stored message and group public key
 // and errors (without sentinel) if the result is not valid. This is required for the function safety since
 // `TrustedAdd` allows adding invalid signatures.
-// The function is thread-safe and blocking.
+// The function is blocking.
 func (r *randomBeaconFollower) Reconstruct() (crypto.Signature, error) {
 	return r.follower.ThresholdSignature()
 }

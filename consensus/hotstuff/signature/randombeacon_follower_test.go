@@ -172,12 +172,12 @@ func TestRandomBeaconFollower(t *testing.T) {
 		pkSharesInvalid := make([]crypto.PublicKey, crypto.ThresholdSignMaxSize+1)
 		follower, err := NewRandomBeaconFollower(pkGroup, pkSharesInvalid, threshold, thresholdSignatureMessage)
 		assert.Error(t, err)
-		assert.True(t, crypto.IsInvalidInputsError(err))
+		assert.True(t, engine.IsInvalidInputError(err))
 		assert.Nil(t, follower)
 		// invalid threshold
 		follower, err = NewRandomBeaconFollower(pkGroup, pkShares, len(pkShares)+1, thresholdSignatureMessage)
 		assert.Error(t, err)
-		assert.True(t, crypto.IsInvalidInputsError(err))
+		assert.True(t, engine.IsInvalidInputError(err))
 		assert.Nil(t, follower)
 	})
 }

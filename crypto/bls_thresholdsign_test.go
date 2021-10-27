@@ -132,7 +132,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create a share and add it
-			i := 0
+			i := mrand.Intn(n)
 			share, err := skShares[i].Sign(thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
 			enough, err := ts.TrustedAdd(i, share)
@@ -144,13 +144,13 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			// VerifyAndAdd
 			verif, enough, err := ts.VerifyAndAdd(i, share)
 			assert.Error(t, err)
-			assert.False(t, IsInvalidInputsError(err))
+			assert.True(t, IsduplicatedSignerError(err))
 			assert.False(t, verif)
 			assert.False(t, enough)
 			// TrustedAdd
 			enough, err = ts.TrustedAdd(i, share)
 			assert.Error(t, err)
-			assert.False(t, IsInvalidInputsError(err))
+			assert.True(t, IsduplicatedSignerError(err))
 			assert.False(t, enough)
 		})
 
