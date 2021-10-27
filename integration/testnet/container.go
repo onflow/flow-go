@@ -50,7 +50,7 @@ type ContainerConfig struct {
 	SupportsUnstakedNodes bool
 }
 
-func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID, machineAccountAddr flow.Address, machineAccountKey encodable.MachineAccountPrivKey) error {
+func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID, machineAccountAddr flow.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
 	// write staking and machine account private key files
 	writeJSONFile := func(relativePath string, val interface{}) error {
 		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
@@ -71,10 +71,11 @@ func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID
 		return fmt.Errorf("failed to write secrets db key file: %w", err)
 	}
 
-	// check the role
-	err = utils.WriteMachineAccountFile(chainID, c.NodeID, machineAccountAddr, machineAccountKey, writeJSONFile)
-	if err != nil {
-		return fmt.Errorf("failed to write machine account file: %w", err)
+	if role == flow.RoleConsensus || role == flow.RoleCollection {
+		err = utils.WriteMachineAccountFile(chainID, c.NodeID, machineAccountAddr, machineAccountKey, writeJSONFile)
+		if err != nil {
+			return fmt.Errorf("failed to write machine account file: %w", err)
+		}
 	}
 
 	return nil
