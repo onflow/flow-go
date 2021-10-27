@@ -145,7 +145,8 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	// we remove pending request on receiving this response
 	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 	// we pass each chunk data pack and its collection to chunk data pack handler
-	mockChunkDataPackHandler(t, s.handler, requests)
+	handlerWG := mockChunkDataPackHandler(t, s.handler, requests)
+
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Times(len(responses))
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Times(len(responses))
 
@@ -153,7 +154,9 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 		err := e.Process(engine.RequestChunks, originID, response)
 		require.Nil(t, err)
 	}
-	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.handler, s.metrics)
+
+	unittest.RequireReturnsBefore(t, handlerWG.Wait, time.Second, "could not handle chunk data responses on time")
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
 }
 
 // TestHandleChunkDataPack_NonExistingRequest evaluates that failing to remove a received chunk data pack's request
@@ -234,7 +237,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	// mocks the requester pipeline
 	vertestutils.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(requests.UniqueRequestInfo())
-	mockChunkDataPackHandler(t, s.handler, requests)
+	handlerWG := mockChunkDataPackHandler(t, s.handler, requests)
 	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 
 	// makes all chunk requests being qualified for dispatch instantly
@@ -258,6 +261,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	})
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
+	unittest.RequireReturnsBefore(t, handlerWG.Wait, time.Second, "could not handle chunk data responses on time")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.metrics)
@@ -334,22 +338,16 @@ func TestHandleChunkDataPack_DuplicateChunkIDs(t *testing.T) {
 
 	// we remove pending request on receiving this response
 	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
-	mockChunkDataPackHandler(t, s.handler, requests)
+	handlerWG := mockChunkDataPackHandler(t, s.handler, requests)
 
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
 	s.metrics.On("OnChunkDataPackSentToFetcher").Return().Twice()
 
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	go func() {
-		err := e.Process(engine.RequestChunks, originID, responseA)
-		require.Nil(t, err)
+	err := e.Process(engine.RequestChunks, originID, responseA)
+	require.Nil(t, err)
 
-		wg.Done()
-	}()
-
-	unittest.RequireReturnsBefore(t, wg.Wait, 100*time.Millisecond, "could not process chunk responses on time")
-	testifymock.AssertExpectationsForObjects(t, s.con, s.handler, s.pendingRequests, s.metrics)
+	unittest.RequireReturnsBefore(t, handlerWG.Wait, time.Second, "could not handle chunk data responses on time")
+	testifymock.AssertExpectationsForObjects(t, s.con, s.pendingRequests, s.metrics)
 }
 
 // TestRequestPendingChunkDataPack evaluates happy path of having a single pending chunk requests.
@@ -539,9 +537,11 @@ func mockConduitForChunkDataPackRequest(t *testing.T,
 
 // mockChunkDataPackHandler mocks chunk data pack handler for receiving a set of chunk responses.
 // It evaluates that, each pair of (chunkIndex, resultID) should be passed exactly once.
-func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHandler, requests verification.ChunkDataPackRequestList) {
+func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHandler, requests verification.ChunkDataPackRequestList) *sync.WaitGroup {
 	handledLocators := make(map[flow.Identifier]struct{})
 
+	wg := sync.WaitGroup{}
+	wg.Add(len(requests))
 	handler.On("HandleChunkDataPack", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			_, ok := args[0].(flow.Identifier)
@@ -559,7 +559,11 @@ func mockChunkDataPackHandler(t *testing.T, handler *mockfetcher.ChunkDataPackHa
 			require.False(t, ok)
 
 			handledLocators[locatorID] = struct{}{}
-		}).Return().Times(len(requests))
+
+			wg.Done()
+		}).Return()
+
+	return &wg
 }
 
 // mockChunkDataPackHandler mocks chunk data pack handler for being notified that a set of chunk IDs are sealed.
