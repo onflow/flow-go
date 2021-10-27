@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -139,7 +140,7 @@ func DefaultLibP2PNodeFactory(
 
 type NodeBuilder interface {
 	SetRootBlockID(flow.Identifier) NodeBuilder
-	SetConnectionManager(TagLessConnManager) NodeBuilder
+	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
 	SetPubsubOptions(...PubsubOption) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
@@ -156,7 +157,7 @@ type DefaultLibP2PNodeBuilder struct {
 	rootBlockID      *flow.Identifier
 	logger           zerolog.Logger
 	connGater        *ConnGater
-	connMngr         TagLessConnManager
+	connMngr         connmgr.ConnManager
 	pingInfoProvider PingInfoProvider
 	resolver         *dns.Resolver
 	streamFactory    LibP2PStreamCompressorWrapperFunc
@@ -195,7 +196,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId flow.Identif
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetConnectionManager(connMngr TagLessConnManager) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetConnectionManager(connMngr connmgr.ConnManager) NodeBuilder {
 	builder.connMngr = connMngr
 	return builder
 }
@@ -357,7 +358,7 @@ type Node struct {
 	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
 	compressedStream     LibP2PStreamCompressorWrapperFunc
 	pingService          *PingService
-	connMgr              TagLessConnManager
+	connMgr              connmgr.ConnManager
 	dht                  *dht.IpfsDHT
 	topicValidation      bool
 	pCache               *protocolPeerCache
@@ -493,11 +494,6 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 // Note that in case an existing TCP connection underneath to `peerID` exists, that connection is utilized for creating a new stream.
 // The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
 func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
-	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
-	// connection creation is being attempted, and remove it from protected list once stream created.
-	n.connMgr.ProtectPeer(peerID)
-	defer n.connMgr.UnprotectPeer(peerID)
-
 	var errs error
 	var s libp2pnet.Stream
 	var retries = 0
@@ -691,8 +687,8 @@ func (n *Node) Ping(ctx context.Context, peerID peer.ID) (message.PingResponse, 
 
 	targetInfo := peer.AddrInfo{ID: peerID}
 
-	n.connMgr.ProtectPeer(targetInfo.ID)
-	defer n.connMgr.UnprotectPeer(targetInfo.ID)
+	n.connMgr.Protect(targetInfo.ID, "ping")
+	defer n.connMgr.Unprotect(targetInfo.ID, "ping")
 
 	// connect to the target node
 	err := n.host.Connect(ctx, targetInfo)
