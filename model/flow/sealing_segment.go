@@ -10,18 +10,11 @@ type SealingSegment struct {
 
 	// ExecutionResults
 	ExecutionResults ExecutionResultList
-	// ExecutionReceipts
-	ExecutionReceipts ExecutionReceiptMetaList
 }
 
 // AddBlock appends block to Blocks
 func (segment *SealingSegment) AddBlock(block *Block) {
 	segment.Blocks = append(segment.Blocks, block)
-}
-
-// AddExecutionReceiptMeta adds receipt to ExecutionReceipts
-func (segment *SealingSegment) AddExecutionReceiptMeta(receipt *ExecutionReceiptMeta) {
-	segment.ExecutionReceipts = append(segment.ExecutionReceipts, receipt)
 }
 
 // AddExecutionResult adds result to ExecutionResults
@@ -32,8 +25,7 @@ func (segment *SealingSegment) AddExecutionResult(result *ExecutionResult) {
 // NewSealingSegment returns SealingSegment
 func NewSealingSegment() *SealingSegment {
 	return &SealingSegment{
-		Blocks:            make([]*Block, 0),
-		ExecutionReceipts: make(ExecutionReceiptMetaList, 0),
-		ExecutionResults:  make(ExecutionResultList, 0),
+		Blocks:           make([]*Block, 0),
+		ExecutionResults: make(ExecutionResultList, 0),
 	}
 }
