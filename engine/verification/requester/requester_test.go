@@ -244,7 +244,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	popAllWG := mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 
 	// makes all chunk requests being qualified for dispatch instantly
-	qualifyWG := mockPendingRequestInfoAndUpdate(t,
+	requestHistoryWG, updateHistoryWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests,
 		requests,
 		verification.ChunkDataPackRequestList{},
@@ -262,7 +262,8 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 		err := e.Process(engine.RequestChunks, requests[0].Agrees[0], response)
 		require.NoError(t, err)
 	})
-	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, requestHistoryWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, updateHistoryWG.Wait, s.retryInterval, "could not update chunk request history on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 	unittest.RequireReturnsBefore(t, popAllWG.Wait, 100*time.Millisecond, "could not invoke pop all on time")
 	unittest.RequireReturnsBefore(t, handlerWG.Wait, 100*time.Second, "could not handle chunk data responses on time")
@@ -299,7 +300,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	s.pendingRequests.On("All").Return(requests.UniqueRequestInfo())
 
 	// makes all (unsealed) chunk requests being qualified for dispatch instantly
-	qualifyWG := mockPendingRequestInfoAndUpdate(t,
+	requestHistoryWG, updateHistoryWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests,
 		unsealedRequests,
 		verification.ChunkDataPackRequestList{},
@@ -317,7 +318,8 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	// unsealed requests should be submitted to the network once
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedRequests, 1, func(*messages.ChunkDataRequest) {})
 
-	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, requestHistoryWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, updateHistoryWG.Wait, s.retryInterval, "could not update chunk request history on time")
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
 	unittest.RequireReturnsBefore(t, popAllWG.Wait, 100*time.Millisecond, "could not invoke pop all on time")
@@ -386,7 +388,7 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	s.pendingRequests.On("All").Return(requests.UniqueRequestInfo())
 
 	// makes all chunk requests being qualified for dispatch instantly
-	qualifyWG := mockPendingRequestInfoAndUpdate(t,
+	requestHistory, updateHistoryWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests,
 		requests,
 		verification.ChunkDataPackRequestList{},
@@ -404,8 +406,8 @@ func testRequestPendingChunkDataPack(t *testing.T, count int, attempts int) {
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, requests, attempts, func(*messages.ChunkDataRequest) {})
-	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
-		"could not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, requestHistory.Wait, time.Duration(2*attempts)*s.retryInterval, "could not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, updateHistoryWG.Wait, s.retryInterval, "could not update chunk request history on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval, "could not request and handle chunks on time")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
@@ -451,7 +453,7 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	s.pendingRequests.On("All").Return(allRequests.UniqueRequestInfo())
 
 	attempts := 10 // waits for 10 iterations of onTimer cycle in requester.
-	qualifyWG := mockPendingRequestInfoAndUpdate(t,
+	requestHistoryWG, updateHistoryWG := mockPendingRequestInfoAndUpdate(t,
 		s.pendingRequests,
 		instantQualifiedRequests,
 		lateQualifiedRequests,
@@ -467,8 +469,10 @@ func TestDispatchingRequests_Hybrid(t *testing.T) {
 	// is kept at 1 during all cycles of this test.
 	s.metrics.On("SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester", uint64(1)).Return()
 
-	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2*attempts)*s.retryInterval,
+	unittest.RequireReturnsBefore(t, requestHistoryWG.Wait, time.Duration(2*attempts)*s.retryInterval,
 		"could not check chunk requests qualification on time")
+	unittest.RequireReturnsBefore(t, updateHistoryWG.Wait, time.Duration(2*attempts)*s.retryInterval,
+		"could not update chunk request history on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2*attempts)*s.retryInterval,
 		"could not request and handle chunks on time")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
@@ -659,14 +663,14 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 	instantQualifiedReqs verification.ChunkDataPackRequestList,
 	lateQualifiedReqs verification.ChunkDataPackRequestList,
 	disQualifiedReqs verification.ChunkDataPackRequestList,
-	attempts int) *sync.WaitGroup {
+	attempts int) (*sync.WaitGroup, *sync.WaitGroup) {
 
-	wg := &sync.WaitGroup{}
+	historyWG := &sync.WaitGroup{}
 
 	// for purpose of test and due to having a mocked mempool, we assume disqualified requests reside on the
 	// mempool, so their qualification is getting checked on each attempt iteration (and rejected).
-	total := attempts * (len(instantQualifiedReqs) + len(lateQualifiedReqs) + len(disQualifiedReqs))
-	wg.Add(total)
+	totalRequestHistory := attempts * (len(instantQualifiedReqs) + len(lateQualifiedReqs) + len(disQualifiedReqs))
+	historyWG.Add(totalRequestHistory)
 
 	pendingRequests.On("RequestHistory", testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
@@ -680,7 +684,7 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 					lateQualifiedReqs.ContainsChunkID(chunkID) ||
 					disQualifiedReqs.ContainsChunkID(chunkID))
 
-			wg.Done()
+			historyWG.Done()
 
 		}).Return(
 		// number of attempts
@@ -727,6 +731,8 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 		},
 	)
 
+	updateWG := &sync.WaitGroup{}
+	updateWG.Add(len(instantQualifiedReqs) * attempts)
 	pendingRequests.On("UpdateRequestHistory", testifymock.Anything, testifymock.Anything).
 		Run(func(args testifymock.Arguments) {
 			// type assertion of inputs.
@@ -742,10 +748,10 @@ func mockPendingRequestInfoAndUpdate(t *testing.T,
 			require.False(t, lateQualifiedReqs.ContainsChunkID(chunkID))
 			require.False(t, disQualifiedReqs.ContainsChunkID(chunkID))
 
-		}). // makes chunk request instantly qualified for retry, i.e., can be
-		// retried anytime after on.
-		Return(uint64(1), time.Now(), 1*time.Millisecond, true).
-		Times(attempts * len(instantQualifiedReqs))
+			updateWG.Done()
 
-	return wg
+		}).
+		Return(uint64(1), time.Now(), 1*time.Millisecond, true)
+
+	return historyWG, updateWG
 }
