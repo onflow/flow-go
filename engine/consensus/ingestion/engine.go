@@ -314,7 +314,7 @@ func (e *Engine) validateGuarantors(guarantee *flow.CollectionGuarantee) error {
 	clusterLookup := cluster.Sort(order.ByNodeIDAsc)
 
 	for _, guarantorID := range guarantors {
-		exists := clusterLookup.IdentifierExists(guarantorID, order.ByIdentifierAsc)
+		exists := clusterLookup.IdentifierExists(guarantorID)
 		if !exists {
 			return engine.NewInvalidInputError("inconsistent guarantors from different clusters")
 		}

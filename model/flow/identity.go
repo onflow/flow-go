@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -278,9 +279,6 @@ type IdentityFilter func(*Identity) bool
 // IdentityOrder is a sort for identities.
 type IdentityOrder func(*Identity, *Identity) bool
 
-// IdentifierOrder is a sort for identifiers.
-type IdentifierOrder func(Identifier, Identifier) bool
-
 // IdentityMapFunc is a modifier function for map operations for identities.
 // Identities are COPIED from the source slice.
 type IdentityMapFunc func(Identity) Identity
@@ -324,9 +322,9 @@ func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 // appending new elements, re-ordering, or inserting new elements in an
 // existing index.
 func (il IdentityList) Copy() IdentityList {
-	return il.Map(func(identity Identity) Identity {
-		return identity
-	})
+	dup := make(IdentityList, 0, len(il))
+	dup = append(dup, il...)
+	return dup
 }
 
 // Selector returns an identity filter function that selects only identities
@@ -348,7 +346,9 @@ func (il IdentityList) Lookup() map[Identifier]*Identity {
 	return lookup
 }
 
-// Sort will sort the list using the given ordering.
+// Sort will sort the list using the given ordering.  This is
+// not recommended for performance.  Expand the 'less' function
+// in place for best performance, and don't use this function.
 func (il IdentityList) Sort(less IdentityOrder) IdentityList {
 	dup := il.Copy()
 	sort.Slice(dup, func(i int, j int) bool {
@@ -481,18 +481,56 @@ func (il IdentityList) SamplePct(pct float64) IdentityList {
 // where duplicates are identities with the same node ID.
 func (il IdentityList) Union(other IdentityList) IdentityList {
 
-	// stores the output, the union of the two lists
-	union := make(IdentityList, 0, len(il)+len(other))
-	// efficient lookup to avoid duplicates
-	lookup := make(map[Identifier]struct{})
+	if (len(il) + len(other)) == 0 {
+		return IdentityList{}
+	}
 
-	// add all identities, omitted duplicates
-	for _, identity := range append(il.Copy(), other...) {
-		if _, exists := lookup[identity.NodeID]; exists {
-			continue
+	// add all identities together
+	union := append(other, il...)
+
+	// sort by node id.  This will enable duplicate checks later
+	sort.Slice(union, func(p, q int) bool {
+		num1 := union[p].NodeID[:]
+		num2 := union[q].NodeID[:]
+		lenID := len(num1)
+
+		// assume the length is a multiple of 4, for performance.  it's 32 bytes
+		for i := 0; i < lenID; i += 4 {
+			if num1[i] < num2[i] ||
+				num1[i+1] < num2[i+1] ||
+				num1[i+2] < num2[i+2] ||
+				num1[i+3] < num2[i+3] {
+				return true
+			}
 		}
-		union = append(union, identity)
-		lookup[identity.NodeID] = struct{}{}
+		return false
+	})
+
+	// at this point, 'union' has a sorted slice of identities, with duplicates
+	lenUnion := len(union)
+
+	// counter
+	i := 1
+
+	// check for duplicates, there can only be duplicates if lenUnion > 1
+	for ; i < lenUnion; i++ {
+		// detect a duplicate, only allocate 'retval' if necessary
+		if union[i].NodeID == union[i-1].NodeID {
+			retval := make(IdentityList, 0, len(il)+len(other))
+			retval = append(retval, union[0:i]...)
+
+			i++
+
+			// loop over the rest of the slice, appending non-duplicates
+			for ; i < lenUnion; i++ {
+				if union[i].NodeID == union[i-1].NodeID {
+					continue
+				}
+				retval = append(retval, union[i])
+			}
+			// time to return
+			return retval
+		}
 	}
 
 	return union
@@ -513,53 +551,84 @@ func (il IdentityList) EqualTo(other IdentityList) bool {
 }
 
 // Exists takes a previously sorted Identity list and searches it for the target value
+// This code is optimized, so the coding style will be different
 // target:  value to search for
-// less:    the algorithm to use as a comparator
-func (il IdentityList) Exists(target *Identity, less IdentityOrder) bool {
+func (il IdentityList) Exists(target *Identity) bool {
 	left := 0
 	lenList := len(il)
 	right := lenList - 1
-	mid := int(uint(lenList) >> 1)
-	for {
-		// use the 'less' function in the order package
-		if less(il[mid], target) {
-			left = mid + 1
-		} else if il[mid].NodeID == target.NodeID {
-			return true
-		} else {
-			right = mid
-		}
+	mid := int(uint(right) >> 1)
+	num2 := target.NodeID[:]
 
-		if left > right {
+	for {
+		num1 := il[mid].NodeID[:]
+		lenID := len(num1)
+		i := 0
+
+		// assume the length is a multiple of 8, for performance.  it's 32 bytes
+		for {
+			chunk1 := binary.BigEndian.Uint64(num1[i:])
+			chunk2 := binary.BigEndian.Uint64(num2[i:])
+
+			if chunk1 < chunk2 {
+				left = mid + 1
+				break
+			} else if chunk1 > chunk2 {
+				right = mid
+				break
+			} else if i >= lenID-8 {
+				// we're on the last chunk of 8 bytes, and
+				// so return true if equal -- it exists
+				return true
+			}
+
+			// these 8 bytes were equal, so increment index by 8 bytes
+			i += 8
+		}
+		if left >= right {
 			return false
 		}
-
 		mid = int(uint(left+right) >> 1)
 	}
 }
 
 // Exists takes a previously sorted Identity list and searches it for the target value
 // target:  value to search for
-// less:    the algorithm to use as a comparator
-func (il IdentityList) IdentifierExists(target Identifier, less IdentifierOrder) bool {
+func (il IdentityList) IdentifierExists(target Identifier) bool {
 	left := 0
 	lenList := len(il)
 	right := lenList - 1
-	mid := int(uint(lenList) >> 1)
-	for {
-		// use the 'less' function in the order package
-		if less(il[mid].NodeID, target) {
-			left = mid + 1
-		} else if il[mid].NodeID == target {
-			return true
-		} else {
-			right = mid
-		}
+	mid := int(uint(right) >> 1)
+	num2 := target[:]
 
-		if left > right {
+	for {
+		num1 := il[mid].NodeID[:]
+		lenID := len(num1)
+		i := 0
+
+		// assume the length is a multiple of 8, for performance.  it's 32 bytes
+		for {
+			chunk1 := binary.BigEndian.Uint64(num1[i:])
+			chunk2 := binary.BigEndian.Uint64(num2[i:])
+
+			if chunk1 < chunk2 {
+				left = mid + 1
+				break
+			} else if chunk1 > chunk2 {
+				right = mid
+				break
+			} else if i >= lenID-8 {
+				// we're on the last chunk of 8 bytes, and
+				// so return true if equal -- it exists
+				return true
+			}
+
+			// these 8 bytes were equal, so increment index by 8 bytes
+			i += 8
+		}
+		if left >= right {
 			return false
 		}
-
 		mid = int(uint(left+right) >> 1)
 	}
 }

@@ -188,7 +188,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		}
 
 		for _, identity := range previousSetup.Participants {
-			exists := identities.Exists(identity, order.ByNodeIDAsc)
+			exists := identities.Exists(identity)
 			// add identity from previous epoch that is not in current epoch
 			if !exists {
 				otherEpochIdentities = append(otherEpochIdentities, identity)
@@ -205,7 +205,7 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		}
 
 		for _, identity := range nextSetup.Participants {
-			exists := identities.Exists(identity, order.ByNodeIDAsc)
+			exists := identities.Exists(identity)
 
 			// add identity from next epoch that is not in current epoch
 			if !exists {
