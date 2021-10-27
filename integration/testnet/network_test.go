@@ -97,6 +97,7 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 		{image: defaultRegistry + "/execution:latest", name: "execution_1", address: "execution_1:2137"},
 		{image: defaultRegistry + "/access:latest", name: "access_1", address: "access_1:2137"},
 		{image: defaultRegistry + "/access:latest", name: "access_2", address: "access_2:2137"},
+
 	}
 
 	assert.Subset(t, realData, expectedData)

@@ -2,7 +2,10 @@ package dkg
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/module"
 	"os"
+
+	"github.com/onflow/flow-go/module"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
