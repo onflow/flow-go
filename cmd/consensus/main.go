@@ -497,7 +497,7 @@ func main() {
 			return prov, err
 		}).
 		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			core, err := ingestion.NewCore(
+			core := ingestion.NewCore(
 				node.Logger,
 				node.Tracer,
 				node.Metrics.Mempool,
@@ -505,9 +505,6 @@ func main() {
 				node.Storage.Headers,
 				guarantees,
 			)
-			if err != nil {
-				return nil, err
-			}
 
 			ing, err := ingestion.New(
 				node.Logger,

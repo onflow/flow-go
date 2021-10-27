@@ -37,10 +37,8 @@ func NewCore(
 	state protocol.State,
 	headers storage.Headers,
 	pool mempool.Guarantees,
-) (*Core, error) {
-
-	// initialize the propagation engine with its dependencies
-	e := &Core{
+) *Core {
+	return &Core{
 		log:     log.With().Str("ingestion", "core").Logger(),
 		tracer:  tracer,
 		mempool: mempool,
@@ -48,8 +46,6 @@ func NewCore(
 		headers: headers,
 		pool:    pool,
 	}
-
-	return e, nil
 }
 
 // OnGuarantee is used to process collection guarantees received

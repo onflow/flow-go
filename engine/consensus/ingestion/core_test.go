@@ -129,13 +129,7 @@ func (suite *IngestionCoreSuite) SetupTest() {
 	// only used for metrics, nobody cares
 	pool.On("Size").Return(uint(0))
 
-	ingest := &Core{
-		tracer:  tracer,
-		mempool: metrics,
-		state:   state,
-		headers: headers,
-		pool:    pool,
-	}
+	ingest := NewCore(unittest.Logger(), tracer, metrics, state, headers, pool)
 
 	suite.head = &head
 	suite.final = final

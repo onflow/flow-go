@@ -380,9 +380,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals := stdmap.NewIncorporatedResultSeals(1000)
 	pendingReceipts := stdmap.NewPendingReceipts(node.Headers, 1000)
 
-	ingestionCore, err := consensusingest.NewCore(node.Log, node.Tracer, node.Metrics, node.State,
-		node.Headers, node.Me, guarantees)
-	require.NoError(t, err)
+	ingestionCore := consensusingest.NewCore(node.Log, node.Tracer, node.Metrics, node.State,
+		node.Headers, guarantees)
 	// receive collections
 	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Net, node.Me, ingestionCore)
 	require.Nil(t, err)
