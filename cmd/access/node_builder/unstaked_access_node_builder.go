@@ -80,6 +80,7 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 
 		// use the default identifier provider
 		anb.SyncEngineParticipantsProviderFactory = func() id.IdentifierProvider {
+<<<<<<< HEAD
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
 				var result flow.IdentifierList
 
@@ -100,6 +101,16 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 
 				return result
 			})
+=======
+
+			// use the middleware that should have now been initialized
+			middleware, ok := anb.Middleware.(*p2p.Middleware)
+			if !ok {
+				// TODO: this shouldn't throw a fatal error, but this also isn't a runtime error
+				anb.Logger.Fatal().Msg("middleware was of unexpected type")
+			}
+			return middleware.IdentifierProvider()
+>>>>>>> 90f86d0a6 (provide a simpler api for safely handling errors and read/done signals)
 		}
 
 		return nil
@@ -255,7 +266,9 @@ func (anb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(ctx irrecoverable
 		}
 
 		me, err := local.New(self, nil)
-		anb.MustNot(err).Msg("could not initialize local")
+		if err != nil {
+			ctx.Throw(fmt.Errorf("could not initialize local identity: %w", err))
+		}
 		node.Me = me
 	}
 }

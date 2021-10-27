@@ -88,44 +88,65 @@ func CheckClosed(done <-chan struct{}) bool {
 	}
 }
 
-// WaitError waits for either an error on the error channel or for the channel to be signalled/closed
-// Returns an error from the error channel if one was received, otherwise it returns nil
+// WaitError waits for an error on the error channel, the provided context to be cancelled, or
+// the provided channel to be signalled/closed.
+// Returns nil if the done channel is signalled/close, otherwise, it returns an error.
 //
-// Without the additional select, there is a race condition here where the done channel
-// could be closed right after an irrecoverable error is thrown, so that when the scheduler
-// yields control back to this goroutine, both channels are available to read from. If this
-// second case happens to be chosen at random to proceed, then we would return and silently
-// ignore the error.
-func WaitError(errChan <-chan error, done <-chan struct{}) error {
+// This handles a race condition between the error signaller and component's done channel described
+// in detail below
+func WaitError(ctx context.Context, errChan <-chan error, done <-chan struct{}) error {
 	select {
 	case err := <-errChan:
 		return err
-	case <-done:
+	case <-ctx.Done():
+		// capture errors that were thrown concurrently with the context being cancelled
 		select {
 		case err := <-errChan:
 			return err
+		default:
+		}
+		return ctx.Err()
+	case <-done:
+		// Without this additional select, there is a race condition here where the done channel
+		// could have been closed as a result of an irrecoverable error being thrown, so that when
+		// the scheduler yields control back to this goroutine, both channels are available to read
+		// from. If this last case happens to be chosen at random to proceed instead of the one
+		// above, then we would return as if the component shutdown gracefully, when in fact it
+		// encountered an irrecoverable error.
+		select {
+		case err := <-errChan:
+			return err
+		default:
+		}
+
+		// Similarly, the done channel could have closed as a result of the context being canceled.
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
 		default:
 		}
 	}
 	return nil
 }
 
-// WrapSignal wraps a os.Signal channel with a struct{} channel, and closes the channel when a
-// signal is received.
-//
-// This is intended to make signals compatible with the other util channel methods.
-func WrapSignal(signals ...os.Signal) <-chan struct{} {
+// WithSignal wraps a os.Signal channel with a context, and calls the cancel a signal is received.
+// TODO: should this go somewhere else? maybe under module
+func WithSignal(parent context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, signals...)
 
-	done := make(chan struct{})
+	ctx, cancel := context.WithCancel(parent)
 	go func() {
-		<-sig
-		close(done)
+		select {
+		case <-ctx.Done():
+			return
+		case <-sig:
+		}
+		cancel()
 
 		// cleanup since we can't use this channel again
 		signal.Stop(sig)
 		close(sig)
 	}()
-	return done
+	return ctx, cancel
 }

@@ -49,20 +49,19 @@ func (node *FlowNodeImp) Run() {
 	}()
 
 	// block till a SIGINT is received or a fatal error is encountered
-	sig := util.WrapSignal(os.Interrupt, syscall.SIGTERM)
-	if err := util.WaitError(errChan, sig); err != nil {
+	sigCtx, _ := util.WithSignal(ctx, os.Interrupt, syscall.SIGTERM)
+	if err := util.WaitError(sigCtx, errChan, nil); err != nil {
 		node.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
 	}
 
 	node.Logger.Info().Msgf("%s node shutting down", node.NodeRole)
 	cancel()
 
-	select {
-	case <-node.Done():
-	case err := <-errChan:
+	if err := util.WaitError(sigCtx, errChan, node.Done()); err != nil {
+		if err == sigCtx.Err() {
+			node.Logger.Fatal().Msg("node shutdown aborted")
+		}
 		node.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error during shutdown")
-	case <-sig:
-		node.Logger.Fatal().Msg("node shutdown aborted")
 	}
 
 	node.Logger.Info().Msgf("%s node shutdown complete", node.NodeRole)

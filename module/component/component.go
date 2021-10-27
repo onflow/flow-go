@@ -103,11 +103,13 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			return err // failure to start
 		}
 
-		select {
-		case <-ctx.Done():
-			stop()
-			return ctx.Err()
-		case err := <-irrecoverableErr:
+		if err := util.WaitError(ctx, irrecoverableErr, done); err != nil {
+			if err == ctx.Err() {
+				stop()
+				return err
+			}
+
+			// an irrecoverable error was encountered
 			stop()
 
 			// send error to the handler
@@ -119,36 +121,10 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			default:
 				panic(fmt.Sprintf("invalid error handling result: %v", result))
 			}
-		case <-done:
-			// Without this additional select, there is a race condition here where the done channel
-			// could have been closed as a result of an irrecoverable error being thrown, so that when
-			// the scheduler yields control back to this goroutine, both channels are available to read
-			// from. If this last case happens to be chosen at random to proceed instead of the one
-			// above, then we would return as if the component shutdown gracefully, when in fact it
-			// encountered an irrecoverable error.
-			select {
-			case err := <-irrecoverableErr:
-				switch result := handler(err); result {
-				case ErrorHandlingRestart:
-					continue
-				case ErrorHandlingStop:
-					return err
-				default:
-					panic(fmt.Sprintf("invalid error handling result: %v", result))
-				}
-			default:
-			}
-
-			// Similarly, the done channel could have closed as a result of the context being canceled.
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-
-			// clean completion
-			return nil
 		}
+
+		// clean completion
+		return nil
 	}
 }
 
@@ -272,25 +248,12 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 
 		// launch goroutine to propagate irrecoverable error
 		go func() {
-			select {
-			case err := <-errChan:
+			if err := util.WaitError(context.Background(), errChan, c.done); err != nil {
 				cancel() // shutdown all workers
 
 				// we propagate the error directly to the parent because a failure in a
 				// worker routine is considered irrecoverable
 				parent.Throw(err)
-			case <-c.done:
-				// Without this additional select, there is a race condition here where the done channel
-				// could be closed right after an irrecoverable error is thrown, so that when the scheduler
-				// yields control back to this goroutine, both channels are available to read from. If this
-				// second case happens to be chosen at random to proceed, then we would return and silently
-				// ignore the error.
-				select {
-				case err := <-errChan:
-					cancel()
-					parent.Throw(err)
-				default:
-				}
 			}
 		}()
 

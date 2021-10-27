@@ -217,7 +217,8 @@ func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 		log.Info().Msg("Access node shutdown complete")
 	}()
 
-	if err := util.WaitError(errChan, cf.Done()); err != nil {
+	// Wait for errors up until the follower is done. we don't care about the context here
+	if err := util.WaitError(context.Background(), errChan, cf.Done()); err != nil {
 		log.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
 	}
 }
