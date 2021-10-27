@@ -1228,6 +1228,19 @@ func ChunkDataPackRequestListFixture(n int, opts ...func(*verification.ChunkData
 	return lst
 }
 
+// ChunkDataPackRequestListForChunkIDsFixture creates and returns a list of chunk data pack requests fixtures for given chunk ids.
+func ChunkDataPackRequestListForChunkIDsFixture(
+	chunkIDs flow.IdentifierList,
+	opts ...func(*verification.ChunkDataPackRequest)) verification.ChunkDataPackRequestList {
+
+	lst := make([]*verification.ChunkDataPackRequest, 0, len(chunkIDs))
+	for _, chunkID := range chunkIDs {
+		opts := append(opts, WithChunkID(chunkID))
+		lst = append(lst, ChunkDataPackRequestFixture(opts...))
+	}
+	return lst
+}
+
 func WithHeight(height uint64) func(*verification.ChunkDataPackRequest) {
 	return func(request *verification.ChunkDataPackRequest) {
 		request.Height = height
