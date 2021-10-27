@@ -491,16 +491,6 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		allPorts:           make(map[string]struct{}),
 	}
 
-	// check that at-least 2 full access nodes must be configure in your test suite
-	// in order to provide a secure GRPC connection for LN & SN nodes
-	accessNodeIDS := make([]string, 0)
-	for _, n := range confs {
-		if n.Role == flow.RoleAccess && !n.Ghost {
-			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
-		}
-	}
-	require.True(t, len(accessNodeIDS) > 1, "at-least 2 access node that is not a ghost must be configured for test suite")
-
 	// add each node to the network
 	for _, nodeConf := range confs {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
