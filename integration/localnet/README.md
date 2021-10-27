@@ -223,23 +223,32 @@ This script below reads the balance field of an account's FlowToken Balance.
 Create a file (for example `my_script.cdc`) containing following cadence code:
 
 ```
-import FungibleToken from "cadence/contracts/FungibleToken.cdc"
-import FlowToken from "cadence/contracts/FlowToken.cdc"
+import FungibleToken from 0xee82856bf20e2aa6
+import FlowToken from 0x0ae53cb6e3f42a79
 
-pub fun main(): UFix64 {
-	let acct = getAccount(<ACCOUNT_ADDRESS>)
+pub fun main(address: Address): UFix64 {
+	let acct = getAccount(address)
 	let vaultRef = acct.getCapability(/public/flowTokenBalance)!.borrow<&FlowToken.Vault{FungibleToken.Balance}>()
 		?? panic("Could not borrow Balance reference to the Vault")
 	return vaultRef.balance
 }
 ```
-replace `<ACCOUNT_ADDRESS>` with an address that you created on your localnet.
 Run the script:
 ```
-flow scripts execute -n localnet ~/my_script.cdc
+flow scripts execute -n localnet ~/my_script.cdc "<ACCOUNT_ADDRESS>"
 ```
+> replace `<ACCOUNT_ADDRESS>` in the command above with an address that you created on your localnet.
+
 The script should output the account balance of the specified account.
 
+You can also execute simple script without creating files, by providing the script in the command, for example:
+```
+# flow scripts execute -n localnet <(echo """
+pub fun main(address: Address): UFix64 {
+    return getAccount(address).balance
+}
+""") "<ACCOUNT_ADDRESS>"
+```
 #### Moving tokens from the service account to another account
 
 Create new cadence contract file from [this template.](https://github.com/onflow/flow-core-contracts/blob/master/transactions/flowToken/transfer_tokens.cdc)
@@ -252,4 +261,6 @@ Send the transaction with this contract to localnet:
 ```
 flow transactions send transfer_tokens.cdc 9999.9 <ACCOUNT_ADDRESS> -n localnet --signer localnet-service-account
 ```
+> replace `<ACCOUNT_ADDRESS>` in the command above with an address that you created on your localnet.
+
 After the transaction is sealed, the account with `<ACCOUNT_ADDRESS>` should have the balance increased by 9999.9 tokens.
