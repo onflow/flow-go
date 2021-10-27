@@ -47,6 +47,7 @@ func (c ChunkDataPackRequestInfo) SampleTargets(count int) flow.IdentifierList {
 	return append(c.Agrees, nonResponders...)
 }
 
+type ChunkDataPackRequestInfoList []*ChunkDataPackRequestInfo
 type ChunkDataPackRequestList []*ChunkDataPackRequest
 
 // ContainsChunkID returns true if list contains a request for chunk ID.
@@ -71,4 +72,19 @@ func (c ChunkDataPackRequestList) ContainsLocator(resultID flow.Identifier, chun
 	return false
 }
 
-type ChunkDataPackRequestInfoList []*ChunkDataPackRequestInfo
+// UniqueRequestInfo extracts and returns request info based on chunk IDs. Note that a ChunkDataPackRequestList
+// may have duplicate requests for the same chunk ID that belongs to distinct execution results.
+func (c ChunkDataPackRequestList) UniqueRequestInfo() ChunkDataPackRequestInfoList {
+	added := make(map[flow.Identifier]struct{})
+	requestInfoList := ChunkDataPackRequestInfoList{}
+
+	for _, request := range c {
+		if _, ok := added[request.ChunkID]; !ok {
+			info := request.ChunkDataPackRequestInfo
+			requestInfoList = append(requestInfoList, &info)
+			added[request.ChunkID] = struct{}{}
+		}
+	}
+
+	return requestInfoList
+}
