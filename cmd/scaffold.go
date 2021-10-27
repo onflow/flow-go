@@ -952,6 +952,8 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetLogLevelCommand{}
+	}).AdminCommand("read-protocol-state-blocks", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewReadProtocolStateBlocksCommand(config.State, config.Storage.Blocks)
 	})
 }
 

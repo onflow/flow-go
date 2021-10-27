@@ -14,8 +14,6 @@ import (
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
 
-	"github.com/onflow/flow-go/admin/commands"
-	consensusCommand "github.com/onflow/flow-go/admin/commands/consensus"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
@@ -169,9 +167,6 @@ func main() {
 	}
 
 	nodeBuilder.
-		AdminCommand("read-protocol-state-blocks", func(config *cmd.NodeConfig) commands.AdminCommand {
-			return consensusCommand.NewReadProtocolStateBlocksCommand(config.State, config.Storage.Blocks)
-		}).
 		Module("consensus node metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
