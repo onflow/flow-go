@@ -340,9 +340,8 @@ func (e *EventHandlerV2) processBlockForCurrentView(block *model.Block) error {
 	if viewChanged == isSelfNextLeader {
 		if isSelfNextLeader {
 			return fmt.Errorf("I am primary for next view (%v) and should be collecting votes, but pacemaker triggered already view change", curView+1)
-		} else {
-			return fmt.Errorf("pacemaker should trigger a view change to net view (%v), but didn't", curView+1)
 		}
+		return fmt.Errorf("pacemaker should trigger a view change to net view (%v), but didn't", curView+1)
 	}
 
 	if viewChanged {
