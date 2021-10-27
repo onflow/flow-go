@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"math/rand"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -306,11 +307,13 @@ func TestExtendInvalidChainID(t *testing.T) {
 }
 
 func TestExtendReceiptsNotSorted(t *testing.T) {
-	// Todo: this test needs to be updated:
-	// We don't require the receipts to be sorted by height anymore
-	// We could require an "parent first" ordering, which is less strict than
-	// a full ordering by height
-	t.Skip()
+	if os.Getenv("TEST_WIP") == "" {
+		// Todo: this test needs to be updated:
+		// We don't require the receipts to be sorted by height anymore
+		// We could require an "parent first" ordering, which is less strict than
+		// a full ordering by height
+		t.Skip()
+	}
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()
