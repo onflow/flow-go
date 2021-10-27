@@ -193,7 +193,7 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 
 	blocks := make([]cluster.Block, 0, n)
-	suite.T().Logf("awaiting %d cluster blocks\n", n)
+	suite.T().Logf("awaiting %d cluster blocks", n)
 
 	waitFor := defaultTimeout + time.Duration(n)*2*time.Second
 	deadline := time.Now().Add(waitFor)
@@ -201,7 +201,7 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 
 		_, msg, err := suite.reader.Next()
 		suite.Require().Nil(err, "could not read next message")
-		suite.T().Logf("ghost recv: %T\n", msg)
+		suite.T().Logf("ghost recv: %T", msg)
 
 		switch val := msg.(type) {
 		case *messages.ClusterBlockProposal:
@@ -216,7 +216,7 @@ func (suite *CollectorSuite) AwaitProposals(n uint) []cluster.Block {
 		}
 	}
 
-	suite.T().Logf("timed out waiting for blocks (timeout=%s, saw=%d, expected=%d)\n", waitFor.String(), len(blocks), n)
+	suite.T().Logf("timed out waiting for blocks (timeout=%s, saw=%d, expected=%d)", waitFor.String(), len(blocks), n)
 	suite.T().FailNow()
 	return nil
 }
@@ -237,7 +237,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		lookup[txID] = struct{}{}
 	}
 
-	suite.T().Logf("awaiting %d transactions included\n", len(txIDs))
+	suite.T().Logf("awaiting %d transactions included", len(txIDs))
 
 	waitFor := defaultTimeout + time.Duration(len(lookup))*200*time.Millisecond
 	deadline := time.Now().Add(waitFor)
@@ -250,7 +250,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		case *messages.ClusterBlockProposal:
 			header := val.Header
 			collection := val.Payload.Collection
-			suite.T().Logf("got proposal height=%d col_id=%x size=%d\n", header.Height, collection.ID(), collection.Len())
+			suite.T().Logf("got proposal height=%d col_id=%x size=%d", header.Height, collection.ID(), collection.Len())
 			if guarantees[collection.ID()] {
 				for _, txID := range collection.Light().Transactions {
 					finalized[txID] = struct{}{}
@@ -266,11 +266,11 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 		case *flow.CollectionGuarantee:
 			finalizedTxIDs, ok := proposals[val.CollectionID]
 			if !ok {
-				suite.T().Logf("got unseen guarantee (id=%x)\n", val.CollectionID)
+				suite.T().Logf("got unseen guarantee (id=%x)", val.CollectionID)
 				guarantees[val.CollectionID] = true
 				continue
 			} else {
-				suite.T().Logf("got guarantee (id=%x)\n", val.CollectionID)
+				suite.T().Logf("got guarantee (id=%x)", val.CollectionID)
 			}
 			for _, txID := range finalizedTxIDs {
 				finalized[txID] = struct{}{}
@@ -286,7 +286,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 	}
 
 	suite.T().Logf(
-		"timed out waiting for inclusion (timeout=%s, finalized=%d, expected=%d)\n",
+		"timed out waiting for inclusion (timeout=%s, finalized=%d, expected=%d)",
 		waitFor.String(), len(finalized), len(lookup),
 	)
 	var missing []flow.Identifier
@@ -295,7 +295,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 			missing = append(missing, id)
 		}
 	}
-	suite.T().Logf("missing: %v\n", missing)
+	suite.T().Logf("missing: %v", missing)
 	suite.T().FailNow()
 }
 
