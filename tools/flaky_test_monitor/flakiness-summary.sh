@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+# This script runs the tests in the category specified by the TEST_CATEGORY environment variable,
+# processes the results and generates a summary file in JSON format, and uploads the file to the
+# GCS bucket specified by the GCS_BUCKET environment variable.
+
 set -e
 shopt -s extglob
 
@@ -15,6 +19,7 @@ case $TEST_CATEGORY in
     ;;
 esac
 
+# save result processing script command for later use
 process_results="go run $(realpath ./process_results.go) test-results.json"
 
 cd ../..
@@ -32,6 +37,7 @@ make crypto/relic/build
 
 export JSON_OUTPUT=true
 
+# run tests and process results
 if [[ $TEST_CATEGORY =~ integration-(common|network|epochs|access|collection|consensus|execution|verification)$ ]]
 then
     make docker-build-flow
@@ -52,4 +58,5 @@ else
     esac
 fi
 
+# upload results to GCS bucket
 gsutil cp test-results.json gs://$GCS_BUCKET/$COMMIT_SHA-$JOB_STARTED-$TEST_CATEGORY.json
