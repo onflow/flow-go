@@ -143,7 +143,7 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 	responses := unittest.ChunkDataResponseMessageListFixture(chunkIDs)
 
 	// we remove pending request on receiving this response
-	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
+	popAllWG := mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 	// we pass each chunk data pack and its collection to chunk data pack handler
 	handlerWG := mockChunkDataPackHandler(t, s.handler, requests)
 
@@ -155,8 +155,9 @@ func TestHandleChunkDataPack_HappyPath_Multiple(t *testing.T) {
 		require.Nil(t, err)
 	}
 
-	unittest.RequireReturnsBefore(t, handlerWG.Wait, time.Second, "could not handle chunk data responses on time")
-	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.con, s.metrics)
+	unittest.RequireReturnsBefore(t, popAllWG.Wait, 100*time.Millisecond, "could not invoke pop all on time")
+	unittest.RequireReturnsBefore(t, handlerWG.Wait, 100*time.Millisecond, "could not handle chunk data responses on time")
+	testifymock.AssertExpectationsForObjects(t, s.con, s.metrics)
 }
 
 // TestHandleChunkDataPack_NonExistingRequest evaluates that failing to remove a received chunk data pack's request
@@ -205,12 +206,14 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
-	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
+	popAllWG := mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, requests)
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 
 	// requester does not call publish to disseminate the request for this chunk.
 	s.con.AssertNotCalled(t, "Publish")
+
+	unittest.RequireReturnsBefore(t, popAllWG.Wait, 100*time.Millisecond, "could not invoke pop all on time")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
 
@@ -238,7 +241,7 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	vertestutils.MockLastSealedHeight(s.state, sealedHeight)
 	s.pendingRequests.On("All").Return(requests.UniqueRequestInfo())
 	handlerWG := mockChunkDataPackHandler(t, s.handler, requests)
-	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
+	popAllWG := mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 
 	// makes all chunk requests being qualified for dispatch instantly
 	qualifyWG := mockPendingRequestInfoAndUpdate(t,
@@ -261,10 +264,11 @@ func TestCompleteRequestingUnsealedChunkLifeCycle(t *testing.T) {
 	})
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
-	unittest.RequireReturnsBefore(t, handlerWG.Wait, time.Second, "could not handle chunk data responses on time")
+	unittest.RequireReturnsBefore(t, popAllWG.Wait, 100*time.Millisecond, "could not invoke pop all on time")
+	unittest.RequireReturnsBefore(t, handlerWG.Wait, 100*time.Second, "could not handle chunk data responses on time")
 
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
-	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.metrics)
+	testifymock.AssertExpectationsForObjects(t, s.metrics)
 }
 
 // TestRequestPendingChunkSealedBlock_Hybrid evaluates the situation that requester has some pending chunk requests belonging to sealed blocks
@@ -308,7 +312,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
 
 	// sealed requests should be removed and the handler should be notified.
-	mockPendingRequestsPopAll(t, s.pendingRequests, sealedRequests)
+	popAllWG := mockPendingRequestsPopAll(t, s.pendingRequests, sealedRequests)
 	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, sealedRequests)
 	// unsealed requests should be submitted to the network once
 	conduitWG := mockConduitForChunkDataPackRequest(t, s.con, unsealedRequests, 1, func(*messages.ChunkDataRequest) {})
@@ -316,9 +320,10 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	unittest.RequireReturnsBefore(t, qualifyWG.Wait, time.Duration(2)*s.retryInterval, "could not check chunk requests qualification on time")
 	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 	unittest.RequireReturnsBefore(t, conduitWG.Wait, time.Duration(2)*s.retryInterval, "could not request chunks from network")
+	unittest.RequireReturnsBefore(t, popAllWG.Wait, 100*time.Millisecond, "could not invoke pop all on time")
 	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 
-	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.metrics)
+	testifymock.AssertExpectationsForObjects(t, s.metrics)
 }
 
 func TestHandleChunkDataPack_DuplicateChunkIDs(t *testing.T) {
@@ -337,7 +342,7 @@ func TestHandleChunkDataPack_DuplicateChunkIDs(t *testing.T) {
 	originID := unittest.IdentifierFixture()
 
 	// we remove pending request on receiving this response
-	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
+	popAllWG := mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 	handlerWG := mockChunkDataPackHandler(t, s.handler, requests)
 
 	s.metrics.On("OnChunkDataPackResponseReceivedFromNetworkByRequester").Return().Once()
@@ -346,8 +351,9 @@ func TestHandleChunkDataPack_DuplicateChunkIDs(t *testing.T) {
 	err := e.Process(engine.RequestChunks, originID, responseA)
 	require.Nil(t, err)
 
+	unittest.RequireReturnsBefore(t, popAllWG.Wait, 100*time.Millisecond, "could not invoke pop all on time")
 	unittest.RequireReturnsBefore(t, handlerWG.Wait, time.Second, "could not handle chunk data responses on time")
-	testifymock.AssertExpectationsForObjects(t, s.con, s.pendingRequests, s.metrics)
+	testifymock.AssertExpectationsForObjects(t, s.con, s.metrics)
 }
 
 // TestRequestPendingChunkDataPack evaluates happy path of having a single pending chunk requests.
@@ -598,9 +604,12 @@ func mockNotifyBlockSealedHandler(t *testing.T, handler *mockfetcher.ChunkDataPa
 
 // mockPendingRequestsPopAll mocks chunk requests mempool for being queried for returning all requests associated with a
 // chunk ID only once.
-func mockPendingRequestsPopAll(t *testing.T, pendingRequests *mempool.ChunkRequests, requests verification.ChunkDataPackRequestList) {
+func mockPendingRequestsPopAll(t *testing.T, pendingRequests *mempool.ChunkRequests, requests verification.ChunkDataPackRequestList) *sync.WaitGroup {
 	// maps keep track of distinct invocations per chunk ID
 	seen := make(map[flow.Identifier]struct{})
+
+	wg := sync.WaitGroup{}
+	wg.Add(len(requests.UniqueRequestInfo()))
 
 	pendingRequests.On("PopAll", testifymock.Anything).
 		Return(
@@ -620,6 +629,7 @@ func mockPendingRequestsPopAll(t *testing.T, pendingRequests *mempool.ChunkReque
 
 				seen[chunkID] = struct{}{}
 
+				wg.Done()
 				return locators
 			},
 			func(chunkID flow.Identifier) bool {
@@ -632,6 +642,8 @@ func mockPendingRequestsPopAll(t *testing.T, pendingRequests *mempool.ChunkReque
 				return false
 			},
 		)
+
+	return &wg
 }
 
 // mockPendingRequestInfoAndUpdate mocks pending requests mempool regarding three sets of chunk IDs: the instant, late, and disqualified ones.
