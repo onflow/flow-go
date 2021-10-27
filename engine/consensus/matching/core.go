@@ -314,6 +314,11 @@ HEIGHT_LOOP:
 		}
 		blockID := header.ID()
 
+		// if we have already a candidate seal, we skip any further processing
+		// CAUTION: this is not BFT, as the existence of a candidate seal
+		//          does _not_ imply that all parent results are sealable.
+		// TODO: update for full BFT
+
 		receipts, err := c.receiptsDB.ByBlockID(blockID)
 		if err != nil && !errors.Is(err, storage.ErrNotFound) {
 			return 0, 0, fmt.Errorf("could not get receipts by block ID: %v, %w", blockID, err)

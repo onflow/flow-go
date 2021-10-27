@@ -4,12 +4,14 @@ package signature
 
 import (
 	"crypto/rand"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/module/local"
 )
 
 const NUM_THRES_TEST = 4
@@ -184,4 +186,32 @@ func BenchmarkThresholdReconstruction(b *testing.B) {
 			b.Fatal(err)
 		}
 	}
+}
+
+func createAggregationB(b *testing.B) (*AggregationProvider, crypto.PrivateKey) {
+	agg, priv, err := createAggregation()
+	if err != nil {
+		b.Fatal(err)
+	}
+	return agg, priv
+}
+
+func createAggregation() (*AggregationProvider, crypto.PrivateKey, error) {
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	n, err := rand.Read(seed)
+	if err != nil {
+		return nil, nil, err
+	}
+	if n < len(seed) {
+		return nil, nil, fmt.Errorf("insufficient random bytes")
+	}
+	priv, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	if err != nil {
+		return nil, nil, err
+	}
+	local, err := local.New(nil, priv)
+	if err != nil {
+		return nil, nil, err
+	}
+	return NewAggregationProvider("test_staking", local), priv, nil
 }

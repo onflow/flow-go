@@ -152,6 +152,9 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			p2p.DefaultUnicastTimeout,
 			enablePeerManagementAndConnectionGating,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
+			p2p.WithIdentifierProvider(
+				idProviders[i],
+			),
 			p2p.WithPeerManager(peerManagerFactory),
 		)
 	}
@@ -302,7 +305,6 @@ func generateLibP2PNode(t *testing.T,
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
 		SetLogger(logger).
-		SetStreamCompressor(p2p.WithGzipCompression).
 		Build(ctx)
 	require.NoError(t, err)
 

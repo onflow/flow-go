@@ -613,7 +613,7 @@ func unstakedNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProv
 		validator.NewAnyValidator(
 			// message should be either from a valid staked node
 			validator.NewOriginValidator(
-				id.NewIdentityFilterIdentifierProvider(filter.IsValidCurrentEpochParticipant, idProvider),
+				id.NewFilteredIdentifierProvider(filter.IsValidCurrentEpochParticipant, idProvider),
 			),
 			// or the message should be specifically targeted for this node
 			validator.ValidateTarget(log, selfID),

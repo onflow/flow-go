@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -27,6 +28,14 @@ import (
 	"github.com/onflow/flow-go/network/validator"
 	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
+)
+
+type communicationMode int
+
+const (
+	NoOp communicationMode = iota
+	OneToOne
+	OneToK
 )
 
 const (
@@ -76,11 +85,18 @@ type Middleware struct {
 	unicastMessageTimeout      time.Duration
 	connectionGating           bool
 	idTranslator               IDTranslator
+	idProvider                 id.IdentifierProvider
 	previousProtocolStatePeers []peer.AddrInfo
 	*component.ComponentManager
 }
 
 type MiddlewareOption func(*Middleware)
+
+func WithIdentifierProvider(provider id.IdentifierProvider) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.idProvider = provider
+	}
+}
 
 func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOption {
 	return func(mw *Middleware) {
@@ -173,7 +189,7 @@ func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 }
 
 func (m *Middleware) allPeers() peer.IDSlice {
-	return m.peerIDs(m.ov.Identities().NodeIDs())
+	return m.peerIDs(m.idProvider.Identifiers())
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
@@ -246,6 +262,10 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	m.libP2PNode = libP2PNode
 	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
+
+	if m.idProvider == nil {
+		m.idProvider = NewPeerstoreIdentifierProvider(m.log, m.libP2PNode.host, m.idTranslator)
+	}
 
 	m.UpdateNodeAddresses()
 
@@ -320,19 +340,13 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
 	defer cancel()
 
-	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
-	// connection creation is being attempted, and remove it from protected list once stream created.
-	tag := fmt.Sprintf("%v:%v", msg.ChannelID, msg.Type)
-	m.libP2PNode.connMgr.Protect(peerID, tag)
-	defer m.libP2PNode.connMgr.Unprotect(peerID, tag)
-
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
 	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
-	// sent out the receiver
+	// sent out the the receiver
 	stream, err := m.libP2PNode.CreateStream(ctx, peerID)
 	if err != nil {
-		return fmt.Errorf("failed to create stream for %s: %w", targetID, err)
+		return fmt.Errorf("failed to create stream for %s :%w", targetID, err)
 	}
 
 	// create a gogo protobuf writer
@@ -369,6 +383,7 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 // handleIncomingStream handles an incoming stream from a remote peer
 // it is a callback that gets called for each incoming stream by libp2p with a new stream object
 func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
+
 	// qualify the logger with local and remote address
 	log := streamLogger(m.log, s)
 
@@ -383,7 +398,7 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	//create a new readConnection with the context of the middleware
 	conn := newReadConnection(m.ctx, s, m.processAuthenticatedMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize, isStaked)
 
-	// kick off the reception loop to continuously receive messages
+	// kick off the receive loop to continuously receive messages
 	m.wg.Add(1)
 	go conn.receiveLoop(m.wg)
 }
@@ -469,7 +484,6 @@ func (m *Middleware) processMessage(msg *message.Message) {
 // a many nodes subscribing to the channel. It does not guarantee the delivery though, and operates on a best
 // effort.
 func (m *Middleware) Publish(msg *message.Message, channel network.Channel) error {
-	m.log.Debug().Str("channel", channel.String()).Interface("msg", msg).Msg("publishing new message")
 
 	// convert the message to bytes to be put on the wire.
 	//bs := binstat.EnterTime(binstat.BinNet + ":wire<4message2protobuf")
@@ -519,6 +533,10 @@ func (m *Middleware) UpdateAllowList() {
 
 	// update peer connections if this middleware also does peer management
 	m.peerManagerUpdate()
+}
+
+func (m *Middleware) IdentifierProvider() id.IdentifierProvider {
+	return m.idProvider
 }
 
 // IsConnected returns true if this node is connected to the node with id nodeID.

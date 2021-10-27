@@ -49,10 +49,10 @@ func (ps *ProposalSuite) SetupTest() {
 	ps.leader = ps.participants[0]
 
 	// the parent is the last finalized block, followed directly by a block from the leader
-	ps.parent = helper.MakeBlock(ps.T(),
+	ps.parent = helper.MakeBlock(
 		helper.WithBlockView(ps.finalized),
 	)
-	ps.block = helper.MakeBlock(ps.T(),
+	ps.block = helper.MakeBlock(
 		helper.WithBlockView(ps.finalized+1),
 		helper.WithBlockProposer(ps.leader.NodeID),
 		helper.WithParentBlock(ps.parent),
@@ -255,7 +255,7 @@ func (vs *VoteSuite) SetupTest() {
 	vs.signer = unittest.IdentityFixture(unittest.WithRole(flow.RoleConsensus))
 
 	// create a block that should be signed
-	vs.block = helper.MakeBlock(vs.T())
+	vs.block = helper.MakeBlock()
 
 	// create a vote for this block
 	vs.vote = &model.Vote{
@@ -350,8 +350,8 @@ func (qs *QCSuite) SetupTest() {
 	qs.signers = qs.participants[:7]
 
 	// create a block that has the signers in its QC
-	qs.block = helper.MakeBlock(qs.T())
-	qs.qc = helper.MakeQC(qs.T(), helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
+	qs.block = helper.MakeBlock()
+	qs.qc = helper.MakeQC(helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
 
 	// return the correct participants and identities from view state
 	qs.committee = &mocks.Committee{}
@@ -403,7 +403,7 @@ func (qs *QCSuite) TestQCRetrievingParticipantsError() {
 func (qs *QCSuite) TestQCInsufficientStake() {
 	// signers only have stake 6 out of 10 total (NOT have a supermajority)
 	qs.signers = qs.participants[:6]
-	qs.qc = helper.MakeQC(qs.T(), helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
+	qs.qc = helper.MakeQC(helper.WithQCBlock(qs.block), helper.WithQCSigners(qs.signers.NodeIDs()))
 
 	// the QC should not be validated anymore
 	err := qs.validator.ValidateQC(qs.qc, qs.block)

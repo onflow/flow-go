@@ -645,7 +645,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		followerEng,
 		syncCore,
 		finalizedHeader,
-		id.NewIdentityFilterIdentifierProvider(
+		id.NewFilteredIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),

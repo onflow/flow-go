@@ -188,7 +188,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 
 	id2 := identities[1]
 
-	flowProtocolID := FlowProtocolID(rootBlockID)
+	flowProtocolID := generateFlowProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(suite.T(), 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 
@@ -279,6 +279,7 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 
 // TestOneToOneComm sends a message from node 1 to node 2 and then from node 2 to node 1
 func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
+
 	count := 2
 	ch := make(chan string, count)
 
@@ -532,7 +533,7 @@ func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
 			require.NoError(suite.T(), err)
 		}(s)
 		// wait for stream to be closed
-		unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second, "could not close stream")
+		wg.Wait()
 
 		// wait for the message to be received
 		unittest.RequireReturnsBefore(suite.T(),
@@ -714,7 +715,6 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
 		SetTopicValidation(false).
-		SetStreamCompressor(WithGzipCompression).
 		SetLogger(log)
 
 	if allowList {

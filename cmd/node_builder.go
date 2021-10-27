@@ -103,34 +103,32 @@ type NodeBuilder interface {
 // For a node running as a standalone process, the config fields will be populated from the command line params,
 // while for a node running as a library, the config fields are expected to be initialized by the caller.
 type BaseConfig struct {
-	nodeIDHex                       string
-	AdminAddr                       string
-	AdminCert                       string
-	AdminKey                        string
-	AdminClientCAs                  string
-	BindAddr                        string
-	NodeRole                        string
-	datadir                         string
-	secretsdir                      string
-	secretsDBEnabled                bool
-	level                           string
-	metricsPort                     uint
-	BootstrapDir                    string
-	PeerUpdateInterval              time.Duration
-	UnicastMessageTimeout           time.Duration
-	DNSCacheTTL                     time.Duration
-	profilerEnabled                 bool
-	profilerDir                     string
-	profilerInterval                time.Duration
-	profilerDuration                time.Duration
-	tracerEnabled                   bool
-	tracerSensitivity               uint
-	metricsEnabled                  bool
-	guaranteesCacheSize             uint
-	receiptsCacheSize               uint
-	db                              *badger.DB
-	LibP2PStreamCompression         string
-	NetworkReceivedMessageCacheSize int
+	nodeIDHex             string
+	AdminAddr             string
+	AdminCert             string
+	AdminKey              string
+	AdminClientCAs        string
+	BindAddr              string
+	NodeRole              string
+	datadir               string
+	secretsdir            string
+	secretsDBEnabled      bool
+	level                 string
+	metricsPort           uint
+	BootstrapDir          string
+	PeerUpdateInterval    time.Duration
+	UnicastMessageTimeout time.Duration
+	DNSCacheTTL           time.Duration
+	profilerEnabled       bool
+	profilerDir           string
+	profilerInterval      time.Duration
+	profilerDuration      time.Duration
+	tracerEnabled         bool
+	tracerSensitivity     uint
+	metricsEnabled        bool
+	guaranteesCacheSize   uint
+	receiptsCacheSize     uint
+	db                    *badger.DB
 }
 
 // NodeConfig contains all the derived parameters such the NodeID, private keys etc. and initialized instances of
@@ -160,6 +158,7 @@ type NodeConfig struct {
 	// ID providers
 	IdentityProvider             id.IdentityProvider
 	IDTranslator                 p2p.IDTranslator
+	NetworkingIdentifierProvider id.IdentifierProvider
 	SyncEngineIdentifierProvider id.IdentifierProvider
 
 	// root state information
@@ -176,30 +175,28 @@ func DefaultBaseConfig() *BaseConfig {
 	datadir := filepath.Join(homedir, ".flow", "database")
 
 	return &BaseConfig{
-		nodeIDHex:                       NotSet,
-		AdminAddr:                       NotSet,
-		AdminCert:                       NotSet,
-		AdminKey:                        NotSet,
-		AdminClientCAs:                  NotSet,
-		BindAddr:                        NotSet,
-		BootstrapDir:                    "bootstrap",
-		datadir:                         datadir,
-		secretsdir:                      NotSet,
-		secretsDBEnabled:                true,
-		level:                           "info",
-		PeerUpdateInterval:              p2p.DefaultPeerUpdateInterval,
-		UnicastMessageTimeout:           p2p.DefaultUnicastTimeout,
-		metricsPort:                     8080,
-		profilerEnabled:                 false,
-		profilerDir:                     "profiler",
-		profilerInterval:                15 * time.Minute,
-		profilerDuration:                10 * time.Second,
-		tracerEnabled:                   false,
-		tracerSensitivity:               4,
-		metricsEnabled:                  true,
-		receiptsCacheSize:               bstorage.DefaultCacheSize,
-		guaranteesCacheSize:             bstorage.DefaultCacheSize,
-		LibP2PStreamCompression:         p2p.NoCompression,
-		NetworkReceivedMessageCacheSize: p2p.DefaultCacheSize,
+		nodeIDHex:             NotSet,
+		AdminAddr:             NotSet,
+		AdminCert:             NotSet,
+		AdminKey:              NotSet,
+		AdminClientCAs:        NotSet,
+		BindAddr:              NotSet,
+		BootstrapDir:          "bootstrap",
+		datadir:               datadir,
+		secretsdir:            NotSet,
+		secretsDBEnabled:      true,
+		level:                 "info",
+		PeerUpdateInterval:    p2p.DefaultPeerUpdateInterval,
+		UnicastMessageTimeout: p2p.DefaultUnicastTimeout,
+		metricsPort:           8080,
+		profilerEnabled:       false,
+		profilerDir:           "profiler",
+		profilerInterval:      15 * time.Minute,
+		profilerDuration:      10 * time.Second,
+		tracerEnabled:         false,
+		tracerSensitivity:     4,
+		metricsEnabled:        true,
+		receiptsCacheSize:     bstorage.DefaultCacheSize,
+		guaranteesCacheSize:   bstorage.DefaultCacheSize,
 	}
 }

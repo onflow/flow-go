@@ -172,7 +172,7 @@ func (ss *SyncSuite) SetupTest() {
 	idCache, err := p2p.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
 	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader,
-		id.NewIdentityFilterIdentifierProvider(
+		id.NewFilteredIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(ss.me.NodeID())),

@@ -13,6 +13,7 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
@@ -162,7 +163,7 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-func FlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
+func generateFlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
 	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID.String())
 }
 
@@ -231,4 +232,43 @@ func flowStream(conn network.Conn) network.Stream {
 		}
 	}
 	return nil
+}
+
+// messagePubKey extracts the public key of the envelope signer from a libp2p message.
+// The location of that key depends on the type of the key, see:
+// https://github.com/libp2p/specs/blob/master/peer-ids/peer-ids.md
+// This reproduces the exact logic of the private function doing the same decoding in libp2p:
+// https://github.com/libp2p/go-libp2p-pubsub/blob/ba28f8ecfc551d4d916beb748d3384951bce3ed0/sign.go#L77
+func messageSigningID(m *pubsub.Message) (peer.ID, error) {
+	var pubk crypto.PubKey
+
+	// m.From is the original sender of the message (versus `m.ReceivedFrom` which is the last hop which sent us this message)
+	pid, err := peer.IDFromBytes(m.From)
+	if err != nil {
+		return "", err
+	}
+
+	if m.Key == nil {
+		// no attached key, it must be extractable from the source ID
+		pubk, err = pid.ExtractPublicKey()
+		if err != nil {
+			return "", fmt.Errorf("cannot extract signing key: %s", err.Error())
+		}
+		if pubk == nil {
+			return "", fmt.Errorf("cannot extract signing key")
+		}
+	} else {
+		pubk, err = crypto.UnmarshalPublicKey(m.Key)
+		if err != nil {
+			return "", fmt.Errorf("cannot unmarshal signing key: %s", err.Error())
+		}
+
+		// verify that the source ID matches the attached key
+		if !pid.MatchesPublicKey(pubk) {
+			return "", fmt.Errorf("bad signing key; source ID %s doesn't match key", pid)
+		}
+	}
+
+	// the pid either contains or matches the signing pubKey
+	return pid, nil
 }

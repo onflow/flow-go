@@ -8,13 +8,11 @@ on:
       - staging
       - trying
       - 'feature/**'
-      - 'v[0-9]+.[0-9]+'
   pull_request:
     branches:
       - master
       - 'auto-cadence-upgrade/**'
       - 'feature/**'
-      - 'v[0-9]+.[0-9]+'
 
 jobs:
   golangci:
@@ -26,13 +24,11 @@ jobs:
     - name: Build relic
       run: make crypto/relic/build
     - name: Run golangci-lint
-      uses: golangci/golangci-lint-action@v2
+      uses: golangci/golangci-lint-action@v2.3.0
       with:
         # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
         version: v1.41
         args: -v --build-tags relic
-        # https://github.com/golangci/golangci-lint-action/issues/244
-        skip-pkg-cache: true
     - name: Run ShellCheck
       uses: ludeeus/action-shellcheck@master
       with:
