@@ -251,7 +251,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	if builder.rootBlockID == nil {
 		return nil, errors.New("root block ID must be provided")
 	}
-	node.flowLibP2PProtocolID = generateFlowProtocolID(*builder.rootBlockID)
+	node.flowLibP2PProtocolID = FlowProtocolID(*builder.rootBlockID)
 
 	var opts []config.Option
 
@@ -293,6 +293,11 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, err
 	}
 	node.host = libp2pHost
+
+	node.pCache, err = newProtocolPeerCache(node.logger, libp2pHost)
+	if err != nil {
+		return nil, err
+	}
 
 	if len(builder.dhtOpts) != 0 {
 		kdht, err := NewDHT(ctx, node.host, builder.dhtOpts...)
@@ -355,6 +360,7 @@ type Node struct {
 	connMgr              TagLessConnManager
 	dht                  *dht.IpfsDHT
 	topicValidation      bool
+	pCache               *protocolPeerCache
 }
 
 // Stop terminates the libp2p node.
@@ -425,12 +431,7 @@ func (n *Node) Stop() (chan struct{}, error) {
 
 // AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
 func (n *Node) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
-	err := n.host.Connect(ctx, peerInfo)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return n.host.Connect(ctx, peerInfo)
 }
 
 // RemovePeer closes the connection with the peer.
@@ -440,6 +441,15 @@ func (n *Node) RemovePeer(ctx context.Context, peerID peer.ID) error {
 		return fmt.Errorf("failed to remove peer %s: %w", peerID, err)
 	}
 	return nil
+}
+
+func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
+	pMap := n.pCache.getPeers(pid)
+	peers := make(peer.IDSlice, 0, len(pMap))
+	for p := range pMap {
+		peers = append(peers, p)
+	}
+	return peers
 }
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
@@ -819,19 +829,20 @@ func DefaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Optio
 // PubsubOption generates a libp2p pubsub.Option from the given context and host
 type PubsubOption func(ctx context.Context, host host.Host) (pubsub.Option, error)
 
-func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
-	pubSubOptionFunc := func(option pubsub.Option) PubsubOption {
-		return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
-			return option, nil
-		}
+func PubSubOptionWrapper(option pubsub.Option) PubsubOption {
+	return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
+		return option, nil
 	}
+}
+
+func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 	return []PubsubOption{
 		// skip message signing
-		pubSubOptionFunc(pubsub.WithMessageSigning(true)),
+		PubSubOptionWrapper(pubsub.WithMessageSigning(true)),
 		// skip message signature
-		pubSubOptionFunc(pubsub.WithStrictSignatureVerification(true)),
+		PubSubOptionWrapper(pubsub.WithStrictSignatureVerification(true)),
 		// set max message size limit for 1-k PubSub messaging
-		pubSubOptionFunc(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
+		PubSubOptionWrapper(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
 		// no discovery
 	}
 }

@@ -224,9 +224,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
 
-		mwOpts := []p2p.MiddlewareOption{
-			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
-		}
+		var mwOpts []p2p.MiddlewareOption
 		if len(fnb.MsgValidators) > 0 {
 			mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 		}
@@ -236,7 +234,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		mwOpts = append(mwOpts, p2p.WithPeerManager(peerManagerFactory))
 
 		fnb.Middleware = p2p.NewMiddleware(
-			fnb.Logger.Level(zerolog.ErrorLevel),
+			fnb.Logger,
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
@@ -390,7 +388,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	log := fnb.Logger.With().
 		Timestamp().
 		Str("node_role", fnb.BaseConfig.NodeRole).
-		Str("node_id", fnb.BaseConfig.nodeIDHex).
+		Str("node_id", fnb.NodeID.String()).
 		Logger()
 
 	log.Info().Msgf("flow %s node starting up", fnb.BaseConfig.NodeRole)
@@ -588,8 +586,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		node.IdentityProvider = idCache
 		node.IDTranslator = idCache
-		node.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
-		node.SyncEngineIdentifierProvider = id.NewFilteredIdentifierProvider(
+		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
