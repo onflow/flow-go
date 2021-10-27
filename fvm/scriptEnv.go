@@ -7,7 +7,6 @@ import (
 	"math/rand"
 	"time"
 
-	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
@@ -712,11 +711,7 @@ func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	return e.contracts.Commit()
 }
 
-// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (e *ScriptEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
-	if err != nil {
-		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
-	}
-	return v, nil
+// AllocateStorageIndex is not implemented in this enviornment
+func (e *ScriptEnv) AllocateStorageIndex(_ []byte) (uint64, error) {
+	return 0, errors.NewOperationNotSupportedError("AllocateStorageIndex")
 }

@@ -15,7 +15,7 @@ require (
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
-	github.com/fxamacker/cbor/v2 v2.2.1-0.20210927235116-3d6d5d1de29b
+	github.com/fxamacker/cbor/v2 v2.2.1-0.20210510192846-c3f3c69e7bc8
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
@@ -45,7 +45,6 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/atree v0.1.0-beta1
 	github.com/onflow/cadence v0.19.1-0.20210920215340-75c54c6c01eb
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
@@ -59,7 +58,6 @@ require (
 	github.com/prometheus/client_golang v1.10.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/rs/zerolog v1.19.0
-	github.com/schollz/progressbar/v3 v3.7.6
 	github.com/sethvargo/go-retry v0.1.0
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.2.1

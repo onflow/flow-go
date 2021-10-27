@@ -6,17 +6,15 @@ package state
 // the state it is recommended that such services wraps
 // an state manager instead of an state itself.
 type StateHolder struct {
-	EnforceLimit bool
-	startState   *State
-	activeState  *State
+	startState  *State
+	activeState *State
 }
 
 // NewStateHolder constructs a new state manager
 func NewStateHolder(startState *State) *StateHolder {
 	return &StateHolder{
-		EnforceLimit: true,
-		startState:   startState,
-		activeState:  startState,
+		startState:  startState,
+		activeState: startState,
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
@@ -86,8 +85,8 @@ func (f FakePublicKey) Equals(key crypto.PublicKey) bool { return false }
 
 type FakeAccounts struct{}
 
-func (f FakeAccounts) Exists(address flow.Address) (bool, error)                     { return true, nil }
-func (f FakeAccounts) Get(address flow.Address) (*flow.Account, error)               { return &flow.Account{}, nil }
+func (f FakeAccounts) Exists(address flow.Address) (bool, error) { return true, nil }
+
 func (f FakeAccounts) GetPublicKeyCount(_ flow.Address) (uint64, error)              { return 0, nil }
 func (f FakeAccounts) AppendPublicKey(_ flow.Address, _ flow.AccountPublicKey) error { return nil }
 func (f FakeAccounts) GetPublicKey(_ flow.Address, _ uint64) (flow.AccountPublicKey, error) {
@@ -105,7 +104,5 @@ func (f FakeAccounts) GetValue(_ flow.Address, _ string) (flow.RegisterValue, er
 func (f FakeAccounts) CheckAccountNotFrozen(_ flow.Address) error                    { return nil }
 func (f FakeAccounts) GetStorageUsed(_ flow.Address) (uint64, error)                 { return 0, nil }
 func (f FakeAccounts) SetValue(_ flow.Address, _ string, _ []byte) error             { return nil }
-func (f FakeAccounts) AllocateStorageIndex(_ flow.Address) (atree.StorageIndex, error) {
-	return atree.StorageIndex{}, nil
-}
-func (f FakeAccounts) SetAccountFrozen(_ flow.Address, _ bool) error { return nil }
+func (f FakeAccounts) AllocateStorageIndex(_ flow.Address) (uint64, error)           { return 0, nil }
+func (f FakeAccounts) SetAccountFrozen(_ flow.Address, _ bool) error                 { return nil }
