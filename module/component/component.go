@@ -218,6 +218,7 @@ func (c *componentManagerBuilderImpl) Build() *ComponentManager {
 		started:         atomic.NewBool(false),
 		ready:           make(chan struct{}),
 		done:            make(chan struct{}),
+		shutdownSignal:  make(chan struct{}),
 		serialStart:     c.serialStart,
 		workers:         c.workers,
 		workersRegistry: c.workersRegistry,
@@ -231,7 +232,7 @@ type ComponentManager struct {
 	started        *atomic.Bool
 	ready          chan struct{}
 	done           chan struct{}
-	shutdownSignal <-chan struct{}
+	shutdownSignal chan struct{}
 
 	serialStart     bool
 	workers         []*worker
@@ -244,7 +245,10 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	if c.started.CAS(false, true) {
 		ctx, cancel := context.WithCancel(parent)
 		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-		c.shutdownSignal = ctx.Done()
+		go func() {
+			<-ctx.Done()
+			close(c.shutdownSignal)
+		}()
 
 		// launch goroutine to propagate irrecoverable error
 		go func() {
