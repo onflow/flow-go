@@ -26,7 +26,7 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-const DefaultCacheSize = 10e6
+const DefaultCacheSize = 10e4
 
 // NotEjectedFilter is an identity filter that, when applied to the identity
 // table at a given snapshot, returns all nodes that we should communicate with
@@ -380,7 +380,7 @@ func (n *Network) multicast(channel network.Channel, message interface{}, num ui
 		return network.EmptyTargetList
 	}
 
-	err := n.sendOnChannel(channel, message, targetIDs)
+	err := n.sendOnChannel(channel, message, selectedIDs)
 
 	// publishes the message to the selected targets
 	if err != nil {
