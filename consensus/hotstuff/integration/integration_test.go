@@ -98,7 +98,7 @@ func TestThreeInstances(t *testing.T) {
 }
 
 func TestSevenInstances(t *testing.T) {
-	if os.Getenv("TEST_FLAKY") != "" {
+	if os.Getenv("TEST_FLAKY") == "" {
 		t.Skip()
 	}
 

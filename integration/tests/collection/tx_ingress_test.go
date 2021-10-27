@@ -2,6 +2,7 @@ package collection
 
 import (
 	"context"
+	"os"
 	"testing"
 	"time"
 
@@ -59,27 +60,39 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 	})
 	t.Run("expired transaction", func(t *testing.T) {
 		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
-		t.Skip()
+		if os.Getenv("TEST_WIP") == "" {
+			t.Skip("Skipping unimplemented test")
+		}
 	})
 	t.Run("non-existent reference block ID", func(t *testing.T) {
 		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
-		t.Skip()
+		if os.Getenv("TEST_WIP") == "" {
+			t.Skip("Skipping unimplemented test")
+		}
 	})
 	t.Run("unparseable script", func(t *testing.T) {
 		// TODO script parsing not implemented
-		t.Skip()
+		if os.Getenv("TEST_WIP") == "" {
+			t.Skip("Skipping unimplemented test")
+		}
 	})
 	t.Run("invalid signature", func(t *testing.T) {
 		// TODO signature validation not implemented
-		t.Skip()
+		if os.Getenv("TEST_WIP") == "" {
+			t.Skip("Skipping unimplemented test")
+		}
 	})
 	t.Run("invalid sequence number", func(t *testing.T) {
 		// TODO nonce validation not implemented
-		t.Skip()
+		if os.Getenv("TEST_WIP") == "" {
+			t.Skip("Skipping unimplemented test")
+		}
 	})
 	t.Run("insufficient payer balance", func(t *testing.T) {
 		// TODO balance checking not implemented
-		t.Skip()
+		if os.Getenv("TEST_WIP") == "" {
+			t.Skip("Skipping unimplemented test")
+		}
 	})
 }
 

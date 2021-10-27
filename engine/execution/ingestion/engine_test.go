@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	mathRand "math/rand"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -573,7 +574,10 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
-	t.Skip("flakey")
+	if os.Getenv("TEST_FLAKY") == "" {
+		t.Skip("flaky")
+	}
+
 	runWithEngine(t, func(ctx testingContext) {
 
 		colSigner := unittest.IdentifierFixture()
@@ -1001,7 +1005,10 @@ func Test_SPOCKGeneration(t *testing.T) {
 }
 
 func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
-	t.Skip("flakey")
+	if os.Getenv("TEST_FLAKY") == "" {
+		t.Skip("flaky")
+	}
+
 	runWithEngine(t, func(ctx testingContext) {
 
 		// create blocks with the following relations

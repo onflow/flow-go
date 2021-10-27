@@ -2,6 +2,7 @@ package migrations_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -554,8 +555,9 @@ import ITest from %s
 	})
 
 	t.Run("contract object", func(t *testing.T) {
-
-		t.Skip("this test assumes Cadence storage format pre-v4")
+		if os.Getenv("TEST_CADENCE_STORAGE_FORMAT") != "v4" {
+			t.Skip("this test assumes Cadence storage format pre-v4")
+		}
 
 		payload1 := ledger.Payload{
 			Key: ledger.Key{

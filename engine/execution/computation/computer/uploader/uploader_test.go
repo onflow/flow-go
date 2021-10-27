@@ -129,13 +129,11 @@ func Test_AsyncUploader(t *testing.T) {
 }
 
 func Test_GCPBucketUploader(t *testing.T) {
-
-	t.Skip("requires GCP Bucket setup")
+	if os.Getenv("TEST_GCP_BUCKET") == "" {
+		t.Skip("requires GCP Bucket setup")
+	}
 
 	bucketName := os.Getenv("FLOW_TEST_GCP_BUCKET")
-	if bucketName == "" {
-		t.Fatal("please set FLOW_TEST_GCP_BUCKET environmental variable")
-	}
 	uploader, err := NewGCPBucketUploader(context.Background(), bucketName, zerolog.Nop())
 	require.NoError(t, err)
 

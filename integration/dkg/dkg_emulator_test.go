@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
@@ -201,6 +202,8 @@ func (s *DKGSuite) TestNodesDown() {
 // between consensus node and access node, as well as connection issues between
 // access node and execution node, or the execution node being down).
 func (s *DKGSuite) TestEmulatorProblems() {
-	s.T().Skip("flaky test - quarantined")
+	if os.Getenv("TEST_FLAKY") == "" {
+		s.T().Skip("flaky test - quarantined")
+	}
 	s.runTest(numberOfNodes, true)
 }
