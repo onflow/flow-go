@@ -518,10 +518,6 @@ func (*testRuntime) SetContractUpdateValidationEnabled(_ bool) {
 	panic("SetContractUpdateValidationEnabled not expected")
 }
 
-func (*testRuntime) SetAtreeValidationEnabled(_ bool) {
-	panic("SetAtreeValidationEnabled not expected")
-}
-
 func (*testRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
 	panic("ReadStored not expected")
 }

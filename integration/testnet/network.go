@@ -489,7 +489,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		bootstrapDir:       bootstrapDir,
 	}
 
-	// at-least 2 full access nodes must be configure in your test suite
+	// check that at-least 2 full access nodes must be configure in your test suite
 	// in order to provide a secure GRPC connection for LN & SN nodes
 	accessNodeIDS := make([]string, 0)
 	for _, n := range confs {
@@ -504,15 +504,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
 
-		anIDS := strings.Join(accessNodeIDS, ",")
-
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 		if nodeConf.Role == flow.RoleConsensus || nodeConf.Role == flow.RoleCollection {
 			// ghost containers don't participate in the network skip any SN/LN ghost containers
 			if !nodeConf.Ghost {
 				nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
 				nodeContainer.addFlag("insecure-access-api", "false")
-				nodeContainer.addFlag("access-node-ids", anIDS)
+				nodeContainer.addFlag("access-node-ids", "*")
 			}
 		}
 	}
