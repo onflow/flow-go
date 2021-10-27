@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -37,9 +38,9 @@ func TestMVP_Network(t *testing.T) {
 }
 
 func TestMVP_Bootstrap(t *testing.T) {
-
-	// skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451
-	t.Skip()
+	if os.Getenv("TEST_WIP") == "" {
+		t.Skip("skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451")
+	}
 
 	testingdock.Verbose = false
 
@@ -103,7 +104,9 @@ func TestMVP_Bootstrap(t *testing.T) {
 func TestMVP_Emulator(t *testing.T) {
 	// Start emulator manually for now, used for testing the test
 	// TODO - start an emulator instance
-	t.Skip()
+	if os.Getenv("TEST_WIP") == "" {
+		t.Skip()
+	}
 
 	// key, err := unittest.EmulatorRootKey()
 	// require.NoError(t, err)

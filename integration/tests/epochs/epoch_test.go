@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"context"
+	"os"
 	"testing"
 
 	"github.com/onflow/cadence"
@@ -22,7 +23,9 @@ func TestEpochs(t *testing.T) {
 // TestViewsProgress asserts epoch state transitions over two full epochs
 // without any nodes joining or leaving.
 func (s *Suite) TestViewsProgress() {
-	s.T().Skip("flaky test - quarantining")
+	if os.Getenv("TEST_FLAKY") == "" {
+		s.T().Skip("flaky test")
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
