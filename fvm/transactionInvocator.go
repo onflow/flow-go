@@ -249,8 +249,10 @@ func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *
 			return
 		}
 		if err != nil {
-			// the error will be hidden, but at least log it
-			i.logger.Error().Err(merr).Msg("error discarding computation meter in deductTransactionFees")
+			// The error merr (from discarding the subMeter) will be hidden by err (transaction fee deduction error)
+			// as it has priority. So log merr.
+			i.logger.Error().Err(merr).
+				Msg("error discarding computation meter in deductTransactionFees (while also handling a deductTransactionFees error)")
 			return
 		}
 		err = merr

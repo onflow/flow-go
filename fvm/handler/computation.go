@@ -6,9 +6,9 @@ import "fmt"
 type ComputationMeter interface {
 	// Limit gets computation limit
 	Limit() uint64
-	// SetUsed sets the currently used computation
-	SetUsed(used uint64) error
-	// Used gets the currently used computation
+	// AddUsed adds more computation used to the current computation used
+	AddUsed(used uint64) error
+	// Used gets the current computation used
 	Used() uint64
 }
 
@@ -40,7 +40,7 @@ func (c *computationMeter) Limit() uint64 {
 	return c.limit
 }
 
-func (c *computationMeter) SetUsed(used uint64) error {
+func (c *computationMeter) AddUsed(used uint64) error {
 	c.used += used
 	return nil
 }
@@ -98,9 +98,9 @@ func (c *computationMeteringHandler) Limit() uint64 {
 	return c.computation.Limit()
 }
 
-func (c *computationMeteringHandler) SetUsed(used uint64) error {
+func (c *computationMeteringHandler) AddUsed(used uint64) error {
 	used = c.computation.Used() + used
-	return c.computation.SetUsed(used)
+	return c.computation.AddUsed(used)
 }
 
 func (c *computationMeteringHandler) Used() uint64 {

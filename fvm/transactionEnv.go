@@ -571,7 +571,7 @@ func (e *TransactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *TransactionEnv) SetComputationUsed(used uint64) error {
-	return e.computationHandler.SetUsed(used)
+	return e.computationHandler.AddUsed(used)
 }
 
 func (e *TransactionEnv) GetComputationUsed() uint64 {
