@@ -66,6 +66,7 @@ func TestExtractExecutionState(t *testing.T) {
 				zerolog.Nop(),
 				false,
 				false,
+				false,
 			)
 			require.Error(t, err)
 		})
