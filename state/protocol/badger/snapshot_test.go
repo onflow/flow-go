@@ -340,8 +340,8 @@ func TestSealingSegment(t *testing.T) {
 
 			// build the block sealing block 1
 			block5 := unittest.BlockWithParentFixture(block4.Header)
-			receipt2, seal1 := unittest.ReceiptAndSealForBlock(&block1)
-			block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal1)))
+			receipt3, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt3), unittest.WithSeals(seal1)))
 			err = state.Extend(context.Background(), &block5)
 			require.NoError(t, err)
 
