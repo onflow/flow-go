@@ -440,7 +440,6 @@ func TestCombinedVoteProcessor_PropertyCreatingQCCorrectness(testifyT *testing.T
 		rbSigAggregator.On("TotalWeight").Return(func() uint64 {
 			return thresholdTotalWeight
 		})
-		// don't require shares
 		reconstructor.On("HasSufficientShares").Return(func() bool {
 			return collectedShares >= beaconSignersCount
 		})
@@ -611,11 +610,9 @@ func TestCombinedVoteProcessor_PropertyCreatingQCCorrectness(testifyT *testing.T
 // We randomly draw a committee and check if we are able to create a QC with minimal number of nodes.
 // In each test iteration we expect to create a QC, we don't check correctness of data since it's checked by another test.
 func TestCombinedVoteProcessor_PropertyCreatingQCLiveness(testifyT *testing.T) {
-	maxParticipants := uint64(53)
-
 	rapid.Check(testifyT, func(t *rapid.T) {
-		// draw beacon signers in range 1 <= beaconSignersCount <= maxParticipants
-		beaconSignersCount := rapid.Uint64Range(1, maxParticipants).Draw(t, "beaconSigners").(uint64)
+		// draw beacon signers in range 1 <= beaconSignersCount <= 53
+		beaconSignersCount := rapid.Uint64Range(1, 53).Draw(t, "beaconSigners").(uint64)
 		// draw staking signers in range 0 <= stakingSignersCount <= 10
 		stakingSignersCount := rapid.Uint64Range(0, 10).Draw(t, "stakingSigners").(uint64)
 
