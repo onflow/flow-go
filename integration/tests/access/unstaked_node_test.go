@@ -61,8 +61,6 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	receivedBlocks := make(map[flow.Identifier]struct{}, blockCount)
 
 	suite.Run("consensus follower follows the chain", func() {
-		suite.T().Skip("flaky test")
-
 		// kick off the first follower
 		suite.followerMgr1.startFollower(ctx)
 		var err error
@@ -90,7 +88,6 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	})
 
 	suite.Run("consensus follower sync up with the chain", func() {
-		suite.T().Skip("flaky test")
 		// kick off the second follower
 		suite.followerMgr2.startFollower(ctx)
 
@@ -169,7 +166,7 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 	suite.followerMgr1, err = newFollowerManager(suite.T(), follower1)
 	require.NoError(suite.T(), err)
 
-	follower2 := suite.net.ConsensusFollowerByID(followerConfigs[0].NodeID)
+	follower2 := suite.net.ConsensusFollowerByID(followerConfigs[1].NodeID)
 	suite.followerMgr2, err = newFollowerManager(suite.T(), follower2)
 	require.NoError(suite.T(), err)
 }

@@ -39,8 +39,7 @@ func newUpstreamConnector(bootstrapIdentities flow.IdentityList, unstakedNode *p
 			default:
 			}
 
-			go connector.onStart(ctx)
-
+			connector.onStart(ctx)
 			ready()
 		}).Build()
 
