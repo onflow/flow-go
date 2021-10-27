@@ -66,6 +66,8 @@ type Middleware interface {
 // BlockExchange represents a block exchange, which is an abstraction over an underlying
 // Bitswap network.
 type BlockExchange interface {
+	// BlockExchange embeds the BlockExchangeFetcher for convenience.
+	// Each call to GetBlocks creates a new session under the hood.
 	BlockExchangeFetcher
 
 	// GetSession returns a session for requesting related blocks
@@ -84,6 +86,11 @@ type BlockExchangeFetcher interface {
 	GetBlocks(cids ...cid.Cid) BlocksPromise
 }
 
+// Example
+//
+//  done, err := bex.GetBlocks(blocksToGet...).ForEach(func(b blocks.Block) {
+//    // [...]
+//  }).Send(ctx)
 type BlocksPromise interface {
 	// ForEach is used to register a callback to handle received blocks
 	ForEach(cb func(blocks.Block)) BlocksRequest
