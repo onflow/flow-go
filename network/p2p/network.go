@@ -26,7 +26,7 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
-const DefaultCacheSize = 10e6
+const DefaultCacheSize = 10e4
 
 // NotEjectedFilter is an identity filter that, when applied to the identity
 // table at a given snapshot, returns all nodes that we should communicate with
@@ -303,7 +303,7 @@ func (n *Network) Identity(pid peer.ID) (*flow.Identity, bool) {
 	return n.identityProvider.ByPeerID(pid)
 }
 
-// Topology returns the identitiess of a uniform subset of nodes in protocol state using the topology provided earlier.
+// Topology returns the identities of a uniform subset of nodes in protocol state using the topology provided earlier.
 // Independent invocations of Topology on different nodes collectively constructs a connected network graph.
 func (n *Network) Topology() (flow.IdentityList, error) {
 	n.Lock()
@@ -469,7 +469,7 @@ func (n *Network) multicast(channel network.Channel, message interface{}, num ui
 		return network.EmptyTargetList
 	}
 
-	err := n.sendOnChannel(channel, message, targetIDs)
+	err := n.sendOnChannel(channel, message, selectedIDs)
 
 	// publishes the message to the selected targets
 	if err != nil {
@@ -488,6 +488,12 @@ func (n *Network) removeSelfFilter() flow.IdentifierFilter {
 
 // sendOnChannel sends the message on channel to targets.
 func (n *Network) sendOnChannel(channel network.Channel, message interface{}, targetIDs []flow.Identifier) error {
+	n.logger.Debug().
+		Interface("message", message).
+		Str("channel", channel.String()).
+		Str("target_ids", fmt.Sprintf("%v", targetIDs)).
+		Msg("sending new message on channel")
+
 	// generate network message (encoding) based on list of recipients
 	msg, err := n.genNetworkMessage(channel, message, targetIDs...)
 	if err != nil {
