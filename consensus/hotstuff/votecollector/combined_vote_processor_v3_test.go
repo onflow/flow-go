@@ -2,13 +2,16 @@ package votecollector
 
 import (
 	"errors"
+	"math/rand"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
+	"pgregory.net/rapid"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
@@ -337,107 +340,6 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughSharesNotEnoughStakes
 	require.True(s.T(), s.reconstructor.HasSufficientShares())
 }
 
-// TestProcess_CreatingQC tests a scenario when we have collected enough staking weight and random beacon shares
-// and proceed to build QC. Created QC has to have all signatures and identities aggregated by
-// aggregators and packed with consensus packer.
-func (s *CombinedVoteProcessorTestSuite) TestProcess_CreatingQC() {
-	// prepare test setup: 5 votes with staking sigs and 9 votes with random beacon sigs
-	stakingSigners := unittest.IdentifierListFixture(5)
-	beaconSigners := unittest.IdentifierListFixture(9)
-
-	// setup aggregators and reconstructor
-	*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
-	*s.rbSigAggregator = mockhotstuff.WeightedSignatureAggregator{}
-	*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
-
-	s.stakingAggregator.On("TotalWeight").Return(func() uint64 {
-		return s.stakingTotalWeight
-	})
-
-	s.rbSigAggregator.On("TotalWeight").Return(func() uint64 {
-		return s.thresholdTotalWeight
-	})
-
-	s.reconstructor.On("HasSufficientShares").Return(func() bool {
-		return s.rbSharesTotal >= s.minRequiredShares
-	})
-
-	// mock expected calls to aggregators and reconstructor
-	combinedSigs := unittest.SignaturesFixture(3)
-	s.stakingAggregator.On("Aggregate").Return(stakingSigners, []byte(combinedSigs[0]), nil).Once()
-	s.rbSigAggregator.On("Aggregate").Return(beaconSigners, []byte(combinedSigs[1]), nil).Once()
-	s.reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
-
-	// mock expected call to Packer
-	mergedSignerIDs := append(append([]flow.Identifier{}, stakingSigners...), beaconSigners...)
-	expectedBlockSigData := &hotstuff.BlockSignatureData{
-		StakingSigners:               stakingSigners,
-		RandomBeaconSigners:          beaconSigners,
-		AggregatedStakingSig:         []byte(combinedSigs[0]),
-		AggregatedRandomBeaconSig:    []byte(combinedSigs[1]),
-		ReconstructedRandomBeaconSig: combinedSigs[2],
-	}
-	packedSigData := unittest.RandomBytes(128)
-	s.packer.On("Pack", s.proposal.Block.BlockID, expectedBlockSigData).Return(mergedSignerIDs, packedSigData, nil).Once()
-
-	// expected QC
-	s.onQCCreatedState.On("onQCCreated", mock.Anything).Run(func(args mock.Arguments) {
-		qc := args.Get(0).(*flow.QuorumCertificate)
-		// ensure that QC contains correct field
-		expectedQC := &flow.QuorumCertificate{
-			View:      s.proposal.Block.View,
-			BlockID:   s.proposal.Block.BlockID,
-			SignerIDs: mergedSignerIDs,
-			SigData:   packedSigData,
-		}
-		require.Equal(s.T(), expectedQC, qc)
-	}).Return(nil).Once()
-
-	// add votes
-	for _, signer := range stakingSigners {
-		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
-		vote.SignerID = signer
-		expectedSig := crypto.Signature(vote.SigData[1:])
-		s.stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Once()
-		s.stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
-			s.stakingTotalWeight += s.sigWeight
-		}).Return(s.stakingTotalWeight, nil).Once()
-		err := s.processor.Process(vote)
-		require.NoError(s.T(), err)
-	}
-	for _, signer := range beaconSigners {
-		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
-		vote.SignerID = signer
-		expectedSig := crypto.Signature(vote.SigData[1:])
-		s.rbSigAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Once()
-		s.rbSigAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
-			s.thresholdTotalWeight += s.sigWeight
-		}).Return(s.thresholdTotalWeight, nil).Once()
-		s.reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
-			s.rbSharesTotal++
-		}).Return(func(signerID flow.Identifier, sig crypto.Signature) bool {
-			return s.rbSharesTotal >= s.minRequiredShares
-		}, func(signerID flow.Identifier, sig crypto.Signature) error {
-			return nil
-		}).Once()
-
-		err := s.processor.Process(vote)
-		require.NoError(s.T(), err)
-	}
-
-	require.True(s.T(), s.processor.done.Load())
-	s.onQCCreatedState.AssertExpectations(s.T())
-	s.rbSigAggregator.AssertExpectations(s.T())
-	s.stakingAggregator.AssertExpectations(s.T())
-	s.reconstructor.AssertExpectations(s.T())
-
-	// processing extra votes shouldn't result in creating new QCs
-	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
-	err := s.processor.Process(vote)
-	require.NoError(s.T(), err)
-	s.onQCCreatedState.AssertExpectations(s.T())
-}
-
 // TestProcess_ConcurrentCreatingQC tests a scenario where multiple goroutines process vote at same time,
 // we expect only one QC created in this scenario.
 func (s *CombinedVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
@@ -483,4 +385,370 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
 	shutdownWg.Wait()
 
 	s.onQCCreatedState.AssertNumberOfCalls(s.T(), "onQCCreated", 1)
+}
+
+// TestCombinedVoteProcessor_PropertyCreatingQCCorrectness uses property testing to test correctness of concurrent votes processing.
+// We randomly draw a committee with some number of staking, random beacon and byzantine nodes.
+// Values are drawn in a way that 1 <= honestParticipants <= participants <= maxParticipants
+// In each test iteration we expect to create a valid QC with all provided data as part of constructed QC.
+func TestCombinedVoteProcessor_PropertyCreatingQCCorrectness(testifyT *testing.T) {
+	maxParticipants := uint64(53)
+
+	rapid.Check(testifyT, func(t *rapid.T) {
+		// draw participants in range 1 <= participants <= maxParticipants
+		participants := rapid.Uint64Range(1, maxParticipants).Draw(t, "participants").(uint64)
+		beaconSignersCount := rapid.Uint64Range(participants/2+1, participants).Draw(t, "beaconSigners").(uint64)
+		stakingSignersCount := participants - beaconSignersCount
+		require.Equal(t, participants, stakingSignersCount+beaconSignersCount)
+
+		// setup how many votes we need to create a QC
+		// 1 <= honestParticipants <= participants <= maxParticipants
+		honestParticipants := participants*2/3 + 1
+		sigWeight := uint64(100)
+		minRequiredStake := honestParticipants * sigWeight
+
+		// proposing block
+		block := helper.MakeBlock()
+
+		t.Logf("running conf\n\t"+
+			"staking signers: %v, beacon signers: %v\n\t"+
+			"required stake: %v", stakingSignersCount, beaconSignersCount, minRequiredStake)
+
+		stakingTotalWeight, thresholdTotalWeight, collectedShares := uint64(0), uint64(0), uint64(0)
+
+		// setup aggregators and reconstructor
+		stakingAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+		rbSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+		reconstructor := &mockhotstuff.RandomBeaconReconstructor{}
+
+		stakingSigners := unittest.IdentifierListFixture(int(stakingSignersCount))
+		beaconSigners := unittest.IdentifierListFixture(int(beaconSignersCount))
+
+		// lists to track signers that actually contributed their signatures
+		var (
+			aggregatedStakingSigners []flow.Identifier
+			aggregatedBeaconSigners  []flow.Identifier
+		)
+
+		// need separate locks to safely update vectors of voted signers
+		stakingAggregatorLock := &sync.Mutex{}
+		beaconAggregatorLock := &sync.Mutex{}
+
+		stakingAggregator.On("TotalWeight").Return(func() uint64 {
+			return stakingTotalWeight
+		})
+		rbSigAggregator.On("TotalWeight").Return(func() uint64 {
+			return thresholdTotalWeight
+		})
+		reconstructor.On("HasSufficientShares").Return(func() bool {
+			return collectedShares >= beaconSignersCount
+		})
+
+		// mock expected calls to aggregators and reconstructor
+		combinedSigs := unittest.SignaturesFixture(3)
+		stakingAggregator.On("Aggregate").Return(
+			func() []flow.Identifier {
+				stakingAggregatorLock.Lock()
+				defer stakingAggregatorLock.Unlock()
+				return aggregatedStakingSigners
+			},
+			func() []byte { return combinedSigs[0] },
+			func() error { return nil }).Once()
+
+		rbSigAggregator.On("Aggregate").Return(
+			func() []flow.Identifier {
+				beaconAggregatorLock.Lock()
+				defer beaconAggregatorLock.Unlock()
+				return aggregatedBeaconSigners
+			},
+			func() []byte { return combinedSigs[1] },
+			func() error { return nil }).Once()
+		reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
+
+		// mock expected call to Packer
+		mergedSignerIDs := make([]flow.Identifier, 0)
+		packedSigData := unittest.RandomBytes(128)
+		packer := &mockhotstuff.Packer{}
+		packer.On("Pack", block.BlockID, mock.Anything).Run(func(args mock.Arguments) {
+			blockSigData := args.Get(1).(*hotstuff.BlockSignatureData)
+
+			// check that aggregated signers are part of all votes signers
+			// due to concurrent processing it is possible that Aggregate will return less that we have actually aggregated
+			// but still enough to construct the QC
+			require.Subset(t, aggregatedStakingSigners, blockSigData.StakingSigners)
+			require.Subset(t, aggregatedBeaconSigners, blockSigData.RandomBeaconSigners)
+			require.GreaterOrEqual(t, uint64(len(blockSigData.StakingSigners)+len(blockSigData.RandomBeaconSigners)),
+				honestParticipants)
+
+			expectedBlockSigData := &hotstuff.BlockSignatureData{
+				StakingSigners:               blockSigData.StakingSigners,
+				RandomBeaconSigners:          blockSigData.RandomBeaconSigners,
+				AggregatedStakingSig:         []byte(combinedSigs[0]),
+				AggregatedRandomBeaconSig:    []byte(combinedSigs[1]),
+				ReconstructedRandomBeaconSig: combinedSigs[2],
+			}
+
+			require.Equal(t, expectedBlockSigData, blockSigData)
+
+			// fill merged signers with collected signers
+			mergedSignerIDs = append(expectedBlockSigData.StakingSigners, expectedBlockSigData.RandomBeaconSigners...)
+		}).Return(
+			func(flow.Identifier, *hotstuff.BlockSignatureData) []flow.Identifier { return mergedSignerIDs },
+			func(flow.Identifier, *hotstuff.BlockSignatureData) []byte { return packedSigData },
+			func(flow.Identifier, *hotstuff.BlockSignatureData) error { return nil }).Once()
+
+		// track if QC was created
+		qcCreated := atomic.NewBool(false)
+
+		// expected QC
+		onQCCreated := func(qc *flow.QuorumCertificate) {
+			// QC should be created only once
+			if !qcCreated.CAS(false, true) {
+				t.Fatalf("QC created more than once")
+			}
+
+			// ensure that QC contains correct field
+			expectedQC := &flow.QuorumCertificate{
+				View:      block.View,
+				BlockID:   block.BlockID,
+				SignerIDs: mergedSignerIDs,
+				SigData:   packedSigData,
+			}
+			require.Equalf(t, expectedQC, qc, "QC should be equal to what we expect")
+		}
+
+		processor := &CombinedVoteProcessor{
+			log:              unittest.Logger(),
+			block:            block,
+			stakingSigAggtor: stakingAggregator,
+			rbSigAggtor:      rbSigAggregator,
+			rbRector:         reconstructor,
+			onQCCreated:      onQCCreated,
+			packer:           packer,
+			minRequiredStake: minRequiredStake,
+			done:             *atomic.NewBool(false),
+		}
+
+		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
+
+		// prepare votes
+		for _, signer := range stakingSigners {
+			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithStakingSig())
+			vote.SignerID = signer
+			expectedSig := crypto.Signature(vote.SigData[1:])
+			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
+			stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
+				signerID := args.Get(0).(flow.Identifier)
+				stakingAggregatorLock.Lock()
+				defer stakingAggregatorLock.Unlock()
+				stakingTotalWeight += sigWeight
+				aggregatedStakingSigners = append(aggregatedStakingSigners, signerID)
+			}).Return(uint64(0), nil).Maybe()
+			votes = append(votes, vote)
+		}
+		for _, signer := range beaconSigners {
+			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithThresholdSig())
+			vote.SignerID = signer
+			expectedSig := crypto.Signature(vote.SigData[1:])
+			rbSigAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
+			rbSigAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
+				signerID := args.Get(0).(flow.Identifier)
+				beaconAggregatorLock.Lock()
+				defer beaconAggregatorLock.Unlock()
+				thresholdTotalWeight += sigWeight
+				aggregatedBeaconSigners = append(aggregatedBeaconSigners, signerID)
+			}).Return(uint64(0), nil).Maybe()
+			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
+				beaconAggregatorLock.Lock()
+				defer beaconAggregatorLock.Unlock()
+				collectedShares++
+			}).Return(true, nil).Maybe()
+			votes = append(votes, vote)
+		}
+
+		// shuffle votes in random order
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(votes), func(i, j int) {
+			votes[i], votes[j] = votes[j], votes[i]
+		})
+
+		var startProcessing, finishProcessing sync.WaitGroup
+		startProcessing.Add(1)
+		// process votes concurrently by multiple workers
+		for _, vote := range votes {
+			finishProcessing.Add(1)
+			go func(vote *model.Vote) {
+				defer finishProcessing.Done()
+				startProcessing.Wait()
+				err := processor.Process(vote)
+				require.NoError(t, err)
+			}(vote)
+		}
+
+		// start all goroutines at the same time
+		startProcessing.Done()
+		finishProcessing.Wait()
+
+		passed := processor.done.Load()
+		passed = passed && qcCreated.Load()
+		passed = passed && rbSigAggregator.AssertExpectations(t)
+		passed = passed && stakingAggregator.AssertExpectations(t)
+		passed = passed && reconstructor.AssertExpectations(t)
+
+		if !passed {
+			t.Fatalf("Assertions weren't met, staking weight: %v, threshold weight: %v", stakingTotalWeight, thresholdTotalWeight)
+		}
+
+		//processing extra votes shouldn't result in creating new QCs
+		vote := unittest.VoteForBlockFixture(block, unittest.VoteWithThresholdSig())
+		err := processor.Process(vote)
+		require.NoError(t, err)
+	})
+}
+
+// TestCombinedVoteProcessor_PropertyCreatingQCLiveness uses property testing to test liveness of concurrent votes processing.
+// We randomly draw a committee and check if we are able to create a QC with minimal number of nodes.
+// In each test iteration we expect to create a QC, we don't check correctness of data since it's checked by another test.
+func TestCombinedVoteProcessor_PropertyCreatingQCLiveness(testifyT *testing.T) {
+	rapid.Check(testifyT, func(t *rapid.T) {
+		// draw beacon signers in range 1 <= beaconSignersCount <= 53
+		beaconSignersCount := rapid.Uint64Range(1, 53).Draw(t, "beaconSigners").(uint64)
+		// draw staking signers in range 0 <= stakingSignersCount <= 10
+		stakingSignersCount := rapid.Uint64Range(0, 10).Draw(t, "stakingSigners").(uint64)
+
+		stakingWeightRange, beaconWeightRange := rapid.Uint64Range(1, 10), rapid.Uint64Range(1, 10)
+
+		minRequiredStake := uint64(0)
+		// draw weight for each signer randomly
+		stakingSigners := unittest.IdentityListFixture(int(stakingSignersCount), func(identity *flow.Identity) {
+			identity.Stake = stakingWeightRange.Draw(t, identity.String()).(uint64)
+			minRequiredStake += identity.Stake
+		})
+		beaconSigners := unittest.IdentityListFixture(int(beaconSignersCount), func(identity *flow.Identity) {
+			identity.Stake = beaconWeightRange.Draw(t, identity.String()).(uint64)
+			minRequiredStake += identity.Stake
+		})
+
+		// proposing block
+		block := helper.MakeBlock()
+
+		t.Logf("running conf\n\t"+
+			"staking signers: %v, beacon signers: %v\n\t"+
+			"required stake: %v", stakingSignersCount, beaconSignersCount, minRequiredStake)
+
+		stakingTotalWeight, thresholdTotalWeight, collectedShares := atomic.NewUint64(0), atomic.NewUint64(0), atomic.NewUint64(0)
+
+		// setup aggregators and reconstructor
+		stakingAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+		rbSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
+		reconstructor := &mockhotstuff.RandomBeaconReconstructor{}
+
+		stakingAggregator.On("TotalWeight").Return(func() uint64 {
+			return stakingTotalWeight.Load()
+		})
+		rbSigAggregator.On("TotalWeight").Return(func() uint64 {
+			return thresholdTotalWeight.Load()
+		})
+		// don't require shares
+		reconstructor.On("HasSufficientShares").Return(func() bool {
+			return collectedShares.Load() >= beaconSignersCount
+		})
+
+		// mock expected calls to aggregators and reconstructor
+		combinedSigs := unittest.SignaturesFixture(3)
+		stakingAggregator.On("Aggregate").Return(stakingSigners.NodeIDs(), []byte(combinedSigs[0]), nil).Once()
+		rbSigAggregator.On("Aggregate").Return(beaconSigners.NodeIDs(), []byte(combinedSigs[1]), nil).Once()
+		reconstructor.On("Reconstruct").Return(combinedSigs[2], nil).Once()
+
+		// mock expected call to Packer
+		mergedSignerIDs := append(stakingSigners.NodeIDs(), beaconSigners.NodeIDs()...)
+		packedSigData := unittest.RandomBytes(128)
+		packer := &mockhotstuff.Packer{}
+		packer.On("Pack", block.BlockID, mock.Anything).Return(mergedSignerIDs, packedSigData, nil)
+
+		// track if QC was created
+		qcCreated := atomic.NewBool(false)
+
+		// expected QC
+		onQCCreated := func(qc *flow.QuorumCertificate) {
+			// QC should be created only once
+			if !qcCreated.CAS(false, true) {
+				t.Fatalf("QC created more than once")
+			}
+		}
+
+		processor := &CombinedVoteProcessor{
+			log:              unittest.Logger(),
+			block:            block,
+			stakingSigAggtor: stakingAggregator,
+			rbSigAggtor:      rbSigAggregator,
+			rbRector:         reconstructor,
+			onQCCreated:      onQCCreated,
+			packer:           packer,
+			minRequiredStake: minRequiredStake,
+			done:             *atomic.NewBool(false),
+		}
+
+		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
+
+		// prepare votes
+		for _, signer := range stakingSigners {
+			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithStakingSig())
+			vote.SignerID = signer.ID()
+			stake := signer.Stake
+			expectedSig := crypto.Signature(vote.SigData[1:])
+			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
+			stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
+				stakingTotalWeight.Add(stake)
+			}).Return(uint64(0), nil).Maybe()
+			votes = append(votes, vote)
+		}
+		for _, signer := range beaconSigners {
+			vote := unittest.VoteForBlockFixture(processor.Block(), unittest.VoteWithThresholdSig())
+			vote.SignerID = signer.ID()
+			stake := signer.Stake
+			expectedSig := crypto.Signature(vote.SigData[1:])
+			rbSigAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
+			rbSigAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
+				thresholdTotalWeight.Add(stake)
+			}).Return(uint64(0), nil).Maybe()
+			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
+				collectedShares.Inc()
+			}).Return(true, nil).Maybe()
+			votes = append(votes, vote)
+		}
+
+		// shuffle votes in random order
+		rand.Seed(time.Now().UnixNano())
+		rand.Shuffle(len(votes), func(i, j int) {
+			votes[i], votes[j] = votes[j], votes[i]
+		})
+
+		var startProcessing, finishProcessing sync.WaitGroup
+		startProcessing.Add(1)
+		// process votes concurrently by multiple workers
+		for _, vote := range votes {
+			finishProcessing.Add(1)
+			go func(vote *model.Vote) {
+				defer finishProcessing.Done()
+				startProcessing.Wait()
+				err := processor.Process(vote)
+				require.NoError(t, err)
+			}(vote)
+		}
+
+		// start all goroutines at the same time
+		startProcessing.Done()
+		finishProcessing.Wait()
+
+		passed := processor.done.Load()
+		passed = passed && qcCreated.Load()
+		passed = passed && rbSigAggregator.AssertExpectations(t)
+		passed = passed && stakingAggregator.AssertExpectations(t)
+		passed = passed && reconstructor.AssertExpectations(t)
+
+		if !passed {
+			t.Fatalf("Assertions weren't met, staking weight: %v, threshold weight: %v", stakingTotalWeight, thresholdTotalWeight)
+		}
+	})
 }
