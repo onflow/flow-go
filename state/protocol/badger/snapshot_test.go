@@ -309,19 +309,19 @@ func TestSealingSegment(t *testing.T) {
 
 	// test sealing segment where a block contains a ExecutionReceipt that
 	// references a ExecutionResult contained in a different block.
-	// the sealing segment should contain any ExecutionResults that were
-	// missing from a blocks payload in the SealingSegment.ExecutionResults field
+	// the sealing segment should contain any ExecutionReceipts that were
+	// missing from a blocks payload in the SealingSegment.ExecutionReceipts field
 	// ROOT -> B1(Receipt_A) -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3 -> B4 -> B5 (Seal_B1)
-	// Expected sealing segment: SealingSegment{Blocks[B1, B2, B3, B4, B5] ExecutionResults{some_result_id:Result_A}}
+	// Expected sealing segment: SealingSegment{Blocks[B1, B2, B3, B4, B5] ExecutionReceipts{some_result_id:Result_A}}
 	t.Run("sealing segment decoupled execution results and receipts", func(t *testing.T) {
 		block1 := unittest.BlockWithParentFixture(head)
 		receipt1 := unittest.ReceiptForBlockFixture(&block1)
 		util.RunWithFollowerProtocolStateAndResults(t, rootSnapshot, []*flow.ExecutionResult{&receipt1.ExecutionResult}, func(db *badger.DB, state *bprotocol.FollowerState) {
-			block1.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
 			// simulate scenario where execution result is missing from block payload
-			// SealingSegment() should get result from results db and store it on ExecutionResults
+			// SealingSegment() should get result from results db and store it on ExecutionReceipts
 			// field on SealingSegment
-			block1.Payload.Results = []*flow.ExecutionResult{}
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(receipt1)))
+
 			err = state.Extend(context.Background(), &block1)
 
 			block2 := unittest.BlockWithParentFixture(block1.Header)
@@ -356,7 +356,7 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Len(t, segment.Blocks, 3)
-			assert.Len(t, segment.ExecutionResults, 0, "expected none of the blocks to have missing results, ExecutionResults should be empty")
+			assert.Len(t, segment.ExecutionReceipts, 0, "expected none of the blocks to have missing results, ExecutionReceipts should be empty")
 		})
 	})
 

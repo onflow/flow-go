@@ -8,10 +8,8 @@ type SealingSegment struct {
 	// Blocks the chain segment blocks
 	Blocks []*Block
 
-	// ExecutionResults execution results referenced in segment block receipts
-	// but missing from the referencing block
-	//ExecutionResults map[Identifier]*ExecutionResult
-	ExecutionResults map[Identifier]*ExecutionResult
+	// ExecutionReceipts map of ExecutionResult.ID -> full ExecutionReceipt
+	ExecutionReceipts map[Identifier]*ExecutionReceipt
 }
 
 // AddBlock appends block to Blocks
@@ -19,21 +17,21 @@ func (segment *SealingSegment) AddBlock(block *Block) {
 	segment.Blocks = append(segment.Blocks, block)
 }
 
-// AddExecutionResult adds execution result to ExecutionResults using id as the key
-func (segment *SealingSegment) AddExecutionResult(result *ExecutionResult) {
-	segment.ExecutionResults[result.ID()] = result
+// AddFullExecutionReceipt adds full execution receipt to ExecutionReceipts using execution result id as the key
+func (segment *SealingSegment) AddFullExecutionReceipt(receipt *ExecutionReceipt) {
+	segment.ExecutionReceipts[receipt.ExecutionResult.ID()] = receipt
 }
 
-// ContainsExecutionResult returns true if result is in ExecutionResults
+// ContainsExecutionResult returns true if result is in ExecutionReceipts
 func (segment *SealingSegment) ContainsExecutionResult(resultID Identifier) bool {
-	_, ok := segment.ExecutionResults[resultID]
+	_, ok := segment.ExecutionReceipts[resultID]
 	return ok
 }
 
 // NewSealingSegment returns SealingSegment
 func NewSealingSegment() *SealingSegment {
 	return &SealingSegment{
-		Blocks:           make([]*Block, 0),
-		ExecutionResults: make(map[Identifier]*ExecutionResult),
+		Blocks:            make([]*Block, 0),
+		ExecutionReceipts: make(map[Identifier]*ExecutionReceipt),
 	}
 }
