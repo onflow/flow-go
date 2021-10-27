@@ -8,11 +8,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	fcrypto "github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	fcrypto "github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestProtocolPeerCache(t *testing.T) {
