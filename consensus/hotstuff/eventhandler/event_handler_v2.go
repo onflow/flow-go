@@ -119,6 +119,8 @@ func (e *EventHandlerV2) OnReceiveProposal(proposal *model.Proposal) error {
 		// validate the block. exit if the proposal is invalid
 		err := e.validator.ValidateProposal(proposal)
 		if model.IsInvalidBlockError(err) {
+			_ = e.voteAggregator.InvalidBlock(proposal)
+
 			log.Warn().Err(err).Msg("invalid block proposal")
 			return nil
 		}
