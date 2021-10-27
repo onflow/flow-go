@@ -35,7 +35,7 @@ type EchoEngineTestSuite struct {
 }
 
 // Some tests are skipped to speedup the build.
-// However, they can be enabled if the environment variable "AllNetworkTest" is set with any value
+// However, they can be enabled if the environment variable "TEST_ECHO_ENGINE" is set
 
 // TestStubEngineTestSuite runs all the test methods in this test suit
 func TestStubEngineTestSuite(t *testing.T) {
@@ -690,7 +690,7 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 }
 
 func (suite *EchoEngineTestSuite) skipTest(reason string) {
-	if _, found := os.LookupEnv("AllNetworkTest"); !found {
+	if _, found := os.LookupEnv("TEST_ECHO_ENGINE"); !found {
 		suite.T().Skip(reason)
 	}
 }

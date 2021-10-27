@@ -2,6 +2,7 @@ package synchronization
 
 import (
 	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -171,7 +172,9 @@ func (r *rapidSync) Check(t *rapid.T) {
 }
 
 func TestRapidSync(t *testing.T) {
-	t.Skip("flaky test - quarantined")
+	if os.Getenv("TEST_FLAKY") == "" {
+		t.Skip("flaky test")
+	}
 	rapid.Check(t, rapid.Run(&rapidSync{}))
 }
 

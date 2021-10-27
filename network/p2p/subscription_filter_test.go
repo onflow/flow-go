@@ -2,6 +2,7 @@ package p2p
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -20,9 +21,11 @@ import (
 // TestFilterSubscribe tests that if node X is filtered out on a specific channel by node Y's subscription
 // filter, then node Y will never propagate any of node X's messages on that channel
 func TestFilterSubscribe(t *testing.T) {
-	// skip for now due to bug in libp2p gossipsub implementation:
-	// https://github.com/libp2p/go-libp2p-pubsub/issues/449
-	t.Skip()
+	if os.Getenv("TEST_WIP") == "" {
+		// TODO: skip for now due to bug in libp2p gossipsub implementation:
+		// https://github.com/libp2p/go-libp2p-pubsub/issues/449
+		t.Skip()
+	}
 
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))

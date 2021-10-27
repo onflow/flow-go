@@ -631,8 +631,10 @@ func (c *ComponentManagerMachine) Check(t *rapid.T) {
 }
 
 func TestComponentManager(t *testing.T) {
-	// skip because this test takes too long
-	t.Skip()
+	if testing.Short() {
+		// skip because this test takes too long
+		t.Skip()
+	}
 
 	rapid.Check(t, rapid.Run(&ComponentManagerMachine{}))
 }
