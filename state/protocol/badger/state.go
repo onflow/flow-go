@@ -156,14 +156,15 @@ func Bootstrap(
 	return state, nil
 }
 
-// bootstrapSealingSegmentExeResults inserts all execution results from SealingSegment.
-// ExecutonResults. This should be done before sealing segment blocks
+// bootstrapSealingSegmentExeResults inserts all execution results from SealingSegment.ExecutionReceipts.
+// This should be done before sealing segment blocks
 // are inserted because transactions are executed concurrently
 // in the db, a block may reference a ExecutionResult that is not yet stored.
 func (state *State) bootstrapSealingSegmentExeResults(segment *flow.SealingSegment) error {
 	err := operation.RetryOnConflictTx(state.db, transaction.Update, func(tx *transaction.Tx) error {
-		for _, result := range segment.ExecutionResults {
-			err := operation.SkipDuplicates(operation.InsertExecutionResult(result))(tx.DBTxn)
+		for _, receipt := range segment.ExecutionReceipts {
+			result := receipt.ExecutionResult
+			err := operation.SkipDuplicates(operation.InsertExecutionResult(&result))(tx.DBTxn)
 			if err != nil {
 				return fmt.Errorf("could not insert execution result: %w", err)
 			}

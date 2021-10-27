@@ -244,6 +244,15 @@ func WithReceipts(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
 	}
 }
 
+// WithReceiptsAndNoResults will add receipt to payload only
+func WithReceiptsAndNoResults(receipts ...*flow.ExecutionReceipt) func(*flow.Payload) {
+	return func(payload *flow.Payload) {
+		for _, receipt := range receipts {
+			payload.Receipts = append(payload.Receipts, receipt.Meta())
+		}
+	}
+}
+
 func BlockWithParentFixture(parent *flow.Header) flow.Block {
 	payload := PayloadFixture()
 	header := BlockHeaderWithParentFixture(parent)
