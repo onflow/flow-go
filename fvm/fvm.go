@@ -18,14 +18,9 @@ type Procedure interface {
 	Run(vm *VirtualMachine, ctx Context, sth *state.StateHolder, programs *programs.Programs) error
 }
 
-func NewInterpreterRuntime(options ...runtime.Option) runtime.Runtime {
-
-	defaultOptions := []runtime.Option{
-		runtime.WithContractUpdateValidationEnabled(true),
-	}
-
+func NewInterpreterRuntime() runtime.Runtime {
 	return runtime.NewInterpreterRuntime(
-		append(defaultOptions, options...)...,
+		runtime.WithContractUpdateValidationEnabled(true),
 	)
 }
 

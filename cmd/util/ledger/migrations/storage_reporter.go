@@ -106,7 +106,7 @@ func (r StorageReporter) isDapper(address flow.Address, st *state.State) (bool, 
 			Identifier: "dapperUtilityCoinReceiver",
 		})
 
-	receiver, err := st.Get(id.Owner, id.Controller, id.Key, false)
+	receiver, err := st.Get(id.Owner, id.Controller, id.Key)
 	if err != nil {
 		return false, fmt.Errorf("could not load dapper receiver at %s: %w", address, err)
 	}
@@ -120,7 +120,7 @@ func (r StorageReporter) hasReceiver(address flow.Address, st *state.State) (boo
 			Identifier: "flowTokenReceiver",
 		})
 
-	receiver, err := st.Get(id.Owner, id.Controller, id.Key, false)
+	receiver, err := st.Get(id.Owner, id.Controller, id.Key)
 	if err != nil {
 		return false, fmt.Errorf("could not load receiver at %s: %w", address, err)
 	}
@@ -140,12 +140,12 @@ func (r StorageReporter) balance(address flow.Address, st *state.State) (balance
 			Identifier: "flowTokenBalance",
 		})
 
-	balanceCapability, err := st.Get(balanceId.Owner, balanceId.Controller, balanceId.Key, false)
+	balanceCapability, err := st.Get(balanceId.Owner, balanceId.Controller, balanceId.Key)
 	if err != nil {
 		return 0, false, fmt.Errorf("could not load capability at %s: %w", address, err)
 	}
 
-	vaultResource, err := st.Get(vaultId.Owner, vaultId.Controller, vaultId.Key, false)
+	vaultResource, err := st.Get(vaultId.Owner, vaultId.Controller, vaultId.Key)
 	if err != nil {
 		return 0, false, fmt.Errorf("could not load resource at %s: %w", address, err)
 	}
