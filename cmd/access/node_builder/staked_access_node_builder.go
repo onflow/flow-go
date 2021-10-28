@@ -26,7 +26,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
@@ -51,7 +53,7 @@ func NewStakedAccessNodeBuilder(anb *FlowAccessNodeBuilder) *StakedAccessNodeBui
 }
 
 func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
-	fnb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+	fnb.Module("id providers", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 
 		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, node.ProtocolEvents)
 		if err != nil {
@@ -78,6 +80,7 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 }
 
 func (builder *StakedAccessNodeBuilder) Initialize() error {
+	builder.InitComponentBuilder()
 	builder.InitIDProviders()
 
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
@@ -104,7 +107,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 	anb.
 		BuildConsensusFollower().
-		Module("collection node client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("collection node client", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			// collection node address is optional (if not specified, collection nodes will be chosen at random)
 			if strings.TrimSpace(anb.rpcConf.CollectionAddr) == "" {
 				node.Logger.Info().Msg("using a dynamic collection node address")
@@ -126,7 +129,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			anb.CollectionRPC = access.NewAccessAPIClient(collectionRPCConn)
 			return nil
 		}).
-		Module("historical access node clients", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("historical access node clients", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			addrs := strings.Split(anb.rpcConf.HistoricalAccessAddrs, ",")
 			for _, addr := range addrs {
 				if strings.TrimSpace(addr) == "" {
@@ -145,7 +148,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			}
 			return nil
 		}).
-		Module("transaction timing mempools", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("transaction timing mempools", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			var err error
 			anb.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
 			if err != nil {
@@ -165,16 +168,16 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			anb.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
 			return err
 		}).
-		Module("transaction metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("transaction metrics", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			anb.TransactionMetrics = metrics.NewTransactionCollector(anb.TransactionTimings, node.Logger, anb.logTxTimeToFinalized,
 				anb.logTxTimeToExecuted, anb.logTxTimeToFinalizedExecuted)
 			return nil
 		}).
-		Module("ping metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("ping metrics", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			anb.PingMetrics = metrics.NewPingCollector()
 			return nil
 		}).
-		Module("server certificate", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("server certificate", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			// generate the server certificate that will be served by the GRPC server
 			x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
 			if err != nil {
@@ -184,7 +187,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			anb.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
 			return nil
 		}).
-		Component("RPC engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("RPC engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			anb.RpcEng = rpc.New(
 				node.Logger,
 				node.State,
@@ -208,7 +211,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			)
 			return anb.RpcEng, nil
 		}).
-		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			var err error
 
 			anb.RequestEng, err = requester.New(
@@ -235,7 +238,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 
 			return anb.IngestEng, nil
 		}).
-		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("requester engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
@@ -247,7 +250,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 		var proxyEngine *splitter.Engine
 
 		anb.
-			Component("unstaked sync request proxy", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			Component("unstaked sync request proxy", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 				proxyEngine = splitter.New(node.Logger, engine.PublicSyncCommittee)
 
 				// register the proxy engine with the unstaked network
@@ -259,7 +262,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 
 				return proxyEngine, nil
 			}).
-			Component("unstaked sync request handler", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			Component("unstaked sync request handler", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 				syncRequestHandler := synceng.NewRequestHandlerEngine(
 					node.Logger.With().Bool("unstaked", true).Logger(),
 					unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
@@ -280,7 +283,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			})
 	}
 
-	anb.Component("ping engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	anb.Component("ping engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		ping, err := pingeng.New(
 			node.Logger,
 			node.State,
@@ -302,7 +305,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
 func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	builder.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	builder.Component("unstaked network", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 		libP2PFactory := builder.initLibP2PFactory(builder.NodeID, builder.NodeConfig.NetworkKey)
 

@@ -15,7 +15,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -66,7 +68,7 @@ func (anb *UnstakedAccessNodeBuilder) initNodeInfo() error {
 }
 
 func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
-	anb.Module("id providers", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+	anb.Module("id providers", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 		idCache, err := p2p.NewProtocolStateIDCache(node.Logger, node.State, anb.ProtocolEvents)
 		if err != nil {
 			return err
@@ -116,6 +118,8 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() error {
 	if err := anb.initNodeInfo(); err != nil {
 		return err
 	}
+
+	anb.InitComponentBuilder()
 
 	anb.InitIDProviders()
 
@@ -234,8 +238,8 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 // initUnstakedLocal initializes the unstaked node ID, network key and network address
 // Currently, it reads a node-info.priv.json like any other node.
 // TODO: read the node ID from the special bootstrap files
-func (anb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.NodeBuilder, node *cmd.NodeConfig) {
-	return func(_ cmd.NodeBuilder, node *cmd.NodeConfig) {
+func (anb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) {
+	return func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) {
 		// for an unstaked node, set the identity here explicitly since it will not be found in the protocol state
 		self := &flow.Identity{
 			NodeID:        node.NodeID,
@@ -255,7 +259,7 @@ func (anb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.NodeB
 // this needs to be done before sync engine participants module
 func (anb *UnstakedAccessNodeBuilder) enqueueMiddleware() {
 	anb.
-		Module("network middleware", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("network middleware", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 
 			// NodeID for the unstaked node on the unstaked network
 			unstakedNodeID := node.NodeID
@@ -290,7 +294,7 @@ func (anb *UnstakedAccessNodeBuilder) Build() cmd.Node {
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
 func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	anb.Component("unstaked network", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	anb.Component("unstaked network", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 		// Network Metrics
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
@@ -320,7 +324,7 @@ func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 // discovered by other unstaked ANs if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (anb *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
-	anb.Component("upstream connector", func(_ cmd.NodeBuilder, _ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+	anb.Component("upstream connector", func(ctx irrecoverable.SignalerContext, _ *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		return newUpstreamConnector(anb.bootstrapIdentities, anb.LibP2PNode, anb.Logger), nil
 	})
 }

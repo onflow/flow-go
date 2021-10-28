@@ -9,6 +9,7 @@ import (
 
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 )
 
 // Component represents a component which can be started and stopped, and exposes
@@ -94,11 +95,9 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			return err // failure to start
 		}
 
-		select {
-		case <-ctx.Done():
-			stop()
-			return ctx.Err()
-		case err := <-irrecoverableErr:
+		doneCtx, _ := util.WithDone(ctx, done)
+		if err := util.WaitError(doneCtx, irrecoverableErr); err != nil {
+			// an irrecoverable error was encountered
 			stop()
 
 			// send error to the handler
@@ -110,76 +109,111 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			default:
 				panic(fmt.Sprintf("invalid error handling result: %v", result))
 			}
-		case <-done:
-			// Without this additional select, there is a race condition here where the done channel
-			// could have been closed as a result of an irrecoverable error being thrown, so that when
-			// the scheduler yields control back to this goroutine, both channels are available to read
-			// from. If this last case happens to be chosen at random to proceed instead of the one
-			// above, then we would return as if the component shutdown gracefully, when in fact it
-			// encountered an irrecoverable error.
-			select {
-			case err := <-irrecoverableErr:
-				switch result := handler(err); result {
-				case ErrorHandlingRestart:
-					continue
-				case ErrorHandlingStop:
-					return err
-				default:
-					panic(fmt.Sprintf("invalid error handling result: %v", result))
-				}
-			default:
-			}
-
-			// Similarly, the done channel could have closed as a result of the context being canceled.
-			select {
-			case <-ctx.Done():
-				return ctx.Err()
-			default:
-			}
-
-			// clean completion
-			return nil
+		} else if util.CheckClosed(ctx.Done()) {
+			// the parent context was cancelled
+			stop()
+			return ctx.Err()
 		}
+
+		// clean completion
+		return nil
 	}
 }
 
+// ReadyFunc is called within a ComponentWorker function to indicate that the worker is ready
+// ComponentManager's Ready channel is closed when all workers are ready. This is also the
+// signal used to indicate that the workers returned by lookup are ready.
 type ReadyFunc func()
 
+// LookupFunc returns a ReadyDoneAware interface for the worker identified by id, and a boolean
+// signalling if the worker exists.
+// id can be prefixed with ! to get a ReadyDoneAware interface for the collection of all workers
+// EXCEPT the id provided. This is particularly useful if there is a main worker that has shutdown
+// logic that should only run after all other workers have shutdown.
+//
+// Caution: waiting on workers can easily create deadlocks. use with care
+type LookupFunc func(workerID string) (module.ReadyDoneAware, bool)
+
 // ComponentWorker represents a worker routine of a component.
-// It takes a SignalerContext which can be used to throw any irrecoverable errors it encouters,
+// It takes a SignalerContext which can be used to throw any irrecoverable errors it encounters,
 // as well as a ReadyFunc which must be called to signal that it is ready. The ComponentManager
 // waits until all workers have signaled that they are ready before closing its own Ready channel.
-type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
+// It additionally takes a LookupFunc which allows the worker function to get a ReadyDoneAware
+// interface for any other worker routine. This provides a convenient interface for managing
+// inter worker dependencies.
+type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc, lookup LookupFunc)
 
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
 	// AddWorker adds a worker routine for the ComponentManager
-	AddWorker(ComponentWorker) ComponentManagerBuilder
+	AddWorker(string, ComponentWorker) ComponentManagerBuilder
 
 	// Build builds and returns a new ComponentManager instance
 	Build() *ComponentManager
+
+	// SerialStart configures node to start components serially
+	// By default, components are started in parallel and must have explicit dependency checks.
+	// This allows using the order components were added to manage dependencies implicitly
+	SetSerialStart(bool) ComponentManagerBuilder
 }
 
 type componentManagerBuilderImpl struct {
-	workers []ComponentWorker
+	built           *atomic.Bool
+	mu              *sync.Mutex
+	serialStart     bool
+	workers         []*worker
+	workersRegistry map[string]module.ReadyDoneAware
 }
 
 // NewComponentManagerBuilder returns a new ComponentManagerBuilder
 func NewComponentManagerBuilder() ComponentManagerBuilder {
-	return &componentManagerBuilderImpl{}
+	return &componentManagerBuilderImpl{
+		built:           atomic.NewBool(false),
+		mu:              &sync.Mutex{},
+		workersRegistry: make(map[string]module.ReadyDoneAware),
+	}
 }
 
-func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
+func (c *componentManagerBuilderImpl) AddWorker(id string, f ComponentWorker) ComponentManagerBuilder {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if _, exists := c.workersRegistry[id]; exists {
+		// worker ids must be unique. adding duplicate ids will break the lookupWorker function which
+		// may result in incorrect dependency ordering
+		panic(fmt.Sprintf("worker with id %s already exists", id))
+	}
+
+	worker := newWorker(id, f)
 	c.workers = append(c.workers, worker)
+	c.workersRegistry[id] = worker
 	return c
 }
 
+// SetSerialStart sets whether the workers should be started in serial or in parallel
+// Workers are started in the order they were added to the ComponentManagerBuilder. If enabled,
+// Start() will wait for the previous worker to call ready() before starting the next.
+func (c *componentManagerBuilderImpl) SetSerialStart(serial bool) ComponentManagerBuilder {
+	c.serialStart = serial
+	return c
+}
+
+// Build returns a new ComponentManager instance with the added workers
+// Build must be called exactly once. Calling it more than once may result in workers being started
+// multiple times.
 func (c *componentManagerBuilderImpl) Build() *ComponentManager {
+	if !c.built.CAS(false, true) {
+		panic("component manager builder can only be used once")
+	}
+
 	return &ComponentManager{
-		started: atomic.NewBool(false),
-		ready:   make(chan struct{}),
-		done:    make(chan struct{}),
-		workers: c.workers,
+		started:         atomic.NewBool(false),
+		ready:           make(chan struct{}),
+		done:            make(chan struct{}),
+		shutdownSignal:  make(chan struct{}),
+		serialStart:     c.serialStart,
+		workers:         c.workers,
+		workersRegistry: c.workersRegistry,
 	}
 }
 
@@ -190,9 +224,11 @@ type ComponentManager struct {
 	started        *atomic.Bool
 	ready          chan struct{}
 	done           chan struct{}
-	shutdownSignal <-chan struct{}
+	shutdownSignal chan struct{}
 
-	workers []ComponentWorker
+	serialStart     bool
+	workers         []*worker
+	workersRegistry map[string]module.ReadyDoneAware
 }
 
 // Start initiates the ComponentManager by launching all worker routines.
@@ -201,36 +237,28 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	if c.started.CAS(false, true) {
 		ctx, cancel := context.WithCancel(parent)
 		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-		c.shutdownSignal = ctx.Done()
+		go func() {
+			<-ctx.Done()
+			close(c.shutdownSignal)
+		}()
 
 		// launch goroutine to propagate irrecoverable error
 		go func() {
-			select {
-			case err := <-errChan:
+			// only signal when done channel is closed
+			doneCtx, _ := util.WithDone(context.Background(), c.done)
+			if err := util.WaitError(doneCtx, errChan); err != nil {
 				cancel() // shutdown all workers
 
 				// we propagate the error directly to the parent because a failure in a
 				// worker routine is considered irrecoverable
 				parent.Throw(err)
-			case <-c.done:
-				// Without this additional select, there is a race condition here where the done channel
-				// could be closed right after an irrecoverable error is thrown, so that when the scheduler
-				// yields control back to this goroutine, both channels are available to read from. If this
-				// second case happens to be chosen at random to proceed, then we would return and silently
-				// ignore the error.
-				select {
-				case err := <-errChan:
-					cancel()
-					parent.Throw(err)
-				default:
-				}
 			}
 		}()
 
 		var workersReady sync.WaitGroup
 		var workersDone sync.WaitGroup
-		workersReady.Add(len(c.workers))
 		workersDone.Add(len(c.workers))
+		workersReady.Add(len(c.workers))
 
 		// launch workers
 		for _, worker := range c.workers {
@@ -238,12 +266,21 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 			go func() {
 				defer workersDone.Done()
 				var readyOnce sync.Once
-				worker(signalerCtx, func() {
-					readyOnce.Do(func() {
-						workersReady.Done()
-					})
-				})
+				worker.run(
+					signalerCtx,
+					func() {
+						readyOnce.Do(func() {
+							workersReady.Done()
+						})
+					},
+					c.lookupWorker,
+				)
 			}()
+			if c.serialStart {
+				if err := util.WaitReady(parent, worker.Ready()); err != nil {
+					break
+				}
+			}
 		}
 
 		// launch goroutine to close ready channel
@@ -254,6 +291,28 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	} else {
 		panic(module.ErrMultipleStartup)
 	}
+}
+
+// lookupWorker returns a ReadyDoneAware interface for the worker specified by ID
+// Prefix id with ! to get a ReadyDoneAware interface for the collection of all workers except the
+// provided id.
+func (c *ComponentManager) lookupWorker(id string) (module.ReadyDoneAware, bool) {
+	if id[0] == '!' {
+		workers := []module.ReadyDoneAware{}
+		for wid, w := range c.workersRegistry {
+			if wid != id[1:] {
+				workers = append(workers, w)
+			}
+		}
+		if len(workers) == 0 {
+			return nil, false
+		}
+
+		return module.NewCustomReadyDoneAware(util.AllReady(workers...), util.AllDone(workers...)), true
+	}
+
+	worker, exists := c.workersRegistry[id]
+	return worker, exists
 }
 
 func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
@@ -284,4 +343,45 @@ func (c *ComponentManager) Done() <-chan struct{} {
 // If this is called before Start, a nil channel will be returned.
 func (c *ComponentManager) ShutdownSignal() <-chan struct{} {
 	return c.shutdownSignal
+}
+
+type worker struct {
+	id    string
+	f     ComponentWorker
+	ready chan struct{}
+	done  chan struct{}
+}
+
+func newWorker(id string, f ComponentWorker) *worker {
+	return &worker{
+		id:    id,
+		f:     f,
+		ready: make(chan struct{}),
+		done:  make(chan struct{}),
+	}
+}
+
+// run calls the worker's ComponentWorker function, and manages the ReadyDoneAware interface
+func (w *worker) run(ctx irrecoverable.SignalerContext, ready ReadyFunc, lookup LookupFunc) {
+	defer close(w.done)
+
+	var readyOnce sync.Once
+	w.f(ctx, func() {
+		readyOnce.Do(func() {
+			close(w.ready)
+			ready()
+		})
+	}, lookup)
+}
+
+// Ready returns a channel which is closed once all the worker routines have been launched and are ready.
+// If any worker routines exit before they indicate that they are ready, the channel returned from Ready will never close.
+func (w *worker) Ready() <-chan struct{} {
+	return w.ready
+}
+
+// Done returns a channel which is closed once the worker has shut down.
+// This happens when all worker routines have shut down (either gracefully or by throwing an error).
+func (w *worker) Done() <-chan struct{} {
+	return w.done
 }

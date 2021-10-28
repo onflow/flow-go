@@ -13,14 +13,16 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 )
 
 // ConsensusFollower is a standalone module run by third parties which provides
 // a mechanism for observing the block chain. It maintains a set of subscribers
 // and delivers block proposals broadcasted by the consensus nodes to each one.
 type ConsensusFollower interface {
-	module.ReadyDoneAware
+	component.Component
 	// Run starts the consensus follower.
 	Run(context.Context)
 	// AddOnBlockFinalizedConsumer adds a new block finalization subscriber.
@@ -136,7 +138,7 @@ func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessN
 }
 
 type ConsensusFollowerImpl struct {
-	module.ReadyDoneAware
+	component.Component
 	*cmd.NodeConfig
 	Logger      zerolog.Logger
 	consumersMu sync.RWMutex
@@ -171,7 +173,7 @@ func NewConsensusFollower(
 	anb.BaseConfig.NodeRole = "consensus_follower"
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(cf.onBlockFinalized)
 	cf.NodeConfig = anb.NodeConfig
-	cf.ReadyDoneAware = anb.Build()
+	cf.Component = anb.SerialStart().Build()
 
 	return cf, nil
 }
@@ -195,22 +197,35 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 }
 
 // Run starts the consensus follower.
+// This is kept for backwards compatibility. Typical implementations will implement the following
+// code and call follower.Start() directly. This allows the implementor to inspect the irrecoverable
+// error returned on the error channel and restart if desired.
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
-	select {
-	case <-ctx.Done():
+	if util.CheckClosed(ctx.Done()) {
 		return
-	default:
 	}
 
-	select {
-	case <-cf.Ready():
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go cf.Start(signalerCtx)
+
+	go func() {
+		if err := util.WaitReady(signalerCtx, cf.Ready()); err != nil {
+			cf.Logger.Info().Msg("Consensus follower startup aborted")
+			return
+		}
 		cf.Logger.Info().Msg("Consensus follower startup complete")
-	case <-ctx.Done():
-		cf.Logger.Info().Msg("Consensus follower startup aborted")
-	}
+	}()
 
-	<-ctx.Done()
-	cf.Logger.Info().Msg("Consensus follower shutting down")
-	<-cf.Done()
+	go func() {
+		<-signalerCtx.Done()
+		cf.Logger.Info().Msg("Consensus follower shutting down")
+	}()
+
+	// Wait for errors up until the follower is done. we don't care about context cancellation
+	// since that will trigger shutting down the follower then closing the Done channel.
+	doneCtx, _ := util.WithDone(context.Background(), cf.Done())
+	if err := util.WaitError(doneCtx, errChan); err != nil {
+		cf.Logger.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
+	}
 	cf.Logger.Info().Msg("Consensus follower shutdown complete")
 }
