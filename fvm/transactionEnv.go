@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
@@ -239,10 +240,10 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 }
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (uint64, error) {
+func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
 	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
-		return 0, fmt.Errorf("storage address allocation failed: %w", err)
+		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
 	}
 	return v, nil
 }
@@ -253,7 +254,7 @@ func (e *TransactionEnv) GetStorageUsed(address common.Address) (value uint64, e
 		defer sp.Finish()
 	}
 
-	value, err = e.accounts.GetStorageUsed(flow.Address(address))
+	value, err = e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
 	if err != nil {
 		return value, fmt.Errorf("getting storage used failed: %w", err)
 	}
@@ -267,7 +268,7 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetStorageCapacityScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	script := Script(blueprints.GetStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
 
 	// TODO (ramtin) this shouldn't be this way, it should call the invokeMeta
 	// and we handle the errors and still compute the state interactions
@@ -302,7 +303,7 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenBalanceScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	script := Script(blueprints.GetFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
 
 	// TODO similar to the one above
 	err = e.vm.Run(
@@ -330,7 +331,7 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenAvailableBalanceScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	script := Script(blueprints.GetFlowTokenAvailableBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
 
 	// TODO similar to the one above
 	err = e.vm.Run(
@@ -434,7 +435,7 @@ func (e *TransactionEnv) GetCode(location runtime.Location) ([]byte, error) {
 		return nil, errors.NewInvalidLocationErrorf(location, "expecting an AddressLocation, but other location types are passed")
 	}
 
-	address := flow.Address(contractLocation.Address)
+	address := flow.BytesToAddress(contractLocation.Address.Bytes())
 
 	err := e.accounts.CheckAccountNotFrozen(address)
 	if err != nil {
@@ -455,7 +456,7 @@ func (e *TransactionEnv) GetAccountContractNames(address runtime.Address) ([]str
 		defer sp.Finish()
 	}
 
-	a := flow.Address(address)
+	a := flow.BytesToAddress(address.Bytes())
 
 	freezeError := e.accounts.CheckAccountNotFrozen(a)
 	if freezeError != nil {
@@ -472,7 +473,7 @@ func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Prog
 	}
 
 	if addressLocation, ok := location.(common.AddressLocation); ok {
-		address := flow.Address(addressLocation.Address)
+		address := flow.BytesToAddress(addressLocation.Address.Bytes())
 
 		freezeError := e.accounts.CheckAccountNotFrozen(address)
 		if freezeError != nil {
@@ -732,11 +733,11 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	if e.ctx.ServiceAccountEnabled {
 		// uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
 		invoker := NewTransactionContractFunctionInvocator(
-			common.AddressLocation{Address: common.Address(e.ctx.Chain.ServiceAddress()), Name: flowServiceAccountContract},
+			common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowServiceAccountContract},
 			"setupNewAccount",
 			[]interpreter.Value{
-				interpreter.NewAddressValue(common.Address(flowAddress)),
-				interpreter.NewAddressValue(payer),
+				interpreter.NewAddressValue(common.BytesToAddress(flowAddress.Bytes())),
+				interpreter.NewAddressValue(common.BytesToAddress(payer.Bytes())),
 			},
 			[]sema.Type{
 				sema.AuthAccountType,

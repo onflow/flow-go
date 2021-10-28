@@ -27,7 +27,6 @@ func extractExecutionState(
 	log zerolog.Logger,
 	migrate bool,
 	report bool,
-	cleanupStorage bool,
 ) error {
 
 	diskWal, err := wal.NewDiskWAL(
@@ -60,10 +59,9 @@ func extractExecutionState(
 	reporters := []ledger.Reporter{}
 
 	if migrate {
-		storageFormatV5Migration := mgr.StorageFormatV5Migration{
-			Log:            log,
-			OutputDir:      outputDir,
-			CleanupStorage: cleanupStorage,
+		storageFormatV6Migration := mgr.StorageFormatV6Migration{
+			Log:       log,
+			OutputDir: outputDir,
 		}
 
 		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
@@ -73,7 +71,7 @@ func extractExecutionState(
 
 		migrations = []ledger.Migration{
 			mgr.PruneMigration,
-			storageFormatV5Migration.Migrate,
+			storageFormatV6Migration.Migrate,
 			storageUsedUpdateMigration.Migrate,
 		}
 	}
@@ -83,14 +81,14 @@ func extractExecutionState(
 				Log:       log,
 				OutputDir: outputDir,
 			},
-			mgr.StorageReporter{
-				Log:       log,
-				OutputDir: outputDir,
-			},
-			//&mgr.BalanceReporter{
-			//	Log:       log,
-			//	OutputDir: outputDir,
-			//},
+			// mgr.StorageReporter{
+			// 	Log:       log,
+			// 	OutputDir: outputDir,
+			// },
+			// &mgr.BalanceReporter{
+			// 	Log:       log,
+			// 	OutputDir: outputDir,
+			// },
 		}
 	}
 	newState, err := led.ExportCheckpointAt(
