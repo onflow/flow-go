@@ -208,13 +208,13 @@ func TestRequestPendingChunkSealedBlock(t *testing.T) {
 
 	popAllWG := mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, requests)
-	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
 
+	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
+	unittest.RequireReturnsBefore(t, popAllWG.Wait, 100*time.Millisecond, "could not invoke pop all on time")
+
+	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 	// requester does not call publish to disseminate the request for this chunk.
 	s.con.AssertNotCalled(t, "Publish")
-
-	unittest.RequireReturnsBefore(t, popAllWG.Wait, 100*time.Millisecond, "could not invoke pop all on time")
-	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
 }
 
 // TestCompleteRequestingUnsealedChunkCycle evaluates a complete life cycle of receiving a chunk request by the requester.
@@ -328,7 +328,7 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	testifymock.AssertExpectationsForObjects(t, s.metrics)
 }
 
-func TestHandleChunkDataPack_DuplicateChunkIDs(t *testing.T) {
+func TestHandleChunkDataPack_DuplicateChunkIDs_HappyPath(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
@@ -356,6 +356,40 @@ func TestHandleChunkDataPack_DuplicateChunkIDs(t *testing.T) {
 	unittest.RequireReturnsBefore(t, popAllWG.Wait, 100*time.Millisecond, "could not invoke pop all on time")
 	unittest.RequireReturnsBefore(t, handlerWG.Wait, time.Second, "could not handle chunk data responses on time")
 	testifymock.AssertExpectationsForObjects(t, s.con, s.metrics)
+}
+
+func TestHandleChunkDataPack_DuplicateChunkIDs_Sealed(t *testing.T) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
+
+	// mocks the requester pipeline
+	sealedHeight := uint64(10)
+	vertestutils.MockLastSealedHeight(s.state, sealedHeight)
+
+	resultA, _, _, _ := vertestutils.ExecutionResultForkFixture(t)
+	duplicateChunkID := resultA.Chunks[0].ID()
+	requestA := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(duplicateChunkID), unittest.WithHeight(uint64(sealedHeight-1)))
+	requestB := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(duplicateChunkID), unittest.WithHeight(uint64(sealedHeight-1)))
+	requests := verification.ChunkDataPackRequestList{requestA, requestB}
+
+	// we remove pending request on receiving this response
+	s.pendingRequests.On("All").Return(requests.UniqueRequestInfo())
+	popAllWG := mockPendingRequestsPopAll(t, s.pendingRequests, requests)
+	notifierWG := mockNotifyBlockSealedHandler(t, s.handler, requests)
+
+	// check data pack request is never tried since its block has been sealed.
+	s.metrics.On("SetMaxChunkDataPackAttemptsForNextUnsealedHeightAtRequester", uint64(0)).Return().Once()
+
+	unittest.RequireCloseBefore(t, e.Ready(), time.Second, "could not start engine on time")
+
+	unittest.RequireReturnsBefore(t, notifierWG.Wait, time.Duration(2)*s.retryInterval, "could not notify the handler on time")
+	unittest.RequireReturnsBefore(t, popAllWG.Wait, 100*time.Millisecond, "could not invoke pop all on time")
+
+	unittest.RequireCloseBefore(t, e.Done(), time.Second, "could not stop engine on time")
+
+	testifymock.AssertExpectationsForObjects(t, s.metrics)
+	// requester does not call publish to disseminate the request for this chunk.
+	s.con.AssertNotCalled(t, "Publish")
 }
 
 // TestRequestPendingChunkDataPack evaluates happy path of having a single pending chunk requests.
