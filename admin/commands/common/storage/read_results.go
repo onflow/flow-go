@@ -17,8 +17,8 @@ var _ commands.AdminCommand = (*ReadResultsCommand)(nil)
 type readResultsRequestType int
 
 const (
-	readResultsRequestID readResultsRequestType = iota
-	readResultsRequestBlock
+	readResultsRequestByID readResultsRequestType = iota
+	readResultsRequestByBlock
 )
 
 type readResultsRequest struct {
@@ -40,11 +40,11 @@ func (r *ReadResultsCommand) Handler(ctx context.Context, req *admin.CommandRequ
 	var err error
 
 	switch data.requestType {
-	case readResultsRequestID:
+	case readResultsRequestByID:
 		if result, err = r.results.ByID(data.value.(flow.Identifier)); err == nil {
-			header, err = getBlockHeader(r.state, &blocksRequest{blocksRequestID, result.BlockID})
+			header, err = getBlockHeader(r.state, &blocksRequest{blocksRequestByID, result.BlockID})
 		}
-	case readResultsRequestBlock:
+	case readResultsRequestByBlock:
 		if header, err = getBlockHeader(r.state, data.value.(*blocksRequest)); err == nil {
 			result, err = r.results.ByBlockID(header.ID())
 		}
@@ -55,9 +55,8 @@ func (r *ReadResultsCommand) Handler(ctx context.Context, req *admin.CommandRequ
 	}
 
 	results = append(results, result)
-	firstHeight := header.Height
 
-	for i := uint64(1); i <= firstHeight && i < data.numResultsToQuery; i++ {
+	for i := uint64(1); i <= header.Height && i < data.numResultsToQuery; i++ {
 		result, err = r.results.ByID(result.PreviousResultID)
 		if err != nil {
 			return nil, err
@@ -86,14 +85,14 @@ func (r *ReadResultsCommand) Validator(req *admin.CommandRequest) error {
 		if err != nil {
 			return errInvalidResultValue
 		}
-		data.requestType = readResultsRequestID
+		data.requestType = readResultsRequestByID
 		data.value = resultID
 	} else if block, ok := input["block"]; ok {
 		br, err := parseBlocksRequest(block)
 		if err != nil {
 			return err
 		}
-		data.requestType = readResultsRequestBlock
+		data.requestType = readResultsRequestByBlock
 		data.value = br
 	} else {
 		return errors.New("either \"block\" or \"result\" field is required")

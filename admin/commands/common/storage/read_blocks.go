@@ -36,19 +36,19 @@ type ReadBlocksCommand struct {
 func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*readBlocksRequest)
 	var result []*flow.Block
-	var firstBlock *flow.Block
+	var block *flow.Block
 
 	if header, err := getBlockHeader(r.state, data.blocksRequest); err != nil {
 		return nil, fmt.Errorf("failed to get block header: %w", err)
-	} else if firstBlock, err = r.blocks.ByID(header.ID()); err != nil {
+	} else if block, err = r.blocks.ByID(header.ID()); err != nil {
 		return nil, fmt.Errorf("failed to get block by ID: %w", err)
 	}
 
-	result = append(result, firstBlock)
-	firstHeight := firstBlock.Header.Height
+	result = append(result, block)
+	firstHeight := block.Header.Height
 
 	for i := uint64(1); i <= firstHeight && i < data.numBlocksToQuery; i++ {
-		block, err := r.blocks.ByHeight(firstHeight - i)
+		block, err := r.blocks.ByID(block.Header.ParentID)
 		if err != nil {
 			return nil, err
 		}

@@ -13,8 +13,8 @@ import (
 type blocksRequestType int
 
 const (
-	blocksRequestID blocksRequestType = iota
-	blocksRequestHeight
+	blocksRequestByID blocksRequestType = iota
+	blocksRequestByHeight
 	blocksRequestFinal
 	blocksRequestSealed
 )
@@ -50,7 +50,7 @@ func parseBlocksRequest(block interface{}) (*blocksRequest, error) {
 		} else if block == "sealed" {
 			req.requestType = blocksRequestSealed
 		} else if id, err := flow.HexStringToIdentifier(block); err == nil {
-			req.requestType = blocksRequestID
+			req.requestType = blocksRequestByID
 			req.value = id
 		} else {
 			return nil, errInvalidBlockValue
@@ -59,7 +59,7 @@ func parseBlocksRequest(block interface{}) (*blocksRequest, error) {
 		if block < 0 || math.Trunc(block) != block {
 			return nil, errInvalidBlockValue
 		}
-		req.requestType = blocksRequestHeight
+		req.requestType = blocksRequestByHeight
 		req.value = uint64(block)
 	default:
 		return nil, errInvalidBlockValue
@@ -70,9 +70,9 @@ func parseBlocksRequest(block interface{}) (*blocksRequest, error) {
 
 func getBlockHeader(state protocol.State, req *blocksRequest) (*flow.Header, error) {
 	switch req.requestType {
-	case blocksRequestID:
+	case blocksRequestByID:
 		return state.AtBlockID(req.value.(flow.Identifier)).Head()
-	case blocksRequestHeight:
+	case blocksRequestByHeight:
 		return state.AtHeight(req.value.(uint64)).Head()
 	case blocksRequestFinal:
 		return state.Final().Head()
@@ -91,4 +91,14 @@ func convertToInterfaceList(list interface{}) ([]interface{}, error) {
 	}
 	err = json.Unmarshal(bytes, &resultList)
 	return resultList, err
+}
+
+func convertToMap(object interface{}) (map[string]interface{}, error) {
+	var result map[string]interface{}
+	bytes, err := json.Marshal(object)
+	if err != nil {
+		return nil, err
+	}
+	err = json.Unmarshal(bytes, &result)
+	return result, err
 }
