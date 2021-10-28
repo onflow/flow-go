@@ -166,7 +166,7 @@ func (suite *UnstakedAccessSuite) buildNetworkConfig() {
 	suite.followerMgr1, err = newFollowerManager(suite.T(), follower1)
 	require.NoError(suite.T(), err)
 
-	follower2 := suite.net.ConsensusFollowerByID(followerConfigs[0].NodeID)
+	follower2 := suite.net.ConsensusFollowerByID(followerConfigs[1].NodeID)
 	suite.followerMgr2, err = newFollowerManager(suite.T(), follower2)
 	require.NoError(suite.T(), err)
 }
