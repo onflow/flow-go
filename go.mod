@@ -93,3 +93,5 @@ replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 replace github.com/onflow/flow-go/crypto => ./crypto
 
 replace github.com/onflow/cadence/v19 => github.com/onflow/cadence v0.19.0
+
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.20.0-beta10-patch.1
