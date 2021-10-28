@@ -106,8 +106,8 @@ func (p *CombinedVoteProcessorV3) Status() hotstuff.VoteCollectorStatus {
 }
 
 // Process performs processing of single vote in concurrent safe way. This function is implemented to be
-// called by multiple goroutines at the same time. Supports processing of both staking and threshold signatures.
-// Design of this function is event driven, as soon as we collect enough weight to create a QC we will immediately do so
+// called by multiple goroutines at the same time. Supports processing of both staking and random beacon signatures.
+// Design of this function is event driven: as soon as we collect enough signatures to create a QC we will immediately do so
 // and submit it via callback for further processing.
 // Expected error returns during normal operations:
 // * VoteForIncompatibleBlockError - submitted vote for incompatible block
@@ -204,8 +204,8 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	return nil
 }
 
-// buildQC performs aggregation and reconstruction of signatures when we have collected enough weight
-// for building QC. This function is run only once by single worker.
+// buildQC performs aggregation and reconstruction of signatures when we have collected enough
+// signatures for building a QC. This function is run only once by a single worker.
 // Any error should be treated as exception.
 func (p *CombinedVoteProcessorV3) buildQC() (*flow.QuorumCertificate, error) {
 	stakingSigners, aggregatedStakingSig, err := p.stakingSigAggtor.Aggregate()

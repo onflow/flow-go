@@ -70,11 +70,13 @@ func (f *combinedVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.
 /* ****************** CombinedVoteProcessorV2 Implementation ****************** */
 
 // CombinedVoteProcessorV2 implements the hotstuff.VerifyingVoteProcessor interface.
-// It processes votes from the main consensus committee, where participants vote in
-// favour of a block by proving either their staking key signature or their random
-// beacon signature. In the former case, the participant only contributes to HotStuff
-// progress; while in the latter case, the voter also contributes to running the
-// random beacon. Concurrency safe.
+// It processes votes from the main consensus committee, where participants must
+// _always_ provide the staking signature as part of their vote and can _optionally_
+// also provide a random beacon signature. Through their staking signature, a
+// participant always contributes to HotStuff's progress. Participation in the random
+// beacon is optional (but encouraged). This allows nodes that failed the DKG to
+// still contribute only to consensus (as fallback).
+// CombinedVoteProcessorV2 is Concurrency safe.
 type CombinedVoteProcessorV2 struct {
 	log              zerolog.Logger
 	block            *model.Block
@@ -99,8 +101,8 @@ func (p *CombinedVoteProcessorV2) Status() hotstuff.VoteCollectorStatus {
 }
 
 // Process performs processing of single vote in concurrent safe way. This function is implemented to be
-// called by multiple goroutines at the same time. Supports processing of both staking and threshold signatures.
-// Design of this function is event driven, as soon as we collect enough weight to create a QC we will immediately do so
+// called by multiple goroutines at the same time. Supports processing of both staking and random beacon signatures.
+// Design of this function is event driven: as soon as we collect enough signatures to create a QC we will immediately do so
 // and submit it via callback for further processing.
 // Expected error returns during normal operations:
 // * VoteForIncompatibleBlockError - submitted vote for incompatible block
@@ -195,8 +197,8 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	return nil
 }
 
-// buildQC performs aggregation and reconstruction of signatures when we have collected enough weight
-// for building QC. This function is run only once by single worker.
+// buildQC performs aggregation and reconstruction of signatures when we have collected enough
+// signatures for building a QC. This function is run only once by a single worker.
 // Any error should be treated as exception.
 func (p *CombinedVoteProcessorV2) buildQC() (*flow.QuorumCertificate, error) {
 	stakingSigners, aggregatedStakingSig, err := p.stakingSigAggtor.Aggregate()
