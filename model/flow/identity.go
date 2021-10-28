@@ -490,26 +490,26 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 
 	// sort by node id.  This will enable duplicate checks later
 	sort.Slice(union, func(p, q int) bool {
-                num1 := union[p].NodeID[:]
-                num2 := union[q].NodeID[:]
-                lenID := len(num1)
+		num1 := union[p].NodeID[:]
+		num2 := union[q].NodeID[:]
+		lenID := len(num1)
 
-                // assume the length is a multiple of 8, for performance.  it's 32 bytes
-                for i := 0; ; i += 8 {
-                        chunk1 := binary.BigEndian.Uint64(num1[i:])
-                        chunk2 := binary.BigEndian.Uint64(num2[i:])
+		// assume the length is a multiple of 8, for performance.  it's 32 bytes
+		for i := 0; ; i += 8 {
+			chunk1 := binary.BigEndian.Uint64(num1[i:])
+			chunk2 := binary.BigEndian.Uint64(num2[i:])
 
-                        if chunk1 < chunk2 {
-                                return true
-                        } else if chunk1 > chunk2 {
-                                return false
-                        } else if i >= lenID-8 {
-                                // we're on the last chunk of 8 bytes, the nodeid's are equal
-                                return false
-                        }
-                }
-        })
-	
+			if chunk1 < chunk2 {
+				return true
+			} else if chunk1 > chunk2 {
+				return false
+			} else if i >= lenID-8 {
+				// we're on the last chunk of 8 bytes, the nodeid's are equal
+				return false
+			}
+		}
+	})
+
 	// at this point, 'union' has a sorted slice of identities, with duplicates
 	lenUnion := len(union)
 
@@ -570,7 +570,7 @@ func (il IdentityList) Exists(target *Identity) bool {
 	tgt[1] = binary.BigEndian.Uint64(num2[8:])
 	tgt[2] = binary.BigEndian.Uint64(num2[16:])
 	tgt[3] = binary.BigEndian.Uint64(num2[24:])
-	
+
 	for {
 		num1 := il[mid].NodeID[:]
 		lenID := len(num1)
@@ -618,7 +618,7 @@ func (il IdentityList) IdentifierExists(target Identifier) bool {
 	tgt[1] = binary.BigEndian.Uint64(num2[8:])
 	tgt[2] = binary.BigEndian.Uint64(num2[16:])
 	tgt[3] = binary.BigEndian.Uint64(num2[24:])
-	
+
 	for {
 		num1 := il[mid].NodeID[:]
 		lenID := len(num1)
@@ -627,7 +627,7 @@ func (il IdentityList) IdentifierExists(target Identifier) bool {
 		for {
 			chunk1 := binary.BigEndian.Uint64(num1[i:])
 			chunk2 := tgt[i/8]
-			
+
 			if chunk1 < chunk2 {
 				left = mid + 1
 				break
