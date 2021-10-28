@@ -20,7 +20,7 @@ const NUM_BLOCKS int = 100
 
 // This returns a forest of blocks, some of which are in a parent relationship
 // It should include forks
-func populatedBlockStore(t *rapid.T) []flow.Header { //nolint:unused
+func populatedBlockStore(t *rapid.T) []flow.Header {
 	store := []flow.Header{unittest.BlockHeaderFixture()}
 	for i := 1; i < NUM_BLOCKS; i++ {
 		// we sample from the store 2/3 times to get deeper trees
@@ -30,7 +30,7 @@ func populatedBlockStore(t *rapid.T) []flow.Header { //nolint:unused
 	return store
 }
 
-type rapidSync struct { //nolint:unused
+type rapidSync struct {
 	store          []flow.Header
 	core           *Core
 	idRequests     map[flow.Identifier]bool // depth 1 pushdown automaton to track ID requests
@@ -38,7 +38,7 @@ type rapidSync struct { //nolint:unused
 }
 
 // Init is an action for initializing a rapidSync instance.
-func (r *rapidSync) Init(t *rapid.T) { //nolint:unused
+func (r *rapidSync) Init(t *rapid.T) {
 	var err error
 
 	r.core, err = New(zerolog.New(ioutil.Discard), DefaultConfig())
@@ -50,7 +50,7 @@ func (r *rapidSync) Init(t *rapid.T) { //nolint:unused
 }
 
 // RequestByID is an action that requests a block by its ID.
-func (r *rapidSync) RequestByID(t *rapid.T) { //nolint:unused
+func (r *rapidSync) RequestByID(t *rapid.T) {
 	b := rapid.SampledFrom(r.store).Draw(t, "id_request").(flow.Header)
 	r.core.RequestBlock(b.ID())
 	// Re-queueing by ID should always succeed
@@ -60,7 +60,7 @@ func (r *rapidSync) RequestByID(t *rapid.T) { //nolint:unused
 }
 
 // RequestByHeight is an action that requests a specific height
-func (r *rapidSync) RequestByHeight(t *rapid.T) { //nolint:unused
+func (r *rapidSync) RequestByHeight(t *rapid.T) {
 	b := rapid.SampledFrom(r.store).Draw(t, "height_request").(flow.Header)
 	r.core.RequestHeight(b.Height)
 	// Re-queueing by height should always succeed
@@ -69,7 +69,7 @@ func (r *rapidSync) RequestByHeight(t *rapid.T) { //nolint:unused
 
 // HandleHeight is an action that requests a heights
 // upon receiving an argument beyond a certain tolerance
-func (r *rapidSync) HandleHeight(t *rapid.T) { //nolint:unused
+func (r *rapidSync) HandleHeight(t *rapid.T) {
 	b := rapid.SampledFrom(r.store).Draw(t, "height_hint_request").(flow.Header)
 	incr := rapid.IntRange(0, (int)(DefaultConfig().Tolerance)+1).Draw(t, "height increment").(int)
 	requestHeight := b.Height + (uint64)(incr)
@@ -83,7 +83,7 @@ func (r *rapidSync) HandleHeight(t *rapid.T) { //nolint:unused
 }
 
 // HandleByID is an action that provides a block header to the sync engine
-func (r *rapidSync) HandleByID(t *rapid.T) { //nolint:unused
+func (r *rapidSync) HandleByID(t *rapid.T) {
 	b := rapid.SampledFrom(r.store).Draw(t, "id_handling").(flow.Header)
 	success := r.core.HandleBlock(&b)
 	assert.True(t, success || r.idRequests[b.ID()] == false)
@@ -98,7 +98,7 @@ func (r *rapidSync) HandleByID(t *rapid.T) { //nolint:unused
 }
 
 // Check runs after every action and verifies that all required invariants hold.
-func (r *rapidSync) Check(t *rapid.T) { //nolint:unused
+func (r *rapidSync) Check(t *rapid.T) {
 	// we collect the received blocks as determined above
 	var receivedBlocks []flow.Header
 	// we also collect the pending blocks
@@ -171,12 +171,12 @@ func (r *rapidSync) Check(t *rapid.T) { //nolint:unused
 }
 
 func TestRapidSync(t *testing.T) {
-	t.Skip("test fails randomly")
+	t.Skip("flaky test - quarantined")
 	rapid.Check(t, rapid.Run(&rapidSync{}))
 }
 
 // utility functions
-func findHeader(store []flow.Header, predicate func(flow.Header) bool) (*flow.Header, bool) { //nolint:unused
+func findHeader(store []flow.Header, predicate func(flow.Header) bool) (*flow.Header, bool) {
 	for _, b := range store {
 		if predicate(b) {
 			return &b, true

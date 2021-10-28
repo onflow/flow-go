@@ -1218,7 +1218,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				txBody := transferTokensTx(chain).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
-					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
 				tx := fvm.Transaction(txBody, 0)
@@ -1254,7 +1254,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				txBody := transferTokensTx(chain).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
-					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
 				tx := fvm.Transaction(txBody, 0)
@@ -1293,7 +1293,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				txBody := transferTokensTx(chain).
 					AddArgument(jsoncdc.MustEncode(cadence.UFix64(1_0000_0000))).
-					AddArgument(jsoncdc.MustEncode(cadence.BytesToAddress(account.Bytes()))).
+					AddArgument(jsoncdc.MustEncode(cadence.Address(account))).
 					AddAuthorizer(chain.ServiceAddress())
 
 				tx := fvm.Transaction(txBody, 0)

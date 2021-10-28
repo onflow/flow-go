@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -70,8 +71,12 @@ func main() {
 		log.Fatal().Err(err).Msgf("error while hex decoding hardcoded root key")
 	}
 
-	// RLP decode the key
-	ServiceAccountPrivateKey, err := flow.DecodeAccountPrivateKey(serviceAccountPrivateKeyBytes)
+	ServiceAccountPrivateKey := flow.AccountPrivateKey{
+		SignAlgo: unittest.ServiceAccountPrivateKeySignAlgo,
+		HashAlgo: unittest.ServiceAccountPrivateKeyHashAlgo,
+	}
+	ServiceAccountPrivateKey.PrivateKey, err = crypto.DecodePrivateKey(
+		ServiceAccountPrivateKey.SignAlgo, serviceAccountPrivateKeyBytes)
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error while decoding hardcoded root key bytes")
 	}
