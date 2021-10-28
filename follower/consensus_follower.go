@@ -136,6 +136,7 @@ func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessN
 
 type ConsensusFollowerImpl struct {
 	module.ReadyDoneAware
+	*cmd.NodeConfig
 	Logger      zerolog.Logger
 	consumersMu sync.RWMutex
 	consumers   []pubsub.OnBlockFinalizedConsumer
@@ -168,6 +169,7 @@ func NewConsensusFollower(
 	cf := &ConsensusFollowerImpl{Logger: anb.Logger}
 	anb.BaseConfig.NodeRole = "consensus_follower"
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(cf.onBlockFinalized)
+	cf.NodeConfig = anb.NodeConfig
 	cf.ReadyDoneAware = anb.Build()
 
 	return cf, nil

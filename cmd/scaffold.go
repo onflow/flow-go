@@ -971,7 +971,7 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 
 func (fnb *FlowNodeBuilder) Build() Node {
 	fnb.sig = make(chan os.Signal)
-	return NewNode(fnb, fnb.BaseConfig.NodeRole, fnb.Logger, fnb.sig)
+	return NewNode(fnb, fnb.NodeConfig, fnb.Logger, fnb.sig)
 }
 
 // Ready returns a channel that closes after initiating all common components (logger, database, protocol state etc.)
