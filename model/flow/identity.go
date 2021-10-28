@@ -323,7 +323,15 @@ func (il IdentityList) Map(f IdentityMapFunc) IdentityList {
 // existing index.
 func (il IdentityList) Copy() IdentityList {
 	dup := make(IdentityList, 0, len(il))
-	dup = append(dup, il...)
+
+	lenList := len(il)
+
+	// performance tests show this is faster than 'range'
+	for i := 0; i < lenList; i++ {
+		next := Identity{}
+		next = *(il[i])
+		dup = append(dup, &next)
+	}
 	return dup
 }
 
@@ -480,7 +488,7 @@ func (il IdentityList) SamplePct(pct float64) IdentityList {
 // either `il`, or `other`, or both. There are no duplicates in the output,
 // where duplicates are identities with the same node ID.
 func (il IdentityList) Union(other IdentityList) IdentityList {
-
+	// stores the output, the union of the two lists
 	if (len(il) + len(other)) == 0 {
 		return IdentityList{}
 	}
@@ -579,7 +587,7 @@ func (il IdentityList) Exists(target *Identity) bool {
 		// assume the length is a multiple of 8, for performance.  it's 32 bytes
 		for {
 			chunk1 := binary.BigEndian.Uint64(num1[i:])
-			chunk2 := tgt[i/3]
+			chunk2 := tgt[i/8]
 
 			if chunk1 < chunk2 {
 				left = mid + 1
