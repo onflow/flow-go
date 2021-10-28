@@ -23,12 +23,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestCombinedVoteProcessor(t *testing.T) {
-	suite.Run(t, new(CombinedVoteProcessorTestSuite))
+func TestCombinedVoteProcessorV3(t *testing.T) {
+	suite.Run(t, new(CombinedVoteProcessorV3TestSuite))
 }
 
-// CombinedVoteProcessorTestSuite is a test suite that holds mocked state for isolated testing of CombinedVoteProcessorV3.
-type CombinedVoteProcessorTestSuite struct {
+// CombinedVoteProcessorV3TestSuite is a test suite that holds mocked state for isolated testing of CombinedVoteProcessorV3.
+type CombinedVoteProcessorV3TestSuite struct {
 	VoteProcessorTestSuiteBase
 
 	thresholdTotalWeight uint64
@@ -43,7 +43,7 @@ type CombinedVoteProcessorTestSuite struct {
 	processor         *CombinedVoteProcessorV3
 }
 
-func (s *CombinedVoteProcessorTestSuite) SetupTest() {
+func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
 	s.VoteProcessorTestSuiteBase.SetupTest()
 
 	s.rbSigAggregator = &mockhotstuff.WeightedSignatureAggregator{}
@@ -92,7 +92,7 @@ func (s *CombinedVoteProcessorTestSuite) SetupTest() {
 }
 
 // TestInitialState tests that Block() and Status() return correct values after calling constructor
-func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
+func (s *CombinedVoteProcessorV3TestSuite) TestInitialState() {
 	require.Equal(s.T(), s.proposal.Block, s.processor.Block())
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.processor.Status())
 }
@@ -100,7 +100,7 @@ func (s *CombinedVoteProcessorTestSuite) TestInitialState() {
 // TestProcess_VoteNotForProposal tests that CombinedVoteProcessorV3 accepts only votes for the block it was initialized with
 // according to interface specification of `VoteProcessor`, we expect dedicated sentinel errors for votes
 // for different views (`VoteForIncompatibleViewError`) _or_ block (`VoteForIncompatibleBlockError`).
-func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
+func (s *CombinedVoteProcessorV3TestSuite) TestProcess_VoteNotForProposal() {
 	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
 	require.ErrorAs(s.T(), err, &VoteForIncompatibleBlockError)
 	require.False(s.T(), model.IsInvalidVoteError(err))
@@ -115,7 +115,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_VoteNotForProposal() {
 
 // TestProcess_InvalidSignatureFormat ensures that we process signatures only with valid format.
 // If we have received vote with signature in invalid format we should return with sentinel error
-func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignatureFormat() {
+func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignatureFormat() {
 	// signature is random in this case
 	vote := unittest.VoteForBlockFixture(s.proposal.Block, func(vote *model.Vote) {
 		vote.SigData[0] = byte(42)
@@ -128,7 +128,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignatureFormat() {
 
 // TestProcess_InvalidSignature tests that CombinedVoteProcessorV3 doesn't collect signatures for votes with invalid signature.
 // Checks are made for cases where both staking and threshold signatures were submitted.
-func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
+func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
 	exception := errors.New("unexpected-exception")
 	// test for staking signatures
 	s.Run("staking-sig", func() {
@@ -177,7 +177,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 }
 
 // TestProcess_TrustedAddError tests a case where we were able to successfully verify signature but failed to collect it.
-func (s *CombinedVoteProcessorTestSuite) TestProcess_TrustedAddError() {
+func (s *CombinedVoteProcessorV3TestSuite) TestProcess_TrustedAddError() {
 	exception := errors.New("unexpected-exception")
 	s.Run("staking-sig", func() {
 		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
@@ -209,7 +209,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_TrustedAddError() {
 // TestProcess_BuildQCError tests all error paths during process of building QC.
 // Building QC is a one time operation, we need to make sure that failing in one of the steps leads to exception.
 // Since it's a one time operation we need a complicated test to test all conditions.
-func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
+func (s *CombinedVoteProcessorV3TestSuite) TestProcess_BuildQCError() {
 	mockAggregator := func(aggregator *mockhotstuff.WeightedSignatureAggregator) {
 		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
 		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredStake, nil)
@@ -306,7 +306,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 // TestProcess_EnoughStakeNotEnoughShares tests a scenario where we first don't have enough stake,
 // then we iteratively increase it to the point where we have enough staking weight. No QC should be created
 // in this scenario since there is not enough random beacon shares.
-func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughStakeNotEnoughShares() {
+func (s *CombinedVoteProcessorV3TestSuite) TestProcess_EnoughStakeNotEnoughShares() {
 	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
@@ -322,7 +322,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughStakeNotEnoughShares(
 // TestProcess_EnoughSharesNotEnoughStakes tests a scenario where we are collecting only threshold signatures
 // to the point where we have enough shares to reconstruct RB signature. No QC should be created
 // in this scenario since there is not enough staking weight.
-func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughSharesNotEnoughStakes() {
+func (s *CombinedVoteProcessorV3TestSuite) TestProcess_EnoughSharesNotEnoughStakes() {
 	// change sig weight to be really low, so we don't reach min staking weight while collecting
 	// threshold signatures
 	s.sigWeight = 10
@@ -342,7 +342,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughSharesNotEnoughStakes
 
 // TestProcess_ConcurrentCreatingQC tests a scenario where multiple goroutines process vote at same time,
 // we expect only one QC created in this scenario.
-func (s *CombinedVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
+func (s *CombinedVoteProcessorV3TestSuite) TestProcess_ConcurrentCreatingQC() {
 	stakingSigners := unittest.IdentifierListFixture(10)
 	mockAggregator := func(aggregator *mockhotstuff.WeightedSignatureAggregator) {
 		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
