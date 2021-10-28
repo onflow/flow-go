@@ -23,48 +23,33 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestCombinedVoteProcessorV3(t *testing.T) {
-	suite.Run(t, new(CombinedVoteProcessorV3TestSuite))
+func TestCombinedVoteProcessorV2(t *testing.T) {
+	suite.Run(t, new(CombinedVoteProcessorV2TestSuite))
 }
 
-// CombinedVoteProcessorV3TestSuite is a test suite that holds mocked state for isolated testing of CombinedVoteProcessorV3.
-type CombinedVoteProcessorV3TestSuite struct {
+// CombinedVoteProcessorV2TestSuite is a test suite that holds mocked state for isolated testing of CombinedVoteProcessorV2.
+type CombinedVoteProcessorV2TestSuite struct {
 	VoteProcessorTestSuiteBase
 
-	thresholdTotalWeight uint64
-	rbSharesTotal        uint64
+	rbSharesTotal uint64
 
 	packer *mockhotstuff.Packer
 
-	rbSigAggregator *mockhotstuff.WeightedSignatureAggregator
-	reconstructor   *mockhotstuff.RandomBeaconReconstructor
+	reconstructor *mockhotstuff.RandomBeaconReconstructor
 
 	minRequiredShares uint64
-	processor         *CombinedVoteProcessorV3
+	processor         *CombinedVoteProcessorV2
 }
 
-func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
+func (s *CombinedVoteProcessorV2TestSuite) SetupTest() {
 	s.VoteProcessorTestSuiteBase.SetupTest()
 
-	s.rbSigAggregator = &mockhotstuff.WeightedSignatureAggregator{}
 	s.reconstructor = &mockhotstuff.RandomBeaconReconstructor{}
 	s.packer = &mockhotstuff.Packer{}
 	s.proposal = helper.MakeProposal()
 
 	s.minRequiredShares = 9 // we require 9 RB shares to reconstruct signature
-	s.thresholdTotalWeight, s.rbSharesTotal = 0, 0
-
-	// setup threshold signature aggregator
-	s.rbSigAggregator.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		s.thresholdTotalWeight += s.sigWeight
-	}).Return(func(signerID flow.Identifier, sig crypto.Signature) uint64 {
-		return s.thresholdTotalWeight
-	}, func(signerID flow.Identifier, sig crypto.Signature) error {
-		return nil
-	}).Maybe()
-	s.rbSigAggregator.On("TotalWeight").Return(func() uint64 {
-		return s.thresholdTotalWeight
-	}).Maybe()
+	s.rbSharesTotal = 0
 
 	// setup rb reconstructor
 	s.reconstructor.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -78,11 +63,10 @@ func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
 		return s.rbSharesTotal >= s.minRequiredShares
 	}).Maybe()
 
-	s.processor = &CombinedVoteProcessorV3{
+	s.processor = &CombinedVoteProcessorV2{
 		log:              unittest.Logger(),
 		block:            s.proposal.Block,
 		stakingSigAggtor: s.stakingAggregator,
-		rbSigAggtor:      s.rbSigAggregator,
 		rbRector:         s.reconstructor,
 		onQCCreated:      s.onQCCreated,
 		packer:           s.packer,
@@ -92,15 +76,15 @@ func (s *CombinedVoteProcessorV3TestSuite) SetupTest() {
 }
 
 // TestInitialState tests that Block() and Status() return correct values after calling constructor
-func (s *CombinedVoteProcessorV3TestSuite) TestInitialState() {
+func (s *CombinedVoteProcessorV2TestSuite) TestInitialState() {
 	require.Equal(s.T(), s.proposal.Block, s.processor.Block())
 	require.Equal(s.T(), hotstuff.VoteCollectorStatusVerifying, s.processor.Status())
 }
 
-// TestProcess_VoteNotForProposal tests that CombinedVoteProcessorV3 accepts only votes for the block it was initialized with
+// TestProcess_VoteNotForProposal tests that CombinedVoteProcessorV2 accepts only votes for the block it was initialized with
 // according to interface specification of `VoteProcessor`, we expect dedicated sentinel errors for votes
 // for different views (`VoteForIncompatibleViewError`) _or_ block (`VoteForIncompatibleBlockError`).
-func (s *CombinedVoteProcessorV3TestSuite) TestProcess_VoteNotForProposal() {
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_VoteNotForProposal() {
 	err := s.processor.Process(unittest.VoteFixture(unittest.WithVoteView(s.proposal.Block.View)))
 	require.ErrorAs(s.T(), err, &VoteForIncompatibleBlockError)
 	require.False(s.T(), model.IsInvalidVoteError(err))
@@ -110,31 +94,37 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_VoteNotForProposal() {
 	require.False(s.T(), model.IsInvalidVoteError(err))
 
 	s.stakingAggregator.AssertNotCalled(s.T(), "Verify")
-	s.rbSigAggregator.AssertNotCalled(s.T(), "Verify")
+	s.reconstructor.AssertNotCalled(s.T(), "Verify")
 }
 
 // TestProcess_InvalidSignatureFormat ensures that we process signatures only with valid format.
 // If we have received vote with signature in invalid format we should return with sentinel error
-func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignatureFormat() {
-	// signature is random in this case
-	vote := unittest.VoteForBlockFixture(s.proposal.Block, func(vote *model.Vote) {
-		vote.SigData[0] = byte(42)
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() {
+	// valid length is 48 or 96
+	generator := rapid.IntRange(0, 128).Filter(func(value int) bool {
+		return value != 48 && value != 96
 	})
-	err := s.processor.Process(vote)
-	require.Error(s.T(), err)
-	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+	rapid.Check(s.T(), func(t *rapid.T) {
+		// create a signature with invalid length
+		vote := unittest.VoteForBlockFixture(s.proposal.Block, func(vote *model.Vote) {
+			vote.SigData = unittest.RandomBytes(generator.Draw(t, "sig-size").(int))
+		})
+		err := s.processor.Process(vote)
+		require.Error(s.T(), err)
+		require.True(s.T(), model.IsInvalidVoteError(err))
+		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+	})
 }
 
-// TestProcess_InvalidSignature tests that CombinedVoteProcessorV3 doesn't collect signatures for votes with invalid signature.
+// TestProcess_InvalidSignature tests that CombinedVoteProcessorV2 doesn't collect signatures for votes with invalid signature.
 // Checks are made for cases where both staking and threshold signatures were submitted.
-func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignature() {
 	exception := errors.New("unexpected-exception")
 	// test for staking signatures
 	s.Run("staking-sig", func() {
-		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig)
 
-		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
+		s.stakingAggregator.On("Verify", stakingVote.SignerID, stakingVote.SigData).Return(msig.ErrInvalidFormat).Once()
 
 		// sentinel error from `ErrInvalidFormat` should be wrapped as `InvalidVoteError`
 		err := s.processor.Process(stakingVote)
@@ -142,7 +132,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
 		require.True(s.T(), model.IsInvalidVoteError(err))
 		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
 
-		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(exception)
+		s.stakingAggregator.On("Verify", stakingVote.SignerID, stakingVote.SigData).Return(exception)
 
 		// unexpected errors from `Verify` should be propagated, but should _not_ be wrapped as `InvalidVoteError`
 		err = s.processor.Process(stakingVote)
@@ -150,34 +140,38 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
 		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
 
 		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
+		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
+		s.reconstructor.AssertNotCalled(s.T(), "Verify")
 	})
-	// test same cases for threshold signature
-	s.Run("threshold-sig", func() {
-		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
+	// test same cases for beacon signature
+	s.Run("beacon-sig", func() {
+		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig)
 
-		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
+		// staking sig valid, beacon sig invalid
+		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, doubleSigVote.SigData[:48]).Return(nil).Once()
+		s.reconstructor.On("Verify", doubleSigVote.SignerID, doubleSigVote.SigData[48:]).Return(msig.ErrInvalidFormat).Once()
 
 		// expect sentinel error in case Verify returns ErrInvalidFormat
-		err := s.processor.Process(thresholdVote)
+		err := s.processor.Process(doubleSigVote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
 		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
 
-		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(exception)
+		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, doubleSigVote.SigData[:48]).Return(nil).Once()
+		s.reconstructor.On("Verify", doubleSigVote.SignerID, doubleSigVote.SigData[:48]).Return(exception)
 
 		// except exception
-		err = s.processor.Process(thresholdVote)
+		err = s.processor.Process(doubleSigVote)
 		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
 		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
 
-		s.rbSigAggregator.AssertNotCalled(s.T(), "TrustedAdd")
+		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
 		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
 	})
-
 }
 
 // TestProcess_TrustedAddError tests a case where we were able to successfully verify signature but failed to collect it.
-func (s *CombinedVoteProcessorV3TestSuite) TestProcess_TrustedAddError() {
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_TrustedAddError() {
 	exception := errors.New("unexpected-exception")
 	s.Run("staking-sig", func() {
 		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
@@ -209,7 +203,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_TrustedAddError() {
 // TestProcess_BuildQCError tests all error paths during process of building QC.
 // Building QC is a one time operation, we need to make sure that failing in one of the steps leads to exception.
 // Since it's a one time operation we need a complicated test to test all conditions.
-func (s *CombinedVoteProcessorV3TestSuite) TestProcess_BuildQCError() {
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 	mockAggregator := func(aggregator *mockhotstuff.WeightedSignatureAggregator) {
 		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
 		aggregator.On("TrustedAdd", mock.Anything, mock.Anything).Return(s.minRequiredStake, nil)
@@ -242,12 +236,11 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_BuildQCError() {
 	createProcessor := func(stakingAggregator *mockhotstuff.WeightedSignatureAggregator,
 		rbSigAggregator *mockhotstuff.WeightedSignatureAggregator,
 		rbReconstructor *mockhotstuff.RandomBeaconReconstructor,
-		packer *mockhotstuff.Packer) *CombinedVoteProcessorV3 {
-		return &CombinedVoteProcessorV3{
+		packer *mockhotstuff.Packer) *CombinedVoteProcessorV2 {
+		return &CombinedVoteProcessorV2{
 			log:              unittest.Logger(),
 			block:            s.proposal.Block,
 			stakingSigAggtor: stakingAggregator,
-			rbSigAggtor:      rbSigAggregator,
 			rbRector:         rbReconstructor,
 			onQCCreated:      s.onQCCreated,
 			packer:           packer,
@@ -306,7 +299,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_BuildQCError() {
 // TestProcess_EnoughStakeNotEnoughShares tests a scenario where we first don't have enough stake,
 // then we iteratively increase it to the point where we have enough staking weight. No QC should be created
 // in this scenario since there is not enough random beacon shares.
-func (s *CombinedVoteProcessorV3TestSuite) TestProcess_EnoughStakeNotEnoughShares() {
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughStakeNotEnoughShares() {
 	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
 		vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
@@ -322,7 +315,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_EnoughStakeNotEnoughShare
 // TestProcess_EnoughSharesNotEnoughStakes tests a scenario where we are collecting only threshold signatures
 // to the point where we have enough shares to reconstruct RB signature. No QC should be created
 // in this scenario since there is not enough staking weight.
-func (s *CombinedVoteProcessorV3TestSuite) TestProcess_EnoughSharesNotEnoughStakes() {
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughSharesNotEnoughStakes() {
 	// change sig weight to be really low, so we don't reach min staking weight while collecting
 	// threshold signatures
 	s.sigWeight = 10
@@ -342,7 +335,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_EnoughSharesNotEnoughStak
 
 // TestProcess_ConcurrentCreatingQC tests a scenario where multiple goroutines process vote at same time,
 // we expect only one QC created in this scenario.
-func (s *CombinedVoteProcessorV3TestSuite) TestProcess_ConcurrentCreatingQC() {
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_ConcurrentCreatingQC() {
 	stakingSigners := unittest.IdentifierListFixture(10)
 	mockAggregator := func(aggregator *mockhotstuff.WeightedSignatureAggregator) {
 		aggregator.On("Verify", mock.Anything, mock.Anything).Return(nil)
@@ -387,11 +380,11 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_ConcurrentCreatingQC() {
 	s.onQCCreatedState.AssertNumberOfCalls(s.T(), "onQCCreated", 1)
 }
 
-// TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness uses property testing to test correctness of concurrent votes processing.
+// TestCombinedVoteProcessor_PropertyCreatingQCCorrectness uses property testing to test correctness of concurrent votes processing.
 // We randomly draw a committee with some number of staking, random beacon and byzantine nodes.
 // Values are drawn in a way that 1 <= honestParticipants <= participants <= maxParticipants
 // In each test iteration we expect to create a valid QC with all provided data as part of constructed QC.
-func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing.T) {
+func TestCombinedVoteProcessor_PropertyCreatingQCCorrectness(testifyT *testing.T) {
 	maxParticipants := uint64(53)
 
 	rapid.Check(testifyT, func(t *rapid.T) {
@@ -517,7 +510,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 			require.Equalf(t, expectedQC, qc, "QC should be equal to what we expect")
 		}
 
-		processor := &CombinedVoteProcessorV3{
+		processor := &CombinedVoteProcessorV2{
 			log:              unittest.Logger(),
 			block:            block,
 			stakingSigAggtor: stakingAggregator,
@@ -606,10 +599,10 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCCorrectness(testifyT *testing
 	})
 }
 
-// TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness uses property testing to test liveness of concurrent votes processing.
+// TestCombinedVoteProcessor_PropertyCreatingQCLiveness uses property testing to test liveness of concurrent votes processing.
 // We randomly draw a committee and check if we are able to create a QC with minimal number of nodes.
 // In each test iteration we expect to create a QC, we don't check correctness of data since it's checked by another test.
-func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T) {
+func TestCombinedVoteProcessor_PropertyCreatingQCLiveness(testifyT *testing.T) {
 	rapid.Check(testifyT, func(t *rapid.T) {
 		// draw beacon signers in range 1 <= beaconSignersCount <= 53
 		beaconSignersCount := rapid.Uint64Range(1, 53).Draw(t, "beaconSigners").(uint64)
@@ -677,7 +670,7 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 			}
 		}
 
-		processor := &CombinedVoteProcessorV3{
+		processor := &CombinedVoteProcessorV2{
 			log:              unittest.Logger(),
 			block:            block,
 			stakingSigAggtor: stakingAggregator,
@@ -751,4 +744,12 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 			t.Fatalf("Assertions weren't met, staking weight: %v, threshold weight: %v", stakingTotalWeight, thresholdTotalWeight)
 		}
 	})
+}
+
+func VoteWithStakingSig(vote *model.Vote) {
+
+}
+
+func VoteWithDoubleSig(vote *model.Vote) {
+
 }
