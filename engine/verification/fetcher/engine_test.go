@@ -796,8 +796,7 @@ func chunkDataPackResponseFixture(t *testing.T,
 	}
 }
 
-// verifiableChunksFixture is a test helper that creates verifiable chunks, chunk data packs,
-// and collection fixtures for the given chunks list.
+// verifiableChunksFixture is a test helper that creates verifiable chunks and chunk data responses.
 func verifiableChunksFixture(t *testing.T,
 	statuses verification.ChunkStatusList,
 	block *flow.Block,
@@ -813,12 +812,8 @@ func verifiableChunksFixture(t *testing.T,
 		chunkLocatorID := chunks.ChunkLocatorID(status.ExecutionResult.ID(), status.ChunkIndex)
 
 		response, ok := responses[chunkLocatorID]
-		require.True(t, ok, "missing chunk data pack")
+		require.True(t, ok, "missing chunk data response")
 
-		// to account for duplicate chunks on execution result forks
-		// we consider verifiable chunks distinct based on their chunk locator.
-		// so on an execution fork, we may have duplicate chunk IDs each belonging to a
-		// distinct result, and hence having a distinct verifiable chunk.
 		verifiableChunks[chunkLocatorID] = verifiableChunkFixture(t, status.Chunk(), block, status.ExecutionResult, response.Cdp)
 	}
 
