@@ -2,10 +2,11 @@ package debug
 
 import (
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
 )
 
 type RemoteDebugger struct {

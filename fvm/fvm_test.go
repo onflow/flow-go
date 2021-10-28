@@ -2650,7 +2650,8 @@ func TestStorageUsed(t *testing.T) {
 	binary.BigEndian.PutUint64(storageUsed, 5)
 
 	simpleView := utils.NewSimpleView()
-	simpleView.Set(string(address), "", state.KeyStorageUsed, storageUsed)
+	err = simpleView.Set(string(address), "", state.KeyStorageUsed, storageUsed)
+	require.NoError(t, err)
 
 	script := fvm.Script(code)
 

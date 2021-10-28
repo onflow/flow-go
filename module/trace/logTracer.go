@@ -12,6 +12,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type spanKey string
+
+const activeSpan spanKey = "activeSpan"
+
 // LogTracer is the implementation of the Tracer interface which passes
 // all the traces back to the passed logger and print them
 // this is mostly useful for debugging and testing
@@ -42,7 +46,7 @@ func (t *LogTracer) StartBlockSpan(
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
 	sp := NewLogSpan(t, spanName)
-	ctx = context.WithValue(ctx, "activeSpan", sp.spanID)
+	ctx = context.WithValue(ctx, activeSpan, sp.spanID)
 	return sp, ctx, true
 }
 
@@ -52,7 +56,7 @@ func (t *LogTracer) StartCollectionSpan(
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
 	sp := NewLogSpan(t, spanName)
-	ctx = context.WithValue(ctx, "activeSpan", sp.spanID)
+	ctx = context.WithValue(ctx, activeSpan, sp.spanID)
 	return sp, ctx, true
 }
 
@@ -64,7 +68,7 @@ func (t *LogTracer) StartTransactionSpan(
 	spanName SpanName,
 	opts ...opentracing.StartSpanOption) (opentracing.Span, context.Context, bool) {
 	sp := NewLogSpan(t, spanName)
-	ctx = context.WithValue(ctx, "activeSpan", sp.spanID)
+	ctx = context.WithValue(ctx, activeSpan, sp.spanID)
 	return sp, ctx, true
 }
 
@@ -73,9 +77,9 @@ func (t *LogTracer) StartSpanFromContext(
 	operationName SpanName,
 	opts ...opentracing.StartSpanOption,
 ) (opentracing.Span, context.Context) {
-	parentSpanID := ctx.Value("activeSpan").(uint64)
+	parentSpanID := ctx.Value(activeSpan).(uint64)
 	sp := NewLogSpanWithParent(t, operationName, parentSpanID)
-	ctx = context.WithValue(ctx, "activeSpan", sp.spanID)
+	ctx = context.WithValue(ctx, activeSpan, sp.spanID)
 	return sp, opentracing.ContextWithSpan(ctx, sp)
 }
 
