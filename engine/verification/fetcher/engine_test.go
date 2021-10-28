@@ -723,7 +723,8 @@ func mockBlocksStorage(blocks *storage.Blocks, headers *storage.Headers, block *
 // mockRequester mocks the chunk data pack requester with the given chunk data pack requests.
 // Each chunk should be requested exactly once.
 // On reply, it invokes the handler function with the given collection and chunk data pack for the chunk ID.
-func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
+func mockRequester(t *testing.T,
+	requester *mockfetcher.ChunkDataPackRequester,
 	requests map[flow.Identifier]*verification.ChunkDataPackRequest,
 	responses map[flow.Identifier]*verification.ChunkDataPackResponse,
 	handler func(flow.Identifier, *verification.ChunkDataPackResponse)) *sync.WaitGroup {
@@ -742,10 +743,12 @@ func mockRequester(t *testing.T, requester *mockfetcher.ChunkDataPackRequester,
 			expectedRequest, ok := requests[actualRequest.ID()]
 			require.True(t, ok, "requester received an unexpected chunk request")
 
-			fmt.Printf("actual: %v \n", actualRequest)
-			fmt.Printf("expected: %v \n", expectedRequest)
-
-			// require.Equal(t, *expectedRequest, *actualRequest)
+			require.Equal(t, expectedRequest.Index, actualRequest.Index)
+			require.Equal(t, expectedRequest.ResultID, actualRequest.ResultID)
+			require.Equal(t, expectedRequest.ChunkID, actualRequest.ChunkID)
+			require.Equal(t, expectedRequest.Agrees, actualRequest.Agrees)
+			require.Equal(t, expectedRequest.Disagrees, actualRequest.Disagrees)
+			require.ElementsMatch(t, expectedRequest.Targets, actualRequest.Targets)
 
 			go func() {
 				response, ok := responses[actualRequest.ID()]
