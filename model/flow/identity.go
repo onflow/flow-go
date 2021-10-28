@@ -328,8 +328,8 @@ func (il IdentityList) Copy() IdentityList {
 
 	// performance tests show this is faster than 'range'
 	for i := 0; i < lenList; i++ {
-		next := Identity{}
-		next = *(il[i])
+		// copy the object
+		next := *(il[i])
 		dup = append(dup, &next)
 	}
 	return dup
