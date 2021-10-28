@@ -85,6 +85,14 @@ func (e InvalidVoteError) Unwrap() error {
 	return e.Err
 }
 
+func NewInvalidVoteErrorf(vote *Vote, msg string, args ...interface{}) error {
+	return InvalidVoteError{
+		VoteID: vote.ID(),
+		View:   vote.View,
+		Err:    fmt.Errorf(msg, args...),
+	}
+}
+
 // ByzantineThresholdExceededError is raised if HotStuff detects malicious conditions which
 // prove a Byzantine threshold of consensus replicas has been exceeded.
 // Per definition, the byzantine threshold is exceeded is there are byzantine consensus
@@ -95,4 +103,43 @@ type ByzantineThresholdExceededError struct {
 
 func (e ByzantineThresholdExceededError) Error() string {
 	return e.Evidence
+}
+
+type DoubleVoteError struct {
+	FirstVote       *Vote
+	ConflictingVote *Vote
+	err             error
+}
+
+func (e DoubleVoteError) Error() string {
+	return e.err.Error()
+}
+
+// IsDoubleVoteError returns whether an error is DoubleVoteError
+func IsDoubleVoteError(err error) bool {
+	var e DoubleVoteError
+	return errors.As(err, &e)
+}
+
+// AsDoubleVoteError determines whether the given error is a DoubleVoteError
+// (potentially wrapped). It follows the same semantics as a checked type cast.
+func AsDoubleVoteError(err error) (*DoubleVoteError, bool) {
+	var e DoubleVoteError
+	ok := errors.As(err, &e)
+	if ok {
+		return &e, true
+	}
+	return nil, false
+}
+
+func (e DoubleVoteError) Unwrap() error {
+	return e.err
+}
+
+func NewDoubleVoteErrorf(firstVote, conflictingVote *Vote, msg string, args ...interface{}) error {
+	return DoubleVoteError{
+		FirstVote:       firstVote,
+		ConflictingVote: conflictingVote,
+		err:             fmt.Errorf(msg, args...),
+	}
 }

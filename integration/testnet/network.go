@@ -136,7 +136,7 @@ func (net *FlowNetwork) Result() *flow.ExecutionResult {
 // Start starts the network.
 func (net *FlowNetwork) Start(ctx context.Context) {
 	// makes it easier to see logs for a specific test case
-	fmt.Println(">>>> starting network: ", net.config.Name)
+	fmt.Println("starting network: ", net.config.Name)
 	net.suite.Start(ctx)
 }
 

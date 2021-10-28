@@ -12,6 +12,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -964,7 +965,7 @@ func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
 // can be customized (ie. set their role) by passing in a function that modifies
 // the input identities as required.
 func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList {
-	identities := make(flow.IdentityList, n)
+	identities := make(flow.IdentityList, 0, n)
 
 	for i := 0; i < n; i++ {
 		identity := IdentityFixture()
@@ -972,7 +973,7 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 		for _, opt := range opts {
 			opt(identity)
 		}
-		identities[i] = identity
+		identities = append(identities, identity)
 	}
 
 	return identities
@@ -1470,12 +1471,53 @@ func QCWithSignerIDs(signerIDs []flow.Identifier) func(*flow.QuorumCertificate) 
 	}
 }
 
-func VoteFixture() *hotstuff.Vote {
-	return &hotstuff.Vote{
+func VoteFixture(opts ...func(vote *hotstuff.Vote)) *hotstuff.Vote {
+	vote := &hotstuff.Vote{
 		View:     uint64(rand.Uint32()),
 		BlockID:  IdentifierFixture(),
 		SignerID: IdentifierFixture(),
 		SigData:  RandomBytes(128),
+	}
+
+	for _, opt := range opts {
+		opt(vote)
+	}
+
+	return vote
+}
+
+func WithVoteView(view uint64) func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.View = view
+	}
+}
+
+func WithVoteBlockID(blockID flow.Identifier) func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.BlockID = blockID
+	}
+}
+
+func VoteForBlockFixture(block *hotstuff.Block, opts ...func(vote *hotstuff.Vote)) *hotstuff.Vote {
+	vote := VoteFixture(WithVoteView(block.View),
+		WithVoteBlockID(block.BlockID))
+
+	for _, opt := range opts {
+		opt(vote)
+	}
+
+	return vote
+}
+
+func VoteWithStakingSig() func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeStaking)}, vote.SigData...)
+	}
+}
+
+func VoteWithThresholdSig() func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeRandomBeacon)}, vote.SigData...)
 	}
 }
 

@@ -146,4 +146,11 @@ type Consumer interface {
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
 	OnInvalidVoteDetected(*model.Vote)
+
+	// OnVoteForInvalidBlockDetected notifications are produced by the Vote Aggregation logic
+	// whenever vote for invalid proposal was detected.
+	// Prerequisites:
+	// Implementation must be concurrency safe; Non-blocking;
+	// and must handle repetition of the same events (with some processing overhead).
+	OnVoteForInvalidBlockDetected(vote *model.Vote, invalidProposal *model.Proposal)
 }
