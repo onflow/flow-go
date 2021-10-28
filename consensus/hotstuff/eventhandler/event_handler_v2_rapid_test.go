@@ -145,12 +145,8 @@ func (r *rapidStuff) ReceiveInvalidBlock(t *rapid.T) {
 	r.unmarkInvalidProposal(block.Block.BlockID)
 }
 
-// ramdonly receive a QC for a view where I'm the leader, if QC's block is above the current view,
-// then it should increment the view
-
-// ramdonly receive a QC for a view where I'm the leader and is the current view,
-// which should increment the current view
-
+// ramdonly receive a QC for a view where I'm the leader and is the current view or future,
+// which should increment the current view to qcView + 1
 func (r *rapidStuff) ReceiveQC(t *rapid.T) {
 	curView := r.curView()
 
@@ -160,11 +156,34 @@ func (r *rapidStuff) ReceiveQC(t *rapid.T) {
 		return
 	}
 
-	block := createProposal(curView+1, curView)
+	qcView := rapid.IntRange(0, 4).Map(func(dis int) uint64 {
+		return uint64(int(curView) + dis)
+	}).Draw(t, "qcView").(uint64)
+
+	block := createProposal(qcView+1, qcView)
 	r.handler.OnQCConstructed(block.Block.QC)
 
 	// after QC has been received, we should enter next view
-	r.expectedCurView++
+	r.expectedCurView = qcView + 1
+}
+
+// ramdonly receive a QC for a view where I'm the leader, if QC's block is for old view,
+// then it should not increment the view
+func (r *rapidStuff) ReceiveOldQC(t *rapid.T) {
+	curView := r.curView()
+
+	qcView := rapid.IntRange(-4, -1).Map(func(dis int) uint64 {
+		return uint64(int(curView) + dis)
+	}).Draw(t, "qcView").(uint64)
+
+	// we only create QC for views where we are the leader
+	// so skip views where I'm no the leader
+	if !isLeaderForView(qcView) {
+		return
+	}
+
+	block := createProposal(qcView+1, qcView)
+	r.handler.OnQCConstructed(block.Block.QC)
 }
 
 func (r *rapidStuff) Check(t *rapid.T) {
