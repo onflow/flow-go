@@ -517,7 +517,7 @@ func TestCombinedVoteProcessor_PropertyCreatingQCCorrectness(testifyT *testing.T
 			require.Equalf(t, expectedQC, qc, "QC should be equal to what we expect")
 		}
 
-		processor := &CombinedVoteProcessor{
+		processor := &CombinedVoteProcessorV3{
 			log:              unittest.Logger(),
 			block:            block,
 			stakingSigAggtor: stakingAggregator,
@@ -677,7 +677,7 @@ func TestCombinedVoteProcessor_PropertyCreatingQCLiveness(testifyT *testing.T) {
 			}
 		}
 
-		processor := &CombinedVoteProcessor{
+		processor := &CombinedVoteProcessorV3{
 			log:              unittest.Logger(),
 			block:            block,
 			stakingSigAggtor: stakingAggregator,

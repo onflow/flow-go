@@ -8,7 +8,8 @@ import (
 // RandomBeaconReconstructor collects signature shares, and reconstructs the
 // group signature with enough shares.
 type RandomBeaconReconstructor interface {
-	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message agreed about upfront.
+	// Verify verifies the signature under the stored public key corresponding
+	// to the signerID, and the stored message agreed about upfront.
 	Verify(signerID flow.Identifier, sig crypto.Signature) error
 
 	// TrustedAdd adds the signature share to the reconstructors internal
@@ -19,7 +20,7 @@ type RandomBeaconReconstructor interface {
 	// It returns:
 	//  - (true, nil) if and only if enough signature shares were collected
 	//  - (false, nil) if not enough shares were collected
-	//  - (false, error) if there is exception adding the sig share)
+	//  - (false, error) if there is exception adding the sig share
 	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (hasSufficientShares bool, err error)
 
 	// HasSufficientShares returns true if and only if reconstructor
@@ -29,14 +30,18 @@ type RandomBeaconReconstructor interface {
 	// Reconstruct reconstructs the group signature.
 	// The reconstructed signature is verified against the overall group public key and the message agreed upon.
 	// This is a sanity check that is necessary since "TrustedAdd" allows adding non-verified signatures.
-	// Reconstruct returns an error if the reconstructed signature fails the sanity verification, or if not enough shares have been collected.
+	// Reconstruct returns an error if the reconstructed signature fails the sanity verification,
+	// or if not enough shares have been collected.
 	Reconstruct() (crypto.Signature, error)
 }
 
 // SigType is the aggregable signature type.
 type SigType uint8
 
-// SigType specifies the role of the signature in the protocol. SigTypeRandomBeacon type is for random beacon signatures. SigTypeStaking is for Hotstuff sigantures. Both types are aggregatable cryptographic signatures.
+// SigType specifies the role of the signature in the protocol.
+// Both types are aggregatable cryptographic signatures.
+//  * SigTypeRandomBeacon type is for random beacon signatures.
+//  * SigTypeStaking is for Hotstuff signatures.
 const (
 	SigTypeStaking SigType = iota
 	SigTypeRandomBeacon
@@ -95,6 +100,7 @@ type BlockSignatureData struct {
 
 // Packer packs aggregated signature data into raw bytes to be used in block header.
 type Packer interface {
+	// Pack serializes the provided BlockSignatureData into a precursor format of a QC.
 	// blockID is the block that the aggregated signature is for.
 	// sig is the aggregated signature data.
 	// Expected error returns during normal operations:
