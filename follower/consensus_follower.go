@@ -130,7 +130,6 @@ func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessN
 	if err := nodeBuilder.Initialize(); err != nil {
 		return nil, err
 	}
-	nodeBuilder.BuildConsensusFollower()
 
 	return nodeBuilder, nil
 }
