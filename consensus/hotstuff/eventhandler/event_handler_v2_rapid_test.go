@@ -12,96 +12,16 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/eventhandler"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
+	"github.com/onflow/flow-go/model/flow"
 )
-
-// func TestEventHandlerV2(t *testing.T) {
-// 	suite.Run(t, new(EventHandlerV2Suite))
-// }
-//
-// // EventHandlerV2Suite contains mocked state for testing event handler under different scenarios.
-// type EventHandlerV2Suite struct {
-// 	suite.Suite
-//
-// 	eventhandler *eventhandler.EventHandlerV2
-//
-// 	paceMaker      hotstuff.PaceMaker
-// 	forks          *Forks
-// 	persist        *mocks.Persister
-// 	blockProducer  *BlockProducer
-// 	communicator   *mocks.Communicator
-// 	committee      *Committee
-// 	voteAggregator *mocks.VoteAggregatorV2
-// 	voter          *Voter
-// 	validator      *BlacklistValidator
-// 	notifier       hotstuff.Consumer
-//
-// 	initView    uint64
-// 	endView     uint64
-// 	votingBlock *model.Block
-// 	qc          *flow.QuorumCertificate
-// 	newview     *model.NewViewEvent
-// }
-//
-// func (es *EventHandlerV2Suite) SetupTest() {
-// 	finalized, curView := uint64(3), uint64(6)
-//
-// 	es.paceMaker = initPaceMaker(es.T(), curView)
-// 	es.forks = NewForks(es.T(), finalized)
-// 	es.persist = &mocks.Persister{}
-// 	es.persist.On("PutStarted", mock.Anything).Return(nil)
-// 	es.blockProducer = &BlockProducer{}
-// 	es.communicator = &mocks.Communicator{}
-// 	es.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(nil)
-// 	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
-// 	es.committee = NewCommittee()
-// 	es.voteAggregator = &mocks.VoteAggregatorV2{}
-// 	es.voter = NewVoter(es.T(), finalized)
-// 	es.validator = NewBlacklistValidator(es.T())
-// 	es.notifier = &notifications.NoopConsumer{}
-//
-// 	eventhandler, err := eventhandler.NewEventHandlerV2(
-// 		zerolog.New(os.Stderr),
-// 		es.paceMaker,
-// 		es.blockProducer,
-// 		es.forks,
-// 		es.persist,
-// 		es.communicator,
-// 		es.committee,
-// 		es.voteAggregator,
-// 		es.voter,
-// 		es.validator,
-// 		es.notifier)
-// 	require.NoError(es.T(), err)
-//
-// 	es.eventhandler = eventhandler
-//
-// 	es.initView = curView
-// 	es.endView = curView
-// 	// voting block is a block for the current view, which will trigger view change
-// 	es.votingBlock = createBlockWithQC(es.paceMaker.CurView(), es.paceMaker.CurView()-1)
-// 	es.qc = &flow.QuorumCertificate{
-// 		BlockID:   es.votingBlock.BlockID,
-// 		View:      es.votingBlock.View,
-// 		SignerIDs: nil,
-// 		SigData:   nil,
-// 	}
-// 	es.newview = &model.NewViewEvent{
-// 		View: es.votingBlock.View + 1, // the vote for the voting blocks will trigger a view change to the next view
-// 	}
-// }
-
-// func (es *EventHandlerV2Suite) becomeLeaderForView(view uint64) {
-// 	es.committee.leaders[view] = struct{}{}
-// }
-//
-// func (es *EventHandlerV2Suite) markInvalidProposal(blockID flow.Identifier) {
-// 	es.validator.invalidProposals[blockID] = struct{}{}
-// }
 
 type rapidStuff struct {
 	handler   *eventhandler.EventHandlerV2
 	pacemaker hotstuff.PaceMaker
+	validator *BlacklistValidator
+	committee *Committee
 
 	curViewChanged  bool
 	expectedCurView uint64
@@ -118,8 +38,11 @@ func (r *rapidStuff) Init(t *rapid.T) {
 	communicator := &mocks.Communicator{}
 	communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(nil)
 	communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
+
 	committee := NewCommittee()
 	voteAggregator := &mocks.VoteAggregatorV2{}
+	voteAggregator.On("InvalidBlock", mock.Anything).Return(nil)
+	voteAggregator.On("AddBlock", mock.Anything).Return(nil)
 	voter := NewVoter(t, finalized)
 	validator := NewBlacklistValidator(t)
 	notifier := &notifications.NoopConsumer{}
@@ -140,14 +63,86 @@ func (r *rapidStuff) Init(t *rapid.T) {
 
 	r.handler = eventhandler
 	r.pacemaker = pacemaker
+	r.validator = validator
+	r.committee = committee
+	r.expectedCurView = curView
+
+	for i := 0; i < 300; i++ {
+		if isLeaderForView(uint64(i)) {
+			r.markSelfAsLeaderForView(uint64(i))
+		}
+	}
+}
+
+func isLeaderForView(view uint64) bool {
+	return view%3 == 0
+}
+
+func (r *rapidStuff) markInvalidProposal(blockID flow.Identifier) {
+	r.validator.invalidProposals[blockID] = struct{}{}
+}
+
+func (r *rapidStuff) unmarkInvalidProposal(blockID flow.Identifier) {
+	delete(r.validator.invalidProposals, blockID)
+}
+
+func randomBlockAroundCurView(t *rapid.T, curView uint64) *model.Proposal {
+	// randomly create a block that could either from the past or the future
+	parentView := rapid.IntRange(-3, 3).Map(func(dis int) uint64 {
+		return uint64(int(curView) + dis)
+	}).Draw(t, "parentView").(uint64)
+
+	view := rapid.IntRange(1, 3).Map(func(dis int) uint64 {
+		return parentView + uint64(dis)
+	}).Draw(t, "view").(uint64)
+
+	return createProposal(view, parentView)
 }
 
 // randomly receive a timeout, which will increment the current view
-func (r *rapidStuff) OnTimeout(t *rapid.T) {
-	curView := r.pacemaker.CurView()
+func (r *rapidStuff) ReceiveTimeout(t *rapid.T) {
+	curView := r.curView()
 	r.handler.OnLocalTimeout()
-	r.curViewChanged = true
 	r.expectedCurView = curView + 1
+}
+
+func (r *rapidStuff) curView() uint64 {
+	return r.pacemaker.CurView()
+}
+
+// receive a block for the current view
+func (r *rapidStuff) ReceiveBlockForCurView(t *rapid.T) {
+	curView := r.curView()
+	block := createProposal(curView, curView-1)
+	r.handler.OnReceiveProposal(block)
+	isNextLeader := isLeaderForView(curView + 1)
+	if !isNextLeader {
+		r.expectedCurView++
+	}
+}
+
+func (r *rapidStuff) markSelfAsLeaderForView(view uint64) {
+	r.committee.leaders[view] = struct{}{}
+}
+
+// randomly receive a invalid block
+func (r *rapidStuff) ReceiveInvalidBlock(t *rapid.T) {
+	curView := r.curView()
+
+	// we don't validate own proposal, so skip views where I'm the leader
+	if isLeaderForView(curView) {
+		return
+	}
+
+	block := randomBlockAroundCurView(t, curView)
+	r.markInvalidProposal(block.Block.BlockID)
+
+	r.handler.OnReceiveProposal(block)
+
+	// the marker is no longer needed after processing the block,
+	// remove the marker so that the same block might be used as a
+	// valid block, and not to be treated as invalid block any more
+	r.unmarkInvalidProposal(block.Block.BlockID)
 }
 
 // ramdonly receive a QC for a view where I'm the leader, if QC's block is above the current view,
@@ -156,21 +151,24 @@ func (r *rapidStuff) OnTimeout(t *rapid.T) {
 // ramdonly receive a QC for a view where I'm the leader and is the current view,
 // which should increment the current view
 
-// randomly receive a block that extends from the last block
+func (r *rapidStuff) ReceiveQC(t *rapid.T) {
+	curView := r.curView()
 
-// ramdomly receive a double proposal block that extends from the parent of the last block,
-// and has the same view as the last block, should not vote for the block
+	// we only create QC for views where we are the leader
+	// so skip views where I'm no the leader
+	if !isLeaderForView(curView) {
+		return
+	}
 
-// randomly receive a invalid block
-func (r *rapidStuff) OnBlock(t *rapid.T) {
+	block := createProposal(curView+1, curView)
+	r.handler.OnQCConstructed(block.Block.QC)
 
+	// after QC has been received, we should enter next view
+	r.expectedCurView++
 }
 
 func (r *rapidStuff) Check(t *rapid.T) {
-	if r.curViewChanged {
-		require.Equal(t, r.expectedCurView, r.pacemaker.CurView())
-		r.curViewChanged = false
-	}
+	require.Equal(t, r.expectedCurView, r.pacemaker.CurView(), "the actual current view is different from expected")
 }
 
 func TestEventHandlerRapid(t *testing.T) {

@@ -203,9 +203,15 @@ func NewForks(t require.TestingT, finalized uint64) *Forks {
 	}
 	f.addBlock = func(block *model.Block) error {
 		f.blocks[block.BlockID] = block
+		if block.QC == nil {
+			panic(fmt.Sprintf("block has no QC: %v", block.View))
+		}
 		_ = f.addQC(block.QC)
 		return nil
 	}
+
+	qc := createQC(createBlock(finalized))
+	f.addQC(qc)
 
 	return f
 }
