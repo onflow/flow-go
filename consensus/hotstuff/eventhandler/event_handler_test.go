@@ -211,7 +211,7 @@ func NewForks(t require.TestingT, finalized uint64) *Forks {
 	}
 
 	qc := createQC(createBlock(finalized))
-	f.addQC(qc)
+	_ = f.addQC(qc)
 
 	return f
 }

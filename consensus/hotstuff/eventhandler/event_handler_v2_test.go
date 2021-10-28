@@ -93,10 +93,6 @@ func (es *EventHandlerV2Suite) SetupTest() {
 	}
 }
 
-func (es *EventHandlerV2Suite) becomeLeaderForView(view uint64) {
-	es.committee.leaders[view] = struct{}{}
-}
-
 func (es *EventHandlerV2Suite) markInvalidProposal(blockID flow.Identifier) {
 	es.validator.invalidProposals[blockID] = struct{}{}
 }

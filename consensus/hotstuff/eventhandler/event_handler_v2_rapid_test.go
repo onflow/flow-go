@@ -101,7 +101,9 @@ func randomBlockAroundCurView(t *rapid.T, curView uint64) *model.Proposal {
 // randomly receive a timeout, which will increment the current view
 func (r *rapidStuff) ReceiveTimeout(t *rapid.T) {
 	curView := r.curView()
-	r.handler.OnLocalTimeout()
+
+	require.NoError(t, r.handler.OnLocalTimeout())
+
 	r.expectedCurView = curView + 1
 }
 
@@ -113,7 +115,9 @@ func (r *rapidStuff) curView() uint64 {
 func (r *rapidStuff) ReceiveBlockForCurView(t *rapid.T) {
 	curView := r.curView()
 	block := createProposal(curView, curView-1)
-	r.handler.OnReceiveProposal(block)
+
+	require.NoError(t, r.handler.OnReceiveProposal(block))
+
 	isNextLeader := isLeaderForView(curView + 1)
 	if !isNextLeader {
 		r.expectedCurView++
@@ -136,7 +140,7 @@ func (r *rapidStuff) ReceiveInvalidBlock(t *rapid.T) {
 	block := randomBlockAroundCurView(t, curView)
 	r.markInvalidProposal(block.Block.BlockID)
 
-	r.handler.OnReceiveProposal(block)
+	require.NoError(t, r.handler.OnReceiveProposal(block))
 
 	// the marker is no longer needed after processing the block,
 	// remove the marker so that the same block might be used as a
@@ -160,7 +164,8 @@ func (r *rapidStuff) ReceiveQC(t *rapid.T) {
 	}).Draw(t, "qcView").(uint64)
 
 	block := createProposal(qcView+1, qcView)
-	r.handler.OnQCConstructed(block.Block.QC)
+
+	require.NoError(t, r.handler.OnQCConstructed(block.Block.QC))
 
 	// after QC has been received, we should enter next view
 	r.expectedCurView = qcView + 1
@@ -182,7 +187,8 @@ func (r *rapidStuff) ReceiveOldQC(t *rapid.T) {
 	}
 
 	block := createProposal(qcView+1, qcView)
-	r.handler.OnQCConstructed(block.Block.QC)
+
+	require.NoError(t, r.handler.OnQCConstructed(block.Block.QC))
 }
 
 func (r *rapidStuff) Check(t *rapid.T) {
