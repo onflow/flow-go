@@ -117,12 +117,12 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() 
 }
 
 // TestProcess_InvalidSignature tests that CombinedVoteProcessorV2 doesn't collect signatures for votes with invalid signature.
-// Checks are made for cases where both staking and threshold signatures were submitted.
+// Checks are made for cases where both staking and staking+beacon signatures were submitted.
 func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignature() {
 	exception := errors.New("unexpected-exception")
 	// test for staking signatures
 	s.Run("staking-sig", func() {
-		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig)
+		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())
 		stakingSig := crypto.Signature(stakingVote.SigData)
 
 		s.stakingAggregator.On("Verify", stakingVote.SignerID, stakingSig).Return(msig.ErrInvalidFormat).Once()
@@ -145,9 +145,33 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignature() {
 		s.reconstructor.AssertNotCalled(s.T(), "Verify")
 		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
 	})
+	s.Run("staking-double-sig", func() {
+		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
+		stakingSig := crypto.Signature(doubleSigVote.SigData[:48])
+
+		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, stakingSig).Return(msig.ErrInvalidFormat).Once()
+
+		// sentinel error from `ErrInvalidFormat` should be wrapped as `InvalidVoteError`
+		err := s.processor.Process(doubleSigVote)
+		require.Error(s.T(), err)
+		require.True(s.T(), model.IsInvalidVoteError(err))
+		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+
+		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, stakingSig).Return(exception)
+
+		// unexpected errors from `Verify` should be propagated, but should _not_ be wrapped as `InvalidVoteError`
+		err = s.processor.Process(doubleSigVote)
+		require.ErrorIs(s.T(), err, exception)              // unexpected errors from verifying the vote signature should be propagated
+		require.False(s.T(), model.IsInvalidVoteError(err)) // but not interpreted as an invalid vote
+
+		s.stakingAggregator.AssertNotCalled(s.T(), "TrustedAdd")
+		// we shouldn't even validate second signature if first one is incorrect
+		s.reconstructor.AssertNotCalled(s.T(), "Verify")
+		s.reconstructor.AssertNotCalled(s.T(), "TrustedAdd")
+	})
 	// test same cases for beacon signature
 	s.Run("beacon-sig", func() {
-		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig)
+		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
 		stakingSig := crypto.Signature(doubleSigVote.SigData[:48])
 		beaconSig := crypto.Signature(doubleSigVote.SigData[48:])
 
@@ -178,7 +202,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignature() {
 func (s *CombinedVoteProcessorV2TestSuite) TestProcess_TrustedAddError() {
 	exception := errors.New("unexpected-exception")
 	s.Run("staking-sig", func() {
-		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig)
+		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())
 		*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
 		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(nil).Once()
 		s.stakingAggregator.On("TrustedAdd", stakingVote.SignerID, mock.Anything).Return(uint64(0), exception).Once()
@@ -187,7 +211,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_TrustedAddError() {
 		require.False(s.T(), model.IsInvalidVoteError(err))
 	})
 	s.Run("beacon-sig", func() {
-		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig)
+		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
 		*s.stakingAggregator = mockhotstuff.WeightedSignatureAggregator{}
 		*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
 
@@ -249,7 +273,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 		}
 	}
 
-	vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig)
+	vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())
 
 	// in this test case we aren't able to aggregate staking signature
 	s.Run("staking-sig-aggregate", func() {
@@ -290,7 +314,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 // in this scenario since there is not enough random beacon shares.
 func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughStakeNotEnoughShares() {
 	for i := uint64(0); i < s.minRequiredStake; i += s.sigWeight {
-		vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig)
+		vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())
 		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil)
 		err := s.processor.Process(vote)
 		require.NoError(s.T(), err)
@@ -306,10 +330,10 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughStakeNotEnoughShare
 // in this scenario since there is not enough staking weight.
 func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughSharesNotEnoughStakes() {
 	// change sig weight to be really low, so we don't reach min staking weight while collecting
-	// threshold signatures
+	// beacon signatures
 	s.sigWeight = 10
 	for i := uint64(0); i < s.minRequiredShares; i++ {
-		vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig)
+		vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
 		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil).Once()
 		s.reconstructor.On("Verify", vote.SignerID, mock.Anything).Return(nil).Once()
 		err := s.processor.Process(vote)
@@ -348,7 +372,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_ConcurrentCreatingQC() {
 
 	var startupWg, shutdownWg sync.WaitGroup
 
-	vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig)
+	vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig())
 	startupWg.Add(1)
 	// prepare goroutines, so they are ready to submit a vote at roughly same time
 	for i := 0; i < 5; i++ {
@@ -512,14 +536,14 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 
 		// prepare votes
 		for _, signer := range stakingSigners {
-			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithStakingSig)
+			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithStakingSig())
 			vote.SignerID = signer
 			// this will set up mock
 			expectStakingAggregatorCalls(vote)
 			votes = append(votes, vote)
 		}
 		for _, signer := range beaconSigners {
-			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig)
+			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer
 			expectStakingAggregatorCalls(vote)
 			expectedSig := crypto.Signature(vote.SigData[48:])
@@ -563,7 +587,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		}
 
 		//processing extra votes shouldn't result in creating new QCs
-		vote := unittest.VoteForBlockFixture(block, VoteWithDoubleSig)
+		vote := unittest.VoteForBlockFixture(block, VoteWithDoubleSig())
 		err := processor.Process(vote)
 		require.NoError(t, err)
 	})
@@ -613,7 +637,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 			return collectedShares.Load() >= beaconSignersCount
 		})
 
-		// mock expected calls to aggregators and reconstructor
+		// mock expected calls to aggregator and reconstructor
 		combinedSigs := unittest.SignaturesFixture(2)
 		stakingAggregator.On("Aggregate").Return(stakingSigners.NodeIDs(), []byte(combinedSigs[0]), nil).Once()
 		reconstructor.On("Reconstruct").Return(combinedSigs[1], nil).Once()
@@ -658,13 +682,13 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 
 		// prepare votes
 		for _, signer := range stakingSigners {
-			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithStakingSig)
+			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithStakingSig())
 			vote.SignerID = signer.ID()
 			expectStakingAggregatorCalls(vote, signer.Stake)
 			votes = append(votes, vote)
 		}
 		for _, signer := range beaconSigners {
-			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig)
+			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer.ID()
 			expectStakingAggregatorCalls(vote, signer.Stake)
 			expectedSig := crypto.Signature(vote.SigData[48:])
@@ -709,10 +733,14 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 	})
 }
 
-func VoteWithStakingSig(vote *model.Vote) {
-	vote.SigData = unittest.RandomBytes(48)
+func VoteWithStakingSig() func(*model.Vote) {
+	return func(vote *model.Vote) {
+		vote.SigData = unittest.RandomBytes(48)
+	}
 }
 
-func VoteWithDoubleSig(vote *model.Vote) {
-	vote.SigData = unittest.RandomBytes(96)
+func VoteWithDoubleSig() func(*model.Vote) {
+	return func(vote *model.Vote) {
+		vote.SigData = unittest.RandomBytes(96)
+	}
 }
