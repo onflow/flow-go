@@ -16,14 +16,14 @@ var DummyHash Hash
 // byte array which should be holding exactly 32 bytes. Note that we don't
 // include the keys here as they are already included in the path.
 func HashLeaf(path Hash, value []byte) Hash {
-	hasher := new256()
+	hasher := &state{}
 	return hasher.hash256Plus(path, value) // path is 256 bits
 }
 
 // HashInterNode returns the hash value for intermediate nodes. hash1 and hash2
 // are fixed-length byte arrays which should be holding exactly 32 bytes each.
 func HashInterNode(hash1 Hash, hash2 Hash) Hash {
-	hasher := new256()
+	hasher := &state{}
 	return hasher.hash256plus256(hash1, hash2) // hash1 and hash2 are 256 bits
 }
 
