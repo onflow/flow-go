@@ -29,18 +29,40 @@ type ReadyDoneAware interface {
 	Done() <-chan struct{}
 }
 
-type NoopReadDoneAware struct{}
+// NoopReadyDoneAware is a ReadyDoneAware implementation whose ready/done channels close
+// immediately
+type NoopReadyDoneAware struct{}
 
-func (n *NoopReadDoneAware) Ready() <-chan struct{} {
+func (n *NoopReadyDoneAware) Ready() <-chan struct{} {
 	ready := make(chan struct{})
 	defer close(ready)
 	return ready
 }
 
-func (n *NoopReadDoneAware) Done() <-chan struct{} {
+func (n *NoopReadyDoneAware) Done() <-chan struct{} {
 	done := make(chan struct{})
 	defer close(done)
 	return done
+}
+
+// CustomReadyDoneAware is a ReadyDoneAware implementation that allows the instantiator
+// to provide the ready/done channels. This is useful for building aggregate interfaces
+// e.g. a collection of ReadyDoneAware objects, or a WaitGroup based approach.
+type CustomReadyDoneAware struct {
+	ready <-chan struct{}
+	done  <-chan struct{}
+}
+
+func NewCustomReadyDoneAware(ready, done <-chan struct{}) *CustomReadyDoneAware {
+	return &CustomReadyDoneAware{ready, done}
+}
+
+func (c *CustomReadyDoneAware) Ready() <-chan struct{} {
+	return c.ready
+}
+
+func (c *CustomReadyDoneAware) Done() <-chan struct{} {
+	return c.done
 }
 
 var ErrMultipleStartup = errors.New("component may only be started once")

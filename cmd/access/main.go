@@ -24,5 +24,8 @@ func main() {
 		anb.Logger.Fatal().Err(err).Send()
 	}
 
-	nodeBuilder.Build().Run()
+	nodeBuilder.
+		SerialStart().
+		Build().
+		Run()
 }

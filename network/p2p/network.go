@@ -124,14 +124,14 @@ func NewNetwork(
 	o.mw.SetOverlay(o)
 
 	o.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(o.runMiddleware).
-		AddWorker(o.processRegisterEngineRequests).
-		AddWorker(o.processRegisterBlobServiceRequests).Build()
+		AddWorker("start middleware", o.runMiddleware).
+		AddWorker("register engine request handler", o.processRegisterEngineRequests).
+		AddWorker("register blob exchange request handler", o.processRegisterBlobServiceRequests).Build()
 
 	return o, nil
 }
 
-func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 	<-n.mw.Ready()
 	ready()
 
@@ -155,7 +155,7 @@ func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerCon
 	}
 }
 
-func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 	<-n.mw.Ready()
 	ready()
 
@@ -179,7 +179,7 @@ func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.Signal
 	}
 }
 
-func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 	// setup the message queue
 	// create priority queue
 	n.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, n.metrics)

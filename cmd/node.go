@@ -1,17 +1,23 @@
 package cmd
 
 import (
+	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 )
 
+var _ component.Component = (*FlowNodeImp)(nil)
+
 type Node interface {
-	module.ReadyDoneAware
+	component.Component
 
 	// Run initiates all common components (logger, database, protocol state etc.)
 	// then starts each component. It also sets up a channel to gracefully shut
@@ -20,48 +26,49 @@ type Node interface {
 }
 
 type FlowNodeImp struct {
-	module.ReadyDoneAware
+	*component.ComponentManager
 	*NodeConfig
 	Logger zerolog.Logger
-	sig    chan os.Signal
 }
 
-func NewNode(builder NodeBuilder, cfg *NodeConfig, logger zerolog.Logger, sig chan os.Signal) Node {
-	return &FlowNodeImp{
-		ReadyDoneAware: builder,
-		NodeConfig:     cfg,
-		Logger:         logger,
-		sig:            sig,
-	}
-}
-
-// Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
+// Run calls Start() to start all the node modules and components. It also sets up a channel to gracefully shut
 // down each component if a SIGINT is received. Until a SIGINT is received, Run will block.
 // Since, Run is a blocking call it should only be used when running a node as it's own independent process.
+// Any unhandled irrecoverable errors thrown in child components will propagate up to here and result in a fatal
+// error
 func (node *FlowNodeImp) Run() {
-	// initialize signal catcher
-	signal.Notify(node.sig, os.Interrupt, syscall.SIGTERM)
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go node.Start(signalerCtx)
 
-	select {
-	case <-node.Ready():
-		node.Logger.Info().Msgf("%s node startup complete", node.BaseConfig.NodeRole)
-	case <-node.sig:
-		node.Logger.Warn().Msg("node startup aborted")
-		os.Exit(1)
+	go func() {
+		select {
+		case <-node.Ready():
+			node.Logger.Info().Msgf("%s node startup complete", node.BaseConfig.NodeRole)
+		case <-ctx.Done():
+		}
+	}()
+
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
+
+	// block till a SIGINT is received or a fatal error is encountered
+	sigCtx, _ := util.WithSignal(ctx, signalChan)
+	if err := util.WaitError(sigCtx, errChan); err != nil {
+		node.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
 	}
-
-	// block till a SIGINT is received
-	<-node.sig
 
 	node.Logger.Info().Msgf("%s node shutting down", node.BaseConfig.NodeRole)
+	cancel()
 
-	select {
-	case <-node.Done():
-		node.Logger.Info().Msgf("%s node shutdown complete", node.BaseConfig.NodeRole)
-	case <-node.sig:
-		node.Logger.Warn().Msg("node shutdown aborted")
-		os.Exit(1)
+	sigCtx, _ = util.WithSignal(ctx, signalChan)
+	doneCtx, _ := util.WithDone(sigCtx, node.Done())
+	if err := util.WaitError(doneCtx, errChan); err != nil {
+		node.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error during shutdown")
+	} else if errors.Is(sigCtx.Err(), util.ErrSignalReceived) {
+		node.Logger.Fatal().Msg("node shutdown aborted")
 	}
 
+	node.Logger.Info().Msgf("%s node shutdown complete", node.BaseConfig.NodeRole)
 	os.Exit(0)
 }

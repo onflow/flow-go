@@ -152,7 +152,7 @@ func NewMiddleware(
 	}
 
 	mw.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		AddWorker("main", func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 			// TODO: refactor to avoid storing ctx altogether
 			mw.ctx = ctx
 

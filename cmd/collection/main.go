@@ -35,9 +35,11 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/collection"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/epochs"
 	confinalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/ingress"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -163,7 +165,7 @@ func main() {
 	}
 
 	nodeBuilder.
-		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("mutable follower state", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -180,29 +182,29 @@ func main() {
 			)
 			return err
 		}).
-		Module("transactions mempool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("transactions mempool", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			create := func() mempool.Transactions { return stdmap.NewTransactions(txLimit) }
 			pools = epochpool.NewTransactionPools(create)
 			err := node.Metrics.Mempool.Register(metrics.ResourceTransaction, pools.CombinedSize)
 			return err
 		}).
-		Module("pending block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("pending block cache", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			followerBuffer = buffer.NewPendingBlocks()
 			return nil
 		}).
-		Module("metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("metrics", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			colMetrics = metrics.NewCollectionCollector(node.Tracer)
 			return nil
 		}).
-		Module("main chain sync core", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("main chain sync core", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			mainChainSyncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Module("machine account config", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("machine account config", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			machineAccountInfo, err = cmd.LoadNodeMachineAccountInfoFile(node.BootstrapDir, node.NodeID)
 			return err
 		}).
-		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Module("sdk client connection options", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
 			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
@@ -215,7 +217,7 @@ func main() {
 
 			return nil
 		}).
-		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("machine account config validator", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
 			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
@@ -231,7 +233,7 @@ func main() {
 
 			return validator, err
 		}).
-		Component("follower engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
 			cleaner := storagekv.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
@@ -301,7 +303,7 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("finalized snapshot", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			finalizedHeader, err = consync.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
@@ -309,7 +311,7 @@ func main() {
 
 			return finalizedHeader, nil
 		}).
-		Component("main chain sync engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("main chain sync engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 			// create a block synchronization engine to handle follower getting out of sync
 			sync, err := consync.New(
@@ -329,7 +331,7 @@ func main() {
 
 			return sync, nil
 		}).
-		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			ing, err = ingest.New(
 				node.Logger,
 				node.Network,
@@ -343,11 +345,11 @@ func main() {
 			)
 			return ing, err
 		}).
-		Component("transaction ingress server", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("transaction ingress server", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			server := ingress.New(ingressConf, ing, node.RootChainID)
 			return server, nil
 		}).
-		Component("provider engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("provider engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			retrieve := func(collID flow.Identifier) (flow.Entity, error) {
 				coll, err := node.Storage.Collections.ByID(collID)
 				return coll, err
@@ -358,7 +360,7 @@ func main() {
 				retrieve,
 			)
 		}).
-		Component("pusher engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("pusher engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			push, err = pusher.New(
 				node.Logger,
 				node.Network,
@@ -373,7 +375,7 @@ func main() {
 		}).
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
-		Component("epoch manager", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("epoch manager", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err
@@ -506,6 +508,7 @@ func main() {
 
 			return manager, err
 		}).
+		SerialStart().
 		Build().
 		Run()
 }
