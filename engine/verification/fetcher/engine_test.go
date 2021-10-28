@@ -743,8 +743,7 @@ func mockRequester(t *testing.T,
 			expectedRequest, ok := requests[actualRequest.ID()]
 			require.True(t, ok, "requester received an unexpected chunk request")
 
-			require.Equal(t, expectedRequest.Index, actualRequest.Index)
-			require.Equal(t, expectedRequest.ResultID, actualRequest.ResultID)
+			require.Equal(t, expectedRequest.Locator, actualRequest.Locator)
 			require.Equal(t, expectedRequest.ChunkID, actualRequest.ChunkID)
 			require.Equal(t, expectedRequest.Agrees, actualRequest.Agrees)
 			require.Equal(t, expectedRequest.Disagrees, actualRequest.Disagrees)
