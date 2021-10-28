@@ -76,10 +76,9 @@ type NodeBuilder interface {
 	// If the error is not nil, returns a fatal log event containing the error.
 	MustNot(err error) *zerolog.Event
 
-	// Run initiates all common components (logger, database, protocol state etc.)
-	// then starts each component. It also sets up a channel to gracefully shut
-	// down each component if a SIGINT is received.
-	Run()
+	// Build finalizes the node configuration in preparation for start and returns a Node
+	// object that can be run
+	Build() Node
 
 	// PreInit registers a new PreInit function.
 	// PreInit functions run before the protocol state is initialized or any other modules or components are initialized
