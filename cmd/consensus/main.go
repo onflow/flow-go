@@ -762,6 +762,7 @@ func main() {
 
 			return reactorEngine, nil
 		}).
+		Build().
 		Run()
 }
 

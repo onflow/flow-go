@@ -561,7 +561,9 @@ func main() {
 		Component("grpc server", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, node.Storage.Headers, node.State, events, results, txResults, node.RootChainID)
 			return rpcEng, nil
-		}).Run()
+		}).
+		Build().
+		Run()
 }
 
 // copy the checkpoint files from the bootstrap folder to the execution state folder

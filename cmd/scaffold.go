@@ -10,10 +10,8 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
@@ -971,37 +969,9 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	})
 }
 
-// Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
-// down each component if a SIGINT is received. Until a SIGINT is received, Run will block.
-// Since, Run is a blocking call it should only be used when running a node as it's own independent process.
-func (fnb *FlowNodeBuilder) Run() {
-
-	// initialize signal catcher
-	fnb.sig = make(chan os.Signal, 1)
-	signal.Notify(fnb.sig, os.Interrupt, syscall.SIGTERM)
-
-	select {
-	case <-fnb.Ready():
-		fnb.Logger.Info().Msgf("%s node startup complete", fnb.BaseConfig.NodeRole)
-	case <-fnb.sig:
-		fnb.Logger.Warn().Msg("node startup aborted")
-		os.Exit(1)
-	}
-
-	// block till a SIGINT is received
-	<-fnb.sig
-
-	fnb.Logger.Info().Msgf("%s node shutting down", fnb.BaseConfig.NodeRole)
-
-	select {
-	case <-fnb.Done():
-		fnb.Logger.Info().Msgf("%s node shutdown complete", fnb.BaseConfig.NodeRole)
-	case <-fnb.sig:
-		fnb.Logger.Warn().Msg("node shutdown aborted")
-		os.Exit(1)
-	}
-
-	os.Exit(0)
+func (fnb *FlowNodeBuilder) Build() Node {
+	fnb.sig = make(chan os.Signal)
+	return NewNode(fnb, fnb.BaseConfig.NodeRole, fnb.Logger, fnb.sig)
 }
 
 // Ready returns a channel that closes after initiating all common components (logger, database, protocol state etc.)
