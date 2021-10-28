@@ -6,12 +6,14 @@ import (
 	"sync"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/cmd"
 	access "github.com/onflow/flow-go/cmd/access/node_builder"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 // ConsensusFollower is a standalone module run by third parties which provides
@@ -134,7 +136,8 @@ func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessN
 }
 
 type ConsensusFollowerImpl struct {
-	NodeBuilder *access.UnstakedAccessNodeBuilder
+	module.ReadyDoneAware
+	Logger      zerolog.Logger
 	consumersMu sync.RWMutex
 	consumers   []pubsub.OnBlockFinalizedConsumer
 }
@@ -163,12 +166,12 @@ func NewConsensusFollower(
 		return nil, err
 	}
 
-	consensusFollower := &ConsensusFollowerImpl{NodeBuilder: anb}
+	cf := &ConsensusFollowerImpl{Logger: anb.Logger}
 	anb.BaseConfig.NodeRole = "consensus_follower"
+	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(cf.onBlockFinalized)
+	cf.ReadyDoneAware = anb.Build()
 
-	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(consensusFollower.onBlockFinalized)
-
-	return consensusFollower, nil
+	return cf, nil
 }
 
 // onBlockFinalized relays the block finalization event to all registered consumers.
@@ -191,10 +194,6 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 
 // Run starts the consensus follower.
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
-	runAccessNode(ctx, cf.NodeBuilder)
-}
-
-func runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {
 	select {
 	case <-ctx.Done():
 		return
@@ -202,14 +201,14 @@ func runAccessNode(ctx context.Context, anb *access.UnstakedAccessNodeBuilder) {
 	}
 
 	select {
-	case <-anb.Ready():
-		anb.Logger.Info().Msg("Access node startup complete")
+	case <-cf.Ready():
+		cf.Logger.Info().Msg("Access node startup complete")
 	case <-ctx.Done():
-		anb.Logger.Info().Msg("Access node startup aborted")
+		cf.Logger.Info().Msg("Access node startup aborted")
 	}
 
 	<-ctx.Done()
-	anb.Logger.Info().Msg("Access node shutting down")
-	<-anb.Done()
-	anb.Logger.Info().Msg("Access node shutdown complete")
+	cf.Logger.Info().Msg("Access node shutting down")
+	<-cf.Done()
+	cf.Logger.Info().Msg("Access node shutdown complete")
 }

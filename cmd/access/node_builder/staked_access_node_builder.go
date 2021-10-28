@@ -3,27 +3,39 @@ package node_builder
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/libp2p/go-libp2p-core/host"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+
+	"github.com/onflow/flow/protobuf/go/flow/access"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/engine/access/ingestion"
 	pingeng "github.com/onflow/flow-go/engine/access/ping"
+	"github.com/onflow/flow-go/engine/access/rpc"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
+	"github.com/onflow/flow-go/engine/common/requester"
 	"github.com/onflow/flow-go/engine/common/splitter"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/metrics/unstaked"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
+	"github.com/onflow/flow-go/utils/grpcutils"
 )
 
 // StakedAccessNodeBuilder builds a staked access node. The staked access node can optionally participate in the
@@ -89,8 +101,146 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 	return nil
 }
 
-func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
-	anb.FlowAccessNodeBuilder.Build()
+func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
+	anb.
+		BuildConsensusFollower().
+		Module("collection node client", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			// collection node address is optional (if not specified, collection nodes will be chosen at random)
+			if strings.TrimSpace(anb.rpcConf.CollectionAddr) == "" {
+				node.Logger.Info().Msg("using a dynamic collection node address")
+				return nil
+			}
+
+			node.Logger.Info().
+				Str("collection_node", anb.rpcConf.CollectionAddr).
+				Msg("using the static collection node address")
+
+			collectionRPCConn, err := grpc.Dial(
+				anb.rpcConf.CollectionAddr,
+				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+				grpc.WithInsecure(),
+				backend.WithClientUnaryInterceptor(anb.rpcConf.CollectionClientTimeout))
+			if err != nil {
+				return err
+			}
+			anb.CollectionRPC = access.NewAccessAPIClient(collectionRPCConn)
+			return nil
+		}).
+		Module("historical access node clients", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			addrs := strings.Split(anb.rpcConf.HistoricalAccessAddrs, ",")
+			for _, addr := range addrs {
+				if strings.TrimSpace(addr) == "" {
+					continue
+				}
+				node.Logger.Info().Str("access_nodes", addr).Msg("historical access node addresses")
+
+				historicalAccessRPCConn, err := grpc.Dial(
+					addr,
+					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
+					grpc.WithInsecure())
+				if err != nil {
+					return err
+				}
+				anb.HistoricalAccessRPCs = append(anb.HistoricalAccessRPCs, access.NewAccessAPIClient(historicalAccessRPCConn))
+			}
+			return nil
+		}).
+		Module("transaction timing mempools", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			var err error
+			anb.TransactionTimings, err = stdmap.NewTransactionTimings(1500 * 300) // assume 1500 TPS * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			anb.CollectionsToMarkFinalized, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			anb.CollectionsToMarkExecuted, err = stdmap.NewTimes(50 * 300) // assume 50 collection nodes * 300 seconds
+			if err != nil {
+				return err
+			}
+
+			anb.BlocksToMarkExecuted, err = stdmap.NewTimes(1 * 300) // assume 1 block per second * 300 seconds
+			return err
+		}).
+		Module("transaction metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			anb.TransactionMetrics = metrics.NewTransactionCollector(anb.TransactionTimings, node.Logger, anb.logTxTimeToFinalized,
+				anb.logTxTimeToExecuted, anb.logTxTimeToFinalizedExecuted)
+			return nil
+		}).
+		Module("ping metrics", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			anb.PingMetrics = metrics.NewPingCollector()
+			return nil
+		}).
+		Module("server certificate", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			// generate the server certificate that will be served by the GRPC server
+			x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
+			if err != nil {
+				return err
+			}
+			tlsConfig := grpcutils.DefaultServerTLSConfig(x509Certificate)
+			anb.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
+			return nil
+		}).
+		Component("RPC engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			anb.RpcEng = rpc.New(
+				node.Logger,
+				node.State,
+				anb.rpcConf,
+				anb.CollectionRPC,
+				anb.HistoricalAccessRPCs,
+				node.Storage.Blocks,
+				node.Storage.Headers,
+				node.Storage.Collections,
+				node.Storage.Transactions,
+				node.Storage.Receipts,
+				node.Storage.Results,
+				node.RootChainID,
+				anb.TransactionMetrics,
+				anb.collectionGRPCPort,
+				anb.executionGRPCPort,
+				anb.retryEnabled,
+				anb.rpcMetricsEnabled,
+				anb.apiRatelimits,
+				anb.apiBurstlimits,
+			)
+			return anb.RpcEng, nil
+		}).
+		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			var err error
+
+			anb.RequestEng, err = requester.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				node.State,
+				engine.RequestCollections,
+				filter.HasRole(flow.RoleCollection),
+				func() flow.Entity { return &flow.Collection{} },
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not create requester engine: %w", err)
+			}
+
+			anb.IngestEng, err = ingestion.New(node.Logger, node.Network, node.State, node.Me, anb.RequestEng, node.Storage.Blocks, node.Storage.Headers, node.Storage.Collections, node.Storage.Transactions, node.Storage.Results, node.Storage.Receipts, anb.TransactionMetrics,
+				anb.CollectionsToMarkFinalized, anb.CollectionsToMarkExecuted, anb.BlocksToMarkExecuted, anb.RpcEng)
+			if err != nil {
+				return nil, err
+			}
+			anb.RequestEng.WithHandle(anb.IngestEng.OnCollection)
+			anb.FinalizationDistributor.AddConsumer(anb.IngestEng)
+
+			return anb.IngestEng, nil
+		}).
+		Component("requester engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
+			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
+			// be handled by the scaffold.
+			return anb.RequestEng, nil
+		})
 
 	if anb.supportsUnstakedFollower {
 		var unstakedNetworkConduit network.Conduit
@@ -146,7 +296,7 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 		return ping, nil
 	})
 
-	return anb
+	return anb.FlowAccessNodeBuilder.Build()
 }
 
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node

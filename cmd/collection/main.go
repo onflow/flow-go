@@ -506,6 +506,7 @@ func main() {
 
 			return manager, err
 		}).
+		Build().
 		Run()
 }
 
