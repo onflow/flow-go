@@ -1079,7 +1079,6 @@ func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInte
 	c.result = newInter.NewArrayValue(
 		c.newInter,
 		arrayStaticType,
-		c.storage,
 		*value.Owner,
 		newElements...,
 	)
@@ -1315,7 +1314,6 @@ func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value
 	c.result = newInter.NewDictionaryValueWithAddress(
 		c.newInter,
 		staticType,
-		c.storage,
 		*value.Owner,
 		keysAndValues...,
 	)
@@ -1408,11 +1406,11 @@ func (c *ValueConverter) VisitLinkValue(_ *oldInter.Interpreter, value oldInter.
 	}
 }
 
-func (c *ValueConverter) VisitInterpretedFunctionValue(_ *oldInter.Interpreter, _ oldInter.InterpretedFunctionValue) {
+func (c *ValueConverter) VisitInterpretedFunctionValue(_ *oldInter.Interpreter, _ *oldInter.InterpretedFunctionValue) {
 	panic("value not storable")
 }
 
-func (c *ValueConverter) VisitHostFunctionValue(_ *oldInter.Interpreter, _ oldInter.HostFunctionValue) {
+func (c *ValueConverter) VisitHostFunctionValue(_ *oldInter.Interpreter, _ *oldInter.HostFunctionValue) {
 	panic("value not storable")
 }
 
