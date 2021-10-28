@@ -16,7 +16,9 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
@@ -29,8 +31,6 @@ const NotSet = "not set"
 
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
-	module.ReadyDoneAware
-
 	// BaseFlags reads the command line arguments common to all nodes
 	BaseFlags()
 
@@ -59,15 +59,25 @@ type NodeBuilder interface {
 	EnqueueTracer()
 
 	// Module enables setting up dependencies of the engine with the builder context
-	Module(name string, f func(builder NodeBuilder, node *NodeConfig) error) NodeBuilder
+	Module(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig) error) NodeBuilder
 
-	// Component adds a new component to the node that conforms to the ReadyDone
-	// interface.
+	// Component adds a new component to the node that conforms to the ReadyDoneAware
+	// interface, and throws a Fatal() when an irrecoverable error is encountered
+	// Use Component if the component cannot be restarted when an irrecoverable error is encountered
+	// and the node should crash.
 	//
 	// When the node is run, this component will be started with `Ready`. When the
 	// node is stopped, we will wait for the component to exit gracefully with
 	// `Done`.
-	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
+	Component(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error)) NodeBuilder
+
+	// BackgroundComponent adds a new component to the node that conforms to the ReadyDoneAware
+	// interface, and calls the provided error handler when an irrecoverable error is encountered.
+	// Use BackgroundComponent if the component is not critical to the node's safe operation and
+	// can/should be independently restarted when an irrecoverable error is encountered.
+	//
+	// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
+	BackgroundComponent(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder
 
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder
@@ -77,18 +87,23 @@ type NodeBuilder interface {
 	// If the error is not nil, returns a fatal log event containing the error.
 	MustNot(err error) *zerolog.Event
 
+	// SerialStart configures the node to start components serially
+	// By default, components are started in parallel and must have explicit dependency checks.
+	// This allows using the order components were added to manage dependencies implicitly
+	SerialStart() NodeBuilder
+
 	// Build finalizes the node configuration in preparation for start and returns a Node
 	// object that can be run
 	Build() Node
 
 	// PreInit registers a new PreInit function.
 	// PreInit functions run before the protocol state is initialized or any other modules or components are initialized
-	PreInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder
+	PreInit(f func(ctx irrecoverable.SignalerContext, node *NodeConfig)) NodeBuilder
 
 	// PostInit registers a new PreInit function.
 	// PostInit functions run after the protocol state has been initialized but before any other modules or components
 	// are initialized
-	PostInit(f func(builder NodeBuilder, node *NodeConfig)) NodeBuilder
+	PostInit(f func(ctx irrecoverable.SignalerContext, node *NodeConfig)) NodeBuilder
 
 	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics() error
