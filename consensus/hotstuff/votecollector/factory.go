@@ -84,7 +84,7 @@ func NewStakingVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Commi
 // not the random beacon. There should be an economic incentive for the nodes to preferably
 // sign with their random beacon key.
 func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
-	base := &combinedVoteProcessorFactoryBase{
+	base := &combinedVoteProcessorFactoryBaseV2{
 		log:         log,
 		committee:   committee,
 		onQCCreated: onQCCreated,

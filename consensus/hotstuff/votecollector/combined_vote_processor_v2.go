@@ -19,16 +19,16 @@ import (
 
 /* **************** Base-Factory for CombinedVoteProcessors ***************** */
 
-// combinedVoteProcessorFactoryBase is a `votecollector.baseFactory` for creating
+// combinedVoteProcessorFactoryBaseV2 is a `votecollector.baseFactory` for creating
 // CombinedVoteProcessors, holding all needed dependencies.
-// combinedVoteProcessorFactoryBase is intended to be used for the main consensus.
+// combinedVoteProcessorFactoryBaseV2 is intended to be used for the main consensus.
 // CAUTION:
 // this base factory only creates the VerifyingVoteProcessor for the given block.
 // It does _not_ check the proposer's vote for its own block, i.e. it does _not_
 // implement `hotstuff.VoteProcessorFactory`. This base factory should be wrapped
 // by `votecollector.VoteProcessorFactory` which adds the logic to verify
 // the proposer's vote (decorator pattern).
-type combinedVoteProcessorFactoryBase struct {
+type combinedVoteProcessorFactoryBaseV2 struct {
 	log         zerolog.Logger
 	committee   hotstuff.Committee
 	onQCCreated hotstuff.OnQCCreated
@@ -37,7 +37,7 @@ type combinedVoteProcessorFactoryBase struct {
 
 // Create creates CombinedVoteProcessorV2 for processing votes for the given block.
 // Caller must treat all errors as exceptions
-func (f *combinedVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
+func (f *combinedVoteProcessorFactoryBaseV2) Create(block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
 	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants at block %v: %w", block.BlockID, err)
