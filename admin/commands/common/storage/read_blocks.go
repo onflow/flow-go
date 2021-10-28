@@ -14,15 +14,6 @@ import (
 
 var _ commands.AdminCommand = (*ReadBlocksCommand)(nil)
 
-type readBlocksRequestType int
-
-const (
-	readBlocksRequestID readBlocksRequestType = iota
-	readBlocksRequestHeight
-	readBlocksRequestFinal
-	readBlocksRequestSealed
-)
-
 type readBlocksRequest struct {
 	blocksRequest    *blocksRequest
 	numBlocksToQuery uint64
