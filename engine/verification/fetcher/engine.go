@@ -291,7 +291,13 @@ func (e *Engine) handleChunkDataPackWithTracing(
 	// make sure the chunk data pack is valid
 	err := e.validateChunkDataPackWithTracing(ctx, status.ChunkIndex, originID, chunkDataPack, status.ExecutionResult)
 	if err != nil {
-		return false, NewChunkDataPackValidationError(originID, chunkDataPack.ID(), chunkDataPack.ChunkID, chunkDataPack.Collection.ID(), err)
+		return false, NewChunkDataPackValidationError(originID,
+			status.ExecutionResult.ID(),
+			status.ChunkIndex,
+			chunkDataPack.ID(),
+			chunkDataPack.ChunkID,
+			chunkDataPack.Collection.ID(),
+			err)
 	}
 
 	processed, err := e.handleValidatedChunkDataPack(ctx, status, chunkDataPack)
