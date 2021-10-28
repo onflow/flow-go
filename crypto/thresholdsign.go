@@ -15,7 +15,7 @@ import (
 
 // A threshold signature scheme allows any subset of (t+1)
 // valid signature shares to reconstruct the threshold signature.
-// up to (t) shares do not reveal any information about the threshold
+// Up to (t) shares do not reveal any information about the threshold
 // signature.
 // Although the API allows using arbitrary values of (t),
 // the threshold signature scheme is secure in the presence of up to (t)
@@ -27,68 +27,70 @@ import (
 // The interface only allows following the threshold signing protocol .
 type ThresholdSignatureFollower interface {
 	// VerifyShare verifies the input signature against the stored message and stored
-	// key at the input index.
-	//
-	// This function does not update the internal state.
-	// The function errors:
-	//  - InvalidInputsError if the index input is invalid
-	//  - other error if the execution failed
-	// The function does not return an error for any invalid signature.
-	// If any error is returned, the returned bool is false.
-	// If no error is returned, the bool represents the validity of the signature.
+	// key at the input index. This function does not update the internal state.
 	// The function is thread-safe.
+	// Returns:
+	//  - (true, nil) if the signature is valid
+	//  - (false, nil) if the orig references a valid signer but the sig share is invalid
+	//  - (false, InvalidInputsError) if orig is not a invalid index value
+	//  - all other errors are unexpected during normal operations
 	VerifyShare(orig int, share Signature) (bool, error)
+
 	// VerifyThresholdSignature verifies the input signature against the stored
-	// message and stored group public key.
-	//
-	// This function does not update the internal state.
-	// The function errors if the execution failed.
-	// The function does not return an error for any invalid signature.
-	// If any error is returned, the returned bool is false.
-	// If no error is returned, the bool represents the validity of the signature.
+	// message and stored group public key. This function does not update the internal state.
 	// The function is thread-safe.
+	// Returns:
+	//  - (true, nil) if the signature is valid
+	//  - (false, nil) if the orig references a valid signer but the sig share is invalid
+	//  - (false, InvalidInputsError) if orig is not a invalid index value
+	//  - all other errors are unexpected during normal operations
 	VerifyThresholdSignature(thresholdSignature Signature) (bool, error)
-	// EnoughShares checks whether there are enough shares to reconstruct a signature.
-	// The funstion returns true if and only if the number of shares have reached (threshold+1)
-	// shares.
-	//
-	// This function is thread safe
+
+	// EnoughShares indicates whether enough shares have been accumulated in order to reconstruct
+	// a group signature. This function is thread safe.
+	// Returns:
+	//  - true if and only if at least (threshold+1) shares were added
 	EnoughShares() bool
+
 	// TrustedAdd adds a signature share to the internal pool of shares
 	// without verifying the signature against the message and the participant's
-	// public key.
+	// public key. This function is thread safe.
 	//
 	// The share is only added if the signer index is valid and has not been
 	// added yet. Moreover, the share is added only if not enough shares were collected.
 	// The function returns:
 	//  - (true, nil) if enough signature shares were already collected and no error occured
 	//  - (false, nil) if not enough shares were collected and no error occured
-	//  - (false, error) if index is invalid (InvalidInputsError) or already added (other error)
+	//  - (false, InvalidInputsError) if index is invalid
+	//  - (false, duplicatedSignerError) if a signature for the index was previously added
 	TrustedAdd(orig int, share Signature) (bool, error)
-	// VerifyAndAdd verifies a signature share (look at `VerifyShare`),
+
+	// VerifyAndAdd verifies a signature share (same as `VerifyShare`),
 	// and may or may not add the share to the local pool of shares.
 	//
 	// The share is only added if the signature is valid, the signer index is valid and has not been
 	// added yet. Moreover, the share is added only if not enough shares were collected.
-	// Thee function returns 3 outputs:
+	// The function returns 3 outputs:
 	//  - First boolean output is true if the share is valid and no error is returned, and false otherwise.
 	//  - Second boolean output is true if enough shares were collected and no error is returned, and false otherwise.
-	//  - error is IsInvalidInputsError if input index is invalid, and a random error if an exception occured.
+	//  - error is IsInvalidInputsError if input index is invalid, and a random error if an exception occurred.
 	//    (an invalid signature is not considered an invalid input, look at `VerifyShare` for details)
 	// This function is thread safe
 	VerifyAndAdd(orig int, share Signature) (bool, bool, error)
+
 	// HasShare checks whether the internal map contains the share of the given index.
-	// This function is thread safe
+	// This function is thread safe.
 	HasShare(orig int) (bool, error)
+
 	// ThresholdSignature returns the threshold signature if the threshold was reached.
 	// The threshold signature is reconstructed if this was not done in a previous call.
-	//
-	// In the case of reconstructing the threshold signature, the function errors
-	// if not enough shares were collected and if any signature fails the deserialization.
-	// It also performs a final verification against the stored message and group public key
-	// and errors if the result is not valid. This is required for the function safety since
-	// `TrustedAdd` allows adding invalid signatures.
 	// The function is thread-safe.
+	// The function errors (without sentinel) in any of the following cases:
+	//  - Not enough shares were collected.
+	//  - Any of the added signatures fails the deserialization.
+	//  - The reconstructed group signature is invalid. This post-verification against
+	//    the stored message and group public key is required  for safety, as `TrustedAdd`
+	//    allows adding invalid signatures.
 	ThresholdSignature() (Signature, error)
 }
 
@@ -242,7 +244,7 @@ func (s *thresholdSigner) SignShare() (Signature, error) {
 	return share, nil
 }
 
-// VerifyShare verifies a signature share using the signer's public key
+// verifyShare verifies a signature share using the signer's public key
 func (s *thresholdSigner) verifyShare(share Signature, signerIndex index) (bool, error) {
 	if len(s.publicKeyShares) != s.size {
 		return false, errors.New("the node public keys are not set")

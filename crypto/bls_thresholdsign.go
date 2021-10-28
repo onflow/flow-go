@@ -20,7 +20,7 @@ import (
 
 // A threshold signature scheme allows any subset of (t+1)
 // valid signature shares to reconstruct the threshold signature.
-// up to (t) shares do not reveal any information about the threshold
+// Up to (t) shares do not reveal any information about the threshold
 // signature.
 // Although the API allows using arbitrary values of (t),
 // the threshold signature scheme is secure in the presence of up to (t)
@@ -36,7 +36,7 @@ import (
 // the signature shares has to be managed outside of the library.
 
 // blsThresholdSignatureFollower is part of the stateful api
-// It holds the data needed for threshold signaures
+// It holds the data needed for threshold signatures
 type blsThresholdSignatureFollower struct {
 	// size of the group
 	size int
@@ -86,7 +86,8 @@ func NewBLSThresholdSignatureFollower(
 	sharePublicKeys []PublicKey,
 	threshold int,
 	message []byte,
-	dsTag string) (*blsThresholdSignatureFollower, error) {
+	dsTag string,
+) (*blsThresholdSignatureFollower, error) {
 
 	size := len(sharePublicKeys)
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
@@ -146,7 +147,8 @@ func NewBLSThresholdSignatureParticipant(
 	currentIndex int,
 	currentPrivateKey PrivateKey,
 	message []byte,
-	dsTag string) (*blsThresholdSignatureParticipant, error) {
+	dsTag string,
+) (*blsThresholdSignatureParticipant, error) {
 
 	size := len(sharePublicKeys)
 	if currentIndex >= size || currentIndex < 0 {
@@ -185,7 +187,6 @@ func NewBLSThresholdSignatureParticipant(
 // not update the internal state.
 // This function is thread safe and non-blocking
 func (s *blsThresholdSignatureParticipant) SignShare() (Signature, error) {
-
 	share, err := s.currentPrivateKey.Sign(s.message, s.hasher)
 	if err != nil {
 		return nil, fmt.Errorf("share signing failed: %w", err)
@@ -341,7 +342,6 @@ func (s *blsThresholdSignatureFollower) TrustedAdd(orig int, share Signature) (b
 //    (an invalid signature is not considered an invalid input, look at `VerifyShare` for details)
 // This function is thread safe and blocking.
 func (s *blsThresholdSignatureFollower) VerifyAndAdd(orig int, share Signature) (bool, bool, error) {
-
 	// validate index
 	if err := s.validIndex(index(orig)); err != nil {
 		return false, false, err

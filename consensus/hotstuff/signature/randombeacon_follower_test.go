@@ -52,7 +52,7 @@ func TestRandomBeaconFollower(t *testing.T) {
 		assert.False(t, enough)
 		var wg sync.WaitGroup
 		// create (t) signatures of the first randomly chosen signers
-		// ( 1 signature short of the threshold)
+		// (1 signature short of the threshold)
 		for j := 0; j < threshold; j++ {
 			wg.Add(1)
 			// test thread safety

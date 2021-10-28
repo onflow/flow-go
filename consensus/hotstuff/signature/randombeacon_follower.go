@@ -10,12 +10,12 @@ import (
 )
 
 // randomBeaconFollower implements hotstuff.RandomBeaconFollower interface.
-// All methods of this structure are thread-safe.
+// All methods of this structure are concurrency-safe.
 type randomBeaconFollower struct {
 	follower crypto.ThresholdSignatureFollower
 }
 
-// NewRandomBeaconFollower returns a new Random Beacon follower instance.
+// NewRandomBeaconFollower instantiates a new randomBeaconFollower.
 //
 // It errors with engine.InvalidInputError if any input is not valid.
 func NewRandomBeaconFollower(
@@ -24,14 +24,12 @@ func NewRandomBeaconFollower(
 	threshold int,
 	message []byte,
 ) (*randomBeaconFollower, error) {
-
 	follower, err := crypto.NewBLSThresholdSignatureFollower(
 		groupPublicKey,
 		publicKeyShares,
 		threshold,
 		message,
 		encoding.RandomBeaconTag)
-
 	if err != nil {
 		return nil, engine.NewInvalidInputErrorf("create a new Random Beacon follower failed: %w", err)
 	}
@@ -42,60 +40,54 @@ func NewRandomBeaconFollower(
 }
 
 // Verify verifies the signature share under the signer's public key and the message agreed upon.
+// The function is thread-safe and wait-free (i.e. allowing arbitrary many routines to
+// execute the business logic, without interfering with each other).
 // It allows concurrent verification of the given signature.
-// It returns :
+// Returns :
 //  - engine.InvalidInputError if signerIndex is invalid
 //  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
-//  - other error if there is an exception.
-// The function call is non-blocking
+//  - other error if there is an unexpected exception.
 func (r *randomBeaconFollower) Verify(signerIndex int, share crypto.Signature) error {
 	verif, err := r.follower.VerifyShare(signerIndex, share)
-
-	// check for errors
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
-			// this erorr happens because of an invalid index
-			return engine.NewInvalidInputErrorf("Verify beacon signature from %d failed: %w", signerIndex, err)
-		} else {
-			// other exceptions
-			return fmt.Errorf("Verify beacon signature from %d failed: %w", signerIndex, err)
+			return engine.NewInvalidInputErrorf("index %d does not reference a valid random beacon participant: %w", signerIndex, err)
 		}
+		return fmt.Errorf("unexpected error verifying beacon signature from %d: %w", signerIndex, err)
 	}
 
-	if !verif {
-		// invalid signature
+	if !verif { // invalid signature
 		return fmt.Errorf("invalid beacon signature from %d: %w", signerIndex, signature.ErrInvalidFormat)
 	}
 	return nil
 }
 
 // TrustedAdd adds a share to the internal signature shares store.
-// The function does not verify the signature is valid. It is the caller's responsibility
-// to make sure the signature was previously verified.
-// It returns:
+// There is no pre-check of the signature's validity _before_ adding it.
+// It is the caller's responsibility to make sure the signature was previously verified.
+// Nevertheless, the implementation guarantees safety (only correct group signatures
+// are successfully reconstructed) through a post-check (verifying the group signature
+// _after_ reconstruction before returning it).
+// The function is thread-safe but lock its internal state, thereby permitting only
+// one routine at a time to add a signature.
+// Returns:
 //  - (true, nil) if the signature has been added, and enough shares have been collected.
 //  - (false, nil) if the signature has been added, but not enough shares were collected.
 //  - (false, error) if there is any exception adding the signature share.
-//      - engine.InvalidInputError if signerIndex is invalid
+//      - engine.InvalidInputError if signerIndex is invalid (not a consensus participant)
 //  	- engine.DuplicatedEntryError if the signer has been already added
-//      - other error if other exceptions
-// The function call is blocking.
+//      - other error if there is an unexpected exception.
 func (r *randomBeaconFollower) TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error) {
-
 	// Trusted add to the crypto layer
 	enough, err := r.follower.TrustedAdd(signerIndex, share)
-
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
-			// means index is invalid
-			return false, engine.NewInvalidInputErrorf("trusted add failed: %w", err)
-		} else if crypto.IsduplicatedSignerError(err) {
-			// signer was added
-			return false, engine.NewDuplicatedEntryErrorf("trusted add failed: %w", err)
-		} else {
-			// other exceptions
-			return false, fmt.Errorf("trusted add failed because of an exception: %w", err)
+			return false, engine.NewInvalidInputErrorf("index %d does not reference a valid random beacon participant: %w", signerIndex, err)
 		}
+		if crypto.IsduplicatedSignerError(err) {
+			return false, engine.NewDuplicatedEntryErrorf("repeated addition of signature from participant %d: %w", signerIndex, err)
+		}
+		return false, fmt.Errorf("unexpected error while adding signature from participant %d: %w", signerIndex, err)
 	}
 	return enough, nil
 }
@@ -108,14 +100,13 @@ func (r *randomBeaconFollower) EnoughShares() bool {
 	return r.follower.EnoughShares()
 }
 
-// Reconstruct reconstructs the group signature.
-//
-// The function errors if not enough shares were collected and if any signature
-// fails the deserialization.
-// It also performs a final verification against the stored message and group public key
-// and errors (without sentinel) if the result is not valid. This is required for the function safety since
-// `TrustedAdd` allows adding invalid signatures.
-// The function is blocking.
+// Reconstruct reconstructs the group signature. The function is thread-safe but locks
+// its internal state, thereby permitting only one routine at a time.
+// The function errors (without sentinel) in any of the following cases:
+//  - Not enough shares were collected.
+//  - Any of the added signatures fails the deserialization.
+//  - The reconstructed group signature is invalid. This post-verification is required
+//	  for safety, as `TrustedAdd` allows adding invalid signatures.
 func (r *randomBeaconFollower) Reconstruct() (crypto.Signature, error) {
 	return r.follower.ThresholdSignature()
 }
