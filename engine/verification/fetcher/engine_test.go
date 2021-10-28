@@ -761,7 +761,7 @@ func mockRequester(t *testing.T,
 	return wg
 }
 
-// chunkDataPackResponsesFixture creates chunk data packs for given chunks.
+// chunkDataPackResponsesFixture creates chunk data pack responses for given chunks.
 func chunkDataPackResponsesFixture(t *testing.T,
 	statuses verification.ChunkStatusList,
 	collMap map[flow.Identifier]*flow.Collection,
@@ -926,7 +926,7 @@ func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount in
 			// system-chunk should have a nil collection
 			continue
 		}
-		collMap[status.ChunkID()] = collections[status.ChunkIndex]
+		collMap[status.Chunk().ID()] = collections[status.ChunkIndex]
 	}
 
 	return block, result, statuses, locators, collMap

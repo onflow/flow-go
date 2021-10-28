@@ -133,7 +133,7 @@ func executionResultForkFixture(t *testing.T) (*flow.Block,
 
 	// keeps collections of assigned chunks
 	collMap := make(map[flow.Identifier]*flow.Collection)
-	collMap[statusA.ChunkID()] = collection
+	collMap[statusA.Chunk().ID()] = collection
 
 	return block, resultA, statusA, resultB, statusB, collMap
 }

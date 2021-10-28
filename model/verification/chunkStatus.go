@@ -15,10 +15,6 @@ func (s ChunkStatus) Chunk() *flow.Chunk {
 	return s.ExecutionResult.Chunks[s.ChunkIndex]
 }
 
-func (s ChunkStatus) ChunkID() flow.Identifier {
-	return s.ExecutionResult.Chunks[s.ChunkIndex].ID()
-}
-
 type ChunkStatusList []*ChunkStatus
 
 func (l ChunkStatusList) Chunks() flow.ChunkList {
