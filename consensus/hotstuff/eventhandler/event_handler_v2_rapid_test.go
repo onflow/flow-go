@@ -23,7 +23,6 @@ type rapidStuff struct {
 	validator *BlacklistValidator
 	committee *Committee
 
-	curViewChanged  bool
 	expectedCurView uint64
 }
 
