@@ -288,24 +288,18 @@ func (e *Engine) handleChunkDataPackWithTracing(
 	status *verification.ChunkStatus,
 	chunkDataPack *flow.ChunkDataPack) (bool, error) {
 
-	var ferr error
-	processed := false
-
 	// make sure the chunk data pack is valid
 	err := e.validateChunkDataPackWithTracing(ctx, status.ChunkIndex, originID, chunkDataPack, status.ExecutionResult)
 	if err != nil {
-		// TODO: this can be due to a byzantine behavior
-		ferr = NewChunkDataPackValidationError(originID, chunkDataPack.ID(), chunkDataPack.ChunkID, chunkDataPack.Collection.ID(), err)
-		return false, ferr
+		return false, NewChunkDataPackValidationError(originID, chunkDataPack.ID(), chunkDataPack.ChunkID, chunkDataPack.Collection.ID(), err)
 	}
 
-	processed, err = e.handleValidatedChunkDataPack(ctx, status, chunkDataPack)
+	processed, err := e.handleValidatedChunkDataPack(ctx, status, chunkDataPack)
 	if err != nil {
-		ferr = fmt.Errorf("could not handle validated chunk data pack: %w", err)
-		return processed, ferr
+		return processed, fmt.Errorf("could not handle validated chunk data pack: %w", err)
 	}
 
-	return processed, ferr
+	return processed, nil
 }
 
 // handleValidatedChunkDataPack receives a validated chunk data pack, removes its status from the memory, and pushes a verifiable chunk for it to
