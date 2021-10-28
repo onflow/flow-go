@@ -146,7 +146,7 @@ func readLoop(ctx context.Context, id flow.Identifier, net *testnet.FlowNetwork,
 
 		switch v := event.(type) {
 		case *message.TestMessage:
-			t.Logf("%s: %s: %s\n", id.String(), actualOriginID.String(), v.Text)
+			t.Logf("%s: %s: %s", id.String(), actualOriginID.String(), v.Text)
 			assert.Equal(t, expectedOrigin, actualOriginID)
 			assert.Equal(t, expectedMsg, v.Text)
 			return
