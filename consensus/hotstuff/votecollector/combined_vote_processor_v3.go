@@ -28,6 +28,7 @@ import (
 // implement `hotstuff.VoteProcessorFactory`. This base factory should be wrapped
 // by `votecollector.VoteProcessorFactory` which adds the logic to verify
 // the proposer's vote (decorator pattern).
+// nolint:unused
 type combinedVoteProcessorFactoryBaseV3 struct {
 	log         zerolog.Logger
 	committee   hotstuff.Committee
@@ -37,6 +38,7 @@ type combinedVoteProcessorFactoryBaseV3 struct {
 
 // Create creates CombinedVoteProcessorV3 for processing votes for the given block.
 // Caller must treat all errors as exceptions
+// nolint:unused
 func (f *combinedVoteProcessorFactoryBaseV3) Create(block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
 	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
 	if err != nil {
