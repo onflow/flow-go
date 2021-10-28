@@ -24,15 +24,15 @@ type Node interface {
 
 type FlowNodeImp struct {
 	module.ReadyDoneAware
-	NodeRole string
-	Logger   zerolog.Logger
-	sig      chan os.Signal
+	*NodeConfig
+	Logger zerolog.Logger
+	sig    chan os.Signal
 }
 
-func NewNode(builder NodeBuilder, role string, logger zerolog.Logger, sig chan os.Signal) Node {
+func NewNode(builder NodeBuilder, cfg *NodeConfig, logger zerolog.Logger, sig chan os.Signal) Node {
 	return &FlowNodeImp{
 		ReadyDoneAware: builder,
-		NodeRole:       role,
+		NodeConfig:     cfg,
 		Logger:         logger,
 		sig:            sig,
 	}
@@ -42,13 +42,12 @@ func NewNode(builder NodeBuilder, role string, logger zerolog.Logger, sig chan o
 // down each component if a SIGINT is received. Until a SIGINT is received, Run will block.
 // Since, Run is a blocking call it should only be used when running a node as it's own independent process.
 func (node *FlowNodeImp) Run() {
-
 	// initialize signal catcher
 	signal.Notify(node.sig, os.Interrupt, syscall.SIGTERM)
 
 	select {
 	case <-node.Ready():
-		node.Logger.Info().Msgf("%s node startup complete", node.NodeRole)
+		node.Logger.Info().Msgf("%s node startup complete", node.BaseConfig.NodeRole)
 	case <-node.sig:
 		node.Logger.Warn().Msg("node startup aborted")
 		os.Exit(1)
@@ -57,11 +56,11 @@ func (node *FlowNodeImp) Run() {
 	// block till a SIGINT is received
 	<-node.sig
 
-	node.Logger.Info().Msgf("%s node shutting down", node.NodeRole)
+	node.Logger.Info().Msgf("%s node shutting down", node.BaseConfig.NodeRole)
 
 	select {
 	case <-node.Done():
-		node.Logger.Info().Msgf("%s node shutdown complete", node.NodeRole)
+		node.Logger.Info().Msgf("%s node shutdown complete", node.BaseConfig.NodeRole)
 	case <-node.sig:
 		node.Logger.Warn().Msg("node shutdown aborted")
 		os.Exit(1)
