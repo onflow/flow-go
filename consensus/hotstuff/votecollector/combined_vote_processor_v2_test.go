@@ -213,7 +213,6 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 	}
 
 	stakingSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
-	thresholdSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
 	reconstructor := &mockhotstuff.RandomBeaconReconstructor{}
 	packer := &mockhotstuff.Packer{}
 
@@ -225,9 +224,6 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 	mockAggregator(stakingSigAggregator)
 	stakingSigAggregator.On("Aggregate").Return(identities, unittest.RandomBytes(128), nil)
 
-	mockAggregator(thresholdSigAggregator)
-	thresholdSigAggregator.On("Aggregate").Return(identities, unittest.RandomBytes(128), nil)
-
 	reconstructor.On("HasSufficientShares").Return(true)
 	reconstructor.On("Reconstruct").Return(unittest.SignatureFixture(), nil)
 
@@ -236,7 +232,6 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 	// Helper factory function to create processors. We need new processor for every test case
 	// because QC creation is one time operation and is triggered as soon as we have collected enough weight and shares.
 	createProcessor := func(stakingAggregator *mockhotstuff.WeightedSignatureAggregator,
-		rbSigAggregator *mockhotstuff.WeightedSignatureAggregator,
 		rbReconstructor *mockhotstuff.RandomBeaconReconstructor,
 		packer *mockhotstuff.Packer) *CombinedVoteProcessorV2 {
 		return &CombinedVoteProcessorV2{
@@ -251,7 +246,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 		}
 	}
 
-	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+	vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig)
 
 	// in this test case we aren't able to aggregate staking signature
 	s.Run("staking-sig-aggregate", func() {
@@ -259,18 +254,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 		stakingSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
 		mockAggregator(stakingSigAggregator)
 		stakingSigAggregator.On("Aggregate").Return(nil, nil, exception)
-		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
-		err := processor.Process(vote)
-		require.ErrorIs(s.T(), err, exception)
-		require.False(s.T(), model.IsInvalidVoteError(err))
-	})
-	// in this test case we aren't able to aggregate threshold signature
-	s.Run("threshold-sig-aggregate", func() {
-		exception := errors.New("threshold-aggregate-exception")
-		thresholdSigAggregator := &mockhotstuff.WeightedSignatureAggregator{}
-		mockAggregator(thresholdSigAggregator)
-		thresholdSigAggregator.On("Aggregate").Return(nil, nil, exception)
-		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
+		processor := createProcessor(stakingSigAggregator, reconstructor, packer)
 		err := processor.Process(vote)
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), model.IsInvalidVoteError(err))
@@ -281,7 +265,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 		reconstructor := &mockhotstuff.RandomBeaconReconstructor{}
 		reconstructor.On("HasSufficientShares").Return(true)
 		reconstructor.On("Reconstruct").Return(nil, exception)
-		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
+		processor := createProcessor(stakingSigAggregator, reconstructor, packer)
 		err := processor.Process(vote)
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), model.IsInvalidVoteError(err))
@@ -291,7 +275,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_BuildQCError() {
 		exception := errors.New("pack-qc-exception")
 		packer := &mockhotstuff.Packer{}
 		packer.On("Pack", mock.Anything, mock.Anything).Return(nil, nil, exception)
-		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
+		processor := createProcessor(stakingSigAggregator, reconstructor, packer)
 		err := processor.Process(vote)
 		require.ErrorIs(s.T(), err, exception)
 		require.False(s.T(), model.IsInvalidVoteError(err))
@@ -339,7 +323,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_ConcurrentCreatingQC() {
 
 	var startupWg, shutdownWg sync.WaitGroup
 
-	vote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
+	vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithStakingSig)
 	startupWg.Add(1)
 	// prepare goroutines, so they are ready to submit a vote at roughly same time
 	for i := 0; i < 5; i++ {
