@@ -14,16 +14,6 @@ import (
 	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
-// TagLessConnManager is a companion interface to libp2p-core.connmgr.ConnManager which implements a (simplified) tagless variant of the Protect / Unprotect logic
-type TagLessConnManager interface {
-	connmgr.ConnManager
-	// ProtectPeer increments the stream setup count for the peer.ID
-	ProtectPeer(id peer.ID)
-	// UnprotectPeer decrements the stream setup count for the peer.ID.
-	// If the count reaches zero, the id is removed from the map
-	UnprotectPeer(id peer.ID)
-}
-
 // ConnManager provides an implementation of Libp2p's ConnManager interface (https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnManager)
 // It is called back by libp2p when certain events occur such as opening/closing a stream, opening/closing connection etc.
 // This implementation updates networking metrics when a peer connection is added or removed
@@ -33,14 +23,10 @@ type ConnManager struct {
 	log                 zerolog.Logger        // logger to log connection, stream and other statistics about libp2p
 	metrics             module.NetworkMetrics // metrics to report connection statistics
 
-	// map to track stream setup progress for each peer
-	// stream setup involves creating a connection (if none exist) with the remote and then creating a stream on that connection.
-	// This map is used to make sure that both these steps occur atomically.
-	streamSetupInProgressCnt map[peer.ID]int
-	// mutex for the stream setup map
-	streamSetupMapLk sync.RWMutex
-
 	idProvider id.IdentityProvider
+
+	plk       sync.RWMutex
+	protected map[peer.ID]map[string]struct{}
 }
 
 type ConnManagerOption func(*ConnManager)
@@ -53,10 +39,10 @@ func TrackUnstakedConnections(idProvider id.IdentityProvider) ConnManagerOption 
 
 func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics, opts ...ConnManagerOption) *ConnManager {
 	cn := &ConnManager{
-		log:                      log,
-		NullConnMgr:              connmgr.NullConnMgr{},
-		metrics:                  metrics,
-		streamSetupInProgressCnt: make(map[peer.ID]int),
+		log:         log,
+		NullConnMgr: connmgr.NullConnMgr{},
+		metrics:     metrics,
+		protected:   make(map[peer.ID]map[string]struct{}),
 	}
 	n := &network.NotifyBundle{ListenCloseF: cn.ListenCloseNotifee,
 		ListenF:       cn.ListenNotifee,
@@ -150,46 +136,46 @@ func (c *ConnManager) logConnectionUpdate(n network.Network, con network.Conn, l
 		Msg(logMsg)
 }
 
-// ProtectPeer increments the stream setup count for the peer.ID
-func (c *ConnManager) ProtectPeer(id peer.ID) {
-	c.streamSetupMapLk.Lock()
-	defer c.streamSetupMapLk.Unlock()
+func (cm *ConnManager) Protect(id peer.ID, tag string) {
+	cm.plk.Lock()
+	defer cm.plk.Unlock()
 
-	c.streamSetupInProgressCnt[id]++
-
-	c.log.Trace().
-		Str("peer_id", id.String()).
-		Int("stream_setup_in_progress_cnt", c.streamSetupInProgressCnt[id]).
-		Msg("protected from connection pruning")
-}
-
-// UnprotectPeer decrements the stream setup count for the peer.ID.
-// If the count reaches zero, the id is removed from the map
-func (c *ConnManager) UnprotectPeer(id peer.ID) {
-	c.streamSetupMapLk.Lock()
-	defer c.streamSetupMapLk.Unlock()
-
-	cnt := c.streamSetupInProgressCnt[id]
-	cnt = cnt - 1
-
-	defer func() {
-		c.log.Trace().
-			Str("peer_id", id.String()).
-			Int("stream_setup_in_progress_cnt", cnt).
-			Msg("unprotected from connection pruning")
-	}()
-
-	if cnt <= 0 {
-		delete(c.streamSetupInProgressCnt, id)
-		return
+	tags, ok := cm.protected[id]
+	if !ok {
+		tags = make(map[string]struct{}, 2)
+		cm.protected[id] = tags
 	}
-	c.streamSetupInProgressCnt[id] = cnt
+	tags[tag] = struct{}{}
 }
 
-// IsProtected returns true is there is at least one stream setup in progress for the given peer.ID else false
-func (c *ConnManager) IsProtected(id peer.ID, _ string) (protected bool) {
-	c.streamSetupMapLk.RLock()
-	defer c.streamSetupMapLk.RUnlock()
+func (cm *ConnManager) Unprotect(id peer.ID, tag string) (protected bool) {
+	cm.plk.Lock()
+	defer cm.plk.Unlock()
 
-	return c.streamSetupInProgressCnt[id] > 0
+	tags, ok := cm.protected[id]
+	if !ok {
+		return false
+	}
+	if delete(tags, tag); len(tags) == 0 {
+		delete(cm.protected, id)
+		return false
+	}
+	return true
+}
+
+func (cm *ConnManager) IsProtected(id peer.ID, tag string) (protected bool) {
+	cm.plk.RLock()
+	defer cm.plk.RUnlock()
+
+	tags, ok := cm.protected[id]
+	if !ok {
+		return false
+	}
+
+	if tag == "" {
+		return true
+	}
+
+	_, protected = tags[tag]
+	return protected
 }
