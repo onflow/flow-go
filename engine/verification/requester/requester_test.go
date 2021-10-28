@@ -93,6 +93,21 @@ func newRequesterEngine(t *testing.T, s *RequesterEngineTestSuite) *requester.En
 	return e
 }
 
+// TestHandleChunkDataPack_Request evaluates happy path of submitting a request to requester engine.
+// The request is added to pending request mempools, and metrics updated.
+func TestHandleChunkDataPack_Request(t *testing.T) {
+	s := setupTest()
+	e := newRequesterEngine(t, s)
+
+	request := unittest.ChunkDataPackRequestFixture(unittest.WithChunkID(unittest.IdentifierFixture()))
+	s.pendingRequests.On("Add", request).Return(true).Once()
+	s.metrics.On("OnChunkDataPackRequestReceivedByRequester").Return().Once()
+
+	e.Request(request)
+
+	testifymock.AssertExpectationsForObjects(t, s.pendingRequests, s.metrics)
+}
+
 // TestHandleChunkDataPack_HappyPath evaluates the happy path of receiving a requested chunk data pack.
 // The chunk data pack should be passed to the registered handler, and the resources should be cleaned up.
 func TestHandleChunkDataPack_HappyPath(t *testing.T) {
