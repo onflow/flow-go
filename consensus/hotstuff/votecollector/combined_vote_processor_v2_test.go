@@ -298,6 +298,28 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughStakeNotEnoughShare
 	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
 }
 
+// TestProcess_EnoughSharesNotEnoughStakes tests a scenario where we are collecting votes with staking and beacon sigs
+// to the point where we have enough shares to reconstruct RB signature. No QC should be created
+// in this scenario since there is not enough staking weight.
+func (s *CombinedVoteProcessorV2TestSuite) TestProcess_EnoughSharesNotEnoughStakes() {
+	// change sig weight to be really low, so we don't reach min staking weight while collecting
+	// threshold signatures
+	s.sigWeight = 10
+	for i := uint64(0); i < s.minRequiredShares; i++ {
+		vote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig)
+		s.stakingAggregator.On("Verify", vote.SignerID, mock.Anything).Return(nil).Once()
+		s.reconstructor.On("Verify", vote.SignerID, mock.Anything).Return(nil).Once()
+		err := s.processor.Process(vote)
+		require.NoError(s.T(), err)
+	}
+
+	require.False(s.T(), s.processor.done.Load())
+	s.reconstructor.AssertNotCalled(s.T(), "HasSufficientShares")
+	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
+	// verify if we indeed have enough shares
+	require.True(s.T(), s.reconstructor.HasSufficientShares())
+}
+
 // TestProcess_ConcurrentCreatingQC tests a scenario where multiple goroutines process vote at same time,
 // we expect only one QC created in this scenario.
 func (s *CombinedVoteProcessorV2TestSuite) TestProcess_ConcurrentCreatingQC() {
