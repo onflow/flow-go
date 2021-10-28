@@ -57,8 +57,8 @@ func TestProcessDuplicateChunksWithDifferentResults(t *testing.T) {
 
 	// chunk data responses
 	chunkDataResponse := make(map[flow.Identifier]*verification.ChunkDataPackResponse)
-	chunkDataResponse[chunkALocatorID] = chunkDataPackResponseFixture(t, statusA, collMap[statusA.Chunk().ID()], resultA)
-	chunkDataResponse[chunkBLocatorID] = chunkDataPackResponseFixture(t, statusB, collMap[statusA.Chunk().ID()], resultB)
+	chunkDataResponse[chunkALocatorID] = chunkDataPackResponseFixture(t, statusA.Chunk(), collMap[statusA.Chunk().ID()], resultA)
+	chunkDataResponse[chunkBLocatorID] = chunkDataPackResponseFixture(t, statusB.Chunk(), collMap[statusA.Chunk().ID()], resultB)
 
 	// verifiable chunks
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)

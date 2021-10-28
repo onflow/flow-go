@@ -770,13 +770,8 @@ func chunkDataPackResponsesFixture(t *testing.T,
 	responses := make(map[flow.Identifier]*verification.ChunkDataPackResponse)
 
 	for _, status := range statuses {
-		chunkID := status.Chunk().ID()
-		coll, ok := collMap[chunkID]
-		// only non-system chunks must have a collection
-		require.Equal(t, ok, !fetcher.IsSystemChunk(status.ChunkIndex, result))
-
 		chunkLocatorID := chunks.ChunkLocatorID(status.ExecutionResult.ID(), status.ChunkIndex)
-		responses[chunkLocatorID] = chunkDataPackResponseFixture(t, status, coll, result)
+		responses[chunkLocatorID] = chunkDataPackResponseFixture(t, status.Chunk(), collMap[status.Chunk().ID()], result)
 	}
 
 	return responses
@@ -784,20 +779,19 @@ func chunkDataPackResponsesFixture(t *testing.T,
 
 // chunkDataPackResponseFixture creates a chunk data pack response for given input.
 func chunkDataPackResponseFixture(t *testing.T,
-	status *verification.ChunkStatus,
+	chunk *flow.Chunk,
 	collection *flow.Collection,
 	result *flow.ExecutionResult) *verification.ChunkDataPackResponse {
 
-	// only non-system chunks must have a collection
-	require.Equal(t, collection != nil, !fetcher.IsSystemChunk(status.ChunkIndex, result))
+	require.Equal(t, collection != nil, !fetcher.IsSystemChunk(chunk.Index, result), "only non-system chunks must have a collection")
 
 	return &verification.ChunkDataPackResponse{
 		Locator: chunks.Locator{
 			ResultID: result.ID(),
-			Index:    status.ChunkIndex,
+			Index:    chunk.Index,
 		},
-		Cdp: unittest.ChunkDataPackFixture(status.Chunk().ID(),
-			unittest.WithStartState(status.Chunk().StartState),
+		Cdp: unittest.ChunkDataPackFixture(chunk.ID(),
+			unittest.WithStartState(chunk.StartState),
 			unittest.WithChunkDataPackCollection(collection)),
 	}
 }
