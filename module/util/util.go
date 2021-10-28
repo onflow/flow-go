@@ -2,9 +2,11 @@ package util
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"sync"
+	"time"
 
 	"github.com/onflow/flow-go/module"
 )
@@ -89,24 +91,16 @@ func CheckClosed(done <-chan struct{}) bool {
 }
 
 // WaitError waits for an error on the error channel, the provided context to be cancelled, or
-// the provided channel to be signalled/closed.
-// Returns nil if the done channel is signalled/close, otherwise, it returns an error.
+// the provided channel to be closed.
+// Returns nil if the done channel is close, otherwise, it returns an error.
 //
 // This handles a race condition between the error signaller and component's done channel described
 // in detail below
-func WaitError(ctx context.Context, errChan <-chan error, done <-chan struct{}) error {
+func WaitError(ctx context.Context, errChan <-chan error) error {
 	select {
 	case err := <-errChan:
 		return err
 	case <-ctx.Done():
-		// capture errors that were thrown concurrently with the context being cancelled
-		select {
-		case err := <-errChan:
-			return err
-		default:
-		}
-		return ctx.Err()
-	case <-done:
 		// Without this additional select, there is a race condition here where the done channel
 		// could have been closed as a result of an irrecoverable error being thrown, so that when
 		// the scheduler yields control back to this goroutine, both channels are available to read
@@ -118,35 +112,93 @@ func WaitError(ctx context.Context, errChan <-chan error, done <-chan struct{}) 
 			return err
 		default:
 		}
-
-		// Similarly, the done channel could have closed as a result of the context being canceled.
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
+		return nil
 	}
-	return nil
 }
 
-// WithSignal wraps a os.Signal channel with a context, and calls the cancel a signal is received.
-// TODO: should this go somewhere else? maybe under module
-func WithSignal(parent context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, signals...)
+var ErrChannelClosed = errors.New("channel closed")
+var ErrSignalReceived = errors.New("signal received")
 
+// WithDone wraps a done channel with a context, and calls the cancel when the done channel is closed.
+func WithDone(parent context.Context, done <-chan struct{}) (context.Context, context.CancelFunc) {
 	ctx, cancel := context.WithCancel(parent)
+	c := &doneCtx{cancelCtx: ctx}
 	go func() {
 		select {
+		case <-done:
+			cancel()
+			c.err = ErrChannelClosed
 		case <-ctx.Done():
-			return
-		case <-sig:
+			c.err = ctx.Err()
 		}
-		cancel()
-
-		// cleanup since we can't use this channel again
-		signal.Stop(sig)
-		close(sig)
 	}()
 	return ctx, cancel
+}
+
+// TODO: we need to be able to receive multiple signals
+// WithSignal wraps an os.Signal channel with a context, and calls the cancel a signal is received.
+// TODO: should this go somewhere else? maybe under module
+func WithSignals(parent context.Context, signals ...os.Signal) (context.Context, context.CancelFunc) {
+	signalChan := make(chan os.Signal, 1)
+	signal.Notify(signalChan, signals...)
+
+	ctx, cancel := context.WithCancel(parent)
+	c := &signalCtx{cancelCtx: ctx}
+	go func() {
+		select {
+		case <-signalChan:
+			cancel()
+			c.err = ErrSignalReceived
+		case <-ctx.Done():
+			c.err = ctx.Err()
+		}
+
+		// cleanup since we can't use this channel again
+		signal.Stop(signalChan)
+		close(signalChan)
+	}()
+
+	return c, cancel
+}
+
+type signalCtx struct {
+	cancelCtx context.Context
+	err       error
+}
+
+func (s *signalCtx) Done() <-chan struct{} {
+	return s.cancelCtx.Done()
+}
+
+func (s *signalCtx) Err() error {
+	return s.err
+}
+
+func (s *signalCtx) Value(key interface{}) interface{} {
+	return s.cancelCtx.Value(key)
+}
+
+func (s *signalCtx) Deadline() (deadline time.Time, ok bool) {
+	return s.cancelCtx.Deadline()
+}
+
+type doneCtx struct {
+	cancelCtx context.Context
+	err       error
+}
+
+func (s *doneCtx) Done() <-chan struct{} {
+	return s.cancelCtx.Done()
+}
+
+func (s *doneCtx) Err() error {
+	return s.err
+}
+
+func (s *doneCtx) Value(key interface{}) interface{} {
+	return s.cancelCtx.Value(key)
+}
+
+func (s *doneCtx) Deadline() (deadline time.Time, ok bool) {
+	return s.cancelCtx.Deadline()
 }

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"os"
 	"syscall"
 
@@ -49,19 +50,19 @@ func (node *FlowNodeImp) Run() {
 	}()
 
 	// block till a SIGINT is received or a fatal error is encountered
-	sigCtx, _ := util.WithSignal(ctx, os.Interrupt, syscall.SIGTERM)
-	if err := util.WaitError(sigCtx, errChan, nil); err != nil {
+	sigCtx, _ := util.WithSignals(ctx, os.Interrupt, syscall.SIGTERM)
+	if err := util.WaitError(sigCtx, errChan); err != nil {
 		node.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
 	}
 
 	node.Logger.Info().Msgf("%s node shutting down", node.NodeRole)
 	cancel()
 
-	if err := util.WaitError(sigCtx, errChan, node.Done()); err != nil {
-		if err == sigCtx.Err() {
-			node.Logger.Fatal().Msg("node shutdown aborted")
-		}
+	doneCtx, _ := util.WithDone(sigCtx, node.Done())
+	if err := util.WaitError(doneCtx, errChan); err != nil {
 		node.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error during shutdown")
+	} else if errors.Is(sigCtx.Err(), util.ErrSignalReceived) {
+		node.Logger.Fatal().Msg("node shutdown aborted")
 	}
 
 	node.Logger.Info().Msgf("%s node shutdown complete", node.NodeRole)

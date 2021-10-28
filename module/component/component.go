@@ -103,12 +103,8 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			return err // failure to start
 		}
 
-		if err := util.WaitError(ctx, irrecoverableErr, done); err != nil {
-			if err == ctx.Err() {
-				stop()
-				return err
-			}
-
+		doneCtx, _ := util.WithDone(ctx, done)
+		if err := util.WaitError(doneCtx, irrecoverableErr); err != nil {
 			// an irrecoverable error was encountered
 			stop()
 
@@ -121,6 +117,10 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			default:
 				panic(fmt.Sprintf("invalid error handling result: %v", result))
 			}
+		} else if util.CheckClosed(ctx.Done()) {
+			// the parent context was cancelled
+			stop()
+			return ctx.Err()
 		}
 
 		// clean completion
@@ -252,7 +252,9 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 
 		// launch goroutine to propagate irrecoverable error
 		go func() {
-			if err := util.WaitError(context.Background(), errChan, c.done); err != nil {
+			// only signal when done channel is closed
+			doneCtx, _ := util.WithDone(context.Background(), c.done)
+			if err := util.WaitError(doneCtx, errChan); err != nil {
 				cancel() // shutdown all workers
 
 				// we propagate the error directly to the parent because a failure in a
@@ -370,6 +372,7 @@ func newWorker(id string, f ComponentWorker) *worker {
 // run calls the worker's ComponentWorker function, and manages the ReadyDoneAware interface
 func (w *worker) run(ctx irrecoverable.SignalerContext, ready ReadyFunc, lookup LookupFunc) {
 	defer close(w.done)
+
 	var readyOnce sync.Once
 	w.f(ctx, func() {
 		readyOnce.Do(func() {

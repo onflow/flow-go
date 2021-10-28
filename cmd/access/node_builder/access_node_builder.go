@@ -314,7 +314,8 @@ func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
 	builder.Component("sync engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		network, _ := lookup("unstaked network")
 		snapshot, _ := lookup("finalized snapshot")
-		if err := util.WaitReady(ctx, util.AllReady(network, snapshot)); err != nil || util.CheckClosed(ctx.Done()) {
+		followerEngine, _ := lookup("follower engine")
+		if err := util.WaitReady(ctx, util.AllReady(network, followerEngine, snapshot)); err != nil || util.CheckClosed(ctx.Done()) {
 			return nil, ctx.Err()
 		}
 
