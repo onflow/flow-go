@@ -190,5 +190,13 @@ func (r *rapidStuff) Check(t *rapid.T) {
 }
 
 func TestEventHandlerRapid(t *testing.T) {
+	// how it works it that, rapid will run a loop for 100 times,
+	// each time it will pick and run one action from a public method defined on *rapidStuff,
+	// for instance, ReceiveBlockForCurView, ReceiveQC, etc
+	// After each action call has finished, it will call the `Check` method to perform
+	// some assertion on certian property.
+	// So the idea here is that we define some actions to call event handler's API methods
+	// no matter in which order those methods are called by rapid test, after each call, the
+	// current view of the pace maker should match with what was expected.
 	rapid.Check(t, rapid.Run(&rapidStuff{}))
 }
