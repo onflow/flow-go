@@ -296,7 +296,6 @@ func (es *EventHandlerV2Suite) TestOnReceiveProposal_InvalidProposal_NoViewChang
 	err := es.eventhandler.OnReceiveProposal(proposal)
 	require.NoError(es.T(), err)
 	require.Equal(es.T(), es.initView, es.paceMaker.CurView(), "incorrect view change")
-
 }
 
 // received a valid proposal that has older view, and cannot build qc from votes for this block,
