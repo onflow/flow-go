@@ -2,10 +2,11 @@ package epochs
 
 import (
 	"context"
+	"testing"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/stretchr/testify/suite"
-	"testing"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -21,6 +22,7 @@ func TestEpochs(t *testing.T) {
 // TestViewsProgress asserts epoch state transitions over two full epochs
 // without any nodes joining or leaving.
 func (s *Suite) TestViewsProgress() {
+	s.T().Skip("flaky test - quarantining")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -143,8 +145,22 @@ func (s *Suite) TestEpochJoin() {
 	require.True(s.T(), ok)
 
 	// make sure node info we generated matches what we get from the flow staking table
-	nodeID := string(nodeInfo.Fields[0].(cadence.String))
-	require.Equal(s.T(), info.NodeID.String(), nodeID, "expected generated in test to equal node ID node ID from staking table ")
+	nodeIDFromState := string(nodeInfo.Fields[0].(cadence.String))
+	require.Equal(s.T(), info.NodeID.String(), nodeIDFromState, "expected node ID generated in test to equal node ID from staking table ")
 
+	result := s.SetApprovedNodesScript(ctx, env, append(s.net.Identities().NodeIDs(), info.NodeID)...)
+	require.NoError(s.T(), result.Error)
+
+	// get new approved nodes list and make sure new node was added correctly
+	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
+
+	found := false
+	for _, val := range approvedNodes.(cadence.Array).Values {
+		if string(val.(cadence.String)) == info.NodeID.String() {
+			found = true
+		}
+	}
+
+	require.True(s.T(), found, "node id for new node not found in approved list after setting the approved list")
 	s.net.StopContainers()
 }
