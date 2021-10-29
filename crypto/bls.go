@@ -87,12 +87,12 @@ func internalBLSKMAC(tag string) hash.Hasher {
 // with a domain separation tag.
 func (sk *PrKeyBLSBLS12381) Sign(data []byte, kmac hash.Hasher) (Signature, error) {
 	if kmac == nil {
-		return nil, invalidInputsErrorf("Sign requires a Hasher")
+		return nil, invalidInputsErrorf("hasher is empty")
 	}
 	// check hasher output size
 	if kmac.Size() < minHashSizeBLSBLS12381 {
 		return nil, invalidInputsErrorf(
-			"Hasher with at least %d output byte size is required, current size is %d",
+			"hasher with at least %d output byte size is required, got hasher with size %d",
 			minHashSizeBLSBLS12381,
 			kmac.Size())
 	}
@@ -127,12 +127,12 @@ func (pk *PubKeyBLSBLS12381) Verify(s Signature, data []byte, kmac hash.Hasher) 
 	}
 
 	if kmac == nil {
-		return false, invalidInputsErrorf("verification requires a Hasher")
+		return false, invalidInputsErrorf("hasher is empty")
 	}
 	// check hasher output size
 	if kmac.Size() < minHashSizeBLSBLS12381 {
 		return false, invalidInputsErrorf(
-			"Hasher with at least %d output byte size is required, current size is %d",
+			"hasher with at least %d output byte size is required, got hasher with size %d",
 			minHashSizeBLSBLS12381,
 			kmac.Size())
 	}
@@ -196,9 +196,8 @@ func BLSInvalidSignature() Signature {
 // This function checks the scalar is less than the group order
 func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, error) {
 	if len(privateKeyBytes) != prKeyLengthBLSBLS12381 {
-		return nil, invalidInputsErrorf(
-			"the input length has to be equal to %d",
-			prKeyLengthBLSBLS12381)
+		return nil, invalidInputsErrorf("input length must be %d, got %d",
+			prKeyLengthBLSBLS12381, len(privateKeyBytes))
 	}
 	sk := newPrKeyBLSBLS12381(nil)
 
@@ -214,9 +213,8 @@ func (a *blsBLS12381Algo) decodePrivateKey(privateKeyBytes []byte) (PrivateKey, 
 // This function includes a membership check in G2 and rejects the infinity point.
 func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, error) {
 	if len(publicKeyBytes) != pubKeyLengthBLSBLS12381 {
-		return nil, invalidInputsErrorf(
-			"the input length has to be %d",
-			pubKeyLengthBLSBLS12381)
+		return nil, invalidInputsErrorf("input length must be %d, got %d",
+			pubKeyLengthBLSBLS12381, len(publicKeyBytes))
 	}
 	var pk PubKeyBLSBLS12381
 	err := readPointG2(&pk.point, publicKeyBytes)
@@ -224,7 +222,7 @@ func (a *blsBLS12381Algo) decodePublicKey(publicKeyBytes []byte) (PublicKey, err
 		return nil, fmt.Errorf("decode public key failed %w", err)
 	}
 	if !pk.point.checkValidPublicKeyPoint() {
-		return nil, invalidInputsErrorf("the input is infinity or does not encode a BLS12-381 point in the valid group")
+		return nil, invalidInputsErrorf("input key is infinity or does not encode a BLS12-381 point in the valid group")
 	}
 	return &pk, nil
 }

@@ -75,7 +75,7 @@ func TestBLSBLS12381Hasher(t *testing.T) {
 	})
 
 	// short size hasher
-	t.Run("Empty hasher", func(t *testing.T) {
+	t.Run("short size hasher", func(t *testing.T) {
 		s, err := sk.Sign(seed, hash.NewSHA2_256())
 		assert.Error(t, err)
 		assert.True(t, IsInvalidInputsError(err))
@@ -105,17 +105,27 @@ func TestBLSEncodeDecode(t *testing.T) {
 	testEncodeDecode(t, BLSBLS12381)
 
 	// specific tests for BLS
+
 	//  zero private key
 	skBytes := make([]byte, PrKeyLenBLSBLS12381)
 	sk, err := DecodePrivateKey(BLSBLS12381, skBytes)
 	require.Error(t, err, "the key decoding should fail - key value is zero")
 	assert.True(t, IsInvalidInputsError(err))
 	assert.Nil(t, sk)
+
 	//  identity public key
 	pkBytes := make([]byte, PubKeyLenBLSBLS12381)
 	pkBytes[0] = 0xC0
 	pk, err := DecodePublicKey(BLSBLS12381, pkBytes)
 	require.Error(t, err, "the key decoding should fail - key value is identity")
+	assert.True(t, IsInvalidInputsError(err))
+	assert.Nil(t, pk)
+
+	// invalid point
+	pkBytes = make([]byte, PubKeyLenBLSBLS12381)
+	pkBytes[0] = invalidBLSSignatureHeader
+	pk, err = DecodePublicKey(BLSBLS12381, pkBytes)
+	require.Error(t, err, "the key decoding should fail - key value is invalid")
 	assert.True(t, IsInvalidInputsError(err))
 	assert.Nil(t, pk)
 }
