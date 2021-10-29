@@ -16,25 +16,29 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// testProcessAssignChunkHappyPath evaluates behavior of fetcher engine respect to receiving some assigned chunks,
-// it should request the requester a chunk data pack for each chunk.
-// Then the test mocks sending a chunk data response for what fetcher engine requested.
-// On receiving the response, fetcher engine should validate it and create and pass a verifiable chunk
-// to the verifier engine.
-// Once the verifier engine returns, the fetcher engine should notify the chunk consumer that it is done with
-// this chunk.
-func TestProcessDuplicateChunksWithDifferentResults(t *testing.T) {
+// TestExecutionForkWithDuplicateAssignedChunks evaluates behavior of fetcher engine respect to
+// receiving duplicate identical assigned chunks on execution forks, i.e., an execution fork with two distinct results, where
+// first chunk of both execution results are the same (i.e., duplicate), and both duplicate chunks are assigned to this
+// verification node.
+//
+// The test asserts that a chunk data pack is requested for those duplicate chunks, and
+// once the chunk data pack arrives, a verifiable chunk is shaped for each of those duplicate chunks, and
+// verifiable chunks are pushed to verifier engine.
+func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	s := setupTest()
 	e := newFetcherEngine(s)
 
-	// creates two results
-	// also, the result has been created by two execution nodes, while the rest two have a conflicting result with it.
+	// resultsA and resultB belong to an execution fork and their first chunk (statusA and statusB)
+	// is duplicate and assigned to this verification node.
 	block, resultA, statusA, resultB, statusB, collMap := executionResultForkFixture(t)
-	_, _, executorsA, executorsB := mockReceiptsBlockIDForConflictingResults(t, block.ID(), s.receipts, resultA, resultB)
-	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(2)
 	assignedChunkStatuses := verification.ChunkStatusList{statusA, statusB}
 
-	// the chunks belong to an unsealed block.
+	// executorsA and executorsB are execution node identities that executed resultA and resultB, respectively.
+	_, _, executorsA, executorsB := mockReceiptsBlockIDForConflictingResults(t, block.ID(), s.receipts, resultA, resultB)
+	s.metrics.On("OnAssignedChunkReceivedAtFetcher").Return().Times(2)
+	mockStateAtBlockIDForIdentities(s.state, block.ID(), executorsA.Union(executorsB))
+
+	// the chunks belong to an unsealed block, so their chunk data pack is requested.
 	mockBlockSealingStatus(s.state, s.headers, block, false)
 
 	// mocks resources on fetcher engine side.
@@ -43,41 +47,35 @@ func TestProcessDuplicateChunksWithDifferentResults(t *testing.T) {
 	mockPendingChunksAdd(t, s.pendingChunks, assignedChunkStatuses, true)
 	mockPendingChunksRem(t, s.pendingChunks, assignedChunkStatuses, true)
 	mockPendingChunksGet(s.pendingChunks, assignedChunkStatuses)
-	mockStateAtBlockIDForIdentities(s.state, block.ID(), executorsA.Union(executorsB))
 
-	// generates and mocks requesting chunk data pack fixture
+	// fetcher engine must create a chunk data request for each of chunk statusA and statusB
 	requestA := chunkRequestFixture(resultA.ID(), statusA, executorsA, executorsB)
 	requestB := chunkRequestFixture(resultB.ID(), statusB, executorsB, executorsA)
 	requests := make(map[flow.Identifier]*verification.ChunkDataPackRequest)
 	requests[requestA.ID()] = requestA
 	requests[requestB.ID()] = requestB
+	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(assignedChunkStatuses))
 
+	// each chunk data request is answered by requester engine on a distinct chunk data response
 	chunkALocatorID := chunks.ChunkLocatorID(statusA.ExecutionResult.ID(), statusA.ChunkIndex)
 	chunkBLocatorID := chunks.ChunkLocatorID(statusB.ExecutionResult.ID(), statusB.ChunkIndex)
-
-	// chunk data responses
 	chunkDataResponse := make(map[flow.Identifier]*verification.ChunkDataPackResponse)
 	chunkDataResponse[chunkALocatorID] = chunkDataPackResponseFixture(t, statusA.Chunk(), collMap[statusA.Chunk().ID()], resultA)
 	chunkDataResponse[chunkBLocatorID] = chunkDataPackResponseFixture(t, statusB.Chunk(), collMap[statusA.Chunk().ID()], resultB)
+	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(assignedChunkStatuses))
 
-	// verifiable chunks
+	// on receiving the chunk data responses, fetcher engine creates verifiable chunks
 	verifiableChunks := make(map[flow.Identifier]*verification.VerifiableChunkData)
 	verifiableChunks[chunkALocatorID] = verifiableChunkFixture(t, statusA.Chunk(), block, resultA, chunkDataResponse[chunkALocatorID].Cdp)
 	verifiableChunks[chunkBLocatorID] = verifiableChunkFixture(t, statusA.Chunk(), block, resultB, chunkDataResponse[chunkBLocatorID].Cdp)
+	s.metrics.On("OnVerifiableChunkSentToVerifier").Return().Times(len(assignedChunkStatuses))
 
-	// fetcher engine should request chunk data for received (assigned) chunk locators
-	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(requests))
-	s.metrics.On("OnChunkDataPackArrivedAtFetcher").Return().Times(len(chunkDataResponse))
 	requesterWg := mockRequester(t, s.requester, requests, chunkDataResponse,
 		func(originID flow.Identifier, response *verification.ChunkDataPackResponse) {
-
 			// mocks replying to the requests by sending a chunk data pack.
 			e.HandleChunkDataPack(originID, response)
 		})
 
-	// fetcher engine should create and pass a verifiable chunk to verifier engine upon receiving each
-	// chunk data responses, and notify the consumer that it is done with processing chunk.
-	s.metrics.On("OnVerifiableChunkSentToVerifier").Return().Times(len(verifiableChunks))
 	verifierWG := mockVerifierEngine(t, s.verifier, verifiableChunks)
 	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.IdentifierList{chunkALocatorID, chunkBLocatorID})
 
@@ -97,9 +95,9 @@ func TestProcessDuplicateChunksWithDifferentResults(t *testing.T) {
 
 	}
 
-	unittest.RequireReturnsBefore(t, requesterWg.Wait, 1*time.Second, "could not handle received chunk data pack on time")
-	unittest.RequireReturnsBefore(t, verifierWG.Wait, 1*time.Second, "could not push verifiable chunk on time")
-	unittest.RequireReturnsBefore(t, processWG.Wait, 1*time.Second, "could not process chunks on time")
+	unittest.RequireReturnsBefore(t, requesterWg.Wait, 100*time.Millisecond, "could not handle received chunk data pack on time")
+	unittest.RequireReturnsBefore(t, verifierWG.Wait, 100*time.Millisecond, "could not push verifiable chunk on time")
+	unittest.RequireReturnsBefore(t, processWG.Wait, 100*time.Millisecond, "could not process chunks on time")
 
 	mock.AssertExpectationsForObjects(t, s.results, s.requester, s.pendingChunks, s.chunkConsumerNotifier, s.metrics)
 }
