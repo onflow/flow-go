@@ -297,7 +297,6 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 				if err != nil {
 					return fmt.Errorf("could not get execution result (%s): %w", receipt.ResultID, err)
 				}
-
 				segment.AddExecutionResult(result)
 			}
 		}
