@@ -31,17 +31,11 @@ func chunkStatus(entity flow.Entity) *verification.ChunkStatus {
 	}
 }
 
-// ByID returns a chunk status by its chunk ID.
+// Get returns a chunk status by its chunk index and result ID.
 // There is a one-to-one correspondence between the chunk statuses in memory, and
-// their chunk ID.
+// their pair of chunk index and result id.
 func (cs ChunkStatuses) Get(chunkIndex uint64, resultID flow.Identifier) (*verification.ChunkStatus, bool) {
-	locatorID := chunks.Locator{
-		ResultID: resultID,
-		Index:    chunkIndex,
-	}.ID()
-
-	entity, exists := cs.Backend.ByID(locatorID)
-
+	entity, exists := cs.Backend.ByID(chunks.ChunkLocatorID(resultID, chunkIndex))
 	if !exists {
 		return nil, false
 	}
@@ -66,11 +60,7 @@ func (cs *ChunkStatuses) Add(status *verification.ChunkStatus) bool {
 // If there is a chunk status associated with this pair, Rem removes it and returns true.
 // Otherwise, it returns false.
 func (cs *ChunkStatuses) Rem(chunkIndex uint64, resultID flow.Identifier) bool {
-	locatorID := chunks.Locator{
-		ResultID: resultID,
-		Index:    chunkIndex,
-	}.ID()
-	return cs.Backend.Rem(locatorID)
+	return cs.Backend.Rem(chunks.ChunkLocatorID(resultID, chunkIndex))
 }
 
 // All returns all chunk statuses stored in this memory pool.
@@ -99,20 +89,14 @@ func (cs ChunkStatuses) Size() uint {
 // this package is taken based on ID of storedChunkStatus.
 type storedChunkStatus struct {
 	ChunkIndex      uint64
-	ExecutionResult *flow.ExecutionResult
 	BlockHeight     uint64
+	ExecutionResult *flow.ExecutionResult
 }
 
 func (s storedChunkStatus) ID() flow.Identifier {
-	return chunks.Locator{
-		ResultID: s.ExecutionResult.ID(),
-		Index:    s.ChunkIndex,
-	}.ID()
+	return chunks.ChunkLocatorID(s.ExecutionResult.ID(), s.ChunkIndex)
 }
 
 func (s storedChunkStatus) Checksum() flow.Identifier {
-	return chunks.Locator{
-		ResultID: s.ExecutionResult.ID(),
-		Index:    s.ChunkIndex,
-	}.ID()
+	return chunks.ChunkLocatorID(s.ExecutionResult.ID(), s.ChunkIndex)
 }
