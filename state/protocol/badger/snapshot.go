@@ -287,7 +287,6 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 		}
 
 		resultLookUp := block.Payload.Results.Lookup()
-
 		for _, receipt := range block.Payload.Receipts {
 			if _, ok := resultsByID[receipt.ResultID]; ok {
 				continue
