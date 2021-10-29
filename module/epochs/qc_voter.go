@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/onflow/flow-go/module/util"
+
 	"github.com/sethvargo/go-retry"
 
 	"github.com/rs/zerolog"
@@ -28,12 +30,12 @@ const (
 // RootQCVoter is responsible for generating and submitting votes for the
 // root quorum certificate of the upcoming epoch for this node's cluster.
 type RootQCVoter struct {
-	log                    zerolog.Logger
-	me                     module.Local
-	signer                 hotstuff.Signer
-	state                  protocol.State
-	qcContractClients      []module.QCContractClient // priority ordered array of client to the QC aggregator smart contract
-	activeQCContractClient int                       // index of the qc contract client that is currently in use
+	log               zerolog.Logger
+	me                module.Local
+	signer            hotstuff.Signer
+	state             protocol.State
+	qcContractClients []module.QCContractClient // priority ordered array of client to the QC aggregator smart contract
+	fallbackStrategy  module.FallbackStrategy
 
 	wait time.Duration // how long to sleep in between vote attempts
 }
@@ -53,6 +55,7 @@ func NewRootQCVoter(
 		signer:            signer,
 		state:             state,
 		qcContractClients: contractClients,
+		fallbackStrategy:  util.NewDefaultFallbackStrategy(len(contractClients) - 1),
 		wait:              time.Second * 10,
 	}
 	return voter
@@ -107,8 +110,8 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 
 		// retry with next fallback client after 2 failed attempts
 		if attempts%2 == 0 {
-			voter.updateActiveQcContractClient()
-			log.Warn().Msgf("retrying on attempt (%d) with fallback access node at index (%d)", attempts, voter.activeQCContractClient)
+			voter.fallbackStrategy.Failure()
+			log.Warn().Msgf("retrying on attempt (%d) with fallback access node at index (%d)", attempts, voter.fallbackStrategy.ClientIndex())
 		}
 
 		// check that we're still in the setup phase, if we're not we can't
@@ -148,15 +151,5 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 }
 
 func (voter *RootQCVoter) qcContractClient() module.QCContractClient {
-	return voter.qcContractClients[voter.activeQCContractClient]
-}
-
-func (voter *RootQCVoter) updateActiveQcContractClient() {
-	// if we have reached the end of our array start from beginning
-	if voter.activeQCContractClient == len(voter.qcContractClients)-1 {
-		voter.activeQCContractClient = 0
-		return
-	}
-
-	voter.activeQCContractClient++
+	return voter.qcContractClients[voter.fallbackStrategy.ClientIndex()]
 }

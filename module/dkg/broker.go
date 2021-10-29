@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/onflow/flow-go/module/util"
+
 	"github.com/onflow/flow-go/engine"
 
 	"github.com/sethvargo/go-retry"
@@ -35,20 +37,20 @@ const retryMilliseconds = 1000 * time.Millisecond
 // with the DKG smart-contract for broadcast messages.
 type Broker struct {
 	sync.Mutex
-	log                     zerolog.Logger
-	unit                    *engine.Unit
-	dkgInstanceID           string                     // unique identifier of the current dkg run (prevent replay attacks)
-	committee               flow.IdentityList          // IDs of DKG members
-	me                      module.Local               // used for signing bcast messages
-	myIndex                 int                        // index of this instance in the committee
-	dkgContractClients      []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
-	activeDKGContractClient int                        // index of the dkg contract client that is currently in use
-	tunnel                  *BrokerTunnel              // channels through which the broker communicates with the network engine
-	privateMsgCh            chan messages.DKGMessage   // channel to forward incoming private messages to consumers
-	broadcastMsgCh          chan messages.DKGMessage   // channel to forward incoming broadcast messages to consumers
-	messageOffset           uint                       // offset for next broadcast messages to fetch
-	shutdownCh              chan struct{}              // channel to stop the broker from listening
-	broadcasts              uint                       // broadcasts counts the number of successful broadcasts
+	log                zerolog.Logger
+	unit               *engine.Unit
+	dkgInstanceID      string                     // unique identifier of the current dkg run (prevent replay attacks)
+	committee          flow.IdentityList          // IDs of DKG members
+	me                 module.Local               // used for signing bcast messages
+	myIndex            int                        // index of this instance in the committee
+	dkgContractClients []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
+	fallbackStrategy   module.FallbackStrategy
+	tunnel             *BrokerTunnel            // channels through which the broker communicates with the network engine
+	privateMsgCh       chan messages.DKGMessage // channel to forward incoming private messages to consumers
+	broadcastMsgCh     chan messages.DKGMessage // channel to forward incoming broadcast messages to consumers
+	messageOffset      uint                     // offset for next broadcast messages to fetch
+	shutdownCh         chan struct{}            // channel to stop the broker from listening
+	broadcasts         uint                     // broadcasts counts the number of successful broadcasts
 }
 
 // NewBroker instantiates a new epoch-specific broker capable of communicating
@@ -70,6 +72,7 @@ func NewBroker(
 		me:                 me,
 		myIndex:            myIndex,
 		dkgContractClients: dkgContractClients,
+		fallbackStrategy:   util.NewDefaultFallbackStrategy(len(dkgContractClients) - 1),
 		tunnel:             tunnel,
 		privateMsgCh:       make(chan messages.DKGMessage),
 		broadcastMsgCh:     make(chan messages.DKGMessage),
@@ -83,17 +86,7 @@ func NewBroker(
 
 // dkgContractClient returns active dkg contract client
 func (b *Broker) dkgContractClient() module.DKGContractClient {
-	return b.dkgContractClients[b.activeDKGContractClient]
-}
-
-func (b *Broker) updateActiveDKGContractClient() {
-	// if we have reached the end of our array start from beginning
-	if b.activeDKGContractClient == len(b.dkgContractClients)-1 {
-		b.activeDKGContractClient = 0
-		return
-	}
-
-	b.activeDKGContractClient++
+	return b.dkgContractClients[b.fallbackStrategy.ClientIndex()]
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -156,8 +149,8 @@ func (b *Broker) Broadcast(data []byte) {
 
 				// retry with next fallback client after 2 failed attempts
 				if attempts%2 == 0 {
-					b.updateActiveDKGContractClient()
-					b.log.Warn().Msgf("broadcast: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.activeDKGContractClient)
+					b.fallbackStrategy.Failure()
+					b.log.Warn().Msgf("broadcast: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.fallbackStrategy.ClientIndex())
 				}
 			}
 
@@ -220,8 +213,8 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 		attempts++
 		// retry with next fallback client after 2 failed attempts
 		if attempts%2 == 0 {
-			b.updateActiveDKGContractClient()
-			b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.activeDKGContractClient)
+			b.fallbackStrategy.Failure()
+			b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.fallbackStrategy.ClientIndex())
 		}
 
 		msgs, err = b.dkgContractClient().ReadBroadcast(b.messageOffset, referenceBlock)
@@ -268,8 +261,8 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 		attempts++
 		// retry with next fallback client after 2 failed attempts
 		if attempts%2 == 0 {
-			b.updateActiveDKGContractClient()
-			b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.activeDKGContractClient)
+			b.fallbackStrategy.Failure()
+			b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.fallbackStrategy.ClientIndex())
 		}
 
 		err := b.dkgContractClient().SubmitResult(pubKey, groupKeys)
