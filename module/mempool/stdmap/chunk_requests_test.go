@@ -256,5 +256,4 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 	locators, ok = requests.PopAll(thisReq.ChunkID)
 	require.False(t, ok)
 	require.Nil(t, locators)
-
 }
