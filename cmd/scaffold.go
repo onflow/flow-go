@@ -940,6 +940,10 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 		return &common.SetLogLevelCommand{}
 	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
 		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
+	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadResultsCommand(config.State, config.Storage.Results)
+	}).AdminCommand("read-seals", func(config *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
 	})
 }
 

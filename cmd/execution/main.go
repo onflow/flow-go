@@ -181,7 +181,7 @@ func main() {
 		}).
 		Module("execution receipts storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
-			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts)
+			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts.(*storage.ExecutionReceipts))
 			return nil
 		}).
 		Module("pending block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
