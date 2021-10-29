@@ -85,6 +85,7 @@ func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 		status.Locators = append(status.Locators, &request.Locator)
 		status.RequestInfo.Agrees = status.RequestInfo.Agrees.Union(request.Agrees)
 		status.RequestInfo.Disagrees = status.RequestInfo.Disagrees.Union(request.Disagrees)
+		status.RequestInfo.Targets = status.RequestInfo.Targets.Union(request.Targets)
 
 		backdata[request.ChunkID] = status
 		return nil
