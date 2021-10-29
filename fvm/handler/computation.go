@@ -21,7 +21,9 @@ type SubComputationMeter interface {
 	// This resets the ComputationMeteringHandler to the previous ComputationMeter,
 	// without updating the limit or computation used
 	Discard() error
-	// TODO: when needed
+	// TODO: this functionality isn't currently needed for anything.
+	// It might be needed in the future, if we need to meter any execution separately and then include it in the base metering.
+	// I left this TODO just as a reminder that this was the idea.
 	// Commit()
 }
 
