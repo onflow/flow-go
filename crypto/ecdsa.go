@@ -43,7 +43,7 @@ func bitsToBytes(bits int) int {
 func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 	r, s, err := goecdsa.Sign(rand.Reader, sk.goPrKey, h)
 	if err != nil {
-		return nil, fmt.Errorf("ECDSA Sign has failed: %w", err)
+		return nil, fmt.Errorf("ECDSA Sign failed: %w", err)
 	}
 	rBytes := r.Bytes()
 	sBytes := s.Bytes()

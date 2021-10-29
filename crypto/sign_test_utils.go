@@ -107,7 +107,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		require.Equal(t, read, seedMinLength)
 		require.NoError(t, err)
 		sk, err := GeneratePrivateKey(salg, seed)
-		assert.Nil(t, err, "the key generation has failed")
+		assert.Nil(t, err, "the key generation failed")
 		seed[0] ^= 1 // alter the seed to get a new private key
 		distinctSk, err := GeneratePrivateKey(salg, seed)
 		require.NoError(t, err)
@@ -115,7 +115,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		// check private key encoding
 		skBytes := sk.Encode()
 		skCheck, err := DecodePrivateKey(salg, skBytes)
-		require.Nil(t, err, "the key decoding has failed")
+		require.Nil(t, err, "the key decoding failed")
 		assert.True(t, sk.Equals(skCheck), "key equality check failed")
 		skCheckBytes := skCheck.Encode()
 		assert.Equal(t, skBytes, skCheckBytes, "keys should be equal")
@@ -126,7 +126,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		pk := sk.PublicKey()
 		pkBytes := pk.Encode()
 		pkCheck, err := DecodePublicKey(salg, pkBytes)
-		require.Nil(t, err, "the key decoding has failed")
+		require.Nil(t, err, "the key decoding failed")
 		assert.True(t, pk.Equals(pkCheck), "key equality check failed")
 		pkCheckBytes := pkCheck.Encode()
 		assert.Equal(t, pkBytes, pkCheckBytes, "keys should be equal")
@@ -136,7 +136,7 @@ func testEncodeDecode(t *testing.T, salg SigningAlgorithm) {
 		// same for the compressed encoding
 		pkComprBytes := pk.EncodeCompressed()
 		pkComprCheck, err := DecodePublicKeyCompressed(salg, pkComprBytes)
-		require.Nil(t, err, "the key decoding has failed")
+		require.Nil(t, err, "the key decoding failed")
 		assert.True(t, pk.Equals(pkComprCheck), "key equality check failed")
 		pkCheckComprBytes := pkComprCheck.EncodeCompressed()
 		assert.Equal(t, pkComprBytes, pkCheckComprBytes, "keys should be equal")

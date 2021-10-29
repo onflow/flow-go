@@ -224,9 +224,6 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	err := seedRelic(seed)
 	if err != nil {
-		if IsInvalidInputsError(err) {
-			return invalidInputsErrorf("generating shares failed: %s", err)
-		}
 		return fmt.Errorf("generating shares failed: %w", err)
 	}
 

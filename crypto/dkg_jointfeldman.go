@@ -106,9 +106,6 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 		s.fvss[i].running = false
 		err := s.fvss[i].Start(seed)
 		if err != nil {
-			if IsInvalidInputsError(err) {
-				invalidInputsErrorf("error when starting dkg: %s", err)
-			}
 			return fmt.Errorf("error when starting dkg: %w", err)
 		}
 	}
@@ -125,7 +122,7 @@ func (s *JointFeldmanState) NextTimeout() error {
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].NextTimeout()
 		if err != nil {
-			return fmt.Errorf("next timeout has failed: %w", err)
+			return fmt.Errorf("next timeout failed: %w", err)
 		}
 	}
 	return nil
@@ -172,7 +169,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if disqualifiedTotal > s.threshold || s.size-disqualifiedTotal <= s.threshold {
 		return nil, nil, nil,
 			fmt.Errorf(
-				"DKG has failed because the diqualified nodes number is high: %d disqualified, threshold is %d, size is %d",
+				"DKG failed because the diqualified nodes number is high: %d disqualified, threshold is %d, size is %d",
 				disqualifiedTotal, s.threshold, s.size)
 	}
 
@@ -202,10 +199,7 @@ func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandleBroadcastMsg(orig, msg)
 		if err != nil {
-			if IsInvalidInputsError(err) {
-				invalidInputsErrorf("handle message has failed: %s", err)
-			}
-			return fmt.Errorf("handle message has failed: %w", err)
+			return fmt.Errorf("handle broadcast message failed: %w", err)
 		}
 	}
 	return nil
@@ -220,10 +214,7 @@ func (s *JointFeldmanState) HandlePrivateMsg(orig int, msg []byte) error {
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandlePrivateMsg(orig, msg)
 		if err != nil {
-			if IsInvalidInputsError(err) {
-				invalidInputsErrorf("handle message has failed: %s", err)
-			}
-			return fmt.Errorf("handle message has failed: %w", err)
+			return fmt.Errorf("handle private message failed: %w", err)
 		}
 	}
 	return nil
@@ -245,12 +236,8 @@ func (s *JointFeldmanState) ForceDisqualify(node int) error {
 	// disqualify the node in the fvss instance where they are a leader
 	err := s.fvss[node].ForceDisqualify(node)
 	if err != nil {
-		if IsInvalidInputsError(err) {
-			return invalidInputsErrorf("force disqualify failed: %s", err)
-		}
-		return fmt.Errorf("disqualif has failed: %w", err)
+		return fmt.Errorf("force disqualify failed: %w", err)
 	}
-
 	return nil
 }
 

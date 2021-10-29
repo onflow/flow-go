@@ -103,7 +103,7 @@ func AggregateBLSSignatures(sigs []Signature) (Signature, error) {
 	case valid:
 		return aggregatedSig, nil
 	case invalid:
-		return nil, invalidInputsErrorf("decoding at least one BLS signatures has failed")
+		return nil, invalidInputsErrorf("decoding at least one BLS signatures failed")
 	default:
 		return nil, fmt.Errorf("aggregating signatures failed")
 	}
