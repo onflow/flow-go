@@ -237,7 +237,7 @@ func (s *JointFeldmanState) ForceDisqualify(node int) error {
 	err := s.fvss[node].ForceDisqualify(node)
 	if err != nil {
 		if IsInvalidInputsError(err) {
-			fmt.Errorf("handle message has failed: %w", err)
+			return fmt.Errorf("handle message has failed: %w", err)
 		}
 		return fmt.Errorf("disqualif has failed: %w", err)
 	}
