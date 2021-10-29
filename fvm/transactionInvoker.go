@@ -231,13 +231,30 @@ func (i *TransactionInvoker) Process(
 	return txError
 }
 
-func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) error {
+func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) (err error) {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
 
+	// start a new computation meter for deducting transaction fees.
+	subMeter := env.computationHandler.StartSubMeter(DefaultGasLimit)
+	defer func() {
+		merr := subMeter.Discard()
+		if merr == nil {
+			return
+		}
+		if err != nil {
+			// The error merr (from discarding the subMeter) will be hidden by err (transaction fee deduction error)
+			// as it has priority. So log merr.
+			i.logger.Error().Err(merr).
+				Msg("error discarding computation meter in deductTransactionFees (while also handling a deductTransactionFees error)")
+			return
+		}
+		err = merr
+	}()
+
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
-	_, err := deductTxFees(proc.Transaction.Payer)
+	_, err = deductTxFees(proc.Transaction.Payer)
 
 	if err != nil {
 		// TODO: Fee value is currently a constant. this should be changed when it is not
