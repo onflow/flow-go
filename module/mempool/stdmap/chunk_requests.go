@@ -78,7 +78,7 @@ func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 		}
 
 		status := toChunkRequestStatus(entity)
-		if status.Locators.Contains(&request.Locator) {
+		if status.Locators.Contains(request.Locator.ResultID, request.Locator.Index) {
 			return fmt.Errorf("chunk request exists with same locator")
 		}
 
