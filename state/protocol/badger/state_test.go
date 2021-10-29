@@ -154,9 +154,9 @@ func TestBootstrapNonRoot(t *testing.T) {
 	t.Run("with one block built", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
 			block1 := unittest.BlockWithParentFixture(rootBlock)
-			buildBlock(t, state, &block1)
+			buildBlock(t, state, block1)
 			child := unittest.BlockWithParentFixture(block1.Header)
-			buildBlock(t, state, &child)
+			buildBlock(t, state, child)
 
 			return state.AtBlockID(block1.ID())
 		})
@@ -172,15 +172,15 @@ func TestBootstrapNonRoot(t *testing.T) {
 	t.Run("with sealed block", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
 			block1 := unittest.BlockWithParentFixture(rootBlock)
-			buildBlock(t, state, &block1)
+			buildBlock(t, state, block1)
 
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1), unittest.WithReceipts(receipt1)))
-			buildBlock(t, state, &block2)
+			buildBlock(t, state, block2)
 
 			child := unittest.BlockWithParentFixture(block2.Header)
-			buildBlock(t, state, &child)
+			buildBlock(t, state, child)
 
 			return state.AtBlockID(block2.ID())
 		})

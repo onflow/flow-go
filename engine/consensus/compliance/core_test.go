@@ -250,7 +250,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	// create a proposal that directly descends from the latest finalized header
 	originID := cs.participants[1].NodeID
 	block := unittest.BlockWithParentFixture(cs.head)
-	proposal := unittest.ProposalFromBlock(&block)
+	proposal := unittest.ProposalFromBlock(block)
 
 	// store the data for retrieval
 	cs.headerDB[block.Header.ParentID] = cs.head
@@ -275,7 +275,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	ancestor := unittest.BlockWithParentFixture(cs.head)
 	parent := unittest.BlockWithParentFixture(ancestor.Header)
 	block := unittest.BlockWithParentFixture(parent.Header)
-	proposal := unittest.ProposalFromBlock(&block)
+	proposal := unittest.ProposalFromBlock(block)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = parent.Header
@@ -301,7 +301,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 	ancestor := unittest.BlockWithParentFixture(cs.head)
 	parent := unittest.BlockWithParentFixture(ancestor.Header)
 	block := unittest.BlockWithParentFixture(parent.Header)
-	proposal := unittest.ProposalFromBlock(&block)
+	proposal := unittest.ProposalFromBlock(block)
 
 	// store the data for retrieval
 	cs.headerDB[parent.ID()] = parent.Header
@@ -331,15 +331,15 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 
 	// create three children blocks
 	parent := unittest.BlockWithParentFixture(cs.head)
-	proposal := unittest.ProposalFromBlock(&parent)
+	proposal := unittest.ProposalFromBlock(parent)
 	block1 := unittest.BlockWithParentFixture(parent.Header)
 	block2 := unittest.BlockWithParentFixture(parent.Header)
 	block3 := unittest.BlockWithParentFixture(parent.Header)
 
 	// create the pending blocks
-	pending1 := unittest.PendingFromBlock(&block1)
-	pending2 := unittest.PendingFromBlock(&block2)
-	pending3 := unittest.PendingFromBlock(&block3)
+	pending1 := unittest.PendingFromBlock(block1)
+	pending2 := unittest.PendingFromBlock(block2)
+	pending3 := unittest.PendingFromBlock(block3)
 
 	// store the parent on disk
 	parentID := parent.ID()
@@ -391,14 +391,14 @@ func (cs *ComplianceCoreSuite) TestProposalBufferingOrder() {
 	// create a proposal that we will not submit until the end
 	originID := cs.participants[1].NodeID
 	block := unittest.BlockWithParentFixture(cs.head)
-	missing := unittest.ProposalFromBlock(&block)
+	missing := unittest.ProposalFromBlock(block)
 
 	// create a chain of descendants
 	var proposals []*messages.BlockProposal
 	parent := missing
 	for i := 0; i < 3; i++ {
 		descendant := unittest.BlockWithParentFixture(parent.Header)
-		proposal := unittest.ProposalFromBlock(&descendant)
+		proposal := unittest.ProposalFromBlock(descendant)
 		proposals = append(proposals, proposal)
 		parent = proposal
 	}

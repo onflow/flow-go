@@ -441,5 +441,5 @@ func ContainerBlockFixture(parent *flow.Header, receipts []*flow.ExecutionReceip
 	containerBlock := unittest.BlockWithParentFixture(parent)
 	containerBlock.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...)))
 
-	return &containerBlock
+	return containerBlock
 }

@@ -39,7 +39,8 @@ func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandReque
 	firstHeight := block.Header.Height
 
 	for i := uint64(1); i <= firstHeight && i < data.numBlocksToQuery; i++ {
-		block, err := r.blocks.ByID(block.Header.ParentID)
+		var err error
+		block, err = r.blocks.ByID(block.Header.ParentID)
 		if err != nil {
 			return nil, err
 		}

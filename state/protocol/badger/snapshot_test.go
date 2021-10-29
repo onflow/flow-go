@@ -210,14 +210,14 @@ func TestSealingSegment(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			// build a block to seal
 			block1 := unittest.BlockWithParentFixture(head)
-			err := state.Extend(context.Background(), &block1)
+			err := state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 
 			// build a block sealing block1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(seal1)))
-			err = state.Extend(context.Background(), &block2)
+			err = state.Extend(context.Background(), block2)
 			require.NoError(t, err)
 
 			segment, err := state.AtBlockID(block2.ID()).SealingSegment()
@@ -240,23 +240,23 @@ func TestSealingSegment(t *testing.T) {
 
 			// build a block to seal
 			block1 := unittest.BlockWithParentFixture(head)
-			err := state.Extend(context.Background(), &block1)
+			err := state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 
 			parent := block1
 			// build a large chain of intermediary blocks
 			for i := 0; i < 100; i++ {
 				next := unittest.BlockWithParentFixture(parent.Header)
-				err = state.Extend(context.Background(), &next)
+				err = state.Extend(context.Background(), next)
 				require.NoError(t, err)
 				parent = next
 			}
 
 			// build the block sealing block 1
 			blockN := unittest.BlockWithParentFixture(parent.Header)
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			blockN.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(seal1)))
-			err = state.Extend(context.Background(), &blockN)
+			err = state.Extend(context.Background(), blockN)
 			require.NoError(t, err)
 
 			segment, err := state.AtBlockID(blockN.ID()).SealingSegment()
@@ -278,23 +278,23 @@ func TestSealingSegment(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 
 			block1 := unittest.BlockWithParentFixture(head)
-			err := state.Extend(context.Background(), &block1)
+			err := state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			err = state.Extend(context.Background(), &block2)
+			err = state.Extend(context.Background(), block2)
 			require.NoError(t, err)
 
 			block3 := unittest.BlockWithParentFixture(block2.Header)
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(seal1)))
-			err = state.Extend(context.Background(), &block3)
+			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
 
 			block4 := unittest.BlockWithParentFixture(block3.Header)
-			receipt2, seal2 := unittest.ReceiptAndSealForBlock(&block2)
+			receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
 			block4.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal2)))
-			err = state.Extend(context.Background(), &block4)
+			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)
 
 			segment, err := state.AtBlockID(block4.ID()).SealingSegment()
@@ -331,13 +331,13 @@ func TestLatestSealedResult(t *testing.T) {
 
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			block1 := unittest.BlockWithParentFixture(head)
-			err = state.Extend(context.Background(), &block1)
+			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1), unittest.WithReceipts(receipt1)))
-			err = state.Extend(context.Background(), &block2)
+			err = state.Extend(context.Background(), block2)
 			require.NoError(t, err)
 
 			// B1 <- B2(R1,S1)
@@ -350,7 +350,7 @@ func TestLatestSealedResult(t *testing.T) {
 			})
 
 			block3 := unittest.BlockWithParentFixture(block2.Header)
-			err = state.Extend(context.Background(), &block3)
+			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
 
 			// B1 <- B2(R1,S1) <- B3
@@ -365,14 +365,14 @@ func TestLatestSealedResult(t *testing.T) {
 			// B1 <- B2(R1,S1) <- B3 <- B4(R2,S2,R3,S3)
 			// There are two seals in B4 - should return latest by height (S3,R3)
 			t.Run("reference block contains multiple seals", func(t *testing.T) {
-				receipt2, seal2 := unittest.ReceiptAndSealForBlock(&block2)
-				receipt3, seal3 := unittest.ReceiptAndSealForBlock(&block3)
+				receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
+				receipt3, seal3 := unittest.ReceiptAndSealForBlock(block3)
 				block4 := unittest.BlockWithParentFixture(block3.Header)
 				block4.SetPayload(unittest.PayloadFixture(
 					unittest.WithReceipts(receipt2, receipt3),
 					unittest.WithSeals(seal2, seal3),
 				))
-				err = state.Extend(context.Background(), &block4)
+				err = state.Extend(context.Background(), block4)
 				require.NoError(t, err)
 
 				gotResult, gotSeal, err := state.AtBlockID(block4.ID()).SealedResult()
@@ -398,7 +398,7 @@ func TestQuorumCertificate(t *testing.T) {
 			// create a block to query
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(flow.EmptyPayload())
-			err := state.Extend(context.Background(), &block1)
+			err := state.Extend(context.Background(), block1)
 			require.Nil(t, err)
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
@@ -417,13 +417,13 @@ func TestQuorumCertificate(t *testing.T) {
 			// create a block to query
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(flow.EmptyPayload())
-			err := state.Extend(context.Background(), &block1)
+			err := state.Extend(context.Background(), block1)
 			require.Nil(t, err)
 
 			// add child
 			unvalidatedChild := unittest.BlockWithParentFixture(head)
 			unvalidatedChild.SetPayload(flow.EmptyPayload())
-			err = state.Extend(context.Background(), &unvalidatedChild)
+			err = state.Extend(context.Background(), unvalidatedChild)
 			assert.Nil(t, err)
 
 			_, err = state.AtBlockID(block1.ID()).QuorumCertificate()
@@ -452,7 +452,7 @@ func TestQuorumCertificate(t *testing.T) {
 			// add a block so we aren't testing against root
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(flow.EmptyPayload())
-			err := state.Extend(context.Background(), &block1)
+			err := state.Extend(context.Background(), block1)
 			require.Nil(t, err)
 			err = state.MarkValid(block1.ID())
 			require.Nil(t, err)
@@ -460,7 +460,7 @@ func TestQuorumCertificate(t *testing.T) {
 			// add a valid child to block1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.SetPayload(flow.EmptyPayload())
-			err = state.Extend(context.Background(), &block2)
+			err = state.Extend(context.Background(), block2)
 			require.Nil(t, err)
 			err = state.MarkValid(block2.ID())
 			require.Nil(t, err)

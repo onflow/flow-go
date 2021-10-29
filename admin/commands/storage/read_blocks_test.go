@@ -3,7 +3,6 @@ package storage
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -58,17 +57,17 @@ func (suite *ReadBlocksSuite) SetupTest() {
 	genesis := unittest.GenesisFixture()
 	blocks = append(blocks, genesis)
 	sealed := unittest.BlockWithParentFixture(genesis.Header)
-	blocks = append(blocks, &sealed)
+	blocks = append(blocks, sealed)
 	final := unittest.BlockWithParentFixture(sealed.Header)
-	blocks = append(blocks, &final)
+	blocks = append(blocks, final)
 	final = unittest.BlockWithParentFixture(final.Header)
-	blocks = append(blocks, &final)
+	blocks = append(blocks, final)
 	final = unittest.BlockWithParentFixture(final.Header)
-	blocks = append(blocks, &final)
+	blocks = append(blocks, final)
 
 	suite.allBlocks = blocks
-	suite.sealed = &sealed
-	suite.final = &final
+	suite.sealed = sealed
+	suite.final = final
 
 	suite.state.On("Final").Return(createSnapshot(final.Header))
 	suite.state.On("Sealed").Return(createSnapshot(sealed.Header))
@@ -107,7 +106,7 @@ func (suite *ReadBlocksSuite) SetupTest() {
 					return nil
 				}
 			}
-			return errors.New("block not found")
+			return fmt.Errorf("block %#v not found", blockID)
 		},
 	)
 
@@ -157,7 +156,7 @@ func (suite *ReadBlocksSuite) TestValidateInvalidBlock() {
 func (suite *ReadBlocksSuite) TestValidateInvalidBlockHeight() {
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
 		Data: map[string]interface{}{
-			"block": float64(0),
+			"block": float64(-1),
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
