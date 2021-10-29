@@ -34,7 +34,7 @@ type sealInfo struct {
 }
 
 type blockSeals struct {
-	BlockID     flow.Identifier // TODO: check that this serializes properly
+	BlockID     flow.Identifier
 	BlockHeight uint64
 	Seals       []*flow.Seal
 	LastSeal    *sealInfo
@@ -45,10 +45,6 @@ type ReadSealsCommand struct {
 	seals storage.Seals
 	index storage.Index
 }
-
-// When we request n, we get last n seals
-// get by seal ID
-// get by block (latest in block)
 
 func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*readSealsRequest)
