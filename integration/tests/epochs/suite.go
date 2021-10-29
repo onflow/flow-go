@@ -53,7 +53,7 @@ func (s *Suite) SetupTest() {
 	s.ghostID = unittest.IdentifierFixture()
 	ghostConNode := testnet.NewNodeConfig(
 		flow.RoleAccess,
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost())
 
@@ -65,13 +65,13 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
+		testnet.NewNodeConfig(flow.RoleAccess),
+		testnet.NewNodeConfig(flow.RoleAccess),
 		ghostConNode,
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs tests", confs, 100, 50, 280)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs tests", confs, 100, 50, 180)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
@@ -100,9 +100,9 @@ func (s *Suite) Ghost() *client.GhostClient {
 
 func (s *Suite) TearDownTest() {
 	//s.net.Remove()
-	if s.cancel != nil {
-		s.cancel()
-	}
+	//if s.cancel != nil {
+	//	s.cancel()
+	//}
 }
 
 // StakedNodeOperationInfo struct contains all the node information needed to start a node after it is onboarded (staked and registered)
@@ -349,8 +349,9 @@ pub fun main(nodeID: String): FlowIDTableStaking.NodeInfo {
     return FlowIDTableStaking.NodeInfo(nodeID: nodeID)
 }`
 
-func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
-	v, err := s.client.ExecuteScriptBytes(ctx, []byte(getNodeInfo), []cadence.Value{cadence.String(nodeID.String())})
+func (s *Suite) ExecuteGetProposedTableScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
+	templates.GenerateReturnProposedTableScript(env)
+	v, err := s.client.ExecuteScriptBytes(ctx, 	templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 
 	return v
