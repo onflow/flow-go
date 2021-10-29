@@ -9,7 +9,7 @@ type SealingSegment struct {
 	Blocks []*Block
 
 	// Due to decoupling of execution receipts it's possible that blocks from sealing segment will be referring
-	// execution results incorporated in blocks that aren't part of the segment. 
+	// execution results incorporated in blocks that aren't part of the segment.
 	// ExecutionResults will contain those results.
 	ExecutionResults ExecutionResultList
 }
