@@ -14,4 +14,7 @@ type IngestRPC interface {
 
 	// GetAccount returns the Account details at the given Block id
 	GetAccount(ctx context.Context, address flow.Address, blockID flow.Identifier) (*flow.Account, error)
+
+	// GetRegisterAtBlockID returns the value of a register at the given Block id (if available)
+	GetRegisterAtBlockID(ctx context.Context, owner, controller, key []byte, blockID flow.Identifier) ([]byte, error)
 }
