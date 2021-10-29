@@ -309,10 +309,10 @@ func TestSealingSegment(t *testing.T) {
 
 	// test sealing segment where a block contains a ExecutionReceipt that
 	// references a ExecutionResult contained in a different block.
-	// the sealing segment should contain any ExecutionReceipts that were
-	// missing from a blocks payload in the SealingSegment.ExecutionReceipts field
+	// the sealing segment should contain any ExecutionResults that were
+	// missing from a blocks payload in the SealingSegment.ExecutionResults field
 	// ROOT -> B1(Receipt_A) -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3 -> B4 -> B5 (Seal_B1)
-	// Expected sealing segment: SealingSegment{Blocks[B1, B2, B3, B4, B5] ExecutionReceipts{some_result_id:Result_A}}
+	// Expected sealing segment: SealingSegment{Blocks[B1, B2, B3, B4, B5] ExecutionResults[Result_A]}
 	t.Run("sealing segment decoupled execution results and receipts", func(t *testing.T) {
 		block1 := unittest.BlockWithParentFixture(head)
 		receipt1 := unittest.ReceiptForBlockFixture(&block1)

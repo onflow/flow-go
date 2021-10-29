@@ -278,7 +278,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
 	segment := flow.NewSealingSegment()
-	resultsByID := make(map[flow.Identifier]*flow.ExecutionResult)
+	includedResults := make(map[flow.Identifier]*flow.ExecutionResult)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
@@ -286,18 +286,19 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 			return fmt.Errorf("could not get block: %w", err)
 		}
 
-		resultLookUp := block.Payload.Results.Lookup()
+		resultsByID := block.Payload.Results.Lookup()
 		for _, receipt := range block.Payload.Receipts {
-			if _, ok := resultsByID[receipt.ResultID]; ok {
+			if _, ok := includedResults[receipt.ResultID]; ok {
 				continue
 			}
 
-			if _, ok := resultLookUp[receipt.ResultID]; !ok {
+			if _, ok := resultsByID[receipt.ResultID]; !ok {
 				result, err := s.state.results.ByID(receipt.ResultID)
 				if err != nil {
 					return fmt.Errorf("could not get execution result (%s): %w", receipt.ResultID, err)
 				}
 				segment.AddExecutionResult(result)
+				includedResults[receipt.ResultID] = result
 			}
 		}
 
