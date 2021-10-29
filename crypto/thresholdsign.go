@@ -47,14 +47,14 @@ type ThresholdSignatureFollower interface {
 	VerifyThresholdSignature(thresholdSignature Signature) (bool, error)
 
 	// EnoughShares indicates whether enough shares have been accumulated in order to reconstruct
-	// a group signature. This function is thread safe.
+	// a group signature. This function is thread safe and locks the internal state.
 	// Returns:
 	//  - true if and only if at least (threshold+1) shares were added
 	EnoughShares() bool
 
 	// TrustedAdd adds a signature share to the internal pool of shares
 	// without verifying the signature against the message and the participant's
-	// public key. This function is thread safe.
+	// public key. This function is thread safe and locks the internal state.
 	//
 	// The share is only added if the signer index is valid and has not been
 	// added yet. Moreover, the share is added only if not enough shares were collected.
@@ -67,6 +67,7 @@ type ThresholdSignatureFollower interface {
 
 	// VerifyAndAdd verifies a signature share (same as `VerifyShare`),
 	// and may or may not add the share to the local pool of shares.
+	// This function is thread safe and locks the internal state.
 	//
 	// The share is only added if the signature is valid, the signer index is valid and has not been
 	// added yet. Moreover, the share is added only if not enough shares were collected.
@@ -75,7 +76,6 @@ type ThresholdSignatureFollower interface {
 	//  - Second boolean output is true if enough shares were collected and no error is returned, and false otherwise.
 	//  - error is IsInvalidInputsError if input index is invalid, and a random error if an exception occurred.
 	//    (an invalid signature is not considered an invalid input, look at `VerifyShare` for details)
-	// This function is thread safe
 	VerifyAndAdd(orig int, share Signature) (bool, bool, error)
 
 	// HasShare checks whether the internal map contains the share of the given index.
