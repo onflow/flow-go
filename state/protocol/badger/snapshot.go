@@ -268,7 +268,7 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 // SealingSegment will walk through the chain backward until we reach the block referenced
 // by the latest seal and build a SealingSegment. As we visit each block we check each execution
 // receipt in the blocks payload to make sure we have a corresponding execution result, any execution
-// results missing from blocks are stored on the SealingSegment.ExecutionReceipts field in full ExecutionReceipt.
+// results missing from blocks are stored in the SealingSegment.ExecutionResults field.
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
