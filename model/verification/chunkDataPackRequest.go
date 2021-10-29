@@ -9,7 +9,7 @@ import (
 // ChunkDataPackRequest is an internal data structure in fetcher engine that is passed between the engine
 // and requester module. It conveys required information for requesting a chunk data pack.
 type ChunkDataPackRequest struct {
-	chunks.Locator
+	chunks.Locator // uniquely identifies chunk
 	ChunkDataPackRequestInfo
 }
 
@@ -20,14 +20,6 @@ type ChunkDataPackRequestInfo struct {
 	Disagrees flow.IdentifierList // execution node ids that generated a conflicting result with result of chunk.
 	Targets   flow.IdentityList   // list of all execution nodes identity at the block height of this chunk (including non-responders).
 }
-
-//func (c ChunkDataPackRequest) ID() flow.Identifier {
-//	return c.Locator.ID()
-//}
-//
-//func (c ChunkDataPackRequest) Checksum() flow.Identifier {
-//	return c.Locator.ID()
-//}
 
 // SampleTargets returns identifier of execution nodes that can be asked for the chunk data pack, based on
 // the agreeing and disagreeing execution nodes of the chunk data pack request.
@@ -75,15 +67,22 @@ func (c ChunkDataPackRequestList) ContainsLocator(resultID flow.Identifier, chun
 // UniqueRequestInfo extracts and returns request info based on chunk IDs. Note that a ChunkDataPackRequestList
 // may have duplicate requests for the same chunk ID that belongs to distinct execution results.
 func (c ChunkDataPackRequestList) UniqueRequestInfo() ChunkDataPackRequestInfoList {
-	added := make(map[flow.Identifier]struct{})
+	added := make(map[flow.Identifier]ChunkDataPackRequestInfo)
+
 	requestInfoList := ChunkDataPackRequestInfoList{}
 
 	for _, request := range c {
+		var info ChunkDataPackRequestInfo
 		if _, ok := added[request.ChunkID]; !ok {
-			info := request.ChunkDataPackRequestInfo
-			requestInfoList = append(requestInfoList, &info)
-			added[request.ChunkID] = struct{}{}
+			info = request.ChunkDataPackRequestInfo
+		} else {
+			info = added[request.ChunkID]
+			info.Agrees = append(info.Agrees, request.Agrees...)
+			info.Disagrees = append(info.Disagrees, request.Disagrees...)
+			info.Targets = append(info.Targets, request.Targets...)
 		}
+
+		added[request.ChunkID] = info
 	}
 
 	return requestInfoList

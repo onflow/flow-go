@@ -12,11 +12,3 @@ type ChunkDataPackResponse struct {
 	chunks.Locator
 	Cdp *flow.ChunkDataPack
 }
-
-func (c ChunkDataPackResponse) ID() flow.Identifier {
-	return c.Locator.ID()
-}
-
-func (c ChunkDataPackResponse) Checksum() flow.Identifier {
-	return c.Locator.ID()
-}
