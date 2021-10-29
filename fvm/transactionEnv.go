@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
@@ -281,33 +280,26 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetStorageCapacityScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
+	result, invokeErr := accountStorageCapacity(address)
 
-	// TODO (ramtin) this shouldn't be this way, it should call the invokeMeta
-	// and we handle the errors and still compute the state interactions
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	var capacity uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
 	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
 	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
 	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-	if script.Err == nil {
-		// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
-		// divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
-		capacity = script.Value.ToGoValue().(uint64) / 100
+	if invokeErr != nil {
+		return 0, nil
 	}
 
-	return capacity, nil
+	return storageMBUFixToBytesUInt(result), nil
+}
+
+// storageMBUFixToBytesUInt converts the return type of storage capacity which is a UFix64 with the unit of megabytes to
+// UInt with the unit of bytes
+func storageMBUFixToBytesUInt(result cadence.Value) uint64 {
+	// Divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
+	return result.ToGoValue().(uint64) / 100
 }
 
 func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
@@ -316,26 +308,14 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenBalanceScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
+	result, invokeErr := accountBalance(address)
 
-	// TODO similar to the one above
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	var balance uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
-	if script.Err == nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if invokeErr != nil {
+		return 0, nil
 	}
-
-	return balance, nil
+	return result.ToGoValue().(uint64), nil
 }
 
 func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
@@ -344,28 +324,16 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenAvailableBalanceScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
+	result, invokeErr := accountAvailableBalance(address)
 
-	// TODO similar to the one above
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	var balance uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
 	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-	if script.Err == nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if invokeErr != nil {
+		return 0, nil
 	}
-
-	return balance, nil
+	return result.ToGoValue().(uint64), nil
 }
 
 func (e *TransactionEnv) ResolveLocation(
@@ -735,22 +703,8 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		// uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
-		invoker := NewTransactionContractFunctionInvocator(
-			common.AddressLocation{Address: common.Address(e.ctx.Chain.ServiceAddress()), Name: flowServiceAccountContract},
-			"setupNewAccount",
-			[]interpreter.Value{
-				interpreter.NewAddressValue(common.Address(flowAddress)),
-				interpreter.NewAddressValue(payer),
-			},
-			[]sema.Type{
-				sema.AuthAccountType,
-				sema.AuthAccountType,
-			},
-			e.ctx.Logger,
-		)
-
-		_, invokeErr := invoker.Invoke(e, e.traceSpan)
+		setupNewAccount := SetupNewAccountInvocation(e, e.traceSpan)
+		_, invokeErr := setupNewAccount(flowAddress, payer)
 
 		if invokeErr != nil {
 			return address, errors.HandleRuntimeError(invokeErr)

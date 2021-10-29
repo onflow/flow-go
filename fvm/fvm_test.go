@@ -1898,7 +1898,7 @@ func TestWithServiceAccount(t *testing.T) {
 		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvoker(zerolog.Nop()),
 		),
 	)
 
@@ -1943,7 +1943,7 @@ func TestEventLimits(t *testing.T) {
 		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvoker(zerolog.Nop()),
 		),
 	)
 
@@ -1981,7 +1981,7 @@ func TestEventLimits(t *testing.T) {
 		fvm.WithChain(chain),
 		fvm.WithEventCollectionSizeLimit(2),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvoker(zerolog.Nop()),
 		),
 	)
 
