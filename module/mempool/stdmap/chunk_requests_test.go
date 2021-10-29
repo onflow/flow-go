@@ -235,9 +235,13 @@ func TestAddingDuplicateChunkIDs(t *testing.T) {
 	reqInfoList := requests.All()
 	require.Len(t, reqInfoList, 1)
 	require.Equal(t, thisReq.ChunkID, reqInfoList[0].ChunkID)
-	// agrees and disagrees must be union of all requests for that chunk ID.
+	// agrees, disagrees, and targets must be union of all requests for that chunk ID.
 	require.ElementsMatch(t, thisReq.Agrees.Union(otherReq.Agrees), reqInfoList[0].Agrees)
 	require.ElementsMatch(t, thisReq.Disagrees.Union(otherReq.Disagrees), reqInfoList[0].Disagrees)
+
+	var thisTargets flow.IdentifierList = thisReq.Targets.NodeIDs()
+	var otherTargets flow.IdentifierList = otherReq.Targets.NodeIDs()
+	require.ElementsMatch(t, thisTargets.Union(otherTargets), reqInfoList[0].Targets.NodeIDs())
 
 	locators, ok := requests.PopAll(thisReq.ChunkID)
 	require.True(t, ok)
