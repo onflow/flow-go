@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -14,17 +13,11 @@ func TestChunkLocatorList_Contains(t *testing.T) {
 
 	t.Run("contains returns true for all existing elements", func(t *testing.T) {
 		for _, l := range list {
-			require.True(t, list.Contains(&chunks.Locator{
-				ResultID: l.ResultID,
-				Index:    l.Index,
-			}))
+			require.True(t, list.Contains(l.ResultID, l.Index))
 		}
 	})
 
 	t.Run("contains returns false for non-existing element", func(t *testing.T) {
-		require.False(t, list.Contains(&chunks.Locator{
-			ResultID: unittest.IdentifierFixture(),
-			Index:    uint64(10),
-		}))
+		require.False(t, list.Contains(unittest.IdentifierFixture(), uint64(10)))
 	})
 }
