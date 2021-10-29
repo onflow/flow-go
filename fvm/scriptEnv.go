@@ -202,7 +202,7 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 
 	// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
 	// divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
-	return result.ToGoValue().(uint64) / 100, nil
+	return storageMBUFixToBytesUInt(result), nil
 }
 
 func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err error) {

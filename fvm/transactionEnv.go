@@ -278,9 +278,14 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		return 0, nil
 	}
 
-	// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
-	// divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
-	return result.ToGoValue().(uint64) / 100, nil
+	return storageMBUFixToBytesUInt(result), nil
+}
+
+// storageMBUFixToBytesUInt converts the return type of storage capacity which is a UFix64 with the unit of megabytes to
+// UInt with the unit of bytes
+func storageMBUFixToBytesUInt(result cadence.Value) uint64 {
+	// Divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
+	return result.ToGoValue().(uint64) / 100
 }
 
 func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
