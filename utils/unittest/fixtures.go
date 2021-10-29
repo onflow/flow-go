@@ -635,7 +635,7 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
 		result.BlockID = blockID
-		result.Chunks = ChunkListFixture(uint(chunks), block.ID())
+		result.Chunks = ChunkListFixture(uint(chunks), blockID)
 		result.Chunks[0].StartState = startState // set start state to value before update
 		result.PreviousResultID = previousResultID
 	}
