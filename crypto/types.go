@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -110,20 +111,22 @@ type Signature []byte
 // It allows a function caller differentiate unexpected program errors from errors caused by
 // invalid inputs.
 type InvalidInputsError struct {
-	message string
+	err error
 }
 
-// newInvalidInputsError constructs a new InvalidInputsError
-func newInvalidInputsError(msg string, args ...interface{}) error {
-	return &InvalidInputsError{message: fmt.Sprintf(msg, args...)}
+// invalidInputsErrorf constructs a new InvalidInputsError
+func invalidInputsErrorf(msg string, args ...interface{}) error {
+	return &InvalidInputsError{
+		err: fmt.Errorf(msg, args...),
+	}
 }
 
 func (e InvalidInputsError) Error() string {
-	return e.message
+	return e.err.Error()
 }
 
 // IsInvalidInputsError checks if the input error is of a InvalidInputsError type
 func IsInvalidInputsError(err error) bool {
-	_, ok := err.(*InvalidInputsError)
-	return ok
+	var target *InvalidInputsError
+	return errors.As(err, &target)
 }
