@@ -206,7 +206,7 @@ func TestValueConversion(t *testing.T) {
 		assert.IsType(t, &newInter.CompositeValue{}, newValue)
 		composite := newValue.(*newInter.CompositeValue)
 
-		fieldValue := composite.GetField("foo")
+		fieldValue := composite.GetField(migration.newInter, newInter.ReturnEmptyLocationRange, "foo")
 
 		assert.IsType(t, &newInter.DictionaryValue{}, fieldValue)
 		dictionary := fieldValue.(*newInter.DictionaryValue)
@@ -268,7 +268,7 @@ func TestEncoding(t *testing.T) {
 		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
 		assert.NoError(t, err)
 
-		err = migration.storage.Commit()
+		err = migration.storage.Commit(migration.newInter, true)
 		assert.NoError(t, err)
 
 		encodedValues := ledgerView.Payloads()
@@ -355,7 +355,7 @@ func TestEncoding(t *testing.T) {
 		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
 		assert.NoError(t, err)
 
-		err = migration.storage.Commit()
+		err = migration.storage.Commit(migration.newInter, true)
 		assert.NoError(t, err)
 
 		encodedValues := ledgerView.Payloads()
@@ -451,7 +451,7 @@ func TestEncoding(t *testing.T) {
 		err = migration.decodeAndConvert(encoded, address, "", oldInter.CurrentEncodingVersion)
 		assert.NoError(t, err)
 
-		err = migration.storage.Commit()
+		err = migration.storage.Commit(migration.newInter, true)
 		assert.NoError(t, err)
 
 		encodedValues := ledgerView.Payloads()
@@ -477,7 +477,7 @@ func TestEncoding(t *testing.T) {
 		assert.IsType(t, &newInter.CompositeValue{}, storedValue)
 		composite := storedValue.(*newInter.CompositeValue)
 
-		fieldValue := composite.GetField("foo")
+		fieldValue := composite.GetField(migration.newInter, newInter.ReturnEmptyLocationRange, "foo")
 
 		assert.IsType(t, &newInter.DictionaryValue{}, fieldValue)
 		dictionary := fieldValue.(*newInter.DictionaryValue)
@@ -931,7 +931,7 @@ func TestDeferredValues(t *testing.T) {
 	require.IsType(t, &newInter.CompositeValue{}, result)
 	composite := result.(*newInter.CompositeValue)
 
-	ownedNFTS := composite.GetField("ownedNFTs")
+	ownedNFTS := composite.GetField(migration.newInter, newInter.ReturnEmptyLocationRange, "ownedNFTs")
 	require.IsType(t, &newInter.DictionaryValue{}, ownedNFTS)
 	dictionary := ownedNFTS.(*newInter.DictionaryValue)
 
