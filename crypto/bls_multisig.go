@@ -235,13 +235,11 @@ func VerifyBLSSignatureOneMessage(pks []PublicKey, s Signature,
 	message []byte, kmac hash.Hasher) (bool, error) {
 	// check the public key list is non empty
 	if len(pks) == 0 {
-		return false, invalidInputsErrorf("key list is empty")
+		return false, invalidInputsErrorf("verify signature one message failed because key list is empty")
 	}
 	aggPk, err := AggregateBLSPublicKeys(pks)
 	if err != nil {
-		return false, invalidInputsErrorf(
-			"aggregating public keys for verification failed: %s",
-			err)
+		return false, fmt.Errorf("verify signature one message failed: %w", err)
 	}
 	return aggPk.Verify(s, message, kmac)
 }
