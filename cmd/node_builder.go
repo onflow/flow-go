@@ -123,6 +123,8 @@ type BaseConfig struct {
 	profilerDir                     string
 	profilerInterval                time.Duration
 	profilerDuration                time.Duration
+	TlsCert                         string
+	TlsKey                          string
 	tracerEnabled                   bool
 	tracerSensitivity               uint
 	metricsEnabled                  bool
@@ -194,6 +196,8 @@ func DefaultBaseConfig() *BaseConfig {
 		profilerDir:                     "profiler",
 		profilerInterval:                15 * time.Minute,
 		profilerDuration:                10 * time.Second,
+		TlsCert:                         NotSet,
+		TlsKey:                          NotSet,
 		tracerEnabled:                   false,
 		tracerSensitivity:               4,
 		metricsEnabled:                  true,

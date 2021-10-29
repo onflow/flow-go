@@ -1,6 +1,7 @@
 package node_builder
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -421,8 +422,17 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 			return nil
 		}).
 		Module("server certificate", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			var x509Certificate *tls.Certificate
+			var err error
 			// generate the server certificate that will be served by the GRPC server
-			x509Certificate, err := grpcutils.X509Certificate(node.NetworkKey)
+			if (node.TlsCert != cmd.NotSet && node.TlsKey != cmd.NotSet) {
+				var tmp tls.Certificate
+				tmp, err = tls.LoadX509KeyPair(node.TlsCert, node.TlsKey)
+				x509Certificate = &tmp
+			} else {
+				x509Certificate, err = grpcutils.X509Certificate(node.NetworkKey)
+			}
+			
 			if err != nil {
 				return err
 			}
