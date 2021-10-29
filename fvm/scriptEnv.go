@@ -31,19 +31,19 @@ var _ runtime.Interface = &ScriptEnv{}
 
 // ScriptEnv is a read-only mostly used for executing scripts.
 type ScriptEnv struct {
-	ctx           Context
-	sth           *state.StateHolder
-	vm            *VirtualMachine
-	accounts      state.Accounts
-	contracts     *handler.ContractHandler
-	programs      *handler.ProgramsHandler
-	accountKeys   *handler.AccountKeyHandler
-	metrics       *handler.MetricsHandler
-	uuidGenerator *state.UUIDGenerator
-	logs          []string
-	totalGasUsed  uint64
-	rng           *rand.Rand
-	traceSpan     opentracing.Span
+	ctx                Context
+	sth                *state.StateHolder
+	vm                 *VirtualMachine
+	accounts           state.Accounts
+	contracts          *handler.ContractHandler
+	programs           *handler.ProgramsHandler
+	accountKeys        *handler.AccountKeyHandler
+	metrics            *handler.MetricsHandler
+	computationHandler handler.ComputationMeteringHandler
+	uuidGenerator      *state.UUIDGenerator
+	logs               []string
+	rng                *rand.Rand
+	traceSpan          opentracing.Span
 }
 
 func NewScriptEnvironment(
@@ -58,16 +58,18 @@ func NewScriptEnvironment(
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
+	computationHandler := handler.NewComputationMeteringHandler(ctx.GasLimit)
 
 	env := &ScriptEnv{
-		ctx:           ctx,
-		sth:           sth,
-		vm:            vm,
-		metrics:       metrics,
-		accounts:      accounts,
-		accountKeys:   accountKeys,
-		uuidGenerator: uuidGenerator,
-		programs:      programsHandler,
+		ctx:                ctx,
+		sth:                sth,
+		vm:                 vm,
+		metrics:            metrics,
+		accounts:           accounts,
+		accountKeys:        accountKeys,
+		uuidGenerator:      uuidGenerator,
+		programs:           programsHandler,
+		computationHandler: computationHandler,
 	}
 
 	env.contracts = handler.NewContractHandler(
@@ -455,16 +457,15 @@ func (e *ScriptEnv) GenerateUUID() (uint64, error) {
 }
 
 func (e *ScriptEnv) GetComputationLimit() uint64 {
-	return e.ctx.GasLimit
+	return e.computationHandler.Limit()
 }
 
 func (e *ScriptEnv) SetComputationUsed(used uint64) error {
-	e.totalGasUsed = used
-	return nil
+	return e.computationHandler.AddUsed(used)
 }
 
 func (e *ScriptEnv) GetComputationUsed() uint64 {
-	return e.totalGasUsed
+	return e.computationHandler.Used()
 }
 
 func (e *ScriptEnv) SetAccountFrozen(address common.Address, frozen bool) error {

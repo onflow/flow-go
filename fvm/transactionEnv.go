@@ -33,25 +33,25 @@ var _ runtime.Interface = &TransactionEnv{}
 
 // TransactionEnv is a read-write environment used for executing flow transactions.
 type TransactionEnv struct {
-	vm               *VirtualMachine
-	ctx              Context
-	sth              *state.StateHolder
-	programs         *handler.ProgramsHandler
-	accounts         state.Accounts
-	uuidGenerator    *state.UUIDGenerator
-	contracts        *handler.ContractHandler
-	accountKeys      *handler.AccountKeyHandler
-	metrics          *handler.MetricsHandler
-	eventHandler     *handler.EventHandler
-	addressGenerator flow.AddressGenerator
-	rng              *rand.Rand
-	logs             []string
-	totalGasUsed     uint64
-	tx               *flow.TransactionBody
-	txIndex          uint32
-	txID             flow.Identifier
-	traceSpan        opentracing.Span
-	authorizers      []runtime.Address
+	vm                 *VirtualMachine
+	ctx                Context
+	sth                *state.StateHolder
+	programs           *handler.ProgramsHandler
+	accounts           state.Accounts
+	uuidGenerator      *state.UUIDGenerator
+	contracts          *handler.ContractHandler
+	accountKeys        *handler.AccountKeyHandler
+	metrics            *handler.MetricsHandler
+	computationHandler handler.ComputationMeteringHandler
+	eventHandler       *handler.EventHandler
+	addressGenerator   flow.AddressGenerator
+	rng                *rand.Rand
+	logs               []string
+	tx                 *flow.TransactionBody
+	txIndex            uint32
+	txID               flow.Identifier
+	traceSpan          opentracing.Span
+	authorizers        []runtime.Address
 }
 
 func NewTransactionEnvironment(
@@ -76,22 +76,24 @@ func NewTransactionEnvironment(
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
+	computationHandler := handler.NewComputationMeteringHandler(computationLimit(ctx, tx))
 
 	env := &TransactionEnv{
-		vm:               vm,
-		ctx:              ctx,
-		sth:              sth,
-		metrics:          metrics,
-		programs:         programsHandler,
-		accounts:         accounts,
-		accountKeys:      accountKeys,
-		addressGenerator: generator,
-		uuidGenerator:    uuidGenerator,
-		eventHandler:     eventHandler,
-		tx:               tx,
-		txIndex:          txIndex,
-		txID:             tx.ID(),
-		traceSpan:        traceSpan,
+		vm:                 vm,
+		ctx:                ctx,
+		sth:                sth,
+		metrics:            metrics,
+		programs:           programsHandler,
+		accounts:           accounts,
+		accountKeys:        accountKeys,
+		addressGenerator:   generator,
+		uuidGenerator:      uuidGenerator,
+		eventHandler:       eventHandler,
+		computationHandler: computationHandler,
+		tx:                 tx,
+		txIndex:            txIndex,
+		txID:               tx.ID(),
+		traceSpan:          traceSpan,
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
@@ -104,6 +106,18 @@ func NewTransactionEnvironment(
 	}
 
 	return env
+}
+
+func computationLimit(ctx Context, tx *flow.TransactionBody) uint64 {
+	// if gas limit is set to zero fallback to the gas limit set by the context
+	if tx.GasLimit == 0 {
+		// if context gasLimit is also zero, fallback to the default gas limit
+		if ctx.GasLimit == 0 {
+			return DefaultGasLimit
+		}
+		return ctx.GasLimit
+	}
+	return tx.GasLimit
 }
 
 func (e *TransactionEnv) TxIndex() uint32 {
@@ -553,24 +567,15 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 }
 
 func (e *TransactionEnv) GetComputationLimit() uint64 {
-	// if gas limit is set to zero fallback to the gas limit set by the context
-	if e.tx.GasLimit == 0 {
-		// if context gasLimit is also zero, fallback to the default gas limit
-		if e.ctx.GasLimit == 0 {
-			return DefaultGasLimit
-		}
-		return e.ctx.GasLimit
-	}
-	return e.tx.GasLimit
+	return e.computationHandler.Limit()
 }
 
 func (e *TransactionEnv) SetComputationUsed(used uint64) error {
-	e.totalGasUsed = used
-	return nil
+	return e.computationHandler.AddUsed(used)
 }
 
 func (e *TransactionEnv) GetComputationUsed() uint64 {
-	return e.totalGasUsed
+	return e.computationHandler.Used()
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
