@@ -339,7 +339,13 @@ func TestRequestPendingChunkSealedBlock_Hybrid(t *testing.T) {
 	testifymock.AssertExpectationsForObjects(t, s.metrics)
 }
 
-func TestHandleChunkDataPack_DuplicateChunkIDs_HappyPath(t *testing.T) {
+// TestReceivingChunkDataResponseForDuplicateChunkRequests evaluates happy path of receiving a chunk data pack response
+// for duplicate chunk data pack requests.
+// On receiving the chunk data pack, requester engine should send a chunk data response to the chunk handler for each
+// of those pending duplicate chunk data requests.
+// Note that by duplicate chunk data requests we mean chunks requests for same chunk ID that belong to
+// distinct execution results.
+func TestReceivingChunkDataResponseForDuplicateChunkRequests(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
 
@@ -354,7 +360,6 @@ func TestHandleChunkDataPack_DuplicateChunkIDs_HappyPath(t *testing.T) {
 	requests := verification.ChunkDataPackRequestList{requestA, requestB}
 	originID := unittest.IdentifierFixture()
 
-	// we remove pending request on receiving this response
 	mockPendingRequestsPopAll(t, s.pendingRequests, requests)
 	handlerWG := mockChunkDataPackHandler(t, s.handler, requests)
 
