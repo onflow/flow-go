@@ -88,6 +88,11 @@ func testCentralizedStatefulAPI(t *testing.T) {
 					assert.True(t, verif)
 					// check EnoughSignature
 					assert.False(t, ts.EnoughShares(), "threshold shouldn't be reached")
+					// check ThresholdSignature
+					sig, err := ts.ThresholdSignature()
+					assert.Error(t, err)
+					assert.True(t, IsNotEnoughSharesError(err))
+					assert.Nil(t, sig)
 				}(j)
 			}
 			wg.Wait()
@@ -144,13 +149,13 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			// VerifyAndAdd
 			verif, enough, err := ts.VerifyAndAdd(i, share)
 			assert.Error(t, err)
-			assert.True(t, IsduplicatedSignerError(err))
+			assert.True(t, IsDuplicatedSignerError(err))
 			assert.False(t, verif)
 			assert.False(t, enough)
 			// TrustedAdd
 			enough, err = ts.TrustedAdd(i, share)
 			assert.Error(t, err)
-			assert.True(t, IsduplicatedSignerError(err))
+			assert.True(t, IsDuplicatedSignerError(err))
 			assert.False(t, enough)
 		})
 
@@ -187,7 +192,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 		})
 
 		t.Run("invalid signature", func(t *testing.T) {
-			index := mrand.Intn(n)
+			index := signers[0]
 			ts, err := NewBLSThresholdSignatureInspector(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
 			require.NoError(t, err)
 			share, err := skShares[index].Sign(thresholdSignatureMessage, kmac)
@@ -212,7 +217,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			share[4] ^= 1
 
 			// valid curve point but invalid signature
-			otherIndex := (index + 1) % len(pkShares) // otherIndex is different than index
+			otherIndex := (index + 1) % n // otherIndex is different than index
 			// VerifyShare
 			verif, err = ts.VerifyShare(otherIndex, share)
 			assert.NoError(t, err)
@@ -226,6 +231,29 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			verif, err = ts.HasShare(otherIndex)
 			assert.NoError(t, err)
 			assert.False(t, verif)
+
+			// trust add one invalid signature and check ThresholdSignature
+			share[4] ^= 1                             // alter the share
+			enough, err = ts.TrustedAdd(index, share) // invalid share
+			assert.NoError(t, err)
+			assert.False(t, enough)
+			for i := 1; i < threshold+1; i++ { // valid shares
+				index := signers[i]
+				valid, err := skShares[index].Sign(thresholdSignatureMessage, kmac)
+				require.NoError(t, err)
+				enough, err = ts.TrustedAdd(index, valid)
+				assert.NoError(t, err)
+				if i < threshold {
+					assert.False(t, enough)
+				} else {
+					assert.True(t, enough)
+				}
+			}
+			sig, err := ts.ThresholdSignature()
+			assert.Error(t, err)
+			assert.True(t, IsInvalidInputsError(err))
+			assert.Nil(t, sig)
+			share[4] ^= 1 // restore the share
 		})
 
 		t.Run("constructor errors", func(t *testing.T) {
@@ -270,7 +298,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			assert.True(t, IsInvalidInputsError(err))
 			assert.Nil(t, tsFollower)
 			// inconsistent private and public key
-			indexSwap := (index + 1) % len(pkShares) // indexSwap is different than index
+			indexSwap := (index + 1) % n // indexSwap is different than index
 			pkShares[index], pkShares[indexSwap] = pkShares[indexSwap], pkShares[index]
 			tsParticipant, err = NewBLSThresholdSignatureParticipant(pkGroup, pkShares, len(pkShares)+1, index, skShares[index], thresholdSignatureMessage, thresholdSignatureTag)
 			assert.Error(t, err)
@@ -287,32 +315,32 @@ func testDistributedStatefulAPI_FeldmanVSS(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
 	gt = t
-	// number of nodes to test
+	// number of participants to test
 	n := 5
 	lead := mrand.Intn(n) // random leader
 	var sync sync.WaitGroup
 	chans := make([]chan *message, n)
 	processors := make([]testDKGProcessor, 0, n)
 
-	// create n processors for all nodes
+	// create n processors for all participants
 	for current := 0; current < n; current++ {
 		processors = append(processors, testDKGProcessor{
 			current:  current,
 			chans:    chans,
 			protocol: dkgType,
 		})
-		// create DKG in all nodes
+		// create DKG in all participants
 		var err error
 		processors[current].dkg, err = NewFeldmanVSS(n, optimalThreshold(n),
 			current, &processors[current], lead)
 		require.NoError(t, err)
 	}
 
-	// create the node (buffered) communication channels
+	// create the participant (buffered) communication channels
 	for i := 0; i < n; i++ {
 		chans[i] = make(chan *message, 2*n)
 	}
-	// start DKG in all nodes
+	// start DKG in all participants
 	seed := make([]byte, SeedMinLenDKG)
 	read, err := rand.Read(seed)
 	require.Equal(t, read, SeedMinLenDKG)
@@ -346,32 +374,32 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 	log.Info("DKG starts")
 	gt = t
-	// number of nodes to test
+	// number of participants to test
 	n := 5
 	for threshold := MinimumThreshold; threshold < n; threshold++ {
 		var sync sync.WaitGroup
 		chans := make([]chan *message, n)
 		processors := make([]testDKGProcessor, 0, n)
 
-		// create n processors for all nodes
+		// create n processors for all participants
 		for current := 0; current < n; current++ {
 			processors = append(processors, testDKGProcessor{
 				current:  current,
 				chans:    chans,
 				protocol: dkgType,
 			})
-			// create DKG in all nodes
+			// create DKG in all participants
 			var err error
 			processors[current].dkg, err = NewJointFeldman(n,
 				optimalThreshold(n), current, &processors[current])
 			require.NoError(t, err)
 		}
 
-		// create the node (buffered) communication channels
+		// create the participant (buffered) communication channels
 		for i := 0; i < n; i++ {
 			chans[i] = make(chan *message, 2*n)
 		}
-		// start DKG in all nodes but the leader
+		// start DKG in all participants but the leader
 		seed := make([]byte, SeedMinLenDKG)
 		read, err := rand.Read(seed)
 		require.Equal(t, read, SeedMinLenDKG)
@@ -383,7 +411,7 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 			go tsDkgRunChan(&processors[current], &sync, t, 0)
 		}
 
-		// sync the 2 timeouts at all nodes and start the next phase
+		// sync the 2 timeouts at all participants and start the next phase
 		for phase := 1; phase <= 2; phase++ {
 			sync.Wait()
 			sync.Add(n)
@@ -411,7 +439,7 @@ func testDistributedStatefulAPI_JointFeldman(t *testing.T) {
 }
 
 // This is a testing function
-// It simulates processing incoming messages by a node during DKG
+// It simulates processing incoming messages by a participant during DKG
 // It assumes proc.dkg is already running
 func tsDkgRunChan(proc *testDKGProcessor,
 	sync *sync.WaitGroup, t *testing.T, phase int) {
@@ -459,7 +487,7 @@ func tsDkgRunChan(proc *testDKGProcessor,
 }
 
 // This is a testing function using the stateful api
-// It simulates processing incoming messages by a node during TS
+// It simulates processing incoming messages by a participant during TS
 func tsRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
 	// Sign a share and broadcast it
 	sigShare, err := proc.ts.SignShare()
@@ -502,8 +530,8 @@ func tsRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
 
 // This stucture holds the keys and is needed for the stateless test
 type statelessKeys struct {
-	// the current node private key (a DKG output)
-	currentPrivateKey PrivateKey
+	// the current participant private key (a DKG output)
+	myPrivateKey PrivateKey
 	// the group public key (a DKG output)
 	groupPublicKey PublicKey
 	// the group public key shares (a DKG output)
@@ -511,16 +539,16 @@ type statelessKeys struct {
 }
 
 // This is a testing function using the stateless api
-// It simulates processing incoming messages by a node during TS
+// It simulates processing incoming messages by a participant during TS
 func tsStatelessRunChan(proc *testDKGProcessor, sync *sync.WaitGroup, t *testing.T) {
 	n := proc.dkg.Size()
 	// Sign a share and broadcast it
 	kmac := NewBLSKMAC(thresholdSignatureTag)
-	ownSignShare, _ := proc.keys.currentPrivateKey.Sign(thresholdSignatureMessage, kmac)
+	ownSignShare, _ := proc.keys.myPrivateKey.Sign(thresholdSignatureMessage, kmac)
 	// the local valid signature shares
 	signShares := make([]Signature, 0, n)
 	signers := make([]int, 0, n)
-	// add the node own share
+	// add the participant own share
 	signShares = append(signShares, ownSignShare)
 	signers = append(signers, proc.current)
 	proc.protocol = tsType

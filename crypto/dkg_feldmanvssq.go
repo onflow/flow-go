@@ -62,12 +62,12 @@ type complaint struct {
 // NewFeldmanVSSq creates a new instance of a Feldman VSS protocol
 // with a qualification mechanism.
 //
-// An instance is run by a single node and is usable for only one protocol.
+// An instance is run by a single participant and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
-func NewFeldmanVSSQual(size int, threshold int, currentIndex int,
+func NewFeldmanVSSQual(size int, threshold int, myIndex int,
 	processor DKGProcessor, leaderIndex int) (DKGState, error) {
 
-	common, err := newDKGCommon(size, threshold, currentIndex, processor, leaderIndex)
+	common, err := newDKGCommon(size, threshold, myIndex, processor, leaderIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -90,13 +90,13 @@ func (s *feldmanVSSQualState) init() {
 }
 
 // NextTimeout sets the next protocol timeout
-// This function needs to be called twice by every node in
+// This function needs to be called twice by every participant in
 // the Feldman VSS Qual protocol.
 // The first call is a timeout for sharing the private shares.
 // The second call is a timeout for broadcasting the complaints.
 func (s *feldmanVSSQualState) NextTimeout() error {
 	if !s.running {
-		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
+		return fmt.Errorf("dkg protocol %d is not running", s.myIndex)
 	}
 	// if leader is already disqualified, there is nothing to do
 	if s.disqualified {
@@ -118,20 +118,20 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 	return errors.New("the next timeout should be to end DKG protocol")
 }
 
-// End ends the protocol in the current node
-// It returns the finalized public data and node private key share.
+// End ends the protocol in the current participant
+// It returns the finalized public data and participant private key share.
 // - the group public key corresponding to the group secret key
-// - all the public key shares corresponding to the nodes private
+// - all the public key shares corresponding to the participants private
 // key shares.
-// - the finalized private key which is the current node's own private key share
+// - the finalized private key which is the current participant's own private key share
 // This is also a timeout to receiving all complaint answers
 func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
-		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
+		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.myIndex)
 	}
 	if !s.sharesTimeout || !s.complaintsTimeout {
 		return nil, nil, nil,
-			fmt.Errorf("%d: two timeouts should be set before ending dkg", s.currentIndex)
+			fmt.Errorf("%d: two timeouts should be set before ending dkg", s.myIndex)
 	}
 	s.running = false
 	// check if a complaint has remained without an answer
@@ -154,12 +154,12 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 		return nil, nil, nil, errors.New("leader is disqualified")
 	}
 
-	// private key of the current node
+	// private key of the current participant
 	x := newPrKeyBLSBLS12381(&s.x)
 
 	// Group public key
 	Y := newPubKeyBLSBLS12381(&s.vA[0])
-	// The nodes public keys
+	// The participants public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range s.y {
 		y[i] = newPubKeyBLSBLS12381(&p)
@@ -172,7 +172,7 @@ const (
 	complaintAnswerSize = 1 + PrKeyLenBLSBLS12381
 )
 
-// HandleBroadcastMsg processes a new broadcasted message received by the current node.
+// HandleBroadcastMsg processes a new broadcasted message received by the current participant.
 // orig is the message origin index
 func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.running {
@@ -186,9 +186,9 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 			orig)
 	}
 
-	// In case a message is received by the origin node,
+	// In case a message is received by the origin participant,
 	// the message is just ignored
-	if s.currentIndex == index(orig) {
+	if s.myIndex == index(orig) {
 		return nil
 	}
 
@@ -217,7 +217,7 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	return nil
 }
 
-// HandlePrivateMsg processes a new private message received by the current node.
+// HandlePrivateMsg processes a new private message received by the current participant.
 // orig is the message origin index.
 func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.running {
@@ -230,9 +230,9 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 			orig)
 	}
 
-	// In case a private message is received by the origin node,
+	// In case a private message is received by the origin participant,
 	// the message is just ignored
-	if s.currentIndex == index(orig) {
+	if s.myIndex == index(orig) {
 		return nil
 	}
 
@@ -256,20 +256,20 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 	return nil
 }
 
-// ForceDisqualify forces a node to get disqualified
+// ForceDisqualify forces a participant to get disqualified
 // for a reason outside of the DKG protocol
-// The caller should make sure all honest nodes call this function,
+// The caller should make sure all honest participants call this function,
 // otherwise, the protocol can be broken
-func (s *feldmanVSSQualState) ForceDisqualify(node int) error {
+func (s *feldmanVSSQualState) ForceDisqualify(participant int) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
-	if node >= s.Size() || node < 0 {
+	if participant >= s.Size() || participant < 0 {
 		return invalidInputsErrorf(
 			"invalid origin input, should be less than %d, got %d",
-			s.Size(), node)
+			s.Size(), participant)
 	}
-	if index(node) == s.leaderIndex {
+	if index(participant) == s.leaderIndex {
 		s.disqualified = true
 	}
 	return nil
@@ -286,7 +286,7 @@ func (s *feldmanVSSQualState) setSharesTimeout() {
 	}
 	// if share is not received, make a complaint
 	if !s.xReceived {
-		s.complaints[s.currentIndex] = &complaint{
+		s.complaints[s.myIndex] = &complaint{
 			received:       true,
 			answerReceived: false,
 		}
@@ -334,7 +334,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 				shareSize, len(data)))
 		return
 	}
-	// read the node private share
+	// read the participant private share
 	if C.bn_read_Zr_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
 		PrKeyLenBLSBLS12381,
@@ -351,7 +351,7 @@ func (s *feldmanVSSQualState) receiveShare(origin index, data []byte) {
 		}
 		// otherwise, build a complaint to broadcast and add it to the local
 		// complaint map
-		s.complaints[s.currentIndex] = &complaint{
+		s.complaints[s.myIndex] = &complaint{
 			received:       true,
 			answerReceived: false,
 		}
@@ -421,7 +421,7 @@ func (s *feldmanVSSQualState) receiveVerifVector(origin index, data []byte) {
 		}
 		// otherwise, build a complaint to broadcast and add it to the local
 		// complaints map
-		s.complaints[s.currentIndex] = &complaint{
+		s.complaints[s.myIndex] = &complaint{
 			received:       true,
 			answerReceived: false,
 		}
@@ -491,8 +491,8 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 			received:       true,
 			answerReceived: false,
 		}
-		// if the complainee is the current node, prepare an answer
-		if s.currentIndex == s.leaderIndex {
+		// if the complainee is the current participant, prepare an answer
+		if s.myIndex == s.leaderIndex {
 			data := make([]byte, complaintAnswerSize+1)
 			data[0] = byte(feldmanVSSComplaintAnswer)
 			data[1] = byte(origin)
@@ -511,7 +511,7 @@ func (s *feldmanVSSQualState) receiveComplaint(origin index, data []byte) {
 	}
 	c.received = true
 	// first flag check is a sanity check
-	if c.answerReceived && s.currentIndex != s.leaderIndex {
+	if c.answerReceived && s.myIndex != s.leaderIndex {
 		s.disqualified = s.checkComplaint(origin, c)
 		if s.disqualified {
 			s.processor.Disqualify(int(s.leaderIndex),
@@ -598,8 +598,8 @@ func (s *feldmanVSSQualState) receiveComplaintAnswer(origin index, data []byte) 
 					complainer))
 		}
 
-		// fix the share of the current node if the complaint in invalid
-		if !s.disqualified && complainer == s.currentIndex {
+		// fix the share of the current participant if the complaint in invalid
+		if !s.disqualified && complainer == s.myIndex {
 			s.x = c.answer
 		}
 	}

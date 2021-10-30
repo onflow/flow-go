@@ -150,16 +150,17 @@ func (rs *randomBeaconSuite) TestInvalidIndex() {
 	share, err := rs.skShares[0].Sign(rs.thresholdSignatureMessage, rs.kmac)
 	require.NoError(rs.T(), err)
 	// invalid index
-	invalidIndex := len(rs.pkShares) + 1
-	// Verify
-	err = follower.Verify(invalidIndex, share)
-	assert.Error(rs.T(), err)
-	assert.True(rs.T(), engine.IsInvalidInputError(err))
-	// TrustedAdd
-	enough, err := follower.TrustedAdd(invalidIndex, share)
-	assert.Error(rs.T(), err)
-	assert.True(rs.T(), engine.IsInvalidInputError(err))
-	assert.False(rs.T(), enough)
+	for _, invalidIndex := range []int{len(rs.pkShares) + 1, -1} {
+		// Verify
+		err = follower.Verify(invalidIndex, share)
+		assert.Error(rs.T(), err)
+		assert.True(rs.T(), engine.IsInvalidInputError(err))
+		// TrustedAdd
+		enough, err := follower.TrustedAdd(invalidIndex, share)
+		assert.Error(rs.T(), err)
+		assert.True(rs.T(), engine.IsInvalidInputError(err))
+		assert.False(rs.T(), enough)
+	}
 }
 
 func (rs *randomBeaconSuite) TestInvalidSignature() {

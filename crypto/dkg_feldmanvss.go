@@ -28,7 +28,7 @@ import (
 type feldmanVSSstate struct {
 	// common DKG state
 	*dkgCommon
-	// node leader index
+	// participant leader index
 	leaderIndex index
 	// Polynomial P = a_0 + a_1*x + .. + a_t*x^t  in Zr[X], the vector size is (t+1)
 	// a_0 is the group private key
@@ -37,10 +37,10 @@ type feldmanVSSstate struct {
 	// A_0 is the group public key
 	vA         []pointG2
 	vAReceived bool
-	// Private share of the current node
+	// Private share of the current participant
 	x         scalar
 	xReceived bool
-	// Public keys of the group nodes, the vector size is (n)
+	// Public keys of the group participants, the vector size is (n)
 	y []pointG2
 	// true if the private share is valid
 	validKey bool
@@ -48,12 +48,12 @@ type feldmanVSSstate struct {
 
 // NewFeldmanVSS creates a new instance of Feldman VSS protocol.
 //
-// An instance is run by a single node and is usable for only one protocol.
+// An instance is run by a single participant and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created
-func NewFeldmanVSS(size int, threshold int, currentIndex int,
+func NewFeldmanVSS(size int, threshold int, myIndex int,
 	processor DKGProcessor, leaderIndex int) (DKGState, error) {
 
-	common, err := newDKGCommon(size, threshold, currentIndex, processor, leaderIndex)
+	common, err := newDKGCommon(size, threshold, myIndex, processor, leaderIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -76,10 +76,10 @@ func (s *feldmanVSSstate) init() {
 	C.bn_new_wrapper((*C.bn_st)(&s.x))
 }
 
-// Start starts running the protocol in the current node
-// If the current node is the leader, then the seed is used
+// Start starts running the protocol in the current participant
+// If the current participant is the leader, then the seed is used
 // to generate the secret polynomial (including the group private key)
-// if the current node is not the leader, the seed is ignored.
+// if the current participant is not the leader, the seed is ignored.
 func (s *feldmanVSSstate) Start(seed []byte) error {
 	if s.running {
 		return errors.New("dkg is already running")
@@ -87,18 +87,18 @@ func (s *feldmanVSSstate) Start(seed []byte) error {
 
 	s.running = true
 	// Generate shares if necessary
-	if s.leaderIndex == s.currentIndex {
+	if s.leaderIndex == s.myIndex {
 		return s.generateShares(seed)
 	}
 	return nil
 }
 
-// End ends the protocol in the current node
-// It returns the finalized public data and node private key share.
+// End ends the protocol in the current participant
+// It returns the finalized public data and participant private key share.
 // - the group public key corresponding to the group secret key
-// - all the public key shares corresponding to the nodes private
+// - all the public key shares corresponding to the participants private
 // key shares.
-// - the finalized private key which is the current node's own private key share
+// - the finalized private key which is the current participant's own private key share
 func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
 		return nil, nil, nil, errors.New("dkg is not running")
@@ -107,13 +107,13 @@ func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.validKey {
 		return nil, nil, nil, errors.New("keys are not correct")
 	}
-	// private key of the current node
+	// private key of the current participant
 	x := newPrKeyBLSBLS12381(&s.x)
 
 	// Group public key
 	Y := newPubKeyBLSBLS12381(&s.vA[0])
 
-	// The nodes public keys
+	// The participants public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range s.y {
 		y[i] = newPubKeyBLSBLS12381(&p)
@@ -128,7 +128,7 @@ const (
 	verifVectorSize = PubKeyLenBLSBLS12381
 )
 
-// HandleBroadcastMsg processes a new broadcasted message received by the current node.
+// HandleBroadcastMsg processes a new broadcasted message received by the current participant.
 //
 // orig is the message origin index.
 func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
@@ -147,9 +147,9 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 		return nil
 	}
 
-	// In case a message is received by the origin node,
+	// In case a message is received by the origin participant,
 	// the message is just ignored
-	if s.currentIndex == index(orig) {
+	if s.myIndex == index(orig) {
 		return nil
 	}
 
@@ -164,7 +164,7 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 	return nil
 }
 
-// HandlePrivateMsg processes a new private message received by the current node.
+// HandlePrivateMsg processes a new private message received by the current participant.
 //
 // orig is the message origin index.
 func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
@@ -183,9 +183,9 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 		return nil
 	}
 
-	// In case a private message is received by the origin node,
+	// In case a private message is received by the origin participant,
 	// the message is just ignored
-	if s.currentIndex == index(orig) {
+	if s.myIndex == index(orig) {
 		return nil
 	}
 
@@ -200,21 +200,21 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 	return nil
 }
 
-// ForceDisqualify forces a node to get disqualified
+// ForceDisqualify forces a participant to get disqualified
 // for a reason outside of the DKG protocol
-// The caller should make sure all honest nodes call this function,
+// The caller should make sure all honest participants call this function,
 // otherwise, the protocol can be broken
-func (s *feldmanVSSstate) ForceDisqualify(node int) error {
+func (s *feldmanVSSstate) ForceDisqualify(participant int) error {
 	if !s.running {
 		return errors.New("dkg is not running")
 	}
-	if node >= s.Size() || node < 0 {
+	if participant >= s.Size() || participant < 0 {
 		return invalidInputsErrorf(
 			"wrong origin input, should be less than %d, got %d",
 			s.Size(),
-			node)
+			participant)
 	}
-	if index(node) == s.leaderIndex {
+	if index(participant) == s.leaderIndex {
 		s.validKey = false
 	}
 	return nil
@@ -242,7 +242,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	// compute the shares
 	for i := index(1); int(i) <= s.size; i++ {
 		// the-leader-own share
-		if i-1 == s.currentIndex {
+		if i-1 == s.myIndex {
 			xdata := make([]byte, shareSize)
 			zrPolynomialImage(xdata, s.a, i, &s.y[i-1])
 			C.bn_read_bin((*C.bn_st)(&s.x),
@@ -251,7 +251,7 @@ func (s *feldmanVSSstate) generateShares(seed []byte) error {
 			)
 			continue
 		}
-		// the-other-node shares
+		// the-other-participant shares
 		data := make([]byte, shareSize+1)
 		data[0] = byte(feldmanVSSShare)
 		zrPolynomialImage(data[1:], s.a, i, &s.y[i-1])
@@ -289,7 +289,7 @@ func (s *feldmanVSSstate) receiveShare(origin index, data []byte) {
 		return
 	}
 
-	// read the node private share
+	// read the participant private share
 	if C.bn_read_Zr_bin((*C.bn_st)(&s.x),
 		(*C.uchar)(&data[0]),
 		PrKeyLenBLSBLS12381,
@@ -379,11 +379,11 @@ func readVerifVector(A []pointG2, src []byte) error {
 func (s *feldmanVSSstate) verifyShare() bool {
 	// check y[current] == x.G2
 	return C.verifyshare((*C.bn_st)(&s.x),
-		(*C.ep2_st)(&s.y[s.currentIndex])) == 1
+		(*C.ep2_st)(&s.y[s.myIndex])) == 1
 }
 
-// computePublicKeys extracts the nodes public keys from the verification vector
-// y[i] = Q(i+1) for all nodes i, with:
+// computePublicKeys extracts the participants public keys from the verification vector
+// y[i] = Q(i+1) for all participants i, with:
 //  Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 func (s *feldmanVSSstate) computePublicKeys() {
 	C.G2_polynomialImages(

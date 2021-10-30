@@ -89,7 +89,7 @@ func (r *randomBeaconInspector) TrustedAdd(signerIndex int, share crypto.Signatu
 		if crypto.IsInvalidInputsError(err) {
 			// means index is invalid
 			return false, engine.NewInvalidInputErrorf("trusted add failed: %w", err)
-		} else if crypto.IsduplicatedSignerError(err) {
+		} else if crypto.IsDuplicatedSignerError(err) {
 			// signer was added
 			return false, engine.NewDuplicatedEntryErrorf("trusted add failed: %w", err)
 		} else {
@@ -110,11 +110,13 @@ func (r *randomBeaconInspector) EnoughShares() bool {
 
 // Reconstruct reconstructs the group signature.
 //
-// The function errors if not enough shares were collected and if any signature
-// fails the deserialization.
-// It also performs a final verification against the stored message and group public key
-// and errors (without sentinel) if the result is not valid. This is required for the function safety since
-// `TrustedAdd` allows adding invalid signatures.
+// Returns:
+// - (signature, nil) if no error occured
+// - (nil, crypto.notEnoughSharesError) if not enough shares were collected
+// - (nil, crypto.invalidInputsError) if at least one collected share does not serialize to a valid BLS signature,
+//    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
+//    is required  for safety, as `TrustedAdd` allows adding invalid signatures.
+// - (nil, error) for any other unexpected error.
 // The function is blocking.
 func (r *randomBeaconInspector) Reconstruct() (crypto.Signature, error) {
 	return r.follower.ThresholdSignature()

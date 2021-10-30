@@ -29,7 +29,13 @@ type RandomBeaconReconstructor interface {
 	// Reconstruct reconstructs the group signature.
 	// The reconstructed signature is verified against the overall group public key and the message agreed upon.
 	// This is a sanity check that is necessary since "TrustedAdd" allows adding non-verified signatures.
-	// Reconstruct returns an error if the reconstructed signature fails the sanity verification, or if not enough shares have been collected.
+	// Returns:
+	// - (signature, nil) if no error occured
+	// - (nil, crypto.notEnoughSharesError) if not enough shares were collected
+	// - (nil, crypto.invalidInputsError) if at least one collected share does not serialize to a valid signature,
+	//    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
+	//    is required  for safety, as `TrustedAdd` allows adding invalid signatures.
+	// - (nil, error) for any other unexpected error.
 	Reconstruct() (crypto.Signature, error)
 }
 

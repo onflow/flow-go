@@ -23,8 +23,8 @@ import (
 // In order to optimize equally for unforgeability and robustness,
 // the input threshold value (t) should be set to t = floor((n-1)/2).
 
-// ThresholdSignatureInspector is an instance of Threshold signature follower.
-// The interface only allows following the threshold signing protocol .
+// ThresholdSignatureInspector is an inspector of the threshold signature protocol.
+// The interface only allows inspecting the threshold signing protocol without taking part in it.
 type ThresholdSignatureInspector interface {
 	// VerifyShare verifies the input signature against the stored message and stored
 	// key at the input index.
@@ -78,22 +78,24 @@ type ThresholdSignatureInspector interface {
 	// This function is thread safe
 	VerifyAndAdd(orig int, share Signature) (bool, bool, error)
 	// HasShare checks whether the internal map contains the share of the given index.
-	// This function is thread safe
+	// This function is thread safe.
+	// The function errors with InvalidInputsError if the index is invalid.
 	HasShare(orig int) (bool, error)
 	// ThresholdSignature returns the threshold signature if the threshold was reached.
-	// The threshold signature is reconstructed if this was not done in a previous call.
+	// The threshold signature is reconstructed only once is cached for subsequent calls.
 	//
-	// In the case of reconstructing the threshold signature, the function errors
-	// if not enough shares were collected and if any signature fails the deserialization.
-	// It also performs a final verification against the stored message and group public key
-	// and errors if the result is not valid. This is required for the function safety since
-	// `TrustedAdd` allows adding invalid signatures.
-	// The function is thread-safe.
+	// Returns:
+	// - (signature, nil) if no error occured
+	// - (nil, notEnoughSharesError) if not enough shares were collected
+	// - (nil, invalidInputsError) if at least one collected share does not serialize to a valid BLS signature,
+	//    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
+	//    is required  for safety, as `TrustedAdd` allows adding invalid signatures.
+	// - (nil, error) for any other unexpected error.
 	ThresholdSignature() (Signature, error)
 }
 
-// ThresholdSignatureParticipant is an instance of Threshold signature Participant.
-// A participant is able to participate in a threshold signing protocol as well as following the
+// ThresholdSignatureParticipant is a participant in a threshold signature protocol.
+// A participant is able to participate in a threshold signing protocol as well as inspecting the
 // protocol.
 type ThresholdSignatureParticipant interface {
 	ThresholdSignatureInspector
@@ -102,7 +104,42 @@ type ThresholdSignatureParticipant interface {
 	// The function does not add the share to the internal pool of shares and do
 	// not update the internal state.
 	// This function is thread safe
+	// No error is expected unless an unexpected exception occurs
 	SignShare() (Signature, error)
+}
+
+// duplicatedSignerError is an error returned when TrustedAdd or VerifyAndAdd encounter
+// a signature share that has been already added to the internal state.
+type duplicatedSignerError struct {
+	error
+}
+
+// duplicatedSignerErrorf constructs a new duplicatedSignerError
+func duplicatedSignerErrorf(msg string, args ...interface{}) error {
+	return &duplicatedSignerError{error: fmt.Errorf(msg, args...)}
+}
+
+// IsDuplicatedSignerError checks if the input error is a duplicatedSignerError
+func IsDuplicatedSignerError(err error) bool {
+	var target *duplicatedSignerError
+	return errors.As(err, &target)
+}
+
+// notEnoughSharesError is an error returned when ThresholdSignature is called
+// and not enough shares have been collected.
+type notEnoughSharesError struct {
+	error
+}
+
+// notEnoughSharesErrorf constructs a new notEnoughSharesError
+func notEnoughSharesErrorf(msg string, args ...interface{}) error {
+	return &notEnoughSharesError{error: fmt.Errorf(msg, args...)}
+}
+
+// IsNotEnoughSharesError checks if the input error is a notEnoughSharesError
+func IsNotEnoughSharesError(err error) bool {
+	var target *notEnoughSharesError
+	return errors.As(err, &target)
 }
 
 // TODO: TO DELETE IN V2
@@ -114,10 +151,10 @@ type thresholdSigner struct {
 	// the thresold t of the scheme where (t+1) shares are
 	// required to reconstruct a signature
 	threshold int
-	// the index of the current node
-	currentIndex int
-	// the current node private key (a DKG output)
-	currentPrivateKey PrivateKey
+	// the index of the current participant
+	myIndex int
+	// the current participant private key (a DKG output)
+	myPrivateKey PrivateKey
 	// the group public key (a DKG output)
 	groupPublicKey PublicKey
 	// the group public key shares (a DKG output)
@@ -127,7 +164,7 @@ type thresholdSigner struct {
 	// the message to be signed. Siganture shares and the threshold signature
 	// are verified using this message
 	messageToSign []byte
-	// the valid signature shares received from other nodes
+	// the valid signature shares received from other participants
 	shares []byte // simulates an array of Signatures
 	// (or a matrix of by bytes) to accommodate a cgo constraint
 	// the list of signers corresponding to the list of shares
@@ -145,16 +182,16 @@ type thresholdSigner struct {
 // hash is the hashing algorithm to be used.
 // size is the number of participants, it must be in the range [ThresholdSignMinSize..ThresholdSignMaxSize]
 // threshold is the threshold value, it must be in the range [MinimumThreshold..size-1]
-func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash.Hasher) (*thresholdSigner, error) {
+func NewThresholdSigner(size int, threshold int, myIndex int, hashAlgo hash.Hasher) (*thresholdSigner, error) {
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
 		return nil, invalidInputsErrorf(
 			"size should be between %d and %d, got %d",
 			ThresholdSignMinSize, ThresholdSignMaxSize, size)
 	}
-	if currentIndex >= size || currentIndex < 0 {
+	if myIndex >= size || myIndex < 0 {
 		return nil, invalidInputsErrorf(
 			"The current index must be between 0 and %d, got %d",
-			size-1, currentIndex)
+			size-1, myIndex)
 	}
 	if threshold >= size || threshold < MinimumThreshold {
 		return nil, invalidInputsErrorf(
@@ -172,7 +209,7 @@ func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash
 	return &thresholdSigner{
 		size:               size,
 		threshold:          threshold,
-		currentIndex:       currentIndex,
+		myIndex:            myIndex,
 		hashAlgo:           hashAlgo,
 		shares:             shares,
 		signers:            signers,
@@ -184,12 +221,12 @@ func NewThresholdSigner(size int, threshold int, currentIndex int, hashAlgo hash
 
 // SetKeys sets the private and public keys needed by the threshold signature
 // - groupPublicKey is the group public key corresponding to the group secret key
-// - sharePublicKeys are the public key shares corresponding to the nodes private
+// - sharePublicKeys are the public key shares corresponding to the participants private
 // key shares.
-// - currentPrivateKey is the current node's own private key share
+// - myPrivateKey is the current participant's own private key share
 // Output keys of ThresholdSignKeyGen or DKG protocols could be used as the input
 // keys to this function.
-func (s *thresholdSigner) SetKeys(currentPrivateKey PrivateKey,
+func (s *thresholdSigner) SetKeys(myPrivateKey PrivateKey,
 	groupPublicKey PublicKey,
 	sharePublicKeys []PublicKey) error {
 
@@ -202,7 +239,7 @@ func (s *thresholdSigner) SetKeys(currentPrivateKey PrivateKey,
 	// clear existing shares signed with previous keys.
 	s.ClearShares()
 
-	s.currentPrivateKey = currentPrivateKey
+	s.myPrivateKey = myPrivateKey
 	s.groupPublicKey = groupPublicKey
 	s.publicKeyShares = sharePublicKeys
 	return nil
@@ -217,19 +254,19 @@ func (s *thresholdSigner) SetMessageToSign(message []byte) {
 
 // SignShare generates a signature share using the current private key share
 func (s *thresholdSigner) SignShare() (Signature, error) {
-	if s.currentPrivateKey == nil {
-		return nil, errors.New("the private key of the current node is not set")
+	if s.myPrivateKey == nil {
+		return nil, errors.New("the private key of the current participant is not set")
 	}
 	// sign
-	share, err := s.currentPrivateKey.Sign(s.messageToSign, s.hashAlgo)
+	share, err := s.myPrivateKey.Sign(s.messageToSign, s.hashAlgo)
 	if err != nil {
 		if IsInvalidInputsError(err) {
 			invalidInputsErrorf("share signature failed: %s", err)
 		}
 		return nil, fmt.Errorf("share signature failed: %w", err)
 	}
-	// add the node own signature
-	valid, err := s.AddShare(s.currentIndex, share)
+	// add the participant own signature
+	valid, err := s.AddShare(s.myIndex, share)
 	if err != nil {
 		if IsInvalidInputsError(err) {
 			return nil, invalidInputsErrorf("share signature failed: %s", err)
@@ -237,7 +274,7 @@ func (s *thresholdSigner) SignShare() (Signature, error) {
 		return nil, fmt.Errorf("share signature failed: %w", err)
 	}
 	if !valid {
-		return nil, errors.New("the current node private and public keys do not match")
+		return nil, errors.New("the current participant private and public keys do not match")
 	}
 	return share, nil
 }
@@ -245,7 +282,7 @@ func (s *thresholdSigner) SignShare() (Signature, error) {
 // VerifyShare verifies a signature share using the signer's public key
 func (s *thresholdSigner) verifyShare(share Signature, signerIndex index) (bool, error) {
 	if len(s.publicKeyShares) != s.size {
-		return false, errors.New("the node public keys are not set")
+		return false, errors.New("the participant public keys are not set")
 	}
 
 	return s.publicKeyShares[signerIndex].Verify(share, s.messageToSign, s.hashAlgo)

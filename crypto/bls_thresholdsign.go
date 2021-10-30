@@ -35,8 +35,8 @@ import (
 // - stateless api with signature reconstruction. Verifying and storing
 // the signature shares has to be managed outside of the library.
 
-// blsThresholdSignatureInspector is part of the stateful api
-// It holds the data needed for threshold signaures
+// blsThresholdSignatureInspector implements ThresholdSignatureInspector
+// based on the BLS signature scheme
 type blsThresholdSignatureInspector struct {
 	// size of the group
 	size int
@@ -61,13 +61,15 @@ type blsThresholdSignatureInspector struct {
 	lock sync.RWMutex
 }
 
+// blsThresholdSignatureParticipant implements ThresholdSignatureParticipant
+// based on the BLS signature scheme
 type blsThresholdSignatureParticipant struct {
 	// embed the follower
 	*blsThresholdSignatureInspector
-	// the index of the current node
-	currentIndex int
-	// the current node private key (a threshold KG output)
-	currentPrivateKey PrivateKey
+	// the index of the current participant
+	myIndex int
+	// the current participant private key (a threshold KG output)
+	myPrivateKey PrivateKey
 }
 
 // NewBLSThresholdSignatureInspector creates a new instance of Threshold signature follower using BLS.
@@ -132,7 +134,7 @@ func NewBLSThresholdSignatureInspector(
 // A new instance is needed for each set of public keys and message.
 // If the key set or message change, a new structure needs to be instantiated.
 // Participants are defined by their public key share, and are indexed from 0 to n-1. The current
-// participant is indexed by `currentIndex` and holds the input private key
+// participant is indexed by `myIndex` and holds the input private key
 // where n is the length of the public key shares slice.
 // The function errors with InvalidInputsError if:
 //  - n is not between `ThresholdSignMinSize` and `ThresholdSignMaxSize`
@@ -143,21 +145,21 @@ func NewBLSThresholdSignatureParticipant(
 	groupPublicKey PublicKey,
 	sharePublicKeys []PublicKey,
 	threshold int,
-	currentIndex int,
-	currentPrivateKey PrivateKey,
+	myIndex int,
+	myPrivateKey PrivateKey,
 	message []byte,
 	dsTag string) (*blsThresholdSignatureParticipant, error) {
 
 	size := len(sharePublicKeys)
-	if currentIndex >= size || currentIndex < 0 {
+	if myIndex >= size || myIndex < 0 {
 		return nil, invalidInputsErrorf(
 			"the current index must be between 0 and %d, got %d",
-			size-1, currentIndex)
+			size-1, myIndex)
 	}
 
 	// check private key is BLS key
-	if _, ok := currentPrivateKey.(*PrKeyBLSBLS12381); !ok {
-		return nil, invalidInputsErrorf("private key of node %d is not a BLS key", currentIndex)
+	if _, ok := myPrivateKey.(*PrKeyBLSBLS12381); !ok {
+		return nil, invalidInputsErrorf("private key of participant %d is not a BLS key", myIndex)
 	}
 
 	// create the follower
@@ -167,15 +169,15 @@ func NewBLSThresholdSignatureParticipant(
 	}
 
 	// check the private key, index and corresponding public key are consistent
-	currentPublicKey := sharePublicKeys[currentIndex]
-	if !currentPrivateKey.PublicKey().Equals(currentPublicKey) {
-		return nil, invalidInputsErrorf("private key is not matching public key at index %d", currentIndex)
+	currentPublicKey := sharePublicKeys[myIndex]
+	if !myPrivateKey.PublicKey().Equals(currentPublicKey) {
+		return nil, invalidInputsErrorf("private key is not matching public key at index %d", myIndex)
 	}
 
 	return &blsThresholdSignatureParticipant{
 		blsThresholdSignatureInspector: follower,
-		currentIndex:                   currentIndex,      // current participant index
-		currentPrivateKey:              currentPrivateKey, // currentPrivateKey is the current node's own private key share
+		myIndex:                        myIndex,      // current participant index
+		myPrivateKey:                   myPrivateKey, // myPrivateKey is the current participant's own private key share
 	}, nil
 }
 
@@ -184,16 +186,17 @@ func NewBLSThresholdSignatureParticipant(
 // The function does not add the share to the internal pool of shares and do
 // not update the internal state.
 // This function is thread safe and non-blocking
+// No error is expected unless an unexpected exception occurs
 func (s *blsThresholdSignatureParticipant) SignShare() (Signature, error) {
 
-	share, err := s.currentPrivateKey.Sign(s.message, s.hasher)
+	share, err := s.myPrivateKey.Sign(s.message, s.hasher)
 	if err != nil {
 		return nil, fmt.Errorf("share signing failed: %w", err)
 	}
 	return share, nil
 }
 
-// retruns and error if given index is valid and nil otherwise
+// returns InvalidInputsError error if given index is invalid and nil otherwise.
 // This function is thread safe
 func (s *blsThresholdSignatureInspector) validIndex(orig index) error {
 	if int(orig) >= s.size || orig < 0 {
@@ -257,6 +260,7 @@ func (s *blsThresholdSignatureInspector) enoughShares() bool {
 
 // HasShare checks whether the internal map contains the share of the given index.
 // This function is thread safe and write-blocking
+// The function errors with InvalidInputsError if the index is invalid.
 func (s *blsThresholdSignatureInspector) HasShare(orig int) (bool, error) {
 	// validate index
 	if err := s.validIndex(index(orig)); err != nil {
@@ -273,27 +277,6 @@ func (s *blsThresholdSignatureInspector) HasShare(orig int) (bool, error) {
 func (s *blsThresholdSignatureInspector) hasShare(orig index) bool {
 	_, ok := s.shares[orig]
 	return ok
-}
-
-// duplicatedSignerError is an error returned when TrustedAdd or VerifyAndAdd encounter
-// a signature share that has been already added to the internal state.
-type duplicatedSignerError struct {
-	message string
-}
-
-// duplicatedSignerErrorf constructs a new duplicatedSignerError
-func duplicatedSignerErrorf(msg string, args ...interface{}) error {
-	return &duplicatedSignerError{message: fmt.Sprintf(msg, args...)}
-}
-
-func (e duplicatedSignerError) Error() string {
-	return e.message
-}
-
-// IsduplicatedSignerError checks if the input error is a duplicatedSignerError
-func IsduplicatedSignerError(err error) bool {
-	var target *duplicatedSignerError
-	return errors.As(err, &target)
 }
 
 // TrustedAdd adds a signature share to the internal pool of shares
@@ -369,15 +352,15 @@ func (s *blsThresholdSignatureInspector) VerifyAndAdd(orig int, share Signature)
 }
 
 // ThresholdSignature returns the threshold signature if the threshold was reached.
-// The threshold signature is reconstructed if this was not done in a previous call.
+// The threshold signature is reconstructed only once is cached for subsequent calls.
 //
-// In the case of reconstructing the threshold signature, the function errors
-// with a non-sentinel error if not enough shares were collected, or with InvalidInputsError
-// if any signature is not a valid BLS signature.
-// It also performs a final verification against the stored message and group public key
-// and errors with a non-sentinel error if the result is not valid. This is required for the
-// function safety since `TrustedAdd` allows adding invalid signatures.
-// The function is thread-safe and blocking.
+// Returns:
+// - (signature, nil) if no error occured
+// - (nil, notEnoughSharesError) if not enough shares were collected
+// - (nil, invalidInputsError) if at least one collected share does not serialize to a valid BLS signature,
+//    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
+//    is required  for safety, as `TrustedAdd` allows adding invalid signatures.
+// - (nil, error) for any other unexpected error.
 func (s *blsThresholdSignatureInspector) ThresholdSignature() (Signature, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
@@ -385,10 +368,6 @@ func (s *blsThresholdSignatureInspector) ThresholdSignature() (Signature, error)
 	// check cached thresholdSignature
 	if s.thresholdSignature != nil {
 		return s.thresholdSignature, nil
-	}
-
-	if !s.enoughShares() {
-		return nil, errors.New("there are not enough signatures shares")
 	}
 
 	// reconstruct the threshold signature
@@ -401,10 +380,16 @@ func (s *blsThresholdSignatureInspector) ThresholdSignature() (Signature, error)
 }
 
 // reconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
+// Returns:
+// - (signature, nil) if no error occured
+// - (nil, notEnoughSharesError) if not enough shares were collected
+// - (nil, invalidInputsError) if at least one collected share does not serialize to a valid BLS signature,
+//    or if the constructed signature failed to verify against the group public key and stored message.
+// - (nil, error) for any other unexpected error.
 func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signature, error) {
-	// sanity check
+
 	if !s.enoughShares() {
-		return nil, fmt.Errorf("number of signature shares %d is not enough, %d are required",
+		return nil, notEnoughSharesErrorf("number of signature shares %d is not enough, %d are required",
 			len(s.shares), s.threshold+1)
 	}
 	thresholdSignature := make([]byte, signatureLengthBLSBLS12381)
@@ -439,7 +424,7 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 		return nil, fmt.Errorf("verify threshold signature failed: %w", err)
 	}
 	if !verif {
-		return nil, errors.New(
+		return nil, invalidInputsErrorf(
 			"constructed threshold signature does not verify against the group public key, check shares and public key")
 	}
 

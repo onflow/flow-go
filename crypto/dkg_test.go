@@ -22,7 +22,7 @@ func TestDKG(t *testing.T) {
 	t.Run("JointFeldman", testJointFeldman)
 }
 
-// optimal threshold (t) to allow the largest number of malicious nodes (m)
+// optimal threshold (t) to allow the largest number of malicious participants (m)
 // assuming the protocol requires:
 //   m<=t for unforgeability
 //   n-m>=t+1 for robustness
@@ -30,7 +30,7 @@ func optimalThreshold(size int) int {
 	return (size - 1) / 2
 }
 
-// Testing the happy path of Feldman VSS by simulating a network of n nodes
+// Testing the happy path of Feldman VSS by simulating a network of n participants
 func testFeldmanVSSSimple(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 
@@ -67,7 +67,7 @@ const (
 	duplicatedSendAndBroadcast
 )
 
-// Testing Feldman VSS with the qualification system by simulating a network of n nodes
+// Testing Feldman VSS with the qualification system by simulating a network of n participants
 func testFeldmanVSSQual(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 
@@ -94,7 +94,7 @@ func testFeldmanVSSQual(t *testing.T) {
 	// are only tested within joint feldman.
 }
 
-// Testing JointFeldman by simulating a network of n nodes
+// Testing JointFeldman by simulating a network of n participants
 func testJointFeldman(t *testing.T) {
 	log.SetLevel(log.ErrorLevel)
 
@@ -139,15 +139,15 @@ const (
 	jointFeldman
 )
 
-func newDKG(dkg int, size int, threshold int, currentIndex int,
+func newDKG(dkg int, size int, threshold int, myIndex int,
 	processor DKGProcessor, leaderIndex int) (DKGState, error) {
 	switch dkg {
 	case feldmanVSS:
-		return NewFeldmanVSS(size, threshold, currentIndex, processor, leaderIndex)
+		return NewFeldmanVSS(size, threshold, myIndex, processor, leaderIndex)
 	case feldmanVSSQual:
-		return NewFeldmanVSSQual(size, threshold, currentIndex, processor, leaderIndex)
+		return NewFeldmanVSSQual(size, threshold, myIndex, processor, leaderIndex)
 	case jointFeldman:
-		return NewJointFeldman(size, threshold, currentIndex, processor)
+		return NewJointFeldman(size, threshold, myIndex, processor)
 	default:
 		return nil, fmt.Errorf("non supported protocol")
 	}
@@ -157,7 +157,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	gt = t
 	log.Info("DKG protocol set up")
 
-	// create the node channels
+	// create the participant channels
 	chans := make([]chan *message, n)
 	lateChansTimeout1 := make([]chan *message, n)
 	lateChansTimeout2 := make([]chan *message, n)
@@ -175,7 +175,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		leaders = 1
 	}
 
-	// create n processors for all nodes
+	// create n processors for all participants
 	processors := make([]testDKGProcessor, 0, n)
 	for current := 0; current < n; current++ {
 		list := make([]bool, leaders)
@@ -197,7 +197,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	// r1 and r2 is the number of malicious participants, each group with a slight diffrent behavior.
 	// - r1 participants of indices 0 to r1-1 behave maliciously and will get disqualified by honest participants.
 	// - r2 participants of indices r1 to r1+r2-1 will behave maliciously at first but will recover and won't be
-	// disqualified by honest nodes. The r2 participants may or may not obtain correct protocol results.
+	// disqualified by honest participants. The r2 participants may or may not obtain correct protocol results.
 	var r1, r2 int
 	// h is the index of the first honest participant. All participant with indices greater than or equal to h are honest.
 	// Checking the final protocol results is done for honest participants only.
@@ -235,7 +235,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	case invalidComplaint:
 		r1 = 1 + mrand.Intn(leaders-1) // participants with invalid complaints and will get disqualified.
 		// r1>= 1 to have at least one malicious leader, and r1<leadrers-1 to leave space for the trigger leader below.
-		r2 = mrand.Intn(leaders - r1) // participants with timeouted complaints: they are considered qualified by honest nodes
+		r2 = mrand.Intn(leaders - r1) // participants with timeouted complaints: they are considered qualified by honest participants
 		// but their results are invalid
 		h = r1 + r2 // r2 shouldn't be verified for protocol correctness
 
@@ -262,9 +262,9 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		t.Logf("%d participants will be disqualified\n", r1)
 	case duplicatedMessages:
 		// r1 = r2 = 0
-		// node 0 will send duplicated shares, verif vector and complaint to all nodes
+		// participant 0 will send duplicated shares, verif vector and complaint to all participants
 		processors[0].malicious = duplicatedSendAndBroadcast
-		// node 1 is a complaint trigger, it sents a wrong share to 0 to trigger a complaint.
+		// participant 1 is a complaint trigger, it sents a wrong share to 0 to trigger a complaint.
 		// it also sends duplicated complaint answers.
 		processors[1].malicious = invalidSharesComplainTrigger
 
@@ -272,11 +272,11 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		panic("test case not supported")
 	}
 
-	// number of nodes to test
+	// number of participants to test
 	lead := 0
 	var sync sync.WaitGroup
 
-	// create DKG in all nodes
+	// create DKG in all participants
 	for current := 0; current < n; current++ {
 		var err error
 		processors[current].dkg, err = newDKG(dkg, n, threshold,
@@ -289,7 +289,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		phase = 2
 	}
 
-	// start DKG in all nodes
+	// start DKG in all participants
 	// start listening on the channels
 	seed := make([]byte, SeedMinLenDKG)
 	read, err := mrand.Read(seed)
@@ -340,20 +340,20 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	}
 
 	for i := h; i < n; i++ {
-		t.Logf("node %d is not disqualified, its disqualified list is:\n", i)
+		t.Logf("participant %d is not disqualified, its disqualified list is:\n", i)
 		t.Log(processors[i].disqualified)
 		assert.Equal(t, expected, processors[i].disqualified)
 	}
 	// check if DKG is successful
 	if (dkg == jointFeldman && (r1 > threshold || (n-r1) <= threshold)) ||
 		(dkg == feldmanVSSQual && r1 == 1) { // case of a single leader
-		t.Logf("dkg failed, there are %d disqualified nodes\n", r1)
+		t.Logf("dkg failed, there are %d disqualified participants\n", r1)
 		// DKG has failed, check for final errors
 		for i := r1; i < n; i++ {
 			assert.Error(t, processors[i].finalError)
 		}
 	} else {
-		t.Logf("dkg succeeded, there are %d disqualified nodes\n", r1)
+		t.Logf("dkg succeeded, there are %d disqualified participants\n", r1)
 		// DKG has succeeded, check for final errors
 		for i := h; i < n; i++ {
 			assert.NoError(t, processors[i].finalError)
@@ -371,7 +371,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 const phaseSwitchTimeout = 200 * time.Millisecond
 
 // This is a testing function
-// It simulates processing incoming messages by a node
+// It simulates processing incoming messages by a participant
 // it assumes proc.dkg is already running
 func dkgRunChan(proc *testDKGProcessor,
 	sync *sync.WaitGroup, t *testing.T, phase int) {
@@ -441,7 +441,7 @@ func timeoutPostProcess(processors []testDKGProcessor, t *testing.T, phase int) 
 type testDKGProcessor struct {
 	// instnce of DKG
 	dkg DKGState
-	// index of the current node in the protocol
+	// index of the current participant in the protocol
 	current int
 	// group public key, output of DKG
 	pk PublicKey
@@ -484,17 +484,17 @@ type message struct {
 	data     []byte
 }
 
-func (proc *testDKGProcessor) Disqualify(node int, logInfo string) {
-	gt.Logf("%d disqualifies %d, %s\n", proc.current, node, logInfo)
-	proc.disqualified[node] = true
+func (proc *testDKGProcessor) Disqualify(participant int, logInfo string) {
+	gt.Logf("%d disqualifies %d, %s\n", proc.current, participant, logInfo)
+	proc.disqualified[participant] = true
 }
 
-func (proc *testDKGProcessor) FlagMisbehavior(node int, logInfo string) {
-	gt.Logf("%d flags a misbehavior from %d: %s", proc.current, node, logInfo)
+func (proc *testDKGProcessor) FlagMisbehavior(participant int, logInfo string) {
+	gt.Logf("%d flags a misbehavior from %d: %s", proc.current, participant, logInfo)
 }
 
 // This is a testing function
-// it simulates sending a message from one node to another
+// it simulates sending a message from one participant to another
 func (proc *testDKGProcessor) PrivateSend(dest int, data []byte) {
 	go func() {
 		log.Infof("%d sending to %d", proc.current, dest)
@@ -509,7 +509,7 @@ func (proc *testDKGProcessor) PrivateSend(dest int, data []byte) {
 }
 
 // This is a testing function
-// it simulates sending a honest message from one node to another
+// it simulates sending a honest message from one participant to another
 func (proc *testDKGProcessor) honestSend(dest int, data []byte) {
 	gt.Logf("%d honestly sending to %d:\n%x\n", proc.current, dest, data)
 	newMsg := &message{proc.current, proc.protocol, private, data}
@@ -517,8 +517,8 @@ func (proc *testDKGProcessor) honestSend(dest int, data []byte) {
 }
 
 // This is a testing function
-// it simulates sending a malicious message from one node to another
-// This function simulates the behavior of a malicious node.
+// it simulates sending a malicious message from one participant to another
+// This function simulates the behavior of a malicious participant.
 func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 
 	// check the behavior
@@ -531,7 +531,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 	case invalidSharesComplainTrigger:
 		recipients = proc.current // equal to r1+r2, which causes all r1+r2 to complain
 	case invalidComplaintAnswerBroadcast:
-		recipients = 0 // treat this case separately as the complaint trigger is the node n-1
+		recipients = 0 // treat this case separately as the complaint trigger is the participant n-1
 	case duplicatedSendAndBroadcast:
 		proc.honestSend(dest, data)
 		proc.honestSend(dest, data)
@@ -579,7 +579,7 @@ func (proc *testDKGProcessor) invalidShareSend(dest int, data []byte) {
 }
 
 // This is a testing function
-// it simulates broadcasting a message from one node to all nodes
+// it simulates broadcasting a message from one participant to all participants
 func (proc *testDKGProcessor) Broadcast(data []byte) {
 	go func() {
 		log.Infof("%d Broadcasting:", proc.current)
