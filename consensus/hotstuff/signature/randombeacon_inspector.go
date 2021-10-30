@@ -48,7 +48,7 @@ func NewRandomBeaconInspector(
 //  - engine.InvalidInputError if signerIndex is invalid
 //  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 //  - other error if there is an unexpected exception.
-func (r *randomBeaconFollower) Verify(signerIndex int, share crypto.Signature) error {
+func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) error {
 	verif, err := r.follower.VerifyShare(signerIndex, share)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
@@ -78,14 +78,14 @@ func (r *randomBeaconFollower) Verify(signerIndex int, share crypto.Signature) e
 //      - engine.InvalidInputError if signerIndex is invalid (out of the valid range)
 //  	- engine.DuplicatedEntryError if the signer has been already added
 //      - other error if there is an unexpected exception.
-func (r *randomBeaconFollower) TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error) {
+func (r *randomBeaconInspector) TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error) {
 	// Trusted add to the crypto layer
 	enough, err := r.follower.TrustedAdd(signerIndex, share)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
 			return false, engine.NewInvalidInputErrorf("trusted add from %d failed: %w", signerIndex, err)
 		}
-		if crypto.IsduplicatedSignerError(err) {
+		if crypto.IsDuplicatedSignerError(err) {
 			return false, engine.NewDuplicatedEntryErrorf("trusted add from %d failed: %w", signerIndex, err)
 		}
 		return false, fmt.Errorf("unexpected error while adding share from %d: %w", signerIndex, err)

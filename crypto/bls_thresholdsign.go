@@ -257,7 +257,7 @@ func (s *blsThresholdSignatureInspector) enoughShares() bool {
 // HasShare checks whether the internal map contains the share of the given index.
 // This function is thread safe and locks the internal state.
 // The function errors with InvalidInputsError if the index is invalid.
-func (s *blsThresholdSignatureFollower) HasShare(orig int) (bool, error) {
+func (s *blsThresholdSignatureInspector) HasShare(orig int) (bool, error) {
 	// validate index
 	if err := s.validIndex(index(orig)); err != nil {
 		return false, err
@@ -416,7 +416,7 @@ func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signat
 	// Verify the computed signature
 	verif, err := s.VerifyThresholdSignature(thresholdSignature)
 	if err != nil {
-		return nil, fmt.Errorf("verify threshold signature failed: %w", err)
+		return nil, fmt.Errorf("internal error while verifying the threshold signature: %w", err)
 	}
 	if !verif {
 		return nil, invalidInputsErrorf(
