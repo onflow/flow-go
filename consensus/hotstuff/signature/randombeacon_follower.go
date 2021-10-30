@@ -51,13 +51,13 @@ func (r *randomBeaconFollower) Verify(signerIndex int, share crypto.Signature) e
 	verif, err := r.follower.VerifyShare(signerIndex, share)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
-			return engine.NewInvalidInputErrorf("index %d does not reference a valid random beacon participant: %w", signerIndex, err)
+			return engine.NewInvalidInputErrorf("verify beacon share from %d failed: %w", signerIndex, err)
 		}
 		return fmt.Errorf("unexpected error verifying beacon signature from %d: %w", signerIndex, err)
 	}
 
 	if !verif { // invalid signature
-		return fmt.Errorf("invalid beacon signature from %d: %w", signerIndex, signature.ErrInvalidFormat)
+		return fmt.Errorf("invalid beacon share from %d: %w", signerIndex, signature.ErrInvalidFormat)
 	}
 	return nil
 }
@@ -65,16 +65,16 @@ func (r *randomBeaconFollower) Verify(signerIndex int, share crypto.Signature) e
 // TrustedAdd adds a share to the internal signature shares store.
 // There is no pre-check of the signature's validity _before_ adding it.
 // It is the caller's responsibility to make sure the signature was previously verified.
-// Nevertheless, the implementation guarantees safety (only correct group signatures
-// are successfully reconstructed) through a post-check (verifying the group signature
+// Nevertheless, the implementation guarantees safety (only correct threshold signatures
+// are returned) through a post-check (verifying the threshold signature
 // _after_ reconstruction before returning it).
-// The function is thread-safe but lock its internal state, thereby permitting only
+// The function is thread-safe but locks its internal state, thereby permitting only
 // one routine at a time to add a signature.
 // Returns:
 //  - (true, nil) if the signature has been added, and enough shares have been collected.
 //  - (false, nil) if the signature has been added, but not enough shares were collected.
 //  - (false, error) if there is any exception adding the signature share.
-//      - engine.InvalidInputError if signerIndex is invalid (not a consensus participant)
+//      - engine.InvalidInputError if signerIndex is invalid (out of the valid range)
 //  	- engine.DuplicatedEntryError if the signer has been already added
 //      - other error if there is an unexpected exception.
 func (r *randomBeaconFollower) TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error) {
@@ -82,12 +82,12 @@ func (r *randomBeaconFollower) TrustedAdd(signerIndex int, share crypto.Signatur
 	enough, err := r.follower.TrustedAdd(signerIndex, share)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
-			return false, engine.NewInvalidInputErrorf("index %d does not reference a valid random beacon participant: %w", signerIndex, err)
+			return false, engine.NewInvalidInputErrorf("trusted add from %d failed: %w", signerIndex, err)
 		}
 		if crypto.IsduplicatedSignerError(err) {
-			return false, engine.NewDuplicatedEntryErrorf("repeated addition of signature from participant %d: %w", signerIndex, err)
+			return false, engine.NewDuplicatedEntryErrorf("trusted add from %d failed: %w", signerIndex, err)
 		}
-		return false, fmt.Errorf("unexpected error while adding signature from participant %d: %w", signerIndex, err)
+		return false, fmt.Errorf("unexpected error while adding share from %d: %w", signerIndex, err)
 	}
 	return enough, nil
 }

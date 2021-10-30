@@ -21,16 +21,16 @@ type RandomBeaconFollower interface {
 	// TrustedAdd adds a share to the internal signature shares store.
 	// There is no pre-check of the signature's validity _before_ adding it.
 	// It is the caller's responsibility to make sure the signature was previously verified.
-	// Nevertheless, the implementation guarantees safety (only correct group signatures
-	// are successfully reconstructed) through a post-check (verifying the group signature
+	// Nevertheless, the implementation guarantees safety (only correct threshold signatures
+	// are returned) through a post-check (verifying the threshold signature
 	// _after_ reconstruction before returning it).
-	// The function is thread-safe but lock its internal state, thereby permitting only
+	// The function is thread-safe but locks its internal state, thereby permitting only
 	// one routine at a time to add a signature.
 	// Returns:
 	//  - (true, nil) if the signature has been added, and enough shares have been collected.
 	//  - (false, nil) if the signature has been added, but not enough shares were collected.
 	//  - (false, error) if there is any exception adding the signature share.
-	//      - engine.InvalidInputError if signerIndex is invalid (not a consensus participant)
+	//      - engine.InvalidInputError if signerIndex is invalid
 	//  	- engine.DuplicatedEntryError if the signer has been already added
 	//      - other error if there is an unexpected exception.
 	TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error)

@@ -31,19 +31,18 @@ type ThresholdSignatureFollower interface {
 	// The function is thread-safe.
 	// Returns:
 	//  - (true, nil) if the signature is valid
-	//  - (false, nil) if the orig references a valid signer but the sig share is invalid
-	//  - (false, InvalidInputsError) if orig is not a invalid index value
-	//  - all other errors are unexpected during normal operations
+	//  - (false, nil) if `orig` is a valid index but the signature share is invalid
+	//  - (false, InvalidInputsError) if `orig` is an invalid index value
+	//  - (false, error) for all other unexpected errors
 	VerifyShare(orig int, share Signature) (bool, error)
 
 	// VerifyThresholdSignature verifies the input signature against the stored
-	// message and stored group public key. This function does not update the internal state.
+	// message and stored group public key. It does not update the internal state.
 	// The function is thread-safe.
 	// Returns:
 	//  - (true, nil) if the signature is valid
-	//  - (false, nil) if the orig references a valid signer but the sig share is invalid
-	//  - (false, InvalidInputsError) if orig is not a invalid index value
-	//  - all other errors are unexpected during normal operations
+	//  - (false, nil) if the signature is invalid
+	//  - (false, error) for all other unexpected errors
 	VerifyThresholdSignature(thresholdSignature Signature) (bool, error)
 
 	// EnoughShares indicates whether enough shares have been accumulated in order to reconstruct
@@ -74,7 +73,8 @@ type ThresholdSignatureFollower interface {
 	// The function returns 3 outputs:
 	//  - First boolean output is true if the share is valid and no error is returned, and false otherwise.
 	//  - Second boolean output is true if enough shares were collected and no error is returned, and false otherwise.
-	//  - error is IsInvalidInputsError if input index is invalid, and a random error if an exception occurred.
+	//  - error is InvalidInputsError if input index is invalid, duplicatedSignerError if signer was added,
+	//	   and a random error if an exception occurred.
 	//    (an invalid signature is not considered an invalid input, look at `VerifyShare` for details)
 	VerifyAndAdd(orig int, share Signature) (bool, bool, error)
 
