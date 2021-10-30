@@ -373,6 +373,11 @@ func TestReceivingChunkDataResponseForDuplicateChunkRequests(t *testing.T) {
 	testifymock.AssertExpectationsForObjects(t, s.con, s.metrics)
 }
 
+// TestHandleChunkDataPack_DuplicateChunkIDs_Sealed evaluates that on receiving duplicate chunk data requests belonging to a sealed
+// block, the requester engine is called chunk handler once for each of those requests notifying it of sealed block.
+//
+// Note that by duplicate chunk data requests we mean chunks requests for same chunk ID that belong to
+// distinct execution results.
 func TestHandleChunkDataPack_DuplicateChunkIDs_Sealed(t *testing.T) {
 	s := setupTest()
 	e := newRequesterEngine(t, s)
