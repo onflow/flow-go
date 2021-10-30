@@ -9,16 +9,16 @@ import (
 // RandomBeaconReconstructor implements hotstuff.RandomBeaconReconstructor.
 // The implementation wraps the thresholdSigner and translates the signer identity into signer index.
 type RandomBeaconReconstructor struct {
-	dkg                  hotstuff.DKG                  // to lookup signer index by signer ID
-	randomBeaconFollower hotstuff.RandomBeaconFollower // a stateful object for this block. It's used for both storing all sig shares and producing the node's own share by signing the block
+	dkg                   hotstuff.DKG                   // to lookup signer index by signer ID
+	randomBeaconInspector hotstuff.RandomBeaconInspector // a stateful object for this block. It's used for both storing all sig shares and producing the node's own share by signing the block
 }
 
 var _ hotstuff.RandomBeaconReconstructor = &RandomBeaconReconstructor{}
 
-func NewRandomBeaconReconstructur(dkg hotstuff.DKG, randomBeaconFollower hotstuff.RandomBeaconFollower) *RandomBeaconReconstructor {
+func NewRandomBeaconReconstructur(dkg hotstuff.DKG, randomBeaconInspector hotstuff.RandomBeaconInspector) *RandomBeaconReconstructor {
 	return &RandomBeaconReconstructor{
-		dkg:                  dkg,
-		randomBeaconFollower: randomBeaconFollower,
+		dkg:                   dkg,
+		randomBeaconInspector: randomBeaconInspector,
 	}
 }
 

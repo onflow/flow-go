@@ -23,9 +23,9 @@ import (
 // In order to optimize equally for unforgeability and robustness,
 // the input threshold value (t) should be set to t = floor((n-1)/2).
 
-// ThresholdSignatureFollower is an instance of Threshold signature follower.
+// ThresholdSignatureInspector is an instance of Threshold signature follower.
 // The interface only allows following the threshold signing protocol .
-type ThresholdSignatureFollower interface {
+type ThresholdSignatureInspector interface {
 	// VerifyShare verifies the input signature against the stored message and stored
 	// key at the input index.
 	//
@@ -96,7 +96,7 @@ type ThresholdSignatureFollower interface {
 // A participant is able to participate in a threshold signing protocol as well as following the
 // protocol.
 type ThresholdSignatureParticipant interface {
-	ThresholdSignatureFollower
+	ThresholdSignatureInspector
 	// SignShare generates a signature share using the current private key share.
 	//
 	// The function does not add the share to the internal pool of shares and do

@@ -35,9 +35,9 @@ import (
 // - stateless api with signature reconstruction. Verifying and storing
 // the signature shares has to be managed outside of the library.
 
-// blsThresholdSignatureFollower is part of the stateful api
+// blsThresholdSignatureInspector is part of the stateful api
 // It holds the data needed for threshold signaures
-type blsThresholdSignatureFollower struct {
+type blsThresholdSignatureInspector struct {
 	// size of the group
 	size int
 	// the thresold t of the scheme where (t+1) shares are
@@ -63,14 +63,14 @@ type blsThresholdSignatureFollower struct {
 
 type blsThresholdSignatureParticipant struct {
 	// embed the follower
-	*blsThresholdSignatureFollower
+	*blsThresholdSignatureInspector
 	// the index of the current node
 	currentIndex int
 	// the current node private key (a threshold KG output)
 	currentPrivateKey PrivateKey
 }
 
-// NewBLSThresholdSignatureFollower creates a new instance of Threshold signature follower using BLS.
+// NewBLSThresholdSignatureInspector creates a new instance of Threshold signature follower using BLS.
 // It only allows following the threshold signing protocol .
 //
 // A new instance is needed for each set of public keys and message.
@@ -81,12 +81,12 @@ type blsThresholdSignatureParticipant struct {
 //  - n is not between `ThresholdSignMinSize` and `ThresholdSignMaxSize`
 //  - threshold value is not between 0 and n-1
 //  - any input public key is not a BLS key
-func NewBLSThresholdSignatureFollower(
+func NewBLSThresholdSignatureInspector(
 	groupPublicKey PublicKey,
 	sharePublicKeys []PublicKey,
 	threshold int,
 	message []byte,
-	dsTag string) (*blsThresholdSignatureFollower, error) {
+	dsTag string) (*blsThresholdSignatureInspector, error) {
 
 	size := len(sharePublicKeys)
 	if size < ThresholdSignMinSize || size > ThresholdSignMaxSize {
@@ -113,7 +113,7 @@ func NewBLSThresholdSignatureFollower(
 	// internal list of valid signature shares
 	shares := make(map[index]Signature)
 
-	return &blsThresholdSignatureFollower{
+	return &blsThresholdSignatureInspector{
 		size:               size,
 		threshold:          threshold,
 		message:            message,
@@ -161,7 +161,7 @@ func NewBLSThresholdSignatureParticipant(
 	}
 
 	// create the follower
-	follower, err := NewBLSThresholdSignatureFollower(groupPublicKey, sharePublicKeys, threshold, message, dsTag)
+	follower, err := NewBLSThresholdSignatureInspector(groupPublicKey, sharePublicKeys, threshold, message, dsTag)
 	if err != nil {
 		return nil, fmt.Errorf("create a threshold signature follower failed: %w", err)
 	}
@@ -173,9 +173,9 @@ func NewBLSThresholdSignatureParticipant(
 	}
 
 	return &blsThresholdSignatureParticipant{
-		blsThresholdSignatureFollower: follower,
-		currentIndex:                  currentIndex,      // current participant index
-		currentPrivateKey:             currentPrivateKey, // currentPrivateKey is the current node's own private key share
+		blsThresholdSignatureInspector: follower,
+		currentIndex:                   currentIndex,      // current participant index
+		currentPrivateKey:              currentPrivateKey, // currentPrivateKey is the current node's own private key share
 	}, nil
 }
 
@@ -195,7 +195,7 @@ func (s *blsThresholdSignatureParticipant) SignShare() (Signature, error) {
 
 // retruns and error if given index is valid and nil otherwise
 // This function is thread safe
-func (s *blsThresholdSignatureFollower) validIndex(orig index) error {
+func (s *blsThresholdSignatureInspector) validIndex(orig index) error {
 	if int(orig) >= s.size || orig < 0 {
 		return invalidInputsErrorf(
 			"origin input is invalid, should be positive less than %d, got %d",
@@ -215,7 +215,7 @@ func (s *blsThresholdSignatureFollower) validIndex(orig index) error {
 // If any error is returned, the returned bool is false.
 // If no error is returned, the bool represents the validity of the signature.
 // The function is thread-safe and non-blocking.
-func (s *blsThresholdSignatureFollower) VerifyShare(orig int, share Signature) (bool, error) {
+func (s *blsThresholdSignatureInspector) VerifyShare(orig int, share Signature) (bool, error) {
 	// validate index
 	if err := s.validIndex(index(orig)); err != nil {
 		return false, err
@@ -233,7 +233,7 @@ func (s *blsThresholdSignatureFollower) VerifyShare(orig int, share Signature) (
 // If any error is returned, the returned bool is false.
 // If no error is returned, the bool represents the validity of the signature.
 // The function is thread-safe and non-blocking only.
-func (s *blsThresholdSignatureFollower) VerifyThresholdSignature(thresholdSignature Signature) (bool, error) {
+func (s *blsThresholdSignatureInspector) VerifyThresholdSignature(thresholdSignature Signature) (bool, error) {
 	return s.groupPublicKey.Verify(thresholdSignature, s.message, s.hasher)
 }
 
@@ -242,7 +242,7 @@ func (s *blsThresholdSignatureFollower) VerifyThresholdSignature(thresholdSignat
 // shares.
 //
 // This function is thread safe and write-blocking
-func (s *blsThresholdSignatureFollower) EnoughShares() bool {
+func (s *blsThresholdSignatureInspector) EnoughShares() bool {
 	s.lock.RLock()
 	defer s.lock.RUnlock()
 
@@ -250,14 +250,14 @@ func (s *blsThresholdSignatureFollower) EnoughShares() bool {
 }
 
 // non thread safe version of EnoughShares
-func (s *blsThresholdSignatureFollower) enoughShares() bool {
+func (s *blsThresholdSignatureInspector) enoughShares() bool {
 	// len(s.signers) is always <= s.threshold + 1
 	return len(s.shares) == (s.threshold + 1)
 }
 
 // HasShare checks whether the internal map contains the share of the given index.
 // This function is thread safe and write-blocking
-func (s *blsThresholdSignatureFollower) HasShare(orig int) (bool, error) {
+func (s *blsThresholdSignatureInspector) HasShare(orig int) (bool, error) {
 	// validate index
 	if err := s.validIndex(index(orig)); err != nil {
 		return false, err
@@ -270,7 +270,7 @@ func (s *blsThresholdSignatureFollower) HasShare(orig int) (bool, error) {
 }
 
 // non thread safe version of HasShare, and assumes input is valid
-func (s *blsThresholdSignatureFollower) hasShare(orig index) bool {
+func (s *blsThresholdSignatureInspector) hasShare(orig index) bool {
 	_, ok := s.shares[orig]
 	return ok
 }
@@ -307,7 +307,7 @@ func IsduplicatedSignerError(err error) bool {
 //  - (false, nil) if not enough shares were collected and no error occured
 //  - (false, error) if index is invalid (InvalidInputsError) or already added (duplicatedSignerError)
 // This function is thread-safe and blocking.
-func (s *blsThresholdSignatureFollower) TrustedAdd(orig int, share Signature) (bool, error) {
+func (s *blsThresholdSignatureInspector) TrustedAdd(orig int, share Signature) (bool, error) {
 
 	// validate index
 	if err := s.validIndex(index(orig)); err != nil {
@@ -340,7 +340,7 @@ func (s *blsThresholdSignatureFollower) TrustedAdd(orig int, share Signature) (b
 //    and a random error if an exception occured.
 //    (an invalid signature is not considered an invalid input, look at `VerifyShare` for details)
 // This function is thread safe and blocking.
-func (s *blsThresholdSignatureFollower) VerifyAndAdd(orig int, share Signature) (bool, bool, error) {
+func (s *blsThresholdSignatureInspector) VerifyAndAdd(orig int, share Signature) (bool, bool, error) {
 
 	// validate index
 	if err := s.validIndex(index(orig)); err != nil {
@@ -378,7 +378,7 @@ func (s *blsThresholdSignatureFollower) VerifyAndAdd(orig int, share Signature) 
 // and errors with a non-sentinel error if the result is not valid. This is required for the
 // function safety since `TrustedAdd` allows adding invalid signatures.
 // The function is thread-safe and blocking.
-func (s *blsThresholdSignatureFollower) ThresholdSignature() (Signature, error) {
+func (s *blsThresholdSignatureInspector) ThresholdSignature() (Signature, error) {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -401,7 +401,7 @@ func (s *blsThresholdSignatureFollower) ThresholdSignature() (Signature, error) 
 }
 
 // reconstructThresholdSignature reconstructs the threshold signature from at least (t+1) shares.
-func (s *blsThresholdSignatureFollower) reconstructThresholdSignature() (Signature, error) {
+func (s *blsThresholdSignatureInspector) reconstructThresholdSignature() (Signature, error) {
 	// sanity check
 	if !s.enoughShares() {
 		return nil, fmt.Errorf("number of signature shares %d is not enough, %d are required",

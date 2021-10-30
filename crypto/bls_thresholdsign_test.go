@@ -53,7 +53,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 		t.Run("happy path", func(t *testing.T) {
 			// create the stateful threshold signer
-			ts, err := NewBLSThresholdSignatureFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
+			ts, err := NewBLSThresholdSignatureInspector(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
 			require.NoError(t, err)
 
 			// check EnoughShares
@@ -128,7 +128,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 		t.Run("duplicate signer", func(t *testing.T) {
 			// create the stateful threshold signer
-			ts, err := NewBLSThresholdSignatureFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
+			ts, err := NewBLSThresholdSignatureInspector(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
 			require.NoError(t, err)
 
 			// Create a share and add it
@@ -156,7 +156,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 		t.Run("Invalid index", func(t *testing.T) {
 			// create the stateful threshold signer
-			ts, err := NewBLSThresholdSignatureFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
+			ts, err := NewBLSThresholdSignatureInspector(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
 			require.NoError(t, err)
 
 			share, err := skShares[0].Sign(thresholdSignatureMessage, kmac)
@@ -188,7 +188,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 
 		t.Run("invalid signature", func(t *testing.T) {
 			index := mrand.Intn(n)
-			ts, err := NewBLSThresholdSignatureFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
+			ts, err := NewBLSThresholdSignatureInspector(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
 			require.NoError(t, err)
 			share, err := skShares[index].Sign(thresholdSignatureMessage, kmac)
 			require.NoError(t, err)
@@ -232,7 +232,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			// invalid keys size
 			index := mrand.Intn(n)
 			pkSharesInvalid := make([]PublicKey, ThresholdSignMaxSize+1)
-			tsFollower, err := NewBLSThresholdSignatureFollower(pkGroup, pkSharesInvalid, threshold, thresholdSignatureMessage, thresholdSignatureTag)
+			tsFollower, err := NewBLSThresholdSignatureInspector(pkGroup, pkSharesInvalid, threshold, thresholdSignatureMessage, thresholdSignatureTag)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
 			assert.Nil(t, tsFollower)
@@ -244,13 +244,13 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			require.NoError(t, err)
 			tmp := pkShares[0]
 			pkShares[0] = skEcdsa.PublicKey()
-			tsFollower, err = NewBLSThresholdSignatureFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
+			tsFollower, err = NewBLSThresholdSignatureInspector(pkGroup, pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
 			assert.Nil(t, tsFollower)
 			pkShares[0] = tmp // restore valid keys
 			// non BLS group key
-			tsFollower, err = NewBLSThresholdSignatureFollower(skEcdsa.PublicKey(), pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
+			tsFollower, err = NewBLSThresholdSignatureInspector(skEcdsa.PublicKey(), pkShares, threshold, thresholdSignatureMessage, thresholdSignatureTag)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
 			assert.Nil(t, tsFollower)
@@ -265,7 +265,7 @@ func testCentralizedStatefulAPI(t *testing.T) {
 			assert.True(t, IsInvalidInputsError(err))
 			assert.Nil(t, tsParticipant)
 			// invalid threshold
-			tsFollower, err = NewBLSThresholdSignatureFollower(pkGroup, pkShares, len(pkShares)+1, thresholdSignatureMessage, thresholdSignatureTag)
+			tsFollower, err = NewBLSThresholdSignatureInspector(pkGroup, pkShares, len(pkShares)+1, thresholdSignatureMessage, thresholdSignatureTag)
 			assert.Error(t, err)
 			assert.True(t, IsInvalidInputsError(err))
 			assert.Nil(t, tsFollower)

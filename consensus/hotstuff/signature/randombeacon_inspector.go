@@ -9,23 +9,23 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-// randomBeaconFollower implements hotstuff.RandomBeaconFollower interface.
+// randomBeaconInspector implements hotstuff.RandomBeaconInspector interface.
 // All methods of this structure are thread-safe.
-type randomBeaconFollower struct {
-	follower crypto.ThresholdSignatureFollower
+type randomBeaconInspector struct {
+	follower crypto.ThresholdSignatureInspector
 }
 
-// NewRandomBeaconFollower returns a new Random Beacon follower instance.
+// NewRandomBeaconInspector returns a new Random Beacon follower instance.
 //
 // It errors with engine.InvalidInputError if any input is not valid.
-func NewRandomBeaconFollower(
+func NewRandomBeaconInspector(
 	groupPublicKey crypto.PublicKey,
 	publicKeyShares []crypto.PublicKey,
 	threshold int,
 	message []byte,
-) (*randomBeaconFollower, error) {
+) (*randomBeaconInspector, error) {
 
-	follower, err := crypto.NewBLSThresholdSignatureFollower(
+	follower, err := crypto.NewBLSThresholdSignatureInspector(
 		groupPublicKey,
 		publicKeyShares,
 		threshold,
@@ -36,7 +36,7 @@ func NewRandomBeaconFollower(
 		return nil, engine.NewInvalidInputErrorf("create a new Random Beacon follower failed: %w", err)
 	}
 
-	return &randomBeaconFollower{
+	return &randomBeaconInspector{
 		follower: follower,
 	}, nil
 }
@@ -48,7 +48,7 @@ func NewRandomBeaconFollower(
 //  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 //  - other error if there is an exception.
 // The function call is non-blocking
-func (r *randomBeaconFollower) Verify(signerIndex int, share crypto.Signature) error {
+func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) error {
 	verif, err := r.follower.VerifyShare(signerIndex, share)
 
 	// check for errors
@@ -80,7 +80,7 @@ func (r *randomBeaconFollower) Verify(signerIndex int, share crypto.Signature) e
 //  	- engine.DuplicatedEntryError if the signer has been already added
 //      - other error if other exceptions
 // The function call is blocking.
-func (r *randomBeaconFollower) TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error) {
+func (r *randomBeaconInspector) TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error) {
 
 	// Trusted add to the crypto layer
 	enough, err := r.follower.TrustedAdd(signerIndex, share)
@@ -104,7 +104,7 @@ func (r *randomBeaconFollower) TrustedAdd(signerIndex int, share crypto.Signatur
 // a group signature.
 //
 // The function is write-blocking
-func (r *randomBeaconFollower) EnoughShares() bool {
+func (r *randomBeaconInspector) EnoughShares() bool {
 	return r.follower.EnoughShares()
 }
 
@@ -116,6 +116,6 @@ func (r *randomBeaconFollower) EnoughShares() bool {
 // and errors (without sentinel) if the result is not valid. This is required for the function safety since
 // `TrustedAdd` allows adding invalid signatures.
 // The function is blocking.
-func (r *randomBeaconFollower) Reconstruct() (crypto.Signature, error) {
+func (r *randomBeaconInspector) Reconstruct() (crypto.Signature, error) {
 	return r.follower.ThresholdSignature()
 }

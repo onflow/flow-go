@@ -4,10 +4,10 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
-// RandomBeaconFollower encapsulates all methods needed by a Hotstuff leader to validate the
+// RandomBeaconInspector encapsulates all methods needed by a Hotstuff leader to validate the
 // beacon votes and reconstruct a beacon signature.
 // The random beacon methods are based on a threshold signature scheme.
-type RandomBeaconFollower interface {
+type RandomBeaconInspector interface {
 	// Verify verifies the signature share under the signer's public key and the message agreed upon.
 	// It allows concurrent verification of the given signature.
 	// It returns :

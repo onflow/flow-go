@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
-func TestRandomBeaconFollower(t *testing.T) {
+func TestRandomBeaconInspector(t *testing.T) {
 	n := 10
 	threshold := signature.RandomBeaconThreshold(n)
 
@@ -44,7 +44,7 @@ func TestRandomBeaconFollower(t *testing.T) {
 	})
 
 	t.Run("happy path", func(t *testing.T) {
-		follower, err := NewRandomBeaconFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage)
+		follower, err := NewRandomBeaconInspector(pkGroup, pkShares, threshold, thresholdSignatureMessage)
 		require.NoError(t, err)
 
 		// check EnoughShares
@@ -105,7 +105,7 @@ func TestRandomBeaconFollower(t *testing.T) {
 	})
 
 	t.Run("duplicate signer", func(t *testing.T) {
-		follower, err := NewRandomBeaconFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage)
+		follower, err := NewRandomBeaconInspector(pkGroup, pkShares, threshold, thresholdSignatureMessage)
 		require.NoError(t, err)
 
 		// Create a share and add it
@@ -125,7 +125,7 @@ func TestRandomBeaconFollower(t *testing.T) {
 	})
 
 	t.Run("Invalid index", func(t *testing.T) {
-		follower, err := NewRandomBeaconFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage)
+		follower, err := NewRandomBeaconInspector(pkGroup, pkShares, threshold, thresholdSignatureMessage)
 		require.NoError(t, err)
 
 		share, err := skShares[0].Sign(thresholdSignatureMessage, kmac)
@@ -144,7 +144,7 @@ func TestRandomBeaconFollower(t *testing.T) {
 	})
 
 	t.Run("invalid signature", func(t *testing.T) {
-		follower, err := NewRandomBeaconFollower(pkGroup, pkShares, threshold, thresholdSignatureMessage)
+		follower, err := NewRandomBeaconInspector(pkGroup, pkShares, threshold, thresholdSignatureMessage)
 		require.NoError(t, err)
 		index := mrand.Intn(n) // random signer
 		share, err := skShares[index].Sign(thresholdSignatureMessage, kmac)
@@ -170,12 +170,12 @@ func TestRandomBeaconFollower(t *testing.T) {
 	t.Run("constructor errors", func(t *testing.T) {
 		// invalid keys size
 		pkSharesInvalid := make([]crypto.PublicKey, crypto.ThresholdSignMaxSize+1)
-		follower, err := NewRandomBeaconFollower(pkGroup, pkSharesInvalid, threshold, thresholdSignatureMessage)
+		follower, err := NewRandomBeaconInspector(pkGroup, pkSharesInvalid, threshold, thresholdSignatureMessage)
 		assert.Error(t, err)
 		assert.True(t, engine.IsInvalidInputError(err))
 		assert.Nil(t, follower)
 		// invalid threshold
-		follower, err = NewRandomBeaconFollower(pkGroup, pkShares, len(pkShares)+1, thresholdSignatureMessage)
+		follower, err = NewRandomBeaconInspector(pkGroup, pkShares, len(pkShares)+1, thresholdSignatureMessage)
 		assert.Error(t, err)
 		assert.True(t, engine.IsInvalidInputError(err))
 		assert.Nil(t, follower)
