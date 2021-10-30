@@ -71,7 +71,7 @@ func (rs *randomBeaconSuite) TestHappyPath() {
 	assert.False(rs.T(), enough)
 	var wg sync.WaitGroup
 	// create (t) signatures of the first randomly chosen signers
-	// ( 1 signature short of the threshold)
+	// (1 signature short of the threshold)
 	for j := 0; j < rs.threshold; j++ {
 		wg.Add(1)
 		// test thread safety
