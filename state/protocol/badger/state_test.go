@@ -148,7 +148,27 @@ func TestBootstrapNonRoot(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootBlock, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	
+
+	// should be able to bootstrap from snapshot after building one block
+	// ROOT <- B1 <- CHILD
+	t.Run("with one block built", func(t *testing.T) {
+		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
+			block1 := unittest.BlockWithParentFixture(rootBlock)
+			buildBlock(t, state, &block1)
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			receipt, seal := unittest.ReceiptAndSealForBlock(&block1)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt), unittest.WithSeals(seal)))
+			buildBlock(t, state, &block2)
+
+			return state.AtBlockID(block1.ID())
+		})
+
+		bootstrap(t, after, func(state *bprotocol.State, err error) {
+			require.NoError(t, err)
+			unittest.AssertSnapshotsEqual(t, after, state.Final())
+		})
+	})
+
 	// should be able to bootstrap from snapshot after sealing a non-root block
 	// ROOT <- B1 <- B2(S1) <- CHILD
 	t.Run("with sealed block", func(t *testing.T) {
