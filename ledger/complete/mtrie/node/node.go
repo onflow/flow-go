@@ -165,7 +165,7 @@ func (n *Node) Pruned() (*Node, bool) {
 		return n, false
 	}
 
-	// if leaf return it as if
+	// if leaf return it as is
 	// if non leaf bubble up
 	lChildEmpty := true
 	rChildEmpty := true
