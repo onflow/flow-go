@@ -426,9 +426,9 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 			var err error
 			// generate the server certificate that will be served by the GRPC server
 			if (node.TlsCert != cmd.NotSet && node.TlsKey != cmd.NotSet) {
-				var tmp tls.Certificate
-				tmp, err = tls.LoadX509KeyPair(node.TlsCert, node.TlsKey)
-				x509Certificate = &tmp
+				var cert tls.Certificate
+				cert, err = tls.LoadX509KeyPair(node.TlsCert, node.TlsKey)
+				x509Certificate = &cert
 			} else {
 				x509Certificate, err = grpcutils.X509Certificate(node.NetworkKey)
 			}
