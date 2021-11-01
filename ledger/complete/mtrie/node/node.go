@@ -169,7 +169,6 @@ func (n *Node) Pruned() (*Node, bool) {
 	// if non leaf bubble up
 	lChildEmpty := true
 	rChildEmpty := true
-	var lChildChanged, rChildChanged bool
 	if n.lChild != nil {
 		lChildEmpty = n.lChild.IsADefaultNode()
 	}
@@ -200,9 +199,6 @@ func (n *Node) Pruned() (*Node, bool) {
 		return r, true
 	}
 
-	if lChildChanged || rChildChanged {
-		return NewInterimNode(n.height, n.lChild, n.rChild), true
-	}
 	// else no change needed
 	return n, false
 }
