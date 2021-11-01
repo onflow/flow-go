@@ -20,6 +20,7 @@ import (
 // a mechanism for observing the block chain. It maintains a set of subscribers
 // and delivers block proposals broadcasted by the consensus nodes to each one.
 type ConsensusFollower interface {
+	module.ReadyDoneAware
 	// Run starts the consensus follower.
 	Run(context.Context)
 	// AddOnBlockFinalizedConsumer adds a new block finalization subscriber.
@@ -203,13 +204,13 @@ func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 
 	select {
 	case <-cf.Ready():
-		cf.Logger.Info().Msg("Access node startup complete")
+		cf.Logger.Info().Msg("Consensus follower startup complete")
 	case <-ctx.Done():
-		cf.Logger.Info().Msg("Access node startup aborted")
+		cf.Logger.Info().Msg("Consensus follower startup aborted")
 	}
 
 	<-ctx.Done()
-	cf.Logger.Info().Msg("Access node shutting down")
+	cf.Logger.Info().Msg("Consensus follower shutting down")
 	<-cf.Done()
-	cf.Logger.Info().Msg("Access node shutdown complete")
+	cf.Logger.Info().Msg("Consensus follower shutdown complete")
 }
