@@ -27,7 +27,8 @@ func (segment *SealingSegment) Lowest() *Block {
 }
 
 var (
-	ErrSegmentMissingSeal = fmt.Errorf("sealing segment failed sanity check: highest block in segment does not contain seal for lowest")
+	ErrSegmentMissingSeal      = fmt.Errorf("sealing segment failed sanity check: highest block in segment does not contain seal for lowest")
+	ErrInvalidSegmentBlocksLen = fmt.Errorf("sealing segment must have atleast 2 blocks")
 )
 
 type SealingSegmentBuilder struct {
@@ -69,6 +70,11 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 	segment := &SealingSegment{
 		Blocks:           builder.blocks,
 		ExecutionResults: builder.results,
+	}
+
+	// invalid empty sealing segment blocks
+	if len(segment.Blocks) < 2 {
+		return nil, ErrInvalidSegmentBlocksLen
 	}
 
 	for _, seal := range segment.Highest().Payload.Seals {
