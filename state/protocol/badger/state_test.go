@@ -148,7 +148,7 @@ func TestBootstrapNonRoot(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	rootBlock, err := rootSnapshot.Head()
 	require.NoError(t, err)
-	
+
 	// should be able to bootstrap from snapshot after sealing a non-root block
 	// ROOT <- B1 <- B2(S1) <- CHILD
 	t.Run("with sealed block", func(t *testing.T) {
