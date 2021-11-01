@@ -98,11 +98,11 @@ func Bootstrap(
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
-		head := segment.Blocks[len(segment.Blocks)-1] // reference block of the snapshot
-		tail := segment.Blocks[0]                     // last sealed block
+		highest := segment.Highest() // reference block of the snapshot
+		lowest := segment.Lowest()   // last sealed block
 
 		// bootstrap the sealing segment step 2:  insert segment blocks
-		err = state.bootstrapSealingSegmentBlocks(segment, head)(tx)
+		err = state.bootstrapSealingSegmentBlocks(segment, highest)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
@@ -140,9 +140,9 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
 		}
-		state.metrics.BlockSealed(tail)
-		state.metrics.SealedHeight(tail.Header.Height)
-		state.metrics.FinalizedHeight(head.Header.Height)
+		state.metrics.BlockSealed(lowest)
+		state.metrics.SealedHeight(lowest.Header.Height)
+		state.metrics.FinalizedHeight(highest.Header.Height)
 		for _, block := range segment.Blocks {
 			state.metrics.BlockFinalized(block)
 		}
@@ -262,29 +262,29 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
-		head := segment.Blocks[len(segment.Blocks)-1]
-		tail := segment.Blocks[0]
+		highest := segment.Highest()
+		lowest := segment.Lowest()
 
 		// insert initial views for HotStuff
-		err = operation.InsertStartedView(head.Header.ChainID, head.Header.View)(tx)
+		err = operation.InsertStartedView(highest.Header.ChainID, highest.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertVotedView(head.Header.ChainID, head.Header.View)(tx)
+		err = operation.InsertVotedView(highest.Header.ChainID, highest.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
 
 		// insert height pointers
-		err = operation.InsertRootHeight(head.Header.Height)(tx)
+		err = operation.InsertRootHeight(highest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root height: %w", err)
 		}
-		err = operation.InsertFinalizedHeight(head.Header.Height)(tx)
+		err = operation.InsertFinalizedHeight(highest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-		err = operation.InsertSealedHeight(tail.Header.Height)(tx)
+		err = operation.InsertSealedHeight(lowest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}

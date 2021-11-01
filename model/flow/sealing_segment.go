@@ -1,5 +1,9 @@
 package flow
 
+import (
+	"fmt"
+)
+
 // SealingSegment is the chain segment such that the head (greatest
 // height) is this snapshot's reference block and the tail (least height)
 // is the most recently sealed block as of this snapshot (ie. the block
@@ -14,20 +18,74 @@ type SealingSegment struct {
 	ExecutionResults ExecutionResultList
 }
 
-// AddBlock appends block to Blocks
-func (segment *SealingSegment) AddBlock(block *Block) {
-	segment.Blocks = append(segment.Blocks, block)
+func (segment *SealingSegment) Highest() *Block {
+	return segment.Blocks[len(segment.Blocks)-1]
 }
 
-// AddExecutionResult adds result to ExecutionResults
-func (segment *SealingSegment) AddExecutionResult(result *ExecutionResult) {
-	segment.ExecutionResults = append(segment.ExecutionResults, result)
+func (segment *SealingSegment) Lowest() *Block {
+	return segment.Blocks[0]
 }
 
-// NewSealingSegment returns SealingSegment
-func NewSealingSegment() *SealingSegment {
-	return &SealingSegment{
-		Blocks:           make([]*Block, 0),
-		ExecutionResults: make(ExecutionResultList, 0),
+var (
+	ErrSegmentMissingSeal = fmt.Errorf("sealing segment failed sanity check: highest block in segment does not contain seal for lowest")
+)
+
+type SealingSegmentBuilder struct {
+	resultLookup    func(resultID Identifier) (*ExecutionResult, error)
+	includedResults map[Identifier]*ExecutionResult
+	blocks          []*Block
+	results         []*ExecutionResult
+}
+
+// AddBlock appends block to blocks
+func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
+	for _, receipt := range block.Payload.Receipts {
+		if _, ok := builder.includedResults[receipt.ResultID]; ok {
+			continue
+		}
+
+		resultsByID := block.Payload.Results.Lookup()
+		if _, ok := resultsByID[receipt.ResultID]; !ok {
+			result, err := builder.resultLookup(receipt.ResultID)
+			if err != nil {
+				return fmt.Errorf("could not get execution result (%s): %w", receipt.ResultID, err)
+			}
+			builder.addExecutionResult(result)
+			builder.includedResults[receipt.ResultID] = result
+		}
+	}
+	builder.blocks = append(builder.blocks, block)
+
+	return nil
+}
+
+// AddExecutionResult adds result to executionResults
+func (builder *SealingSegmentBuilder) addExecutionResult(result *ExecutionResult) {
+	builder.results = append(builder.results, result)
+}
+
+// SealingSegment will check if the highest block has a seal for the lowest block in the segment
+func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) {
+	segment := &SealingSegment{
+		Blocks:           builder.blocks,
+		ExecutionResults: builder.results,
+	}
+
+	for _, seal := range segment.Highest().Payload.Seals {
+		if seal.BlockID == segment.Lowest().ID() {
+			return segment, nil
+		}
+	}
+
+	return nil, ErrSegmentMissingSeal
+}
+
+// NewSealingSegmentBuilder returns *SealingSegmentBuilder
+func NewSealingSegmentBuilder(resultLookup func(resultID Identifier) (*ExecutionResult, error)) *SealingSegmentBuilder {
+	return &SealingSegmentBuilder{
+		resultLookup:    resultLookup,
+		includedResults: make(map[Identifier]*ExecutionResult),
+		blocks:          make([]*Block, 0),
+		results:         make(ExecutionResultList, 0),
 	}
 }
