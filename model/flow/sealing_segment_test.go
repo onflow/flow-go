@@ -55,7 +55,7 @@ func TestSealingSegmentBuilder_AddBlock(t *testing.T) {
 }
 
 func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
-	t.Run("should return error if highest block does not contain seal for lowest", func(t *testing.T) {
+	t.Run("should return ErrSegmentMissingSeal if highest block does not contain seal for lowest", func(t *testing.T) {
 		block1 := unittest.BlockFixture()
 		receipt1 := unittest.ReceiptForBlockFixture(&block1)
 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return &receipt1.ExecutionResult, nil }
@@ -73,5 +73,12 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 
 		_, err = builder.SealingSegment()
 		require.True(t, errors.Is(err, flow.ErrSegmentMissingSeal))
+	})
+
+	t.Run("should ErrInvalidSegmentBlocksLen if sealing segment is built with no blocks", func(t *testing.T) {
+		resultLookup := func(resultID flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil}
+		builder := flow.NewSealingSegmentBuilder(resultLookup)
+		_, err := builder.SealingSegment()
+		require.True(t, errors.Is(err, flow.ErrInvalidSegmentBlocksLen))
 	})
 }
