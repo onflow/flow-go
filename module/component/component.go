@@ -127,10 +127,12 @@ type ReadyFunc func()
 
 // LookupFunc returns a ReadyDoneAware interface for the worker identified by id, and a boolean
 // signalling if the worker exists.
-// id can be prefixed with ! to get a ReadyDoneAware interface for the collection of all workers
-// EXCEPT the id provided. This is particularly useful if there is a main worker that has shutdown
-// logic that should only run after all other workers have shutdown.
+// workerID can be prefixed with ! to get a ReadyDoneAware interface for the collection of all
+// workers EXCEPT the id provided. This is particularly useful if there is a main worker that has
+// shutdown logic that should only run after all other workers have shutdown.
 //
+// The ReadyDoneAware interface returned by this function can be used to synchronize with the
+// worker associated with workerID.
 // Caution: waiting on workers can easily create deadlocks. use with care
 type LookupFunc func(workerID string) (module.ReadyDoneAware, bool)
 
@@ -151,15 +153,15 @@ type ComponentManagerBuilder interface {
 	// Build builds and returns a new ComponentManager instance
 	Build() *ComponentManager
 
-	// SerialStart configures node to start components serially
-	// By default, components are started in parallel and must have explicit dependency checks.
-	// This allows using the order components were added to manage dependencies implicitly
+	// SetSerialStart configures the ComponentManager to start workers serially
+	// By default, workers are started in parallel and must have explicit dependency checks
+	// This allows using the order workers were added to manage dependencies implicitly
 	SetSerialStart(bool) ComponentManagerBuilder
 }
 
 type componentManagerBuilderImpl struct {
-	built           *atomic.Bool
 	mu              *sync.Mutex
+	built           bool
 	serialStart     bool
 	workers         []*worker
 	workersRegistry map[string]module.ReadyDoneAware
@@ -168,7 +170,6 @@ type componentManagerBuilderImpl struct {
 // NewComponentManagerBuilder returns a new ComponentManagerBuilder
 func NewComponentManagerBuilder() ComponentManagerBuilder {
 	return &componentManagerBuilderImpl{
-		built:           atomic.NewBool(false),
 		mu:              &sync.Mutex{},
 		workersRegistry: make(map[string]module.ReadyDoneAware),
 	}
@@ -194,6 +195,9 @@ func (c *componentManagerBuilderImpl) AddWorker(id string, f ComponentWorker) Co
 // Workers are started in the order they were added to the ComponentManagerBuilder. If enabled,
 // Start() will wait for the previous worker to call ready() before starting the next.
 func (c *componentManagerBuilderImpl) SetSerialStart(serial bool) ComponentManagerBuilder {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
 	c.serialStart = serial
 	return c
 }
@@ -202,9 +206,13 @@ func (c *componentManagerBuilderImpl) SetSerialStart(serial bool) ComponentManag
 // Build must be called exactly once. Calling it more than once may result in workers being started
 // multiple times.
 func (c *componentManagerBuilderImpl) Build() *ComponentManager {
-	if !c.built.CAS(false, true) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if c.built {
 		panic("component manager builder can only be used once")
 	}
+	c.built = true
 
 	return &ComponentManager{
 		started:         atomic.NewBool(false),
@@ -233,64 +241,65 @@ type ComponentManager struct {
 
 // Start initiates the ComponentManager by launching all worker routines.
 func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
-	// only start once
-	if c.started.CAS(false, true) {
-		ctx, cancel := context.WithCancel(parent)
-		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-		go func() {
-			<-ctx.Done()
-			close(c.shutdownSignal)
-		}()
-
-		// launch goroutine to propagate irrecoverable error
-		go func() {
-			// only signal when done channel is closed
-			doneCtx, _ := util.WithDone(context.Background(), c.done)
-			if err := util.WaitError(doneCtx, errChan); err != nil {
-				cancel() // shutdown all workers
-
-				// we propagate the error directly to the parent because a failure in a
-				// worker routine is considered irrecoverable
-				parent.Throw(err)
-			}
-		}()
-
-		var workersReady sync.WaitGroup
-		var workersDone sync.WaitGroup
-		workersDone.Add(len(c.workers))
-		workersReady.Add(len(c.workers))
-
-		// launch workers
-		for _, worker := range c.workers {
-			worker := worker
-			go func() {
-				defer workersDone.Done()
-				var readyOnce sync.Once
-				worker.run(
-					signalerCtx,
-					func() {
-						readyOnce.Do(func() {
-							workersReady.Done()
-						})
-					},
-					c.lookupWorker,
-				)
-			}()
-			if c.serialStart {
-				if err := util.WaitReady(parent, worker.Ready()); err != nil {
-					break
-				}
-			}
-		}
-
-		// launch goroutine to close ready channel
-		go c.waitForReady(&workersReady)
-
-		// launch goroutine to close done channel
-		go c.waitForDone(&workersDone)
-	} else {
+	// Make sure we only start once. atomically check if started is false then set it to true.
+	// If it was not false, panic
+	if !c.started.CAS(false, true) {
 		panic(module.ErrMultipleStartup)
 	}
+
+	ctx, cancel := context.WithCancel(parent)
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+	go func() {
+		<-ctx.Done()
+		close(c.shutdownSignal)
+	}()
+
+	// launch goroutine to propagate irrecoverable error
+	go func() {
+		// only signal when done channel is closed
+		doneCtx, _ := util.WithDone(context.Background(), c.done)
+		if err := util.WaitError(doneCtx, errChan); err != nil {
+			cancel() // shutdown all workers
+
+			// we propagate the error directly to the parent because a failure in a
+			// worker routine is considered irrecoverable
+			parent.Throw(err)
+		}
+	}()
+
+	var workersReady sync.WaitGroup
+	var workersDone sync.WaitGroup
+	workersDone.Add(len(c.workers))
+	workersReady.Add(len(c.workers))
+
+	// launch workers
+	for _, worker := range c.workers {
+		worker := worker
+		go func() {
+			defer workersDone.Done()
+			var readyOnce sync.Once
+			worker.run(
+				signalerCtx,
+				func() {
+					readyOnce.Do(func() {
+						workersReady.Done()
+					})
+				},
+				c.lookupWorker,
+			)
+		}()
+		if c.serialStart {
+			if err := util.WaitReady(parent, worker.Ready()); err != nil {
+				break
+			}
+		}
+	}
+
+	// launch goroutine to close ready channel
+	go c.waitForReady(&workersReady)
+
+	// launch goroutine to close done channel
+	go c.waitForDone(&workersDone)
 }
 
 // lookupWorker returns a ReadyDoneAware interface for the worker specified by ID

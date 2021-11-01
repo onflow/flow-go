@@ -199,15 +199,20 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 // Run starts the consensus follower.
 // This is kept for backwards compatibility. Typical implementations will implement the following
 // code and call follower.Start() directly. This allows the implementor to inspect the irrecoverable
-// error returned on the error channel and restart if desired.
+// error returned on the error channel and restart if desired. The default behavior is to crash
+// the application with os.Exit(1).
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 	if util.CheckClosed(ctx.Done()) {
 		return
 	}
 
+	// Start the consensus follower with an irrecoverable signaler context. The returned error channel
+	// will receive irrecoverable errors thrown by the consensus follower or any of its child components.
+	// This allows us to listen for irrecoverable errors and restart the consensus follower if desired.
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 	go cf.Start(signalerCtx)
 
+	// setup logging listeners
 	go func() {
 		if err := util.WaitReady(signalerCtx, cf.Ready()); err != nil {
 			cf.Logger.Info().Msg("Consensus follower startup aborted")
