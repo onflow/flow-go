@@ -603,7 +603,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msg("failed to read root sealed result")
 	sealingSegment, err := rootSnapshot.SealingSegment()
 	fnb.MustNot(err).Msg("failed to read root sealing segment")
-	fnb.RootBlock = sealingSegment.Blocks[len(sealingSegment.Blocks)-1]
+	fnb.RootBlock = sealingSegment.Highest()
 	fnb.RootQC, err = rootSnapshot.QuorumCertificate()
 	fnb.MustNot(err).Msg("failed to read root qc")
 	// set the chain ID based on the root header

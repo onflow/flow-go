@@ -277,8 +277,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	segment := flow.NewSealingSegment()
-	includedResults := make(map[flow.Identifier]*flow.ExecutionResult)
+	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
@@ -286,29 +285,22 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 			return fmt.Errorf("could not get block: %w", err)
 		}
 
-		resultsByID := block.Payload.Results.Lookup()
-		for _, receipt := range block.Payload.Receipts {
-			if _, ok := includedResults[receipt.ResultID]; ok {
-				continue
-			}
-
-			if _, ok := resultsByID[receipt.ResultID]; !ok {
-				result, err := s.state.results.ByID(receipt.ResultID)
-				if err != nil {
-					return fmt.Errorf("could not get execution result (%s): %w", receipt.ResultID, err)
-				}
-				segment.AddExecutionResult(result)
-				includedResults[receipt.ResultID] = result
-			}
+		err = builder.AddBlock(block)
+		if err != nil {
+			return fmt.Errorf("could not add block to sealing segment: %w", err)
 		}
 
-		segment.AddBlock(block)
 		return nil
 	}
 
 	err = fork.TraverseForward(s.state.headers, s.blockID, scraper, fork.IncludingBlock(seal.BlockID))
 	if err != nil {
 		return nil, fmt.Errorf("could not traverse sealing segment: %w", err)
+	}
+
+	segment, err := builder.SealingSegment()
+	if err != nil {
+		return nil, fmt.Errorf("could not build sealing segment: %w", err)
 	}
 
 	return segment, nil
