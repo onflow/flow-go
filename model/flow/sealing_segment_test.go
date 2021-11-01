@@ -75,10 +75,10 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		require.True(t, errors.Is(err, flow.ErrSegmentMissingSeal))
 	})
 
-	t.Run("should ErrInvalidSegmentBlocksLen if sealing segment is built with no blocks", func(t *testing.T) {
+	t.Run("should ErrSegmentBlocksEmpty if sealing segment is built with no blocks", func(t *testing.T) {
 		resultLookup := func(resultID flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil}
 		builder := flow.NewSealingSegmentBuilder(resultLookup)
 		_, err := builder.SealingSegment()
-		require.True(t, errors.Is(err, flow.ErrInvalidSegmentBlocksLen))
+		require.True(t, errors.Is(err, flow.ErrSegmentBlocksEmpty))
 	})
 }
