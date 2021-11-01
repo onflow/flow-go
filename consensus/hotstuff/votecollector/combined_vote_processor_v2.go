@@ -212,9 +212,7 @@ func (p *CombinedVoteProcessorV2) buildQC() (*flow.QuorumCertificate, error) {
 
 	blockSigData := &hotstuff.BlockSignatureData{
 		StakingSigners:               stakingSigners,
-		RandomBeaconSigners:          nil,
 		AggregatedStakingSig:         aggregatedStakingSig,
-		AggregatedRandomBeaconSig:    nil,
 		ReconstructedRandomBeaconSig: reconstructedBeaconSig,
 	}
 
