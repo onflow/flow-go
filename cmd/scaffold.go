@@ -970,7 +970,7 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 }
 
 func (fnb *FlowNodeBuilder) Build() Node {
-	fnb.sig = make(chan os.Signal)
+	fnb.sig = make(chan os.Signal, 1)
 	return NewNode(fnb, fnb.NodeConfig, fnb.Logger, fnb.sig)
 }
 
