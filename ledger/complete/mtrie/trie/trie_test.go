@@ -399,7 +399,7 @@ func Test_Pruning(t *testing.T) {
 		require.NoError(t, err)
 
 		// after pruning
-		//       n7  (path6/payload6) // 1000
+		//       n7  (path1/payload1)
 		require.Equal(t, trie3.RootHash(), trie3withpruning.RootHash())
 		require.True(t, trie3withpruning.RootNode().VerifyCachedHash())
 		require.Equal(t, trie3.MaxDepth()-3, trie3withpruning.MaxDepth())
