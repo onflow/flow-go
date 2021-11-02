@@ -26,7 +26,7 @@ var _ ghost.GhostNodeAPIServer = Handler{}
 
 func NewHandler(log zerolog.Logger, conduitMap map[network.Channel]network.Conduit, msgChan chan ghost.FlowMessage, codec network.Codec) *Handler {
 	return &Handler{
-		log:        log,
+		log:        log.With().Str("component", "ghost_engine_handler").Logger(),
 		conduitMap: conduitMap,
 		msgChan:    msgChan,
 		codec:      codec,
@@ -58,6 +58,12 @@ func (h Handler) SendEvent(_ context.Context, req *ghost.SendEventRequest) (*emp
 	for i, id := range targetIDs {
 		flowIDs[i] = flow.HashToID(id)
 	}
+
+	h.log.Info().
+		Interface("event", event).
+		Str("flow_ids", fmt.Sprintf("%v", flowIDs)).
+		Str("target_ids", fmt.Sprintf("%v", targetIDs)).
+		Msg("sending message")
 
 	// Submit the message over libp2p
 	err = conduit.Publish(event, flowIDs...)
