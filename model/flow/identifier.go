@@ -16,8 +16,10 @@ import (
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
+const IdentifierLen = 32
+
 // Identifier represents a 32-byte unique identifier for an entity.
-type Identifier [32]byte
+type Identifier [IdentifierLen]byte
 
 // IdentifierFilter is a filter on identifiers.
 type IdentifierFilter func(Identifier) bool

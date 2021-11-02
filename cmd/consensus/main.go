@@ -9,14 +9,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
-
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
