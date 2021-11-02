@@ -300,38 +300,34 @@ func update(
 
 	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
 	// payload is re-written at a register.
-	if lChild == lchildParent && rChild == rchildParent {
+	if !lChildUpdated && !rChildUpdated {
 		return parentNode, false
 	}
 
-	childrenUpdated := lChildUpdated || rChildUpdated
 	lSubtrieEmpty := lChild.IsDefaultNode()
 	rSubtrieEmpty := rChild.IsDefaultNode()
 
 	// both children are empty => subtree is empty: return nil
 	if lSubtrieEmpty && rSubtrieEmpty {
-		return nil, childrenUpdated
+		return nil, true
 	}
 
 	// one child is empty, the other one is a single leaf => node is a single leaf
 	lChildIsLeaf := lChild.IsLeaf()
 	rChildIsLeaf := rChild.IsLeaf()
 	if lChildIsLeaf && rSubtrieEmpty {
-		return lChild, childrenUpdated
+		return lChild, true
 	}
 	if lSubtrieEmpty && rChildIsLeaf {
-		return rChild, childrenUpdated
+		return rChild, true
 	}
 
-	// node is a sub-trie with more than one allocated leaf
-	var childRecompactified bool
+	// node is a sub-trie with _more_ than one allocated leaf
 	if lChildIsLeaf {
-		lChild, childRecompactified = toCompactifiedLeaf(lChild, nodeHeight)
-		childrenUpdated = childrenUpdated || childRecompactified
+		lChild = toCompactifiedLeaf(lChild, nodeHeight)
 	}
 	if rChildIsLeaf {
-		rChild, childRecompactified = toCompactifiedLeaf(rChild, nodeHeight)
-		childrenUpdated = childrenUpdated || childRecompactified
+		rChild = toCompactifiedLeaf(rChild, nodeHeight)
 	}
 
 	return node.NewInterimNode(nodeHeight, lChild, rChild), true
@@ -340,19 +336,19 @@ func update(
 // toCompactifiedLeaf generates compactified leaf holding the same register value
 // as leaf, but potentially with a different height.
 // UNSAFE: vertex must be a leaf
-func toCompactifiedLeaf(leaf *node.Node, newHeight int) (*node.Node, bool) {
+func toCompactifiedLeaf(leaf *node.Node, newHeight int) *node.Node {
 	if leaf == nil || leaf.Payload().IsEmpty() {
-		return nil, false
+		return nil
 	}
 	oldHeight := leaf.Height()
 	if oldHeight == newHeight {
-		return leaf, false
+		return leaf
 	}
 
 	// note: leaf.Path() is guaranteed to return a non-nil path for a leaf. Otherwise, this implementation panics.
 	path := leaf.Path()
 	if newHeight < oldHeight {
-		return node.NewLeaf(*path, leaf.Payload(), newHeight), true
+		return node.NewLeaf(*path, leaf.Payload(), newHeight)
 	}
 
 	// we only reach the following code, if newHeight > oldHeight
@@ -377,7 +373,7 @@ func toCompactifiedLeaf(leaf *node.Node, newHeight int) (*node.Node, bool) {
 		newHash,
 		0,
 		1,
-	), true
+	)
 }
 
 // UnsafeProofs provides proofs for the given paths.
