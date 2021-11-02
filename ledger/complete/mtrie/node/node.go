@@ -1,7 +1,6 @@
 package node
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 
@@ -49,15 +48,16 @@ type Node struct {
 // NewNode creates a new Node.
 // UNCHECKED requirement: combination of values must conform to
 // a valid node type (see documentation of `Node` for details)
-func NewNode(height int,
+func NewNode(
+	height int,
 	lchild,
 	rchild *Node,
 	path ledger.Path,
 	payload *ledger.Payload,
 	hashValue hash.Hash,
 	maxDepth uint16,
-	regCount uint64) *Node {
-
+	regCount uint64,
+) *Node {
 	var pl *ledger.Payload
 	if payload != nil {
 		pl = payload.DeepCopy()
@@ -81,7 +81,11 @@ func NewNode(height int,
 // UNCHECKED requirement: payload is non nil
 func NewLeaf(path ledger.Path,
 	payload *ledger.Payload,
-	height int) *Node {
+	height int,
+) *Node {
+	if payload == nil || len(payload.Value) == 0 {
+		return nil
+	}
 
 	n := &Node{
 		lChild:   nil,
@@ -90,16 +94,21 @@ func NewLeaf(path ledger.Path,
 		path:     path,
 		payload:  payload.DeepCopy(),
 		maxDepth: 0,
-		regCount: uint64(1),
+		regCount: 1,
 	}
 	n.computeAndStoreHash()
 	return n
 }
 
-// NewInterimNode creates a new Node with the provided value and no children.
+// NewInterimNode creates a new Node with the provided children. In case _both_
+// children are nil, the nil-representation of a default node is returned.
 // UNCHECKED requirement: lchild.height and rchild.height must be smaller than height
 // UNCHECKED requirement: if lchild != nil then height = lchild.height + 1, and same for rchild
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
+	if lchild == nil && rchild == nil {
+		return nil
+	}
+
 	var lMaxDepth, rMaxDepth uint16
 	var lRegCount, rRegCount uint64
 	if lchild != nil {
@@ -165,20 +174,19 @@ func (n *Node) Pruned() (*Node, bool) {
 		return n, false
 	}
 
-	// if leaf return it as if
+	// if leaf return it as is
 	// if non leaf bubble up
 	lChildEmpty := true
 	rChildEmpty := true
 	var lChildChanged, rChildChanged bool
 	if n.lChild != nil {
-		lChildEmpty = n.lChild.IsADefaultNode()
+		lChildEmpty = n.lChild.IsDefaultNode()
 	}
 	if n.rChild != nil {
-		rChildEmpty = n.rChild.IsADefaultNode()
+		rChildEmpty = n.rChild.IsDefaultNode()
 	}
 	if rChildEmpty && lChildEmpty {
-		// is like a leaf
-		return NewLeaf(ledger.Path{}, ledger.EmptyPayload(), n.height), true
+		return nil, true
 	}
 
 	// if childNode is non empty
@@ -207,10 +215,14 @@ func (n *Node) Pruned() (*Node, bool) {
 	return n, false
 }
 
-func (n *Node) IsADefaultNode() bool {
-	// TODO make this optimize by caching if the node is a default node
-	defaultHashValue := ledger.GetDefaultHashForHeight(n.height)
-	return bytes.Equal(n.hashValue[:], defaultHashValue[:])
+// IsDefaultNode returns true if and only of the _entire_ subtree of registers
+// is unallocated. Per definition, a nil node represents only unallocated
+// registers, or a node with default hash.
+func (n *Node) IsDefaultNode() bool {
+	if n == nil {
+		return true
+	}
+	return ledger.GetDefaultHashForHeight(n.height) == n.hashValue
 }
 
 // computeHash returns the hashValue of the node

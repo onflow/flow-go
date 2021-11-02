@@ -5,7 +5,7 @@ import (
 )
 
 // PruneMigration removes all the payloads with empty value
-// this prunes the trie for values that has been deleted
+// this prunes the trie for values that have been deleted
 func PruneMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 	newPayload := make([]ledger.Payload, 0, len(payload))
 	for _, p := range payload {

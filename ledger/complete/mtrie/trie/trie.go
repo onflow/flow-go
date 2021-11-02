@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/bitutils"
+	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
 )
 
@@ -202,20 +203,22 @@ func update(
 	nodeHeight int, parentNode *node.Node,
 	paths []ledger.Path, payloads []ledger.Payload, compactLeaf *node.Node,
 	prune bool,
-) *node.Node {
+) (*node.Node, bool) {
 	// No new paths to write
 	if len(paths) == 0 {
-		// check is a compactLeaf from a higher height is still left.
+		// check if a compactLeaf from a higher height is still left.
 		if compactLeaf != nil {
-			// create a new node for the compact leaf path and payload. The old node shouldn't
-			// be recycled as it is still used by the tree copy before the update.
-			return node.NewLeaf(*compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
+			// CAUTION: we return the prior compactified leaf. This can lead to node heights not matching
+			return compactLeaf, false
 		}
-		return parentNode
+		return parentNode, false
 	}
 
 	if len(paths) == 1 && parentNode == nil && compactLeaf == nil {
-		return node.NewLeaf(paths[0], &payloads[0], nodeHeight)
+		if len(payloads[0].Value) == 0 {
+			return nil, false
+		}
+		return node.NewLeaf(paths[0], &payloads[0], nodeHeight), true
 	}
 
 	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
@@ -227,10 +230,10 @@ func update(
 				// the case where the recursion stops: only one path to update
 				if len(paths) == 1 {
 					if !parentNode.Payload().Equals(&payloads[i]) {
-						return node.NewLeaf(paths[i], &payloads[i], nodeHeight)
+						return node.NewLeaf(paths[i], &payloads[i], nodeHeight), true
 					}
 					// avoid creating a new node when the same payload is written
-					return parentNode
+					return parentNode, false
 				}
 				// the case where the recursion carries on: len(paths)>1
 				found = true
@@ -277,37 +280,104 @@ func update(
 
 	// recurse over each branch
 	var lChild, rChild *node.Node
+	var lChildUpdated, rChildUpdated bool
 	parallelRecursionThreshold := 16
 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
-		// runtime optimization: if there are _no_ updates for either left or right sub-tree, proceed single-threaded
-		lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
-		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune)
+		// runtime optimization: if there are _few_ updates for either left or right sub-tree, proceed single-threaded
+		lChild, lChildUpdated = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
+		rChild, rChildUpdated = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune)
 	} else {
 		// runtime optimization: process the left child is a separate thread
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
+			lChild, lChildUpdated = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
 		}()
-		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune)
+		rChild, rChildUpdated = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune)
 		wg.Wait()
 	}
 
 	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
 	// payload is re-written at a register.
 	if lChild == lchildParent && rChild == rchildParent {
-		return parentNode
+		return parentNode, false
 	}
 
-	n := node.NewInterimNode(nodeHeight, lChild, rChild)
+	childrenUpdated := lChildUpdated || rChildUpdated
+	lSubtrieEmpty := lChild.IsDefaultNode()
+	rSubtrieEmpty := rChild.IsDefaultNode()
 
-	if prune {
-		nn, _ := n.Pruned()
-		return nn
+	// both children are empty => subtree is empty: return nil
+	if lSubtrieEmpty && rSubtrieEmpty {
+		return nil, childrenUpdated
 	}
 
-	return n
+	// one child is empty, the other one is a single leaf => node is a single leaf
+	lChildIsLeaf := lChild.IsLeaf()
+	rChildIsLeaf := rChild.IsLeaf()
+	if lChildIsLeaf && rSubtrieEmpty {
+		return lChild, childrenUpdated
+	}
+	if lSubtrieEmpty && rChildIsLeaf {
+		return rChild, childrenUpdated
+	}
+
+	// node is a sub-trie with more than one allocated leaf
+	var childRecompactified bool
+	if lChildIsLeaf {
+		lChild, childRecompactified = toCompactifiedLeaf(lChild, nodeHeight)
+		childrenUpdated = childrenUpdated || childRecompactified
+	}
+	if rChildIsLeaf {
+		rChild, childRecompactified = toCompactifiedLeaf(rChild, nodeHeight)
+		childrenUpdated = childrenUpdated || childRecompactified
+	}
+
+	return node.NewInterimNode(nodeHeight, lChild, rChild), true
+}
+
+// toCompactifiedLeaf generates compactified leaf holding the same register value
+// as leaf, but potentially with a different height.
+// UNSAFE: vertex must be a leaf
+func toCompactifiedLeaf(leaf *node.Node, newHeight int) (*node.Node, bool) {
+	if leaf == nil || leaf.Payload().IsEmpty() {
+		return nil, false
+	}
+	oldHeight := leaf.Height()
+	if oldHeight == newHeight {
+		return leaf, false
+	}
+
+	// note: leaf.Path() is guaranteed to return a non-nil path for a leaf. Otherwise, this implementation panics.
+	path := leaf.Path()
+	if newHeight < oldHeight {
+		return node.NewLeaf(*path, leaf.Payload(), newHeight), true
+	}
+
+	// we only reach the following code, if newHeight > oldHeight
+	newHash := leaf.Hash()
+	for h := oldHeight + 1; h <= newHeight; h++ { // then, we hash our way upwards towards the root until we hit the specified nodeHeight
+		// h is the height of the node, whose hash we are computing in this iteration.
+		// The hash is computed from the node's children at height h-1.
+		bit := bitutils.Bit(path[:], ledger.NodeMaxHeight-h)
+		if bit == 1 { // right branching
+			newHash = hash.HashInterNode(ledger.GetDefaultHashForHeight(h-1), newHash)
+		} else { // left branching
+			newHash = hash.HashInterNode(newHash, ledger.GetDefaultHashForHeight(h-1))
+		}
+	}
+
+	return node.NewNode(
+		newHeight,
+		nil,
+		nil,
+		*path,
+		leaf.Payload(),
+		newHash,
+		0,
+		1,
+	), true
 }
 
 // UnsafeProofs provides proofs for the given paths.

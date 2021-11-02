@@ -321,7 +321,6 @@ func (l *Ledger) ExportCheckpointAt(
 	}
 
 	emptyTrie := trie.NewEmptyMTrie()
-
 	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)

@@ -205,7 +205,7 @@ func (p *Payload) Size() int {
 
 // IsEmpty returns true if key or value is not empty
 func (p *Payload) IsEmpty() bool {
-	return p.Size() == 0
+	return p == nil || len(p.Value) == 0
 }
 
 // TODO fix me
