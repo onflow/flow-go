@@ -350,23 +350,6 @@ func (h *Handler) ExecuteScriptAtBlockID(
 	}, nil
 }
 
-// GetRegisterAtBlockID gets a register value at a specific block ID.
-func (h *Handler) GetRegisterAtBlockID(
-	ctx context.Context,
-	req *access.GetRegisterAtBlockIDRequest,
-) (*access.GetRegisterAtBlockIDResponse, error) {
-	blockID := convert.MessageToIdentifier(req.GetBlockId())
-
-	value, err := h.api.GetRegisterAtBlockID(ctx, req.GetRegisterOwner(), req.GetRegisterController(), req.GetRegisterKey(), blockID)
-	if err != nil {
-		return nil, err
-	}
-
-	return &access.GetRegisterAtBlockIDResponse{
-		Value: value,
-	}, nil
-}
-
 // GetEventsForHeightRange returns events matching a query.
 func (h *Handler) GetEventsForHeightRange(
 	ctx context.Context,

@@ -45,15 +45,15 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/atree v0.1.0-beta1.0.20211004182016-e18ec57f5888
-	github.com/onflow/cadence v0.20.0-beta8.0.20211004204216-1566e18e1291
+	github.com/onflow/atree v0.1.0-beta1.0.20211008214020-61661a17afed
+	github.com/onflow/cadence v0.20.0-beta8.0.20211008215159-65b39a750a8c
 	github.com/onflow/cadence/v19 v19.0.0-00010101000000-000000000000
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.21.3
-	github.com/onflow/flow/protobuf/go/flow v0.2.3-0.20211007062332-279075f29e2c // TODO (ramtin) fix me to a proper tag
+	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pkg/errors v0.9.1

@@ -835,6 +835,27 @@ func (as *AggregatorSuite) TestNonePruneAfterBlock() {
 	require.Equal(as.T(), 3, votingStatusLen)
 }
 
+// receive the block for view 2,3,4,5
+// prune by view 5, should be all pruned
+func (as *AggregatorSuite) TestPruneAll() {
+	pruneView := uint64(5)
+	for i := 2; i <= 5; i++ {
+		view := uint64(i)
+		bp := newMockBlock(as, view, as.participants[i].NodeID)
+		as.aggregator.StoreProposerVote(bp.ProposerVote())
+	}
+
+	require.Len(as.T(), as.aggregator.proposerVotes, 4)
+
+	as.aggregator.PruneByView(pruneView)
+	// proposerVotes should be all pruned, otherwise, there is memory leak
+	require.Len(as.T(), as.aggregator.proposerVotes, 0)
+	require.Len(as.T(), as.aggregator.blockIDToVotingStatus, 0)
+	require.Len(as.T(), as.aggregator.createdQC, 0)
+	require.Len(as.T(), as.aggregator.viewToVoteID, 0)
+	require.Len(as.T(), as.aggregator.viewToBlockIDSet, 0)
+}
+
 // RANDOM BEACON
 // if there are 7 nodes, it requires 4 votes for random beacon,
 // and receives the block from proposer who has 80% stake,
