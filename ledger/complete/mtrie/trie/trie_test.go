@@ -334,7 +334,7 @@ func Test_Pruning(t *testing.T) {
 	baseTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
 
-	t.Run("leaf update with prunning test", func(t *testing.T) {
+	t.Run("leaf update with pruning test", func(t *testing.T) {
 		trie1, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path1}, []ledger.Payload{*emptyPayload}, false)
 		require.NoError(t, err)
 
@@ -356,7 +356,7 @@ func Test_Pruning(t *testing.T) {
 		require.Equal(t, trie1.MaxDepth()-1, trie1withpruning.MaxDepth())
 	})
 
-	t.Run("leaf update with two level prunning test", func(t *testing.T) {
+	t.Run("leaf update with two level pruning test", func(t *testing.T) {
 		// setting path4 to zero from baseTrie
 		trie2, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, []ledger.Payload{*emptyPayload}, false)
 		require.NoError(t, err)
@@ -406,7 +406,7 @@ func Test_Pruning(t *testing.T) {
 	})
 
 	t.Run("smoke testing trie pruning", func(t *testing.T) {
-		t.Skip("skipping trie prunning smoke testing as its not needed to always run")
+		t.Skip("skipping trie pruning smoke testing as its not needed to always run")
 
 		numberOfSteps := 1000
 		numberOfUpdates := 750

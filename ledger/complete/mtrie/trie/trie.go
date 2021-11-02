@@ -303,8 +303,7 @@ func update(
 	n := node.NewInterimNode(nodeHeight, lChild, rChild)
 
 	if prune {
-		nn, _ := n.Pruned()
-		return nn
+		n, _ = n.Compactify()
 	}
 
 	return n

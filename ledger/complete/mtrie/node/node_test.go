@@ -136,14 +136,11 @@ func Test_VerifyCachedHash(t *testing.T) {
 	require.True(t, n5.VerifyCachedHash())
 }
 
-// TODO update the last test
-func Test_Prunning(t *testing.T) {
+func Test_Compactify(t *testing.T) {
 	// Paths are not acurate in this case which causes the compact value be wrong
 	path0 := utils.PathByUint16(0)             // 0000...
 	path1 := utils.PathByUint16(1<<14 + 1<<13) // 01100...
 	path2 := utils.PathByUint16(1 << 15)       // 1000...
-	// path4 := utils.PathByUint16(1 << 12)       // 000100...
-	// path5 := utils.PathByUint16(1 << 13)       // 001000...
 	payload1 := utils.LightPayload(2, 2)
 	payload2 := utils.LightPayload(2, 4)
 	emptyPayload := &ledger.Payload{}
@@ -155,8 +152,8 @@ func Test_Prunning(t *testing.T) {
 		//   /    \
 		//  n1(p1) n2(p2)
 		//
-		// eventhough n3 is empty it should not be pruned
-		// we avoid empty leaf prunnings for performance reasons
+		// even though n4 is empty, it should not be pruned
+		// we avoid empty-leaf pruning for performance reasons
 		// while keeping it would only add one extra lookup, removing
 		// it requires the whole branch to change to the top
 		n1 := node.NewLeaf(path0, payload1, 254)
@@ -165,8 +162,8 @@ func Test_Prunning(t *testing.T) {
 		n4 := node.NewLeaf(path2, emptyPayload, 255)
 		n5 := node.NewInterimNode(256, n3, n4)
 
-		nn5, pruned := n5.Pruned()
-		require.False(t, pruned)
+		nn5, compactified := n5.Compactify()
+		require.False(t, compactified)
 		require.True(t, nn5.VerifyCachedHash())
 		require.Equal(t, nn5, n5)
 	})
@@ -178,27 +175,27 @@ func Test_Prunning(t *testing.T) {
 		//   /    \
 		//  n1(p1) n2(-)
 		//
-		// n2 is set to nil value
-		// prunning n3 should result in
+		// n2 represents an unallocated/empty register
+		// pruning n3 should result in
 		//
 		//          nn5
 		//       /     \
 		//     nn3(p1)  n4(p2)
-		// and nn5 prunning should result in no change
+		// and nn5 pruning should result in no change
 		n1 := node.NewLeaf(path0, payload1, 254)
 		n2 := node.NewLeaf(path1, emptyPayload, 254)
 		n3 := node.NewInterimNode(255, n1, n2)
 		n4 := node.NewLeaf(path2, payload2, 255)
 		n5 := node.NewInterimNode(256, n3, n4)
 
-		nn3, pruned := n3.Pruned()
-		require.True(t, pruned)
+		nn3, compactified := n3.Compactify()
+		require.True(t, compactified)
 		require.True(t, nn3.VerifyCachedHash())
 		require.Equal(t, nn3.Hash(), n3.Hash())
 		require.Equal(t, nn3.Payload(), payload1)
 
-		_, pruned = n5.Pruned()
-		require.False(t, pruned)
+		_, compactified = n5.Compactify()
+		require.False(t, compactified)
 	})
 
 	t.Run("lowest level left leaf be empty", func(t *testing.T) {
@@ -208,8 +205,8 @@ func Test_Prunning(t *testing.T) {
 		//   /    \
 		//  n1(-) n2(p1)
 		//
-		// n1 is set to nil value
-		// prunning should result in
+		// n1 represents an unallocated/empty register
+		// pruning should result in
 		//          nn5
 		//       /     \
 		//     nn3(p1)  n4(p2)
@@ -220,14 +217,14 @@ func Test_Prunning(t *testing.T) {
 		n5 := node.NewInterimNode(256, n3, n4)
 		require.True(t, n2.VerifyCachedHash())
 
-		nn3, pruned := n3.Pruned()
-		require.True(t, pruned)
+		nn3, compactified := n3.Compactify()
+		require.True(t, compactified)
 		require.True(t, nn3.VerifyCachedHash())
 		require.Equal(t, nn3.Hash(), n3.Hash())
 		require.Equal(t, nn3.Payload(), payload1)
 
-		_, pruned = n5.Pruned()
-		require.False(t, pruned)
+		_, compactified = n5.Compactify()
+		require.False(t, compactified)
 	})
 
 	t.Run("lowest level left and right leaves be empty", func(t *testing.T) {
@@ -237,8 +234,8 @@ func Test_Prunning(t *testing.T) {
 		//   /    \
 		//  n1(-) n2(-)
 		//
-		// n1 and n2 is set to nil value
-		// prunning should result in
+		// n1 and n2 represent unallocated/empty registers
+		// pruning should result in
 		//          nn5 (p1)
 		n1 := node.NewLeaf(path0, emptyPayload, 254)
 		n2 := node.NewLeaf(path1, emptyPayload, 254)
@@ -247,13 +244,13 @@ func Test_Prunning(t *testing.T) {
 		n5 := node.NewInterimNode(256, n3, n4)
 		require.True(t, n2.VerifyCachedHash())
 
-		nn3, pruned := n3.Pruned()
-		require.True(t, pruned)
+		nn3, compactified := n3.Compactify()
+		require.True(t, compactified)
 		require.True(t, nn3.VerifyCachedHash())
 		require.Equal(t, nn3.Hash(), n3.Hash())
 
-		nn5, pruned := n5.Pruned()
-		require.True(t, pruned)
+		nn5, compactified := n5.Compactify()
+		require.True(t, compactified)
 		require.True(t, nn5.VerifyCachedHash())
 		require.Equal(t, nn5.Hash(), n5.Hash())
 		require.Equal(t, nn5.Payload(), payload1)

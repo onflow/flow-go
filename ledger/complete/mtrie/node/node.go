@@ -1,7 +1,6 @@
 package node
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 
@@ -157,10 +156,13 @@ func (n *Node) computeAndStoreHash() {
 	n.hashValue = n.computeHash()
 }
 
-// Pruned would look at the child of a node and if it can be pruned
-// it constructs a new subtrie and return that one instead of n
-// otherwise it would return the node itself if no change is required
-func (n *Node) Pruned() (*Node, bool) {
+// Compactify an expanded leaf into its most concise representation. The
+// compactified representation of a default node is `nil`. For a node that only has a
+// _single_ child that is itself a leaf, this method returns a new, fully compactified leaf.
+// Returns:
+//  * (n, false) if the node cannot be compactified, we return the original node `n`
+//  * (cn, true) if the node can be compactified, where cn is a newly created compactified leaf
+func (n *Node) Compactify() (*Node, bool) {
 	if n.IsLeaf() {
 		return n, false
 	}
@@ -170,10 +172,10 @@ func (n *Node) Pruned() (*Node, bool) {
 	lChildEmpty := true
 	rChildEmpty := true
 	if n.lChild != nil {
-		lChildEmpty = n.lChild.IsADefaultNode()
+		lChildEmpty = n.lChild.IsDefaultNode()
 	}
 	if n.rChild != nil {
-		rChildEmpty = n.rChild.IsADefaultNode()
+		rChildEmpty = n.rChild.IsDefaultNode()
 	}
 	if rChildEmpty && lChildEmpty {
 		// is like a leaf
@@ -203,10 +205,13 @@ func (n *Node) Pruned() (*Node, bool) {
 	return n, false
 }
 
-func (n *Node) IsADefaultNode() bool {
-	// TODO make this optimize by caching if the node is a default node
-	defaultHashValue := ledger.GetDefaultHashForHeight(n.height)
-	return bytes.Equal(n.hashValue[:], defaultHashValue[:])
+func (n *Node) IsDefaultNode() bool {
+	//  TODO make this optimize by caching if the node is a default node
+	if n == nil {
+		return true
+	}
+	return n.hashValue == ledger.GetDefaultHashForHeight(n.height)
+
 }
 
 // computeHash returns the hashValue of the node
