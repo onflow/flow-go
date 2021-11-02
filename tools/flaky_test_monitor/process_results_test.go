@@ -71,9 +71,9 @@ func runProcessTestRun(t *testing.T, jsonExpectedActualFile string) {
 	// these hard coded values simulate a real test run that would obtain these environment variables dynamically
 	// we are simulating this scenario by setting the environment variables explicitly in the test before calling the main processing script which will look for them
 	// these values are uses in testdata/expected/*.json files
-	require.NoError(t, os.Setenv("COMMIT_DATE", "2021-09-21T18:06:25+00:00"))
+	require.NoError(t, os.Setenv("COMMIT_DATE", "2021-09-21T18:06:25-07:00"))
 	require.NoError(t, os.Setenv("COMMIT_SHA", "46baf6c6be29af9c040bc14195e195848598bbae"))
-	require.NoError(t, os.Setenv("JOB_STARTED", "2021-09-21T21:06:25+00:00"))
+	require.NoError(t, os.Setenv("JOB_STARTED", "2021-09-21T21:06:25-07:00"))
 
 	// simulate generating raw "go test -json" output by loading output from saved file
 	resultReader := FileResultReader{

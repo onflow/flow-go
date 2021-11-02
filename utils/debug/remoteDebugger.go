@@ -32,7 +32,7 @@ func NewRemoteDebugger(grpcAddress string,
 			fvm.NewTransactionAccountFrozenChecker(),
 			fvm.NewTransactionSequenceNumberChecker(),
 			fvm.NewTransactionAccountFrozenEnabler(),
-			fvm.NewTransactionInvocator(logger),
+			fvm.NewTransactionInvoker(logger),
 		),
 	)
 
