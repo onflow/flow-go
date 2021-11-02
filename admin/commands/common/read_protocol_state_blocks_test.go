@@ -157,7 +157,7 @@ func (suite *ReadProtocolStateBlocksSuite) TestValidateInvalidBlock() {
 func (suite *ReadProtocolStateBlocksSuite) TestValidateInvalidBlockHeight() {
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
 		Data: map[string]interface{}{
-			"block": float64(0),
+			"block": float64(-1),
 		},
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
