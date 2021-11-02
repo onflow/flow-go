@@ -9,8 +9,6 @@ import (
 
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
-	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -40,20 +38,6 @@ func CreateContractDeploymentTransaction(contractName string, contract string, a
 		SetScript(script).
 		AddAuthorizer(authorizer).
 		AddAuthorizer(chain.ServiceAddress())
-
-	// to synthetically generate event using Cadence code we would need a lot of
-	// copying, so its easier to just hardcode the json string
-	// TODO - extract parts of Cadence to make exporting events easy without interpreter
-
-	interpreterHash := runtime.CodeToHashValue(script)
-	hashElements := interpreterHash.Elements()
-
-	valueStrings := make([]string, len(hashElements))
-
-	for i, value := range hashElements {
-		uint8 := value.(interpreter.UInt8Value)
-		valueStrings[i] = fmt.Sprintf("{\"type\":\"UInt8\",\"value\":\"%d\"}", uint8)
-	}
 
 	return txBody
 }
@@ -189,7 +173,7 @@ func CreateAccountsWithSimpleAddresses(
 		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvoker(zerolog.Nop()),
 		),
 	)
 

@@ -42,6 +42,8 @@ type ComputationManager interface {
 
 var DefaultScriptLogThreshold = 1 * time.Second
 
+const MaxScriptErrorMessageSize = 1000 // 1000 chars
+
 // Manager manages computation and execution
 type Manager struct {
 	log                zerolog.Logger
@@ -164,7 +166,17 @@ func (e *Manager) ExecuteScript(code []byte, arguments [][]byte, blockHeader *fl
 	}
 
 	if script.Err != nil {
-		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), script.Err.Error())
+		scriptErrMsg := script.Err.Error()
+		if len(scriptErrMsg) > MaxScriptErrorMessageSize {
+			split := int(MaxScriptErrorMessageSize/2) - 1
+			var sb strings.Builder
+			sb.WriteString(scriptErrMsg[:split])
+			sb.WriteString(" ... ")
+			sb.WriteString(scriptErrMsg[len(scriptErrMsg)-split:])
+			scriptErrMsg = sb.String()
+		}
+
+		return nil, fmt.Errorf("failed to execute script at block (%s): %s", blockHeader.ID(), scriptErrMsg)
 	}
 
 	encodedValue, err := jsoncdc.Encode(script.Value)
