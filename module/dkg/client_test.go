@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"sort"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -269,7 +270,11 @@ func (s *ClientSuite) startDKGWithParticipants(nodeIDs []flow.Identifier) {
 
 	// sanity check: verify that DKG was started with correct node IDs
 	result := s.executeScript(templates.GenerateGetConsensusNodesScript(s.env), nil)
-	assert.Equal(s.T(), cadence.NewArray(valueNodeIDs), result)
+	resultArray := result.(cadence.Array).Values
+	sort.Slice(valueNodeIDs, func(i, j int) bool { return valueNodeIDs[i].(cadence.String) < valueNodeIDs[j].(cadence.String) })
+	sort.Slice(resultArray, func(i, j int) bool { return resultArray[i].(cadence.String) < resultArray[j].(cadence.String) })
+
+	assert.Equal(s.T(), valueNodeIDs, resultArray)
 }
 
 func (s *ClientSuite) createParticipant(nodeID flow.Identifier, authoriser sdk.Address, signer sdkcrypto.Signer) {

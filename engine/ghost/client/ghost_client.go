@@ -57,9 +57,11 @@ func (c *GhostClient) Send(ctx context.Context, channel network.Channel, event i
 		return fmt.Errorf("could not encode event: %w", err)
 	}
 
-	targets := make([][]byte, len(targetIDs))
-	for i, t := range targetIDs {
-		targets[i] = t[:]
+	var targets [][]byte
+	for _, t := range targetIDs {
+		id := make([]byte, len(t))
+		copy(id, t[:])
+		targets = append(targets, id)
 	}
 
 	req := ghost.SendEventRequest{

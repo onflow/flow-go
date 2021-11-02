@@ -444,7 +444,7 @@ func TestOriginValidation(t *testing.T) {
 		EntityIDs: []flow.Identifier{wanted.ID()},
 	}
 
-	network := &module.Network{}
+	network := &mocknetwork.Network{}
 	network.On("Register", mock.Anything, mock.Anything).Return(nil, nil)
 
 	e, err := New(

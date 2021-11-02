@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -106,24 +107,26 @@ const (
 // Signature is a generic type, regardless of the signature scheme
 type Signature []byte
 
-// InvalidInputsError is an error returned when a crypto API receives invalid inputs.
+// invalidInputsError is an error returned when a crypto API receives invalid inputs.
 // It allows a function caller differentiate unexpected program errors from errors caused by
 // invalid inputs.
-type InvalidInputsError struct {
-	message string
+type invalidInputsError struct {
+	err error
 }
 
-// newInvalidInputsError constructs a new InvalidInputsError
-func newInvalidInputsError(msg string, args ...interface{}) error {
-	return &InvalidInputsError{message: fmt.Sprintf(msg, args...)}
+// invalidInputsErrorf constructs a new invalidInputsError
+func invalidInputsErrorf(msg string, args ...interface{}) error {
+	return &invalidInputsError{
+		err: fmt.Errorf(msg, args...),
+	}
 }
 
-func (e InvalidInputsError) Error() string {
-	return e.message
+func (e invalidInputsError) Error() string {
+	return e.err.Error()
 }
 
-// IsInvalidInputsError checks if the input error is of a InvalidInputsError type
+// IsInvalidInputsError checks if the input error is of a invalidInputsError type
 func IsInvalidInputsError(err error) bool {
-	_, ok := err.(*InvalidInputsError)
-	return ok
+	var target *invalidInputsError
+	return errors.As(err, &target)
 }

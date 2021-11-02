@@ -41,7 +41,7 @@ func TestSafetyCheck(t *testing.T) {
 
 			buffer := &bytes.Buffer{}
 			log := zerolog.New(buffer)
-			txInvocator := fvm.NewTransactionInvocator(log)
+			txInvoker := fvm.NewTransactionInvoker(log)
 
 			vm := fvm.NewVirtualMachine(rt)
 
@@ -89,7 +89,7 @@ func TestSafetyCheck(t *testing.T) {
 				state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 			))
 
-			err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+			err = txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 			require.Error(t, err)
 
 			require.Contains(t, buffer.String(), "programs")
@@ -111,7 +111,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := fvm.NewTransactionInvocator(log)
+		txInvoker := fvm.NewTransactionInvoker(log)
 
 		vm := fvm.NewVirtualMachine(rt)
 
@@ -159,7 +159,7 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err = txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err = txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.Contains(t, buffer.String(), "programs")
@@ -173,7 +173,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := fvm.NewTransactionInvocator(log)
+		txInvoker := fvm.NewTransactionInvoker(log)
 
 		vm := fvm.NewVirtualMachine(rt)
 
@@ -191,7 +191,7 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err := txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -206,7 +206,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		buffer := &bytes.Buffer{}
 		log := zerolog.New(buffer)
-		txInvocator := fvm.NewTransactionInvocator(log)
+		txInvoker := fvm.NewTransactionInvoker(log)
 
 		vm := fvm.NewVirtualMachine(rt)
 
@@ -224,7 +224,7 @@ func TestSafetyCheck(t *testing.T) {
 			state.WithMaxInteractionSizeAllowed(context.MaxStateInteractionSize),
 		))
 
-		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err := txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		require.Error(t, err)
 
 		require.NotContains(t, buffer.String(), "programs")
@@ -244,8 +244,10 @@ func TestSafetyCheck(t *testing.T) {
 								TargetType: sema.AnyType,
 							}, // some dummy error
 							&sema.ImportedProgramError{
-								Err:      &sema.CheckerError{},
-								Location: common.AddressLocation{Address: common.BytesToAddress([]byte{1, 2, 3, 4})},
+								Err: &sema.CheckerError{},
+								Location: common.AddressLocation{
+									Address: common.BytesToAddress([]byte{1, 2, 3, 4}),
+								},
 							},
 						},
 					},
@@ -258,7 +260,7 @@ func TestSafetyCheck(t *testing.T) {
 		}}
 
 		log := zerolog.Nop()
-		txInvocator := fvm.NewTransactionInvocator(log)
+		txInvoker := fvm.NewTransactionInvoker(log)
 
 		vm := fvm.NewVirtualMachine(rt)
 		code := `doesn't matter`
@@ -271,7 +273,7 @@ func TestSafetyCheck(t *testing.T) {
 
 		sth := state.NewStateHolder(state.NewState(view))
 
-		err := txInvocator.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
+		err := txInvoker.Process(vm, &context, proc, sth, programs.NewEmptyPrograms())
 		assert.Error(t, err)
 
 		require.Equal(t, 1, proc.Retried)

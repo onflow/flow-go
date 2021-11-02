@@ -31,6 +31,9 @@ const DefaultMaxCollectionTotalGas = 10_000_000 // 10M
 // DefaultMaxCollectionSize is the default maximum number of transactions allowed inside a collection.
 const DefaultMaxCollectionSize = 100
 
+// DefaultMaxAddressIndex is the default for the maximum address index allowed to be acceptable by collection and acccess nodes.
+const DefaultMaxAddressIndex = 20_000_000
+
 // DefaultValueLogGCFrequency is the default frequency in blocks that we call the
 // badger value log GC. Equivalent to 10 mins for a 1 second block time
 const DefaultValueLogGCFrequency = 10 * 60
