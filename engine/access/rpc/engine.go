@@ -19,7 +19,7 @@ import (
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/access/swagger"
+	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -156,8 +156,8 @@ func New(log zerolog.Logger,
 		log,
 	)
 
-	restAPIHandler := swagger.NewRestAPIHandler(backend, log)
-	restServer := swagger.NewRestAPIServer(restAPIHandler, config.RESTListenAddr)
+	restAPIHandler := rest.NewRestAPIHandler(backend, log)
+	restServer := rest.NewRestAPIServer(restAPIHandler, config.RESTListenAddr)
 
 	eng := &Engine{
 		log:                log,
@@ -347,6 +347,6 @@ func (e *Engine) serveREST() {
 		if errors.Is(err, http.ErrServerClosed) {
 			return
 		}
-		e.log.Fatal().Err(err).Msg("fatal error in REST server")
+		e.log.Error().Err(err).Msg("fatal error in REST server")
 	}
 }

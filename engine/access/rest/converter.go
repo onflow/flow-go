@@ -1,9 +1,9 @@
-package swagger
+package rest
 
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/engine/access/swagger/generated"
+	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"github.com/onflow/flow-go/model/flow"
 )
 

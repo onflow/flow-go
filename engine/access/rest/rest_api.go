@@ -1,4 +1,4 @@
-package swagger
+package rest
 
 import (
 	"net/http"
@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/engine/access/swagger/generated"
+	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -67,6 +67,11 @@ func (restAPI *RestAPIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Reques
 		restAPI.errorResponse(w, r, err)
 	}
 	w.WriteHeader(http.StatusOK)
+}
+
+func (restAPI *RestAPIHandler) NotImplemented(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(http.StatusNotImplemented)
 }
 
 func (restAPI *RestAPIHandler) errorResponse(w http.ResponseWriter, r *http.Request, err error) {

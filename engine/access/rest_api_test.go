@@ -112,7 +112,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		suite.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
 
 		client := suite.restAPIClient()
-		ctx, cancel := context.WithTimeout(context.Background(), time.Hour*5)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
 		blocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, nil)
