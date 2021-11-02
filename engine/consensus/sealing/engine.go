@@ -262,6 +262,8 @@ func (e *Engine) processAvailableMessages() error {
 
 		event, ok := e.pendingIncorporatedResults.Pop()
 		if ok {
+			e.log.Debug().Msg("got new incorporated result")
+
 			err := e.processIncorporatedResult(event.(*flow.IncorporatedResult))
 			if err != nil {
 				return fmt.Errorf("could not process incorporated result: %w", err)
@@ -276,6 +278,8 @@ func (e *Engine) processAvailableMessages() error {
 			msg, ok = e.pendingApprovals.Get()
 		}
 		if ok {
+			e.log.Debug().Msg("got new result approval")
+
 			err := e.onApproval(msg.OriginID, msg.Payload.(*flow.ResultApproval))
 			if err != nil {
 				return fmt.Errorf("could not process result approval: %w", err)

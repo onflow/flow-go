@@ -5,6 +5,7 @@ import (
 	"math/rand"
 	"sync"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"github.com/onflow/flow-go/engine"
@@ -33,6 +34,7 @@ const DefaultEmergencySealingThreshold = 100
 type VerifyingAssignmentCollector struct {
 	AssignmentCollectorBase
 
+	log                    zerolog.Logger
 	lock                   sync.RWMutex
 	collectors             map[flow.Identifier]*ApprovalCollector // collectors is a mapping IncorporatedBlockID -> ApprovalCollector
 	authorizedApprovers    map[flow.Identifier]*flow.Identity     // map of approvers pre-selected at block that is being sealed
@@ -51,6 +53,7 @@ func NewVerifyingAssignmentCollector(collectorBase AssignmentCollectorBase) (*Ve
 
 	return &VerifyingAssignmentCollector{
 		AssignmentCollectorBase: collectorBase,
+		log:                     collectorBase.log.With().Str("component", "verifying_assignment_collector").Logger(),
 		lock:                    sync.RWMutex{},
 		collectors:              make(map[flow.Identifier]*ApprovalCollector),
 		authorizedApprovers:     authorizedApprovers,
@@ -103,6 +106,12 @@ func (ac *VerifyingAssignmentCollector) ProcessingStatus() ProcessingStatus {
 //  * no errors expected during normal operation;
 //    errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *VerifyingAssignmentCollector) ProcessIncorporatedResult(incorporatedResult *flow.IncorporatedResult) error {
+	ac.log.Debug().
+		Str("result_id", incorporatedResult.Result.ID().String()).
+		Str("incorporated_block_id", incorporatedResult.IncorporatedBlockID.String()).
+		Str("block_id", incorporatedResult.Result.BlockID.String()).
+		Msg("processing incorporated result")
+
 	// check that result is the one that this VerifyingAssignmentCollector manages
 	if irID := incorporatedResult.Result.ID(); irID != ac.ResultID() {
 		return fmt.Errorf("this VerifyingAssignmentCollector manages result %x but got %x", ac.ResultID(), irID)
@@ -262,6 +271,11 @@ func (ac *VerifyingAssignmentCollector) validateApproval(approval *flow.ResultAp
 //  * engine.InvalidInputError if the result approval is invalid
 //  * any other errors might be symptoms of bugs or internal state corruption (fatal)
 func (ac *VerifyingAssignmentCollector) ProcessApproval(approval *flow.ResultApproval) error {
+	ac.log.Debug().
+		Str("result_id", approval.Body.ExecutionResultID.String()).
+		Str("verifier_id", approval.Body.ApproverID.String()).
+		Msg("processing result approval")
+
 	// we have this approval cached already, no need to process it again
 	// here we need to use PartialID to have a hash over Attestation + ApproverID
 	// there is no need to use hash over full approval since it contains extra information

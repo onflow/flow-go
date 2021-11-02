@@ -348,7 +348,7 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 	if (dkg == jointFeldman && (r1 > threshold || (n-r1) <= threshold)) ||
 		(dkg == feldmanVSSQual && r1 == 1) { // case of a single leader
 		t.Logf("dkg failed, there are %d disqualified nodes\n", r1)
-		// DKG has failed, check for final errors
+		// DKG failed, check for final errors
 		for i := r1; i < n; i++ {
 			assert.Error(t, processors[i].finalError)
 		}
