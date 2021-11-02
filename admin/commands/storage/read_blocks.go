@@ -27,24 +27,24 @@ type ReadBlocksCommand struct {
 func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*readBlocksRequest)
 	var result []*flow.Block
-	var block *flow.Block
+	var blockID flow.Identifier
 
 	if header, err := getBlockHeader(r.state, data.blocksRequest); err != nil {
 		return nil, fmt.Errorf("failed to get block header: %w", err)
-	} else if block, err = r.blocks.ByID(header.ID()); err != nil {
-		return nil, fmt.Errorf("failed to get block by ID: %w", err)
+	} else {
+		blockID = header.ID()
 	}
 
-	result = append(result, block)
-	firstHeight := block.Header.Height
-
-	for i := uint64(1); i <= firstHeight && i < data.numBlocksToQuery; i++ {
-		var err error
-		block, err = r.blocks.ByID(block.Header.ParentID)
+	for i := uint64(0); i < data.numBlocksToQuery; i++ {
+		block, err := r.blocks.ByID(blockID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get block by ID: %w", err)
 		}
 		result = append(result, block)
+		if block.Header.Height == 0 {
+			break
+		}
+		blockID = block.Header.ParentID
 	}
 
 	return convertToInterfaceList(result)

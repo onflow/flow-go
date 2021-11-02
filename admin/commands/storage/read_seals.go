@@ -48,41 +48,39 @@ type ReadSealsCommand struct {
 
 func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*readSealsRequest)
-	var result []*blockSeals
-	var header *flow.Header
 
-	switch data.requestType {
-	case readSealsRequestByID:
+	if data.requestType == readSealsRequestByID {
 		if seal, err := r.seals.ByID(data.value.(flow.Identifier)); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get seal by ID: %w", err)
 		} else {
 			return convertToMap(seal)
 		}
-	case readSealsRequestByBlock:
-		var err error
-		header, err = getBlockHeader(r.state, data.value.(*blocksRequest))
-		if err != nil {
-			return nil, err
-		}
 	}
 
-	firstHeight := header.Height
+	var result []*blockSeals
+	var br *blocksRequest = data.value.(*blocksRequest)
 
-	for i := uint64(0); i <= firstHeight && i < data.numBlocksToQuery; i++ {
-		index, err := r.index.ByBlockID(header.ID())
+	for i := uint64(0); i < data.numBlocksToQuery; i++ {
+		header, err := getBlockHeader(r.state, br)
 		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve index for block %#v: %w", header.ID(), err)
+			return nil, fmt.Errorf("failed to get block header: %w", err)
 		}
-		lastSeal, err := r.seals.ByBlockID(header.ID())
+		blockID := header.ID()
+
+		index, err := r.index.ByBlockID(blockID)
 		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve last seal for block %#v: %w", header.ID(), err)
+			return nil, fmt.Errorf("failed to retrieve index for block %#v: %w", blockID, err)
+		}
+		lastSeal, err := r.seals.ByBlockID(blockID)
+		if err != nil {
+			return nil, fmt.Errorf("failed to retrieve last seal for block %#v: %w", blockID, err)
 		}
 		lastSealed, err := r.state.AtBlockID(lastSeal.BlockID).Head()
 		if err != nil {
-			return nil, fmt.Errorf("failed to retrieve header for last sealed block at block %#v: %w", header.ID(), err)
+			return nil, fmt.Errorf("failed to retrieve header for last sealed block at block %#v: %w", blockID, err)
 		}
 		bs := &blockSeals{
-			BlockID:     header.ID(),
+			BlockID:     blockID,
 			BlockHeight: header.Height,
 			LastSeal: &sealInfo{
 				BlockID:     lastSeal.BlockID,
@@ -111,9 +109,13 @@ func (r *ReadSealsCommand) Handler(ctx context.Context, req *admin.CommandReques
 
 		result = append(result, bs)
 
-		header, err = r.state.AtBlockID(header.ParentID).Head()
-		if err != nil {
-			return nil, err
+		if header.Height == 0 {
+			break
+		}
+
+		br = &blocksRequest{
+			blocksRequestByID,
+			header.ParentID,
 		}
 	}
 

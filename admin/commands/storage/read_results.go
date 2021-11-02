@@ -35,33 +35,31 @@ type ReadResultsCommand struct {
 func (r *ReadResultsCommand) Handler(ctx context.Context, req *admin.CommandRequest) (interface{}, error) {
 	data := req.ValidatorData.(*readResultsRequest)
 	var results []*flow.ExecutionResult
-	var result *flow.ExecutionResult
-	var header *flow.Header
-	var err error
+	var resultID flow.Identifier
+	n := data.numResultsToQuery
 
 	switch data.requestType {
 	case readResultsRequestByID:
-		if result, err = r.results.ByID(data.value.(flow.Identifier)); err == nil {
-			header, err = getBlockHeader(r.state, &blocksRequest{blocksRequestByID, result.BlockID})
-		}
+		resultID = data.value.(flow.Identifier)
 	case readResultsRequestByBlock:
-		if header, err = getBlockHeader(r.state, data.value.(*blocksRequest)); err == nil {
-			result, err = r.results.ByBlockID(header.ID())
+		if header, err := getBlockHeader(r.state, data.value.(*blocksRequest)); err != nil {
+			return nil, fmt.Errorf("failed to get block header: %w", err)
+		} else if result, err := r.results.ByBlockID(header.ID()); err != nil {
+			return nil, fmt.Errorf("failed to get result by block ID: %w", err)
+		} else {
+			results = append(results, result)
+			resultID = result.PreviousResultID
+			n -= 1
 		}
 	}
 
-	if err != nil {
-		return nil, err
-	}
-
-	results = append(results, result)
-
-	for i := uint64(1); i <= header.Height && i < data.numResultsToQuery; i++ {
-		result, err = r.results.ByID(result.PreviousResultID)
+	for i := uint64(0); i < n && resultID != flow.ZeroID; i++ {
+		result, err := r.results.ByID(resultID)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("failed to get result by ID: %w", err)
 		}
 		results = append(results, result)
+		resultID = result.PreviousResultID
 	}
 
 	return convertToInterfaceList(results)
