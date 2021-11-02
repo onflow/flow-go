@@ -4,7 +4,6 @@ package crypto
 
 import (
 	"crypto/rand"
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,8 +33,8 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 	t.Run("correctness check", func(t *testing.T) {
 		result, err := SPOCKVerifyAgainstData(pk, s, data, kmac)
 		require.NoError(t, err)
-		assert.True(t, result, fmt.Sprintf(
-			"Verification should succeed:\n signature:%s\n message:%s\n private key:%s", s, data, sk))
+		assert.True(t, result,
+			"Verification should succeed:\n signature:%s\n message:%s\n private key:%s", s, data, sk)
 	})
 
 	// test with a different message (unhappy path)
@@ -43,8 +42,8 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 		data[0] ^= 1
 		result, err := SPOCKVerifyAgainstData(pk, s, data, kmac)
 		require.NoError(t, err)
-		assert.False(t, result, fmt.Sprintf(
-			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, data, sk))
+		assert.False(t, result,
+			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, data, sk)
 		data[0] ^= 1
 	})
 
@@ -55,8 +54,8 @@ func TestSPOCKProveVerifyAgainstData(t *testing.T) {
 		require.NoError(t, err)
 		result, err := SPOCKVerifyAgainstData(wrongSk.PublicKey(), s, data, kmac)
 		require.NoError(t, err)
-		assert.False(t, result, fmt.Sprintf(
-			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, data, sk))
+		assert.False(t, result,
+			"Verification should fail:\n signature:%s\n message:%s\n private key:%s", s, data, sk)
 	})
 
 	// test with an invalid key type
@@ -103,9 +102,9 @@ func TestSPOCKProveVerify(t *testing.T) {
 	t.Run("correctness check", func(t *testing.T) {
 		result, err := SPOCKVerify(sk1.PublicKey(), pr1, sk2.PublicKey(), pr2)
 		require.NoError(t, err)
-		assert.True(t, result, fmt.Sprintf(
+		assert.True(t, result,
 			"Verification should succeed:\n proofs:%s\n %s\n private keys:%s\n %s\n data:%x",
-			pr1, pr2, sk1, sk2, data))
+			pr1, pr2, sk1, sk2, data)
 	})
 
 	// test with a different message, verification should fail for proofs
@@ -116,9 +115,9 @@ func TestSPOCKProveVerify(t *testing.T) {
 		require.NoError(t, err)
 		result, err := SPOCKVerify(sk1.PublicKey(), pr1, sk2.PublicKey(), pr2bis)
 		require.NoError(t, err)
-		assert.False(t, result, fmt.Sprintf(
+		assert.False(t, result,
 			"Verification should fail:\n proofs:%s\n %s\n private keys:%s\n %s \n data:%x",
-			pr1, pr2bis, sk1, sk2, data))
+			pr1, pr2bis, sk1, sk2, data)
 		data[0] ^= 1 // restore the data
 	})
 
@@ -130,9 +129,9 @@ func TestSPOCKProveVerify(t *testing.T) {
 		require.NoError(t, err)
 		result, err := SPOCKVerify(sk1.PublicKey(), pr1, sk2bis.PublicKey(), pr2)
 		require.NoError(t, err)
-		assert.False(t, result, fmt.Sprintf(
+		assert.False(t, result,
 			"Verification should succeed:\n proofs:%s\n %s\n private keys:%s\n %s \n data:%s",
-			pr1, pr2, sk1, sk2bis, data))
+			pr1, pr2, sk1, sk2bis, data)
 	})
 
 	// test with an invalid key type
