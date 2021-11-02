@@ -3,20 +3,22 @@ package rest
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
 // NewRestAPIServer returns an HTTP server initialized with the REST API handler
-func NewRestAPIServer(api *RestAPIHandler, listenAddress string) *http.Server {
+func NewRestAPIServer(api *RestAPIHandler, listenAddress string, logger zerolog.Logger) *http.Server {
 
 	router := mux.NewRouter().StrictSlash(true)
 	for _, route := range apiRoutes(api) {
 		var handler http.Handler
 		handler = route.HandlerFunc
-		handler = generated.Logger(handler, route.Name)
+		handler = newHandler(handler, route.Name, logger)
 		router.
 			Methods(route.Method).
 			Path(route.Pattern).
@@ -104,4 +106,34 @@ func apiRoutes(api *RestAPIHandler) generated.Routes {
 			HandlerFunc: api.NotImplemented,
 		},
 	}
+}
+
+// newHandler creates a request handler which adds a logger interceptor to each request to log the request method, uri,
+// duration and response code
+func newHandler(inner http.Handler, name string, logger zerolog.Logger) http.Handler {
+	apiLogger := logger.With().Str("route_name", name).Logger()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		respWrite := newResponseWriter(w)
+		inner.ServeHTTP(respWrite, r)
+		apiLogger.Info().Str("method", r.Method).
+			Str("uri", r.RequestURI).
+			Dur("duration", time.Since(start)).
+			Int("response_code", respWrite.statusCode).Msg("api")
+	})
+}
+
+// responseWriter is a wrapper around http.ResponseWriter and helps capture the response code
+type responseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func newResponseWriter(w http.ResponseWriter) *responseWriter {
+	return &responseWriter{w, http.StatusOK}
+}
+
+func (rw *responseWriter) WriteHeader(code int) {
+	rw.statusCode = code
+	rw.ResponseWriter.WriteHeader(code)
 }

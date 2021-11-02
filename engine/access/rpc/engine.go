@@ -18,8 +18,8 @@ import (
 	"github.com/onflow/flow-go/access"
 	legacyaccess "github.com/onflow/flow-go/access/legacy"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/protocol"
@@ -157,7 +157,7 @@ func New(log zerolog.Logger,
 	)
 
 	restAPIHandler := rest.NewRestAPIHandler(backend, log)
-	restServer := rest.NewRestAPIServer(restAPIHandler, config.RESTListenAddr)
+	restServer := rest.NewRestAPIServer(restAPIHandler, config.RESTListenAddr, log)
 
 	eng := &Engine{
 		log:                log,
