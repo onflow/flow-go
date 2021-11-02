@@ -3,6 +3,7 @@ package execution
 import (
 	"context"
 	"math/rand"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -29,7 +30,9 @@ type ChunkDataPacksSuite struct {
 }
 
 func (gs *ChunkDataPacksSuite) TestVerificationNodesRequestChunkDataPacks() {
-	gs.Suite.T().Skip("flaky test - quarantined")
+	if os.Getenv("TEST_FLAKY") == "" {
+		gs.Suite.T().Skip("flaky test - quarantined")
+	}
 
 	// wait for next height finalized (potentially first height), called blockA
 	blockA := gs.BlockState.WaitForHighestFinalizedProgress(gs.T())
