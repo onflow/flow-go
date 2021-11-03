@@ -17,9 +17,6 @@ type Node interface {
 	// then starts each component. It also sets up a channel to gracefully shut
 	// down each component if a SIGINT is received.
 	Run()
-
-	// ShutdownSignal returns a channel that is closed when shutdown has commenced.
-	ShutdownSignal() <-chan struct{}
 }
 
 type FlowNodeImp struct {
@@ -67,13 +64,4 @@ func (node *FlowNodeImp) Run() {
 	}
 
 	os.Exit(0)
-}
-
-func (node *FlowNodeImp) ShutdownSignal() <-chan struct{} {
-	shutdown := make(chan struct{})
-	go func() {
-		<-node.sig
-		close(shutdown)
-	}()
-	return shutdown
 }
