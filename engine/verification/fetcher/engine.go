@@ -262,6 +262,7 @@ func (e *Engine) HandleChunkDataPack(originID flow.Identifier, response *verific
 	}
 
 	if err != nil {
+		// TODO: byzantine fault
 		lg.Fatal().Err(err).Msg("could not handle chunk data pack")
 		return
 	}
