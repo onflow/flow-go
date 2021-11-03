@@ -5,6 +5,7 @@ package badger_test
 import (
 	"context"
 	"errors"
+	"github.com/onflow/flow-go/storage/badger/operation"
 	"math/rand"
 	"testing"
 	"time"
@@ -311,53 +312,63 @@ func TestSealingSegment(t *testing.T) {
 	// references a ExecutionResult contained in a different block.
 	// the sealing segment should contain any ExecutionResults that were
 	// missing from a blocks payload in the SealingSegment.ExecutionResults field
-	// ROOT -> B1(Receipt_A) -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3 -> B4 -> B5 (Seal_B1)
-	// Expected sealing segment: SealingSegment{Blocks[B1, B2, B3, B4, B5] ExecutionResults[Result_A]}
+	// ROOT -> B1(Rec_1) -> B2[Res_1, Rec_2, Res_2] -> B3(Rec_3, Res_3, Seal_B1) -> B4 -> B5(Rec_4, Res_4, Seal_B4)
 	t.Run("sealing segment decoupled execution results and receipts", func(t *testing.T) {
-		block1 := unittest.BlockWithParentFixture(head)
-		receipt1 := unittest.ReceiptForBlockFixture(&block1)
-		util.RunWithFollowerProtocolStateAndResults(t, rootSnapshot, []*flow.ExecutionResult{&receipt1.ExecutionResult}, func(db *badger.DB, state *bprotocol.FollowerState) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			require.NoError(t, err)
 			// simulate scenario where execution result is missing from block payload
 			// SealingSegment() should get result from results db and store it on ExecutionReceipts
 			// field on SealingSegment
-			block1.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(receipt1)))
+			block1 := unittest.BlockWithParentFixture(head)
+			receipt1 := unittest.ReceiptForBlockFixture(&block1)
 
+			// insert result from receipt1
+			err := db.Update(func(txn *badger.Txn) error {
+				err := db.Update(operation.InsertExecutionResult(&receipt1.ExecutionResult))
+				require.NoError(t, err)
+				return nil
+			})
+
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(receipt1)))
 			err = state.Extend(context.Background(), &block1)
 
+			// block2 contains result1 referenced in receipt1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
+			receipt2 := unittest.ReceiptForBlockFixture(&block2)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithExecutionResults(&receipt1.ExecutionResult), unittest.WithReceipts(receipt2)))
 			err = state.Extend(context.Background(), &block2)
 			require.NoError(t, err)
 
+			// build the block sealing block 1
 			block3 := unittest.BlockWithParentFixture(block2.Header)
+			receipt3, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt3), unittest.WithSeals(seal1)))
 			err = state.Extend(context.Background(), &block3)
 			require.NoError(t, err)
 
 			block4 := unittest.BlockWithParentFixture(block3.Header)
-			receipt2, seal2 := unittest.ReceiptAndSealForBlock(&block2)
-			block4.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal2)))
 			err = state.Extend(context.Background(), &block4)
 			require.NoError(t, err)
 
-			// build the block sealing block 1
 			block5 := unittest.BlockWithParentFixture(block4.Header)
-			receipt3, seal1 := unittest.ReceiptAndSealForBlock(&block1)
-			block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt3), unittest.WithSeals(seal1)))
+			receipt4, seal4 := unittest.ReceiptAndSealForBlock(&block4)
+			block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt4), unittest.WithSeals(seal4)))
 			err = state.Extend(context.Background(), &block5)
 			require.NoError(t, err)
 
-			segment, err := state.AtBlockID(block5.ID()).SealingSegment()
+			segment, err := state.AtBlockID(block3.ID()).SealingSegment()
 			require.NoError(t, err)
 
-			assert.Len(t, segment.Blocks, 5)
+			assert.Len(t, segment.Blocks, 3)
 
 			_, found := segment.ExecutionResults.Lookup()[receipt1.Meta().ResultID]
 			assert.True(t, found)
 
 			// no blocks in this segment have missing execution results
-			segment, err = state.AtBlockID(block4.ID()).SealingSegment()
+			segment, err = state.AtBlockID(block5.ID()).SealingSegment()
 			require.NoError(t, err)
 
-			assert.Len(t, segment.Blocks, 3)
+			assert.Len(t, segment.Blocks, 2)
 			assert.Len(t, segment.ExecutionResults, 0, "expected none of the blocks to have missing results, ExecutionResults should be empty")
 		})
 	})
