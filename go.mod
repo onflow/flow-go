@@ -62,7 +62,7 @@ require (
 	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pelletier/go-toml v1.9.4 // indirect
-	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
+	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
