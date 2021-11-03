@@ -973,7 +973,8 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 			return setup, receipt, seal
 		}
 
-		t.Run("wrong counter", func(t *testing.T) {
+		// expect a setup event with wrong counter to trigger EECC without error
+		t.Run("wrong counter (EECC)", func(t *testing.T) {
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.Counter = epoch1Setup.Counter
 			})
@@ -982,10 +983,11 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), &qcBlock)
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, db)
 		})
 
+		// expect a setup event with wrong final view to trigger EECC without error
 		t.Run("invalid final view", func(t *testing.T) {
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.FinalView = block1.Header.View
@@ -995,10 +997,11 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), &qcBlock)
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, db)
 		})
 
+		// expect a setup event with empty seed to trigger EECC without error
 		t.Run("empty seed", func(t *testing.T) {
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.RandomSource = nil
@@ -1008,8 +1011,8 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), &qcBlock)
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, db)
 		})
 	})
 }
@@ -1086,6 +1089,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		err = state.Extend(context.Background(), &block3)
 		require.NoError(t, err)
 
+		// expect a commit event with wrong counter to trigger EECC without error
 		t.Run("inconsistent counter", func(t *testing.T) {
 			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
 				commit.Counter = epoch2Setup.Counter + 1
@@ -1095,10 +1099,11 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), &qcBlock)
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, db)
 		})
 
+		// expect a commit event with wrong cluster QCs to trigger EECC without error
 		t.Run("inconsistent cluster QCs", func(t *testing.T) {
 			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
 				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateFixture()))
@@ -1108,10 +1113,11 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), &qcBlock)
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, db)
 		})
 
+		// expect a commit event with wrong dkg participants to trigger EECC without error
 		t.Run("inconsistent DKG participants", func(t *testing.T) {
 			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
 				// add an extra dkg key
@@ -1122,8 +1128,8 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), &qcBlock)
-			require.Error(t, err)
-			require.True(t, st.IsInvalidExtensionError(err), err)
+			require.NoError(t, err)
+			assertEpochEmergencyFallbackTriggered(t, db)
 		})
 	})
 }
@@ -1688,4 +1694,11 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 		assert.Error(t, err, "a proposal with invalid timestamp has to be rejected")
 		assert.True(t, st.IsInvalidExtensionError(err), "if timestamp is invalid it should return invalid block error")
 	})
+}
+
+func assertEpochEmergencyFallbackTriggered(t *testing.T, db *badger.DB) {
+	var triggered bool
+	err := db.View(operation.RetrieveEpochEmergencyFallbackTriggered(&triggered))
+	require.NoError(t, err)
+	assert.True(t, triggered)
 }
