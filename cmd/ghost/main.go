@@ -7,7 +7,6 @@ import (
 	"github.com/onflow/flow-go/engine/ghost/engine"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/validator"
 )
@@ -27,7 +26,7 @@ func main() {
 	}
 
 	nodeBuilder.
-		Module("message validators", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("message validators", func(node *cmd.NodeConfig) error {
 			validators := []network.MessageValidator{
 				// filter out messages sent by this node itself
 				validator.ValidateNotSender(node.Me.NodeID()),
@@ -36,7 +35,7 @@ func main() {
 			node.MsgValidators = validators
 			return nil
 		}).
-		Component("RPC engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("RPC engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			rpcEng, err := engine.New(node.Network, node.Logger, node.Me, node.State, rpcConf)
 			return rpcEng, err
 		}).
