@@ -749,7 +749,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 			return nil, fmt.Errorf("internal error constructing EECC from parent's epoch status: %w", err)
 		}
 		ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), parentStatus.Copy()))
-		ops = append(ops, transaction.WithTx(operation.InsertEpochEmergencyFallbackTriggered()))
+		ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered()))
 		// TODO set metric for the above
 		return ops, nil
 	} else if err != nil {
@@ -790,7 +790,7 @@ SealLoop:
 				if protocol.IsInvalidServiceEventError(err) {
 					// EECC - we have observed an invalid service event, which is
 					// an unrecoverable failure. Flag this in the DB and exit
-					ops = append(ops, transaction.WithTx(operation.InsertEpochEmergencyFallbackTriggered()))
+					ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered()))
 					break SealLoop
 				}
 
@@ -811,7 +811,7 @@ SealLoop:
 				if protocol.IsInvalidServiceEventError(err) {
 					// EECC - we have observed an invalid service event, which is
 					// an unrecoverable failure. Flag this in the DB and exit
-					ops = append(ops, transaction.WithTx(operation.InsertEpochEmergencyFallbackTriggered()))
+					ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered()))
 					break SealLoop
 				}
 
@@ -835,7 +835,7 @@ SealLoop:
 
 func (m *FollowerState) isEpochEmergencyFallbackTriggered() (bool, error) {
 	var triggered bool
-	err := m.db.View(operation.RetrieveEpochEmergencyFallbackTriggered(&triggered))
+	err := m.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
 	return triggered, err
 }
 

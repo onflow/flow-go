@@ -1698,7 +1698,7 @@ func TestHeaderInvalidTimestamp(t *testing.T) {
 
 func assertEpochEmergencyFallbackTriggered(t *testing.T, db *badger.DB) {
 	var triggered bool
-	err := db.View(operation.RetrieveEpochEmergencyFallbackTriggered(&triggered))
+	err := db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
 	require.NoError(t, err)
 	assert.True(t, triggered)
 }
