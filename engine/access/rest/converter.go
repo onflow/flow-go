@@ -28,20 +28,20 @@ func toBlockHeader(flowHeader *flow.Header) *generated.BlockHeader {
 
 func toBlockPayload(flowPayload *flow.Payload) *generated.BlockPayload {
 	return &generated.BlockPayload{
-		CollectionGuarantees: collectionGuarantees(flowPayload.Guarantees),
+		CollectionGuarantees: toCollectionGuarantees(flowPayload.Guarantees),
 		BlockSeals:           blockSeals(flowPayload.Seals),
 	}
 }
 
-func collectionGuarantees(flowCollGuarantee []*flow.CollectionGuarantee) []generated.CollectionGuarantee {
+func toCollectionGuarantees(flowCollGuarantee []*flow.CollectionGuarantee) []generated.CollectionGuarantee {
 	collectionGuarantees := make([]generated.CollectionGuarantee, len(flowCollGuarantee))
 	for i, flowCollGuarantee := range flowCollGuarantee {
-		collectionGuarantees[i] = collectionGuarantee(flowCollGuarantee)
+		collectionGuarantees[i] = toCollectionGuarantee(flowCollGuarantee)
 	}
 	return collectionGuarantees
 }
 
-func collectionGuarantee(flowCollGuarantee *flow.CollectionGuarantee) generated.CollectionGuarantee {
+func toCollectionGuarantee(flowCollGuarantee *flow.CollectionGuarantee) generated.CollectionGuarantee {
 	signerIDs := make([]string, len(flowCollGuarantee.SignerIDs))
 	for i, signerID := range flowCollGuarantee.SignerIDs {
 		signerIDs[i] = signerID.String()
