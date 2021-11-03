@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"encoding/base64"
 	"fmt"
 
 	"github.com/onflow/flow-go/engine/access/rest/generated"
@@ -49,7 +50,7 @@ func toCollectionGuarantee(flowCollGuarantee *flow.CollectionGuarantee) generate
 	return generated.CollectionGuarantee{
 		CollectionId: flowCollGuarantee.CollectionID.String(),
 		SignerIds:    signerIDs,
-		Signature:    flowCollGuarantee.Signature.String(),
+		Signature:    base64.StdEncoding.EncodeToString(flowCollGuarantee.Signature.Bytes()),
 	}
 }
 

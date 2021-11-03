@@ -108,8 +108,11 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 
 	suite.Run("happy path - REST client successfully executed the GetBlockByID request", func() {
 
-		block := unittest.BlockFixture()
-		suite.blocks.On("ByID", block.ID()).Return(&block, nil).Once()
+		collections := unittest.CollectionListFixture(1)
+		block := unittest.BlockWithGuaranteesFixture(
+			unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+		)
+		suite.blocks.On("ByID", block.ID()).Return(block, nil).Once()
 
 		client := suite.restAPIClient()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
