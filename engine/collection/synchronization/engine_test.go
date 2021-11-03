@@ -475,5 +475,4 @@ func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
 		require.Error(ss.T(), err)
 		require.True(ss.T(), engine.IsIncompatibleInputTypeError(err))
 	}
-
 }

@@ -234,7 +234,6 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
-		// since we have checked type it's safe to assume we are processing local event
 		return e.requestHandler.process(originID, event)
 	case *messages.SyncResponse, *messages.ClusterBlockResponse:
 		return e.responseMessageHandler.Process(originID, event)
