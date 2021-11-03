@@ -172,7 +172,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	m.Log.Info().Msg("Re-encoding converted values...")
 	m.incrementProgress()
 
-	err := m.storage.Commit()
+	err := m.storage.Commit(m.newInter, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate payloads: %w", err)
 	}

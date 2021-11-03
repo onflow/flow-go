@@ -11,7 +11,6 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/onflow/cadence/runtime"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
@@ -109,7 +108,6 @@ func main() {
 		blockDataUploaders            []uploader.Uploader
 		blockDataUploaderMaxRetry     uint64 = 5
 		blockdataUploaderRetryTimeout        = 1 * time.Second
-		atreeValidationEnabled        bool
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -140,7 +138,6 @@ func main() {
 			flags.BoolVar(&pauseExecution, "pause-execution", false, "pause the execution. when set to true, no block will be executed, but still be able to serve queries")
 			flags.BoolVar(&enableBlockDataUpload, "enable-blockdata-upload", false, "enable uploading block data to Cloud Bucket")
 			flags.StringVar(&gcpBucketName, "gcp-bucket-name", "", "GCP Bucket name for block data uploader")
-			flags.BoolVar(&atreeValidationEnabled, "atree-validation", false, "validates all atree values after mutations")
 			flags.StringVar(&s3BucketName, "s3-bucket-name", "", "S3 Bucket name for block data uploader")
 		}).
 		ValidateFlags(func() error {
@@ -326,9 +323,7 @@ func main() {
 
 			extralog.ExtraLogDumpPath = extraLogPath
 
-			rt := fvm.NewInterpreterRuntime(
-				runtime.WithAtreeValidationEnabled(atreeValidationEnabled),
-			)
+			rt := fvm.NewInterpreterRuntime()
 
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
@@ -564,7 +559,7 @@ func main() {
 			return syncEngine, nil
 		}).
 		Component("grpc server", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, events, results, txResults, node.RootChainID)
+			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, node.Storage.Headers, node.State, events, results, txResults, node.RootChainID)
 			return rpcEng, nil
 		}).Run()
 }

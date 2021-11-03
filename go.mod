@@ -45,22 +45,22 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/atree v0.1.0-beta1.0.20211008214020-61661a17afed
-	github.com/onflow/cadence v0.20.0-beta8.0.20211008215159-65b39a750a8c
+	github.com/onflow/atree v0.1.0-beta1.0.20211027184039-559ee654ece9
+	github.com/onflow/cadence v0.20.0-beta10
 	github.com/onflow/cadence/v19 v19.0.0-00010101000000-000000000000
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
-	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
+	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.7
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.21.3
-	github.com/onflow/flow/protobuf/go/flow v0.2.2
+	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/rs/zerolog v1.19.0
-	github.com/schollz/progressbar/v3 v3.7.6
+	github.com/schollz/progressbar/v3 v3.8.3
 	github.com/sethvargo/go-retry v0.1.0
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.2.1
@@ -72,10 +72,10 @@ require (
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.7.0
-	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
+	go.uber.org/multierr v1.6.0
+	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210910150752-751e447fb3d0 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.49.0
@@ -93,3 +93,5 @@ replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 replace github.com/onflow/flow-go/crypto => ./crypto
 
 replace github.com/onflow/cadence/v19 => github.com/onflow/cadence v0.19.0
+
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.20.0-beta10-patch.1

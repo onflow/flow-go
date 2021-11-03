@@ -21,10 +21,11 @@ import (
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/lifecycle"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/observable"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -134,7 +135,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 		node := libP2PNodes[i]
 
 		// libp2p node factory for this instance of middleware
-		factory := func() (*p2p.Node, error) {
+		factory := func(ctx context.Context) (*p2p.Node, error) {
 			return node, nil
 		}
 
@@ -151,9 +152,6 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			p2p.DefaultUnicastTimeout,
 			enablePeerManagementAndConnectionGating,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
-			p2p.WithIdentifierProvider(
-				idProviders[i],
-			),
 			p2p.WithPeerManager(peerManagerFactory),
 		)
 	}
@@ -168,7 +166,7 @@ func GenerateNetworks(t *testing.T,
 	csize int,
 	tops []network.Topology,
 	sms []network.SubscriptionManager,
-	dryRunMode bool) []*p2p.Network {
+	dryRunMode bool) ([]*p2p.Network, context.CancelFunc) {
 	count := len(ids)
 	nets := make([]*p2p.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -201,7 +199,7 @@ func GenerateNetworks(t *testing.T,
 			log,
 			cbor.NewCodec(),
 			me,
-			mws[i],
+			func() (network.Middleware, error) { return mws[i], nil },
 			csize,
 			tops[i],
 			sms[i],
@@ -213,13 +211,26 @@ func GenerateNetworks(t *testing.T,
 		nets = append(nets, net)
 	}
 
+	ctx, cancel := context.WithCancel(context.Background())
+	netCtx, errChan := irrecoverable.WithSignaler(ctx)
+
 	// if dryrun then don't actually start the network
 	if !dryRunMode {
+		go func() {
+			select {
+			case err := <-errChan:
+				t.Error("networks encountered fatal error", err)
+			case <-ctx.Done():
+				return
+			}
+		}()
+
 		for _, net := range nets {
+			net.Start(netCtx)
 			<-net.Ready()
 		}
 	}
-	return nets
+	return nets, cancel
 }
 
 // GenerateIDsAndMiddlewares returns nodeIDs, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
@@ -238,12 +249,12 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []network.Topology,
-	dryRun bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network, []observable.Observable) {
+	dryRun bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network, []observable.Observable, context.CancelFunc) {
 
 	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, dryRun, log, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
-	return ids, mws, networks, observables
+	networks, netCancel := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
+	return ids, mws, networks, observables, netCancel
 }
 
 // GenerateEngines generates MeshEngines for the given networks
@@ -272,7 +283,7 @@ func generateLibP2PNode(t *testing.T,
 	pingInfoProvider.On("SoftwareVersion").Return("test")
 	pingInfoProvider.On("SealedBlockHeight").Return(uint64(1000))
 
-	ctx := context.Background()
+	ctx := context.TODO()
 	var connGater *p2p.ConnGater = nil
 	if connGating {
 		connGater = p2p.NewConnGater(logger)
@@ -291,6 +302,7 @@ func generateLibP2PNode(t *testing.T,
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
 		SetLogger(logger).
+		SetStreamCompressor(p2p.WithGzipCompression).
 		Build(ctx)
 	require.NoError(t, err)
 
@@ -342,13 +354,14 @@ func GenerateSubscriptionManagers(t *testing.T, mws []*p2p.Middleware) []network
 // stopNetworks stops network instances in parallel and fails the test if they could not be stopped within the
 // duration.
 func stopNetworks(t *testing.T, nets []*p2p.Network, duration time.Duration) {
+
 	// casts nets instances into ReadyDoneAware components
 	comps := make([]module.ReadyDoneAware, 0, len(nets))
 	for _, net := range nets {
 		comps = append(comps, net)
 	}
 
-	unittest.RequireCloseBefore(t, lifecycle.AllDone(comps...), duration,
+	unittest.RequireCloseBefore(t, util.AllDone(comps...), duration,
 		"could not stop the networks")
 }
 
