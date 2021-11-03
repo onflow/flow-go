@@ -164,7 +164,9 @@ func (s *Suite) TestEpochJoin() {
 
 		currentPhase, err := snapshot.Phase()
 		require.NoError(s.T(), err)
-		if currentPhase == flow.EpochPhaseSetup {
+		_, err = snapshot.Identity(info.NodeID)
+
+		if currentPhase == flow.EpochPhaseSetup && err == nil {
 			break
 		}
 
