@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v2
         with:
           fetch-depth: 2
-      - uses: actions/setup-go@v1
+      - uses: actions/setup-go@v2
       - name: Build relic
         run: make crypto/relic/build
       # Run benchmark with `go test -bench` and stores the output to a file
