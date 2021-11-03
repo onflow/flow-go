@@ -530,9 +530,21 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return fmt.Errorf("could not get parent (id=%x): %w", header.ParentID, err)
 	}
 
+	// EECC - check whether the epoch emergency fallback flag has been set
+	// in the database. If so, skip updating any epoch-related metrics.
+	epochFallbackTriggered, err := m.isEpochEmergencyFallbackTriggered()
+	if err != nil {
+		return fmt.Errorf("could not check epoch emergency fallback flag: %w", err)
+	}
+
 	// track service event driven metrics and protocol events that should be emitted
 	var events []func()
 	for _, seal := range parent.Payload.Seals {
+		// skip updating epoch-related metrics if EECC is triggered
+		if epochFallbackTriggered {
+			break
+		}
+
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
 			return fmt.Errorf("could not retrieve result (id=%x) for seal (id=%x): %w", seal.ResultID, seal.ID(), err)
@@ -573,31 +585,21 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		return fmt.Errorf("could not get parent epoch final view: %w", err)
 	}
 
-	if header.View > parentEpochFinalView {
-		// TMP: EMERGENCY EPOCH CHAIN CONTINUATION [EECC]
-		//
-		// If we have triggered emergency chain continuation as a result of a
-		// failed epoch, these events would be emitted for every block. Instead,
-		// we will skip them.
-		//
-		// We detect EECC here by checking for two blocks spanning what should
-		// be an epoch transition having the same epoch counter. This indicates
-		// that the last epoch was continued past its specified end time.
-		parentCounter, err := parentBlocksEpoch.Counter()
-		if err != nil {
-			return fmt.Errorf("could not check parent counter to skip events in fallback epoch: %w", err)
-		}
-		if parentCounter != currentEpochSetup.Counter {
-			events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
+	// When this block's view exceeds the parent epoch's final view, this block
+	// represents the first block of the next epoch. Therefore we update metrics
+	// related to the epoch transition here.
+	//
+	// We skip updating these metrics when EECC has been triggered
+	if header.View > parentEpochFinalView && !epochFallbackTriggered {
+		events = append(events, func() { m.consumer.EpochTransition(currentEpochSetup.Counter, header) })
 
-			// set current epoch counter corresponding to new epoch
-			events = append(events, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
-			// set epoch phase - since we are starting a new epoch we begin in the staking phase
-			events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
-		}
+		// set current epoch counter corresponding to new epoch
+		events = append(events, func() { m.metrics.CurrentEpochCounter(currentEpochSetup.Counter) })
+		// set epoch phase - since we are starting a new epoch we begin in the staking phase
+		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
 	}
 
-	// FIFTH: Persist updates in data base
+	// FIFTH: Persist updates in database
 	// * Add this block to the height-indexed set of finalized blocks.
 	// * Update the largest finalized height to this block's height.
 	// * Update the largest height of sealed and finalized block.
@@ -829,6 +831,12 @@ SealLoop:
 	ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), epochStatus))
 
 	return ops, nil
+}
+
+func (m *FollowerState) isEpochEmergencyFallbackTriggered() (bool, error) {
+	var triggered bool
+	err := m.db.View(operation.RetrieveEpochEmergencyFallbackTriggered(&triggered))
+	return triggered, err
 }
 
 // MarkValid marks the block as valid in protocol state, and triggers
