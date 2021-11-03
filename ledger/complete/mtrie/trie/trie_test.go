@@ -479,7 +479,6 @@ func Test_Pruning(t *testing.T) {
 
 		}
 		require.Greater(t, activeTrie.MaxDepth(), activeTrieWithPruning.MaxDepth())
-		t.Fatal("XXXX")
 	})
 }
 
