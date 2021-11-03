@@ -361,7 +361,7 @@ func Test_Pruning(t *testing.T) {
 		trie2, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, []ledger.Payload{*emptyPayload}, false)
 		require.NoError(t, err)
 
-		// this should not prune anything (non leaf example)
+		// pruning is not activated here because n3 is not a leaf node
 		trie2withpruning, err := trie.NewTrieWithUpdatedRegisters(baseTrie, []ledger.Path{path4}, []ledger.Payload{*emptyPayload}, true)
 		require.NoError(t, err)
 		require.True(t, trie2withpruning.RootNode().VerifyCachedHash())
