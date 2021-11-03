@@ -88,7 +88,7 @@ func New(
 	componentManagerBuilder := component.NewComponentManagerBuilder()
 
 	for i := 0; i < defaultIngestionEngineWorkers; i++ {
-		componentManagerBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		componentManagerBuilder.AddWorker("main", func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 			ready()
 			err := e.loop(ctx)
 			if err != nil {

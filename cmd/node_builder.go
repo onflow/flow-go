@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
@@ -58,7 +57,7 @@ type NodeBuilder interface {
 	EnqueueTracer()
 
 	// Module enables setting up dependencies of the engine with the builder context
-	Module(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig) error) NodeBuilder
+	Module(name string, f BuilderFunc) NodeBuilder
 
 	// Component adds a new component to the node that conforms to the ReadyDoneAware
 	// interface, and throws a Fatal() when an irrecoverable error is encountered
@@ -68,7 +67,7 @@ type NodeBuilder interface {
 	// When the node is run, this component will be started with `Ready`. When the
 	// node is stopped, we will wait for the component to exit gracefully with
 	// `Done`.
-	Component(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error)) NodeBuilder
+	Component(name string, f ComponentBuilderFunc) NodeBuilder
 
 	// BackgroundComponent adds a new component to the node that conforms to the ReadyDoneAware
 	// interface, and calls the provided error handler when an irrecoverable error is encountered.
@@ -76,7 +75,7 @@ type NodeBuilder interface {
 	// can/should be independently restarted when an irrecoverable error is encountered.
 	//
 	// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-	BackgroundComponent(name string, f func(ctx irrecoverable.SignalerContext, node *NodeConfig, lookup component.LookupFunc) (component.Component, error), errHandler func(err error) component.ErrorHandlingResult) NodeBuilder
+	BackgroundComponent(name string, f BackgroundComponentBuilderFunc, errHandler component.OnError) NodeBuilder
 
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder
@@ -97,12 +96,12 @@ type NodeBuilder interface {
 
 	// PreInit registers a new PreInit function.
 	// PreInit functions run before the protocol state is initialized or any other modules or components are initialized
-	PreInit(f func(ctx irrecoverable.SignalerContext, node *NodeConfig)) NodeBuilder
+	PreInit(f BuilderFunc) NodeBuilder
 
 	// PostInit registers a new PreInit function.
 	// PostInit functions run after the protocol state has been initialized but before any other modules or components
 	// are initialized
-	PostInit(f func(ctx irrecoverable.SignalerContext, node *NodeConfig)) NodeBuilder
+	PostInit(f BuilderFunc) NodeBuilder
 
 	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics() error

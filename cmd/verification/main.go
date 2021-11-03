@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/module/chunks"
 	"github.com/onflow/flow-go/module/component"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -99,7 +98,7 @@ func main() {
 	}
 
 	nodeBuilder.
-		Module("mutable follower state", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -116,11 +115,11 @@ func main() {
 			)
 			return err
 		}).
-		Module("verification metrics", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("verification metrics", func(node *cmd.NodeConfig) error {
 			collector = metrics.NewVerificationCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		Module("chunk status memory pool", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("chunk status memory pool", func(node *cmd.NodeConfig) error {
 			chunkStatuses = stdmap.NewChunkStatuses(chunkLimit)
 			err = node.Metrics.Mempool.Register(metrics.ResourceChunkStatus, chunkStatuses.Size)
 			if err != nil {
@@ -128,7 +127,7 @@ func main() {
 			}
 			return nil
 		}).
-		Module("chunk requests memory pool", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("chunk requests memory pool", func(node *cmd.NodeConfig) error {
 			chunkRequests = stdmap.NewChunkRequests(chunkLimit)
 			err = node.Metrics.Mempool.Register(metrics.ResourceChunkRequest, chunkRequests.Size)
 			if err != nil {
@@ -136,15 +135,15 @@ func main() {
 			}
 			return nil
 		}).
-		Module("processed chunk index consumer progress", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("processed chunk index consumer progress", func(node *cmd.NodeConfig) error {
 			processedChunkIndex = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
 			return nil
 		}).
-		Module("processed block height consumer progress", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("processed block height consumer progress", func(node *cmd.NodeConfig) error {
 			processedBlockHeight = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
 			return nil
 		}).
-		Module("chunks queue", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("chunks queue", func(node *cmd.NodeConfig) error {
 			chunkQueue = storage.NewChunkQueue(node.DB)
 			ok, err := chunkQueue.Init(chunkconsumer.DefaultJobIndex)
 			if err != nil {
@@ -158,7 +157,7 @@ func main() {
 
 			return nil
 		}).
-		Module("pending block cache", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("pending block cache", func(node *cmd.NodeConfig) error {
 			// consensus cache for follower engine
 			pendingBlocks = buffer.NewPendingBlocks()
 
@@ -170,11 +169,11 @@ func main() {
 
 			return nil
 		}).
-		Module("sync core", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("sync core", func(node *cmd.NodeConfig) error {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Component("verifier engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("verifier engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			rt := fvm.NewInterpreterRuntime()
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
@@ -191,7 +190,7 @@ func main() {
 				approvalStorage)
 			return verifierEng, err
 		}).
-		Component("chunk consumer, requester, and fetcher engines", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("chunk consumer, requester, and fetcher engines", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			requesterEngine, err = vereq.New(
 				node.Logger,
 				node.State,
@@ -233,7 +232,7 @@ func main() {
 
 			return chunkConsumer, nil
 		}).
-		Component("assigner engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("assigner engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			var chunkAssigner module.ChunkAssigner
 			chunkAssigner, err = chunks.NewChunkAssigner(chunkAlpha, node.State)
 			if err != nil {
@@ -252,7 +251,7 @@ func main() {
 
 			return assignerEngine, nil
 		}).
-		Component("block consumer", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("block consumer", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			var initBlockHeight uint64
 
 			blockConsumer, initBlockHeight, err = blockconsumer.NewBlockConsumer(
@@ -280,7 +279,7 @@ func main() {
 
 			return blockConsumer, nil
 		}).
-		Component("follower engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
 			cleaner := storage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
@@ -342,7 +341,7 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("finalized snapshot", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("finalized snapshot", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
@@ -350,7 +349,7 @@ func main() {
 
 			return finalizedHeader, nil
 		}).
-		Component("sync engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("sync engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,

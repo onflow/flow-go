@@ -48,7 +48,6 @@ import (
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/component"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
@@ -156,7 +155,7 @@ func main() {
 	}
 
 	nodeBuilder.
-		Module("mutable follower state", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("mutable follower state", func(node *cmd.NodeConfig) error {
 			// For now, we only support state implementations from package badger.
 			// If we ever support different implementations, the following can be replaced by a type-aware factory
 			state, ok := node.State.(*badgerState.State)
@@ -173,24 +172,24 @@ func main() {
 			)
 			return err
 		}).
-		Module("execution metrics", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("execution metrics", func(node *cmd.NodeConfig) error {
 			collector = metrics.NewExecutionCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		Module("sync core", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("sync core", func(node *cmd.NodeConfig) error {
 			syncCore, err = chainsync.New(node.Logger, chainsync.DefaultConfig())
 			return err
 		}).
-		Module("execution receipts storage", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("execution receipts storage", func(node *cmd.NodeConfig) error {
 			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
 			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts.(*storage.ExecutionReceipts))
 			return nil
 		}).
-		Module("pending block cache", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("pending block cache", func(node *cmd.NodeConfig) error {
 			pendingBlocks = buffer.NewPendingBlocks() // for following main chain consensus
 			return nil
 		}).
-		Component("GCP block data uploader", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("GCP block data uploader", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			if enableBlockDataUpload && gcpBucketName != "" {
 				logger := node.Logger.With().Str("component_name", "gcp_block_data_uploader").Logger()
 				gcpBucketUploader, err := uploader.NewGCPBucketUploader(
@@ -220,7 +219,7 @@ func main() {
 			// blockDataUploader will stay nil and disable calling uploader at all
 			return &module.NoopReadyDoneAware{}, nil
 		}).
-		Component("S3 block data uploader", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("S3 block data uploader", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			if enableBlockDataUpload && s3BucketName != "" {
 				logger := node.Logger.With().Str("component_name", "s3_block_data_uploader").Logger()
 
@@ -254,21 +253,21 @@ func main() {
 			// blockDataUploader will stay nil and disable calling uploader at all
 			return &module.NoopReadyDoneAware{}, nil
 		}).
-		Module("state deltas mempool", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("state deltas mempool", func(node *cmd.NodeConfig) error {
 			deltas, err = ingestion.NewDeltas(stateDeltasLimit)
 			return err
 		}).
-		Module("stake checking function", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+		Module("stake checking function", func(node *cmd.NodeConfig) error {
 			checkStakedAtBlock = func(blockID flow.Identifier) (bool, error) {
 				return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 			}
 			return nil
 		}).
-		Component("Write-Ahead Log", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("Write-Ahead Log", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			diskWAL, err = wal.NewDiskWAL(node.Logger.With().Str("subcomponent", "wal").Logger(), node.MetricsRegisterer, collector, triedir, int(mTrieCacheSize), pathfinder.PathByteSize, wal.SegmentSize)
 			return diskWAL, err
 		}).
-		Component("execution state ledger", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("execution state ledger", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 			// check if the execution database already exists
 			bootstrapper := bootstrap.NewBootstrapper(node.Logger)
@@ -306,7 +305,7 @@ func main() {
 			ledgerStorage, err = ledger.NewLedger(diskWAL, int(mTrieCacheSize), collector, node.Logger.With().Str("subcomponent", "ledger").Logger(), ledger.DefaultPathFinderVersion)
 			return ledgerStorage, err
 		}).
-		Component("execution state ledger WAL compactor", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("execution state ledger WAL compactor", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 			checkpointer, err := ledgerStorage.Checkpointer()
 			if err != nil {
@@ -316,7 +315,7 @@ func main() {
 
 			return compactor, nil
 		}).
-		Component("provider engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("provider engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			extraLogPath := path.Join(triedir, "extralogs")
 			err := os.MkdirAll(extraLogPath, 0777)
 			if err != nil {
@@ -389,7 +388,7 @@ func main() {
 
 			return providerEngine, err
 		}).
-		Component("checker engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("checker engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			checkerEng = checker.New(
 				node.Logger,
 				node.State,
@@ -398,7 +397,7 @@ func main() {
 			)
 			return checkerEng, nil
 		}).
-		Component("ingestion engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			collectionRequester, err = requester.New(node.Logger, node.Metrics.Engine, node.Network, node.Me, node.State,
 				engine.RequestCollections,
 				filter.Any,
@@ -452,7 +451,7 @@ func main() {
 
 			return ingestionEng, err
 		}).
-		Component("follower engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
 			cleaner := storage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
@@ -513,13 +512,13 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("collection requester engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("collection requester engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
 			return collectionRequester, nil
 		}).
-		Component("receipt provider engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("receipt provider engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			retrieve := func(blockID flow.Identifier) (flow.Entity, error) { return myReceipts.MyReceipt(blockID) }
 			eng, err := provider.New(
 				node.Logger,
@@ -533,7 +532,7 @@ func main() {
 			)
 			return eng, err
 		}).
-		Component("finalized snapshot", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("finalized snapshot", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			finalizedHeader, err = synchronization.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
@@ -541,7 +540,7 @@ func main() {
 
 			return finalizedHeader, nil
 		}).
-		Component("synchronization engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("synchronization engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			// initialize the synchronization engine
 			syncEngine, err = synchronization.New(
 				node.Logger,
@@ -560,7 +559,7 @@ func main() {
 
 			return syncEngine, nil
 		}).
-		Component("grpc server", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("grpc server", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, node.Storage.Headers, node.State, events, results, txResults, node.RootChainID)
 			return rpcEng, nil
 		}).
