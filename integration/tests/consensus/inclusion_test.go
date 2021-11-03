@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -47,25 +48,30 @@ func (is *InclusionSuite) SetupTest() {
 	var nodeConfigs []testnet.NodeConfig
 
 	// need one dummy execution node (unused ghost)
-	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.AsGhost())
+	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
 	// need one dummy verification node (unused ghost)
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.AsGhost())
+	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
 
 	// need three real consensus nodes
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
-		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithID(conID))
+		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.WarnLevel), testnet.WithID(conID))
 		nodeConfigs = append(nodeConfigs, nodeConfig)
 		is.conIDs = append(is.conIDs, conID)
 	}
 
 	// need one controllable collection node (used ghost)
 	is.collID = unittest.IdentifierFixture()
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(is.collID), testnet.AsGhost())
+	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(is.collID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, collConfig)
+
+	nodeConfigs = append(nodeConfigs,
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+	)
 
 	// generate the network config
 	netConfig := testnet.NewNetworkConfig("consensus_collection_guarantee_inclusion", nodeConfigs)
@@ -106,7 +112,7 @@ func (is *InclusionSuite) TestCollectionGuaranteeIncluded() {
 	sentinel.SignerIDs = []flow.Identifier{is.collID}
 	sentinel.ReferenceBlockID = is.net.Root().ID()
 
-	is.T().Logf("collection guarantee generated: %x", sentinel.CollectionID)
+	is.T().Logf("collection guarantee generated: %x\n", sentinel.CollectionID)
 
 	// keep trying to send collection guarantee to at least one consensus node
 SendingLoop:
@@ -116,7 +122,7 @@ SendingLoop:
 		err := is.Collection().Send(ctx, engine.PushGuarantees, sentinel, conID)
 		cancel()
 		if err != nil {
-			is.T().Logf("could not send collection guarantee: %s", err)
+			is.T().Logf("could not send collection guarantee: %s\n", err)
 			continue
 		}
 		break SendingLoop
@@ -130,7 +136,7 @@ InclusionLoop:
 		// we read the next message until we reach deadline
 		_, msg, err := is.reader.Next()
 		if err != nil {
-			is.T().Logf("could not read message: %s", err)
+			is.T().Logf("could not read message: %s\n", err)
 			continue
 		}
 
@@ -153,7 +159,7 @@ InclusionLoop:
 		for _, guarantee := range guarantees {
 			if guarantee.CollectionID == sentinel.CollectionID {
 				confirmations[proposalID] = 0
-				is.T().Logf("%x: collection guarantee included!", proposalID)
+				is.T().Logf("%x: collection guarantee included!\n", proposalID)
 				continue InclusionLoop
 			}
 		}
@@ -164,7 +170,7 @@ InclusionLoop:
 		n, ok := confirmations[proposal.Header.ParentID]
 		if ok {
 			confirmations[proposalID] = n + 1
-			is.T().Logf("%x: collection guarantee confirmed! (count: %d)", proposalID, n+1)
+			is.T().Logf("%x: collection guarantee confirmed! (count: %d)\n", proposalID, n+1)
 		}
 
 		// if we reached three or more confirmations, we are done!

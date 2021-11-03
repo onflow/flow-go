@@ -1119,8 +1119,8 @@ github.com/onflow/flow-go-sdk v0.21.0 h1:KRU6F80KZLD+CJLj57S2EaAPNJUx4qpFTw1Ok0A
 github.com/onflow/flow-go-sdk v0.21.0/go.mod h1:2xhtzwRAeItwbHQzHiIK2gPgLDw1hNPa0xYlpvx8Gx4=
 github.com/onflow/flow/protobuf/go/flow v0.1.9/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
 github.com/onflow/flow/protobuf/go/flow v0.2.0/go.mod h1:kRugbzZjwQqvevJhrnnCFMJZNmoSJmxlKt6hTGXZojM=
-github.com/onflow/flow/protobuf/go/flow v0.2.2 h1:EVhA0w3lu+BG7RK39ojIJVghLH998iP7YC0V/Op0KnU=
-github.com/onflow/flow/protobuf/go/flow v0.2.2/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
+github.com/onflow/flow/protobuf/go/flow v0.2.3 h1:Ql+IjlhyVzCg5L+jHtE7J7xjFIk6D+tQN6SfTJhgZ5U=
+github.com/onflow/flow/protobuf/go/flow v0.2.3/go.mod h1:gQxYqCfkI8lpnKsmIjwtN2mV/N2PIwc1I+RUK4HPIc8=
 github.com/onsi/ginkgo v1.6.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.7.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=
 github.com/onsi/ginkgo v1.8.0/go.mod h1:lLunBs/Ym6LB5Z9jYTR76FiuTmxDTDusOGeTQH+WWjE=

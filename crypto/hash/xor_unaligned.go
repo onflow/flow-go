@@ -40,12 +40,17 @@ import "unsafe"
 type storageBuf [maxRate / 8]uint64
 
 func (b *storageBuf) asBytes() *[maxRate]byte {
-	return (*[maxRate]byte)(unsafe.Pointer(b))
+	// re-using a trick from https://github.com/golang/go/blob/master/src/runtime/stubs.go#L178:
+	// to hide the input pointer from escape analysis and avoid
+	// an escape to to the heap. The 0 xor tricks the escape analysis tool
+	// to think "ptr" and "b" are not related.
+	ptr := uintptr(unsafe.Pointer(b)) ^ 0 // nolint:staticcheck
+	return (*[maxRate]byte)(unsafe.Pointer(ptr))
 }
 
-// xorInUnaligned uses unaligned reads and writes to update d.a to contain d.a
+// xorIn uses unaligned reads and writes to update d.a to contain d.a
 // XOR buf.
-func xorInUnaligned(d *sha3State, buf []byte) {
+func xorIn(d *sha3State, buf []byte) {
 	n := len(buf)
 	bw := (*[maxRate / 8]uint64)(unsafe.Pointer(&buf[0]))[: n/8 : n/8]
 
@@ -70,12 +75,7 @@ func xorInUnaligned(d *sha3State, buf []byte) {
 	}
 }
 
-func copyOutUnaligned(buf []byte, d *sha3State) {
+func copyOut(buf []byte, d *sha3State) {
 	ab := (*[maxRate]uint8)(unsafe.Pointer(&d.a[0]))
 	copy(buf, ab[:])
 }
-
-var (
-	xorIn   = xorInUnaligned
-	copyOut = copyOutUnaligned
-)
