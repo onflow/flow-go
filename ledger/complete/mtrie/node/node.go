@@ -122,12 +122,12 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	return n
 }
 
-// bubbleUpCopy makes a copy of a node and moves it one level higher to replace
+// CopyAndPromoteLeafNode makes a copy of a node and moves it one level higher to replace
 // the parent node, this method should only be called for leaf nodes
 // depending on where this node is located to the parent the
 // hash value would be different, if isLeft is set to true the original place
 // of the node n was left child of its parent so the hash value would be adjusted accordingly
-func (n *Node) bubbleUpCopyLeafNode(isLeft bool) *Node {
+func (n *Node) copyAndPromoteLeafNode(isLeft bool) *Node {
 	// note path is an arrays (not slice) so it would be coppied
 	newNode := &Node{
 		height:   n.height + 1,
@@ -185,10 +185,10 @@ func (n *Node) Compactify() *Node {
 
 	// if childNode is non empty
 	if !lChildEmpty && rChildEmpty && n.lChild.IsLeaf() {
-		return n.lChild.bubbleUpCopyLeafNode(true)
+		return n.lChild.copyAndPromoteLeafNode(true)
 	}
 	if lChildEmpty && !rChildEmpty && n.rChild.IsLeaf() {
-		return n.rChild.bubbleUpCopyLeafNode(false)
+		return n.rChild.copyAndPromoteLeafNode(false)
 	}
 
 	// else no change needed
