@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -38,7 +39,7 @@ func (s *Suite) SetupTest() {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -46,28 +47,28 @@ func (s *Suite) SetupTest() {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
 	// a ghost node masquerading as a consensus node
 	s.ghostID = unittest.IdentifierFixture()
 	ghostConNode := testnet.NewNodeConfig(
 		flow.RoleAccess,
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost())
 
 	confs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
-		testnet.NewNodeConfig(flow.RoleAccess),
-		testnet.NewNodeConfig(flow.RoleAccess),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		ghostConNode,
 	}
 
