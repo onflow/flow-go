@@ -2,17 +2,12 @@ package state_synchronization
 
 import (
 	"context"
-	"io/fs"
-	"os"
-	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 
 	"cloud.google.com/go/storage"
 	"github.com/fxamacker/cbor/v2"
-	datastore "github.com/ipfs/go-datastore/examples"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/iterator"
@@ -22,27 +17,14 @@ import (
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/compressor"
+	"github.com/onflow/flow-go/network/test"
 )
-
-func makeBlockstore(t *testing.T, name string) (blockstore.Blockstore, func()) {
-	dsDir := filepath.Join(os.TempDir(), name)
-	require.NoError(t, os.RemoveAll(dsDir))
-	err := os.Mkdir(dsDir, fs.ModeDir)
-	require.NoError(t, err)
-
-	ds, err := datastore.NewDatastore(dsDir)
-	require.NoError(t, err)
-
-	return blockstore.NewBlockstore(ds.(*datastore.Datastore)), func() {
-		require.NoError(t, os.RemoveAll(dsDir))
-	}
-}
 
 const BUCKET_NAME = "flow_public_mainnet14_execution_state"
 
 func TestStateDiffStorer(t *testing.T) {
 	// this test is intended to be run locally
-	t.Skip()
+	t.Skip("manual test")
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -74,7 +56,7 @@ func TestStateDiffStorer(t *testing.T) {
 		require.NoError(t, err)
 		defer reader.Close()
 
-		bstore, cleanup := makeBlockstore(t, "state-diff-storer-test")
+		bstore, cleanup := test.MakeBlockstore(t, "state-diff-storer-test")
 		defer cleanup()
 
 		sdp, err := NewStateDiffStorer(&cborcodec.Codec{}, compressor.NewLz4Compressor(), bstore)

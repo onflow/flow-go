@@ -2,11 +2,14 @@ package compressor
 
 import (
 	"io"
+	"io/ioutil"
 
 	"github.com/pierrec/lz4"
 
 	"github.com/onflow/flow-go/network"
 )
+
+var _ network.Compressor = (*Lz4Compressor)(nil)
 
 type Lz4Compressor struct{}
 
@@ -14,8 +17,8 @@ func NewLz4Compressor() *Lz4Compressor {
 	return &Lz4Compressor{}
 }
 
-func (lz4Comp Lz4Compressor) NewReader(r io.Reader) (io.Reader, error) {
-	return lz4.NewReader(r), nil
+func (lz4Comp Lz4Compressor) NewReader(r io.Reader) (io.ReadCloser, error) {
+	return ioutil.NopCloser(lz4.NewReader(r)), nil
 }
 
 func (lz4Comp Lz4Compressor) NewWriter(w io.Writer) (network.WriteCloseFlusher, error) {
