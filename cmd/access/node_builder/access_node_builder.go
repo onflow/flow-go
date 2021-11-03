@@ -34,7 +34,6 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
@@ -170,7 +169,7 @@ type FlowAccessNodeBuilder struct {
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilder {
-	builder.Module("mutable follower state", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+	builder.Module("mutable follower state", func(node *cmd.NodeConfig) error {
 		// For now, we only support state implementations from package badger.
 		// If we ever support different implementations, the following can be replaced by a type-aware factory
 		state, ok := node.State.(*badgerState.State)
@@ -195,7 +194,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerState() *FlowAccessNodeBuilde
 }
 
 func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
-	builder.Module("sync core", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+	builder.Module("sync core", func(node *cmd.NodeConfig) error {
 		syncCore, err := synchronization.New(node.Logger, synchronization.DefaultConfig())
 		builder.SyncCore = syncCore
 
@@ -206,7 +205,7 @@ func (builder *FlowAccessNodeBuilder) buildSyncCore() *FlowAccessNodeBuilder {
 }
 
 func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
-	builder.Module("committee", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+	builder.Module("committee", func(node *cmd.NodeConfig) error {
 		// initialize consensus committee's membership state
 		// This committee state is for the HotStuff follower, which follows the MAIN CONSENSUS Committee
 		// Note: node.Me.NodeID() is not part of the consensus committee
@@ -220,7 +219,7 @@ func (builder *FlowAccessNodeBuilder) buildCommittee() *FlowAccessNodeBuilder {
 }
 
 func (builder *FlowAccessNodeBuilder) buildLatestHeader() *FlowAccessNodeBuilder {
-	builder.Module("latest header", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig) error {
+	builder.Module("latest header", func(node *cmd.NodeConfig) error {
 		finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 		builder.Finalized, builder.Pending = finalized, pending
 
@@ -231,7 +230,7 @@ func (builder *FlowAccessNodeBuilder) buildLatestHeader() *FlowAccessNodeBuilder
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder {
-	builder.Component("follower core", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	builder.Component("follower core", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		// create a finalizer that will handle updating the protocol
 		// state when the follower detects newly finalized blocks
 		final := finalizer.NewFinalizer(node.DB, node.Storage.Headers, builder.FollowerState, node.Tracer)
@@ -258,7 +257,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerCore() *FlowAccessNodeBuilder
 }
 
 func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuilder {
-	builder.Component("follower engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	builder.Component("follower engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		// initialize cleaner for DB
 		cleaner := storage.NewCleaner(node.Logger, node.DB, builder.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 		conCache := buffer.NewPendingBlocks()
@@ -290,7 +289,7 @@ func (builder *FlowAccessNodeBuilder) buildFollowerEngine() *FlowAccessNodeBuild
 }
 
 func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuilder {
-	builder.Component("finalized snapshot", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	builder.Component("finalized snapshot", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		finalizedHeader, err := synceng.NewFinalizedHeaderCache(node.Logger, node.State, builder.FinalizationDistributor)
 		if err != nil {
 			return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
@@ -304,7 +303,7 @@ func (builder *FlowAccessNodeBuilder) buildFinalizedHeader() *FlowAccessNodeBuil
 }
 
 func (builder *FlowAccessNodeBuilder) buildSyncEngine() *FlowAccessNodeBuilder {
-	builder.Component("sync engine", func(ctx irrecoverable.SignalerContext, node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	builder.Component("sync engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
 		sync, err := synceng.New(
 			node.Logger,
 			node.Metrics.Engine,
