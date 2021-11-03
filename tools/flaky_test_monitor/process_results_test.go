@@ -91,10 +91,6 @@ func runProcessTestRun(t *testing.T, jsonExpectedActualFile string) {
 	}
 	actualTestRun := processTestRun(&resultReader)
 
-	if resultReader.saveFiles() {
-		actualTestRun.save(resultReader.getResultsFileName())
-	}
-
 	checkTestRuns(t, expectedTestRun, actualTestRun)
 }
 
@@ -177,10 +173,4 @@ func (fileResultReader *FileResultReader) close() {
 func (fileResultReader FileResultReader) getResultsFileName() string {
 	t := time.Now()
 	return "test-run-" + strings.ReplaceAll(t.Format("2006-01-02-15-04-05.0000"), ".", "-") + ".json"
-}
-
-// don't want to save test result files when running unit tests in CI or locally
-// can set this to true locally temporarily to make it easier to debug, so can see how test results are being processed
-func (fileResultReader FileResultReader) saveFiles() bool {
-	return true
 }

@@ -74,10 +74,6 @@ type ResultReader interface {
 
 	// where to save results - will be different for tests vs production
 	getResultsFileName() string
-
-	// for most unit testing and CI runs, not necessary to save results in json file
-	// only want to save result files in production when monitoring real tests
-	saveFiles() bool
 }
 
 type StdinResultReader struct {
@@ -94,11 +90,6 @@ func (stdinResultReader StdinResultReader) close() {
 
 func (stdinResultReader StdinResultReader) getResultsFileName() string {
 	return os.Args[1]
-}
-
-// always want to save files in production - these files will be used to produce a visual representation of test flakiness
-func (stdinResultReader StdinResultReader) saveFiles() bool {
-	return true
 }
 
 func processTestRun(resultReader ResultReader) TestRun {
@@ -228,8 +219,11 @@ func postProcessTestRun(packageResultMap map[string]*PackageResult) {
 
 		for _, testResults := range packageResult.TestMap {
 			for j, testResult := range testResults {
-				// found nil test - test with no result - due to `go test` bug
-				// see https://www.notion.so/dapperlabs/Tests-With-No-Result-2caa9ce6f69c4364a4df53f70ccb9255
+				// found nil test - test with no result - due to `go test` bug where using fmt.Printf() without a newline causes that test to not have a result
+				// example:
+				// func Test1(t *testing.T) {
+				//   fmt.Printf("hello from test")
+				// }
 				if testResult.Result == "" {
 					// separate nil test results from regular test results
 					packageResult.NilTests = append(packageResult.NilTests, testResult)
