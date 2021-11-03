@@ -19,11 +19,10 @@ func WithDone(parent context.Context, done <-chan struct{}) (context.Context, co
 	go func() {
 		select {
 		case <-done:
-			cancel()
 			c.err = ErrChannelClosed
 		case <-ctx.Done():
-			c.err = ctx.Err()
 		}
+		cancel()
 	}()
 	return ctx, cancel
 }
@@ -38,7 +37,10 @@ func (d *doneCtx) Done() <-chan struct{} {
 }
 
 func (d *doneCtx) Err() error {
-	return d.err
+	if d.err != nil {
+		return d.err
+	}
+	return d.cancelCtx.Err()
 }
 
 func (d *doneCtx) Value(key interface{}) interface{} {
@@ -65,12 +67,11 @@ func WithSignal(parent context.Context, signalChan <-chan os.Signal) (context.Co
 	go func() {
 		select {
 		case sig := <-signalChan:
-			cancel()
 			c.err = ErrSignalReceived
 			c.signal = sig
 		case <-ctx.Done():
-			c.err = ctx.Err()
 		}
+		cancel()
 	}()
 	return c, cancel
 }
@@ -86,7 +87,10 @@ func (s *signalCtx) Done() <-chan struct{} {
 }
 
 func (s *signalCtx) Err() error {
-	return s.err
+	if s.err != nil {
+		return s.err
+	}
+	return s.cancelCtx.Err()
 }
 
 func (s *signalCtx) Signal() os.Signal {
