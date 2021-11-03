@@ -1,0 +1,27 @@
+name: Bench
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  benchmark:
+    name: Performance regression check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-go@v1
+      - name: Build relic
+        run: make crypto/relic/build
+      # Run benchmark with `go test -bench` and stores the output to a file
+      - name: Run benchmark
+        run: go test ./fvm --bench . --tags relic -count 5 | tee new.txt
+      - run: git checkout HEAD^
+      # Run benchmark with `go test -bench` and stores the output to a file
+      - name: Run benchmark
+        run: go test ./fvm --bench . --tags relic -count 5 | tee old.txt
+      - run: GO111MODULE=off go get -u golang.org/x/perf/cmd/benchstat
+      - run: benchstat old.txt new.txt
+      
