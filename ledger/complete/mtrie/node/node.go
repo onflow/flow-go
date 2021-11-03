@@ -122,29 +122,6 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	return n
 }
 
-// deepCopy constructs a deep copy of the node
-// func (n *Node) deepCopy() *Node {
-// 	var lChildCopy, rChildCopy *Node
-// 	if n.lChild != nil {
-// 		lChildCopy = n.lChild.deepCopy()
-// 	}
-// 	if n.rChild != nil {
-// 		rChildCopy = n.rChild.deepCopy()
-// 	}
-
-// 	// note path and hashValue are both arrays (not slices) so they would be coppied
-// 	return &Node{
-// 		lChild:    lChildCopy,
-// 		rChild:    rChildCopy,
-// 		height:    n.height,
-// 		path:      n.path,
-// 		payload:   n.payload.DeepCopy(),
-// 		maxDepth:  n.maxDepth,
-// 		regCount:  n.regCount,
-// 		hashValue: n.hashValue,
-// 	}
-// }
-
 // bubbleUpCopy makes a copy of a node and moves it one level higher to replace
 // the parent node, this method should only be called for leaf nodes
 // depending on where this node is located to the parent the
