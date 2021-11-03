@@ -82,3 +82,12 @@ type Epoch interface {
 	// DKG returns the result of the distributed key generation procedure.
 	DKG() (DKG, error)
 }
+
+// EpochEmergencyFallback enables checking whether epoch emergency chain continuation (EECC)
+// has been triggered. Once EECC is triggered, it remains active until the next spork.
+type EpochEmergencyFallback interface {
+
+	// IsTriggered returns whether EECC has been triggered.
+	// * any errors returned by this method are unexpected
+	IsTriggered() (bool, error)
+}
