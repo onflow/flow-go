@@ -137,7 +137,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 	err := e.messageHandler.Process(originID, event)
 	if err != nil {
 		if engine.IsIncompatibleInputTypeError(err) {
-			e.log.Warn().Msgf("unsupported message %T was delivered through %v", event, channel)
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
 			return nil
 		}
 		return fmt.Errorf("unexpected error while processing engine message: %w", err)
