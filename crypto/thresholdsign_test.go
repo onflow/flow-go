@@ -506,7 +506,7 @@ func testStatelessThresholdSignatureSimpleKeyGen(t *testing.T) {
 			signers[randomDuplicate] = signers[0]
 			thresholdSignature, err = ReconstructThresholdSignature(n, threshold, signShares, signers[:threshold+1])
 			assert.Error(t, err)
-			assert.IsType(t, expectedError, err)
+			assert.True(t, IsInvalidInputsError(err))
 		}
 	}
 }

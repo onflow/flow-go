@@ -42,15 +42,10 @@ func (b *storageBuf) asBytes() *[maxRate]byte {
 	return (*[maxRate]byte)(b)
 }
 
-var (
-	xorIn   = xorInGeneric
-	copyOut = copyOutGeneric
-)
-
-// xorInGeneric xors the bytes in buf into the state; it
+// xorIn xors the bytes in buf into the state; it
 // makes no non-portable assumptions about memory layout
 // or alignment.
-func xorInGeneric(d *sha3State, buf []byte) {
+func xorIn(d *sha3State, buf []byte) {
 	n := len(buf) / 8
 
 	for i := 0; i < n; i++ {
@@ -60,8 +55,8 @@ func xorInGeneric(d *sha3State, buf []byte) {
 	}
 }
 
-// copyOutGeneric copies ulint64s to a byte buffer.
-func copyOutGeneric(b []byte, d *sha3State) {
+// copyOut copies ulint64s to a byte buffer.
+func copyOut(b []byte, d *sha3State) {
 	for i := 0; len(b) >= 8; i++ {
 		binary.LittleEndian.PutUint64(b, d.a[i])
 		b = b[8:]
