@@ -63,17 +63,18 @@ func (s *StateDiffStorer) writeBlocks(v interface{}) ([]cid.Cid, error) {
 }
 
 func (s *StateDiffStorer) Store(sd *ExecutionStateDiff) (cid.Cid, error) {
-	if cids, err := s.writeBlocks(sd); err != nil {
+	cids, err := s.writeBlocks(sd)
+	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to write state diff blocks: %w", err)
-	} else {
-		for {
-			if len(cids) == 1 {
-				return cids[0], nil
-			}
+	}
 
-			if cids, err = s.writeBlocks(cids); err != nil {
-				return cid.Undef, fmt.Errorf("failed to write cid blocks: %w", err)
-			}
+	for {
+		if len(cids) == 1 {
+			return cids[0], nil
+		}
+
+		if cids, err = s.writeBlocks(cids); err != nil {
+			return cid.Undef, fmt.Errorf("failed to write cid blocks: %w", err)
 		}
 	}
 }
@@ -101,10 +102,9 @@ func (s *StateDiffStorer) Load(c cid.Cid) (*ExecutionStateDiff, error) {
 		var sd ExecutionStateDiff
 		if err := s.readBlocks(cids, &sd); err == nil {
 			return &sd, nil
-		} else {
-			if err := s.readBlocks(cids, &cids); err != nil {
-				return nil, fmt.Errorf("could not parse blocks as cids: %w", err)
-			}
+		}
+		if err := s.readBlocks(cids, &cids); err != nil {
+			return nil, fmt.Errorf("could not parse blocks as cids: %w", err)
 		}
 	}
 }
