@@ -150,7 +150,7 @@ func (n *Node) computeAndStoreHash() {
 	n.hashValue = n.computeHash()
 }
 
-// Compactify an expanded leaf into its most concise representation. The
+// Compactify checks if the subtree represented by an interim-node can be simplified to its most concise representation by looking only at its direct children. The
 // compactified representation of a default node is `nil`. For a node that only has a
 // _single_ child that is itself a leaf, this method returns a new, fully compactified leaf.
 // Returns:
