@@ -758,7 +758,6 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve current epoch setup event: %w", err)
 	}
-	counter := activeSetup.Counter
 
 	// we will apply service events from blocks which are sealed by this block's PARENT
 	parent, err := m.blocks.ByID(block.Header.ParentID)
@@ -772,6 +771,7 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 	// state to go to the next epoch when needed. In cases where there is a bug
 	// in the smart contract, it could be that this happens too late and the
 	// chain finalization should halt.
+SealLoop:
 	for _, seal := range parent.Payload.Seals {
 		result, err := m.results.ByID(seal.ResultID)
 		if err != nil {
@@ -783,30 +783,13 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 			switch ev := event.Event.(type) {
 			case *flow.EpochSetup:
 
-				// We should only have a single epoch setup event per epoch.
-				if epochStatus.NextEpoch.SetupID != flow.ZeroID {
-					// true iff EpochSetup event for NEXT epoch was already included before
-					return nil, protocol.NewInvalidServiceEventError("duplicate epoch setup service event")
-				}
-
-				// The setup event should have the counter increased by one.
-				if ev.Counter != counter+1 {
-					return nil, protocol.NewInvalidServiceEventError("next epoch setup has invalid counter (%d => %d)", counter, ev.Counter)
-				}
-
-				// The first view needs to be exactly one greater than the current epoch final view
-				if ev.FirstView != activeSetup.FinalView+1 {
-					return nil, protocol.NewInvalidServiceEventError(
-						"next epoch first view must be exactly 1 more than current epoch final view (%d != %d+1)",
-						ev.FirstView,
-						activeSetup.FinalView,
-					)
-				}
-
-				// Finally, the epoch setup event must contain all necessary information.
-				err := isValidEpochSetup(ev)
-				if err != nil {
-					return nil, protocol.NewInvalidServiceEventError("invalid epoch setup: %w", err)
+				// validate the service event
+				err := isValidExtendingEpochSetup(ev, activeSetup, epochStatus)
+				if protocol.IsInvalidServiceEventError(err) {
+					// EECC - we have observed an invalid service event, which is
+					// an unrecoverable failure. Flag this in the DB and exit
+					ops = append(ops, transaction.WithTx(operation.InsertEpochEmergencyFallbackTriggered()))
+					break SealLoop
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
@@ -817,30 +800,17 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 
 			case *flow.EpochCommit:
 
-				// We should only have a single epoch commit event per epoch.
-				if epochStatus.NextEpoch.CommitID != flow.ZeroID {
-					// true iff EpochCommit event for NEXT epoch was already included before
-					return nil, protocol.NewInvalidServiceEventError("duplicate epoch commit service event")
-				}
-
-				// The epoch setup event needs to happen before the commit.
-				if epochStatus.NextEpoch.SetupID == flow.ZeroID {
-					return nil, protocol.NewInvalidServiceEventError("missing epoch setup for epoch commit")
-				}
-
-				// The commit event should have the counter increased by one.
-				if ev.Counter != counter+1 {
-					return nil, protocol.NewInvalidServiceEventError("next epoch commit has invalid counter (%d => %d)", counter, ev.Counter)
-				}
-
-				// Finally, the commit should commit all the necessary information.
-				setup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
+				extendingSetup, err := m.epoch.setups.ByID(epochStatus.NextEpoch.SetupID)
 				if err != nil {
 					return nil, state.NewInvalidExtensionErrorf("could not retrieve next epoch setup: %s", err)
 				}
-				err = isValidEpochCommit(ev, setup)
-				if err != nil {
-					return nil, state.NewInvalidExtensionErrorf("invalid epoch commit: %s", err)
+				// validate the service event
+				err = isValidExtendingEpochCommit(ev, extendingSetup, activeSetup, epochStatus)
+				if protocol.IsInvalidServiceEventError(err) {
+					// EECC - we have observed an invalid service event, which is
+					// an unrecoverable failure. Flag this in the DB and exit
+					ops = append(ops, transaction.WithTx(operation.InsertEpochEmergencyFallbackTriggered()))
+					break SealLoop
 				}
 
 				// prevents multiple setup events for same Epoch (including multiple setup events in payload of same block)
