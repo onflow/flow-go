@@ -133,14 +133,23 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.process(originID, event)
+	err := e.process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 // process processes events for the matching engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	receipt, ok := event.(*flow.ExecutionReceipt)
 	if !ok {
-		return fmt.Errorf("input message of incompatible type: %T, origin: %x", event, originID[:])
+		return fmt.Errorf("no matching processor for message of type %T from origin %x: %w", event, originID[:],
+			engine.IncompatibleInputTypeError)
 	}
 	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
 	e.pendingReceipts.Push(receipt)
@@ -151,9 +160,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 // HandleReceipt ingests receipts from the Requester module.
 func (e *Engine) HandleReceipt(originID flow.Identifier, receipt flow.Entity) {
 	e.log.Debug().Msg("received receipt from requester engine")
-	e.metrics.MessageReceived(metrics.EngineSealing, metrics.MessageExecutionReceipt)
-	e.pendingReceipts.Push(receipt)
-	e.inboundEventsNotifier.Notify()
+	err := e.process(originID, receipt)
+	if err != nil {
+		e.log.Fatal().Err(err).Msg("internal error processing event from requester module")
+	}
 }
 
 // OnFinalizedBlock implements the `OnFinalizedBlock` callback from the `hotstuff.FinalizationConsumer`
