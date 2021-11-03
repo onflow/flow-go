@@ -3,7 +3,6 @@ package test
 import (
 	"context"
 	"fmt"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -172,7 +171,7 @@ func (suite *BlockExchangeTestSuite) TestHas() {
 
 func makeBlockstore(t *testing.T, name string) blockstore.Blockstore {
 	dsDir := filepath.Join(os.TempDir(), name)
-	err := os.Mkdir(dsDir, fs.ModeDir)
+	err := os.Mkdir(dsDir, os.ModeDir)
 	require.NoError(t, err)
 
 	ds, err := datastore.NewDatastore(dsDir)
