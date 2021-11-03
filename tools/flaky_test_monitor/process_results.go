@@ -118,10 +118,6 @@ func processTestRun(resultReader ResultReader) TestRun {
 
 	testRun := finalizeTestRun(packageResultMap)
 
-	if resultReader.saveFiles() {
-		testRun.save(resultReader.getResultsFileName())
-	}
-
 	return testRun
 }
 
@@ -297,5 +293,9 @@ func finalizeTestRun(packageResultMap map[string]*PackageResult) TestRun {
 }
 
 func main() {
-	processTestRun(StdinResultReader{})
+	resultReader := StdinResultReader{}
+
+	testRun := processTestRun(resultReader)
+
+	testRun.save(resultReader.getResultsFileName())
 }
