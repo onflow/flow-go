@@ -19,8 +19,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/storage/util"
 	"github.com/onflow/flow-go/utils/unittest"
-
-	bstorage "github.com/onflow/flow-go/storage/badger"
 )
 
 // MockReceiptValidator returns a ReceiptValidator that accepts
@@ -71,30 +69,6 @@ func RunWithBootstrapState(t testing.TB, rootSnapshot protocol.Snapshot, f func(
 		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
 		require.NoError(t, err)
 		f(db, state)
-	})
-}
-
-// RunWithFollowerProtocolStateAndResults will insert some results into results db. Used to test sealing segment edge cases.
-func RunWithFollowerProtocolStateAndResults(t testing.TB, rootSnapshot protocol.Snapshot, exeResults []*flow.ExecutionResult, f func(*badger.DB, *pbadger.FollowerState)) {
-	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
-		metrics := metrics.NewNoopCollector()
-		tracer := trace.NewNoopTracer()
-		consumer := events.NewNoop()
-		headers, guarantees, seals, index, _, blocks, setups, commits, statuses, results := util.StorageLayer(t, db)
-		for _, r := range exeResults {
-			err := results.Store(r)
-			require.NoError(t, err)
-		}
-
-		receipts := bstorage.NewExecutionReceipts(metrics, db, results, bstorage.DefaultCacheSize)
-		payloads := bstorage.NewPayloads(db, index, guarantees, seals, receipts, results)
-
-		state, err := pbadger.Bootstrap(metrics, db, headers, seals, results, blocks, setups, commits, statuses, rootSnapshot)
-		require.NoError(t, err)
-		mockTimer := MockBlockTimer()
-		followerState, err := pbadger.NewFollowerState(state, index, payloads, tracer, consumer, mockTimer)
-		require.NoError(t, err)
-		f(db, followerState)
 	})
 }
 

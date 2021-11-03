@@ -272,7 +272,7 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
-		return nil, fmt.Errorf("could not get seal for sealing seg: %w", err)
+		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
 	}
 
 	// walk through the chain backward until we reach the block referenced by
