@@ -118,7 +118,7 @@ func TestStateDiffStorer(t *testing.T) {
 		duration = time.Since(start)
 		require.NoError(t, err)
 		t.Logf("time to load state diff: %v\n", duration)
-		if maxLoadTime > duration {
+		if duration > maxLoadTime {
 			maxLoadTime = duration
 		}
 
