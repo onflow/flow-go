@@ -22,6 +22,7 @@ import (
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 type BlockExchangeTestSuite struct {
@@ -88,7 +89,7 @@ func (suite *BlockExchangeTestSuite) TestGetBlocks() {
 		}).Send(ctx)
 		require.NoError(suite.T(), err)
 
-		<-done
+		unittest.AssertClosesBefore(suite.T(), done, 5*time.Second)
 		cancel()
 
 		for _, blockCid := range blocksToGet {
