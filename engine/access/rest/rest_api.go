@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage"
 )
 
 // RestAPIHandler provides the implementation of each of the REST API
@@ -47,24 +49,28 @@ func (restAPI *RestAPIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Reques
 	for i, id := range ids {
 		flowID, err := flow.HexStringToIdentifier(id)
 		if err != nil {
-			restAPI.errorResponse(w, r, err)
+			restAPI.errorResponse(w, r, err, http.StatusBadRequest)
 		}
 
 		flowBlock, err := restAPI.backend.GetBlockByID(r.Context(), flowID)
+
 		if err != nil {
-			restAPI.errorResponse(w, r, err)
+			if errors.Is(err, storage.ErrNotFound) {
+				restAPI.errorResponse(w, r, err, http.StatusNotFound)
+			}
+			restAPI.errorResponse(w, r, err, http.StatusInternalServerError)
 		}
 		blocks[i] = toBlock(flowBlock)
 	}
 
 	encodedBlocks, err := restAPI.encoder.Encode(blocks)
 	if err != nil {
-		restAPI.errorResponse(w, r, err)
+		restAPI.errorResponse(w, r, err, http.StatusInternalServerError)
 	}
 
 	_, err = w.Write(encodedBlocks)
 	if err != nil {
-		restAPI.errorResponse(w, r, err)
+		restAPI.errorResponse(w, r, err, http.StatusInternalServerError)
 	}
 	w.WriteHeader(http.StatusOK)
 }
@@ -74,8 +80,8 @@ func (restAPI *RestAPIHandler) NotImplemented(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-func (restAPI *RestAPIHandler) errorResponse(w http.ResponseWriter, r *http.Request, err error) {
-	w.WriteHeader(http.StatusInternalServerError)
+func (restAPI *RestAPIHandler) errorResponse(w http.ResponseWriter, r *http.Request, err error, returnCode int) {
+	w.WriteHeader(returnCode)
 	encodedError, encodingErr := restAPI.encoder.Encode(err.Error())
 	if encodingErr != nil {
 		restAPI.logger.Error().Str("request_url", r.URL.String()).Err(err).Msg("failed to encode error")
