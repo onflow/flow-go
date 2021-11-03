@@ -17,8 +17,8 @@ func EncodeSingleSig(sigType hotstuff.SigType, sig crypto.Signature) []byte {
 	return encoded
 }
 
-// DecodeSingleSig decodes signature data into a cryptographic signature and a type as required by
-// the consensus design.
+// DecodeSingleSig decodes the signature data into a cryptographic signature and a type as required by
+// the consensus design. Cryptographic validity of signatures is _not_ checked.
 // It returns:
 //  - 0, nil, ErrInvalidFormat if the sig type is invalid (covers nil or empty sigData)
 //  - sigType, signature, nil if the sig type is valid and the decoding is done successfully.
@@ -34,4 +34,26 @@ func DecodeSingleSig(sigData []byte) (hotstuff.SigType, crypto.Signature, error)
 
 	sig := crypto.Signature(sigData[1:])
 	return sigType, sig, nil
+}
+
+// DecodeDoubleSig decodes the signature data into a staking signature and an optional
+// random beacon signature. Cryptographic validity of signatures is _not_ checked.
+// Decomposition of the sigData is purely done based on length.
+// It returns:
+//  - staking signature, random beacon signature, nil:
+//    if sigData is 96 bytes long, we use the leading 48 bytes as staking signature
+//    and the tailing 48 bytes as random beacon sig
+//  - staking signature, nil, nil:
+//    if sigData is 48 bytes long, we interpret sigData entirely as staking signature
+//  - nil, nil, ErrInvalidFormat if the sig type is invalid (covers nil or empty sigData)
+func DecodeDoubleSig(sigData []byte) (crypto.Signature, crypto.Signature, error) {
+	sigLength := len(sigData)
+	switch sigLength {
+	case 48:
+		return sigData, nil, nil
+	case 96:
+		return sigData[:48], sigData[48:], nil
+	}
+
+	return nil, nil, fmt.Errorf("invalid sig data length %d: %w", sigLength, msig.ErrInvalidFormat)
 }
