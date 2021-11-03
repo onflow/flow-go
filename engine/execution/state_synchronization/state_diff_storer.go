@@ -47,7 +47,7 @@ func getPrototype(code byte) interface{} {
 type ExecutionStateDiff struct {
 	Collections        []*flow.Collection
 	Events             []*flow.Event
-	TrieUpdate         []*ledger.TrieUpdate
+	TrieUpdates        []*ledger.TrieUpdate
 	TransactionResults []*flow.TransactionResult
 }
 

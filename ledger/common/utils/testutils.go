@@ -241,6 +241,15 @@ func KeyPartFixture(typ uint16, val string) l.KeyPart {
 	return l.NewKeyPart(kp1t, kp1v)
 }
 
+// TrieUpdateFixture returns a trie update fixture
+func TrieUpdateFixture(n int, minPayloadByteSize int, maxPayloadByteSize int) *l.TrieUpdate {
+	return &l.TrieUpdate{
+		RootHash: RootHashFixture(),
+		Paths:    RandomPaths(n),
+		Payloads: RandomPayloads(n, minPayloadByteSize, maxPayloadByteSize),
+	}
+}
+
 // UpdateFixture returns an update fixture
 func UpdateFixture() *l.Update {
 	scBytes, _ := hex.DecodeString("6a7a565add94fb36069d79e8725c221cd1e5740742501ef014ea6db999fd98ad")
@@ -329,7 +338,7 @@ func RandomPayload(minByteSize int, maxByteSize int) *l.Payload {
 	keyByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	keydata := make([]byte, keyByteSize)
 	rand.Read(keydata)
-	key := l.Key{KeyParts: []l.KeyPart{l.KeyPart{Type: 0, Value: keydata}}}
+	key := l.Key{KeyParts: []l.KeyPart{{Type: 0, Value: keydata}}}
 	valueByteSize := minByteSize + rand.Intn(maxByteSize-minByteSize)
 	valuedata := make([]byte, valueByteSize)
 	rand.Read(valuedata)
