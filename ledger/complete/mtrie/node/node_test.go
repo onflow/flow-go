@@ -162,8 +162,8 @@ func Test_Compactify(t *testing.T) {
 		n4 := node.NewLeaf(path2, emptyPayload, 255)
 		n5 := node.NewInterimNode(256, n3, n4)
 
-		nn5, compactified := n5.Compactify()
-		require.False(t, compactified)
+		nn5 := n5.Compactify()
+		require.Equal(t, n5.MaxDepth(), nn5.MaxDepth())
 		require.True(t, nn5.VerifyCachedHash())
 		require.Equal(t, nn5, n5)
 	})
@@ -188,14 +188,14 @@ func Test_Compactify(t *testing.T) {
 		n4 := node.NewLeaf(path2, payload2, 255)
 		n5 := node.NewInterimNode(256, n3, n4)
 
-		nn3, compactified := n3.Compactify()
-		require.True(t, compactified)
+		nn3 := n3.Compactify()
 		require.True(t, nn3.VerifyCachedHash())
-		require.Equal(t, nn3.Hash(), n3.Hash())
-		require.Equal(t, nn3.Payload(), payload1)
+		require.Equal(t, n3.Hash(), nn3.Hash())
+		require.Equal(t, payload1, nn3.Payload())
+		require.True(t, nn3.IsLeaf())
 
-		_, compactified = n5.Compactify()
-		require.False(t, compactified)
+		nn5 := n5.Compactify()
+		require.Equal(t, nn5, n5)
 	})
 
 	t.Run("lowest level left leaf be empty", func(t *testing.T) {
@@ -217,14 +217,14 @@ func Test_Compactify(t *testing.T) {
 		n5 := node.NewInterimNode(256, n3, n4)
 		require.True(t, n2.VerifyCachedHash())
 
-		nn3, compactified := n3.Compactify()
-		require.True(t, compactified)
+		nn3 := n3.Compactify()
 		require.True(t, nn3.VerifyCachedHash())
 		require.Equal(t, nn3.Hash(), n3.Hash())
 		require.Equal(t, nn3.Payload(), payload1)
+		require.True(t, nn3.IsLeaf())
 
-		_, compactified = n5.Compactify()
-		require.False(t, compactified)
+		nn5 := n5.Compactify()
+		require.Equal(t, nn5, n5)
 	})
 
 	t.Run("lowest level left and right leaves be empty", func(t *testing.T) {
@@ -244,16 +244,14 @@ func Test_Compactify(t *testing.T) {
 		n5 := node.NewInterimNode(256, n3, n4)
 		require.True(t, n2.VerifyCachedHash())
 
-		nn3, compactified := n3.Compactify()
-		require.True(t, compactified)
-		require.True(t, nn3.VerifyCachedHash())
-		require.Equal(t, nn3.Hash(), n3.Hash())
+		nn3 := n3.Compactify()
+		require.Nil(t, nn3)
 
-		nn5, compactified := n5.Compactify()
-		require.True(t, compactified)
+		nn5 := n5.Compactify()
 		require.True(t, nn5.VerifyCachedHash())
 		require.Equal(t, nn5.Hash(), n5.Hash())
 		require.Equal(t, nn5.Payload(), payload1)
+		require.True(t, nn5.IsLeaf())
 	})
 
 }

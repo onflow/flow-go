@@ -122,32 +122,49 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	return n
 }
 
-// deepCopy
-func (n *Node) deepCopy() *Node {
-	var h hash.Hash
-	copy(h[:], n.hashValue[:])
+// deepCopy constructs a deep copy of the node
+// func (n *Node) deepCopy() *Node {
+// 	var lChildCopy, rChildCopy *Node
+// 	if n.lChild != nil {
+// 		lChildCopy = n.lChild.deepCopy()
+// 	}
+// 	if n.rChild != nil {
+// 		rChildCopy = n.rChild.deepCopy()
+// 	}
 
-	var p ledger.Path
-	copy(p[:], n.path[:])
+// 	// note path and hashValue are both arrays (not slices) so they would be coppied
+// 	return &Node{
+// 		lChild:    lChildCopy,
+// 		rChild:    rChildCopy,
+// 		height:    n.height,
+// 		path:      n.path,
+// 		payload:   n.payload.DeepCopy(),
+// 		maxDepth:  n.maxDepth,
+// 		regCount:  n.regCount,
+// 		hashValue: n.hashValue,
+// 	}
+// }
 
-	var lChildCopy, rChildCopy *Node
-	if n.lChild != nil {
-		lChildCopy = n.lChild.deepCopy()
+// bubbleUpCopy makes a copy of a node and moves it one level higher to replace
+// the parent node, this method should only be called for leaf nodes
+// depending on where this node is located to the parent the
+// hash value would be different, if isLeft is set to true the original place
+// of the node n was left child of its parent so the hash value would be adjusted accordingly
+func (n *Node) bubbleUpCopyLeafNode(isLeft bool) *Node {
+	// note path is an arrays (not slice) so it would be coppied
+	newNode := &Node{
+		height:   n.height + 1,
+		path:     n.path,
+		payload:  n.payload.DeepCopy(),
+		maxDepth: n.maxDepth,
+		regCount: n.regCount,
 	}
-	if n.rChild != nil {
-		rChildCopy = n.rChild.deepCopy()
+	if isLeft {
+		newNode.hashValue = hash.HashInterNode(n.hashValue, ledger.GetDefaultHashForHeight(n.height))
+	} else {
+		newNode.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(n.height), n.hashValue)
 	}
-
-	return &Node{
-		lChild:    lChildCopy,
-		rChild:    rChildCopy,
-		height:    n.height,
-		path:      p,
-		payload:   n.payload.DeepCopy(),
-		maxDepth:  n.maxDepth,
-		regCount:  n.regCount,
-		hashValue: h,
-	}
+	return newNode
 }
 
 // computeAndStoreHash computes the node's hash value and
@@ -160,11 +177,18 @@ func (n *Node) computeAndStoreHash() {
 // compactified representation of a default node is `nil`. For a node that only has a
 // _single_ child that is itself a leaf, this method returns a new, fully compactified leaf.
 // Returns:
-//  * (n, false) if the node cannot be compactified, we return the original node `n`
-//  * (cn, true) if the node can be compactified, where cn is a newly created compactified leaf
-func (n *Node) Compactify() (*Node, bool) {
+//  * n: if the node cannot be compactified, we return the original node `n`
+//  * cn: if the node can be compactified, where cn is a newly created compactified leaf
+func (n *Node) Compactify() *Node {
+
+	// if is a default node return nil instaed
+	if n.isDefaultNode() {
+		return nil
+	}
+
+	// if is a non default leaf, return it as is (no need for deep copy)
 	if n.IsLeaf() {
-		return n, false
+		return n
 	}
 
 	// if leaf return it as is
@@ -172,41 +196,33 @@ func (n *Node) Compactify() (*Node, bool) {
 	lChildEmpty := true
 	rChildEmpty := true
 	if n.lChild != nil {
-		lChildEmpty = n.lChild.IsDefaultNode()
+		lChildEmpty = n.lChild.isDefaultNode()
 	}
 	if n.rChild != nil {
-		rChildEmpty = n.rChild.IsDefaultNode()
+		rChildEmpty = n.rChild.isDefaultNode()
 	}
 	if rChildEmpty && lChildEmpty {
-		// is like a leaf
-		return NewLeaf(ledger.Path{}, ledger.EmptyPayload(), n.height), true
+		// if both children are empty this is the same as as a default leafs
+		return nil
 	}
 
 	// if childNode is non empty
 	if !lChildEmpty && rChildEmpty && n.lChild.IsLeaf() {
-		// TODO merge these two methods
-		l := n.lChild.deepCopy()
-		l.hashValue = hash.HashInterNode(l.hashValue, ledger.GetDefaultHashForHeight(l.height))
-		l.height = l.height + 1
-
-		// bubble up all children and return as parent
-		return l, true
+		return n.lChild.bubbleUpCopyLeafNode(true)
 	}
 	if lChildEmpty && !rChildEmpty && n.rChild.IsLeaf() {
-		// TODO merge these two methods
-		r := n.rChild.deepCopy()
-		r.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(r.height), r.hashValue)
-		r.height = r.height + 1
-		// bubble up all children and return as parent
-		return r, true
+		return n.rChild.bubbleUpCopyLeafNode(false)
 	}
 
 	// else no change needed
-	return n, false
+	return n
 }
 
-func (n *Node) IsDefaultNode() bool {
-	//  TODO make this optimize by caching if the node is a default node
+// isDefaultNode returns true if either the node is nil
+// or the node's hash value is equal to the default hash value
+// for that height, in other words, it
+// does not contains any non-empty value in its sub-trie
+func (n *Node) isDefaultNode() bool {
 	if n == nil {
 		return true
 	}
