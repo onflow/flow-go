@@ -26,7 +26,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// RestAPITestSuite tests that Access node provides a secure GRPC server
+// RestAPITestSuite tests that the Access node serves the REST API defined via the OpenApi spec accurately
 type RestAPITestSuite struct {
 	suite.Suite
 	state      *protocol.State
