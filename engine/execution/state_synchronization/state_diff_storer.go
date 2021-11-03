@@ -15,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
-const MAX_BLOCK_SIZE = 1e6
+const MAX_BLOCK_SIZE = 1e6 // 1MB
 
 type ExecutionStateDiff struct {
 	Collections        []*flow.Collection
@@ -96,6 +96,10 @@ func (s *StateDiffStorer) readBlocks(cids []cid.Cid, v interface{}) error {
 	return dec.Decode(v)
 }
 
+// Load loads the ExecutionStateDiff represented by the given CID from the blockstore.
+// Since blocks are limited to MAX_BLOCK_SIZE bytes, it's possible that the data was
+// stored in multiple chunks, and hence the root CID may point to a block for which
+// the data itself is a list of concatenated CIDs.
 func (s *StateDiffStorer) Load(c cid.Cid) (*ExecutionStateDiff, error) {
 	cids := []cid.Cid{c}
 	for {
