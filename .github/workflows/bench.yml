@@ -24,7 +24,7 @@ jobs:
       # Run benchmark with `go test -bench` and stores the output to a file
       - name: Run benchmark
         run: go test ./fvm --bench . --tags relic -count 5 | tee new.txt
-      - run: git checkout HEAD^
+      - run: git stash && git checkout HEAD^ && git stash pop
       # Run benchmark with `go test -bench` and stores the output to a file
       - name: Run benchmark
         run: go test ./fvm --bench . --tags relic -count 5 | tee old.txt
