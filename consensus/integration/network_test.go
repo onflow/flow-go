@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
 )
 
 // TODO replace this type with `network/stub/hub.go`
@@ -61,7 +61,7 @@ type Network struct {
 	node     *Node
 	originID flow.Identifier
 	conduits map[network.Channel]*Conduit
-	component.NoopComponent
+	mocknetwork.Network
 }
 
 // Register registers an Engine of the attached node to the channel via a Conduit, and returns the

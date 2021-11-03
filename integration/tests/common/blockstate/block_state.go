@@ -31,7 +31,7 @@ func NewBlockState() *BlockState {
 	}
 }
 
-func (bs *BlockState) Add(b *messages.BlockProposal) {
+func (bs *BlockState) Add(t *testing.T, b *messages.BlockProposal) {
 	bs.Lock()
 	defer bs.Unlock()
 
@@ -49,15 +49,15 @@ func (bs *BlockState) Add(b *messages.BlockProposal) {
 		return
 	}
 
-	bs.processAncestors(b, confirmsHeight)
+	bs.processAncestors(t, b, confirmsHeight)
 }
 
 // processAncestors checks whether ancestors of block are within the confirming height, and finalizes
 // them if that is the case.
 // It also processes the seals of blocks being finalized.
-func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight uint64) {
+func (bs *BlockState) processAncestors(t *testing.T, b *messages.BlockProposal, confirmsHeight uint64) {
 	// puts this block proposal and all ancestors into `finalizedByHeight`
-	fmt.Printf("new height arrived: %d \n", b.Header.Height)
+	t.Logf("new height arrived: %d\n", b.Header.Height)
 	ancestor, ok := b, true
 	for ancestor.Header.Height > bs.highestFinalized {
 		heightDistance := b.Header.Height - ancestor.Header.Height
@@ -76,7 +76,7 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 				if finalized.Header.Height > bs.highestFinalized { // updates highestFinalized height
 					bs.highestFinalized = finalized.Header.Height
 				}
-				fmt.Printf("height %d finalized %d, highest finalized %d \n",
+				t.Logf("height %d finalized %d, highest finalized %d \n",
 					b.Header.Height,
 					finalized.Header.Height,
 					bs.highestFinalized)
@@ -93,7 +93,7 @@ func (bs *BlockState) processAncestors(b *messages.BlockProposal, confirmsHeight
 					}
 				}
 			} else {
-				fmt.Printf("fork detected: view distance (%d) between received block and ancestor is not same as their height distance (%d)\n",
+				t.Logf("fork detected: view distance (%d) between received block and ancestor is not same as their height distance (%d)\n",
 					viewDistance, heightDistance)
 			}
 
@@ -118,7 +118,7 @@ func (bs *BlockState) WaitForHighestFinalizedProgress(t *testing.T) *messages.Bl
 		bs.RLock() // avoiding concurrent map access
 		defer bs.RUnlock()
 
-		fmt.Printf("checking highest finalized: %d, highest proposed: %d\n", bs.highestFinalized, bs.highestProposed)
+		t.Logf("checking highest finalized: %d, highest proposed: %d\n", bs.highestFinalized, bs.highestProposed)
 		return bs.highestFinalized > currentFinalized
 	}, blockStateTimeout, 100*time.Millisecond,
 		fmt.Sprintf("did not receive progress on highest finalized height (%v) from (%v) within %v seconds",
@@ -180,7 +180,7 @@ func (bs *BlockState) WaitForSealed(t *testing.T, height uint64) *messages.Block
 	require.Eventually(t,
 		func() bool {
 			if bs.highestSealed != nil {
-				fmt.Println("waiting for sealed", bs.highestSealed.Header.Height, height)
+				t.Log("waiting for sealed", bs.highestSealed.Header.Height, height)
 			}
 			return bs.highestSealed != nil && bs.highestSealed.Header.Height >= height
 		},
@@ -203,7 +203,7 @@ func (bs *BlockState) WaitForSealedView(t *testing.T, view uint64) *messages.Blo
 	require.Eventually(t,
 		func() bool {
 			if bs.highestSealed != nil {
-				fmt.Println("waiting for sealed", bs.highestSealed.Header.View, view)
+				t.Log("waiting for sealed", bs.highestSealed.Header.View, view)
 			}
 			return bs.highestSealed != nil && bs.highestSealed.Header.View >= view
 		},

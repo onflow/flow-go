@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
@@ -97,7 +98,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
+	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger, nil, nil)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -110,7 +111,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	// create the mock overlays
 	for i := 0; i < m.size; i++ {
-		m.ov = append(m.ov, m.createOverlay())
+		m.ov = append(m.ov, m.createOverlay(m.providers[i]))
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -138,16 +139,15 @@ func (m *MiddlewareTestSuite) SetupTest() {
 // the addresses of the staked network participants.
 func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// create a new staked identity
-	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1, false, false)
+	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1, false, false, nil, nil)
 	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, false)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	newMw := mws[0]
-	// newProvider := providers[0]
 
-	overlay := m.createOverlay()
+	overlay := m.createOverlay(providers[0])
 	overlay.On("Receive",
 		m.ids[0].NodeID,
 		mock.AnythingOfType("*message.Message"),
@@ -169,11 +169,6 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	require.ErrorIs(m.T(), err, swarm.ErrNoAddresses)
 
 	// update the addresses
-	m.Lock()
-	m.ids = idList
-	m.Unlock()
-	// newProvider.SetIdentities(idList)
-	// newMw.UpdateAllowList()
 	m.mws[0].UpdateNodeAddresses()
 
 	// now the message should send successfully
@@ -181,20 +176,18 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	require.NoError(m.T(), err)
 }
 
-func (m *MiddlewareTestSuite) createOverlay() *mocknetwork.Overlay {
+func (m *MiddlewareTestSuite) createOverlay(provider *UpdatableIDProvider) *mocknetwork.Overlay {
 	overlay := &mocknetwork.Overlay{}
-	overlay.On("Identities").Maybe().Return(m.getIds, nil)
-	overlay.On("Topology").Maybe().Return(m.getIds, nil)
+	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
+		return provider.Identities(filter.Any)
+	})
+	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
+		return provider.Identities(filter.Any)
+	}, nil)
 	// this test is not testing the topic validator, especially in spoofing,
 	// so we always return a valid identity
 	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(), true)
 	return overlay
-}
-
-func (m *MiddlewareTestSuite) getIds() flow.IdentityList {
-	m.RLock()
-	defer m.RUnlock()
-	return flow.IdentityList(m.ids)
 }
 
 func (m *MiddlewareTestSuite) TearDownTest() {

@@ -22,6 +22,7 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0
+	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c // indirect
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2 v2.0.0-rc.2
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-20200501113911-9a95f0fdbfea
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
@@ -29,7 +30,14 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/improbable-eng/grpc-web v0.12.0
+	github.com/ipfs/go-bitswap v0.4.0
+	github.com/ipfs/go-block-format v0.0.3
+	github.com/ipfs/go-cid v0.0.7
+	github.com/ipfs/go-datastore v0.4.5
+	github.com/ipfs/go-ipfs-blockstore v0.1.6
+	github.com/ipfs/go-ipfs-exchange-interface v0.0.1
 	github.com/ipfs/go-log v1.0.5
+	github.com/ipld/go-ipld-prime v0.12.0 // indirect
 	github.com/jrick/bitset v1.0.0
 	github.com/kr/text v0.2.0 // indirect
 	github.com/libp2p/go-addr-util v0.1.0
@@ -51,7 +59,7 @@ require (
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.21.3
-	github.com/onflow/flow/protobuf/go/flow v0.2.2
+	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pkg/errors v0.9.1
@@ -59,6 +67,7 @@ require (
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/rs/zerolog v1.19.0
 	github.com/sethvargo/go-retry v0.1.0
+	github.com/smartystreets/assertions v1.0.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
