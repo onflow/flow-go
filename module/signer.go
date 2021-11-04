@@ -39,9 +39,9 @@ var (
 // ThresholdSignerStore returns the threshold signer object by view
 type ThresholdSignerStore interface {
 	// It returns:
-//  - (signer, nil) if the node has beacon keys in the epoch of the view
-//  - (nil, DKGIncompleteError) if the node doesn't have beacon keys in the epoch of the view
-//  - (nil, error) if there is any exception
+	//  - (signer, nil) if the node has beacon keys in the epoch of the view
+	//  - (nil, DKGIncompleteError) if the node doesn't have beacon keys in the epoch of the view
+	//  - (nil, error) if there is any exception
 	GetThresholdSigner(view uint64) (ThresholdSigner, error)
 }
 
