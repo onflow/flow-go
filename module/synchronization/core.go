@@ -51,7 +51,12 @@ type Core struct {
 	Config   Config
 	mu       sync.Mutex
 	heights  map[uint64]*Status
-	blockIDs map[flow.Identifier]*Status
+	blockIDs map[flow.Identifier]*statusWithHeight
+}
+
+type statusWithHeight struct {
+	*Status
+	height uint64
 }
 
 func New(log zerolog.Logger, config Config) (*Core, error) {
@@ -59,9 +64,21 @@ func New(log zerolog.Logger, config Config) (*Core, error) {
 		log:      log.With().Str("module", "synchronization").Logger(),
 		Config:   config,
 		heights:  make(map[uint64]*Status),
-		blockIDs: make(map[flow.Identifier]*Status),
+		blockIDs: make(map[flow.Identifier]*statusWithHeight),
 	}
 	return core, nil
+}
+
+func (c *Core) setBlockIDStatus(blockID flow.Identifier, height uint64, status *Status) {
+	c.blockIDs[blockID] = &statusWithHeight{status, height}
+}
+
+func (c *Core) getBlockIDStatus(blockID flow.Identifier) *Status {
+	s, ok := c.blockIDs[blockID]
+	if !ok {
+		return nil
+	}
+	return s.Status
 }
 
 // HandleBlock handles receiving a new block from another node. It returns
@@ -86,7 +103,7 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 	status.Received = time.Now()
 
 	// track it by ID and by height so we don't accidentally request it again
-	c.blockIDs[header.ID()] = status
+	c.setBlockIDStatus(header.ID(), header.Height, status)
 	c.heights[header.Height] = status
 
 	return true
@@ -111,18 +128,17 @@ func (c *Core) HandleHeight(final *flow.Header, height uint64) {
 	}
 }
 
-func (c *Core) RequestBlock(blockID flow.Identifier) {
+func (c *Core) RequestBlock(blockID flow.Identifier, height uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	// if we already received this block, reset the status so we can re-queue
-	status := c.blockIDs[blockID]
+	status := c.getBlockIDStatus(blockID)
 	if status.WasReceived() {
-		delete(c.blockIDs, status.Header.ID())
-		delete(c.heights, status.Header.Height)
+		c.clearStatuses(status.Header)
 	}
 
-	c.queueByBlockID(blockID)
+	c.queueByBlockID(blockID, height)
 }
 
 func (c *Core) RequestHeight(height uint64) {
@@ -132,14 +148,18 @@ func (c *Core) RequestHeight(height uint64) {
 	c.requeueHeight(height)
 }
 
+func (c *Core) clearStatuses(header *flow.Header) {
+	delete(c.blockIDs, header.ID())
+	delete(c.heights, header.Height)
+}
+
 // requeueHeight queues the given height, ignoring any previously received
 // blocks at that height
 func (c *Core) requeueHeight(height uint64) {
 	// if we already received this block, reset the status so we can re-queue
 	status := c.heights[height]
 	if status.WasReceived() {
-		delete(c.blockIDs, status.Header.ID())
-		delete(c.heights, status.Header.Height)
+		c.clearStatuses(status.Header)
 	}
 
 	c.queueByHeight(height)
@@ -193,22 +213,22 @@ func (c *Core) queueByHeight(height uint64) {
 
 // queueByBlockID queues a request for a block by block ID, only if no
 // equivalent request has been queued before.
-func (c *Core) queueByBlockID(blockID flow.Identifier) {
+func (c *Core) queueByBlockID(blockID flow.Identifier, height uint64) {
 
 	// only queue the request if have never queued it before
-	if c.blockIDs[blockID].WasQueued() {
+	if c.getBlockIDStatus(blockID).WasQueued() {
 		return
 	}
 
 	// queue the request
-	c.blockIDs[blockID] = NewQueuedStatus()
+	c.setBlockIDStatus(blockID, height, NewQueuedStatus())
 }
 
 // getRequestStatus retrieves a request status for a block, regardless of
 // whether it was queued by height or by block ID.
 func (c *Core) getRequestStatus(height uint64, blockID flow.Identifier) *Status {
 	heightStatus := c.heights[height]
-	idStatus := c.blockIDs[blockID]
+	idStatus := c.getBlockIDStatus(blockID)
 
 	if idStatus.WasQueued() {
 		return idStatus
@@ -237,13 +257,9 @@ func (c *Core) prune(final *flow.Header) {
 	}
 
 	for blockID, status := range c.blockIDs {
-		if status.WasReceived() {
-			header := status.Header
-
-			if header.Height <= final.Height {
-				delete(c.blockIDs, blockID)
-				continue
-			}
+		if status.WasReceived() && status.height <= final.Height {
+			delete(c.blockIDs, blockID)
+			continue
 		}
 	}
 
@@ -300,7 +316,6 @@ func (c *Core) getRequestableItems() ([]uint64, []flow.Identifier) {
 	// create list of all the block IDs blocks that are missing
 	var blockIDs []flow.Identifier
 	for blockID, status := range c.blockIDs {
-
 		// if the last request is young enough, skip
 		retryAfter := status.Requested.Add(c.Config.RetryInterval << status.Attempts)
 		if now.Before(retryAfter) {

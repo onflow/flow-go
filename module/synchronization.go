@@ -11,7 +11,7 @@ import (
 type BlockRequester interface {
 
 	// RequestBlock indicates that the given block should be queued for retrieval.
-	RequestBlock(blockID flow.Identifier)
+	RequestBlock(blockID flow.Identifier, height uint64)
 
 	// RequestHeight indicates that the given block height should be queued for retrieval.
 	RequestHeight(height uint64)
