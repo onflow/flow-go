@@ -16,7 +16,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestExecutionForkWithDuplicateAssignedChunks evaluates behavior of fetcher engine respect to
+// TestExecutionForkWithDuplicateAssignedChunks evaluates behavior of fetcher engine with respect to
 // receiving duplicate identical assigned chunks on execution forks, i.e., an execution fork with two distinct results, where
 // first chunk of both execution results are the same (i.e., duplicate), and both duplicate chunks are assigned to this
 // verification node.
