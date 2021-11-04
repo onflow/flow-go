@@ -783,7 +783,7 @@ func (fnb *FlowNodeBuilder) Component(name string, f ComponentBuilderFunc) NodeB
 
 	fnb.componentBuilder.AddWorker(name, func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 		modules, _ := lookup("modules")
-		if err := util.WaitReady(ctx, modules.Ready()); err != nil || util.CheckClosed(ctx.Done()) {
+		if err := util.WaitClosed(ctx, modules.Ready()); err != nil || util.CheckClosed(ctx.Done()) {
 			return
 		}
 
@@ -801,7 +801,7 @@ func (fnb *FlowNodeBuilder) Component(name string, f ComponentBuilderFunc) NodeB
 			go component.Start(ctx)
 		}
 
-		if err := util.WaitReady(ctx, readyAware.Ready()); err != nil {
+		if err := util.WaitClosed(ctx, readyAware.Ready()); err != nil {
 			log.Info().Msg("component startup aborted")
 		} else {
 			log.Info().Msg("component startup complete")
@@ -828,7 +828,7 @@ func (fnb *FlowNodeBuilder) BackgroundComponent(name string, f BackgroundCompone
 
 	fnb.componentBuilder.AddWorker(name, func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 		modules, _ := lookup("modules")
-		if err := util.WaitReady(ctx, modules.Ready()); err != nil || util.CheckClosed(ctx.Done()) {
+		if err := util.WaitClosed(ctx, modules.Ready()); err != nil || util.CheckClosed(ctx.Done()) {
 			return
 		}
 
@@ -842,7 +842,7 @@ func (fnb *FlowNodeBuilder) BackgroundComponent(name string, f BackgroundCompone
 			log.Info().Msg("component initialization complete")
 
 			go func() {
-				if err := util.WaitReady(ctx, c.Ready()); err != nil {
+				if err := util.WaitClosed(ctx, c.Ready()); err != nil {
 					log.Info().Msg("component startup aborted")
 				} else {
 					log.Info().Msg("component startup complete")
@@ -854,18 +854,9 @@ func (fnb *FlowNodeBuilder) BackgroundComponent(name string, f BackgroundCompone
 			return c, nil
 		}
 
-		// default error handler will re-throw error to parent
-		if errHandler == nil {
-			errHandler = func(err error) component.ErrorHandlingResult {
-				// RunComponent will return the original error
-				return component.ErrorHandlingStop
-			}
-		}
-
-		// Note: we're marking the component ready before we even attempt to start it.
-		// the idea behind a background component is that the system as a whole should
-		// not depend on it for safe operation, so the node does not need to wait for
-		// it to be ready.
+		// Note: we're marking the worker routine as ready before we even attempt to start the
+		// component. the idea behind a background component is that the system as a whole should
+		// not depend on it for safe operation, so the node does not need to wait for it to be ready.
 		ready()
 		err := component.RunComponent(ctx, componentFactory, errHandler)
 		if err != nil && err != ctx.Err() {
@@ -1013,7 +1004,7 @@ func (fnb *FlowNodeBuilder) InitComponentBuilder() {
 		}).
 		AddWorker("modules", func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
 			main, _ := lookup("main")
-			if err := util.WaitReady(ctx, main.Ready()); err != nil || util.CheckClosed(ctx.Done()) {
+			if err := util.WaitClosed(ctx, main.Ready()); err != nil || util.CheckClosed(ctx.Done()) {
 				return
 			}
 
