@@ -5,10 +5,11 @@ package badger_test
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/storage/badger/operation"
 	"math/rand"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/storage/badger/operation"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -328,9 +329,11 @@ func TestSealingSegment(t *testing.T) {
 				require.NoError(t, err)
 				return nil
 			})
+			require.NoError(t, err)
 
 			block1.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(receipt1)))
 			err = state.Extend(context.Background(), &block1)
+			require.NoError(t, err)
 
 			// block2 contains result1 referenced in receipt1
 			block2 := unittest.BlockWithParentFixture(block1.Header)

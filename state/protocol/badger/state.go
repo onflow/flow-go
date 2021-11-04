@@ -87,13 +87,6 @@ func Bootstrap(
 		return nil, fmt.Errorf("could not get sealing segment: %w", err)
 	}
 
-	// bootstrap the sealing segment step 1: insert segment execution results.
-	// execution results must be inserted first.
-	err = state.bootstrapSealingSegmentExeResults(segment)
-	if err != nil {
-		return nil, fmt.Errorf("could not bootstrap sealing chain segment execution results: %w", err)
-	}
-
 	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
@@ -101,8 +94,8 @@ func Bootstrap(
 		highest := segment.Highest() // reference block of the snapshot
 		lowest := segment.Lowest()   // last sealed block
 
-		// bootstrap the sealing segment step 2:  insert segment blocks
-		err = state.bootstrapSealingSegmentBlocks(segment, highest)(tx)
+		// bootstrap the sealing segment
+		err = state.bootstrapSealingSegment(segment, highest)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
@@ -156,35 +149,22 @@ func Bootstrap(
 	return state, nil
 }
 
-// bootstrapSealingSegmentExeResults inserts all execution results from SealingSegment.ExecutionReceipts.
-// This should be done before sealing segment blocks
-// are inserted because transactions are executed concurrently
-// in the db, a block may reference a ExecutionResult that is not yet stored.
-func (state *State) bootstrapSealingSegmentExeResults(segment *flow.SealingSegment) error {
-	err := operation.RetryOnConflictTx(state.db, transaction.Update, func(tx *transaction.Tx) error {
+// bootstrapSealingSegment inserts all blocks and associated metadata for the
+// protocol state root snapshot to disk.
+func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block) func(tx *transaction.Tx) error {
+	return func(tx *transaction.Tx) error {
+
 		for _, result := range segment.ExecutionResults {
-			err := operation.SkipDuplicates(operation.InsertExecutionResult(result))(tx.DBTxn)
+			err := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert execution result: %w", err)
 			}
-			err = operation.IndexExecutionResult(result.BlockID, result.ID())(tx.DBTxn)
+			err = transaction.WithTx(operation.IndexExecutionResult(result.BlockID, result.ID()))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index execution result: %w", err)
 			}
 		}
-		return nil
-	})
-	if err != nil {
-		return fmt.Errorf("could not insert sealing segment execution results: %w", err)
-	}
 
-	return nil
-}
-
-// bootstrapSealingSegmentBlocks inserts all blocks and associated metadata for the
-// protocol state root snapshot to disk.
-func (state *State) bootstrapSealingSegmentBlocks(segment *flow.SealingSegment, head *flow.Block) func(tx *transaction.Tx) error {
-	return func(tx *transaction.Tx) error {
 		for i, block := range segment.Blocks {
 			blockID := block.ID()
 			height := block.Header.Height

@@ -138,13 +138,14 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	if len(segment.Blocks) == 0 {
 		return fmt.Errorf("invalid empty sealing segment")
 	}
+
 	highest := segment.Highest() // reference block of the snapshot
 	lowest := segment.Lowest()   // last sealed block
 	highestID := highest.ID()
 	lowestID := lowest.ID()
 
 	if result.BlockID != lowestID {
-		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, lowest)
+		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, lowest.ID())
 	}
 
 	if seal.BlockID != lowestID {
@@ -172,7 +173,7 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("could not get qc for root snapshot: %w", err)
 	}
 	if qc.BlockID != highestID {
-		return fmt.Errorf("qc is for wrong block (got: %v, expected: %v)", qc.BlockID, highest)
+		return fmt.Errorf("qc is for wrong block (got: %x, expected: %x)", qc.BlockID, highestID)
 	}
 
 	firstView, err := snap.Epochs().Current().FirstView()
@@ -186,7 +187,7 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 
 	// the segment must be fully within the current epoch
 	if firstView > lowest.Header.View {
-		return fmt.Errorf("tail block of sealing segment has lower view than first view of epoch")
+		return fmt.Errorf("lowest block of sealing segment has lower view than first view of epoch")
 	}
 	if highest.Header.View >= finalView {
 		return fmt.Errorf("final view of epoch less than first block view")
