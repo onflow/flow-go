@@ -153,6 +153,15 @@ func (va *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
 		return false
 	}
 	va.proposerVotes[vote.BlockID] = vote
+	// update viewToBlockIDSet
+	blockIDSet, exists := va.viewToBlockIDSet[vote.View]
+	if exists {
+		blockIDSet[vote.BlockID] = struct{}{}
+	} else {
+		blockIDSet = make(map[flow.Identifier]struct{})
+		blockIDSet[vote.BlockID] = struct{}{}
+		va.viewToBlockIDSet[vote.View] = blockIDSet
+	}
 	return true
 }
 
