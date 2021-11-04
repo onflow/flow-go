@@ -19,13 +19,13 @@ const MAX_BLOCK_SIZE = 1e6 // 1MB
 
 const (
 	CodeIntermediateCIDs = iota
-	CodeExecutionStateDiff
+	CodeExecutionData
 )
 
 func getCode(v interface{}) byte {
 	switch v.(type) {
-	case *ExecutionStateDiff:
-		return CodeExecutionStateDiff
+	case *ExecutionData:
+		return CodeExecutionData
 	case []cid.Cid:
 		return CodeIntermediateCIDs
 	default:
@@ -35,8 +35,8 @@ func getCode(v interface{}) byte {
 
 func getPrototype(code byte) interface{} {
 	switch code {
-	case CodeExecutionStateDiff:
-		return &ExecutionStateDiff{}
+	case CodeExecutionData:
+		return &ExecutionData{}
 	case CodeIntermediateCIDs:
 		return &[]cid.Cid{}
 	default:
@@ -44,32 +44,33 @@ func getPrototype(code byte) interface{} {
 	}
 }
 
-type ExecutionStateDiff struct {
+type ExecutionData struct {
+	BlockID            flow.Identifier
 	Collections        []*flow.Collection
 	Events             []*flow.Event
 	TrieUpdate         []*ledger.TrieUpdate
 	TransactionResults []*flow.TransactionResult
 }
 
-type StateDiffStorer struct {
+type ExecutionDataStorer struct {
 	blockWriter *BlockWriter
 	codec       encoding.Codec
 	compressor  network.Compressor
 }
 
-func NewStateDiffStorer(
+func NewExecutionDataStorer(
 	codec encoding.Codec,
 	compressor network.Compressor,
 	bstore blockstore.Blockstore,
-) (*StateDiffStorer, error) {
+) (*ExecutionDataStorer, error) {
 	bw := &BlockWriter{
 		maxBlockSize: MAX_BLOCK_SIZE,
 		bstore:       bstore,
 	}
-	return &StateDiffStorer{bw, codec, compressor}, nil
+	return &ExecutionDataStorer{bw, codec, compressor}, nil
 }
 
-func (s *StateDiffStorer) writeBlocks(v interface{}) ([]cid.Cid, error) {
+func (s *ExecutionDataStorer) writeBlocks(v interface{}) ([]cid.Cid, error) {
 	if _, err := s.blockWriter.Write([]byte{getCode(v)}); err != nil {
 		return nil, err
 	}
@@ -92,7 +93,7 @@ func (s *StateDiffStorer) writeBlocks(v interface{}) ([]cid.Cid, error) {
 	return cids, nil
 }
 
-func (s *StateDiffStorer) Store(sd *ExecutionStateDiff) (cid.Cid, error) {
+func (s *ExecutionDataStorer) Store(sd *ExecutionData) (cid.Cid, error) {
 	cids, err := s.writeBlocks(sd)
 	if err != nil {
 		return cid.Undef, fmt.Errorf("failed to write state diff blocks: %w", err)
@@ -109,7 +110,7 @@ func (s *StateDiffStorer) Store(sd *ExecutionStateDiff) (cid.Cid, error) {
 	}
 }
 
-func (s *StateDiffStorer) readBlocks(cids []cid.Cid) (interface{}, error) {
+func (s *ExecutionDataStorer) readBlocks(cids []cid.Cid) (interface{}, error) {
 	buf := &bytes.Buffer{}
 	comp, err := s.compressor.NewReader(buf)
 	if err != nil {
@@ -134,11 +135,11 @@ func (s *StateDiffStorer) readBlocks(cids []cid.Cid) (interface{}, error) {
 	return v, err
 }
 
-// Load loads the ExecutionStateDiff represented by the given CID from the blockstore.
+// Load loads the ExecutionData represented by the given CID from the blockstore.
 // Since blocks are limited to MAX_BLOCK_SIZE bytes, it's possible that the data was
 // stored in multiple chunks, and hence the root CID may point to a block for which
 // the data itself is a list of concatenated CIDs.
-func (s *StateDiffStorer) Load(c cid.Cid) (*ExecutionStateDiff, error) {
+func (s *ExecutionDataStorer) Load(c cid.Cid) (*ExecutionData, error) {
 	cids := []cid.Cid{c}
 	for {
 		v, err := s.readBlocks(cids)
@@ -146,7 +147,7 @@ func (s *StateDiffStorer) Load(c cid.Cid) (*ExecutionStateDiff, error) {
 			return nil, fmt.Errorf("could not read blocks: %w", err)
 		}
 		switch v := v.(type) {
-		case *ExecutionStateDiff:
+		case *ExecutionData:
 			return v, nil
 		case *[]cid.Cid:
 			cids = *v

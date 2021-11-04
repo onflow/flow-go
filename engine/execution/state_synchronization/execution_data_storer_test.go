@@ -18,11 +18,12 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/test"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const BUCKET_NAME = "flow_public_mainnet14_execution_state"
 
-func TestStateDiffStorer(t *testing.T) {
+func TestExecutionDataStorer(t *testing.T) {
 	// this test is intended to be run locally
 	t.Skip("manual test")
 
@@ -59,7 +60,7 @@ func TestStateDiffStorer(t *testing.T) {
 		bstore, cleanup := test.MakeBlockstore(t, "state-diff-storer-test")
 		defer cleanup()
 
-		sdp, err := NewStateDiffStorer(&cborcodec.Codec{}, compressor.NewLz4Compressor(), bstore)
+		sdp, err := NewExecutionDataStorer(&cborcodec.Codec{}, compressor.NewLz4Compressor(), bstore)
 		require.NoError(t, err)
 
 		var blockData uploader.BlockData
@@ -79,7 +80,8 @@ func TestStateDiffStorer(t *testing.T) {
 			maxEventsLength = len(blockData.Events)
 		}
 
-		sd := &ExecutionStateDiff{
+		sd := &ExecutionData{
+			BlockID:            unittest.IdentifierFixture(),
 			Collections:        collections,
 			TransactionResults: blockData.TxResults,
 			Events:             blockData.Events,
