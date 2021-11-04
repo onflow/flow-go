@@ -36,6 +36,7 @@ var (
 	flagRootBlock                   string
 	flagRootBlockVotesDir           string
 	flagRootCommit                  string
+	flagProtocolVersion             uint
 	flagServiceAccountPublicKeyJSON string
 	flagGenesisTokenSupply          string
 	flagEpochCounter                uint64
@@ -92,6 +93,8 @@ func addFinalizeCmdFlags() {
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInEpoch, "epoch-length", 4000, "length of each epoch measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInStakingAuction, "epoch-staking-phase-length", 100, "length of the epoch staking phase measured in views")
 	finalizeCmd.Flags().Uint64Var(&flagNumViewsInDKGPhase, "epoch-dkg-phase-length", 1000, "length of each DKG phase measured in views")
+	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(), "The seed used to for DKG, Clustering and Cluster QC generation")
+	finalizeCmd.Flags().UintVar(&flagProtocolVersion, "protocol-version", 0, "major software version used for the duration of this spork")
 
 	cmd.MarkFlagRequired(finalizeCmd, "root-block")
 	cmd.MarkFlagRequired(finalizeCmd, "root-block-votes-dir")
@@ -100,8 +103,7 @@ func addFinalizeCmdFlags() {
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-length")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-staking-phase-length")
 	cmd.MarkFlagRequired(finalizeCmd, "epoch-dkg-phase-length")
-
-	finalizeCmd.Flags().BytesHexVar(&flagBootstrapRandomSeed, "random-seed", GenerateRandomSeed(), "The seed used to for DKG, Clustering and Cluster QC generation")
+	cmd.MarkFlagRequired(finalizeCmd, "protocol-version")
 
 	// optional parameters to influence various aspects of identity generation
 	finalizeCmd.Flags().UintVar(&flagCollectionClusters, "collection-clusters", 2, "number of collection clusters")
@@ -197,7 +199,7 @@ func finalize(cmd *cobra.Command, args []string) {
 
 	// construct serializable root protocol snapshot
 	log.Info().Msg("constructing root protocol snapshot")
-	snapshot, err := inmem.SnapshotFromBootstrapState(block, result, seal, rootQC)
+	snapshot, err := inmem.SnapshotFromBootstrapStateWithProtocolVersion(block, result, seal, rootQC, flagProtocolVersion)
 	if err != nil {
 		log.Fatal().Err(err).Msg("unable to generate root protocol snapshot")
 	}
@@ -312,7 +314,7 @@ func readPartnerNodeInfos() []model.NodeInfo {
 	return nodes
 }
 
-// readParnterNodes reads the partner node information
+// readPartnerNodes reads the partner node information
 func readPartnerNodes() []model.NodeInfoPub {
 	var partners []model.NodeInfoPub
 	files, err := filesInDir(flagPartnerNodeInfoDir)

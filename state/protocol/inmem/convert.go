@@ -220,6 +220,18 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // root bootstrap state. This is used to bootstrap the protocol state for
 // genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
+	return SnapshotFromBootstrapStateWithProtocolVersion(root, result, seal, qc, flow.DefaultProtocolVersion)
+}
+
+// SnapshotFromBootstrapStateWithProtocolVersion is SnapshotFromBootstrapState
+// with a caller-specified protocol version.
+func SnapshotFromBootstrapStateWithProtocolVersion(
+	root *flow.Block,
+	result *flow.ExecutionResult,
+	seal *flow.Seal,
+	qc *flow.QuorumCertificate,
+	version uint,
+) (*Snapshot, error) {
 
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
@@ -238,11 +250,10 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 		Current: current.enc,
 	}
 
-	// create spork parameters deterministically from input root state
 	params := EncodableParams{
-		ChainID:         root.Header.ChainID,
-		SporkID:         root.ID(),
-		ProtocolVersion: 42,
+		ChainID:         root.Header.ChainID, // chain ID must match the root block
+		SporkID:         root.ID(),           // use root block ID as the unique spork identifier
+		ProtocolVersion: version,             // major software version for this spork
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
