@@ -8,8 +8,9 @@ import (
 // RandomBeaconReconstructor collects signature shares, and reconstructs the
 // group signature with enough shares.
 type RandomBeaconReconstructor interface {
-	// Verify verifies the signature under the stored public key corresponding to the signerID, and the stored message agreed about upfront.
-	Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error)
+	// Verify verifies the signature under the stored public key corresponding
+	// to the signerID, and the stored message agreed about upfront.
+	Verify(signerID flow.Identifier, sig crypto.Signature) error
 
 	// TrustedAdd adds the signature share to the reconstructors internal
 	// state. Validity of signature is not checked. It is up to the
@@ -19,7 +20,7 @@ type RandomBeaconReconstructor interface {
 	// It returns:
 	//  - (true, nil) if and only if enough signature shares were collected
 	//  - (false, nil) if not enough shares were collected
-	//  - (false, error) if there is exception adding the sig share)
+	//  - (false, error) if there is an exception adding the share
 	TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (EnoughShares bool, err error)
 
 	// EnoughShares returns true if and only if reconstructor
@@ -42,7 +43,10 @@ type RandomBeaconReconstructor interface {
 // SigType is the aggregable signature type.
 type SigType uint8
 
-// SigType specifies the role of the signature in the protocol. SigTypeRandomBeacon type is for random beacon signatures. SigTypeStaking is for Hotstuff sigantures. Both types are aggregatable cryptographic signatures.
+// SigType specifies the role of the signature in the protocol.
+// Both types are aggregatable cryptographic signatures.
+//  * SigTypeRandomBeacon type is for random beacon signatures.
+//  * SigTypeStaking is for Hotstuff signatures.
 const (
 	SigTypeStaking SigType = iota
 	SigTypeRandomBeacon
@@ -101,6 +105,7 @@ type BlockSignatureData struct {
 
 // Packer packs aggregated signature data into raw bytes to be used in block header.
 type Packer interface {
+	// Pack serializes the provided BlockSignatureData into a precursor format of a QC.
 	// blockID is the block that the aggregated signature is for.
 	// sig is the aggregated signature data.
 	// Expected error returns during normal operations:

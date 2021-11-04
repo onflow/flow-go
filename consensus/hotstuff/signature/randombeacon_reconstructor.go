@@ -24,7 +24,7 @@ func NewRandomBeaconReconstructur(dkg hotstuff.DKG, randomBeaconInspector hotstu
 
 // Verify returns true if and only if the signature is valid.
 // It expects that correct type of signature is passed. Only SigTypeRandomBeacon is supported
-func (r *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
+func (r *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	panic("to be implemented")
 }
 

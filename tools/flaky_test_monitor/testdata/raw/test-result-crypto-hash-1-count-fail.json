@@ -1,0 +1,55 @@
+{"Time":"2021-09-24T11:51:27.764908-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256"}
+{"Time":"2021-09-24T11:51:27.767125-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"=== RUN   TestSanitySha3_256\n"}
+{"Time":"2021-09-24T11:51:27.767166-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"    hash_test.go:21: \n"}
+{"Time":"2021-09-24T11:51:27.76718-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \tError Trace:\thash_test.go:21\n"}
+{"Time":"2021-09-24T11:51:27.767187-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \tError:      \tNot equal: \n"}
+{"Time":"2021-09-24T11:51:27.767194-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \t            \texpected: hash.Hash{0x36, 0xf0, 0x28, 0x58, 0xb, 0xb0, 0x2c, 0xc8, 0x27, 0x2a, 0x9a, 0x2, 0xf, 0x42, 0x0, 0xe3, 0x46, 0xe2, 0x76, 0xae, 0x66, 0x4e, 0x45, 0xee, 0x80, 0x74, 0x55, 0x74, 0xe2, 0xf5, 0xab, 0x81}\n"}
+{"Time":"2021-09-24T11:51:27.767226-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \t            \tactual  : hash.Hash{0x36, 0xf0, 0x28, 0x58, 0xb, 0xb0, 0x2c, 0xc8, 0x27, 0x2a, 0x9a, 0x2, 0xf, 0x42, 0x0, 0xe3, 0x46, 0xe2, 0x76, 0xae, 0x66, 0x4e, 0x45, 0xee, 0x80, 0x74, 0x55, 0x74, 0xe2, 0xf5, 0xab, 0x80}\n"}
+{"Time":"2021-09-24T11:51:27.767234-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \t            \t\n"}
+{"Time":"2021-09-24T11:51:27.76724-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \t            \tDiff:\n"}
+{"Time":"2021-09-24T11:51:27.76745-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \t            \t--- Expected\n"}
+{"Time":"2021-09-24T11:51:27.767484-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \t            \t+++ Actual\n"}
+{"Time":"2021-09-24T11:51:27.767497-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \t            \t@@ -1,2 +1,2 @@\n"}
+{"Time":"2021-09-24T11:51:27.76751-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \t            \t-(hash.Hash) (len=32) 0x36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab81\n"}
+{"Time":"2021-09-24T11:51:27.767522-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \t            \t+(hash.Hash) (len=32) 0x36f028580bb02cc8272a9a020f4200e346e276ae664e45ee80745574e2f5ab80\n"}
+{"Time":"2021-09-24T11:51:27.767533-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \t            \t \n"}
+{"Time":"2021-09-24T11:51:27.767544-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"        \tTest:       \tTestSanitySha3_256\n"}
+{"Time":"2021-09-24T11:51:27.76759-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Output":"--- FAIL: TestSanitySha3_256 (0.00s)\n"}
+{"Time":"2021-09-24T11:51:27.767602-04:00","Action":"fail","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_256","Elapsed":0}
+{"Time":"2021-09-24T11:51:27.767632-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_384"}
+{"Time":"2021-09-24T11:51:27.767642-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_384","Output":"=== RUN   TestSanitySha3_384\n"}
+{"Time":"2021-09-24T11:51:27.767654-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_384","Output":"--- PASS: TestSanitySha3_384 (0.00s)\n"}
+{"Time":"2021-09-24T11:51:27.767663-04:00","Action":"pass","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha3_384","Elapsed":0}
+{"Time":"2021-09-24T11:51:27.767672-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_256"}
+{"Time":"2021-09-24T11:51:27.767681-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_256","Output":"=== RUN   TestSanitySha2_256\n"}
+{"Time":"2021-09-24T11:51:27.767692-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_256","Output":"--- PASS: TestSanitySha2_256 (0.00s)\n"}
+{"Time":"2021-09-24T11:51:27.767702-04:00","Action":"pass","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_256","Elapsed":0}
+{"Time":"2021-09-24T11:51:27.767712-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_384"}
+{"Time":"2021-09-24T11:51:27.767721-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_384","Output":"=== RUN   TestSanitySha2_384\n"}
+{"Time":"2021-09-24T11:51:27.767732-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_384","Output":"--- PASS: TestSanitySha2_384 (0.00s)\n"}
+{"Time":"2021-09-24T11:51:27.767743-04:00","Action":"pass","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanitySha2_384","Elapsed":0}
+{"Time":"2021-09-24T11:51:27.767752-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanityKmac128"}
+{"Time":"2021-09-24T11:51:27.767791-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanityKmac128","Output":"=== RUN   TestSanityKmac128\n"}
+{"Time":"2021-09-24T11:51:27.767816-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanityKmac128","Output":"--- PASS: TestSanityKmac128 (0.00s)\n"}
+{"Time":"2021-09-24T11:51:27.767824-04:00","Action":"pass","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSanityKmac128","Elapsed":0}
+{"Time":"2021-09-24T11:51:27.767831-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestHashersAPI"}
+{"Time":"2021-09-24T11:51:27.767837-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestHashersAPI","Output":"=== RUN   TestHashersAPI\n"}
+{"Time":"2021-09-24T11:51:27.767843-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestHashersAPI","Output":"    hash_test.go:114: math rand seed is 1632498687765218000\n"}
+{"Time":"2021-09-24T11:51:27.767866-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestHashersAPI","Output":"--- PASS: TestHashersAPI (0.00s)\n"}
+{"Time":"2021-09-24T11:51:27.767875-04:00","Action":"pass","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestHashersAPI","Elapsed":0}
+{"Time":"2021-09-24T11:51:27.767884-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3"}
+{"Time":"2021-09-24T11:51:27.7679-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3","Output":"=== RUN   TestSha3\n"}
+{"Time":"2021-09-24T11:51:27.767909-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3","Output":"    hash_test.go:158: math rand seed is 1632498687765661000\n"}
+{"Time":"2021-09-24T11:51:27.767965-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3/SHA3_256"}
+{"Time":"2021-09-24T11:51:27.767986-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3/SHA3_256","Output":"=== RUN   TestSha3/SHA3_256\n"}
+{"Time":"2021-09-24T11:51:27.875316-04:00","Action":"run","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3/SHA3_384"}
+{"Time":"2021-09-24T11:51:27.875342-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3/SHA3_384","Output":"=== RUN   TestSha3/SHA3_384\n"}
+{"Time":"2021-09-24T11:51:27.99617-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3","Output":"--- PASS: TestSha3 (0.23s)\n"}
+{"Time":"2021-09-24T11:51:27.996209-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3/SHA3_256","Output":"    --- PASS: TestSha3/SHA3_256 (0.11s)\n"}
+{"Time":"2021-09-24T11:51:27.99622-04:00","Action":"pass","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3/SHA3_256","Elapsed":0.11}
+{"Time":"2021-09-24T11:51:27.996229-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3/SHA3_384","Output":"    --- PASS: TestSha3/SHA3_384 (0.12s)\n"}
+{"Time":"2021-09-24T11:51:27.996233-04:00","Action":"pass","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3/SHA3_384","Elapsed":0.12}
+{"Time":"2021-09-24T11:51:27.996236-04:00","Action":"pass","Package":"github.com/onflow/flow-go/crypto/hash","Test":"TestSha3","Elapsed":0.23}
+{"Time":"2021-09-24T11:51:27.996241-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Output":"FAIL\n"}
+{"Time":"2021-09-24T11:51:27.997332-04:00","Action":"output","Package":"github.com/onflow/flow-go/crypto/hash","Output":"FAIL\tgithub.com/onflow/flow-go/crypto/hash\t0.483s\n"}
+{"Time":"2021-09-24T11:51:27.997383-04:00","Action":"fail","Package":"github.com/onflow/flow-go/crypto/hash","Elapsed":0.483}
