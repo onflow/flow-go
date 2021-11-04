@@ -14,8 +14,8 @@ type RandomBeaconReconstructor struct {
 	mock.Mock
 }
 
-// HasSufficientShares provides a mock function with given fields:
-func (_m *RandomBeaconReconstructor) HasSufficientShares() bool {
+// EnoughShares provides a mock function with given fields:
+func (_m *RandomBeaconReconstructor) EnoughShares() bool {
 	ret := _m.Called()
 
 	var r0 bool

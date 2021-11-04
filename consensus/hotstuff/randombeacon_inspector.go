@@ -41,10 +41,13 @@ type RandomBeaconInspector interface {
 
 	// Reconstruct reconstructs the group signature. The function is thread-safe but locks
 	// its internal state, thereby permitting only one routine at a time.
-	// The function errors (without sentinel) in any of the following cases:
-	//  - Not enough shares were collected.
-	//  - Any of the added signatures fails the deserialization.
-	//  - The reconstructed group signature is invalid. This post-verification is required
-	//	  for safety, as `TrustedAdd` allows adding invalid signatures.
+	//
+	// Returns:
+	// - (signature, nil) if no error occurred
+	// - (nil, crypto.notEnoughSharesError) if not enough shares were collected
+	// - (nil, crypto.invalidInputsError) if at least one collected share does not serialize to a valid BLS signature,
+	//    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
+	//    is required  for safety, as `TrustedAdd` allows adding invalid signatures.
+	// - (nil, error) for any other unexpected error.
 	Reconstruct() (crypto.Signature, error)
 }

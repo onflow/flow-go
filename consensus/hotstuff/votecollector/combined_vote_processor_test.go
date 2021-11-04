@@ -74,7 +74,7 @@ func (s *CombinedVoteProcessorTestSuite) SetupTest() {
 	}, func(signerID flow.Identifier, sig crypto.Signature) error {
 		return nil
 	}).Maybe()
-	s.reconstructor.On("HasSufficientShares").Return(func() bool {
+	s.reconstructor.On("EnoughShares").Return(func() bool {
 		return s.rbSharesTotal >= s.minRequiredShares
 	}).Maybe()
 
@@ -232,7 +232,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 	mockAggregator(thresholdSigAggregator)
 	thresholdSigAggregator.On("Aggregate").Return(identities, unittest.RandomBytes(128), nil)
 
-	reconstructor.On("HasSufficientShares").Return(true)
+	reconstructor.On("EnoughShares").Return(true)
 	reconstructor.On("Reconstruct").Return(unittest.SignatureFixture(), nil)
 
 	packer.On("Pack", mock.Anything, mock.Anything).Return(identities, unittest.RandomBytes(128), nil)
@@ -284,7 +284,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_BuildQCError() {
 	s.Run("reconstruct", func() {
 		exception := errors.New("reconstruct-exception")
 		reconstructor := &mockhotstuff.RandomBeaconReconstructor{}
-		reconstructor.On("HasSufficientShares").Return(true)
+		reconstructor.On("EnoughShares").Return(true)
 		reconstructor.On("Reconstruct").Return(nil, exception)
 		processor := createProcessor(stakingSigAggregator, thresholdSigAggregator, reconstructor, packer)
 		err := processor.Process(vote)
@@ -315,7 +315,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughStakeNotEnoughShares(
 	}
 
 	require.False(s.T(), s.processor.done.Load())
-	s.reconstructor.AssertCalled(s.T(), "HasSufficientShares")
+	s.reconstructor.AssertCalled(s.T(), "EnoughShares")
 	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
 }
 
@@ -334,10 +334,10 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_EnoughSharesNotEnoughStakes
 	}
 
 	require.False(s.T(), s.processor.done.Load())
-	s.reconstructor.AssertNotCalled(s.T(), "HasSufficientShares")
+	s.reconstructor.AssertNotCalled(s.T(), "EnoughShares")
 	s.onQCCreatedState.AssertNotCalled(s.T(), "onQCCreated")
 	// verify if we indeed have enough shares
-	require.True(s.T(), s.reconstructor.HasSufficientShares())
+	require.True(s.T(), s.reconstructor.EnoughShares())
 }
 
 // TestProcess_ConcurrentCreatingQC tests a scenario where multiple goroutines process vote at same time,
@@ -358,7 +358,7 @@ func (s *CombinedVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
 	mockAggregator(s.rbSigAggregator)
 	*s.reconstructor = mockhotstuff.RandomBeaconReconstructor{}
 	s.reconstructor.On("Reconstruct").Return(unittest.SignatureFixture(), nil)
-	s.reconstructor.On("HasSufficientShares").Return(true)
+	s.reconstructor.On("EnoughShares").Return(true)
 
 	// at this point sending any vote should result in creating QC.
 	s.packer.On("Pack", s.proposal.Block.BlockID, mock.Anything).Return(stakingSigners, unittest.RandomBytes(128), nil)
@@ -440,7 +440,7 @@ func TestCombinedVoteProcessor_PropertyCreatingQCCorrectness(testifyT *testing.T
 		rbSigAggregator.On("TotalWeight").Return(func() uint64 {
 			return thresholdTotalWeight
 		})
-		reconstructor.On("HasSufficientShares").Return(func() bool {
+		reconstructor.On("EnoughShares").Return(func() bool {
 			return collectedShares >= beaconSignersCount
 		})
 
@@ -650,7 +650,7 @@ func TestCombinedVoteProcessor_PropertyCreatingQCLiveness(testifyT *testing.T) {
 			return thresholdTotalWeight.Load()
 		})
 		// don't require shares
-		reconstructor.On("HasSufficientShares").Return(func() bool {
+		reconstructor.On("EnoughShares").Return(func() bool {
 			return collectedShares.Load() >= beaconSignersCount
 		})
 

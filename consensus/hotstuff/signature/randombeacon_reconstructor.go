@@ -38,9 +38,9 @@ func (r *RandomBeaconReconstructor) TrustedAdd(signerID flow.Identifier, sig cry
 	panic("to be implemented")
 }
 
-// HasSufficientShares returns true if and only if reconstructor
+// EnoughShares returns true if and only if reconstructor
 // has collected a sufficient number of signature shares.
-func (r *RandomBeaconReconstructor) HasSufficientShares() bool {
+func (r *RandomBeaconReconstructor) EnoughShares() bool {
 	panic("to be implemented")
 }
 

@@ -12,7 +12,7 @@ import (
 // randomBeaconInspector implements hotstuff.RandomBeaconInspector interface.
 // All methods of this structure are concurrency-safe.
 type randomBeaconInspector struct {
-	follower crypto.ThresholdSignatureInspector
+	inspector crypto.ThresholdSignatureInspector
 }
 
 // NewRandomBeaconInspector instantiates a new randomBeaconInspector.
@@ -25,18 +25,18 @@ func NewRandomBeaconInspector(
 	message []byte,
 ) (*randomBeaconInspector, error) {
 
-	follower, err := crypto.NewBLSThresholdSignatureInspector(
+	inspector, err := crypto.NewBLSThresholdSignatureInspector(
 		groupPublicKey,
 		publicKeyShares,
 		threshold,
 		message,
 		encoding.RandomBeaconTag)
 	if err != nil {
-		return nil, engine.NewInvalidInputErrorf("create a new Random Beacon follower failed: %w", err)
+		return nil, engine.NewInvalidInputErrorf("create a new Random Beacon inspector failed: %w", err)
 	}
 
 	return &randomBeaconInspector{
-		follower: follower,
+		inspector: inspector,
 	}, nil
 }
 
@@ -49,7 +49,7 @@ func NewRandomBeaconInspector(
 //  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 //  - other error if there is an unexpected exception.
 func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) error {
-	verif, err := r.follower.VerifyShare(signerIndex, share)
+	verif, err := r.inspector.VerifyShare(signerIndex, share)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
 			return engine.NewInvalidInputErrorf("verify beacon share from %d failed: %w", signerIndex, err)
@@ -80,7 +80,7 @@ func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) 
 //      - other error if there is an unexpected exception.
 func (r *randomBeaconInspector) TrustedAdd(signerIndex int, share crypto.Signature) (enoughshares bool, exception error) {
 	// Trusted add to the crypto layer
-	enough, err := r.follower.TrustedAdd(signerIndex, share)
+	enough, err := r.inspector.TrustedAdd(signerIndex, share)
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
 			return false, engine.NewInvalidInputErrorf("trusted add from %d failed: %w", signerIndex, err)
@@ -98,20 +98,19 @@ func (r *randomBeaconInspector) TrustedAdd(signerIndex int, share crypto.Signatu
 //
 // The function is write-blocking
 func (r *randomBeaconInspector) EnoughShares() bool {
-	return r.follower.EnoughShares()
+	return r.inspector.EnoughShares()
 }
 
 // Reconstruct reconstructs the group signature. The function is thread-safe but locks
 // its internal state, thereby permitting only one routine at a time.
 //
 // Returns:
-// - (signature, nil) if no error occured
+// - (signature, nil) if no error occurred
 // - (nil, crypto.notEnoughSharesError) if not enough shares were collected
 // - (nil, crypto.invalidInputsError) if at least one collected share does not serialize to a valid BLS signature,
 //    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
 //    is required  for safety, as `TrustedAdd` allows adding invalid signatures.
 // - (nil, error) for any other unexpected error.
-// The function is blocking.
 func (r *randomBeaconInspector) Reconstruct() (crypto.Signature, error) {
-	return r.follower.ThresholdSignature()
+	return r.inspector.ThresholdSignature()
 }

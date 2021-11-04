@@ -58,8 +58,8 @@ type ThresholdSignatureInspector interface {
 	// The share is only added if the signer index is valid and has not been
 	// added yet. Moreover, the share is added only if not enough shares were collected.
 	// The function returns:
-	//  - (true, nil) if enough signature shares were already collected and no error occured
-	//  - (false, nil) if not enough shares were collected and no error occured
+	//  - (true, nil) if enough signature shares were already collected and no error occurred
+	//  - (false, nil) if not enough shares were collected and no error occurred
 	//  - (false, InvalidInputsError) if index is invalid
 	//  - (false, duplicatedSignerError) if a signature for the index was previously added
 	TrustedAdd(orig int, share Signature) (bool, error)
@@ -70,12 +70,14 @@ type ThresholdSignatureInspector interface {
 	//
 	// The share is only added if the signature is valid, the signer index is valid and has not been
 	// added yet. Moreover, the share is added only if not enough shares were collected.
-	// The function returns 3 outputs:
+	// Boolean returns:
 	//  - First boolean output is true if the share is valid and no error is returned, and false otherwise.
 	//  - Second boolean output is true if enough shares were collected and no error is returned, and false otherwise.
-	//  - error is InvalidInputsError if input index is invalid, duplicatedSignerError if signer was added,
-	//	   and a random error if an exception occurred.
-	//    (an invalid signature is not considered an invalid input, look at `VerifyShare` for details)
+	// Error returns:
+	//  - invalidInputsError if input index is invalid. A signature that doesn't verify against the signer's
+	//    public key is not considered an invalid input.
+	//  - duplicatedSignerError if signer was already added.
+	//  - other errors if an unexpected exception occurred.
 	VerifyAndAdd(orig int, share Signature) (bool, bool, error)
 
 	// HasShare checks whether the internal map contains the share of the given index.
@@ -87,7 +89,7 @@ type ThresholdSignatureInspector interface {
 	// The threshold signature is reconstructed only once and is cached for subsequent calls.
 	//
 	// Returns:
-	// - (signature, nil) if no error occured
+	// - (signature, nil) if no error occurred
 	// - (nil, notEnoughSharesError) if not enough shares were collected
 	// - (nil, invalidInputsError) if at least one collected share does not serialize to a valid BLS signature,
 	//    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
