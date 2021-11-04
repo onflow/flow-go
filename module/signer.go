@@ -44,3 +44,15 @@ type ThresholdSignerStore interface {
 	//  - (nil, error) if there is any exception
 	GetThresholdSigner(view uint64) (ThresholdSigner, error)
 }
+
+type MsgSigner interface {
+	Sign(msg []byte) (crypto.Signature, error)
+}
+
+type RandomBeaconSignerStore interface {
+	// It returns:
+	//  - (signer, nil) if DKG was completed in the epoch of the view
+	//  - (nil, DKGIncompleteError) if DKG was not completed in the epoch of the view
+	//  - (nil, error) if there is any exception
+	GetSigner(view uint64) (MsgSigner, error)
+}

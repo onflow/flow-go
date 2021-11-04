@@ -525,10 +525,7 @@ func main() {
 			)
 
 			// initialize the aggregating signature module for staking signatures
-			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
-
-			// initialize the verifier used to verify threshold signatures
-			thresholdVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
+			staking := signature.NewStakingSigner(encoding.ConsensusVoteTag, node.Me)
 
 			// initialize the simple merger to combine staking & beacon signatures
 			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
@@ -543,16 +540,15 @@ func main() {
 
 			epochLookup := epochs.NewEpochLookup(node.State)
 
-			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, node.Storage.DKGKeys)
+			randomBeaconSigner := signature.NewRandomBeaconSigner(epochLookup, node.Storage.DKGKeys)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.SignerVerifier
 			signer = verification.NewCombinedSigner(
 				committee,
 				staking,
-				thresholdVerifier,
 				merger,
-				thresholdSignerStore,
+				randomBeaconSigner,
 				node.NodeID,
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
