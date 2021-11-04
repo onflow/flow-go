@@ -90,27 +90,27 @@ func (ss *SyncSuite) TestQueueByHeight() {
 func (ss *SyncSuite) TestQueueByBlockID() {
 
 	// generate a number of block IDs
-	var blockIDs []flow.Identifier
+	var blockHeaders []flow.Header
 	for n := 0; n < 100; n++ {
-		blockIDs = append(blockIDs, unittest.IdentifierFixture())
+		blockHeaders = append(blockHeaders, unittest.BlockHeaderFixture())
 	}
 
 	// add all of them to engine
-	for _, blockID := range blockIDs {
-		ss.core.queueByBlockID(blockID)
+	for _, blockHeader := range blockHeaders {
+		ss.core.queueByBlockID(blockHeader.ID(), blockHeader.Height)
 	}
 
 	// check they are all in the map now
-	for _, blockID := range blockIDs {
-		status, exists := ss.core.blockIDs[blockID]
+	for _, blockHeader := range blockHeaders {
+		status, exists := ss.core.blockIDs[blockHeader.ID()]
 		ss.Assert().True(exists, "status map should contain the block ID")
 		ss.Assert().False(status.WasRequested(), "block should have correct status")
 	}
 
 	// get current count and add all again
 	count := len(ss.core.blockIDs)
-	for _, blockID := range blockIDs {
-		ss.core.queueByBlockID(blockID)
+	for _, blockHeader := range blockHeaders {
+		ss.core.queueByBlockID(blockHeader.ID(), blockHeader.Height)
 	}
 
 	// check that operation was idempotent (size still the same)
@@ -119,24 +119,24 @@ func (ss *SyncSuite) TestQueueByBlockID() {
 
 func (ss *SyncSuite) TestRequestBlock() {
 
-	queuedID := unittest.IdentifierFixture()
-	requestedID := unittest.IdentifierFixture()
+	queuedHeader := unittest.BlockHeaderFixture()
+	requestedHeader := unittest.BlockHeaderFixture()
 	received := unittest.BlockHeaderFixture()
 
-	ss.core.blockIDs[queuedID] = ss.QueuedStatus()
-	ss.core.blockIDs[requestedID] = ss.RequestedStatus()
-	ss.core.blockIDs[received.ID()] = ss.RequestedStatus()
+	ss.core.blockIDs[queuedHeader.ID()] = &statusWithHeight{ss.QueuedStatus(), queuedHeader.Height}
+	ss.core.blockIDs[requestedHeader.ID()] = &statusWithHeight{ss.RequestedStatus(), queuedHeader.Height}
+	ss.core.blockIDs[received.ID()] = &statusWithHeight{ss.RequestedStatus(), received.Height}
 
 	// queued status should stay the same
-	ss.core.RequestBlock(queuedID)
-	assert.True(ss.T(), ss.core.blockIDs[queuedID].WasQueued())
+	ss.core.RequestBlock(queuedHeader.ID(), queuedHeader.Height)
+	assert.True(ss.T(), ss.core.blockIDs[queuedHeader.ID()].WasQueued())
 
 	// requested status should stay the same
-	ss.core.RequestBlock(requestedID)
-	assert.True(ss.T(), ss.core.blockIDs[requestedID].WasRequested())
+	ss.core.RequestBlock(requestedHeader.ID(), requestedHeader.Height)
+	assert.True(ss.T(), ss.core.blockIDs[requestedHeader.ID()].WasRequested())
 
 	// received status should be re-queued by ID
-	ss.core.RequestBlock(received.ID())
+	ss.core.RequestBlock(received.ID(), received.Height)
 	assert.True(ss.T(), ss.core.blockIDs[received.ID()].WasQueued())
 	assert.False(ss.T(), ss.core.blockIDs[received.ID()].WasReceived())
 	assert.False(ss.T(), ss.core.heights[received.Height].WasQueued())
@@ -148,10 +148,10 @@ func (ss *SyncSuite) TestHandleBlock() {
 	queuedByHeight := unittest.BlockHeaderFixture()
 	ss.core.heights[queuedByHeight.Height] = ss.QueuedStatus()
 	requestedByID := unittest.BlockHeaderFixture()
-	ss.core.blockIDs[requestedByID.ID()] = ss.RequestedStatus()
+	ss.core.blockIDs[requestedByID.ID()] = &statusWithHeight{ss.RequestedStatus(), requestedByID.Height}
 	received := unittest.BlockHeaderFixture()
 	ss.core.heights[received.Height] = ss.ReceivedStatus(&received)
-	ss.core.blockIDs[received.ID()] = ss.ReceivedStatus(&received)
+	ss.core.blockIDs[received.ID()] = &statusWithHeight{ss.ReceivedStatus(&received), received.Height}
 
 	// should ignore un-requested blocks
 	shouldProcess := ss.core.HandleBlock(&unrequested)
@@ -232,27 +232,36 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 	}
 
 	// fill in a block ID that should be skipped
-	skipBlockID := unittest.IdentifierFixture()
-	ss.core.blockIDs[skipBlockID] = &Status{
-		Queued:    now,
-		Requested: now,
-		Attempts:  0,
+	skipBlockHeader := unittest.BlockHeaderFixture()
+	ss.core.blockIDs[skipBlockHeader.ID()] = &statusWithHeight{
+		&Status{
+			Queued:    now,
+			Requested: now,
+			Attempts:  0,
+		},
+		skipBlockHeader.Height,
 	}
 
 	// fill in a block ID that should be deleted
-	dropBlockID := unittest.IdentifierFixture()
-	ss.core.blockIDs[dropBlockID] = &Status{
-		Queued:    now,
-		Requested: zero,
-		Attempts:  ss.core.Config.MaxAttempts,
+	dropBlockHeader := unittest.BlockHeaderFixture()
+	ss.core.blockIDs[dropBlockHeader.ID()] = &statusWithHeight{
+		&Status{
+			Queued:    now,
+			Requested: zero,
+			Attempts:  ss.core.Config.MaxAttempts,
+		},
+		dropBlockHeader.Height,
 	}
 
 	// fill in a block ID that should be requested
-	reqBlockID := unittest.IdentifierFixture()
-	ss.core.blockIDs[reqBlockID] = &Status{
-		Queued:    now,
-		Requested: zero,
-		Attempts:  0,
+	reqBlockHeader := unittest.BlockHeaderFixture()
+	ss.core.blockIDs[reqBlockHeader.ID()] = &statusWithHeight{
+		&Status{
+			Queued:    now,
+			Requested: zero,
+			Attempts:  0,
+		},
+		reqBlockHeader.Height,
 	}
 
 	// execute the pending scan
@@ -264,9 +273,9 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 	require.Contains(ss.T(), heights, reqHeight, "output should contain request height")
 
 	// check only the request block ID is in block IDs
-	require.NotContains(ss.T(), blockIDs, skipBlockID, "output should not contain skip blockID")
-	require.NotContains(ss.T(), blockIDs, dropBlockID, "output should not contain drop blockID")
-	require.Contains(ss.T(), blockIDs, reqBlockID, "output should contain request blockID")
+	require.NotContains(ss.T(), blockIDs, skipBlockHeader.ID(), "output should not contain skip blockID")
+	require.NotContains(ss.T(), blockIDs, dropBlockHeader.ID(), "output should not contain drop blockID")
+	require.Contains(ss.T(), blockIDs, reqBlockHeader.ID(), "output should contain request blockID")
 
 	// check only delete height was deleted
 	require.Contains(ss.T(), ss.core.heights, skipHeight, "status should not contain skip height")
@@ -274,9 +283,9 @@ func (ss *SyncSuite) TestGetRequestableItems() {
 	require.Contains(ss.T(), ss.core.heights, reqHeight, "status should contain request height")
 
 	// check only the delete block ID was deleted
-	require.Contains(ss.T(), ss.core.blockIDs, skipBlockID, "status should not contain skip blockID")
-	require.NotContains(ss.T(), ss.core.blockIDs, dropBlockID, "status should not contain drop blockID")
-	require.Contains(ss.T(), ss.core.blockIDs, reqBlockID, "status should contain request blockID")
+	require.Contains(ss.T(), ss.core.blockIDs, skipBlockHeader.ID(), "status should not contain skip blockID")
+	require.NotContains(ss.T(), ss.core.blockIDs, dropBlockHeader.ID(), "status should not contain drop blockID")
+	require.Contains(ss.T(), ss.core.blockIDs, reqBlockHeader.ID(), "status should contain request blockID")
 }
 
 func (ss *SyncSuite) TestGetRanges() {
@@ -415,14 +424,14 @@ func (ss *SyncSuite) TestPrune() {
 	for i := 0; i < 3; i++ {
 		block := unittest.BlockFixture()
 		block.Header.Height = uint64(i + 1)
-		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
+		ss.core.blockIDs[block.ID()] = &statusWithHeight{ss.ReceivedStatus(block.Header), block.Header.Height}
 		prunableBlockIDs = append(prunableBlockIDs, block)
 	}
 	// add some un-finalized, received blocks by block ID
 	for i := 0; i < 3; i++ {
 		block := unittest.BlockFixture()
 		block.Header.Height = 100 + uint64(i+1)
-		ss.core.blockIDs[block.ID()] = ss.ReceivedStatus(block.Header)
+		ss.core.blockIDs[block.ID()] = &statusWithHeight{ss.ReceivedStatus(block.Header), block.Header.Height}
 		unprunable = append(unprunable, block)
 	}
 

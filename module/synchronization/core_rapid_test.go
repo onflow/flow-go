@@ -52,7 +52,7 @@ func (r *rapidSync) Init(t *rapid.T) {
 // RequestByID is an action that requests a block by its ID.
 func (r *rapidSync) RequestByID(t *rapid.T) {
 	b := rapid.SampledFrom(r.store).Draw(t, "id_request").(flow.Header)
-	r.core.RequestBlock(b.ID())
+	r.core.RequestBlock(b.ID(), b.Height)
 	// Re-queueing by ID should always succeed
 	r.idRequests[b.ID()] = true
 	// Re-qeueuing by ID "forgets" a past height request
