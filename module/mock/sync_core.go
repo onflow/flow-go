@@ -31,6 +31,20 @@ func (_m *SyncCore) HandleBlock(header *flow.Header) bool {
 	return r0
 }
 
+// HandleFinalizedBlock provides a mock function with given fields: header
+func (_m *SyncCore) HandleFinalizedBlock(header *flow.Header) bool {
+	ret := _m.Called(header)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*flow.Header) bool); ok {
+		r0 = rf(header)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	return r0
+}
+
 // HandleHeight provides a mock function with given fields: final, height
 func (_m *SyncCore) HandleHeight(final *flow.Header, height uint64) {
 	_m.Called(final, height)
