@@ -4,13 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"path/filepath"
-	"testing"
 	"time"
 
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	datastore "github.com/ipfs/go-datastore/examples"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/rs/zerolog"
@@ -28,6 +25,7 @@ type BlockExchangeTestSuite struct {
 	suite.Suite
 
 	cancel         context.CancelFunc
+	cleanupFuncs   []func()
 	networks       []*p2p.Network
 	blockExchanges []network.BlockExchange
 	blockCids      []cid.Cid
@@ -50,7 +48,8 @@ func (suite *BlockExchangeTestSuite) SetupTest() {
 	blockExchangeChannel := network.Channel("block-exchange")
 
 	for i, net := range networks {
-		bstore := makeBlockstore(suite.T(), fmt.Sprintf("bs%v", i))
+		bstore, cleanupFunc := MakeBlockstore(suite.T(), fmt.Sprintf("bs%v", i))
+		suite.cleanupFuncs = append(suite.cleanupFuncs, cleanupFunc)
 		block := blocks.NewBlock([]byte(fmt.Sprintf("foo%v", i)))
 		suite.blockCids = append(suite.blockCids, block.Cid())
 		require.NoError(suite.T(), bstore.Put(block))
@@ -63,6 +62,9 @@ func (suite *BlockExchangeTestSuite) SetupTest() {
 
 func (suite *BlockExchangeTestSuite) TearDownTest() {
 	suite.cancel()
+	for _, cleanupFunc := range suite.cleanupFuncs {
+		cleanupFunc()
+	}
 	netDoneChans := make([]<-chan struct{}, len(suite.networks))
 	for i, net := range suite.networks {
 		netDoneChans[i] = net.Done()
@@ -167,15 +169,4 @@ func (suite *BlockExchangeTestSuite) TestHas() {
 			assert.True(suite.T(), received, "block %v not received by node %v", c, i)
 		}
 	}
-}
-
-func makeBlockstore(t *testing.T, name string) blockstore.Blockstore {
-	dsDir := filepath.Join(os.TempDir(), name)
-	err := os.Mkdir(dsDir, os.ModeDir)
-	require.NoError(t, err)
-
-	ds, err := datastore.NewDatastore(dsDir)
-	require.NoError(t, err)
-
-	return blockstore.NewBlockstore(ds.(*datastore.Datastore))
 }

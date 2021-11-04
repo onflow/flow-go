@@ -34,7 +34,7 @@ func TestEventFingerprint(t *testing.T) {
 
 	data := fingerprint.Fingerprint(evt)
 	var decoded eventWrapper
-	rlp.NewEncoder().MustDecode(data, &decoded)
+	rlp.NewMarshaler().MustUnmarshal(data, &decoded)
 	assert.Equal(t, wrapEvent(evt), decoded)
 }
 
