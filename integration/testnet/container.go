@@ -43,7 +43,6 @@ type ContainerConfig struct {
 	Ghost                 bool
 	AdditionalFlags       []string
 	Debug                 bool
-	Unstaked              bool
 	SupportsUnstakedNodes bool
 }
 

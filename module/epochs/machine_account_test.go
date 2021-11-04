@@ -32,7 +32,7 @@ func TestMachineAccountChecking(t *testing.T) {
 	})
 	t.Run("inconsistent key", func(t *testing.T) {
 		local, remote := unittest.MachineAccountFixture(t)
-		randomKey := unittest.PrivateKeyFixture(crypto.ECDSAP256)
+		randomKey := unittest.PrivateKeyFixture(crypto.ECDSAP256, unittest.DefaultSeedFixtureLength)
 		remote.Keys[0].PublicKey = randomKey.PublicKey()
 		err := CheckMachineAccountInfo(zerolog.Nop(), flow.RoleConsensus, local, remote)
 		require.Error(t, err)
@@ -129,7 +129,7 @@ func TestMachineAccountChecking(t *testing.T) {
 			local, remote := unittest.MachineAccountFixture(t)
 
 			// non-standard sig algo
-			sk := unittest.PrivateKeyFixture(crypto.ECDSASecp256k1)
+			sk := unittest.PrivateKeyFixture(crypto.ECDSASecp256k1, unittest.DefaultSeedFixtureLength)
 			local.EncodedPrivateKey = sk.Encode()
 			local.SigningAlgorithm = sdkcrypto.ECDSA_secp256k1
 			// consistent between local/remote

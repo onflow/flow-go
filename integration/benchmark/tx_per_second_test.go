@@ -110,8 +110,12 @@ func (gs *TransactionsPerSecondSuite) privateKey() string {
 		panic("error while hex decoding hardcoded root key")
 	}
 
-	// RLP decode the key
-	ServiceAccountPrivateKey, err := flow.DecodeAccountPrivateKey(serviceAccountPrivateKeyBytes)
+	ServiceAccountPrivateKey := flow.AccountPrivateKey{
+		SignAlgo: unittest.ServiceAccountPrivateKeySignAlgo,
+		HashAlgo: unittest.ServiceAccountPrivateKeyHashAlgo,
+	}
+	ServiceAccountPrivateKey.PrivateKey, err = crypto.DecodePrivateKey(
+		ServiceAccountPrivateKey.SignAlgo, serviceAccountPrivateKeyBytes)
 	if err != nil {
 		panic("error while decoding hardcoded root key bytes")
 	}

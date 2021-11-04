@@ -13,34 +13,49 @@ import (
 
 // signerInfo holds information about a signer, its stake and index
 type signerInfo struct {
-	weight uint64 //nolint:unused
+	weight uint64
 	index  int
 }
 
 // WeightedSignatureAggregator implements consensus/hotstuff.WeightedSignatureAggregator
 type WeightedSignatureAggregator struct {
-	aggregator   *signature.SignatureAggregatorSameMessage // low level crypto aggregator, agnostic of weights and flow IDs
-	signers      []flow.Identity                           //nolint:unused
-	idToSigner   map[flow.Identifier]signerInfo
-	totalWeight  uint64                       // weight collected
-	lock         sync.RWMutex                 // lock for atomic updates
-	collectedIDs map[flow.Identifier]struct{} // map of collected IDs
+	aggregator   *signature.SignatureAggregatorSameMessage // low level crypto BLS aggregator, agnostic of weights and flow IDs
+	ids          flow.IdentityList                         // all possible ids (only gets updated by constructor)
+	idToInfo     map[flow.Identifier]signerInfo            // auxiliary map to lookup signer weight and index by ID (only gets updated by constructor)
+	totalWeight  uint64                                    // weight collected (gets updated)
+	collectedIDs map[flow.Identifier]struct{}              // map of collected IDs (gets updated)
+	lock         sync.RWMutex                              // lock for atomic updates to totalWeight and collectedIDs
 }
 
 var _ hotstuff.WeightedSignatureAggregator = &WeightedSignatureAggregator{}
 
-// NewWeightedSignatureAggregator returns a weighted aggregator initialized with the input data.
+// NewWeightedSignatureAggregator returns a weighted aggregator initialized with a list of flow
+// identities, a message and a domain separation tag. The identities represent the list of all
+// possible signers.
+//
+// The constructor errors engine.InvalidInputError if:
+// - the list of identities is empty
+// - if an identity doesn't hold a valid staking key.
 //
 // A weighted aggregator is used for one aggregation only. A new instance should be used for each use.
 func NewWeightedSignatureAggregator(
-	signers []flow.Identity, // list of all possible signers
+	ids flow.IdentityList, // list of all possible signers
 	message []byte, // message to get an aggregated signature for
 	dsTag string, // domain separation tag used by the signature
 ) (*WeightedSignatureAggregator, error) {
 
+	// build the internal map for a faster look-up
+	idToInfo := make(map[flow.Identifier]signerInfo)
+	for i, id := range ids {
+		idToInfo[id.NodeID] = signerInfo{
+			weight: id.Stake,
+			index:  i,
+		}
+	}
+
 	// build a low level crypto aggregator
-	publicKeys := make([]crypto.PublicKey, 0, len(signers))
-	for _, id := range signers {
+	publicKeys := make([]crypto.PublicKey, 0, len(ids))
+	for _, id := range ids {
 		publicKeys = append(publicKeys, id.StakingPubKey)
 	}
 	agg, err := signature.NewSignatureAggregatorSameMessage(message, dsTag, publicKeys)
@@ -50,17 +65,12 @@ func NewWeightedSignatureAggregator(
 
 	// build the weighted aggregator
 	weightedAgg := &WeightedSignatureAggregator{
-		aggregator: agg,
-		signers:    signers,
+		aggregator:   agg,
+		ids:          ids,
+		idToInfo:     idToInfo,
+		collectedIDs: make(map[flow.Identifier]struct{}),
 	}
 
-	// build the internal map for a faster look-up
-	for i, id := range signers {
-		weightedAgg.idToSigner[id.NodeID] = signerInfo{
-			weight: id.Stake,
-			index:  i,
-		}
-	}
 	return weightedAgg, nil
 }
 
@@ -72,7 +82,7 @@ func NewWeightedSignatureAggregator(
 //  - random error if the execution failed
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
-	info, ok := w.idToSigner[signerID]
+	info, ok := w.idToInfo[signerID]
 	if !ok {
 		return engine.NewInvalidInputErrorf("couldn't find signerID %s in the index map", signerID)
 	}
@@ -82,7 +92,7 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 		return fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
 	}
 	if !ok {
-		return signature.ErrInvalidFormat
+		return fmt.Errorf("invalid signature from %s: %w", signerID, signature.ErrInvalidFormat)
 	}
 	return nil
 }
@@ -108,15 +118,13 @@ func (w *WeightedSignatureAggregator) hasSignature(signerID flow.Identifier) boo
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (uint64, error) {
 
-	currentWeight := w.TotalWeight()
-
-	info, found := w.idToSigner[signerID]
+	info, found := w.idToInfo[signerID]
 	if !found {
-		return currentWeight, engine.NewInvalidInputErrorf("couldn't find signerID %s in the map", signerID)
+		return w.TotalWeight(), engine.NewInvalidInputErrorf("couldn't find signerID %s in the map", signerID)
 	}
 
 	if w.hasSignature(signerID) {
-		return currentWeight, engine.NewDuplicatedEntryErrorf("SigneID %s was already added", signerID)
+		return w.TotalWeight(), engine.NewDuplicatedEntryErrorf("SigneID %s was already added", signerID)
 	}
 
 	// atomically update the signatures pool and the total weight
@@ -125,7 +133,7 @@ func (w *WeightedSignatureAggregator) TrustedAdd(signerID flow.Identifier, sig c
 
 	err := w.aggregator.TrustedAdd(info.index, sig)
 	if err != nil {
-		return currentWeight, fmt.Errorf("Trusted add has failed: %w", err)
+		return w.totalWeight, fmt.Errorf("Trusted add has failed: %w", err)
 	}
 
 	w.collectedIDs[signerID] = struct{}{}
@@ -162,7 +170,7 @@ func (w *WeightedSignatureAggregator) Aggregate() ([]flow.Identifier, []byte, er
 	}
 	signerIDs := make([]flow.Identifier, 0, len(indices))
 	for _, index := range indices {
-		signerIDs = append(signerIDs, w.signers[index].NodeID)
+		signerIDs = append(signerIDs, w.ids[index].NodeID)
 	}
 
 	return signerIDs, aggSignature, nil

@@ -3,6 +3,7 @@ package testutil
 import (
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -153,7 +154,8 @@ func GenericNodeWithStateFixture(t testing.TB,
 		Log:            log,
 		Metrics:        metrics,
 		Tracer:         tracer,
-		DB:             stateFixture.DB,
+		PublicDB:       stateFixture.PublicDB,
+		SecretsDB:      stateFixture.SecretsDB,
 		State:          stateFixture.State,
 		Headers:        stateFixture.Storage.Headers,
 		Guarantees:     stateFixture.Storage.Guarantees,
@@ -198,9 +200,12 @@ func CompleteStateFixture(
 	rootSnapshot protocol.Snapshot,
 ) *testmock.StateFixture {
 
-	dbDir := unittest.TempDir(t)
-	db := unittest.BadgerDB(t, dbDir)
+	dataDir := unittest.TempDir(t)
+	publicDBDir := filepath.Join(dataDir, "protocol")
+	secretsDBDir := filepath.Join(dataDir, "secrets")
+	db := unittest.TypedBadgerDB(t, publicDBDir, storage.InitPublic)
 	s := storage.InitAll(metric, db)
+	secretsDB := unittest.TypedBadgerDB(t, secretsDBDir, storage.InitSecret)
 	consumer := events.NewDistributor()
 
 	state, err := badgerstate.Bootstrap(metric, db, s.Headers, s.Seals, s.Results, s.Blocks, s.Setups, s.EpochCommits, s.Statuses, rootSnapshot)
@@ -211,9 +216,10 @@ func CompleteStateFixture(
 	require.NoError(t, err)
 
 	return &testmock.StateFixture{
-		DB:             db,
+		PublicDB:       db,
+		SecretsDB:      secretsDB,
 		Storage:        s,
-		DBDir:          dbDir,
+		DBDir:          dataDir,
 		ProtocolEvents: consumer,
 		State:          mutableState,
 	}
@@ -225,9 +231,9 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	node := GenericNode(t, hub, identity, rootSnapshot)
 
 	pools := epochs.NewTransactionPools(func() mempool.Transactions { return stdmap.NewTransactions(1000) })
-	transactions := storage.NewTransactions(node.Metrics, node.DB)
-	collections := storage.NewCollections(node.DB, transactions)
-	clusterPayloads := storage.NewClusterPayloads(node.Metrics, node.DB)
+	transactions := storage.NewTransactions(node.Metrics, node.PublicDB)
+	collections := storage.NewCollections(node.PublicDB, transactions)
+	clusterPayloads := storage.NewClusterPayloads(node.Metrics, node.PublicDB)
 
 	ingestionEngine, err := collectioningest.New(node.Log, node.Net, node.State, node.Metrics, node.Metrics, node.Me, node.ChainID.Chain(), pools, collectioningest.DefaultConfig())
 	require.NoError(t, err)
@@ -244,14 +250,14 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	require.NoError(t, err)
 
 	clusterStateFactory, err := factories.NewClusterStateFactory(
-		node.DB,
+		node.PublicDB,
 		node.Metrics,
 		node.Tracer,
 	)
 	require.NoError(t, err)
 
 	builderFactory, err := factories.NewBuilderFactory(
-		node.DB,
+		node.PublicDB,
 		node.Headers,
 		node.Tracer,
 		node.Metrics,
@@ -293,7 +299,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 		node.Log,
 		node.Me,
 		aggregator,
-		node.DB,
+		node.PublicDB,
 		node.State,
 		createMetrics,
 		consensus.WithInitialTimeout(time.Second*2),
@@ -363,8 +369,8 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
-	resultsDB := storage.NewExecutionResults(node.Metrics, node.DB)
-	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.DB, resultsDB, storage.DefaultCacheSize)
+	resultsDB := storage.NewExecutionResults(node.Metrics, node.PublicDB)
+	receiptsDB := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, resultsDB, storage.DefaultCacheSize)
 
 	guarantees, err := stdmap.NewGuarantees(1000)
 	require.NoError(t, err)
@@ -374,9 +380,10 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals := stdmap.NewIncorporatedResultSeals(1000)
 	pendingReceipts := stdmap.NewPendingReceipts(node.Headers, 1000)
 
+	ingestionCore := consensusingest.NewCore(node.Log, node.Tracer, node.Metrics, node.State,
+		node.Headers, guarantees)
 	// receive collections
-	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State,
-		node.Headers, node.Me, guarantees)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Net, node.Me, ingestionCore)
 	require.Nil(t, err)
 
 	// request receipts from execution nodes
@@ -481,16 +488,16 @@ type CheckerMock struct {
 func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, syncThreshold int, chainID flow.ChainID) testmock.ExecutionNode {
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
 
-	transactionsStorage := storage.NewTransactions(node.Metrics, node.DB)
-	collectionsStorage := storage.NewCollections(node.DB, transactionsStorage)
-	eventsStorage := storage.NewEvents(node.Metrics, node.DB)
-	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.DB)
-	txResultStorage := storage.NewTransactionResults(node.Metrics, node.DB, storage.DefaultCacheSize)
-	commitsStorage := storage.NewCommits(node.Metrics, node.DB)
-	chunkDataPackStorage := storage.NewChunkDataPacks(node.Metrics, node.DB, collectionsStorage, 100)
-	results := storage.NewExecutionResults(node.Metrics, node.DB)
-	receipts := storage.NewExecutionReceipts(node.Metrics, node.DB, results, storage.DefaultCacheSize)
-	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.DB, receipts)
+	transactionsStorage := storage.NewTransactions(node.Metrics, node.PublicDB)
+	collectionsStorage := storage.NewCollections(node.PublicDB, transactionsStorage)
+	eventsStorage := storage.NewEvents(node.Metrics, node.PublicDB)
+	serviceEventsStorage := storage.NewServiceEvents(node.Metrics, node.PublicDB)
+	txResultStorage := storage.NewTransactionResults(node.Metrics, node.PublicDB, storage.DefaultCacheSize)
+	commitsStorage := storage.NewCommits(node.Metrics, node.PublicDB)
+	chunkDataPackStorage := storage.NewChunkDataPacks(node.Metrics, node.PublicDB, collectionsStorage, 100)
+	results := storage.NewExecutionResults(node.Metrics, node.PublicDB)
+	receipts := storage.NewExecutionReceipts(node.Metrics, node.PublicDB, results, storage.DefaultCacheSize)
+	myReceipts := storage.NewMyExecutionReceipts(node.Metrics, node.PublicDB, receipts)
 	checkStakedAtBlock := func(blockID flow.Identifier) (bool, error) {
 		return protocol.IsNodeStakedAt(node.State.AtBlockID(blockID), node.Me.NodeID())
 	}
@@ -525,11 +532,11 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		fvm.WithInitialTokenSupply(unittest.GenesisTokenSupply))
 	require.NoError(t, err)
 
-	err = bootstrapper.BootstrapExecutionDatabase(node.DB, commit, genesisHead)
+	err = bootstrapper.BootstrapExecutionDatabase(node.PublicDB, commit, genesisHead)
 	require.NoError(t, err)
 
 	execState := executionState.NewExecutionState(
-		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.DB, node.Tracer,
+		ls, commitsStorage, node.Blocks, node.Headers, collectionsStorage, chunkDataPackStorage, results, receipts, myReceipts, eventsStorage, serviceEventsStorage, txResultStorage, node.PublicDB, node.Tracer,
 	)
 
 	requestEngine, err := requester.New(
@@ -619,7 +626,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	followerCore, finalizer := createFollowerCore(t, &node, followerState, finalizationDistributor, rootHead, rootQC)
 
 	// initialize cleaner for DB
-	cleaner := storage.NewCleaner(node.Log, node.DB, node.Metrics, flow.DefaultValueLogGCFrequency)
+	cleaner := storage.NewCleaner(node.Log, node.PublicDB, node.Metrics, flow.DefaultValueLogGCFrequency)
 
 	followerEng, err := follower.New(node.Log, node.Net, node.Me, node.Metrics, node.Metrics, cleaner,
 		node.Headers, node.Payloads, followerState, pendingBlocks, followerCore, syncCore, node.Tracer)
@@ -639,7 +646,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		followerEng,
 		syncCore,
 		finalizedHeader,
-		id.NewFilteredIdentifierProvider(
+		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
@@ -659,7 +666,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		ExecutionEngine:     computation,
 		RequestEngine:       requestEngine,
 		ReceiptsEngine:      pusherEngine,
-		BadgerDB:            node.DB,
+		BadgerDB:            node.PublicDB,
 		VM:                  vm,
 		ExecutionState:      execState,
 		Ledger:              ls,
@@ -735,7 +742,7 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState 
 	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 	verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
-	finalizer := confinalizer.NewFinalizer(node.DB, node.Headers, followerState, trace.NewNoopTracer())
+	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())
 
 	pending := make([]*flow.Header, 0)
 
@@ -808,24 +815,24 @@ func VerificationNode(t testing.TB,
 	}
 
 	if node.Results == nil {
-		results := storage.NewExecutionResults(node.Metrics, node.DB)
+		results := storage.NewExecutionResults(node.Metrics, node.PublicDB)
 		node.Results = results
-		node.Receipts = storage.NewExecutionReceipts(node.Metrics, node.DB, results, storage.DefaultCacheSize)
+		node.Receipts = storage.NewExecutionReceipts(node.Metrics, node.PublicDB, results, storage.DefaultCacheSize)
 	}
 
 	if node.ProcessedChunkIndex == nil {
-		node.ProcessedChunkIndex = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationChunkIndex)
+		node.ProcessedChunkIndex = storage.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationChunkIndex)
 	}
 
 	if node.ChunksQueue == nil {
-		node.ChunksQueue = storage.NewChunkQueue(node.DB)
+		node.ChunksQueue = storage.NewChunkQueue(node.PublicDB)
 		ok, err := node.ChunksQueue.Init(chunkconsumer.DefaultJobIndex)
 		require.NoError(t, err)
 		require.True(t, ok)
 	}
 
 	if node.ProcessedBlockHeight == nil {
-		node.ProcessedBlockHeight = storage.NewConsumerProgress(node.DB, module.ConsumeProgressVerificationBlockHeight)
+		node.ProcessedBlockHeight = storage.NewConsumerProgress(node.PublicDB, module.ConsumeProgressVerificationBlockHeight)
 	}
 
 	if node.VerifierEngine == nil {
@@ -843,7 +850,7 @@ func VerificationNode(t testing.TB,
 
 		chunkVerifier := chunks.NewChunkVerifier(vm, vmCtx, node.Log)
 
-		approvalStorage := storage.NewResultApprovals(node.Metrics, node.DB)
+		approvalStorage := storage.NewResultApprovals(node.Metrics, node.PublicDB)
 
 		node.VerifierEngine, err = verifier.New(node.Log,
 			collector,

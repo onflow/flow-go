@@ -23,8 +23,8 @@ func TestProduceVote(t *testing.T) {
 	t.Run("should not vote while not a committee member", testVotingWhileNonCommitteeMember)
 }
 
-func createVoter(t *testing.T, blockView uint64, lastVotedView uint64, isBlockSafe, isCommitteeMember bool) (*model.Block, *model.Vote, *Voter) {
-	block := helper.MakeBlock(t, helper.WithBlockView(blockView))
+func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitteeMember bool) (*model.Block, *model.Vote, *Voter) {
+	block := helper.MakeBlock(helper.WithBlockView(blockView))
 	expectVote := makeVote(block)
 
 	forks := &mocks.ForksReader{}
@@ -53,7 +53,7 @@ func testVoterOK(t *testing.T) {
 	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(2), true, true
 
 	// create voter
-	block, expectVote, voter := createVoter(t, blockView, lastVotedView, isBlockSafe, isCommitteeMember)
+	block, expectVote, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
 	// produce vote
 	vote, err := voter.ProduceVoteIfVotable(block, curView)
@@ -67,7 +67,7 @@ func testUnsafe(t *testing.T) {
 	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(2), false, true
 
 	// create voter
-	block, _, voter := createVoter(t, blockView, lastVotedView, isBlockSafe, isCommitteeMember)
+	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
 	_, err := voter.ProduceVoteIfVotable(block, curView)
 	require.Error(t, err)
@@ -79,7 +79,7 @@ func testBelowVote(t *testing.T) {
 	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(2), uint64(2), true, true
 
 	// create voter
-	block, _, voter := createVoter(t, blockView, lastVotedView, isBlockSafe, isCommitteeMember)
+	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
 	_, err := voter.ProduceVoteIfVotable(block, curView)
 	require.Error(t, err)
@@ -91,7 +91,7 @@ func testAboveVote(t *testing.T) {
 	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(4), uint64(2), true, true
 
 	// create voter
-	block, _, voter := createVoter(t, blockView, lastVotedView, isBlockSafe, isCommitteeMember)
+	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
 	_, err := voter.ProduceVoteIfVotable(block, curView)
 	require.Error(t, err)
@@ -103,7 +103,7 @@ func testEqualLastVotedView(t *testing.T) {
 	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(3), true, true
 
 	// create voter
-	block, _, voter := createVoter(t, blockView, lastVotedView, isBlockSafe, isCommitteeMember)
+	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
 	_, err := voter.ProduceVoteIfVotable(block, curView)
 	require.Error(t, err)
@@ -115,7 +115,7 @@ func testBelowLastVotedView(t *testing.T) {
 	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(4), true, true
 
 	// create voter
-	block, _, voter := createVoter(t, blockView, lastVotedView, isBlockSafe, isCommitteeMember)
+	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
 	_, err := voter.ProduceVoteIfVotable(block, curView)
 	require.Error(t, err)
@@ -126,7 +126,7 @@ func testVotingAgain(t *testing.T) {
 	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(2), true, true
 
 	// create voter
-	block, _, voter := createVoter(t, blockView, lastVotedView, isBlockSafe, isCommitteeMember)
+	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
 	// produce vote
 	_, err := voter.ProduceVoteIfVotable(block, curView)
@@ -143,7 +143,7 @@ func testVotingWhileNonCommitteeMember(t *testing.T) {
 	blockView, curView, lastVotedView, isBlockSafe, isCommitteeMember := uint64(3), uint64(3), uint64(2), true, false
 
 	// create voter
-	block, _, voter := createVoter(t, blockView, lastVotedView, isBlockSafe, isCommitteeMember)
+	block, _, voter := createVoter(blockView, lastVotedView, isBlockSafe, isCommitteeMember)
 
 	// produce vote
 	_, err := voter.ProduceVoteIfVotable(block, curView)

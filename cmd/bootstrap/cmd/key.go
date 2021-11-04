@@ -67,7 +67,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	validateAddressFormat(flagAddress)
 
 	// generate staking and network keys
-	networkKey, stakingKey, err := generateKeys()
+	networkKey, stakingKey, secretsDBKey, err := generateKeys()
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not generate staking or network keys")
 	}
@@ -88,6 +88,7 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	// write files
 	writeText(model.PathNodeID, []byte(nodeInfo.NodeID.String()))
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPriv, nodeInfo.NodeID), private)
+	writeText(fmt.Sprintf(model.PathSecretsEncryptionKey, nodeInfo.NodeID), secretsDBKey)
 	writeJSON(fmt.Sprintf(model.PathNodeInfoPub, nodeInfo.NodeID), nodeInfo.Public())
 
 	// write machine account info
@@ -106,13 +107,13 @@ func keyCmdRun(_ *cobra.Command, _ []string) {
 	}
 }
 
-func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, error) {
+func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, []byte, error) {
 
 	log.Debug().Msg("will generate networking key")
 	networkSeed := validateSeed(flagNetworkSeed)
 	networkKey, err := utils.GenerateNetworkingKey(networkSeed)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not generate networking key: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not generate networking key: %w", err)
 	}
 	log.Info().Msg("generated networking key")
 
@@ -120,11 +121,18 @@ func generateKeys() (crypto.PrivateKey, crypto.PrivateKey, error) {
 	stakingSeed := validateSeed(flagStakingSeed)
 	stakingKey, err := utils.GenerateStakingKey(stakingSeed)
 	if err != nil {
-		return nil, nil, fmt.Errorf("could not generate staking key: %w", err)
+		return nil, nil, nil, fmt.Errorf("could not generate staking key: %w", err)
 	}
 	log.Info().Msg("generated staking key")
 
-	return networkKey, stakingKey, nil
+	log.Debug().Msg("will generate db encryption key")
+	secretsDBKey, err := utils.GenerateSecretsDBEncryptionKey()
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("could not generate secrets db encryption key: %w", err)
+	}
+	log.Info().Msg("generated db encryption key")
+
+	return networkKey, stakingKey, secretsDBKey, nil
 }
 
 func generateMachineAccountKey() (crypto.PrivateKey, error) {

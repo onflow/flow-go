@@ -37,7 +37,7 @@ type TransactionEnv struct {
 	ctx              Context
 	sth              *state.StateHolder
 	programs         *handler.ProgramsHandler
-	accounts         *state.Accounts
+	accounts         state.Accounts
 	uuidGenerator    *state.UUIDGenerator
 	contracts        *handler.ContractHandler
 	accountKeys      *handler.AccountKeyHandler
@@ -154,15 +154,15 @@ func (e *TransactionEnv) GetAuthorizedAccountsForContractUpdates() []common.Addr
 		runtime.Context{Interface: e},
 	)
 	if err != nil {
-		e.ctx.Logger.Warn().Msg("failed to read contract deployment authrozied accounts from service account. using default behaviour instead.")
+		e.ctx.Logger.Warn().Msg("failed to read contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts
 	}
-	adresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
+	addresses, ok := utils.OptionalCadenceValueToAddressSlice(value)
 	if !ok {
-		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authrozied accounts from service account. using default behaviour instead.")
+		e.ctx.Logger.Warn().Msg("failed to parse contract deployment authorized accounts from service account. using default behaviour instead.")
 		return defaultAccounts
 	}
-	return adresses
+	return addresses
 }
 
 func (e *TransactionEnv) isAuthorizerServiceAccount() bool {
@@ -253,7 +253,7 @@ func (e *TransactionEnv) GetStorageUsed(address common.Address) (value uint64, e
 		defer sp.Finish()
 	}
 
-	value, err = e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
+	value, err = e.accounts.GetStorageUsed(flow.Address(address))
 	if err != nil {
 		return value, fmt.Errorf("getting storage used failed: %w", err)
 	}
@@ -267,7 +267,7 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetStorageCapacityScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
+	script := Script(blueprints.GetStorageCapacityScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
 
 	// TODO (ramtin) this shouldn't be this way, it should call the invokeMeta
 	// and we handle the errors and still compute the state interactions
@@ -302,7 +302,7 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
+	script := Script(blueprints.GetFlowTokenBalanceScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
 
 	// TODO similar to the one above
 	err = e.vm.Run(
@@ -330,7 +330,7 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenAvailableBalanceScript(flow.BytesToAddress(address.Bytes()), e.ctx.Chain.ServiceAddress()))
+	script := Script(blueprints.GetFlowTokenAvailableBalanceScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
 
 	// TODO similar to the one above
 	err = e.vm.Run(
@@ -434,7 +434,7 @@ func (e *TransactionEnv) GetCode(location runtime.Location) ([]byte, error) {
 		return nil, errors.NewInvalidLocationErrorf(location, "expecting an AddressLocation, but other location types are passed")
 	}
 
-	address := flow.BytesToAddress(contractLocation.Address.Bytes())
+	address := flow.Address(contractLocation.Address)
 
 	err := e.accounts.CheckAccountNotFrozen(address)
 	if err != nil {
@@ -455,7 +455,7 @@ func (e *TransactionEnv) GetAccountContractNames(address runtime.Address) ([]str
 		defer sp.Finish()
 	}
 
-	a := flow.BytesToAddress(address.Bytes())
+	a := flow.Address(address)
 
 	freezeError := e.accounts.CheckAccountNotFrozen(a)
 	if freezeError != nil {
@@ -472,7 +472,7 @@ func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Prog
 	}
 
 	if addressLocation, ok := location.(common.AddressLocation); ok {
-		address := flow.BytesToAddress(addressLocation.Address.Bytes())
+		address := flow.Address(addressLocation.Address)
 
 		freezeError := e.accounts.CheckAccountNotFrozen(address)
 		if freezeError != nil {
@@ -732,11 +732,11 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	if e.ctx.ServiceAccountEnabled {
 		// uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
 		invoker := NewTransactionContractFunctionInvocator(
-			common.AddressLocation{Address: common.BytesToAddress(e.ctx.Chain.ServiceAddress().Bytes()), Name: flowServiceAccountContract},
+			common.AddressLocation{Address: common.Address(e.ctx.Chain.ServiceAddress()), Name: flowServiceAccountContract},
 			"setupNewAccount",
 			[]interpreter.Value{
-				interpreter.NewAddressValue(common.BytesToAddress(flowAddress.Bytes())),
-				interpreter.NewAddressValue(common.BytesToAddress(payer.Bytes())),
+				interpreter.NewAddressValue(common.Address(flowAddress)),
+				interpreter.NewAddressValue(payer),
 			},
 			[]sema.Type{
 				sema.AuthAccountType,

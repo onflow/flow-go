@@ -1,6 +1,7 @@
 package dkg
 
 import (
+	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"os"
 	"testing"
@@ -81,7 +82,8 @@ func createNode(
 
 	// keyKeys is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgKeys := badger.NewDKGKeys(core.Metrics, core.DB)
+	dkgKeys, err := badger.NewDKGKeys(core.Metrics, core.SecretsDB)
+	require.NoError(t, err)
 
 	// configure the state snapthost at firstBlock to return the desired
 	// Epochs
@@ -130,6 +132,12 @@ func createNode(
 	})
 	controllerFactoryLogger := zerolog.New(os.Stdout).Hook(hook)
 
+	// create a config with no delays for tests
+	config := dkg.ControllerConfig{
+		BaseStartDelay:                0,
+		BaseHandleFirstBroadcastDelay: 0,
+	}
+
 	// the reactor engine reacts to new views being finalized and drives the
 	// DKG protocol
 	reactorEngine := dkgeng.NewReactorEngine(
@@ -140,8 +148,9 @@ func createNode(
 		dkg.NewControllerFactory(
 			controllerFactoryLogger,
 			core.Me,
-			NewWhiteboardClient(id.NodeID, whiteboard),
+			[]module.DKGContractClient{NewWhiteboardClient(id.NodeID, whiteboard)},
 			brokerTunnel,
+			config,
 		),
 		viewsObserver,
 	)

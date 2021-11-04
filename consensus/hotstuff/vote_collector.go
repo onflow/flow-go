@@ -85,7 +85,12 @@ type VoteCollector interface {
 // VoteProcessor processes votes. It implements the vote-format specific processing logic.
 // Depending on their implementation, a VoteProcessor might drop votes or attempt to construct a QC.
 type VoteProcessor interface {
-	// Process processes the given vote.
+	// Process performs processing of single vote. This function is safe to call from multiple goroutines.
+	// Expected error returns during normal operations:
+	// * VoteForIncompatibleBlockError - submitted vote for incompatible block
+	// * VoteForIncompatibleViewError - submitted vote for incompatible view
+	// * model.InvalidVoteError - submitted vote with invalid signature
+	// All other errors should be treated as exceptions.
 	Process(vote *model.Vote) error
 
 	// Status returns the status of the vote processor
@@ -99,4 +104,14 @@ type VerifyingVoteProcessor interface {
 	// Block returns which block that will be used to collector votes for. Transition to VerifyingVoteCollector can occur only
 	// when we have received block proposal so this information has to be available.
 	Block() *model.Block
+}
+
+// VoteProcessorFactory is a factory that can be used to create a verifying vote processors for a specific proposal.
+// Depending on factory implementation it will return processors for consensus or collection clusters
+type VoteProcessorFactory interface {
+	// Create instantiates a VerifyingVoteProcessor for processing votes for a specific proposal.
+	// Caller can be sure that proposal vote was successfully verified and processed.
+	// Expected error returns during normal operations:
+	// * model.InvalidBlockError - proposal has invalid proposer vote
+	Create(proposal *model.Proposal) (VerifyingVoteProcessor, error)
 }
