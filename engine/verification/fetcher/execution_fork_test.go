@@ -57,8 +57,8 @@ func TestExecutionForkWithDuplicateAssignedChunks(t *testing.T) {
 	s.metrics.On("OnChunkDataPackRequestSentByFetcher").Return().Times(len(assignedChunkStatuses))
 
 	// each chunk data request is answered by requester engine on a distinct chunk data response
-	chunkALocatorID := chunks.ChunkLocatorID(statusA.ExecutionResult.ID(), statusA.ChunkIndex)
-	chunkBLocatorID := chunks.ChunkLocatorID(statusB.ExecutionResult.ID(), statusB.ChunkIndex)
+	chunkALocatorID := statusA.ChunkLocatorID()
+	chunkBLocatorID := statusB.ChunkLocatorID()
 	chunkDataResponse := make(map[flow.Identifier]*verification.ChunkDataPackResponse)
 	chunkDataResponse[chunkALocatorID] = chunkDataPackResponseFixture(t, statusA.Chunk(), collMap[statusA.Chunk().ID()], resultA)
 	chunkDataResponse[chunkBLocatorID] = chunkDataPackResponseFixture(t, statusB.Chunk(), collMap[statusA.Chunk().ID()], resultB)
