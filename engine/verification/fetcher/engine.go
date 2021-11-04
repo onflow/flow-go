@@ -361,7 +361,7 @@ func (e *Engine) validateChunkDataPack(chunkIndex uint64,
 
 	chunk := result.Chunks[chunkIndex]
 	// 1. chunk ID of chunk data pack should map the chunk ID on execution result
-	expectedChunkID := result.Chunks[chunkIndex].ID()
+	expectedChunkID := chunk.ID()
 	if chunkDataPack.ChunkID != expectedChunkID {
 		return fmt.Errorf("chunk ID of chunk data pack does not match corresponding chunk on execution result, expected: %x, got:%x",
 			expectedChunkID, chunkDataPack.ChunkID)
