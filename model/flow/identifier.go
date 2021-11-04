@@ -145,8 +145,13 @@ func GetIDs(value interface{}) []Identifier {
 func MerkleRoot(ids ...Identifier) Identifier {
 	var root Identifier
 	tree := merkle.NewTree()
-	for _, id := range ids {
-		tree.Put(id[:], nil)
+	for i, id := range ids {
+		// NOTE: the id[:] passed in here will be the address of byte array
+		// that is used by Go in the loop, so it MUST be copied to a different
+		// slice if the intention is to store it's value. Otherwise,
+		// all the value will be the last item of the ids slice.
+		// This is not a problem for i, due to it being a primative (int)
+		tree.Put(id[:], i)
 	}
 	hash := tree.Hash()
 	copy(root[:], hash)
@@ -173,7 +178,7 @@ func CheckConcatSum(sum Identifier, fps ...Identifier) bool {
 }
 
 // Sample returns random sample of length 'size' of the ids
-// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher–Yates_shuffle).
+// [Fisher-Yates shuffle](https://en.wikipedia.org/wiki/Fisher-Yates_shuffle).
 func Sample(size uint, ids ...Identifier) []Identifier {
 	n := uint(len(ids))
 	dup := make([]Identifier, 0, n)

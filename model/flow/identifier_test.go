@@ -101,12 +101,14 @@ func TestMerkleRoot(t *testing.T) {
 
 }
 
+// We should ideally replace this with a completely different reference implementation
+// Possibly writen in another language, such as python, similar to the Ledger Trie Implementation
 func referenceMerkleRoot(ids ...flow.Identifier) flow.Identifier {
 	var root flow.Identifier
 	tree := merkle.NewTree()
-	for _, id := range ids {
-		idCopy := id
-		tree.Put(idCopy[:], nil)
+	for i, id := range ids {
+		iCopy, idCopy := i, id
+		tree.Put(idCopy[:], iCopy)
 	}
 	hash := tree.Hash()
 	copy(root[:], hash)
