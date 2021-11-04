@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/storage/merkle"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -78,4 +79,36 @@ func TestIdentifierSample(t *testing.T) {
 		sample := flow.Sample(sampleSize, ids...)
 		require.Empty(t, sample)
 	})
+}
+
+func TestMerkleRoot(t *testing.T) {
+
+	total := 10
+	ids := make([]flow.Identifier, total)
+	for i := range ids {
+		ids[i] = unittest.IdentifierFixture()
+	}
+
+	idsBad := make([]flow.Identifier, total)
+	for i := range idsBad {
+		idsBad[i] = ids[len(ids)-1]
+	}
+	fmt.Println(ids)
+	fmt.Println(idsBad)
+
+	require.NotEqual(t, flow.MerkleRoot(ids...), flow.MerkleRoot(idsBad...))
+	require.Equal(t, referenceMerkleRoot(ids...), flow.MerkleRoot(ids...))
+
+}
+
+func referenceMerkleRoot(ids ...flow.Identifier) flow.Identifier {
+	var root flow.Identifier
+	tree := merkle.NewTree()
+	for _, id := range ids {
+		idCopy := id
+		tree.Put(idCopy[:], nil)
+	}
+	hash := tree.Hash()
+	copy(root[:], hash)
+	return root
 }

@@ -144,8 +144,11 @@ PutLoop:
 			// if we have reached the end of the key, insert the new value
 			totalCount := uint(len(key)) * 8
 			if index == totalCount {
+				// Make a copy of the key, to ensure we have the only pointer to it
+				keyCopy := make([]byte, len(key))
+				copy(keyCopy, key)
 				*cur = &leaf{
-					key: key,
+					key: keyCopy,
 					val: val,
 				}
 				return false
