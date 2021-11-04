@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"errors"
 	"fmt"
 )
 
@@ -113,8 +114,8 @@ type InvalidInputsError struct {
 	message string
 }
 
-// newInvalidInputsError constructs a new InvalidInputsError
-func newInvalidInputsError(msg string, args ...interface{}) error {
+// invalidInputsErrorf constructs a new InvalidInputsError
+func invalidInputsErrorf(msg string, args ...interface{}) error {
 	return &InvalidInputsError{message: fmt.Sprintf(msg, args...)}
 }
 
@@ -124,6 +125,6 @@ func (e InvalidInputsError) Error() string {
 
 // IsInvalidInputsError checks if the input error is of a InvalidInputsError type
 func IsInvalidInputsError(err error) bool {
-	_, ok := err.(*InvalidInputsError)
-	return ok
+	var target *InvalidInputsError
+	return errors.As(err, &target)
 }

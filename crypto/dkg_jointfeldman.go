@@ -46,27 +46,27 @@ type JointFeldmanState struct {
 	fvss []feldmanVSSQualState
 	// is the group public key
 	jointPublicKey pointG2
-	// Private share of the current node
+	// Private share of the current participant
 	jointx scalar
-	// Public keys of the group nodes, the vector size is (n)
+	// Public keys of the group participants, the vector size is (n)
 	jointy []pointG2
 }
 
 // NewJointFeldman creates a new instance of a Joint Feldman protocol.
 //
-// size if the total number of nodes (n).
+// size if the total number of participants (n).
 // threshold is the threshold parameter (t). the DKG protocol is secure in the
 // presence of up to (t) malicious participants when (t < n/2).
-// currentIndex is the index of the node creating the new DKG instance.
-// processor is the DKGProcessor instance required to connect the node to the
+// myIndex is the index of the participant creating the new DKG instance.
+// processor is the DKGProcessor instance required to connect the participant to the
 // communication channels.
 //
-// An instance is run by a single node and is usable for only one protocol.
+// An instance is run by a single participant and is usable for only one protocol.
 // In order to run the protocol again, a new instance needs to be created.
-func NewJointFeldman(size int, threshold int, currentIndex int,
+func NewJointFeldman(size int, threshold int, myIndex int,
 	processor DKGProcessor) (DKGState, error) {
 
-	common, err := newDKGCommon(size, threshold, currentIndex, processor, 0)
+	common, err := newDKGCommon(size, threshold, myIndex, processor, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -93,10 +93,10 @@ func (s *JointFeldmanState) init() {
 	}
 }
 
-// Start starts running Joint Feldman protocol in the current node
+// Start starts running Joint Feldman protocol in the current participant
 // The seed is used to generate the FVSS secret polynomial
 // (including the instance group private key) when the current
-// node is the leader.
+// participant is the leader.
 func (s *JointFeldmanState) Start(seed []byte) error {
 	if s.jointRunning {
 		return errors.New("dkg is already running")
@@ -106,9 +106,6 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 		s.fvss[i].running = false
 		err := s.fvss[i].Start(seed)
 		if err != nil {
-			if IsInvalidInputsError(err) {
-				newInvalidInputsError("error when starting dkg: %s", err)
-			}
 			return fmt.Errorf("error when starting dkg: %w", err)
 		}
 	}
@@ -119,7 +116,7 @@ func (s *JointFeldmanState) Start(seed []byte) error {
 // NextTimeout sets the next timeout of the protocol if any timeout applies
 func (s *JointFeldmanState) NextTimeout() error {
 	if !s.jointRunning {
-		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
+		return fmt.Errorf("dkg protocol %d is not running", s.myIndex)
 	}
 
 	for i := index(0); int(i) < s.size; i++ {
@@ -131,15 +128,15 @@ func (s *JointFeldmanState) NextTimeout() error {
 	return nil
 }
 
-// End ends the protocol in the current node
-// It returns the finalized public data and node private key share.
+// End ends the protocol in the current participant
+// It returns the finalized public data and participant private key share.
 // - the group public key corresponding to the group secret key
-// - all the public key shares corresponding to the nodes private
+// - all the public key shares corresponding to the participants private
 // key shares.
-// - the finalized private key which is the current node's own private key share
+// - the finalized private key which is the current participant's own private key share
 func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.jointRunning {
-		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
+		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.myIndex)
 	}
 
 	disqualifiedTotal := 0
@@ -147,7 +144,7 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 		// check previous timeouts were called
 		if !s.fvss[i].sharesTimeout || !s.fvss[i].complaintsTimeout {
 			return nil, nil, nil,
-				fmt.Errorf("%d: two timeouts should be set before ending dkg", s.currentIndex)
+				fmt.Errorf("%d: two timeouts should be set before ending dkg", s.myIndex)
 		}
 
 		// check if a complaint has remained without an answer
@@ -172,20 +169,20 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if disqualifiedTotal > s.threshold || s.size-disqualifiedTotal <= s.threshold {
 		return nil, nil, nil,
 			fmt.Errorf(
-				"DKG has failed because the diqualified nodes number is high: %d disqualified, threshold is %d, size is %d",
+				"DKG has failed because the diqualified participants number is high: %d disqualified, threshold is %d, size is %d",
 				disqualifiedTotal, s.threshold, s.size)
 	}
 
 	// wrap up the keys from qualified leaders
 	jointx, jointPublicKey, jointy := s.sumUpQualifiedKeys(s.size - disqualifiedTotal)
 
-	// private key of the current node
+	// private key of the current participant
 	x := newPrKeyBLSBLS12381(jointx)
 
 	// Group public key
 	Y := newPubKeyBLSBLS12381(jointPublicKey)
 
-	// The nodes public keys
+	// The participants public keys
 	y := make([]PublicKey, s.size)
 	for i, p := range jointy {
 		y[i] = newPubKeyBLSBLS12381(&p)
@@ -193,37 +190,31 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	return x, Y, y, nil
 }
 
-// HandleBroadcastMsg processes a new broadcasted message received by the current node
+// HandleBroadcastMsg processes a new broadcasted message received by the current participant
 // orig is the message origin index
 func (s *JointFeldmanState) HandleBroadcastMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
+		return fmt.Errorf("dkg protocol %d is not running", s.myIndex)
 	}
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandleBroadcastMsg(orig, msg)
 		if err != nil {
-			if IsInvalidInputsError(err) {
-				newInvalidInputsError("handle message has failed: %s", err)
-			}
-			return fmt.Errorf("handle message has failed: %w", err)
+			return fmt.Errorf("handle broadcast message has failed: %w", err)
 		}
 	}
 	return nil
 }
 
-// HandlePrivateMsg processes a new private message received by the current node
+// HandlePrivateMsg processes a new private message received by the current participant
 // orig is the message origin index
 func (s *JointFeldmanState) HandlePrivateMsg(orig int, msg []byte) error {
 	if !s.jointRunning {
-		return fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
+		return fmt.Errorf("dkg protocol %d is not running", s.myIndex)
 	}
 	for i := index(0); int(i) < s.size; i++ {
 		err := s.fvss[i].HandlePrivateMsg(orig, msg)
 		if err != nil {
-			if IsInvalidInputsError(err) {
-				newInvalidInputsError("handle message has failed: %s", err)
-			}
-			return fmt.Errorf("handle message has failed: %w", err)
+			return fmt.Errorf("handle private message has failed: %w", err)
 		}
 	}
 	return nil
@@ -234,19 +225,19 @@ func (s *JointFeldmanState) Running() bool {
 	return s.jointRunning
 }
 
-// ForceDisqualify forces a node to get disqualified
+// ForceDisqualify forces a participant to get disqualified
 // for a reason outside of the DKG protocol
-// The caller should make sure all honest nodes call this function,
+// The caller should make sure all honest participants call this function,
 // otherwise, the protocol can be broken
-func (s *JointFeldmanState) ForceDisqualify(node int) error {
+func (s *JointFeldmanState) ForceDisqualify(participant int) error {
 	if !s.jointRunning {
 		return errors.New("dkg is not running")
 	}
-	// disqualify the node in the fvss instance where they are a leader
-	err := s.fvss[node].ForceDisqualify(node)
+	// disqualify the participant in the fvss instance where they are a leader
+	err := s.fvss[participant].ForceDisqualify(participant)
 	if err != nil {
 		if IsInvalidInputsError(err) {
-			newInvalidInputsError("handle message has failed: %s", err)
+			return fmt.Errorf("handle message has failed: %w", err)
 		}
 		return fmt.Errorf("disqualif has failed: %w", err)
 	}
