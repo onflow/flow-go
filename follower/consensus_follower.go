@@ -214,7 +214,7 @@ func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 
 	// setup logging listeners
 	go func() {
-		if err := util.WaitReady(signalerCtx, cf.Ready()); err != nil {
+		if err := util.WaitClosed(signalerCtx, cf.Ready()); err != nil {
 			cf.Logger.Info().Msg("Consensus follower startup aborted")
 			return
 		}

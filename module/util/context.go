@@ -51,7 +51,7 @@ func (d *doneCtx) Deadline() (deadline time.Time, ok bool) {
 	return d.cancelCtx.Deadline()
 }
 
-// WithSignal wraps an os.Signal channel with a context, and calls the cancel a signal is received.
+// WithSignal wraps an os.Signal channel with a context, and calls cancel when a signal is received.
 // When the context is Done, the ctx.Err() will either be ErrSignalReceived if a signal was received,
 // or the error from the underlying context (Canceled, DeadlineExceeded, etc).
 //
