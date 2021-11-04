@@ -592,7 +592,7 @@ func (builder *FlowAccessNodeBuilder) initNetwork(nodeID module.Local,
 		builder.Logger,
 		codec,
 		nodeID,
-		builder.Middleware,
+		func() (network.Middleware, error) { return builder.Middleware, nil },
 		p2p.DefaultCacheSize,
 		topology,
 		p2p.NewChannelSubscriptionManager(middleware),
@@ -613,7 +613,7 @@ func unstakedNetworkMsgValidators(log zerolog.Logger, idProvider id.IdentityProv
 		validator.NewAnyValidator(
 			// message should be either from a valid staked node
 			validator.NewOriginValidator(
-				id.NewFilteredIdentifierProvider(filter.IsValidCurrentEpochParticipant, idProvider),
+				id.NewIdentityFilterIdentifierProvider(filter.IsValidCurrentEpochParticipant, idProvider),
 			),
 			// or the message should be specifically targeted for this node
 			validator.ValidateTarget(log, selfID),
