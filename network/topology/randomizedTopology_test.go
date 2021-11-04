@@ -151,7 +151,7 @@ func (suite *RandomizedTopologyTestSuite) TestConnectedness_NonClusterChannel() 
 // cluster channel are individually connected.
 func (suite *RandomizedTopologyTestSuite) TestConnectedness_ClusterChannel() {
 	// picks one cluster channel as sample
-	channel := clusterChannels(suite.T())[0]
+	channel := engine.ChannelSyncCluster(flow.Emulator)
 
 	// adjacency map keeps graph component of a single channel
 	channelAdjMap := make(map[flow.Identifier]flow.IdentityList)

@@ -124,6 +124,6 @@ func (e *Engine) pingNode(peer *flow.Identity) {
 
 	// if ping succeeded then update the node info metric
 	if pingErr == nil {
-		e.metrics.NodeInfo(peer, info, resp.Version, resp.BlockHeight)
+		e.metrics.NodeInfo(peer, info, resp.Version, resp.BlockHeight, resp.HotstuffView)
 	}
 }

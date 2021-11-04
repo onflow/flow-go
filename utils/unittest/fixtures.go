@@ -12,6 +12,7 @@ import (
 
 	sdk "github.com/onflow/flow-go-sdk"
 
+	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -28,6 +29,10 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
+)
+
+const (
+	DefaultSeedFixtureLength = 64
 )
 
 func AddressFixture() flow.Address {
@@ -875,15 +880,17 @@ func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	return &identity
 }
 
+// IdentityFixture returns a node identity and networking private key
+func IdentityWithNetworkingKeyFixture(opts ...func(*flow.Identity)) (*flow.Identity, crypto.PrivateKey) {
+	networkKey := NetworkingPrivKeyFixture()
+	opts = append(opts, WithNetworkingKey(networkKey.PublicKey()))
+	id := IdentityFixture(opts...)
+	return id, networkKey
+}
+
 func WithKeys(identity *flow.Identity) {
-	staking, err := StakingKey()
-	if err != nil {
-		panic(err)
-	}
-	networking, err := NetworkingKey()
-	if err != nil {
-		panic(err)
-	}
+	staking := StakingPrivKeyFixture()
+	networking := NetworkingPrivKeyFixture()
 	identity.StakingPubKey = staking.PublicKey()
 	identity.NetworkPubKey = networking.PublicKey()
 }
@@ -958,7 +965,7 @@ func CompleteIdentitySet(identities ...*flow.Identity) flow.IdentityList {
 // can be customized (ie. set their role) by passing in a function that modifies
 // the input identities as required.
 func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList {
-	identities := make(flow.IdentityList, n)
+	identities := make(flow.IdentityList, 0, n)
 
 	for i := 0; i < n; i++ {
 		identity := IdentityFixture()
@@ -966,7 +973,7 @@ func IdentityListFixture(n int, opts ...func(*flow.Identity)) flow.IdentityList 
 		for _, opt := range opts {
 			opt(identity)
 		}
-		identities[i] = identity
+		identities = append(identities, identity)
 	}
 
 	return identities
@@ -1502,6 +1509,18 @@ func VoteForBlockFixture(block *hotstuff.Block, opts ...func(vote *hotstuff.Vote
 	return vote
 }
 
+func VoteWithStakingSig() func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeStaking)}, vote.SigData...)
+	}
+}
+
+func VoteWithThresholdSig() func(*hotstuff.Vote) {
+	return func(vote *hotstuff.Vote) {
+		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeRandomBeacon)}, vote.SigData...)
+	}
+}
+
 func WithParticipants(participants flow.IdentityList) func(*flow.EpochSetup) {
 	return func(setup *flow.EpochSetup) {
 		setup.Participants = participants.Sort(order.ByNodeIDAsc)
@@ -1758,18 +1777,29 @@ func DKGBroadcastMessageFixture() *messages.BroadcastDKGMessage {
 	}
 }
 
-func PrivateKeyFixture(algo crypto.SigningAlgorithm) crypto.PrivateKey {
-	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(64))
+// PrivateKeyFixture returns a random private key with specified signature algorithm and seed length
+func PrivateKeyFixture(algo crypto.SigningAlgorithm, seedLength int) crypto.PrivateKey {
+	sk, err := crypto.GeneratePrivateKey(algo, SeedFixture(seedLength))
 	if err != nil {
 		panic(err)
 	}
 	return sk
 }
 
+// NetworkingPrivKeyFixture returns random ECDSAP256 private key
+func NetworkingPrivKeyFixture() crypto.PrivateKey {
+	return PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
+}
+
+//StakingPrivKeyFixture returns a random BLS12381 private keyf
+func StakingPrivKeyFixture() crypto.PrivateKey {
+	return PrivateKeyFixture(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381)
+}
+
 func NodeMachineAccountInfoFixture() bootstrap.NodeMachineAccountInfo {
 	return bootstrap.NodeMachineAccountInfo{
 		Address:           RandomAddressFixture().String(),
-		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256).Encode(),
+		EncodedPrivateKey: PrivateKeyFixture(crypto.ECDSAP256, DefaultSeedFixtureLength).Encode(),
 		HashAlgorithm:     bootstrap.DefaultMachineAccountHashAlgo,
 		SigningAlgorithm:  bootstrap.DefaultMachineAccountSignAlgo,
 		KeyIndex:          bootstrap.DefaultMachineAccountKeyIndex,

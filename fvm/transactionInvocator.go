@@ -111,8 +111,8 @@ func (i *TransactionInvocator) Process(
 
 			// reset error part of proc
 			// Warning right now the tx requires retry logic doesn't change
-			// anything on state but we might want to revert the state changes (or not commiting)
-			// if we decided to expand it furthur.
+			// anything on state but we might want to revert the state changes (or not committing)
+			// if we decided to expand it further.
 			proc.Err = nil
 			proc.Logs = make([]string, 0)
 			proc.Events = make([]flow.Event, 0)
@@ -243,12 +243,12 @@ func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *
 
 	invocator := NewTransactionContractFunctionInvocator(
 		common.AddressLocation{
-			Address: common.BytesToAddress(env.ctx.Chain.ServiceAddress().Bytes()),
+			Address: common.Address(env.ctx.Chain.ServiceAddress()),
 			Name:    flowServiceAccountContract,
 		},
 		deductFeesContractFunction,
 		[]interpreter.Value{
-			interpreter.NewAddressValue(common.BytesToAddress(proc.Transaction.Payer.Bytes())),
+			interpreter.NewAddressValue(common.Address(proc.Transaction.Payer)),
 		},
 		[]sema.Type{
 			sema.AuthAccountType,

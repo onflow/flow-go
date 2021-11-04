@@ -40,13 +40,15 @@ type QCContractClient struct {
 }
 
 // NewQCContractClient returns a new client to the Quorum Certificate contract
-func NewQCContractClient(log zerolog.Logger,
+func NewQCContractClient(
+	log zerolog.Logger,
 	flowClient module.SDKClientWrapper,
 	nodeID flow.Identifier,
 	accountAddress string,
 	accountKeyIndex uint,
 	qcContractAddress string,
-	signer sdkcrypto.Signer) *QCContractClient {
+	signer sdkcrypto.Signer,
+) *QCContractClient {
 
 	log = log.With().Str("component", "qc_contract_client").Logger()
 	base := NewBaseClient(log, flowClient, accountAddress, accountKeyIndex, signer, qcContractAddress)

@@ -1,4 +1,3 @@
-//nolint
 package votecollector
 
 import (
@@ -10,30 +9,60 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
-// StakingVoteProcessorFactory generates StakingVoteProcessor instances
-func StakingVoteProcessorFactory(log zerolog.Logger, proposal *model.Proposal) (*StakingVoteProcessor, error) {
-	processor := &StakingVoteProcessor{
-		log:   log,
-		block: proposal.Block,
-		done:  *atomic.NewBool(false),
-	}
-	err := processor.Process(proposal.ProposerVote())
-	if err != nil {
-		if model.IsInvalidVoteError(err) {
-			return nil, model.InvalidBlockError{
-				BlockID: proposal.Block.BlockID,
-				View:    proposal.Block.View,
-				Err:     err,
-			}
-		}
-		return nil, fmt.Errorf("")
-	}
-	return processor, nil
+/* ***************** Base-Factory for StakingVoteProcessor ****************** */
+
+// stakingVoteProcessorFactoryBase implements a factory for creating StakingVoteProcessor
+// holds needed dependencies to initialize StakingVoteProcessor.
+// stakingVoteProcessorFactoryBase is used in collector cluster.
+// CAUTION:
+// this base factory only creates the VerifyingVoteProcessor for the given block.
+// It does _not_ check the proposer's vote for its own block, i.e. it does _not_
+// implement `hotstuff.VoteProcessorFactory`. This base factory should be wrapped
+// by `votecollector.VoteProcessorFactory` which adds the logic to verify
+// the proposer's vote (decorator pattern).
+type stakingVoteProcessorFactoryBase struct {
+	log         zerolog.Logger
+	committee   hotstuff.Committee
+	onQCCreated hotstuff.OnQCCreated
 }
+
+// Create creates StakingVoteProcessor for processing votes for the given block.
+// Caller must treat all errors as exceptions
+func (f *stakingVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
+	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
+	}
+
+	// message that has to be verified against aggregated signature
+	msg := verification.MakeVoteMessage(block.View, block.BlockID)
+
+	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.CollectorVoteTag)
+	if err != nil {
+		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
+	}
+
+	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
+
+	return &StakingVoteProcessor{
+		log:              f.log,
+		block:            block,
+		stakingSigAggtor: stakingSigAggtor,
+		onQCCreated:      f.onQCCreated,
+		minRequiredStake: minRequiredStake,
+		done:             *atomic.NewBool(false),
+	}, nil
+}
+
+/* ****************** StakingVoteProcessor Implementation ******************* */
 
 // StakingVoteProcessor implements the hotstuff.VerifyingVoteProcessor interface.
 // It processes hotstuff votes from a collector cluster, where participants vote
@@ -48,14 +77,26 @@ type StakingVoteProcessor struct {
 	done             atomic.Bool
 }
 
+// Block returns block that is part of proposal that we are processing votes for.
 func (p *StakingVoteProcessor) Block() *model.Block {
 	return p.block
 }
 
+// Status returns status of this vote processor, it's always verifying.
 func (p *StakingVoteProcessor) Status() hotstuff.VoteCollectorStatus {
 	return hotstuff.VoteCollectorStatusVerifying
 }
 
+// Process performs processing of single vote in concurrent safe way. This
+// function is implemented to be called by multiple goroutines at the same time.
+// Supports processing of both staking and threshold signatures. Design of this
+// function is event driven, as soon as we collect enough weight to create a QC
+// we will immediately do this and submit it via callback for further processing.
+// Expected error returns during normal operations:
+// * VoteForIncompatibleBlockError - submitted vote for incompatible block
+// * VoteForIncompatibleViewError - submitted vote for incompatible view
+// * model.InvalidVoteError - submitted vote with invalid signature
+// All other errors should be treated as exceptions.
 func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	err := EnsureVoteForBlock(vote, p.block)
 	if err != nil {
@@ -69,7 +110,7 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	err = p.stakingSigAggtor.Verify(vote.SignerID, vote.SigData)
 	if err != nil {
 		if errors.Is(err, msig.ErrInvalidFormat) {
-			return model.NewInvalidVoteErrorf(vote, "submitted invalid signature for vote (%x) at view %d", vote.ID(), vote.View)
+			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has invalid signature: %w", vote.ID(), vote.View, err)
 		}
 		return fmt.Errorf("internal error checking signature validity: %w", err)
 	}
@@ -92,23 +133,28 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	if !p.done.CAS(false, true) {
 		return nil
 	}
-	err = p.buildQC()
+	qc, err := p.buildQC()
 	if err != nil {
-		return fmt.Errorf("could not build QC: %w", err)
+		return fmt.Errorf("internal error constructing QC from votes: %w", err)
 	}
+	p.onQCCreated(qc)
 
 	return nil
 }
 
-func (p *StakingVoteProcessor) buildQC() error {
-	_, _, err := p.stakingSigAggtor.Aggregate()
+// buildQC performs aggregation of signatures when we have collected enough
+// weight for building QC. This function is run only once by single worker.
+// Any error should be treated as exception.
+func (p *StakingVoteProcessor) buildQC() (*flow.QuorumCertificate, error) {
+	stakingSigners, aggregatedStakingSig, err := p.stakingSigAggtor.Aggregate()
 	if err != nil {
-		return fmt.Errorf("could not aggregate staking signature: %w", err)
+		return nil, fmt.Errorf("could not aggregate staking signature: %w", err)
 	}
 
-	// TODO: use signature to build qc
-	var qc *flow.QuorumCertificate
-	p.onQCCreated(qc)
-
-	panic("not implemented")
+	return &flow.QuorumCertificate{
+		View:      p.block.View,
+		BlockID:   p.block.BlockID,
+		SignerIDs: stakingSigners,
+		SigData:   aggregatedStakingSig,
+	}, nil
 }

@@ -55,7 +55,7 @@ type ComplianceCoreSuite struct {
 	state    *protocol.MutableState
 	snapshot *protocol.Snapshot
 	con      *mocknetwork.Conduit
-	net      *module.Network
+	net      *mocknetwork.Network
 	prov     *mocknetwork.Engine
 	pending  *module.PendingBlockBuffer
 	hotstuff *module.HotStuff
@@ -179,7 +179,7 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.con.On("Unicast", mock.Anything, mock.Anything).Return(nil)
 
 	// set up network module mock
-	cs.net = &module.Network{}
+	cs.net = &mocknetwork.Network{}
 	cs.net.On("Register", mock.Anything, mock.Anything).Return(
 		func(channel netint.Channel, engine netint.Engine) netint.Conduit {
 			return cs.con

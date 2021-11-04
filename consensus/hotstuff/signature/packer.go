@@ -65,7 +65,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 			signerIDs = append(signerIDs, stakingSigner)
 			sigTypes = append(sigTypes, hotstuff.SigTypeStaking)
 		} else {
-			return nil, nil, fmt.Errorf("staking signer ID (%v) not found in the committees at block: %v", stakingSigner, blockID)
+			return nil, nil, fmt.Errorf("staking signer %v not found in the committee at block: %v", stakingSigner, blockID)
 		}
 	}
 
@@ -75,7 +75,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 			signerIDs = append(signerIDs, beaconSigner)
 			sigTypes = append(sigTypes, hotstuff.SigTypeRandomBeacon)
 		} else {
-			return nil, nil, fmt.Errorf("random beacon signer ID (%v) not found in the committees at block: %v", beaconSigner, blockID)
+			return nil, nil, fmt.Errorf("random beacon signer %v not found in the committee at block: %v", beaconSigner, blockID)
 		}
 	}
 
@@ -191,7 +191,7 @@ func serializeToBytes(sigTypes []hotstuff.SigType) ([]byte, error) {
 				return nil, fmt.Errorf("invalid sig type: %v at pos %v", sigType, pos)
 			}
 
-			b ^= (byte(sigType) << offset)
+			b ^= byte(sigType) << offset
 			offset--
 		}
 		bytes = append(bytes, b)

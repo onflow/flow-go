@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine/common/splitter"
-	mockmodule "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -45,8 +45,8 @@ func (suite *Suite) TestDownstreamEngineFailure() {
 	id := unittest.IdentifierFixture()
 	event := getEvent()
 
-	engine1 := new(mockmodule.Engine)
-	engine2 := new(mockmodule.Engine)
+	engine1 := new(mocknetwork.Engine)
+	engine2 := new(mocknetwork.Engine)
 
 	suite.engine.RegisterEngine(engine1)
 	suite.engine.RegisterEngine(engine2)
@@ -96,7 +96,7 @@ func (suite *Suite) TestProcessUnknownChannel() {
 
 	unknownChannel := network.Channel("unknown-chan")
 
-	engine := new(mockmodule.Engine)
+	engine := new(mocknetwork.Engine)
 
 	suite.engine.RegisterEngine(engine)
 
@@ -113,10 +113,10 @@ func (suite *Suite) TestConcurrentEvents() {
 	const numEvents = 10
 	const numEngines = 5
 
-	var engines [numEngines]*mockmodule.Engine
+	var engines [numEngines]*mocknetwork.Engine
 
 	for i := 0; i < numEngines; i++ {
-		engine := new(mockmodule.Engine)
+		engine := new(mocknetwork.Engine)
 		suite.engine.RegisterEngine(engine)
 		engines[i] = engine
 	}
