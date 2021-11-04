@@ -17,8 +17,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// 1. if DKG was completed, then sign with random beacon key
-func TestDKGComplete(t *testing.T) {
+// 1. if the node has beacon keys, then sign with random beacon key
+func TestWithBeaconKeys(t *testing.T) {
 	// prepare data
 	dkgKey := unittest.DKGParticipantPriv()
 	pk := dkgKey.RandomBeaconPrivKey.PublicKey()

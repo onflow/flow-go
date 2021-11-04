@@ -20,7 +20,7 @@ import (
 // participate in the DKG.
 // The default behaviour of a node is to contribute to both the random beacon and
 // hotstuff, as it will yield higher rewards. Therefore, we always sign with the
-// random beacon key it is available.
+// random beacon key if it is available.
 type CombinedSignerV2 struct {
 	staking              module.AggregatingSigner
 	thresholdSignerStore module.ThresholdSignerStore
@@ -29,7 +29,7 @@ type CombinedSignerV2 struct {
 
 // NewCombinedSignerV2 creates a new combined signer with the given dependencies:
 // - the hotstuff committee's state is used to retrieve public keys for signers;
-// - the staking signer is used to create and verify aggregatable signatures for the first signature part;
+// - the staking signer is used to create and verify aggregatable signatures for Hotstuff
 // - the thresholdVerifier is used to verify threshold signatures
 // - the thresholdSignerStore is used to get threshold-signers by epoch/view;
 // - the signer ID is used as the identity when creating signatures;

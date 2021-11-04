@@ -31,8 +31,8 @@ func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.DKGKe
 // given view. The view determines the epoch, which determines the DKG private
 // key underlying the signer.
 // It returns:
-//  - (signer, nil) if DKG was completed in the epoch of the view
-//  - (nil, DKGIncompleteError) if DKG was not completed in the epoch of the view
+//  - (signer, nil) if the node has beacon keys in the epoch of the view
+//  - (nil, DKGIncompleteError) if the node doesn't have beacon keys in the epoch of the view
 //  - (nil, error) if there is any exception
 func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.ThresholdSigner, error) {
 	epoch, err := s.epochLookup.EpochForViewWithFallback(view)
@@ -42,12 +42,12 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 	signer, ok := s.signers[epoch]
 	if ok {
 		// A nil signer means that we don't have a Random Beacon key for this epoch.
-		return signer, fmt.Errorf("did not complete DKG at for epoch %v, at view %v: %w",
+		return signer, fmt.Errorf("no beacon keys for epoch %v, at view %v: %w",
 			epoch, view, module.DKGIncompleteError)
 	}
 
 	privDKGData, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
-	// DKG was not completed, there is no DKG private key
+	// There is no DKG private key
 	if errors.Is(err, storage.ErrNotFound) {
 		s.signers[epoch] = nil
 		return nil, fmt.Errorf("did not complete DKG at for epoch %v, at view %v: %w",
@@ -59,7 +59,7 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 			epoch, view, err)
 	}
 
-	// DKG was completed and a random beacon key is available
+	// a random beacon key is available
 	signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData.RandomBeaconPrivKey)
 	s.signers[epoch] = signer
 

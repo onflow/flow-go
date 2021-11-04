@@ -32,16 +32,16 @@ type ThresholdSigner interface {
 }
 
 var (
-	// DKGIncompleteError indicates that the node did not complete dkg at a certain view
+	// DKGIncompleteError indicates that the node did not manage to obtain beacon keys from DKG at a certain view
 	DKGIncompleteError = errors.New("incomplete dkg")
 )
 
 // ThresholdSignerStore returns the threshold signer object by view
 type ThresholdSignerStore interface {
 	// It returns:
-	//  - (signer, nil) if DKG was completed in the epoch of the view
-	//  - (nil, DKGIncompleteError) if DKG was not completed in the epoch of the view
-	//  - (nil, error) if there is any exception
+//  - (signer, nil) if the node has beacon keys in the epoch of the view
+//  - (nil, DKGIncompleteError) if the node doesn't have beacon keys in the epoch of the view
+//  - (nil, error) if there is any exception
 	GetThresholdSigner(view uint64) (ThresholdSigner, error)
 }
 
