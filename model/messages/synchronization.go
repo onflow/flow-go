@@ -31,6 +31,13 @@ type RangeRequest struct {
 	ToHeight   uint64
 }
 
+// RangeResponse is part of the synchronization protocol and represents the reply to
+// a range request. It contains a list of blocks that should correspond to the request.
+type RangeResponse struct {
+	Nonce  uint64
+	Blocks []*flow.Block
+}
+
 // BatchRequest is part of the sychronization protocol and represents an active
 // (pulling) attempt to synchronize with the consensus state of the network. It
 // requests finalized or unfinalized blocks by a list of block IDs.
@@ -39,10 +46,9 @@ type BatchRequest struct {
 	BlockIDs []flow.Identifier
 }
 
-// BlockResponse is part of the synchronization protocol and represents the
-// reply to any active synchronization attempts. It contains a list of blocks
-// that should correspond to the request.
-type BlockResponse struct {
+// BatchResponse is part of the synchronization protocol and represents the reply to
+// a batch request. It contains a list of blocks that should correspond to the request.
+type BatchResponse struct {
 	Nonce  uint64
 	Blocks []*flow.Block
 }

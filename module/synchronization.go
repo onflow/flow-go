@@ -28,6 +28,11 @@ type SyncCore interface {
 	// if it should be discarded.
 	HandleBlock(header *flow.Header) bool
 
+	// HandleBlock handles receiving a new finalized block. It returns true if the
+	// block should be passed along to the rest of the system for processing, or
+	// false if it should be discarded.
+	HandleFinalizedBlock(header *flow.Header) bool
+
 	// HandleHeight handles receiving a new highest finalized height from another node.
 	HandleHeight(final *flow.Header, height uint64)
 

@@ -249,7 +249,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 	}
 
 	// send the response
-	res := &messages.BlockResponse{
+	res := &messages.RangeResponse{
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
@@ -258,7 +258,7 @@ func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *mes
 		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending range response failed")
 		return nil
 	}
-	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageRangeResponse)
 
 	return nil
 }
@@ -303,7 +303,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 	}
 
 	// send the response
-	res := &messages.BlockResponse{
+	res := &messages.BatchResponse{
 		Nonce:  req.Nonce,
 		Blocks: blocks,
 	}
@@ -312,7 +312,7 @@ func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *mes
 		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending batch response failed")
 		return nil
 	}
-	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
+	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBatchResponse)
 
 	return nil
 }

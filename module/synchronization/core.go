@@ -8,6 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 )
 
 const (
@@ -54,6 +55,8 @@ type Core struct {
 	blockIDs map[flow.Identifier]*statusWithHeight
 }
 
+var _ module.SyncCore = (*Core)(nil)
+
 type statusWithHeight struct {
 	*Status
 	height uint64
@@ -88,7 +91,7 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	status := c.getRequestStatus(header.Height, header.ID())
+	status := c.getBlockIDRequestStatus(header.ID())
 	// if we never asked for this block, discard it
 	if !status.WasQueued() {
 		return false
@@ -102,8 +105,34 @@ func (c *Core) HandleBlock(header *flow.Header) bool {
 	status.Header = header
 	status.Received = time.Now()
 
-	// track it by ID and by height so we don't accidentally request it again
+	// track it by ID so we don't accidentally request it again
 	c.setBlockIDStatus(header.ID(), header.Height, status)
+
+	return true
+}
+
+// HandleFinalizedBlock handles receiving a new finalized block from another node. It
+// returns true if the block should be processed by the compliance layer and
+// false if it should be ignored.
+func (c *Core) HandleFinalizedBlock(header *flow.Header) bool {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	status := c.getHeightRequestStatus(header.Height)
+	// if we never asked for this block, discard it
+	if !status.WasQueued() {
+		return false
+	}
+	// if we have already received this block, exit
+	if status.WasReceived() {
+		return false
+	}
+
+	// this is a new block, remember that we've seen it
+	status.Header = header
+	status.Received = time.Now()
+
+	// track it by ID so we don't accidentally request it again
 	c.heights[header.Height] = status
 
 	return true
@@ -224,16 +253,21 @@ func (c *Core) queueByBlockID(blockID flow.Identifier, height uint64) {
 	c.setBlockIDStatus(blockID, height, NewQueuedStatus())
 }
 
-// getRequestStatus retrieves a request status for a block, regardless of
-// whether it was queued by height or by block ID.
-func (c *Core) getRequestStatus(height uint64, blockID flow.Identifier) *Status {
-	heightStatus := c.heights[height]
+// getBlockIDRequestStatus retrieves a request status for a block that was queued by block ID.
+func (c *Core) getBlockIDRequestStatus(blockID flow.Identifier) *Status {
 	idStatus := c.getBlockIDStatus(blockID)
 
 	if idStatus.WasQueued() {
 		return idStatus
 	}
-	// Only return the height status if there is no matching status for the ID
+
+	return nil
+}
+
+// getHeightRequestStatus retrieves a request status for a finalized block that was queued by height.
+func (c *Core) getHeightRequestStatus(height uint64) *Status {
+	heightStatus := c.heights[height]
+
 	if heightStatus.WasQueued() {
 		return heightStatus
 	}
