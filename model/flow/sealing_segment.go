@@ -81,13 +81,8 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 	}
 
 	// invalid empty sealing segment blocks
-	if len(segment.Blocks) == 0 {
-		return nil, ErrSegmentBlocksEmpty
-	}
-
-	// segment with 1 block
-	if len(segment.Blocks) == 1 {
-		return segment, nil
+	if len(segment.Blocks) < 2 {
+		return nil, fmt.Errorf("expect at least 2 blocks in a sealing segment, but actually got %v: %w", len(segment.Blocks), ErrSegmentBlocksEmpty)
 	}
 
 	for _, seal := range segment.Highest().Payload.Seals {

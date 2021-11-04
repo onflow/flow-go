@@ -5,8 +5,8 @@ package badger
 import (
 	"errors"
 	"fmt"
-
 	"github.com/dgraph-io/badger/v2"
+	"github.com/onflow/flow-go/utils/unittest"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -82,10 +82,12 @@ func Bootstrap(
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
 
-	segment, err := root.SealingSegment()
-	if err != nil {
-		return nil, fmt.Errorf("could not get sealing segment: %w", err)
-	}
+	//segment, err := root.SealingSegment()
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not get sealing segment: %w", err)
+	//}
+
+	segment := tempTest(root)
 
 	// bootstrap the sealing segment step 1: insert segment execution results.
 	// execution results must be inserted first.
@@ -153,7 +155,36 @@ func Bootstrap(
 		return nil, fmt.Errorf("bootstrapping failed: %w", err)
 	}
 
+	fmt.Printf("\n\nBOOOTSTRAPPED")
 	return state, nil
+}
+
+func tempTest(root protocol.Snapshot) *flow.SealingSegment {
+	head, _ := root.Head()
+	block1 := unittest.BlockWithParentFixture(head)
+	receipt1 := unittest.ReceiptForBlockFixture(&block1)
+
+	block1.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(receipt1)))
+
+	// block2 contains result1 referenced in receipt1
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block2.SetPayload(unittest.PayloadFixture(unittest.WithExecutionResults(&receipt1.ExecutionResult)))
+
+	// build the block sealing block 1
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	receipt3, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+	block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt3), unittest.WithSeals(seal1)))
+	segment, err := root.SealingSegment()
+	if err != nil {
+		panic(fmt.Errorf("could not get sealing segment: %w", err))
+	}
+
+	segment.Blocks = []*flow.Block{&block1, &block2, &block3}
+	segment.ExecutionResults = []*flow.ExecutionResult{&receipt1.ExecutionResult}
+
+	fmt.Printf("\n\nExecutionResult ID: %x\n\n", receipt1.ExecutionResult.ID())
+
+	return segment
 }
 
 // bootstrapSealingSegmentExeResults inserts all execution results from SealingSegment.ExecutionReceipts.
@@ -163,14 +194,17 @@ func Bootstrap(
 func (state *State) bootstrapSealingSegmentExeResults(segment *flow.SealingSegment) error {
 	err := operation.RetryOnConflictTx(state.db, transaction.Update, func(tx *transaction.Tx) error {
 		for _, result := range segment.ExecutionResults {
-			err := operation.SkipDuplicates(operation.InsertExecutionResult(result))(tx.DBTxn)
+			err := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))(tx)
 			if err != nil {
 				return fmt.Errorf("could not insert execution result: %w", err)
 			}
-			err = operation.IndexExecutionResult(result.BlockID, result.ID())(tx.DBTxn)
+			err = transaction.WithTx(operation.IndexExecutionResult(result.BlockID, result.ID()))(tx)
 			if err != nil {
 				return fmt.Errorf("could not index execution result: %w", err)
 			}
+
+			fmt.Printf("STORING EXECUTION RESULT (separate): %x", result.ID())
+
 		}
 		return nil
 	})
@@ -185,6 +219,19 @@ func (state *State) bootstrapSealingSegmentExeResults(segment *flow.SealingSegme
 // protocol state root snapshot to disk.
 func (state *State) bootstrapSealingSegmentBlocks(segment *flow.SealingSegment, head *flow.Block) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
+		//for _, result := range segment.ExecutionResults {
+		//	err := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))(tx)
+		//	if err != nil {
+		//		return fmt.Errorf("could not insert execution result: %w", err)
+		//	}
+		//	err = transaction.WithTx(operation.IndexExecutionResult(result.BlockID, result.ID()))(tx)
+		//	if err != nil {
+		//		return fmt.Errorf("could not index execution result: %w", err)
+		//	}
+		//
+		//	fmt.Printf("STORING EXECUTION RESULT: %x", result.ID())
+		//}
+
 		for i, block := range segment.Blocks {
 			blockID := block.ID()
 			height := block.Header.Height

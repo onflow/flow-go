@@ -144,7 +144,7 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	lowestID := lowest.ID()
 
 	if result.BlockID != lowestID {
-		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, lowest)
+		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, lowest.ID())
 	}
 
 	if seal.BlockID != lowestID {
@@ -172,7 +172,7 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("could not get qc for root snapshot: %w", err)
 	}
 	if qc.BlockID != highestID {
-		return fmt.Errorf("qc is for wrong block (got: %v, expected: %v)", qc.BlockID, highest)
+		return fmt.Errorf("qc is for wrong block (got: %x, expected: %x)", qc.BlockID, highest.ID())
 	}
 
 	firstView, err := snap.Epochs().Current().FirstView()
