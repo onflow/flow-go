@@ -43,26 +43,25 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 	// which is not included in current payload but was incorporated in one of previous blocks.
 	// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
 	// and execution result is decoupled.
-	resultsByID := payload.Results.Lookup()
-	fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
-	var err error
-	for _, meta := range payload.Receipts {
-		result, ok := resultsByID[meta.ResultID]
-		if !ok {
-			result, err = p.results.ByID(meta.ResultID)
-			if err != nil {
-				if errors.Is(err, storage.ErrNotFound) {
-					err = fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
-				}
-				return func(*transaction.Tx) error {
+
+	return func(tx *transaction.Tx) error {
+
+		resultsByID := payload.Results.Lookup()
+		fullReceipts := make([]*flow.ExecutionReceipt, 0, len(payload.Receipts))
+		var err error
+		for _, meta := range payload.Receipts {
+			result, ok := resultsByID[meta.ResultID]
+			if !ok {
+				result, err = p.results.ByIDTx(meta.ResultID)(tx)
+				if err != nil {
+					if errors.Is(err, storage.ErrNotFound) {
+						err = fmt.Errorf("invalid payload referencing unknown execution result %v, err: %w", meta.ResultID, err)
+					}
 					return err
 				}
 			}
+			fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
 		}
-		fullReceipts = append(fullReceipts, flow.ExecutionReceiptFromMeta(*meta, *result))
-	}
-
-	return func(tx *transaction.Tx) error {
 
 		// make sure all payload guarantees are stored
 		for _, guarantee := range payload.Guarantees {
@@ -89,7 +88,7 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 		}
 
 		// store the index
-		err := p.index.storeTx(blockID, payload.Index())(tx)
+		err = p.index.storeTx(blockID, payload.Index())(tx)
 		if err != nil {
 			return fmt.Errorf("could not store index: %w", err)
 		}
