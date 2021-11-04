@@ -160,7 +160,7 @@ type ComponentManagerBuilder interface {
 }
 
 type componentManagerBuilderImpl struct {
-	mu              *sync.Mutex
+	mu              sync.Mutex
 	built           bool
 	serialStart     bool
 	workers         []*worker
@@ -170,7 +170,7 @@ type componentManagerBuilderImpl struct {
 // NewComponentManagerBuilder returns a new ComponentManagerBuilder
 func NewComponentManagerBuilder() ComponentManagerBuilder {
 	return &componentManagerBuilderImpl{
-		mu:              &sync.Mutex{},
+		mu:              sync.Mutex{},
 		workersRegistry: make(map[string]module.ReadyDoneAware),
 	}
 }
@@ -267,39 +267,24 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 		}
 	}()
 
-	var workersReady sync.WaitGroup
-	var workersDone sync.WaitGroup
-	workersDone.Add(len(c.workers))
-	workersReady.Add(len(c.workers))
-
 	// launch workers
-	for _, worker := range c.workers {
+	running := make([]module.ReadyDoneAware, len(c.workers))
+	for i, worker := range c.workers {
 		worker := worker
-		go func() {
-			defer workersDone.Done()
-			var readyOnce sync.Once
-			worker.run(
-				signalerCtx,
-				func() {
-					readyOnce.Do(func() {
-						workersReady.Done()
-					})
-				},
-				c.lookupWorker,
-			)
-		}()
+		running[i] = worker
+		go worker.run(signalerCtx, c.lookupWorker)
 		if c.serialStart {
-			if err := util.WaitReady(parent, worker.Ready()); err != nil {
+			if err := util.WaitClosed(parent, worker.Ready()); err != nil {
 				break
 			}
 		}
 	}
 
 	// launch goroutine to close ready channel
-	go c.waitForReady(&workersReady)
+	go c.waitForReady(running)
 
 	// launch goroutine to close done channel
-	go c.waitForDone(&workersDone)
+	go c.waitForDone(running)
 }
 
 // lookupWorker returns a ReadyDoneAware interface for the worker specified by ID
@@ -324,13 +309,13 @@ func (c *ComponentManager) lookupWorker(id string) (module.ReadyDoneAware, bool)
 	return worker, exists
 }
 
-func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
-	workersReady.Wait()
+func (c *ComponentManager) waitForReady(workers []module.ReadyDoneAware) {
+	<-util.AllReady(workers...)
 	close(c.ready)
 }
 
-func (c *ComponentManager) waitForDone(workersDone *sync.WaitGroup) {
-	workersDone.Wait()
+func (c *ComponentManager) waitForDone(workers []module.ReadyDoneAware) {
+	<-util.AllDone(workers...)
 	close(c.done)
 }
 
@@ -371,26 +356,24 @@ func newWorker(id string, f ComponentWorker) *worker {
 }
 
 // run calls the worker's ComponentWorker function, and manages the ReadyDoneAware interface
-func (w *worker) run(ctx irrecoverable.SignalerContext, ready ReadyFunc, lookup LookupFunc) {
+func (w *worker) run(ctx irrecoverable.SignalerContext, lookup LookupFunc) {
 	defer close(w.done)
 
 	var readyOnce sync.Once
 	w.f(ctx, func() {
 		readyOnce.Do(func() {
 			close(w.ready)
-			ready()
 		})
 	}, lookup)
 }
 
-// Ready returns a channel which is closed once all the worker routines have been launched and are ready.
-// If any worker routines exit before they indicate that they are ready, the channel returned from Ready will never close.
+// Ready returns a channel which is closed once all the worker routines have been launched and
+// are ready.
 func (w *worker) Ready() <-chan struct{} {
 	return w.ready
 }
 
 // Done returns a channel which is closed once the worker has shut down.
-// This happens when all worker routines have shut down (either gracefully or by throwing an error).
 func (w *worker) Done() <-chan struct{} {
 	return w.done
 }

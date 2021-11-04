@@ -52,23 +52,23 @@ func AllClosed(channels ...<-chan struct{}) <-chan struct{} {
 	return done
 }
 
-// WaitReady waits for either a signal/close on the ready channel or for the context to be cancelled
+// WaitClosed waits for either a signal/close on the channel or for the context to be cancelled
 // Returns nil if the channel was signalled/closed before returning, otherwise, it returns the context
 // error.
 //
-// This handles the corner case where the context is cancelled at the same time that components
-// were marked ready, and the Done case was selected.
+// This handles the corner case where the context is cancelled at the same time that the channel
+// is closed, and the Done case was selected.
 // This is intended for situations where ignoring a signal can cause safety issues.
-func WaitReady(ctx context.Context, ready <-chan struct{}) error {
+func WaitClosed(ctx context.Context, ch <-chan struct{}) error {
 	select {
 	case <-ctx.Done():
 		select {
-		case <-ready:
+		case <-ch:
 			return nil
 		default:
 		}
 		return ctx.Err()
-	case <-ready:
+	case <-ch:
 		return nil
 	}
 }
