@@ -48,11 +48,12 @@ func DefaultConfig() Config {
 //
 // Core is safe for concurrent use by multiple goroutines.
 type Core struct {
-	log      zerolog.Logger
-	Config   Config
-	mu       sync.Mutex
-	heights  map[uint64]*Status
-	blockIDs map[flow.Identifier]*statusWithHeight
+	log               zerolog.Logger
+	Config            Config
+	mu                sync.Mutex
+	heights           map[uint64]*Status
+	maxHeightReceived uint64
+	blockIDs          map[flow.Identifier]*statusWithHeight
 }
 
 var _ module.SyncCore = (*Core)(nil)
@@ -64,10 +65,11 @@ type statusWithHeight struct {
 
 func New(log zerolog.Logger, config Config) (*Core, error) {
 	core := &Core{
-		log:      log.With().Str("module", "synchronization").Logger(),
-		Config:   config,
-		heights:  make(map[uint64]*Status),
-		blockIDs: make(map[flow.Identifier]*statusWithHeight),
+		log:               log.With().Str("module", "synchronization").Logger(),
+		Config:            config,
+		heights:           make(map[uint64]*Status),
+		blockIDs:          make(map[flow.Identifier]*statusWithHeight),
+		maxHeightReceived: 0,
 	}
 	return core, nil
 }
@@ -134,6 +136,11 @@ func (c *Core) HandleFinalizedBlock(header *flow.Header) bool {
 
 	// track it by ID so we don't accidentally request it again
 	c.heights[header.Height] = status
+
+	// update our max height
+	if header.Height > c.maxHeightReceived {
+		c.maxHeightReceived = header.Height
+	}
 
 	return true
 }
@@ -337,8 +344,9 @@ func (c *Core) getRequestableItems() ([]uint64, []flow.Identifier) {
 			continue
 		}
 
-		// if we reached maximum number of attempts, delete
-		if status.Attempts >= c.Config.MaxAttempts {
+		// if we reached maximum number of attempts and we're not certain that the height
+		// has actually been finalized, delete
+		if height > c.maxHeightReceived && status.Attempts >= c.Config.MaxAttempts {
 			delete(c.heights, height)
 			continue
 		}
