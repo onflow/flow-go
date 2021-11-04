@@ -174,7 +174,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	if p.stakingSigAggtor.TotalWeight() < p.minRequiredStake {
 		return nil
 	}
-	if !p.rbRector.HasSufficientShares() {
+	if !p.rbRector.EnoughShares() {
 		return nil
 	}
 
