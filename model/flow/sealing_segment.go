@@ -40,12 +40,12 @@ type SealingSegmentBuilder struct {
 
 // AddBlock appends block to blocks
 func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
+	resultsByID := block.Payload.Results.Lookup()
 	for _, receipt := range block.Payload.Receipts {
 		if _, ok := builder.includedResults[receipt.ResultID]; ok {
 			continue
 		}
 
-		resultsByID := block.Payload.Results.Lookup()
 		if _, ok := resultsByID[receipt.ResultID]; !ok {
 			result, err := builder.resultLookup(receipt.ResultID)
 			if err != nil {
