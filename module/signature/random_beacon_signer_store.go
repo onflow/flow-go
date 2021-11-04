@@ -10,16 +10,16 @@ import (
 )
 
 type EpochAwareRandomBeaconSignerStore struct {
-	epochLookup module.EpochLookup       // used to fetch epoch counter by view
-	keys        storage.DKGKeys          // used to fetch DKG private key by epoch
-	signers     map[uint64]module.Signer // cache of signers by epoch
+	epochLookup module.EpochLookup          // used to fetch epoch counter by view
+	keys        storage.DKGKeys             // used to fetch DKG private key by epoch
+	signers     map[uint64]module.MsgSigner // cache of signers by epoch
 }
 
 func NewEpochAwareRandomBeaconSignerStore(epochLookup module.EpochLookup, keys storage.DKGKeys) *EpochAwareRandomBeaconSignerStore {
 	return &EpochAwareRandomBeaconSignerStore{
 		epochLookup: epochLookup,
 		keys:        keys,
-		signers:     make(map[uint64]module.Signer),
+		signers:     make(map[uint64]module.MsgSigner),
 	}
 }
 
@@ -30,7 +30,7 @@ func NewEpochAwareRandomBeaconSignerStore(epochLookup module.EpochLookup, keys s
 //  - (signer, nil) if DKG was completed in the epoch of the view, signer is not nil
 //  - (nil, DKGIncompleteError) if DKG was not completed in the epoch of the view
 //  - (nil, error) if there is any exception
-func (s *EpochAwareRandomBeaconSignerStore) GetSigner(view uint64) (module.Signer, error) {
+func (s *EpochAwareRandomBeaconSignerStore) GetSigner(view uint64) (module.MsgSigner, error) {
 	// fetching the epoch by view, if epoch is found, then DKG must have been completed
 	epoch, err := s.epochLookup.EpochForViewWithFallback(view)
 	if err != nil {
