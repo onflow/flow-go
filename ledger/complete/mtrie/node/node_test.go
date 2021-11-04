@@ -145,17 +145,14 @@ func Test_Compactify(t *testing.T) {
 	payload2 := utils.LightPayload(2, 4)
 	emptyPayload := &ledger.Payload{}
 
-	t.Run("should not be pruned", func(t *testing.T) {
+	t.Run("non-leaf non-empty on right and leaf empty on left", func(t *testing.T) {
 		//          n5
 		//       /     \
 		//      n3      n4(-)
 		//   /    \
 		//  n1(p1) n2(p2)
 		//
-		// even though n4 is empty, it should not be pruned
-		// we avoid empty-leaf pruning for performance reasons
-		// while keeping it would only add one extra lookup, removing
-		// it requires the whole branch to change to the top
+		// n4 would be replaced with nil, but n5 won't be prunned
 		n1 := node.NewLeaf(path0, payload1, 254)
 		n2 := node.NewLeaf(path1, payload2, 254)
 		n3 := node.NewInterimNode(255, n1, n2)
@@ -165,6 +162,8 @@ func Test_Compactify(t *testing.T) {
 		nn5 := n5.Compactify()
 		require.Equal(t, n5.MaxDepth(), nn5.MaxDepth())
 		require.True(t, nn5.VerifyCachedHash())
+		require.True(t, nn5.VerifyCachedHash())
+		require.Nil(t, nn5.RightChild())
 		require.Equal(t, nn5, n5)
 	})
 

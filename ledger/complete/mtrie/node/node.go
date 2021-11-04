@@ -184,11 +184,19 @@ func (n *Node) Compactify() *Node {
 	}
 
 	// if childNode is non empty
-	if !lChildEmpty && rChildEmpty && n.lChild.IsLeaf() {
-		return n.lChild.copyAndPromoteLeafNode(true)
+	if rChildEmpty {
+		if !lChildEmpty && n.lChild.IsLeaf() {
+			return n.lChild.copyAndPromoteLeafNode(true)
+		}
+		// this would replace empty nodes with nil
+		n.rChild = nil
 	}
-	if lChildEmpty && !rChildEmpty && n.rChild.IsLeaf() {
-		return n.rChild.copyAndPromoteLeafNode(false)
+	if lChildEmpty {
+		if !rChildEmpty && n.rChild.IsLeaf() {
+			return n.rChild.copyAndPromoteLeafNode(false)
+		}
+		// this would replace empty nodes with nil
+		n.lChild = nil
 	}
 
 	// else no change needed
