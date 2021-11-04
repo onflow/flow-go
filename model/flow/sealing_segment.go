@@ -4,10 +4,18 @@ import (
 	"fmt"
 )
 
-// SealingSegment is the chain segment such that the head (greatest
-// height) is this snapshot's reference block and the tail (least height)
+// SealingSegment is the chain segment such that the last block (greatest
+// height) is this snapshot's reference block and the first (least height)
 // is the most recently sealed block as of this snapshot (ie. the block
-// referenced by LatestSeal). The segment is in ascending height order.
+// referenced by LatestSeal). 
+// In other words, the last block contains a seal for the first block.
+// For instance: 
+//   A <- B <- C <- D <- E (seal_A)
+// The above sealing segment's last block (E) has a seal for block A, which is
+// the first block of the sealing segment.
+//
+// It is guaranteed there are at least 2 blocks in a SealingSegment
+// The segment is in ascending height order.
 type SealingSegment struct {
 	// Blocks the chain segment blocks
 	Blocks []*Block
