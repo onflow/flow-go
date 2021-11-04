@@ -30,8 +30,11 @@ import (
 // defaultSyncResponseQueueCapacity maximum capacity of sync responses queue
 const defaultSyncResponseQueueCapacity = 500
 
-// defaultBlockResponseQueueCapacity maximum capacity of block responses queue
-const defaultBlockResponseQueueCapacity = 500
+// defaultBatchResponseQueueCapacity maximum capacity of batch responses queue
+const defaultBatchResponseQueueCapacity = 500
+
+// defaultRangeResponseQueueCapacity maximum capacity of range responses queue
+const defaultRangeResponseQueueCapacity = 500
 
 // Engine is the synchronization engine, responsible for synchronizing chain state.
 type Engine struct {
@@ -52,7 +55,8 @@ type Engine struct {
 	requestHandler *RequestHandlerEngine // component responsible for handling requests
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
-	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
+	pendingBatchResponses  engine.MessageStore    // message store for *message.BatchResponse
+	pendingRangeResponses  engine.MessageStore    // message store for *message.RangeResponse
 	responseMessageHandler *engine.MessageHandler // message handler responsible for response processing
 }
 
@@ -128,14 +132,24 @@ func (e *Engine) setupResponseMessageHandler() error {
 		FifoQueue: syncResponseQueue,
 	}
 
-	blockResponseQueue, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultBlockResponseQueueCapacity))
+	batchResponseQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultBatchResponseQueueCapacity))
 	if err != nil {
-		return fmt.Errorf("failed to create queue for block responses: %w", err)
+		return fmt.Errorf("failed to create queue for batch responses: %w", err)
 	}
 
-	e.pendingBlockResponses = &engine.FifoMessageStore{
-		FifoQueue: blockResponseQueue,
+	e.pendingBatchResponses = &engine.FifoMessageStore{
+		FifoQueue: batchResponseQueue,
+	}
+
+	rangeResponseQueue, err := fifoqueue.NewFifoQueue(
+		fifoqueue.WithCapacity(defaultRangeResponseQueueCapacity))
+	if err != nil {
+		return fmt.Errorf("failed to create queue for range responses: %w", err)
+	}
+
+	e.pendingRangeResponses = &engine.FifoMessageStore{
+		FifoQueue: rangeResponseQueue,
 	}
 
 	// define message queueing behaviour
@@ -154,13 +168,23 @@ func (e *Engine) setupResponseMessageHandler() error {
 		},
 		engine.Pattern{
 			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.ClusterBlockResponse)
+				_, ok := msg.Payload.(*messages.ClusterBatchResponse)
 				if ok {
-					e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
+					e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageBatchResponse)
 				}
 				return ok
 			},
-			Store: e.pendingBlockResponses,
+			Store: e.pendingBatchResponses,
+		},
+		engine.Pattern{
+			Match: func(msg *engine.Message) bool {
+				_, ok := msg.Payload.(*messages.ClusterRangeResponse)
+				if ok {
+					e.metrics.MessageReceived(metrics.EngineClusterSynchronization, metrics.MessageRangeResponse)
+				}
+				return ok
+			},
+			Store: e.pendingRangeResponses,
 		},
 	)
 
@@ -238,7 +262,7 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	switch event.(type) {
 	case *messages.RangeRequest, *messages.BatchRequest, *messages.SyncRequest:
 		return e.requestHandler.process(originID, event)
-	case *messages.SyncResponse, *messages.ClusterBlockResponse:
+	case *messages.SyncResponse, *messages.ClusterBatchResponse, *messages.ClusterRangeResponse:
 		return e.responseMessageHandler.Process(originID, event)
 	default:
 		return fmt.Errorf("received input with type %T from %x: %w", event, originID[:], engine.IncompatibleInputTypeError)
@@ -274,10 +298,17 @@ func (e *Engine) processAvailableResponses() {
 			continue
 		}
 
-		msg, ok = e.pendingBlockResponses.Get()
+		msg, ok = e.pendingBatchResponses.Get()
 		if ok {
-			e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.ClusterBlockResponse))
-			e.metrics.MessageHandled(metrics.EngineClusterSynchronization, metrics.MessageBlockResponse)
+			e.onBatchResponse(msg.OriginID, msg.Payload.(*messages.ClusterBatchResponse))
+			e.metrics.MessageHandled(metrics.EngineClusterSynchronization, metrics.MessageBatchResponse)
+			continue
+		}
+
+		msg, ok = e.pendingRangeResponses.Get()
+		if ok {
+			e.onRangeResponse(msg.OriginID, msg.Payload.(*messages.ClusterRangeResponse))
+			e.metrics.MessageHandled(metrics.EngineClusterSynchronization, metrics.MessageRangeResponse)
 			continue
 		}
 
@@ -297,11 +328,30 @@ func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResp
 	e.core.HandleHeight(final, res.Height)
 }
 
-// onBlockResponse processes a response containing a specifically requested block.
-func (e *Engine) onBlockResponse(originID flow.Identifier, res *messages.ClusterBlockResponse) {
+// onBatchResponse processes a response containing a specifically requested batch.
+func (e *Engine) onBatchResponse(originID flow.Identifier, res *messages.ClusterBatchResponse) {
 	// process the blocks one by one
 	for _, block := range res.Blocks {
 		if !e.core.HandleBlock(block.Header) {
+			continue
+		}
+		synced := &events.SyncedClusterBlock{
+			OriginID: originID,
+			Block:    block,
+		}
+		e.comp.SubmitLocal(synced)
+	}
+}
+
+// onRangeResponse processes a response containing a specifically requested range.
+// TODO: Currently, we trust that the response is honest and only contains finalized
+// blocks. In the future, we may consider keeping track of the responses received
+// and slashing nodes which responded to range requests with blocks which don't get
+// finalized.
+func (e *Engine) onRangeResponse(originID flow.Identifier, res *messages.ClusterRangeResponse) {
+	// process the blocks one by one
+	for _, block := range res.Blocks {
+		if !e.core.HandleFinalizedBlock(block.Header) {
 			continue
 		}
 		synced := &events.SyncedClusterBlock{

@@ -53,9 +53,16 @@ type BatchResponse struct {
 	Blocks []*flow.Block
 }
 
-// ClusterBlockResponse is the same thing as BlockResponse, but for cluster
+// ClusterRangeResponse is the same thing as RangeResponse, but for cluster
 // consensus.
-type ClusterBlockResponse struct {
+type ClusterRangeResponse struct {
+	Nonce  uint64
+	Blocks []*cluster.Block
+}
+
+// ClusterBatchResponse is the same thing as BatchResponse, but for cluster
+// consensus.
+type ClusterBatchResponse struct {
 	Nonce  uint64
 	Blocks []*cluster.Block
 }

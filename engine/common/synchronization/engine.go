@@ -341,7 +341,8 @@ func (e *Engine) onBatchResponse(originID flow.Identifier, res *messages.BatchRe
 // onRangeResponse processes a response containing a specifically requested range.
 // TODO: Currently, we trust that the response is honest and only contains finalized
 // blocks. In the future, we may consider keeping track of the responses received
-// and slashing nodes which responded to range requests with unfinalized blocks.
+// and slashing nodes which responded to range requests with blocks which don't get
+// finalized.
 func (e *Engine) onRangeResponse(originID flow.Identifier, res *messages.RangeResponse) {
 	e.log.Debug().Str("origin_id", originID.String()).Msg("received range response")
 	// process the blocks one by one
