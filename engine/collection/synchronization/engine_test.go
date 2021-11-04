@@ -261,7 +261,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	req.ToHeight = ref - 1
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.ClusterBlockResponse)
+			res := args.Get(0).(*messages.ClusterRangeResponse)
 			expected := []*clustermodel.Block{ss.heights[ref-1]}
 			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
@@ -277,7 +277,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	req.ToHeight = ref + 2
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.ClusterBlockResponse)
+			res := args.Get(0).(*messages.ClusterRangeResponse)
 			expected := []*clustermodel.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
 			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
@@ -293,7 +293,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	req.ToHeight = ref
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.ClusterBlockResponse)
+			res := args.Get(0).(*messages.ClusterRangeResponse)
 			expected := []*clustermodel.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
 			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
@@ -333,7 +333,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	ss.blockIDs[block.ID()] = &block
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.ClusterBlockResponse)
+			res := args.Get(0).(*messages.ClusterBatchResponse)
 			assert.ElementsMatch(ss.T(), []*clustermodel.Block{&block}, res.Blocks, "response should contain right block")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 			recipientID := args.Get(1).(flow.Identifier)
@@ -344,11 +344,11 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	require.NoError(ss.T(), err, "should pass request with valid block")
 }
 
-func (ss *SyncSuite) TestOnBlockResponse() {
+func (ss *SyncSuite) TestOnBatchResponse() {
 
 	// generate origin and block response
 	originID := unittest.IdentifierFixture()
-	res := &messages.ClusterBlockResponse{
+	res := &messages.ClusterBatchResponse{
 		Nonce:  rand.Uint64(),
 		Blocks: []*clustermodel.Block{},
 	}
@@ -363,14 +363,15 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	ss.core.On("HandleBlock", unprocessable.Header).Return(false)
 	res.Blocks = append(res.Blocks, &unprocessable)
 
-	ss.comp.On("SubmitLocal", mock.Anything).Run(func(args mock.Arguments) {
-		res := args.Get(0).(*events.SyncedBlock)
-		ss.Assert().Equal(&processable, res.Block)
-		ss.Assert().Equal(originID, res.OriginID)
-	},
+	ss.comp.On("SubmitLocal", mock.Anything).Run(
+		func(args mock.Arguments) {
+			res := args.Get(0).(*events.SyncedBlock)
+			ss.Assert().Equal(&processable, res.Block)
+			ss.Assert().Equal(originID, res.OriginID)
+		},
 	)
 
-	ss.e.onBlockResponse(originID, res)
+	ss.e.onBatchResponse(originID, res)
 	ss.comp.AssertExpectations(ss.T())
 	ss.core.AssertExpectations(ss.T())
 }

@@ -279,7 +279,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	req.ToHeight = ref - 1
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.BlockResponse)
+			res := args.Get(0).(*messages.RangeResponse)
 			expected := []*flow.Block{ss.heights[ref-1]}
 			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
@@ -295,7 +295,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	req.ToHeight = ref + 2
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.BlockResponse)
+			res := args.Get(0).(*messages.RangeResponse)
 			expected := []*flow.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
 			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
@@ -311,7 +311,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	req.ToHeight = ref
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.BlockResponse)
+			res := args.Get(0).(*messages.RangeResponse)
 			expected := []*flow.Block{ss.heights[ref-2], ss.heights[ref-1], ss.heights[ref]}
 			assert.ElementsMatch(ss.T(), expected, res.Blocks, "response should contain right blocks")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
@@ -327,7 +327,7 @@ func (ss *SyncSuite) TestOnRangeRequest() {
 	req.ToHeight = ref
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Once().Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.BlockResponse)
+			res := args.Get(0).(*messages.RangeResponse)
 			assert.Len(ss.T(), res.Blocks, int(synccore.DefaultConfig().MaxSize))
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 			recipientID := args.Get(1).(flow.Identifier)
@@ -366,7 +366,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	ss.blockIDs[block.ID()] = &block
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.BlockResponse)
+			res := args.Get(0).(*messages.BatchResponse)
 			assert.ElementsMatch(ss.T(), []*flow.Block{&block}, res.Blocks, "response should contain right block")
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 			recipientID := args.Get(1).(flow.Identifier)
@@ -385,7 +385,7 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	}
 	ss.con.On("Unicast", mock.Anything, mock.Anything).Return(nil).Run(
 		func(args mock.Arguments) {
-			res := args.Get(0).(*messages.BlockResponse)
+			res := args.Get(0).(*messages.BatchResponse)
 			assert.Len(ss.T(), res.Blocks, int(synccore.DefaultConfig().MaxSize))
 			assert.Equal(ss.T(), req.Nonce, res.Nonce, "response should contain request nonce")
 			recipientID := args.Get(1).(flow.Identifier)
@@ -396,11 +396,11 @@ func (ss *SyncSuite) TestOnBatchRequest() {
 	require.NoError(ss.T(), err, "valid batch request exceeding max size should still pass")
 }
 
-func (ss *SyncSuite) TestOnBlockResponse() {
+func (ss *SyncSuite) TestOnBatchResponse() {
 
 	// generate origin and block response
 	originID := unittest.IdentifierFixture()
-	res := &messages.BlockResponse{
+	res := &messages.BatchResponse{
 		Nonce:  rand.Uint64(),
 		Blocks: []*flow.Block{},
 	}
@@ -422,7 +422,7 @@ func (ss *SyncSuite) TestOnBlockResponse() {
 	},
 	)
 
-	ss.e.onBlockResponse(originID, res)
+	ss.e.onBatchResponse(originID, res)
 	ss.comp.AssertExpectations(ss.T())
 	ss.core.AssertExpectations(ss.T())
 }

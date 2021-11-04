@@ -34,16 +34,20 @@ func switchv2code(v interface{}) (uint8, error) {
 		code = CodeRangeRequest
 	case *messages.BatchRequest:
 		code = CodeBatchRequest
-	case *messages.BlockResponse:
-		code = CodeBlockResponse
+	case *messages.RangeResponse:
+		code = CodeRangeResponse
+	case *messages.BatchResponse:
+		code = CodeBatchResponse
 
 	// cluster consensus
 	case *messages.ClusterBlockProposal:
 		code = CodeClusterBlockProposal
 	case *messages.ClusterBlockVote:
 		code = CodeClusterBlockVote
-	case *messages.ClusterBlockResponse:
-		code = CodeClusterBlockResponse
+	case *messages.ClusterRangeResponse:
+		code = CodeClusterRangeResponse
+	case *messages.ClusterBatchResponse:
+		code = CodeClusterBatchResponse
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:
@@ -116,9 +120,11 @@ func switchv2what(v interface{}) (string, error) {
 		what = "CodeSyncResponse"
 	case *messages.RangeRequest:
 		what = "CodeRangeRequest"
+	case *messages.RangeResponse:
+		what = "CodeRangeRequest"
 	case *messages.BatchRequest:
 		what = "CodeBatchRequest"
-	case *messages.BlockResponse:
+	case *messages.BatchResponse:
 		what = "CodeBatchRequest"
 
 	// cluster consensus
@@ -126,8 +132,10 @@ func switchv2what(v interface{}) (string, error) {
 		what = "CodeClusterBlockProposal"
 	case *messages.ClusterBlockVote:
 		what = "CodeClusterBlockVote"
-	case *messages.ClusterBlockResponse:
-		what = "CodeClusterBlockResponse"
+	case *messages.ClusterRangeResponse:
+		what = "CodeClusterRangeResponse"
+	case *messages.ClusterBatchResponse:
+		what = "CodeClusterBatchResponse"
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:

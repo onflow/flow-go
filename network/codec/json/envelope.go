@@ -16,13 +16,15 @@ const (
 	CodeSyncRequest
 	CodeSyncResponse
 	CodeRangeRequest
+	CodeRangeResponse
 	CodeBatchRequest
-	CodeBlockResponse
+	CodeBatchResponse
 
 	// cluster consensus
 	CodeClusterBlockProposal
 	CodeClusterBlockVote
-	CodeClusterBlockResponse
+	CodeClusterBatchResponse
+	CodeClusterRangeResponse
 
 	// collections, guarantees & transactions
 	CodeCollectionGuarantee
