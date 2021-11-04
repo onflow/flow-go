@@ -7,9 +7,9 @@ import (
 // SealingSegment is the chain segment such that the last block (greatest
 // height) is this snapshot's reference block and the first (least height)
 // is the most recently sealed block as of this snapshot (ie. the block
-// referenced by LatestSeal). 
+// referenced by LatestSeal).
 // In other words, the last block contains a seal for the first block.
-// For instance: 
+// For instance:
 //   A <- B <- C <- D <- E (seal_A)
 // The above sealing segment's last block (E) has a seal for block A, which is
 // the first block of the sealing segment.
@@ -35,8 +35,8 @@ func (segment *SealingSegment) Lowest() *Block {
 }
 
 var (
-	ErrSegmentMissingSeal = fmt.Errorf("sealing segment failed sanity check: highest block in segment does not contain seal for lowest")
-	ErrSegmentBlocksEmpty = fmt.Errorf("invalid sealing segment with 0 blocks")
+	ErrSegmentMissingSeal    = fmt.Errorf("sealing segment failed sanity check: highest block in segment does not contain seal for lowest")
+	ErrSegmentBlocksWrongLen = fmt.Errorf("sealing segment is required to have atleast 2 blocks")
 )
 
 type SealingSegmentBuilder struct {
@@ -80,14 +80,8 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 		ExecutionResults: builder.results,
 	}
 
-	// invalid empty sealing segment blocks
-	if len(segment.Blocks) == 0 {
-		return nil, ErrSegmentBlocksEmpty
-	}
-
-	// segment with 1 block
-	if len(segment.Blocks) == 1 {
-		return segment, nil
+	if len(segment.Blocks) < 2 {
+		return nil, fmt.Errorf("expect at least 2 blocks in a sealing segment, but actually got %v: %w", len(segment.Blocks), ErrSegmentBlocksWrongLen)
 	}
 
 	for _, seal := range segment.Highest().Payload.Seals {
