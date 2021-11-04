@@ -209,13 +209,13 @@ func update(
 		if compactLeaf != nil {
 			// create a new node for the compact leaf path and payload. The old node shouldn't
 			// be recycled as it is still used by the tree copy before the update.
-			return node.NewLeaf(*compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
+			return node.NewLeaf(*compactLeaf.Path(), compactLeaf.Payload().DeepCopy(), nodeHeight)
 		}
 		return parentNode
 	}
 
 	if len(paths) == 1 && parentNode == nil && compactLeaf == nil {
-		return node.NewLeaf(paths[0], &payloads[0], nodeHeight)
+		return node.NewLeaf(paths[0], payloads[0].DeepCopy(), nodeHeight)
 	}
 
 	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
@@ -227,7 +227,7 @@ func update(
 				// the case where the recursion stops: only one path to update
 				if len(paths) == 1 {
 					if !parentNode.Payload().Equals(&payloads[i]) {
-						return node.NewLeaf(paths[i], &payloads[i], nodeHeight)
+						return node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
 					}
 					// avoid creating a new node when the same payload is written
 					return parentNode

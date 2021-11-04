@@ -406,7 +406,7 @@ func Test_Pruning(t *testing.T) {
 	})
 
 	t.Run("smoke testing trie pruning", func(t *testing.T) {
-		t.Skip("skipping trie pruning smoke testing as its not needed to always run")
+		// t.Skip("skipping trie pruning smoke testing as its not needed to always run")
 
 		numberOfSteps := 1000
 		numberOfUpdates := 750
