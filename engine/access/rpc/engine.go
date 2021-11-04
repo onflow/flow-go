@@ -35,7 +35,8 @@ type Config struct {
 	SecureGRPCListenAddr      string                           // the secure GRPC server address as ip:port
 	TransportCredentials      credentials.TransportCredentials // the secure GRPC credentials
 	HTTPListenAddr            string                           // the HTTP web proxy address as ip:port
-	RESTListenAddr            string                           // the REST server address as ip:port
+	ServeRESTAPI              bool                             // flag to enable the REST API server
+	RESTListenAddr            string                           // the REST server address as ip:port (ignored if ServeRESTAPI is false)
 	CollectionAddr            string                           // the address of the upstream collection node
 	HistoricalAccessAddrs     string                           // the list of all access nodes from previous spork
 	MaxMsgSize                int                              // GRPC max message size
@@ -60,7 +61,7 @@ type Engine struct {
 	config              Config
 	unsecureGrpcAddress net.Addr
 	secureGrpcAddress   net.Addr
-	resetAPIAddress     net.Addr
+	restAPIAddress      net.Addr
 }
 
 // New returns a new RPC engine.
@@ -156,9 +157,6 @@ func New(log zerolog.Logger,
 		log,
 	)
 
-	restAPIHandler := rest.NewRestAPIHandler(backend, log)
-	restServer := rest.NewRestAPIServer(restAPIHandler, config.RESTListenAddr, log)
-
 	eng := &Engine{
 		log:                log,
 		unit:               engine.NewUnit(),
@@ -166,7 +164,6 @@ func New(log zerolog.Logger,
 		unsecureGrpcServer: unsecureGrpcServer,
 		secureGrpcServer:   secureGrpcServer,
 		httpServer:         httpServer,
-		restServer:         restServer,
 		config:             config,
 	}
 
@@ -207,7 +204,9 @@ func (e *Engine) Ready() <-chan struct{} {
 	e.unit.Launch(e.serveUnsecureGRPC)
 	e.unit.Launch(e.serveSecureGRPC)
 	e.unit.Launch(e.serveGRPCWebProxy)
-	e.unit.Launch(e.serveREST)
+	if e.config.ServeRESTAPI {
+		e.unit.Launch(e.serveREST)
+	}
 	return e.unit.Ready()
 }
 
@@ -250,7 +249,7 @@ func (e *Engine) SecureGRPCAddress() net.Addr {
 }
 
 func (e *Engine) RestApiAddress() net.Addr {
-	return e.resetAPIAddress
+	return e.restAPIAddress
 }
 
 // process processes the given ingestion engine event. Events that are given
@@ -332,15 +331,18 @@ func (e *Engine) serveREST() {
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
+	restAPIHandler := rest.NewRestAPIHandler(e.backend, e.log)
+	e.restServer = rest.NewRestAPIServer(restAPIHandler, e.config.RESTListenAddr, e.log)
+
 	l, err := net.Listen("tcp", e.config.RESTListenAddr)
 	if err != nil {
 		e.log.Err(err).Msg("failed to start the REST server")
 		return
 	}
 
-	e.resetAPIAddress = l.Addr()
+	e.restAPIAddress = l.Addr()
 
-	e.log.Debug().Str("rest_api_address", e.resetAPIAddress.String()).Msg("listening on port")
+	e.log.Debug().Str("rest_api_address", e.restAPIAddress.String()).Msg("listening on port")
 
 	err = e.restServer.Serve(l) // blocking call
 	if err != nil {
