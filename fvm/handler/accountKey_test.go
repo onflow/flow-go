@@ -6,6 +6,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
 	"github.com/stretchr/testify/assert"
@@ -104,5 +105,7 @@ func (f FakeAccounts) GetValue(_ flow.Address, _ string) (flow.RegisterValue, er
 func (f FakeAccounts) CheckAccountNotFrozen(_ flow.Address) error                    { return nil }
 func (f FakeAccounts) GetStorageUsed(_ flow.Address) (uint64, error)                 { return 0, nil }
 func (f FakeAccounts) SetValue(_ flow.Address, _ string, _ []byte) error             { return nil }
-func (f FakeAccounts) AllocateStorageIndex(_ flow.Address) (uint64, error)           { return 0, nil }
-func (f FakeAccounts) SetAccountFrozen(_ flow.Address, _ bool) error                 { return nil }
+func (f FakeAccounts) AllocateStorageIndex(_ flow.Address) (atree.StorageIndex, error) {
+	return atree.StorageIndex{}, nil
+}
+func (f FakeAccounts) SetAccountFrozen(_ flow.Address, _ bool) error { return nil }
