@@ -31,6 +31,13 @@ func TestProcessTestRun(t *testing.T) {
 		// this is a single unit test that produces a nil test result
 		"1 count single nil test": "test-result-nil-test-single-1-count-pass.json",
 
+		//raw results generated with: go test -v -tags relic -count=5 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
+		//for testing that re-slicing logic works when there are multiple nil tests in a row
+		"5 nil tests in a row": "test-result-nil-test-single-5-count-pass.json",
+
+		//for testing that re-slicing logic works when there is a normal test at the of a test run with multiple nil tests in front of it
+		"4 nil tests in a row, 1 normal test": "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
+
 		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
 		// this is a group of unit tests with a single nil test result
 		"3 count nil test with normal tests": "test-result-nil-test-others-normal-3-count-pass.json",
