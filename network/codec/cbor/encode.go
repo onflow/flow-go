@@ -30,16 +30,20 @@ func switchv2code(v interface{}) (uint8, error) {
 		code = CodeRangeRequest
 	case *messages.BatchRequest:
 		code = CodeBatchRequest
-	case *messages.BlockResponse:
-		code = CodeBlockResponse
+	case *messages.BatchResponse:
+		code = CodeBatchResponse
+	case *messages.RangeResponse:
+		code = CodeRangeResponse
 
 	// cluster consensus
 	case *messages.ClusterBlockProposal:
 		code = CodeClusterBlockProposal
 	case *messages.ClusterBlockVote:
 		code = CodeClusterBlockVote
-	case *messages.ClusterBlockResponse:
-		code = CodeClusterBlockResponse
+	case *messages.ClusterBatchResponse:
+		code = CodeClusterBatchResponse
+	case *messages.ClusterRangeResponse:
+		code = CodeClusterRangeResponse
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:
@@ -114,16 +118,20 @@ func switchv2what(v interface{}) (string, error) {
 		what = "CodeRangeRequest"
 	case *messages.BatchRequest:
 		what = "CodeBatchRequest"
-	case *messages.BlockResponse:
+	case *messages.BatchResponse:
 		what = "CodeBatchRequest"
+	case *messages.RangeResponse:
+		what = "CodeRangeRequest"
 
 	// cluster consensus
 	case *messages.ClusterBlockProposal:
 		what = "CodeClusterBlockProposal"
 	case *messages.ClusterBlockVote:
 		what = "CodeClusterBlockVote"
-	case *messages.ClusterBlockResponse:
-		what = "CodeClusterBlockResponse"
+	case *messages.ClusterBatchResponse:
+		what = "CodeClusterBatchResponse"
+	case *messages.ClusterRangeResponse:
+		what = "CodeClusterRangeResponse"
 
 	// collections, guarantees & transactions
 	case *flow.CollectionGuarantee:

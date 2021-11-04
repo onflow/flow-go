@@ -26,8 +26,10 @@ func switchenv2v(code uint8) (interface{}, error) {
 		v = &messages.ClusterBlockProposal{}
 	case CodeClusterBlockVote:
 		v = &messages.ClusterBlockVote{}
-	case CodeClusterBlockResponse:
-		v = &messages.ClusterBlockResponse{}
+	case CodeClusterBatchResponse:
+		v = &messages.ClusterBatchResponse{}
+	case CodeClusterRangeResponse:
+		v = &messages.ClusterRangeResponse{}
 
 	// protocol state sync
 	case CodeSyncRequest:
@@ -38,8 +40,10 @@ func switchenv2v(code uint8) (interface{}, error) {
 		v = &messages.RangeRequest{}
 	case CodeBatchRequest:
 		v = &messages.BatchRequest{}
-	case CodeBlockResponse:
-		v = &messages.BlockResponse{}
+	case CodeBatchResponse:
+		v = &messages.BatchResponse{}
+	case CodeRangeResponse:
+		v = &messages.RangeResponse{}
 
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
@@ -109,8 +113,10 @@ func switchenv2what(code uint8) (string, error) {
 		what = "CodeClusterBlockProposal"
 	case CodeClusterBlockVote:
 		what = "CodeClusterBlockVote"
-	case CodeClusterBlockResponse:
-		what = "CodeClusterBlockResponse"
+	case CodeClusterBatchResponse:
+		what = "CodeClusterBatchResponse"
+	case CodeClusterRangeResponse:
+		what = "CodeClusterRangeResponse"
 
 	// protocol state sync
 	case CodeSyncRequest:
@@ -121,8 +127,10 @@ func switchenv2what(code uint8) (string, error) {
 		what = "CodeRangeRequest"
 	case CodeBatchRequest:
 		what = "CodeBatchRequest"
-	case CodeBlockResponse:
-		what = "CodeBlockResponse"
+	case CodeBatchResponse:
+		what = "CodeBatchResponse"
+	case CodeRangeResponse:
+		what = "CodeRangeResponse"
 
 	// collections, guarantees & transactions
 	case CodeCollectionGuarantee:
