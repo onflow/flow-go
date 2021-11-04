@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"os"
 	"sync"
@@ -138,7 +137,7 @@ func (suite *LibP2PNodeTestSuite) TestAddPeers() {
 	count := 3
 
 	// create nodes
-	nodes, identities := suite.NodesFixture(count, nil, false)
+	nodes, identities := NodesFixtureWithHandler(suite.T(), count, nil, false)
 	defer StopNodes(suite.T(), nodes)
 
 	// add the remaining nodes to the first node as its set of peers
@@ -158,7 +157,7 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 	count := 3
 
 	// create nodes
-	nodes, identities := suite.NodesFixture(count, nil, false)
+	nodes, identities := NodesFixtureWithHandler(suite.T(), count, nil, false)
 	peerInfos, errs := peerInfosFromIDs(identities)
 	assert.Len(suite.T(), errs, 0)
 	defer StopNodes(suite.T(), nodes)
@@ -183,7 +182,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 	count := 2
 
 	// Creates nodes
-	nodes, identities := suite.NodesFixture(count, nil, false)
+	nodes, identities := NodesFixtureWithHandler(suite.T(), count, nil, false)
 	defer StopNodes(suite.T(), nodes)
 
 	id2 := identities[1]
@@ -231,7 +230,7 @@ func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {
 
 	count := 2
 	// Creates nodes
-	nodes, identities := suite.NodesFixture(count, nil, false)
+	nodes, identities := NodesFixtureWithHandler(suite.T(), count, nil, false)
 	node1 := nodes[0]
 	node2 := nodes[1]
 
@@ -294,7 +293,7 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 	}
 
 	// Creates nodes
-	nodes, identities := suite.NodesFixture(count, handler, false)
+	nodes, identities := NodesFixtureWithHandler(suite.T(), count, handler, false)
 	defer StopNodes(suite.T(), nodes)
 	require.Len(suite.T(), identities, count)
 
@@ -354,7 +353,7 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() {
 
 	// creates a regular node
-	nodes, identities := suite.NodesFixture(1, nil, false)
+	nodes, identities := NodesFixtureWithHandler(suite.T(), 1, nil, false)
 	defer StopNodes(suite.T(), nodes)
 	require.Len(suite.T(), identities, 1)
 
@@ -388,7 +387,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamTimeoutWithUnresponsiveNode() 
 // does not block another concurrent call.
 func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 	// create two regular node
-	goodNodes, goodNodeIds := suite.NodesFixture(2, nil, false)
+	goodNodes, goodNodeIds := NodesFixtureWithHandler(suite.T(), 2, nil, false)
 	defer StopNodes(suite.T(), goodNodes)
 	require.Len(suite.T(), goodNodeIds, 2)
 	goodNodeInfo1, err := PeerAddressInfo(*goodNodeIds[1])
@@ -431,7 +430,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 
 	// create two nodes
-	nodes, identities := suite.NodesFixture(2, nil, false)
+	nodes, identities := NodesFixtureWithHandler(suite.T(), 2, nil, false)
 	defer StopNodes(suite.T(), nodes)
 	require.Len(suite.T(), identities, 2)
 	nodeInfo1, err := PeerAddressInfo(*identities[1])
@@ -462,94 +461,11 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
 	unittest.AssertReturnsBefore(suite.T(), wg.Wait, 10*time.Second)
 }
 
-// TestStreamClosing tests 1-1 communication with streams closed using libp2p2 handler.FullClose
-func (suite *LibP2PNodeTestSuite) TestStreamClosing() {
-	suite.T().Skip("QUARANTINED as FLAKY: closing network.Stream.Close() often errors in handler function, thereby failing this test")
-
-	count := 10
-	ch := make(chan string, count)
-	defer close(ch)
-	done := make(chan struct{})
-	defer close(done)
-
-	// Create the handler function
-	handler := func(t *testing.T) network.StreamHandler {
-		h := func(s network.Stream) {
-			go func(s network.Stream) {
-				rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-				for {
-					str, err := rw.ReadString('\n')
-					if err != nil {
-						if errors.Is(err, io.EOF) {
-							err := s.Close()
-							assert.NoError(t, err)
-							return
-						}
-						assert.Fail(t, fmt.Sprintf("received error %v", err))
-						err = s.Reset()
-						assert.NoError(t, err)
-						return
-					}
-					select {
-					case <-done:
-						return
-					default:
-						ch <- str
-					}
-				}
-			}(s)
-
-		}
-		return h
-	}
-
-	// Creates nodes
-	nodes, identities := suite.NodesFixture(2, handler, false)
-	defer StopNodes(suite.T(), nodes)
-	nodeInfo1, err := PeerAddressInfo(*identities[1])
-	require.NoError(suite.T(), err)
-
-	for i := 0; i < count; i++ {
-		// Create stream from node 1 to node 2 (reuse if one already exists)
-		nodes[0].host.Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
-		s, err := nodes[0].CreateStream(context.Background(), nodeInfo1.ID)
-		assert.NoError(suite.T(), err)
-		w := bufio.NewWriter(s)
-
-		// Send message from node 1 to 2
-		msg := fmt.Sprintf("hello%d\n", i)
-		_, err = w.WriteString(msg)
-		assert.NoError(suite.T(), err)
-
-		// Flush the stream
-		assert.NoError(suite.T(), w.Flush())
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func(s network.Stream) {
-			defer wg.Done()
-			// close the stream
-			err := s.Close()
-			require.NoError(suite.T(), err)
-		}(s)
-		// wait for stream to be closed
-		unittest.RequireReturnsBefore(suite.T(), wg.Wait, 1*time.Second, "could not close stream")
-
-		// wait for the message to be received
-		unittest.RequireReturnsBefore(suite.T(),
-			func() {
-				rcv := <-ch
-				require.Equal(suite.T(), msg, rcv)
-			},
-			10*time.Second,
-			fmt.Sprintf("message %s not received", msg))
-	}
-}
-
 // TestPing tests that a node can ping another node
 func (suite *LibP2PNodeTestSuite) TestPing() {
 
 	// creates two nodes
-	nodes, identities := suite.NodesFixture(2, nil, false)
+	nodes, identities := NodesFixtureWithHandler(suite.T(), 2, nil, false)
 	defer StopNodes(suite.T(), nodes)
 
 	node1 := nodes[0]
@@ -584,7 +500,7 @@ func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion 
 func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 
 	// create 2 nodes
-	nodes, identities := suite.NodesFixture(2, nil, true)
+	nodes, identities := NodesFixtureWithHandler(suite.T(), 2, nil, true)
 
 	node1 := nodes[0]
 	node1Id := *identities[0]
@@ -645,7 +561,7 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGating() {
 
 func (suite *LibP2PNodeTestSuite) TestConnectionGatingBootstrap() {
 	// Create a Node with AllowList = false
-	node, identity := suite.NodesFixture(1, nil, false)
+	node, identity := NodesFixtureWithHandler(suite.T(), 1, nil, false)
 	node1 := node[0]
 	node1Id := identity[0]
 	defer StopNode(suite.T(), node1)
@@ -658,9 +574,9 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGatingBootstrap() {
 	})
 }
 
-// NodesFixture creates a number of LibP2PNodes with the given callback function for stream handling.
+// NodesFixtureWithHandler creates a number of LibP2PNodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testing.T) network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
+func NodesFixtureWithHandler(t *testing.T, count int, handler func(t *testing.T) network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*Node
@@ -668,7 +584,7 @@ func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testin
 	defer func() {
 		if err != nil && nodes != nil {
 			// stops all nodes upon an error in starting even one single node
-			StopNodes(suite.T(), nodes)
+			StopNodes(t, nodes)
 		}
 	}()
 
@@ -676,8 +592,8 @@ func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testin
 	var identities flow.IdentityList
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
-		key := generateNetworkingKey(suite.T())
-		node, identity := NodeFixture(suite.T(), suite.logger, key, rootBlockID, handler, allowList, defaultAddress)
+		key := generateNetworkingKey(t)
+		node, identity := NodeFixture(t, unittest.Logger(), key, rootBlockID, handler, allowList, defaultAddress)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
