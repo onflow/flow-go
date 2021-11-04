@@ -34,14 +34,11 @@ func TestGenerateRootQC(t *testing.T) {
 func createSignerData(t *testing.T, n int) *ParticipantData {
 	identities := unittest.IdentityListFixture(n)
 
-	networkingKeys, err := unittest.NetworkingKeys(n)
-	require.NoError(t, err)
-
-	stakingKeys, err := unittest.StakingKeys(n)
-	require.NoError(t, err)
+	networkingKeys := unittest.NetworkingKeys(n)
+	stakingKeys := unittest.StakingKeys(n)
 
 	seed := make([]byte, crypto.SeedMinLenDKG)
-	_, err = rand.Read(seed)
+	_, err := rand.Read(seed)
 	require.NoError(t, err)
 	randomBSKs, randomBPKs, groupKey, err := crypto.ThresholdSignKeyGen(n,
 		signature.RandomBeaconThreshold(n), seed)

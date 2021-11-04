@@ -7,7 +7,6 @@ import (
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -21,8 +20,8 @@ type Engine struct {
 func New(
 	log zerolog.Logger,
 	channels network.ChannelList,
-	net module.Network,
-	unstakedNet module.Network,
+	net network.Network,
+	unstakedNet network.Network,
 ) (*Engine, error) {
 	e := &Engine{
 		unit:     engine.NewUnit(),

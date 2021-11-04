@@ -21,10 +21,11 @@ require (
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
 	github.com/onflow/flow-emulator v0.20.3
+	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.21.0
 	github.com/onflow/flow-go/crypto v0.21.3 // replaced by version on-disk
-	github.com/onflow/flow/protobuf/go/flow v0.2.2
+	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/common v0.20.0 // indirect
 	github.com/rs/zerolog v1.21.0

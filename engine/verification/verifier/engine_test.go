@@ -32,7 +32,7 @@ import (
 
 type VerifierEngineTestSuite struct {
 	suite.Suite
-	net       *mockmodule.Network
+	net       *mocknetwork.Network
 	tracer    realModule.Tracer
 	state     *protocol.State
 	ss        *protocol.Snapshot
@@ -53,7 +53,7 @@ func TestVerifierEngine(t *testing.T) {
 func (suite *VerifierEngineTestSuite) SetupTest() {
 
 	suite.state = &protocol.State{}
-	suite.net = &mockmodule.Network{}
+	suite.net = &mocknetwork.Network{}
 	suite.tracer = trace.NewNoopTracer()
 	suite.ss = &protocol.Snapshot{}
 	suite.pushCon = &mocknetwork.Conduit{}

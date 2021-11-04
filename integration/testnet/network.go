@@ -107,6 +107,7 @@ type FlowNetwork struct {
 	result             *flow.ExecutionResult
 	seal               *flow.Seal
 	bootstrapDir       string
+	allPorts           map[string]struct{}
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -266,6 +267,23 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt)
 		ViewsInStakingAuction: DefaultViewsInStakingAuction,
 		ViewsInDKGPhase:       DefaultViewsInDKGPhase,
 		ViewsInEpoch:          DefaultViewsInEpoch,
+	}
+
+	for _, apply := range opts {
+		apply(&c)
+	}
+
+	return c
+}
+
+func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
+	c := NetworkConfig{
+		Nodes:                 nodes,
+		Name:                  name,
+		NClusters:             1, // default to 1 cluster
+		ViewsInStakingAuction: viewsInStakingAuction,
+		ViewsInDKGPhase:       viewsInDKGPhase,
+		ViewsInEpoch:          viewsInEpoch,
 	}
 
 	for _, apply := range opts {
@@ -470,17 +488,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		seal:               seal,
 		result:             result,
 		bootstrapDir:       bootstrapDir,
+		allPorts:           make(map[string]struct{}),
 	}
-
-	// check that at-least 2 full access nodes must be configure in your test suite
-	// in order to provide a secure GRPC connection for LN & SN nodes
-	accessNodeIDS := make([]string, 0)
-	for _, n := range confs {
-		if n.Role == flow.RoleAccess && !n.Ghost {
-			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
-		}
-	}
-	require.True(t, len(accessNodeIDS) > 1, "at-least 2 access node that is not a ghost must be configured for test suite")
 
 	// add each node to the network
 	for _, nodeConf := range confs {
@@ -508,6 +517,16 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	return flowNetwork
 }
 
+func (net *FlowNetwork) getRandomPort(t *testing.T) string {
+	for {
+		port := testingdock.RandomPort(t)
+		if _, ok := net.allPorts[port]; !ok {
+			net.allPorts[port] = struct{}{}
+			return port
+		}
+	}
+}
+
 func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
 	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-consensus-follower")
 	require.NoError(t, err)
@@ -532,7 +551,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	require.NoError(t, err)
 
 	// consensus follower
-	bindPort := testingdock.RandomPort(t)
+	bindPort := net.getRandomPort(t)
 	bindAddr := fmt.Sprintf("0.0.0.0:%s", bindPort)
 	opts := append(
 		followerConf.Opts,
@@ -635,7 +654,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		switch nodeConf.Role {
 		case flow.RoleCollection:
 
-			hostPort := testingdock.RandomPort(t)
+			hostPort := net.getRandomPort(t)
 			containerPort := "9000/tcp"
 
 			nodeContainer.bindPort(hostPort, containerPort)
@@ -651,12 +670,12 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 		case flow.RoleExecution:
 
-			hostPort := testingdock.RandomPort(t)
+			hostPort := net.getRandomPort(t)
 			containerPort := "9000/tcp"
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
-			hostMetricsPort := testingdock.RandomPort(t)
+			hostMetricsPort := net.getRandomPort(t)
 			containerMetricsPort := "8080/tcp"
 
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
@@ -683,9 +702,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
 
 		case flow.RoleAccess:
-			hostGRPCPort := testingdock.RandomPort(t)
-			hostHTTPProxyPort := testingdock.RandomPort(t)
-			hostSecureGRPCPort := testingdock.RandomPort(t)
+			hostGRPCPort := net.getRandomPort(t)
+			hostHTTPProxyPort := net.getRandomPort(t)
+			hostSecureGRPCPort := net.getRandomPort(t)
 			containerGRPCPort := "9000/tcp"
 			containerSecureGRPCPort := "9001/tcp"
 			containerHTTPProxyPort := "8000/tcp"
@@ -705,7 +724,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 
 			if nodeConf.SupportsUnstakedNodes {
-				hostExternalNetworkPort := testingdock.RandomPort(t)
+				hostExternalNetworkPort := net.getRandomPort(t)
 				nodeContainer.bindPort(hostExternalNetworkPort, fmt.Sprintf("%s/tcp", strconv.Itoa(DefaultFlowPort)))
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
 				nodeContainer.addFlag("supports-unstaked-node", "true")
@@ -723,7 +742,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 		}
 	} else {
-		hostPort := testingdock.RandomPort(t)
+		hostPort := net.getRandomPort(t)
 		containerPort := "9000/tcp"
 
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
@@ -769,10 +788,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	// TODO: currently just stashing a dummy key as staking key to prevent the nodeinfo.Type() function from
 	// returning an error. Eventually, a new key type NodeInfoTypePrivateUnstaked needs to be defined
 	// (see issue: https://github.com/onflow/flow-go/issues/1214)
-	dummyStakingKey, err := unittest.StakingKey()
-	if err != nil {
-		return nil, err
-	}
+	dummyStakingKey := unittest.StakingPrivKeyFixture()
 
 	for _, conf := range confs {
 		info := bootstrap.NewPrivateNodeInfo(
@@ -992,16 +1008,10 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 	roleCounter := make(map[flow.Role]int)
 
 	// get networking keys for all nodes
-	networkKeys, err := unittest.NetworkingKeys(nNodes)
-	if err != nil {
-		return nil, err
-	}
+	networkKeys := unittest.NetworkingKeys(nNodes)
 
 	// get staking keys for all nodes
-	stakingKeys, err := unittest.StakingKeys(nNodes)
-	if err != nil {
-		return nil, err
-	}
+	stakingKeys := unittest.StakingKeys(nNodes)
 
 	// create node container configs and corresponding public identities
 	confs := make([]ContainerConfig, 0, nNodes)

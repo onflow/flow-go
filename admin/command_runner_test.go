@@ -28,6 +28,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 
 	pb "github.com/onflow/flow-go/admin/admin"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 type CommandRunnerSuite struct {
@@ -63,16 +64,17 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 	ctx, cancel := context.WithCancel(context.Background())
 	suite.cancel = cancel
 
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+
 	logger := zerolog.New(zerolog.NewConsoleWriter())
 	suite.runner = suite.bootstrapper.Bootstrap(logger, suite.httpAddress, opts...)
-	err := suite.runner.Start(ctx)
-	suite.NoError(err)
+	suite.runner.Start(signalerCtx)
 	<-suite.runner.Ready()
 	go func() {
 		select {
 		case <-ctx.Done():
 			return
-		case err := <-suite.runner.Errors():
+		case err := <-errChan:
 			suite.Fail("encountered unexpected error", err)
 		}
 	}()
@@ -86,18 +88,20 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 func (suite *CommandRunnerSuite) TestHandler() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
+
+		data := req.Data.(map[string]interface{})
 
 		suite.EqualValues(data["string"], "foo")
 		suite.EqualValues(data["number"], 123)
 		called = true
 
-		return nil
+		return "ok", nil
 	})
 
 	suite.SetupCommandRunner()
@@ -105,7 +109,7 @@ func (suite *CommandRunnerSuite) TestHandler() {
 	data := make(map[string]interface{})
 	data["string"] = "foo"
 	data["number"] = 123
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -125,7 +129,7 @@ func (suite *CommandRunnerSuite) TestUnimplementedHandler() {
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -142,21 +146,21 @@ func (suite *CommandRunnerSuite) TestUnimplementedHandler() {
 func (suite *CommandRunnerSuite) TestValidator() {
 	calls := 0
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
 		calls += 1
 
-		return nil
+		return "ok", nil
 	})
 
 	validatorErr := errors.New("unexpected value")
-	suite.bootstrapper.RegisterValidator("foo", func(data map[string]interface{}) error {
-		if data["key"] != "value" {
+	suite.bootstrapper.RegisterValidator("foo", func(req *CommandRequest) error {
+		if req.Data.(map[string]interface{})["key"] != "value" {
 			return validatorErr
 		}
 		return nil
@@ -166,7 +170,7 @@ func (suite *CommandRunnerSuite) TestValidator() {
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -181,7 +185,7 @@ func (suite *CommandRunnerSuite) TestValidator() {
 	suite.Equal(calls, 1)
 
 	data["key"] = "blah"
-	val, err = structpb.NewStruct(data)
+	val, err = structpb.NewValue(data)
 	suite.NoError(err)
 	request.Data = val
 	_, err = suite.client.RunCommand(ctx, request)
@@ -192,21 +196,21 @@ func (suite *CommandRunnerSuite) TestValidator() {
 
 func (suite *CommandRunnerSuite) TestHandlerError() {
 	handlerErr := errors.New("handler error")
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
-		return handlerErr
+		return nil, handlerErr
 	})
 
 	suite.SetupCommandRunner()
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -222,16 +226,16 @@ func (suite *CommandRunnerSuite) TestHandlerError() {
 }
 
 func (suite *CommandRunnerSuite) TestTimeout() {
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		<-ctx.Done()
-		return ctx.Err()
+		return nil, ctx.Err()
 	})
 
 	suite.SetupCommandRunner()
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -248,17 +252,17 @@ func (suite *CommandRunnerSuite) TestTimeout() {
 func (suite *CommandRunnerSuite) TestHTTPServer() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
-		suite.EqualValues(data["key"], "value")
+		suite.EqualValues(req.Data.(map[string]interface{})["key"], "value")
 		called = true
 
-		return nil
+		return "ok", nil
 	})
 
 	suite.SetupCommandRunner()
@@ -387,17 +391,17 @@ func generateCerts(t *testing.T) (tls.Certificate, *x509.CertPool, tls.Certifica
 func (suite *CommandRunnerSuite) TestTLS() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, data map[string]interface{}) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
-		suite.EqualValues(data["key"], "value")
+		suite.EqualValues(req.Data.(map[string]interface{})["key"], "value")
 		called = true
 
-		return nil
+		return "ok", nil
 	})
 
 	serverCert, serverCertPool, clientCert, clientCertPool := generateCerts(suite.T())

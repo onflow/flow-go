@@ -1,0 +1,47 @@
+name: Flakiness Summary
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  NUM_RUNS: 1
+  GCS_BUCKET: production_ddp_flow_test_metrics
+  COMMIT_SHA: ${{ github.sha }}
+
+jobs:
+  tests:
+    name: Tests
+    strategy:
+      fail-fast: false
+      matrix:
+        test-category:
+          - unit
+          - crypto-unit
+          - integration-unit
+          - integration-common
+          - integration-network
+          - integration-epochs
+          - integration-access
+          - integration-collection
+          - integration-consensus
+          - integration-execution
+          - integration-verification
+    runs-on: ubuntu-latest
+    steps:
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@master
+      with:
+        service_account_key: ${{ secrets.GCP_SA_KEY }}
+    - name: Setup Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: 1.16
+    - name: Checkout repo
+      uses: actions/checkout@v2
+    - name: Run flakiness summary script
+      working-directory: ./tools/flaky_test_monitor
+      run: ./flakiness-summary.sh
+      env:
+        TEST_CATEGORY: ${{ matrix.test-category }}
