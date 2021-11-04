@@ -144,11 +144,11 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	lowestID := lowest.ID()
 
 	if result.BlockID != lowestID {
-		return fmt.Errorf("root execution result for wrong block (%v != %v)", result.BlockID, lowest)
+		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, lowest)
 	}
 
 	if seal.BlockID != lowestID {
-		return fmt.Errorf("root block seal for wrong block (%v != %v)", seal.BlockID, lowestID)
+		return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, lowest.ID())
 	}
 
 	if verifyResultID {
