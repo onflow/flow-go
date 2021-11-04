@@ -18,7 +18,7 @@ import (
 // SPOCKProve generates a spock poof for data under the private key sk.
 func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error) {
 	if sk.Algorithm() != BLSBLS12381 {
-		return nil, newInvalidInputsError(
+		return nil, invalidInputsErrorf(
 			"private key must be a BLS key, got %s",
 			sk.Algorithm())
 	}
@@ -34,7 +34,7 @@ func SPOCKProve(sk PrivateKey, data []byte, kmac hash.Hasher) (Signature, error)
 // and public key.
 func SPOCKVerifyAgainstData(pk PublicKey, proof Signature, data []byte, kmac hash.Hasher) (bool, error) {
 	if pk.Algorithm() != BLSBLS12381 {
-		return false, newInvalidInputsError(
+		return false, invalidInputsErrorf(
 			"public key must be a BLS key, got %s",
 			pk.Algorithm())
 	}
@@ -57,7 +57,7 @@ func SPOCKVerify(pk1 PublicKey, proof1 Signature, pk2 PublicKey, proof2 Signatur
 	blsPk1, ok1 := pk1.(*PubKeyBLSBLS12381)
 	blsPk2, ok2 := pk2.(*PubKeyBLSBLS12381)
 	if !(ok1 && ok2) {
-		return false, newInvalidInputsError("public keys must be BLS keys")
+		return false, invalidInputsErrorf("public keys must be BLS keys")
 	}
 
 	if len(proof1) != signatureLengthBLSBLS12381 || len(proof2) != signatureLengthBLSBLS12381 {

@@ -65,7 +65,7 @@ func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 	// no need to check the hasher output size as all supported hash algos
 	// have at least 32 bytes output
 	if alg == nil {
-		return nil, newInvalidInputsError("Sign requires a Hasher")
+		return nil, invalidInputsErrorf("Sign requires a Hasher")
 	}
 	h := alg.ComputeHash(data)
 	return sk.signHash(h)
@@ -97,7 +97,7 @@ func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool
 	// no need to check the hasher output size as all supported hash algos
 	// have at lease 32 bytes output
 	if alg == nil {
-		return false, newInvalidInputsError("Verify requires a Hasher")
+		return false, invalidInputsErrorf("Verify requires a Hasher")
 	}
 
 	h := alg.ComputeHash(data)
@@ -161,7 +161,7 @@ func (a *ecdsaAlgo) generatePrivateKey(seed []byte) (PrivateKey, error) {
 	// use extra 128 bits to reduce the modular reduction bias
 	minSeedLen := Nlen + (securityBits / 8)
 	if len(seed) < minSeedLen || len(seed) > KeyGenSeedMaxLenECDSA {
-		return nil, newInvalidInputsError("seed byte length should be between %d and %d",
+		return nil, invalidInputsErrorf("seed byte length should be between %d and %d",
 			minSeedLen, KeyGenSeedMaxLenECDSA)
 	}
 	sk := goecdsaGenerateKey(a.curve, seed)
@@ -176,13 +176,13 @@ func (a *ecdsaAlgo) rawDecodePrivateKey(der []byte) (PrivateKey, error) {
 	n := a.curve.Params().N
 	nlen := bitsToBytes(n.BitLen())
 	if len(der) != nlen {
-		return nil, newInvalidInputsError("input has incorrect %s key size", a.algo)
+		return nil, invalidInputsErrorf("input has incorrect %s key size", a.algo)
 	}
 	var d big.Int
 	d.SetBytes(der)
 
 	if d.Cmp(n) >= 0 {
-		return nil, newInvalidInputsError("input is not a valid %s key", a.algo)
+		return nil, invalidInputsErrorf("input is not a valid %s key", a.algo)
 	}
 
 	priv := goecdsa.PrivateKey{
@@ -205,7 +205,7 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	p := (a.curve.Params().P)
 	plen := bitsToBytes(p.BitLen())
 	if len(der) != 2*plen {
-		return nil, newInvalidInputsError("input has incorrect %s key size", a.algo)
+		return nil, invalidInputsErrorf("input has incorrect %s key size", a.algo)
 	}
 	var x, y big.Int
 	x.SetBytes(der[:plen])
@@ -214,7 +214,7 @@ func (a *ecdsaAlgo) rawDecodePublicKey(der []byte) (PublicKey, error) {
 	// all the curves supported for now have a cofactor equal to 1,
 	// so that IsOnCurve guarantees the point is on the right subgroup.
 	if x.Cmp(p) >= 0 || y.Cmp(p) >= 0 || !a.curve.IsOnCurve(&x, &y) {
-		return nil, newInvalidInputsError("input %x is not a valid %s key", der, a.algo)
+		return nil, invalidInputsErrorf("input %x is not a valid %s key", der, a.algo)
 	}
 
 	pk := goecdsa.PublicKey{
@@ -235,14 +235,14 @@ func (a *ecdsaAlgo) decodePublicKey(der []byte) (PublicKey, error) {
 func (a *ecdsaAlgo) decodePublicKeyCompressed(pkBytes []byte) (PublicKey, error) {
 	expectedLen := bitsToBytes(a.curve.Params().BitSize) + 1
 	if len(pkBytes) != expectedLen {
-		return nil, newInvalidInputsError(fmt.Sprintf("input length incompatible, expected %d, got %d", expectedLen, len(pkBytes)))
+		return nil, invalidInputsErrorf(fmt.Sprintf("input length incompatible, expected %d, got %d", expectedLen, len(pkBytes)))
 	}
 	var goPubKey *goecdsa.PublicKey
 
 	if a.curve == elliptic.P256() {
 		x, y := elliptic.UnmarshalCompressed(a.curve, pkBytes)
 		if x == nil {
-			return nil, newInvalidInputsError("Key %x can't be interpreted as %v", pkBytes, a.algo.String())
+			return nil, invalidInputsErrorf("Key %x can't be interpreted as %v", pkBytes, a.algo.String())
 		}
 		goPubKey = new(goecdsa.PublicKey)
 		goPubKey.Curve = a.curve
@@ -252,12 +252,12 @@ func (a *ecdsaAlgo) decodePublicKeyCompressed(pkBytes []byte) (PublicKey, error)
 	} else if a.curve == btcec.S256() {
 		pk, err := btcec.ParsePubKey(pkBytes, btcec.S256())
 		if err != nil {
-			return nil, newInvalidInputsError("Key %x can't be interpreted as %v", pkBytes, a.algo.String())
+			return nil, invalidInputsErrorf("Key %x can't be interpreted as %v", pkBytes, a.algo.String())
 		}
 		// This assertion never fails
 		goPubKey = (*goecdsa.PublicKey)(pk)
 	} else {
-		return nil, newInvalidInputsError("the input curve is not supported")
+		return nil, invalidInputsErrorf("the input curve is not supported")
 	}
 	return &PubKeyECDSA{a, goPubKey}, nil
 }
