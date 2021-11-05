@@ -50,3 +50,17 @@ func AllClosed(channels ...<-chan struct{}) <-chan struct{} {
 
 	return done
 }
+
+// CheckClosed checks if the provided channel has a signal or was closed.
+// Returns true if the channel was signaled/closed, otherwise, returns false.
+//
+// This is intended to reduce boilerplate code when multiple channel checks are required because
+// missed signals could cause safety issues.
+func CheckClosed(done <-chan struct{}) bool {
+	select {
+	case <-done:
+		return true
+	default:
+		return false
+	}
+}
