@@ -92,7 +92,8 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 			err := h.mergeState(view)
 			if err != nil {
 				// ignore LedgerIntractionLimitExceededError errors
-				if !errors.As(err, &errors.LedgerIntractionLimitExceededError{}) {
+				var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
+				if !errors.As(err, &interactionLimiExceededErr) {
 					panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
 				}
 			}
