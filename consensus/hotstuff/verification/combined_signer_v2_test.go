@@ -44,8 +44,9 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	nodeID.NodeID = signerID
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	local, err := local.New(nil, stakingPriv)
-	staking := modulesig.NewSingleSigner(encoding.ConsensusVoteTag, local)
+	me, err := local.New(nil, stakingPriv)
+	require.NoError(t, err)
+	staking := modulesig.NewSingleSigner(encoding.ConsensusVoteTag, me)
 	signer := NewCombinedSignerV2(staking, beaconSignerStore, signerID)
 
 	dkg := &mocks.DKG{}
@@ -96,8 +97,9 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	nodeID.NodeID = signerID
 	nodeID.StakingPubKey = stakingPriv.PublicKey()
 
-	local, err := local.New(nil, stakingPriv)
-	staking := modulesig.NewSingleSigner(encoding.ConsensusVoteTag, local)
+	me, err := local.New(nil, stakingPriv)
+	require.NoError(t, err)
+	staking := modulesig.NewSingleSigner(encoding.ConsensusVoteTag, me)
 	signer := NewCombinedSignerV2(staking, beaconSignerStore, signerID)
 
 	dkg := &mocks.DKG{}
