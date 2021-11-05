@@ -57,9 +57,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 
 	merger := modulesig.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 	// TODO: to be replaced with factory methods that creates signer and verifier
-	stakingVerifier := modulesig.NewThresholdVerifier(encoding.ConsensusVoteTag)
-	beaconVerifier := modulesig.NewThresholdVerifier(encoding.RandomBeaconTag)
-	verifier := NewCombinedVerifierV2(committee, stakingVerifier, beaconVerifier, merger)
+	verifier := NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, merger)
 
 	proposal, err := signer.CreateProposal(block)
 	require.NoError(t, err)
@@ -110,9 +108,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 
 	merger := modulesig.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 	// TODO: to be replaced with factory methods that creates signer and verifier
-	stakingVerifier := modulesig.NewThresholdVerifier(encoding.ConsensusVoteTag)
-	beaconVerifier := modulesig.NewThresholdVerifier(encoding.RandomBeaconTag)
-	verifier := NewCombinedVerifierV2(committee, stakingVerifier, beaconVerifier, merger)
+	verifier := NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, merger)
 
 	proposal, err := signer.CreateProposal(block)
 	require.NoError(t, err)

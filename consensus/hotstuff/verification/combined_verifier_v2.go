@@ -1,3 +1,5 @@
+// +build relic
+
 package verification
 
 import (
@@ -6,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	modulesig "github.com/onflow/flow-go/module/signature"
@@ -18,24 +22,23 @@ import (
 // the reconstructed threshold signature.
 type CombinedVerifierV2 struct {
 	committee      hotstuff.Committee
-	staking        module.ThresholdVerifier
+	staking        hash.Hasher
+	beacon         hash.Hasher
 	keysAggregator *stakingKeysAggregator
-	beacon         module.ThresholdVerifier
 	merger         module.Merger
 }
 
 // NewCombinedVerifier creates a new combined verifier with the given dependencies.
 // - the hotstuff committee's state is used to retrieve the public keys for the staking signature;
-// - the DKG state is used to retrieve DKG data necessary to verify beacon signatures;
-// - the staking verifier is used to verify single & aggregated staking signatures;
-// - the beacon verifier is used to verify signature shares & threshold signatures;
-// - the merger is used to combined & split staking & random beacon signatures; and
-func NewCombinedVerifierV2(committee hotstuff.Committee, staking module.ThresholdVerifier, beacon module.ThresholdVerifier, merger module.Merger) *CombinedVerifierV2 {
+// - the staking tag is used to create hasher to verify staking signatures;
+// - the beacon tag is used to create hasher to verify random beacon signatures;
+// - the merger is used to combined & split staking & random beacon signatures;
+func NewCombinedVerifierV2(committee hotstuff.Committee, stakingTag string, beaconTag string, merger module.Merger) *CombinedVerifierV2 {
 	return &CombinedVerifierV2{
 		committee:      committee,
-		staking:        staking,
+		staking:        crypto.NewBLSKMAC(stakingTag),
+		beacon:         crypto.NewBLSKMAC(beaconTag),
 		keysAggregator: newStakingKeysAggregator(),
-		beacon:         beacon,
 		merger:         merger,
 	}
 }
@@ -70,7 +73,7 @@ func (c *CombinedVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, b
 
 	// verify each signature against the message
 	// TODO: check if using batch verification is faster (should be yes)
-	stakingValid, err := c.staking.Verify(msg, stakingSig, signer.StakingPubKey)
+	stakingValid, err := signer.StakingPubKey.Verify(stakingSig, msg, c.staking)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}
@@ -83,7 +86,7 @@ func (c *CombinedVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, b
 		return true, nil
 	}
 
-	beaconValid, err := c.beacon.Verify(msg, beaconShare, beaconPubKey)
+	beaconValid, err := beaconPubKey.Verify(beaconShare, msg, c.beacon)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
@@ -113,7 +116,7 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 	// TODO: verify if batch verification is faster
 
 	// verify the beacon signature first
-	beaconValid, err := c.beacon.VerifyThreshold(msg, beaconThresSig, dkg.GroupKey())
+	beaconValid, err := dkg.GroupKey().Verify(beaconThresSig, msg, c.beacon)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
@@ -131,7 +134,7 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 	if err != nil {
 		return false, fmt.Errorf("could not compute aggregated key: %w", err)
 	}
-	stakingValid, err := c.staking.Verify(msg, stakingAggSig, aggregatedKey)
+	stakingValid, err := aggregatedKey.Verify(stakingAggSig, msg, c.staking)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}

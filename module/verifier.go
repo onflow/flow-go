@@ -18,6 +18,7 @@ type AggregatingVerifier interface {
 	VerifyMany(msg []byte, sig crypto.Signature, keys []crypto.PublicKey) (bool, error)
 }
 
+// TODO: to delete in V2
 // ThresholdVerifier can verify a message against a signature share from a
 // single key or a threshold signature against many keys.
 type ThresholdVerifier interface {
