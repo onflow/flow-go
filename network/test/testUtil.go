@@ -3,6 +3,8 @@ package test
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -10,6 +12,8 @@ import (
 	"testing"
 	"time"
 
+	datastore "github.com/ipfs/go-datastore/examples"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/rs/zerolog"
@@ -419,4 +423,18 @@ func networkPayloadFixture(t *testing.T, size uint) []byte {
 	require.InDelta(t, len(encodedEvent), int(size), float64(overhead))
 
 	return payload
+}
+
+func MakeBlockstore(t *testing.T, name string) (blockstore.Blockstore, func()) {
+	dsDir := filepath.Join(os.TempDir(), name)
+	require.NoError(t, os.RemoveAll(dsDir))
+	err := os.Mkdir(dsDir, os.ModeDir)
+	require.NoError(t, err)
+
+	ds, err := datastore.NewDatastore(dsDir)
+	require.NoError(t, err)
+
+	return blockstore.NewBlockstore(ds.(*datastore.Datastore)), func() {
+		require.NoError(t, os.RemoveAll(dsDir))
+	}
 }
