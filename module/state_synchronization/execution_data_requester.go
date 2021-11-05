@@ -14,12 +14,14 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
+// ExecutionDataRequester requests ExecutionData for given root CIDs from the network.
 type ExecutionDataRequester struct {
 	blockExchange  network.BlockExchange
 	activeRequests sync.Map
 	serializer     *serializer
 }
 
+// RequestExecutionData requests the execution data for the given root CID.
 func (s *ExecutionDataRequester) RequestExecutionData(ctx context.Context, rootCid cid.Cid) ExecutionDataRequest {
 	req, exists := s.activeRequests.LoadOrStore(rootCid, &executionDataRequestImpl{
 		cid:  rootCid,

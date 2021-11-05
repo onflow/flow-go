@@ -9,8 +9,9 @@ import (
 	"github.com/onflow/flow-go/network"
 )
 
+// header codes to distinguish between different types of data
 const (
-	CodeIntermediateCIDs = iota
+	CodeRecursiveCIDs = iota
 	CodeExecutionData
 )
 
@@ -19,7 +20,7 @@ func getCode(v interface{}) byte {
 	case *ExecutionData:
 		return CodeExecutionData
 	case []cid.Cid:
-		return CodeIntermediateCIDs
+		return CodeRecursiveCIDs
 	default:
 		panic(fmt.Sprintf("invalid type for interface: %T", v))
 	}
@@ -29,7 +30,7 @@ func getPrototype(code byte) interface{} {
 	switch code {
 	case CodeExecutionData:
 		return &ExecutionData{}
-	case CodeIntermediateCIDs:
+	case CodeRecursiveCIDs:
 		return &[]cid.Cid{}
 	default:
 		panic(fmt.Sprintf("invalid code: %v", code))
@@ -46,6 +47,7 @@ type writer interface {
 	io.Writer
 }
 
+// serializer encapulates the serialization and deserialization of data
 type serializer struct {
 	codec      encoding.Codec
 	compressor network.Compressor

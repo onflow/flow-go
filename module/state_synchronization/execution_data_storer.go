@@ -17,6 +17,7 @@ import (
 
 const MAX_BLOCK_SIZE = 1e6 // 1MB
 
+// ExecutionData represents the execution data of a block
 type ExecutionData struct {
 	BlockID            flow.Identifier
 	Collections        []*flow.Collection
@@ -25,6 +26,7 @@ type ExecutionData struct {
 	TransactionResults []*flow.TransactionResult
 }
 
+// ExecutionDataStorer handles storing and loading execution data from a blockstore
 type ExecutionDataStorer struct {
 	blockWriter *BlockWriter
 	serializer  *serializer
@@ -54,6 +56,10 @@ func (s *ExecutionDataStorer) writeBlocks(v interface{}) ([]cid.Cid, error) {
 	return cids, nil
 }
 
+// Store stores the given ExecutionData into the blockstore and returns the root CID.
+// Since blocks are limited to MAX_BLOCK_SIZE bytes, it's possible that the data may
+// be stored in multiple blocks, and hence the returned root CID may point to a block
+// for which the data itself represents a recursive list of CIDs.
 func (s *ExecutionDataStorer) Store(sd *ExecutionData) (cid.Cid, error) {
 	cids, err := s.writeBlocks(sd)
 	if err != nil {
@@ -85,8 +91,8 @@ func (s *ExecutionDataStorer) readBlocks(cids []cid.Cid) (interface{}, error) {
 
 // Load loads the ExecutionData represented by the given CID from the blockstore.
 // Since blocks are limited to MAX_BLOCK_SIZE bytes, it's possible that the data was
-// stored in multiple chunks, and hence the root CID may point to a block for which
-// the data itself is a list of concatenated CIDs.
+// stored in multiple blocks, and hence the root CID may point to a block for which
+// the data itself represents a recursive list of CIDs.
 func (s *ExecutionDataStorer) Load(c cid.Cid) (*ExecutionData, error) {
 	cids := []cid.Cid{c}
 	for {

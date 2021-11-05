@@ -4,10 +4,20 @@ import (
 	"github.com/ipfs/go-cid"
 )
 
+// ExecutionDataRequest represents a request to get the execution data of a block
 type ExecutionDataRequest interface {
+	// If Done is not yet closed, ExecutionData returns nil. If Done is closed and the request was successful,
+	// ExecutionData returns the execution data of the block.
 	ExecutionData() *ExecutionData
+
+	// CID returns the root CID of the execution data being requested.
 	CID() cid.Cid
+
+	// If Done is not yet closed, Error returns nil. If Done is closed and the request was unsuccessful,
+	// Error returns the error.
 	Error() error
+
+	// Done returns a channel that is closed when the request is completed
 	Done() <-chan struct{}
 }
 
