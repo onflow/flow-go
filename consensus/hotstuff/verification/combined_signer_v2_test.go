@@ -17,6 +17,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// Test that when DKG key is available for a view, a signed block can pass the validation
+// the sig include both staking sig and random beacon sig.
 func TestCombinedSignWithDKGKey(t *testing.T) {
 	// prepare data
 	dkgKey := unittest.DKGParticipantPriv()
@@ -68,6 +70,8 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	require.Equal(t, true, valid)
 }
 
+// Test that when DKG key is not available for a view, a signed block can pass the validation
+// the sig only include staking sig
 func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	// prepare data
 	dkgKey := unittest.DKGParticipantPriv()
