@@ -25,7 +25,7 @@ func TestEpochs(t *testing.T) {
 // without any nodes joining or leaving.
 func (s *Suite) TestViewsProgress() {
 	//s.T().Skip("flaky test - quarantining")
-	//12
+	//123
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
