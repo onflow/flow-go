@@ -17,33 +17,6 @@ import (
 
 const MAX_BLOCK_SIZE = 1e6 // 1MB
 
-const (
-	CodeIntermediateCIDs = iota
-	CodeExecutionData
-)
-
-func getCode(v interface{}) byte {
-	switch v.(type) {
-	case *ExecutionData:
-		return CodeExecutionData
-	case []cid.Cid:
-		return CodeIntermediateCIDs
-	default:
-		panic(fmt.Sprintf("invalid type for interface: %T", v))
-	}
-}
-
-func getPrototype(code byte) interface{} {
-	switch code {
-	case CodeExecutionData:
-		return &ExecutionData{}
-	case CodeIntermediateCIDs:
-		return &[]cid.Cid{}
-	default:
-		panic(fmt.Sprintf("invalid code: %v", code))
-	}
-}
-
 type ExecutionData struct {
 	BlockID            flow.Identifier
 	Collections        []*flow.Collection
@@ -54,8 +27,7 @@ type ExecutionData struct {
 
 type ExecutionDataStorer struct {
 	blockWriter *BlockWriter
-	codec       encoding.Codec
-	compressor  network.Compressor
+	serializer  *serializer
 }
 
 func NewExecutionDataStorer(
@@ -67,22 +39,11 @@ func NewExecutionDataStorer(
 		maxBlockSize: MAX_BLOCK_SIZE,
 		bstore:       bstore,
 	}
-	return &ExecutionDataStorer{bw, codec, compressor}, nil
+	return &ExecutionDataStorer{bw, &serializer{codec, compressor}}, nil
 }
 
 func (s *ExecutionDataStorer) writeBlocks(v interface{}) ([]cid.Cid, error) {
-	if _, err := s.blockWriter.Write([]byte{getCode(v)}); err != nil {
-		return nil, err
-	}
-	comp, err := s.compressor.NewWriter(s.blockWriter)
-	if err != nil {
-		return nil, err
-	}
-	enc := s.codec.NewEncoder(comp)
-	if err := enc.Encode(v); err != nil {
-		return nil, err
-	}
-	if err := comp.Close(); err != nil {
+	if err := s.serializer.serialize(s.blockWriter, v); err != nil {
 		return nil, err
 	}
 	if err := s.blockWriter.Flush(); err != nil {
@@ -112,27 +73,14 @@ func (s *ExecutionDataStorer) Store(sd *ExecutionData) (cid.Cid, error) {
 
 func (s *ExecutionDataStorer) readBlocks(cids []cid.Cid) (interface{}, error) {
 	buf := &bytes.Buffer{}
-	comp, err := s.compressor.NewReader(buf)
-	if err != nil {
-		return nil, err
-	}
-	dec := s.codec.NewDecoder(comp)
-	var code byte
-	for i, c := range cids {
+	for _, c := range cids {
 		block, err := s.blockWriter.bstore.Get(c)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block %v from blockstore: %w", c, err)
 		}
-		data := block.RawData()
-		if i == 0 {
-			code = data[0]
-			data = data[1:]
-		}
-		_, _ = buf.Write(data) // never returns error
+		_, _ = buf.Write(block.RawData()) // never returns error
 	}
-	v := getPrototype(code)
-	err = dec.Decode(v)
-	return v, err
+	return s.serializer.deserialize(buf)
 }
 
 // Load loads the ExecutionData represented by the given CID from the blockstore.
@@ -192,6 +140,17 @@ func (bw *BlockWriter) writeBlock(data []byte) error {
 	return nil
 }
 
+func (bw *BlockWriter) WriteByte(c byte) error {
+	bw.buf = append(bw.buf, c)
+	if len(bw.buf) >= bw.maxBlockSize {
+		if err := bw.writeBlock(bw.buf); err != nil {
+			return err
+		}
+		bw.buf = nil
+	}
+	return nil
+}
+
 func (bw *BlockWriter) Write(p []byte) (n int, err error) {
 	var chunk []byte
 	if leftover := len(bw.buf); leftover > 0 {
@@ -217,7 +176,7 @@ func (bw *BlockWriter) Write(p []byte) (n int, err error) {
 		}
 	}
 	if len(p) > 0 {
-		bw.buf = make([]byte, 0, bw.maxBlockSize)
+		bw.buf = make([]byte, 0, len(p))
 		bw.buf = append(bw.buf, p...)
 		n += len(bw.buf)
 	}

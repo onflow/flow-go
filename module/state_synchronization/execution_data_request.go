@@ -1,26 +1,24 @@
-package state_requester
+package state_synchronization
 
 import (
 	"github.com/ipfs/go-cid"
-
-	"github.com/onflow/flow-go/engine/execution/state_synchronization"
 )
 
 type ExecutionDataRequest interface {
-	ExecutionData() *state_synchronization.ExecutionData
+	ExecutionData() *ExecutionData
 	CID() cid.Cid
 	Error() error
 	Done() <-chan struct{}
 }
 
 type executionDataRequestImpl struct {
-	executionData *state_synchronization.ExecutionData
+	executionData *ExecutionData
 	cid           cid.Cid
 	err           error
 	done          chan struct{}
 }
 
-func (r *executionDataRequestImpl) ExecutionData() *state_synchronization.ExecutionData {
+func (r *executionDataRequestImpl) ExecutionData() *ExecutionData {
 	return r.executionData
 }
 
@@ -34,4 +32,14 @@ func (r *executionDataRequestImpl) Error() error {
 
 func (r *executionDataRequestImpl) Done() <-chan struct{} {
 	return r.done
+}
+
+func (r *executionDataRequestImpl) setExecutionData(e *ExecutionData) {
+	r.executionData = e
+	close(r.done)
+}
+
+func (r *executionDataRequestImpl) setError(err error) {
+	r.err = err
+	close(r.done)
 }
