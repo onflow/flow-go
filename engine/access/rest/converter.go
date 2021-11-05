@@ -21,7 +21,7 @@ func toBlockHeader(flowHeader *flow.Header) *generated.BlockHeader {
 	return &generated.BlockHeader{
 		Id:                   flowHeader.ID().String(),
 		ParentId:             flowHeader.ParentID.String(),
-		Height:               fmt.Sprint(flowHeader.Height),
+		Height:               int32(flowHeader.Height),
 		Timestamp:            flowHeader.Timestamp,
 		ParentVoterSignature: fmt.Sprint(flowHeader.ParentVoterSigData),
 	}
