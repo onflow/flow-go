@@ -5,6 +5,7 @@ import (
 	"io"
 
 	"github.com/ipfs/go-cid"
+
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/network"
 )
