@@ -144,7 +144,7 @@ func (e *Engine) Process(channel network.Channel, originID flow.Identifier, even
 	return nil
 }
 
-// process processes events for the matching engine on the consensus node.
+// process events for the matching engine on the consensus node.
 func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	receipt, ok := event.(*flow.ExecutionReceipt)
 	if !ok {
