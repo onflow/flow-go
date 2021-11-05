@@ -36,6 +36,17 @@ func DecodeSingleSig(sigData []byte) (hotstuff.SigType, crypto.Signature, error)
 	return sigType, sig, nil
 }
 
+// TODO: to be removed in V3, replace by packer's pack method
+// EncodeDoubleSig encodes both the staking signature and random beacon signature
+// into one sigData.
+func EncodeDoubleSig(stakingSig crypto.Signature, beaconSig crypto.Signature) []byte {
+	encoded := make([]byte, 0, len(stakingSig)+len(beaconSig))
+	encoded = append(encoded, stakingSig[:]...)
+	encoded = append(encoded, beaconSig[:]...)
+	return encoded
+}
+
+// TODO: to be removed in V3, replace by packer's unpack method
 // DecodeDoubleSig decodes the signature data into a staking signature and an optional
 // random beacon signature. Cryptographic validity of signatures is _not_ checked.
 // Decomposition of the sigData is purely done based on length.

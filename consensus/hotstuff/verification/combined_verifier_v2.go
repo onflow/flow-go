@@ -5,20 +5,20 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/signature"
+	modulesig "github.com/onflow/flow-go/module/signature"
 )
 
-// TODO: to be replaced by CombinedVerifierV2
 // CombinedVerifier is a verifier capable of verifying two signatures for each
 // verifying operation. The first type is a signature from an aggregating signer,
 // which verifies either the single or the aggregated signature. The second type is
 // a signature from a threshold signer, which verifies either the signature share or
 // the reconstructed threshold signature.
-type CombinedVerifier struct {
+type CombinedVerifierV2 struct {
 	committee      hotstuff.Committee
-	staking        module.AggregatingVerifier
+	staking        module.ThresholdVerifier
 	keysAggregator *stakingKeysAggregator
 	beacon         module.ThresholdVerifier
 	merger         module.Merger
@@ -30,27 +30,31 @@ type CombinedVerifier struct {
 // - the staking verifier is used to verify single & aggregated staking signatures;
 // - the beacon verifier is used to verify signature shares & threshold signatures;
 // - the merger is used to combined & split staking & random beacon signatures; and
-func NewCombinedVerifier(committee hotstuff.Committee, staking module.AggregatingVerifier, beacon module.ThresholdVerifier, merger module.Merger) *CombinedVerifier {
-	c := &CombinedVerifier{
+func NewCombinedVerifierV2(committee hotstuff.Committee, staking module.ThresholdVerifier, beacon module.ThresholdVerifier, merger module.Merger) *CombinedVerifierV2 {
+	return &CombinedVerifierV2{
 		committee:      committee,
 		staking:        staking,
 		keysAggregator: newStakingKeysAggregator(),
 		beacon:         beacon,
 		merger:         merger,
 	}
-	return c
 }
 
 // VerifyVote verifies the validity of a combined signature from a vote.
-func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
+// Usually this method is only used to verify the proposer's vote, which is
+// the vote included in a block proposal.
+// TODO: return error only, because when the sig is invalid, the returned bool
+// can't indicate whether it's staking sig was invalid, or beacon sig was invalid.
+func (c *CombinedVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
 
 	// create the to-be-signed message
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// split the two signatures from the vote
-	stakingSig, beaconShare, err := c.merger.Split(sigData)
+	// TODO: move DecodeDoubleSig to merger.Split
+	stakingSig, beaconShare, err := signature.DecodeDoubleSig(sigData)
 	if err != nil {
-		return false, fmt.Errorf("could not split signature: %w", signature.ErrInvalidFormat)
+		return false, fmt.Errorf("could not split signature: %w", modulesig.ErrInvalidFormat)
 	}
 
 	dkg, err := c.committee.DKG(block.BlockID)
@@ -71,28 +75,38 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}
 	if !stakingValid {
-		return false, nil
+		return false, fmt.Errorf("invalid staking sig")
 	}
+
+	// there is no beacon share, no need to verify it
+	if beaconShare == nil {
+		return true, nil
+	}
+
 	beaconValid, err := c.beacon.Verify(msg, beaconShare, beaconPubKey)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
 
-	return beaconValid, nil
+	if !beaconValid {
+		return false, fmt.Errorf("invalid beacon sig")
+	}
+	return true, nil
 }
 
 // VerifyQC verifies the validity of a combined signature on a quorum certificate.
-func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
+func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
 
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
 		return false, fmt.Errorf("could not get dkg: %w", err)
 	}
 
+	// TODO: to be replaced by packer.Unpack method
 	// split the aggregated staking & beacon signatures
 	stakingAggSig, beaconThresSig, err := c.merger.Split(sigData)
 	if err != nil {
-		return false, fmt.Errorf("could not split signature: %w", signature.ErrInvalidFormat)
+		return false, fmt.Errorf("could not split signature: %w", modulesig.ErrInvalidFormat)
 	}
 
 	msg := MakeVoteMessage(block.View, block.BlockID)

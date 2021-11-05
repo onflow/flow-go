@@ -28,6 +28,7 @@ func NewEpochAwareRandomBeaconSignerStore(epochLookup module.EpochLookup, keys s
 // key underlying the signer.
 // It returns:
 //  - (signer, nil) if DKG was completed in the epoch of the view, signer is not nil
+//  - (nil, protocol.ErrEpochNotCommitted) if no epoch found for given view
 //  - (nil, DKGIncompleteError) if DKG was not completed in the epoch of the view
 //  - (nil, error) if there is any exception
 func (s *EpochAwareRandomBeaconSignerStore) GetSigner(view uint64) (module.MsgSigner, error) {
@@ -86,4 +87,23 @@ func (s *EpochAwareRandomBeaconSignerStore) GetSigner(view uint64) (module.MsgSi
 	s.signers[epoch] = signer
 
 	return signer, nil
+}
+
+// SingleBeaconSignerStore implements the msgSigner interface. It only
+// keeps one signer and is not epoch-aware. It is used only for the
+// bootstrapping process.
+type SingleBeaconSignerStore struct {
+	signer module.MsgSigner
+}
+
+// NewSingleSignerStore instantiates a new SingleSignerStore.
+func NewSingleBeaconSignerStore(signer module.MsgSigner) *SingleBeaconSignerStore {
+	return &SingleBeaconSignerStore{
+		signer: signer,
+	}
+}
+
+// GetThresholdSigner returns the signer.
+func (s *SingleBeaconSignerStore) GetSigner(view uint64) (module.MsgSigner, error) {
+	return s.signer, nil
 }

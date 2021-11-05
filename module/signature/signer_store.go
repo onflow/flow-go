@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// TODO: to be replaced with EpochAwareRandomBeaconSignerStore
 // EpochAwareSignerStore implements the SignerStore interface. It is epoch
 // aware, and provides the appropriate threshold signers on a per-view basis,
 // using the database to retrieve the relevant DKG keys.
