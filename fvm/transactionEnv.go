@@ -720,6 +720,9 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		defer sp.Finish()
 	}
 
+	e.sth.DisableLimitEnforcement() // don't enforce limit during account creation
+	defer e.sth.EnableLimitEnforcement()
+
 	flowAddress, err := e.addressGenerator.NextAddress()
 	if err != nil {
 		return address, err
