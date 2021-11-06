@@ -282,18 +282,15 @@ func (suite *LibP2PNodeTestSuite) TestOneToOneComm() {
 	ch := make(chan string, count)
 
 	// Create the handler function
-	handler := func(t *testing.T) network.StreamHandler {
-		h := func(s network.Stream) {
-			rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-			str, err := rw.ReadString('\n')
-			assert.NoError(t, err)
-			ch <- str
-		}
-		return h
+	streamHandler := func(s network.Stream) {
+		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+		str, err := rw.ReadString('\n')
+		assert.NoError(suite.T(), err)
+		ch <- str
 	}
 
 	// Creates nodes
-	nodes, identities := NodesFixtureWithHandler(suite.T(), count, handler, false)
+	nodes, identities := NodesFixtureWithHandler(suite.T(), count, streamHandler, false)
 	defer StopNodes(suite.T(), nodes)
 	require.Len(suite.T(), identities, count)
 
@@ -576,7 +573,7 @@ func (suite *LibP2PNodeTestSuite) TestConnectionGatingBootstrap() {
 
 // NodesFixtureWithHandler creates a number of LibP2PNodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func NodesFixtureWithHandler(t *testing.T, count int, handler func(t *testing.T) network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
+func NodesFixtureWithHandler(t *testing.T, count int, handler network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*Node
@@ -602,14 +599,14 @@ func NodesFixtureWithHandler(t *testing.T, count int, handler func(t *testing.T)
 
 // NodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
-func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID flow.Identifier, handler func(t *testing.T) network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
+func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID flow.Identifier, handler network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
 
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(address))
 
 	var handlerFunc network.StreamHandler
 	if handler != nil {
 		// use the callback that has been passed in
-		handlerFunc = handler(t)
+		handlerFunc = handler
 	} else {
 		// use a default call back
 		handlerFunc = func(network.Stream) {}
@@ -673,12 +670,16 @@ func StopNodes(t *testing.T, nodes []*Node) {
 	for _, n := range nodes {
 		StopNode(t, n)
 	}
+	fmt.Println("[debug] nodes stopped")
 }
 
 func StopNode(t *testing.T, node *Node) {
+	addr := node.host.Addrs()
+	fmt.Printf("[debug] stopping %v\n", addr)
 	done, err := node.Stop()
 	assert.NoError(t, err)
 	<-done
+	fmt.Printf("[debug] stopped %v\n", addr)
 }
 
 // generateNetworkingKey is a test helper that generates a ECDSA flow key pair.
