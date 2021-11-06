@@ -60,10 +60,6 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 				err = errors.NewEncodingUnsupportedValueError(encodingErr.Value, encodingErr.Path)
 				return
 			}
-			ledgerIntractionLimitExceededError := errors.NewLedgerIntractionLimitExceededError(0, 0)
-			if errors.As(err, &ledgerIntractionLimitExceededError) {
-				return
-			}
 
 			panic(r)
 		}
