@@ -967,7 +967,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				require.NoError(t, err)
 
 				require.Error(t, tx.Err)
-				fmt.Println(tx.Err.Error())
+
 				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
 			}))
 }

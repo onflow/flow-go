@@ -60,11 +60,6 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 				err = errors.NewEncodingUnsupportedValueError(encodingErr.Value, encodingErr.Path)
 				return
 			}
-			// If we hit the ledger interaction limit during cadence
-			if recognizedErr, ok := r.(errors.Error); ok && recognizedErr.Code() == errors.ErrCodeLedgerIntractionLimitExceededError {
-				err = recognizedErr
-				return
-			}
 
 			panic(r)
 		}
