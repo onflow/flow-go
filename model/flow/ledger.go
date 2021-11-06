@@ -23,7 +23,7 @@ func (r *RegisterID) String() string {
 
 	requiredLen := ((ownerLen + controllerLen + keyLen) * 2) + 2
 
-	arr := make([]byte, requiredLen, requiredLen)
+	arr := make([]byte, requiredLen)
 	n := 0
 
 	for i := 0; i < ownerLen; i++ {
