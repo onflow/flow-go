@@ -172,7 +172,7 @@ func (ss *SyncSuite) SetupTest() {
 	idCache, err := p2p.NewProtocolStateIDCache(log, ss.state, protocolEvents.NewDistributor())
 	require.NoError(ss.T(), err, "could not create protocol state identity cache")
 	e, err := New(log, metrics, ss.net, ss.me, ss.blocks, ss.comp, ss.core, finalizedHeader,
-		id.NewFilteredIdentifierProvider(
+		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(ss.me.NodeID())),
@@ -525,4 +525,20 @@ func (ss *SyncSuite) TestOnFinalizedBlock() {
 	actualHeader := ss.e.finalizedHeader.Get()
 	require.ElementsMatch(ss.T(), ss.e.participantsProvider.Identifiers(), ss.participants[1:].NodeIDs())
 	require.Equal(ss.T(), actualHeader, &finalizedBlock)
+}
+
+// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
+// was submitted from network layer.
+func (ss *SyncSuite) TestProcessUnsupportedMessageType() {
+	invalidEvent := uint64(42)
+	engines := []netint.Engine{ss.e, ss.e.requestHandler}
+	for _, e := range engines {
+		err := e.Process("ch", unittest.IdentifierFixture(), invalidEvent)
+		// shouldn't result in error since byzantine inputs are expected
+		require.NoError(ss.T(), err)
+		// in case of local processing error cannot be consumed since all inputs are trusted
+		err = e.ProcessLocal(invalidEvent)
+		require.Error(ss.T(), err)
+		require.True(ss.T(), engine.IsIncompatibleInputTypeError(err))
+	}
 }

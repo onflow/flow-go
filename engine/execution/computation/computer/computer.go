@@ -3,6 +3,7 @@ package computer
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -26,6 +27,7 @@ import (
 )
 
 const SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
+const MaxTransactionErrorStringSize = 1000            // 1000 chars
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
@@ -59,7 +61,7 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithRestrictedDeployment(false),
 		fvm.WithTransactionFeesEnabled(false),
 		fvm.WithServiceEventCollectionEnabled(),
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(logger)),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 	)
 }
@@ -368,10 +370,20 @@ func (e *blockComputer) executeTransaction(
 	}
 
 	if tx.Err != nil {
-		txResult.ErrorMessage = tx.Err.Error()
+		// limit the size of transaction error that is going to be captured
+		errorMsg := tx.Err.Error()
+		if len(errorMsg) > MaxTransactionErrorStringSize {
+			split := int(MaxTransactionErrorStringSize/2) - 1
+			var sb strings.Builder
+			sb.WriteString(errorMsg[:split])
+			sb.WriteString(" ... ")
+			sb.WriteString(errorMsg[len(errorMsg)-split:])
+			errorMsg = sb.String()
+		}
+		txResult.ErrorMessage = errorMsg
 		e.log.Debug().
 			Hex("tx_id", logging.Entity(txBody)).
-			Str("error_message", tx.Err.Error()).
+			Str("error_message", errorMsg).
 			Uint16("error_code", uint16(tx.Err.Code())).
 			Msg("transaction execution failed")
 	} else {

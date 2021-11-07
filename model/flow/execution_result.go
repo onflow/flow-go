@@ -1,6 +1,7 @@
 package flow
 
 import (
+	"encoding/json"
 	"errors"
 )
 
@@ -54,6 +55,17 @@ func (er ExecutionResult) InitialStateCommit() (StateCommitment, error) {
 		return DummyStateCommitment, NoChunksError
 	}
 	return er.Chunks[0].StartState, nil
+}
+
+func (er ExecutionResult) MarshalJSON() ([]byte, error) {
+	type Alias ExecutionResult
+	return json.Marshal(struct {
+		Alias
+		ID string
+	}{
+		Alias: Alias(er),
+		ID:    er.ID().String(),
+	})
 }
 
 /*******************************************************************************

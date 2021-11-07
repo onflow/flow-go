@@ -3,7 +3,6 @@
 package synchronization
 
 import (
-	"errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -201,18 +200,9 @@ func (e *Engine) SubmitLocal(event interface{}) {
 // for processing in a non-blocking manner. It returns instantly and logs
 // a potential processing error internally when done.
 func (e *Engine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := e.process(originID, event)
+	err := e.Process(channel, originID, event)
 	if err != nil {
-		lg := e.log.With().
-			Err(err).
-			Str("channel", channel.String()).
-			Str("origin", originID.String()).
-			Logger()
-		if errors.Is(err, engine.IncompatibleInputTypeError) {
-			lg.Error().Msg("received message with incompatible type")
-			return
-		}
-		lg.Fatal().Msg("internal error processing message")
+		e.log.Fatal().Err(err).Msg("internal error processing event")
 	}
 }
 
@@ -224,7 +214,15 @@ func (e *Engine) ProcessLocal(event interface{}) error {
 // Process processes the given event from the node with the given origin ID in
 // a blocking manner. It returns the potential processing error when done.
 func (e *Engine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	return e.process(originID, event)
+	err := e.process(originID, event)
+	if err != nil {
+		if engine.IsIncompatibleInputTypeError(err) {
+			e.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
+			return nil
+		}
+		return fmt.Errorf("unexpected error while processing engine message: %w", err)
+	}
+	return nil
 }
 
 // process processes events for the synchronization engine.
