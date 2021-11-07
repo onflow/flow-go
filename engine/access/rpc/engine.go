@@ -223,9 +223,11 @@ func (e *Engine) Done() <-chan struct{} {
 			}
 		},
 		func() {
-			err := e.restServer.Shutdown(context.Background())
-			if err != nil {
-				e.log.Error().Err(err).Msg("error stopping http REST server")
+			if e.restServer != nil {
+				err := e.restServer.Shutdown(context.Background())
+				if err != nil {
+					e.log.Error().Err(err).Msg("error stopping http REST server")
+				}
 			}
 		})
 }
