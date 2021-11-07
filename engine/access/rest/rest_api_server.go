@@ -12,7 +12,7 @@ import (
 )
 
 // NewRestAPIServer returns an HTTP server initialized with the REST API handler
-func NewRestAPIServer(api *RestAPIHandler, listenAddress string, logger zerolog.Logger) *http.Server {
+func NewRestAPIServer(api *APIHandler, listenAddress string, logger zerolog.Logger) *http.Server {
 
 	router := mux.NewRouter().StrictSlash(true)
 	for _, route := range apiRoutes(api) {
@@ -34,7 +34,7 @@ func NewRestAPIServer(api *RestAPIHandler, listenAddress string, logger zerolog.
 
 // apiRoutes returns the Gorilla Mux routes for each of the API defined in the rest definition
 // currently, it only supports BlocksIdGet
-func apiRoutes(api *RestAPIHandler) generated.Routes {
+func apiRoutes(api *APIHandler) generated.Routes {
 	return generated.Routes{
 		generated.Route{
 			Name:        "AccountsAddressGet",
@@ -114,12 +114,25 @@ func newHandler(inner http.Handler, name string, logger zerolog.Logger) http.Han
 	apiLogger := logger.With().Str("route_name", name).Logger()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		respWrite := newResponseWriter(w)
-		inner.ServeHTTP(respWrite, r)
-		apiLogger.Info().Str("method", r.Method).
-			Str("uri", r.RequestURI).
-			Dur("duration", time.Since(start)).
-			Int("response_code", respWrite.statusCode).Msg("api")
+		respWriter := newResponseWriter(w)
+		inner.ServeHTTP(respWriter, r)
+		if respWriter.statusCode == http.StatusOK {
+			apiLogger.Info().Str("method", r.Method).
+				Str("uri", r.RequestURI).
+				Str("client_ip", r.RemoteAddr).
+				Str("user_agent", r.UserAgent()).
+				Dur("duration", time.Since(start)).
+				Int("response_code", respWriter.statusCode).
+				Msg("api")
+		} else {
+			apiLogger.Error().Str("method", r.Method).
+				Str("uri", r.RequestURI).
+				Str("client_ip", r.RemoteAddr).
+				Str("user_agent", r.UserAgent()).
+				Dur("duration", time.Since(start)).
+				Int("response_code", respWriter.statusCode).
+				Msg("api")
+		}
 	})
 }
 

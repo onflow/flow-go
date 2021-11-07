@@ -22,6 +22,7 @@ import (
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/network"
 	protocol "github.com/onflow/flow-go/state/protocol/mock"
+	"github.com/onflow/flow-go/storage"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -107,7 +108,7 @@ func TestRestAPI(t *testing.T) {
 
 func (suite *RestAPITestSuite) TestRestAPICall() {
 
-	suite.Run("happy path - REST client successfully executed the GetBlockByID request", func() {
+	suite.Run("GetBlockByID - happy path", func() {
 
 		collections := unittest.CollectionListFixture(1)
 		block := unittest.BlockWithGuaranteesFixture(
@@ -125,6 +126,30 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		assert.Len(suite.T(), blocks, 1)
 		assert.Equal(suite.T(), block.ID().String(), blocks[0].Header.Id)
 	})
+
+	suite.Run("GetBlockByID with a non-existing block ID", func() {
+
+		nonExistingBlockID := unittest.IdentifierFixture()
+		suite.blocks.On("ByID", nonExistingBlockID).Return(nil, storage.ErrNotFound).Once()
+
+		client := suite.restAPIClient()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{nonExistingBlockID.String()}, nil)
+		assertError(suite.T(), resp, err, http.StatusNotFound, "not found")
+	})
+
+	suite.Run("GetBlockByID with an invalid block ID", func() {
+
+		client := suite.restAPIClient()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		const invalidBlockID = "invalid_block_id"
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{invalidBlockID}, nil)
+		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("invalid ID %s", invalidBlockID))
+	})
 }
 
 func (suite *RestAPITestSuite) TearDownTest() {
@@ -139,4 +164,14 @@ func (suite *RestAPITestSuite) restAPIClient() *restclient.APIClient {
 	config := restclient.NewConfiguration()
 	config.BasePath = fmt.Sprintf("http://%s/v1", suite.rpcEng.RestApiAddress().String())
 	return restclient.NewAPIClient(config)
+}
+
+func assertError(t *testing.T, resp *http.Response, err error, expectedCode int, expectedMsgSubstr string) {
+	require.NotNil(t, resp)
+	assert.Equal(t, expectedCode, resp.StatusCode)
+	require.Error(t, err)
+	swaggerError := err.(restclient.GenericSwaggerError)
+	modelError := swaggerError.Model().(restclient.ModelError)
+	require.EqualValues(t, expectedCode, modelError.Code)
+	require.Contains(t, modelError.Message, expectedMsgSubstr)
 }

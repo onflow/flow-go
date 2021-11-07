@@ -1,43 +1,43 @@
 package rest
 
 import (
-	"errors"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"github.com/onflow/flow-go/engine/access/rpc/backend"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/storage"
 )
 
 // RestAPIHandler provides the implementation of each of the REST API
-type RestAPIHandler struct {
+type APIHandler struct {
 	backend *backend.Backend
 	logger  zerolog.Logger
-	encoder encoding.Encoder
 }
 
-func NewRestAPIHandler(backend *backend.Backend, logger zerolog.Logger) *RestAPIHandler {
-	return &RestAPIHandler{
+func NewRestAPIHandler(backend *backend.Backend, logger zerolog.Logger) *APIHandler {
+	return &APIHandler{
 		backend: backend,
 		logger:  logger,
-		encoder: encoding.DefaultEncoder, //use the default JSON encoder
 	}
 }
 
-func (restAPI *RestAPIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
+func (restAPI *APIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
+	// create a logger for the request
+	errorLogger := restAPI.logger.With().Str("request_url", r.URL.String()).Logger()
+
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
 	vars := mux.Vars(r)
-	idParam, ok := vars["id"]
-	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
-		return
-	}
+	idParam := vars["id"]
+
 	// gorilla mux retains opening and ending square brackets for ids
 	idParam = strings.TrimSuffix(idParam, "]")
 	idParam = strings.TrimPrefix(idParam, "[")
@@ -49,46 +49,57 @@ func (restAPI *RestAPIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Reques
 	for i, id := range ids {
 		flowID, err := flow.HexStringToIdentifier(id)
 		if err != nil {
-			restAPI.errorResponse(w, r, err, http.StatusBadRequest)
+			restAPI.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID %s", id), errorLogger)
+			return
 		}
 
 		flowBlock, err := restAPI.backend.GetBlockByID(r.Context(), flowID)
-
 		if err != nil {
-			if errors.Is(err, storage.ErrNotFound) {
-				restAPI.errorResponse(w, r, err, http.StatusNotFound)
+			// if error has GRPC code NotFound, the return HTTP NotFound error
+			if status.Code(err) == codes.NotFound {
+				restAPI.errorResponse(w, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", id), errorLogger)
+				return
 			}
-			restAPI.errorResponse(w, r, err, http.StatusInternalServerError)
+			restAPI.errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("failed to look up block with ID %s", id), errorLogger)
+			return
 		}
 		blocks[i] = toBlock(flowBlock)
 	}
 
-	encodedBlocks, err := restAPI.encoder.Encode(blocks)
+	encodedBlocks, err := json.Marshal(blocks)
 	if err != nil {
-		restAPI.errorResponse(w, r, err, http.StatusInternalServerError)
+		restAPI.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
+		return
 	}
 
 	_, err = w.Write(encodedBlocks)
 	if err != nil {
-		restAPI.errorResponse(w, r, err, http.StatusInternalServerError)
+		restAPI.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
+		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
-func (restAPI *RestAPIHandler) NotImplemented(w http.ResponseWriter, r *http.Request) {
+func (restAPI *APIHandler) NotImplemented(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-func (restAPI *RestAPIHandler) errorResponse(w http.ResponseWriter, r *http.Request, err error, returnCode int) {
+// errorResponse sends an HTTP error response to the client with the given return code and a model error with the given
+// response message in the response body
+func (restAPI *APIHandler) errorResponse(w http.ResponseWriter, returnCode int, responseMessage string, logger zerolog.Logger) {
 	w.WriteHeader(returnCode)
-	encodedError, encodingErr := restAPI.encoder.Encode(err.Error())
-	if encodingErr != nil {
-		restAPI.logger.Error().Str("request_url", r.URL.String()).Err(err).Msg("failed to encode error")
+	modelError := generated.ModelError{
+		Code:    int32(returnCode),
+		Message: responseMessage,
+	}
+	encodedError, err := json.Marshal(modelError)
+	if err != nil {
+		logger.Error().Str("response_message", responseMessage).Msg("failed to json encode error message")
 		return
 	}
 	_, err = w.Write(encodedError)
 	if err != nil {
-		restAPI.logger.Err(err).Msg("failed to send error response")
+		logger.Error().Err(err).Msg("failed to send error response")
 	}
 }
