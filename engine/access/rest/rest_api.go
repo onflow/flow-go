@@ -16,6 +16,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const MaxBlockIDCount = 50
+
 // RestAPIHandler provides the implementation of each of the REST API
 type APIHandler struct {
 	backend *backend.Backend
@@ -45,6 +47,11 @@ func (restAPI *APIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 	ids := strings.Split(idParam, ",")
 
 	blocks := make([]*generated.Block, len(ids))
+
+	if len(ids) > MaxBlockIDCount {
+		restAPI.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", MaxBlockIDCount), errorLogger)
+		return
+	}
 
 	for i, id := range ids {
 		flowID, err := flow.HexStringToIdentifier(id)
