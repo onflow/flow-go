@@ -100,7 +100,7 @@ func (s *stakingKeysAggregator) getCurrent() *aggregate {
 	return (*aggregate)(atomic.LoadPointer(&s.current))
 }
 
-// periodically and sets aggregate struct as current using this function.
+// periodically sets aggregate struct as current
 func (s *stakingKeysAggregator) updateCurrent(agg *aggregate) {
 	atomic.StorePointer(&s.current, unsafe.Pointer(agg))
 }
@@ -145,6 +145,7 @@ func (s *stakingKeysAggregator) aggregatedStakingKey(signers flow.IdentityList) 
 		lastStakingKey:     updatedKey,
 	}
 
+	// swap the struct out
 	s.updateCurrent(nextInner)
 
 	return updatedKey, nil
