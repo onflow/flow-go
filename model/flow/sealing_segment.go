@@ -55,26 +55,24 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 		 return fmt.Errorf("invalid block height (%x): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
 	}
 
-	resultsByID := block.Payload.Results.Lookup()
-	for _, receipt := range block.Payload.Receipts {
-		if _, ok := builder.includedResults[receipt.ResultID]; ok {
-			fmt.Printf("HERE\n\n")
-			continue
-		}
+	// cache results in included results
+	// they could be referenced in a future block in the segment
+	for _, result := range block.Payload.Results.Lookup() {
+		builder.includedResults[result.ID()] = result
+	}
 
-		if _, ok := resultsByID[receipt.ResultID]; !ok {
+	for _, receipt := range block.Payload.Receipts {
+		if _, ok := builder.includedResults[receipt.ResultID]; !ok {
 			result, err := builder.resultLookup(receipt.ResultID)
 			if err != nil {
 				return fmt.Errorf("%w: (%x) %v", ErrSegmentResultLookup,receipt.ResultID, err)
 			}
-			fmt.Printf("HERE 2 %x\n\n", result.ID())
 
 			builder.addExecutionResult(result)
 			builder.includedResults[receipt.ResultID] = result
 		}
 	}
 	builder.blocks = append(builder.blocks, block)
-
 	return nil
 }
 
