@@ -2,6 +2,7 @@ package votecollector
 
 import (
 	"errors"
+
 	"sync"
 	"testing"
 
@@ -11,11 +12,17 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/local"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -222,4 +229,76 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_ConcurrentCreatingQC() {
 	shutdownWg.Wait()
 
 	s.onQCCreatedState.AssertNumberOfCalls(s.T(), "onQCCreated", 1)
+}
+
+// TestStakingVoteProcessorV2_BuildVerifyQC tests a complete path from creating votes to collecting votes and then
+// building & verifying QC.
+// We start with leader proposing a block, then new leader collects votes and builds a QC.
+// Need to verify that QC that was produced is valid and can be embedded in new proposal.
+func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
+	epochCounter := uint64(3)
+	epochLookup := &modulemock.EpochLookup{}
+	view := uint64(20)
+	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
+
+	// signers hold objects that are created with private key and can sign votes and proposals
+	signers := make(map[flow.Identifier]*verification.CombinedSignerV2)
+	// prepare staking signers, each signer has it's own private/public key pair
+	stakingSigners := unittest.IdentityListFixture(7, func(identity *flow.Identity) {
+		stakingPriv := unittest.StakingPrivKeyFixture()
+		identity.StakingPubKey = stakingPriv.PublicKey()
+
+		keys := &storagemock.DKGKeys{}
+		// there is no DKG key for this epoch
+		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
+
+		beaconSignerStore := msig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+
+		me, err := local.New(nil, stakingPriv)
+		require.NoError(t, err)
+
+		staking := msig.NewSingleSigner(encoding.CollectorVoteTag, me)
+		// TODO: replace this with something else, we don't need combined signer for collector cluster or do we?
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
+	})
+
+	leader := stakingSigners[0]
+
+	block := helper.MakeBlock(helper.WithBlockView(view),
+		helper.WithBlockProposer(leader.NodeID))
+
+	committee := &mockhotstuff.Committee{}
+	committee.On("Identities", block.BlockID, mock.Anything).Return(stakingSigners, nil)
+
+	votes := make([]*model.Vote, 0, len(stakingSigners))
+
+	// first staking signer will be leader collecting votes for proposal
+	// prepare votes for every member of committee except leader
+	for _, signer := range stakingSigners[1:] {
+		vote, err := signers[signer.NodeID].CreateVote(block)
+		require.NoError(t, err)
+		votes = append(votes, vote)
+	}
+
+	// create and sign proposal
+	proposal, err := signers[leader.NodeID].CreateProposal(block)
+	require.NoError(t, err)
+
+	qcCreated := false
+	onQCCreated := func(qc *flow.QuorumCertificate) {
+		qcCreated = true
+		// TODO: add checks for QC validity
+	}
+
+	voteProcessorFactory := NewStakingVoteProcessorFactory(unittest.Logger(), committee, onQCCreated)
+	voteProcessor, err := voteProcessorFactory.Create(proposal)
+	require.NoError(t, err)
+
+	// process votes by new leader, this will result in producing new QC
+	for _, vote := range votes {
+		err := voteProcessor.Process(vote)
+		require.NoError(t, err)
+	}
+
+	require.True(t, qcCreated)
 }
