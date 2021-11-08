@@ -162,9 +162,9 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-// generateFlowProtocolID creates a libp2p protocol ID namespaced to a particular
+// FlowProtocolID creates a libp2p protocol ID namespaced to a particular
 // spork. This prevents cross-talk between nodes from different sporks.
-func generateFlowProtocolID(sporkID flow.Identifier) protocol.ID {
+func FlowProtocolID(sporkID flow.Identifier) protocol.ID {
 	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + sporkID.String())
 }
 

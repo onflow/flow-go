@@ -9,14 +9,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
-
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
@@ -497,18 +496,23 @@ func main() {
 			return prov, err
 		}).
 		Component("ingestion engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			ing, err := ingestion.New(
+			core := ingestion.NewCore(
 				node.Logger,
 				node.Tracer,
-				node.Metrics.Engine,
-				conMetrics,
 				node.Metrics.Mempool,
-				node.Network,
 				node.State,
 				node.Storage.Headers,
-				node.Me,
 				guarantees,
 			)
+
+			ing, err := ingestion.New(
+				node.Logger,
+				node.Metrics.Engine,
+				node.Network,
+				node.Me,
+				core,
+			)
+
 			return ing, err
 		}).
 		Component("consensus components", func(nodebuilder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {

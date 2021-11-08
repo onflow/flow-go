@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sync"
@@ -18,7 +19,9 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/model/flow/filter"
 	libp2pmessage "github.com/onflow/flow-go/model/libp2p/message"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
 	"github.com/onflow/flow-go/network/codec/cbor"
@@ -67,6 +70,9 @@ type MiddlewareTestSuite struct {
 	metrics   *metrics.NoopCollector // no-op performance monitoring simulation
 	logger    zerolog.Logger
 	providers []*UpdatableIDProvider
+
+	mwCancel context.CancelFunc
+	mwCtx    irrecoverable.SignalerContext
 }
 
 // TestMiddlewareTestSuit runs all the test methods in this test suit
@@ -105,10 +111,26 @@ func (m *MiddlewareTestSuite) SetupTest() {
 
 	// create the mock overlays
 	for i := 0; i < m.size; i++ {
-		m.ov = append(m.ov, m.createOverlay())
+		m.ov = append(m.ov, m.createOverlay(m.providers[i]))
 	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	m.mwCancel = cancel
+	var errChan <-chan error
+	m.mwCtx, errChan = irrecoverable.WithSignaler(ctx)
+	go func() {
+		select {
+		case err := <-errChan:
+			m.T().Error("middlewares encountered fatal error", err)
+		case <-m.mwCtx.Done():
+			return
+		}
+	}()
+
 	for i, mw := range m.mws {
-		assert.NoError(m.T(), mw.Start(m.ov[i]))
+		mw.SetOverlay(m.ov[i])
+		mw.Start(m.mwCtx)
+		<-mw.Ready()
 		mw.UpdateAllowList()
 	}
 }
@@ -124,15 +146,14 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	require.Len(m.T(), mws, 1)
 	newId := ids[0]
 	newMw := mws[0]
-	// newProvider := providers[0]
-	defer newMw.Stop()
 
-	overlay := m.createOverlay()
+	overlay := m.createOverlay(providers[0])
 	overlay.On("Receive",
 		m.ids[0].NodeID,
 		mock.AnythingOfType("*message.Message"),
 	).Return(nil)
-	assert.NoError(m.T(), newMw.Start(overlay))
+	newMw.SetOverlay(overlay)
+	newMw.Start(m.mwCtx)
 
 	idList := flow.IdentityList(append(m.ids, newId))
 
@@ -148,11 +169,6 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	require.ErrorIs(m.T(), err, swarm.ErrNoAddresses)
 
 	// update the addresses
-	m.Lock()
-	m.ids = idList
-	m.Unlock()
-	// newProvider.SetIdentities(idList)
-	// newMw.UpdateAllowList()
 	m.mws[0].UpdateNodeAddresses()
 
 	// now the message should send successfully
@@ -160,20 +176,18 @@ func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	require.NoError(m.T(), err)
 }
 
-func (m *MiddlewareTestSuite) createOverlay() *mocknetwork.Overlay {
+func (m *MiddlewareTestSuite) createOverlay(provider *UpdatableIDProvider) *mocknetwork.Overlay {
 	overlay := &mocknetwork.Overlay{}
-	overlay.On("Identities").Maybe().Return(m.getIds, nil)
-	overlay.On("Topology").Maybe().Return(m.getIds, nil)
+	overlay.On("Identities").Maybe().Return(func() flow.IdentityList {
+		return provider.Identities(filter.Any)
+	})
+	overlay.On("Topology").Maybe().Return(func() flow.IdentityList {
+		return provider.Identities(filter.Any)
+	}, nil)
 	// this test is not testing the topic validator, especially in spoofing,
 	// so we always return a valid identity
 	overlay.On("Identity", mock.AnythingOfType("peer.ID")).Maybe().Return(unittest.IdentityFixture(), true)
 	return overlay
-}
-
-func (m *MiddlewareTestSuite) getIds() flow.IdentityList {
-	m.RLock()
-	defer m.RUnlock()
-	return flow.IdentityList(m.ids)
 }
 
 func (m *MiddlewareTestSuite) TearDownTest() {
@@ -510,10 +524,10 @@ func createMessage(originID flow.Identifier, targetID flow.Identifier, msg ...st
 }
 
 func (m *MiddlewareTestSuite) stopMiddlewares() {
-	// start all the middlewares
+	m.mwCancel()
+
 	for i := 0; i < m.size; i++ {
-		// start the middleware
-		m.mws[i].Stop()
+		<-m.mws[i].Done()
 	}
 	m.mws = nil
 	m.ov = nil

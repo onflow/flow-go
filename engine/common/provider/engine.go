@@ -43,7 +43,7 @@ type Engine struct {
 // New creates a new provider engine, operating on the provided network channel, and accepting requests for entities
 // from a node within the set obtained by applying the provided selector filter. It uses the injected retrieve function
 // to manage the fullfilment of these requests.
-func New(log zerolog.Logger, metrics module.EngineMetrics, net module.Network, me module.Local, state protocol.State,
+func New(log zerolog.Logger, metrics module.EngineMetrics, net network.Network, me module.Local, state protocol.State,
 	channel network.Channel, selector flow.IdentityFilter, retrieve RetrieveFunc) (*Engine, error) {
 
 	// make sure we don't respond to requests sent by self or non-staked nodes

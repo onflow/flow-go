@@ -14,8 +14,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/lifecycle"
-	mockmodule "github.com/onflow/flow-go/module/mock"
+	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/cluster"
 	bcluster "github.com/onflow/flow-go/state/cluster/badger"
@@ -36,7 +36,7 @@ type ClusterSwitchoverTestCase struct {
 	hub        *stub.Hub                 // mock network hub
 	root       protocol.Snapshot         // shared root snapshot
 	nodes      []testmock.CollectionNode // collection nodes
-	sn         *mockmodule.Engine        // fake consensus node engine for receiving guarantees
+	sn         *mocknetwork.Engine       // fake consensus node engine for receiving guarantees
 	builder    *unittest.EpochBuilder    // utility for building epochs
 
 	// epoch counter -> cluster index -> transaction IDs
@@ -78,7 +78,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		tc.identities.Filter(filter.HasRole(flow.RoleConsensus))[0],
 		tc.root,
 	)
-	tc.sn = new(mockmodule.Engine)
+	tc.sn = new(mocknetwork.Engine)
 	_, err := consensus.Net.Register(engine.ReceiveGuarantees, tc.sn)
 	require.NoError(tc.T(), err)
 
@@ -136,7 +136,7 @@ func (tc *ClusterSwitchoverTestCase) StartNodes() {
 	for _, node := range tc.nodes {
 		nodes = append(nodes, node)
 	}
-	unittest.RequireCloseBefore(tc.T(), lifecycle.AllReady(nodes...), time.Second, "could not start nodes")
+	unittest.RequireCloseBefore(tc.T(), util.AllReady(nodes...), time.Second, "could not start nodes")
 
 	// start continuous delivery for all nodes
 	for _, node := range tc.nodes {
@@ -149,7 +149,7 @@ func (tc *ClusterSwitchoverTestCase) StopNodes() {
 	for _, node := range tc.nodes {
 		nodes = append(nodes, node)
 	}
-	unittest.RequireCloseBefore(tc.T(), lifecycle.AllDone(nodes...), time.Second, "could not stop nodes")
+	unittest.RequireCloseBefore(tc.T(), util.AllDone(nodes...), time.Second, "could not stop nodes")
 }
 
 func (tc *ClusterSwitchoverTestCase) RootBlock() *flow.Header {

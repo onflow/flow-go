@@ -220,7 +220,7 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // root bootstrap state. This is used to bootstrap the protocol state for
 // genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
-	return SnapshotFromBootstrapStateWithProtocolVersion(root, result, seal, qc, 42)
+	return SnapshotFromBootstrapStateWithProtocolVersion(root, result, seal, qc, flow.DefaultProtocolVersion)
 }
 
 // SnapshotFromBootstrapStateWithProtocolVersion is SnapshotFromBootstrapState

@@ -22,20 +22,25 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/admin"
+	"github.com/onflow/flow-go/admin/commands"
+	"github.com/onflow/flow-go/admin/commands/common"
 	"github.com/onflow/flow-go/cmd/build"
+	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/trace"
+	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -112,6 +117,7 @@ type FlowNodeBuilder struct {
 	lm                       *lifecycle.LifecycleManager
 	extraFlagCheck           func() error
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
+	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
@@ -138,18 +144,21 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.UintVar(&fnb.BaseConfig.tracerSensitivity, "tracer-sensitivity", defaultConfig.tracerSensitivity,
 		"adjusts the level of sampling when tracing is enabled. 0 means capture everything, higher value results in less samples")
 
-	fnb.flags.StringVar(&fnb.BaseConfig.adminAddr, "admin-addr", defaultConfig.adminAddr, "address to bind on for admin HTTP server")
-	fnb.flags.StringVar(&fnb.BaseConfig.adminCert, "admin-cert", defaultConfig.adminCert, "admin cert file (for TLS)")
-	fnb.flags.StringVar(&fnb.BaseConfig.adminKey, "admin-key", defaultConfig.adminKey, "admin key file (for TLS)")
-	fnb.flags.StringVar(&fnb.BaseConfig.adminClientCAs, "admin-client-certs", defaultConfig.adminClientCAs, "admin client certs (for mutual TLS)")
+	fnb.flags.StringVar(&fnb.BaseConfig.AdminAddr, "admin-addr", defaultConfig.AdminAddr, "address to bind on for admin HTTP server")
+	fnb.flags.StringVar(&fnb.BaseConfig.AdminCert, "admin-cert", defaultConfig.AdminCert, "admin cert file (for TLS)")
+	fnb.flags.StringVar(&fnb.BaseConfig.AdminKey, "admin-key", defaultConfig.AdminKey, "admin key file (for TLS)")
+	fnb.flags.StringVar(&fnb.BaseConfig.AdminClientCAs, "admin-client-certs", defaultConfig.AdminClientCAs, "admin client certs (for mutual TLS)")
 
-	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", dns.DefaultTimeToLive, "time-to-live for dns cache")
+	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
+	fnb.flags.StringVar(&fnb.BaseConfig.LibP2PStreamCompression, "stream-compression", p2p.NoCompression,
+		"networking stream compression mechanism")
+	fnb.flags.IntVar(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultCacheSize,
+		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
-
 }
 
-func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
+func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component("network", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
 
 		codec := cborcodec.NewCodec()
@@ -171,10 +180,36 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 				}
 				return head.Height, nil
 			},
+			HotstuffViewFun: nil, // set in next code block, depending on role
 		}
 
-		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(ctx,
-			fnb.Logger.Level(zerolog.ErrorLevel),
+		// only consensus roles will need to report hotstuff view
+		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
+			// initialize the persister
+			persist := persister.New(node.DB, node.RootChainID)
+
+			pingProvider.HotstuffViewFun = func() (uint64, error) {
+				curView, err := persist.GetStarted()
+				if err != nil {
+					return 0, err
+				}
+
+				return curView, nil
+			}
+		} else {
+			// non-consensus will not report any hotstuff view
+			pingProvider.HotstuffViewFun = func() (uint64, error) {
+				return 0, fmt.Errorf("non-consensus nodes do not report hotstuff view in ping")
+			}
+		}
+
+		streamFactory, err := p2p.LibP2PStreamCompressorFactoryFunc(fnb.BaseConfig.LibP2PStreamCompression)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert stream factory: %w", err)
+		}
+
+		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
+			fnb.Logger,
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
@@ -184,15 +219,14 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 			fnb.Metrics.Network,
 			pingProvider,
 			fnb.BaseConfig.DNSCacheTTL,
-			fnb.BaseConfig.NodeRole)
+			fnb.BaseConfig.NodeRole,
+			streamFactory)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
 
-		mwOpts := []p2p.MiddlewareOption{
-			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
-		}
+		var mwOpts []p2p.MiddlewareOption
 		if len(fnb.MsgValidators) > 0 {
 			mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 		}
@@ -202,7 +236,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		mwOpts = append(mwOpts, p2p.WithPeerManager(peerManagerFactory))
 
 		fnb.Middleware = p2p.NewMiddleware(
-			fnb.Logger.Level(zerolog.ErrorLevel),
+			fnb.Logger,
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
@@ -229,8 +263,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		net, err := p2p.NewNetwork(fnb.Logger,
 			codec,
 			fnb.Me,
-			fnb.Middleware,
-			p2p.DefaultCacheSize,
+			func() (network.Middleware, error) { return fnb.Middleware, nil },
+			fnb.NetworkReceivedMessageCacheSize,
 			topologyCache,
 			subscriptionManager,
 			fnb.Metrics.Network,
@@ -248,7 +282,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit(ctx context.Context) {
 		})
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
-		return net, err
+		return net, nil
 	})
 }
 
@@ -259,38 +293,42 @@ func (fnb *FlowNodeBuilder) EnqueueMetricsServerInit() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) EnqueueAdminServerInit(ctx context.Context) {
-	fnb.Component("admin server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
-		var opts []admin.CommandRunnerOption
-
-		if node.adminCert != NotSet {
-			serverCert, err := tls.LoadX509KeyPair(node.adminCert, node.adminKey)
-			if err != nil {
-				return nil, err
-			}
-			clientCAs, err := ioutil.ReadFile(node.adminClientCAs)
-			if err != nil {
-				return nil, err
-			}
-			certPool := x509.NewCertPool()
-			certPool.AppendCertsFromPEM(clientCAs)
-			config := &tls.Config{
-				MinVersion:   tls.VersionTLS13,
-				Certificates: []tls.Certificate{serverCert},
-				ClientAuth:   tls.RequireAndVerifyClientCert,
-				ClientCAs:    certPool,
-			}
-
-			opts = append(opts, admin.WithTLS(config))
+func (fnb *FlowNodeBuilder) EnqueueAdminServerInit() {
+	if fnb.AdminAddr != NotSet {
+		if (fnb.AdminCert != NotSet || fnb.AdminKey != NotSet || fnb.AdminClientCAs != NotSet) &&
+			!(fnb.AdminCert != NotSet && fnb.AdminKey != NotSet && fnb.AdminClientCAs != NotSet) {
+			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
 		}
+		fnb.RegisterDefaultAdminCommands()
+		fnb.Component("admin server", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
+			var opts []admin.CommandRunnerOption
 
-		command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.adminAddr, opts...)
-		if err := command_runner.Start(ctx); err != nil {
-			return nil, err
-		}
+			if node.AdminCert != NotSet {
+				serverCert, err := tls.LoadX509KeyPair(node.AdminCert, node.AdminKey)
+				if err != nil {
+					return nil, err
+				}
+				clientCAs, err := ioutil.ReadFile(node.AdminClientCAs)
+				if err != nil {
+					return nil, err
+				}
+				certPool := x509.NewCertPool()
+				certPool.AppendCertsFromPEM(clientCAs)
+				config := &tls.Config{
+					MinVersion:   tls.VersionTLS13,
+					Certificates: []tls.Certificate{serverCert},
+					ClientAuth:   tls.RequireAndVerifyClientCert,
+					ClientCAs:    certPool,
+				}
 
-		return command_runner, nil
-	})
+				opts = append(opts, admin.WithTLS(config))
+			}
+
+			command_runner := fnb.adminCommandBootstrapper.Bootstrap(fnb.Logger, fnb.AdminAddr, opts...)
+
+			return command_runner, nil
+		})
+	}
 }
 
 func (fnb *FlowNodeBuilder) RegisterBadgerMetrics() error {
@@ -352,7 +390,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	log := fnb.Logger.With().
 		Timestamp().
 		Str("node_role", fnb.BaseConfig.NodeRole).
-		Str("node_id", fnb.BaseConfig.nodeIDHex).
+		Str("node_id", fnb.NodeID.String()).
 		Logger()
 
 	log.Info().Msgf("flow %s node starting up", fnb.BaseConfig.NodeRole)
@@ -362,7 +400,8 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid log level")
 	}
-	log = log.Level(lvl)
+	log = log.Level(zerolog.DebugLevel)
+	zerolog.SetGlobalLevel(lvl)
 
 	fnb.Logger = log
 }
@@ -395,10 +434,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 		fnb.Metrics = Metrics{
-			Network:        metrics.NewNetworkCollector(),
-			Engine:         metrics.NewEngineCollector(),
-			Compliance:     metrics.NewComplianceCollector(),
-			Cache:          metrics.NewCacheCollector(fnb.RootChainID),
+			Network:    metrics.NewNetworkCollector(),
+			Engine:     metrics.NewEngineCollector(),
+			Compliance: metrics.NewComplianceCollector(),
+			// CacheControl metrics has been causing memory abuse, disable for now
+			// Cache:          metrics.NewCacheCollector(fnb.RootChainID),
+			Cache:          metrics.NewNoopCollector(),
 			CleanCollector: metrics.NewCleanerCollector(),
 			Mempool:        mempools,
 		}
@@ -547,8 +588,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		node.IdentityProvider = idCache
 		node.IDTranslator = idCache
-		node.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
-		node.SyncEngineIdentifierProvider = id.NewFilteredIdentifierProvider(
+		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
@@ -708,7 +748,9 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithAccountStorageLimit(true),
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Mainnet {
-		fvm.WithTransactionFeesEnabled(true)
+		vmOpts = append(vmOpts,
+			fvm.WithTransactionFeesEnabled(true),
+		)
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary {
 		vmOpts = append(vmOpts,
@@ -727,7 +769,7 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) {
 	}
 }
 
-func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
+func (fnb *FlowNodeBuilder) handleComponent(ctx irrecoverable.SignalerContext, v namedComponentFunc) {
 
 	log := fnb.Logger.With().Str("component", v.name).Logger()
 
@@ -736,6 +778,11 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc) {
 		log.Fatal().Err(err).Msg("component initialization failed")
 	} else {
 		log.Info().Msg("component initialization complete")
+	}
+
+	component, ok := readyAware.(component.Component)
+	if ok {
+		component.Start(ctx)
 	}
 
 	select {
@@ -779,10 +826,8 @@ func (fnb *FlowNodeBuilder) Module(name string, f func(builder NodeBuilder, node
 	return fnb
 }
 
-// AdminCommand registers a new admin command with the admin server
-func (fnb *FlowNodeBuilder) AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder {
-	fnb.adminCommandBootstrapper.RegisterHandler(command, handler)
-	fnb.adminCommandBootstrapper.RegisterValidator(command, validator)
+func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder {
+	fnb.adminCommands[command] = f
 	return fnb
 }
 
@@ -886,15 +931,12 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 		flags:                    pflag.CommandLine,
 		lm:                       lifecycle.NewLifecycleManager(),
 		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
+		adminCommands:            make(map[string]func(*NodeConfig) commands.AdminCommand),
 	}
 	return builder
 }
 
 func (fnb *FlowNodeBuilder) Initialize() error {
-
-	ctx, cancel := context.WithCancel(context.Background())
-	fnb.Cancel = cancel
-
 	fnb.PrintBuildVersionDetails()
 
 	fnb.BaseFlags()
@@ -908,7 +950,7 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
 
-	fnb.EnqueueNetworkInit(ctx)
+	fnb.EnqueueNetworkInit()
 
 	if fnb.metricsEnabled {
 		fnb.EnqueueMetricsServerInit()
@@ -917,17 +959,19 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 		}
 	}
 
-	if fnb.adminAddr != NotSet {
-		if (fnb.adminCert != NotSet || fnb.adminKey != NotSet || fnb.adminClientCAs != NotSet) &&
-			!(fnb.adminCert != NotSet && fnb.adminKey != NotSet && fnb.adminClientCAs != NotSet) {
-			fnb.Logger.Fatal().Msg("admin cert / key and client certs must all be provided to enable mutual TLS")
-		}
-		fnb.EnqueueAdminServerInit(ctx)
-	}
+	fnb.EnqueueAdminServerInit()
 
 	fnb.EnqueueTracer()
 
 	return nil
+}
+
+func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
+	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
+		return &common.SetLogLevelCommand{}
+	}).AdminCommand("read-protocol-state-blocks", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewReadProtocolStateBlocksCommand(config.State, config.Storage.Blocks)
+	})
 }
 
 // Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
@@ -998,14 +1042,34 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 			fnb.handlePostInit(f)
 		}
 
+		// set up all admin commands
+		for commandName, commandFunc := range fnb.adminCommands {
+			command := commandFunc(fnb.NodeConfig)
+			fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
+			fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
+		}
+
 		// set up all modules
 		for _, f := range fnb.modules {
 			fnb.handleModule(f)
 		}
 
+		ctx, cancel := context.WithCancel(context.TODO())
+		fnb.Cancel = cancel
+		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+
+		// TODO: implement proper error handling
+		go func() {
+			select {
+			case err := <-errChan:
+				fnb.Logger.Fatal().Err(err).Msg("component encountered irrecoverable error")
+			case <-ctx.Done():
+			}
+		}()
+
 		// initialize all components
 		for _, f := range fnb.components {
-			fnb.handleComponent(f)
+			fnb.handleComponent(signalerCtx, f)
 		}
 	})
 	return fnb.lm.Started()
@@ -1013,6 +1077,10 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 
 // Done returns a channel that closes after all registered components are stopped
 func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
+	// cancel the context used by the networking layer
+	if fnb.Cancel != nil {
+		fnb.Cancel()
+	}
 	fnb.lm.OnStop(func() {
 		for i := len(fnb.doneObject) - 1; i >= 0; i-- {
 			doneObject := fnb.doneObject[i]
@@ -1022,10 +1090,6 @@ func (fnb *FlowNodeBuilder) Done() <-chan struct{} {
 
 		fnb.closeDatabase()
 	})
-	// cancel the context used by the networking layer
-	if fnb.Cancel != nil {
-		fnb.Cancel()
-	}
 	return fnb.lm.Stopped()
 }
 

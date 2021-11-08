@@ -53,7 +53,7 @@ func (suite *Suite) SetupTest() {
 
 	metrics := metrics.NewNoopCollector()
 
-	net := new(module.Network)
+	net := new(mocknetwork.Network)
 	suite.conduit = new(mocknetwork.Conduit)
 	net.On("Register", mock.Anything, mock.Anything).Return(suite.conduit, nil)
 
