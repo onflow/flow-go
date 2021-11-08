@@ -65,12 +65,6 @@ func (c *CombinedVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, b
 		return false, fmt.Errorf("could not get dkg: %w", err)
 	}
 
-	// get the signer dkg key share
-	beaconPubKey, err := dkg.KeyShare(signer.NodeID)
-	if err != nil {
-		return false, fmt.Errorf("could not get random beacon key share for %x: %w", signer.NodeID, err)
-	}
-
 	// verify each signature against the message
 	// TODO: check if using batch verification is faster (should be yes)
 	stakingValid, err := signer.StakingPubKey.Verify(stakingSig, msg, c.staking)
@@ -84,6 +78,12 @@ func (c *CombinedVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, b
 	// there is no beacon share, no need to verify it
 	if beaconShare == nil {
 		return true, nil
+	}
+
+	// if there is beacon share, there must be beacon public key
+	beaconPubKey, err := dkg.KeyShare(signer.NodeID)
+	if err != nil {
+		return false, fmt.Errorf("could not get random beacon key share for %x: %w", signer.NodeID, err)
 	}
 
 	beaconValid, err := beaconPubKey.Verify(beaconShare, msg, c.beacon)
