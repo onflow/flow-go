@@ -33,7 +33,7 @@ func TestProduceConsume(t *testing.T) {
 	// pushing 10 jobs sequentially to chunk queue, with 3 workers on consumer and the engine blocking on the jobs,
 	// results in engine only receiving 3 jobs.
 	t.Run("pushing 10 jobs receive 3", func(t *testing.T) {
-		called := make([]*chunks.Locator, 0)
+		var called chunks.LocatorList
 		lock := &sync.Mutex{}
 		neverFinish := func(notifier module.ProcessingNotifier, locator *chunks.Locator) {
 			lock.Lock()
@@ -63,7 +63,7 @@ func TestProduceConsume(t *testing.T) {
 	// pushing 10 jobs sequentially to chunk queue, with 3 workers on consumer and the engine immediately finishing the job,
 	// results in engine eventually receiving all 10 jobs.
 	t.Run("pushing 10 receive 10", func(t *testing.T) {
-		called := make([]*chunks.Locator, 0)
+		var called chunks.LocatorList
 		lock := &sync.Mutex{}
 		var finishAll sync.WaitGroup
 		alwaysFinish := func(notifier module.ProcessingNotifier, locator *chunks.Locator) {
@@ -98,7 +98,7 @@ func TestProduceConsume(t *testing.T) {
 	// pushing 100 jobs concurrently to chunk queue, with 3 workers on consumer and the engine immediately finishing the job,
 	// results in engine eventually receiving all 100 jobs.
 	t.Run("pushing 100 concurrently receive 100", func(t *testing.T) {
-		called := make([]*chunks.Locator, 0)
+		var called chunks.LocatorList
 		lock := &sync.Mutex{}
 		var finishAll sync.WaitGroup
 		finishAll.Add(100)
