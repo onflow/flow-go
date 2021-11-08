@@ -63,7 +63,7 @@ func TestSealingSegmentBuilder_AddBlock(t *testing.T) {
 		block1 := unittest.BlockFixture()
 		block2 := unittest.BlockFixture()
 		block3 := unittest.BlockWithParentFixture(block2.Header)
- 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
 		builder := flow.NewSealingSegmentBuilder(resultLookup)
 
 		err := builder.AddBlock(&block1)
@@ -77,7 +77,7 @@ func TestSealingSegmentBuilder_AddBlock(t *testing.T) {
 // TestSealingSegmentBuilder_SealingSegment checks behavior and sanity checks when building sealing segment
 func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 	t.Run("should return valid sealing segment", func(t *testing.T) {
-		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil}
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
 		builder := flow.NewSealingSegmentBuilder(resultLookup)
 
 		block1 := unittest.BlockFixture()
