@@ -38,7 +38,7 @@ var (
 	ErrSegmentMissingSeal        = fmt.Errorf("sealing segment failed sanity check: highest block in segment does not contain seal for lowest")
 	ErrSegmentBlocksWrongLen     = fmt.Errorf("sealing segment failed sanity check: must have atleast 2 blocks")
 	ErrSegmentInvalidBlockHeight = fmt.Errorf("sealing segment failed sanity check: blocks must be in ascending order")
-	ErrSegmentResultLookup = fmt.Errorf("failed to lookup execution result")
+	ErrSegmentResultLookup       = fmt.Errorf("failed to lookup execution result")
 )
 
 type SealingSegmentBuilder struct {
@@ -52,7 +52,7 @@ type SealingSegmentBuilder struct {
 func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	//sanity check: block should be 1 height higher than current highest
 	if !builder.isValidHeight(block) {
-		 return fmt.Errorf("invalid block height (%x): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
+		return fmt.Errorf("invalid block height (%x): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
 	}
 
 	// cache results in included results
@@ -65,7 +65,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 		if _, ok := builder.includedResults[receipt.ResultID]; !ok {
 			result, err := builder.resultLookup(receipt.ResultID)
 			if err != nil {
-				return fmt.Errorf("%w: (%x) %v", ErrSegmentResultLookup,receipt.ResultID, err)
+				return fmt.Errorf("%w: (%x) %v", ErrSegmentResultLookup, receipt.ResultID, err)
 			}
 
 			builder.addExecutionResult(result)
