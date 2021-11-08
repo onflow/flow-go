@@ -189,6 +189,19 @@ func TestSealingSegment(t *testing.T) {
 	head, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
+	t.Run("root sealing segment", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			expected, err := rootSnapshot.SealingSegment()
+			require.NoError(t, err)
+			actual, err := state.AtBlockID(head.ID()).SealingSegment()
+			require.NoError(t, err)
+
+			assert.Len(t, actual.Blocks, 1)
+			assert.Equal(t, len(expected.Blocks), len(actual.Blocks))
+			assert.Equal(t, expected.Blocks[0].ID(), actual.Blocks[0].ID())
+		})
+	})
+
 	// test sealing segment for non-root segment with simple sealing structure
 	// (no blocks in between reference block and latest sealed)
 	// ROOT <- B1 <- B2(S1)

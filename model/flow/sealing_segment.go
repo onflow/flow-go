@@ -88,8 +88,13 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 		ExecutionResults: builder.results,
 	}
 
-	if len(segment.Blocks) < 2 {
-		return nil, fmt.Errorf("expect at least 2 blocks in a sealing segment, but actually got %v: %w", len(segment.Blocks), ErrSegmentBlocksWrongLen)
+	if len(segment.Blocks) < 1 {
+		return nil, fmt.Errorf("expect at least 2 blocks in a sealing segment or 1 block in the case of root segments, but actually got %v: %w", len(segment.Blocks), ErrSegmentBlocksWrongLen)
+	}
+
+	// if root sealing segment skip seal sanity check
+	if len(segment.Blocks) == 1 {
+		return segment, nil
 	}
 
 	if !builder.hasValidSeal() {
