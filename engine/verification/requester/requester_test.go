@@ -119,13 +119,12 @@ func TestHandleChunkDataPack_HappyPath(t *testing.T) {
 	originID := unittest.IdentifierFixture()
 
 	// we remove pending request on receiving this response
-	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(
-		chunks.LocatorList{
-			&chunks.Locator{
-				ResultID: request.ResultID,
-				Index:    request.Index,
-			},
-		}, true).Once()
+	locators := chunks.LocatorMap{}
+	locators[chunks.ChunkLocatorID(request.ResultID, request.Index)] = &chunks.Locator{
+		ResultID: request.ResultID,
+		Index:    request.Index,
+	}
+	s.pendingRequests.On("PopAll", response.ChunkDataPack.ChunkID).Return(locators, true).Once()
 
 	s.handler.On("HandleChunkDataPack", originID, &verification.ChunkDataPackResponse{
 		Locator: chunks.Locator{
@@ -667,8 +666,8 @@ func mockPendingRequestsPopAll(t *testing.T, pendingRequests *mempool.ChunkReque
 
 	pendingRequests.On("PopAll", testifymock.Anything).
 		Return(
-			func(chunkID flow.Identifier) chunks.LocatorList {
-				locators := chunks.LocatorList{}
+			func(chunkID flow.Identifier) chunks.LocatorMap {
+				locators := make(chunks.LocatorMap)
 
 				// chunk ID must not be seen
 				_, ok := seen[chunkID]
@@ -677,7 +676,7 @@ func mockPendingRequestsPopAll(t *testing.T, pendingRequests *mempool.ChunkReque
 				for _, request := range requests {
 					if request.ChunkID == chunkID {
 						locator := request.Locator
-						locators = append(locators, &locator)
+						locators[locator.ID()] = &locator
 					}
 				}
 

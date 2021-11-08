@@ -458,7 +458,9 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	// side.
 	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators))
 
-	e.ProcessAssignedChunk(locators[0])
+	for _, locator := range locators {
+		e.ProcessAssignedChunk(locator)
+	}
 
 	mock.AssertExpectationsForObjects(t, s.results, s.metrics)
 	// we should not request a duplicate chunk status.
@@ -891,7 +893,7 @@ func chunkRequestFixture(resultID flow.Identifier,
 func completeChunkStatusListFixture(t *testing.T, chunkCount int, statusCount int) (*flow.Block,
 	*flow.ExecutionResult,
 	verification.ChunkStatusList,
-	chunks.LocatorList,
+	chunks.LocatorMap,
 	map[flow.Identifier]*flow.Collection) {
 	require.LessOrEqual(t, statusCount, chunkCount)
 

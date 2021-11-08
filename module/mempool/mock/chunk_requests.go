@@ -65,15 +65,15 @@ func (_m *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 }
 
 // PopAll provides a mock function with given fields: chunkID
-func (_m *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorList, bool) {
+func (_m *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorMap, bool) {
 	ret := _m.Called(chunkID)
 
-	var r0 chunks.LocatorList
-	if rf, ok := ret.Get(0).(func(flow.Identifier) chunks.LocatorList); ok {
+	var r0 chunks.LocatorMap
+	if rf, ok := ret.Get(0).(func(flow.Identifier) chunks.LocatorMap); ok {
 		r0 = rf(chunkID)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(chunks.LocatorList)
+			r0 = ret.Get(0).(chunks.LocatorMap)
 		}
 	}
 

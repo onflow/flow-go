@@ -30,15 +30,5 @@ func ChunkLocatorID(resultID flow.Identifier, chunkIndex uint64) flow.Identifier
 	}.ID()
 }
 
-type LocatorList []*Locator
-
-// Contains returns whether the list already contains the chunk locator.
-func (l LocatorList) Contains(resultID flow.Identifier, chunkIndex uint64) bool {
-	for _, existing := range l {
-		if existing.ResultID == resultID && existing.Index == chunkIndex {
-			return true
-		}
-	}
-
-	return false
-}
+// LocatorMap maps keeps chunk locators based on their locator id.
+type LocatorMap map[flow.Identifier]*Locator

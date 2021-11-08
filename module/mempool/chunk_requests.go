@@ -72,7 +72,7 @@ type ChunkRequests interface {
 	// chunk request status for this chunk id.
 	// Boolean return value indicates whether there are requests in the memory pool associated
 	// with chunk ID.
-	PopAll(chunkID flow.Identifier) (chunks.LocatorList, bool)
+	PopAll(chunkID flow.Identifier) (chunks.LocatorMap, bool)
 
 	// IncrementAttempt increments the Attempt field of the corresponding status of the
 	// chunk request in memory pool that has the specified chunk ID.

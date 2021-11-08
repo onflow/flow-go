@@ -66,11 +66,15 @@ func (cs *ChunkRequests) RequestHistory(chunkID flow.Identifier) (uint64, time.T
 func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		entity, exists := backdata[request.ChunkID]
+		chunkLocatorID := request.Locator.ID()
 
 		if !exists {
+			locators := make(chunks.LocatorMap)
+			locators[chunkLocatorID] = &request.Locator
+
 			// no chunk request status exists for this chunk ID, hence initiating one.
 			status := &chunkRequestStatus{
-				Locators:    chunks.LocatorList{&request.Locator},
+				Locators:    locators,
 				RequestInfo: request.ChunkDataPackRequestInfo,
 			}
 			backdata[request.ChunkID] = status
@@ -78,11 +82,11 @@ func (cs *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 		}
 
 		status := toChunkRequestStatus(entity)
-		if status.Locators.Contains(request.Locator.ResultID, request.Locator.Index) {
+		if _, ok := status.Locators[chunkLocatorID]; ok {
 			return fmt.Errorf("chunk request exists with same locator (result_id=%x, chunk_index=%d)", request.Locator.ResultID, request.Locator.Index)
 		}
 
-		status.Locators = append(status.Locators, &request.Locator)
+		status.Locators[chunkLocatorID] = &request.Locator
 		status.RequestInfo.Agrees = status.RequestInfo.Agrees.Union(request.Agrees)
 		status.RequestInfo.Disagrees = status.RequestInfo.Disagrees.Union(request.Disagrees)
 		status.RequestInfo.Targets = status.RequestInfo.Targets.Union(request.Targets)
@@ -105,8 +109,8 @@ func (cs *ChunkRequests) Rem(chunkID flow.Identifier) bool {
 // chunk request status for this chunk id.
 // Boolean return value indicates whether there are requests in the memory pool associated
 // with chunk ID.
-func (cs *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorList, bool) {
-	var locators chunks.LocatorList
+func (cs *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorMap, bool) {
+	var locators map[flow.Identifier]*chunks.Locator
 
 	err := cs.Backend.Run(func(backdata map[flow.Identifier]flow.Entity) error {
 		entity, exists := backdata[chunkID]
@@ -203,7 +207,7 @@ func (cs ChunkRequests) Size() uint {
 // chunkRequestStatus is an internal data type for ChunkRequests mempool. It acts as a wrapper for ChunkDataRequests, maintaining
 // some auxiliary attributes that are internal to ChunkRequests.
 type chunkRequestStatus struct {
-	Locators    chunks.LocatorList
+	Locators    map[flow.Identifier]*chunks.Locator // keeps locators by their chunk id.
 	RequestInfo verification.ChunkDataPackRequestInfo
 	LastAttempt time.Time     // timestamp of last request dispatched for this chunk id.
 	RetryAfter  time.Duration // interval until request should be retried.

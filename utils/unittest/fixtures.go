@@ -1003,11 +1003,12 @@ func ChunkListFixture(n uint, blockID flow.Identifier) flow.ChunkList {
 	return chunks
 }
 
-func ChunkLocatorListFixture(n uint) chunks.LocatorList {
-	locators := chunks.LocatorList{}
+func ChunkLocatorListFixture(n uint) []*chunks.Locator {
+	locators := make([]*chunks.Locator, 0)
 	resultID := IdentifierFixture()
 	for i := uint64(0); i < uint64(n); i++ {
-		locators = append(locators, ChunkLocatorFixture(resultID, i))
+		locator := ChunkLocatorFixture(resultID, i)
+		locators = append(locators, locator)
 	}
 	return locators
 }
@@ -1020,11 +1021,11 @@ func ChunkLocatorFixture(resultID flow.Identifier, index uint64) *chunks.Locator
 }
 
 // ChunkStatusListToChunkLocatorFixture extracts chunk locators from a list of chunk statuses.
-func ChunkStatusListToChunkLocatorFixture(statuses []*verification.ChunkStatus) chunks.LocatorList {
-	locators := chunks.LocatorList{}
+func ChunkStatusListToChunkLocatorFixture(statuses []*verification.ChunkStatus) chunks.LocatorMap {
+	locators := chunks.LocatorMap{}
 	for _, status := range statuses {
 		locator := ChunkLocatorFixture(status.ExecutionResult.ID(), status.ChunkIndex)
-		locators = append(locators, locator)
+		locators[locator.ID()] = locator
 	}
 
 	return locators
