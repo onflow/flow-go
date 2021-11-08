@@ -1003,8 +1003,8 @@ func ChunkListFixture(n uint, blockID flow.Identifier) flow.ChunkList {
 	return chunks
 }
 
-func ChunkLocatorListFixture(n uint) []*chunks.Locator {
-	locators := make([]*chunks.Locator, 0)
+func ChunkLocatorListFixture(n uint) chunks.LocatorList {
+	locators := chunks.LocatorList{}
 	resultID := IdentifierFixture()
 	for i := uint64(0); i < uint64(n); i++ {
 		locator := ChunkLocatorFixture(resultID, i)
