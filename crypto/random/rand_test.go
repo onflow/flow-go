@@ -1,6 +1,7 @@
 package random
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -20,11 +21,18 @@ func TestRandInt(t *testing.T) {
 	tolerance := 0.05
 	sampleSpace := uint64(16) // this should be a power of 2 for a more uniform distribution
 	distribution := make([]float64, sampleSpace)
-	seed := []uint8{0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
+	seed := []uint8{
+		0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 		0x6A, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x5C,
 		0x66, 0x53, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x51,
-		0xAA, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x50}
-	rng, err := NewRand(seed)
+		0xAA, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x50,
+		0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
+		0x6A, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x5C,
+		0x66, 0x53, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x51,
+		0xAA, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x50,
+	}
+	stream_id := make([]byte, 12)
+	rng, err := NewRand(seed, stream_id)
 	require.NoError(t, err)
 	for i := 0; i < sampleSize; i++ {
 		r := rng.UintN(sampleSpace)
@@ -41,13 +49,14 @@ func TestRandInt(t *testing.T) {
 func TestRandomPermutationSubset(t *testing.T) {
 	listSize := 100
 	subsetSize := 20
-	seed := make([]byte, 16)
+	seed := make([]byte, 32)
+	stream_id := make([]byte, 12)
 	// test a zero seed
-	_, err := NewRand(seed)
+	_, err := NewRand(seed, stream_id)
 	require.NoError(t, err)
 	// fix thee seed
 	seed[0] = 45
-	rng, err := NewRand(seed)
+	rng, err := NewRand(seed, stream_id)
 	require.NoError(t, err)
 	// statictics parameters
 	sampleSize := 64768
@@ -90,9 +99,11 @@ func TestRandomPermutationSubset(t *testing.T) {
 //  * permuting an empty set returns an empty list
 //  * drawing a sample of size zero from a non-empty set returns an empty list
 func TestEmptyPermutationSubset(t *testing.T) {
-	seed := make([]byte, 16)
+	seed := make([]byte, 32)
 	seed[0] = 45
-	rng, err := NewRand(seed)
+	stream_id := make([]byte, 12)
+
+	rng, err := NewRand(seed, stream_id)
 	require.NoError(t, err)
 
 	// verify that permuting an empty set returns an empty list
@@ -108,9 +119,11 @@ func TestEmptyPermutationSubset(t *testing.T) {
 
 func TestRandomShuffle(t *testing.T) {
 	listSize := 100
-	seed := make([]byte, 16)
+	seed := make([]byte, 32)
 	seed[0] = 45
-	rng, err := NewRand(seed)
+
+	stream_id := make([]byte, 12)
+	rng, err := NewRand(seed, stream_id)
 	require.NoError(t, err)
 	// statictics parameters
 	sampleSize := 64768
@@ -148,9 +161,10 @@ func TestRandomShuffle(t *testing.T) {
 }
 
 func TestEmptyShuffle(t *testing.T) {
-	seed := make([]byte, 16)
+	seed := make([]byte, 32)
 	seed[0] = 45
-	rng, err := NewRand(seed)
+	stream_id := make([]byte, 12)
+	rng, err := NewRand(seed, stream_id)
 	require.NoError(t, err)
 	emptySlice := make([]float64, 0)
 	err = rng.Shuffle(len(emptySlice), func(i, j int) {
@@ -163,9 +177,11 @@ func TestEmptyShuffle(t *testing.T) {
 func TestRandomSamples(t *testing.T) {
 	listSize := 100
 	samplesSize := 20
-	seed := make([]byte, 16)
+	seed := make([]byte, 32)
 	seed[0] = 45
-	rng, err := NewRand(seed)
+	stream_id := make([]byte, 12)
+
+	rng, err := NewRand(seed, stream_id)
 	require.NoError(t, err)
 	// statictics parameters
 	sampleSize := 100000
@@ -210,9 +226,10 @@ func TestRandomSamples(t *testing.T) {
 
 // TestEmptySamples verifies that drawing a sample of size zero leaves the original list unchanged
 func TestEmptySamples(t *testing.T) {
-	seed := make([]byte, 16)
+	seed := make([]byte, 32)
 	seed[0] = 45
-	rng, err := NewRand(seed)
+	stream_id := make([]byte, 12)
+	rng, err := NewRand(seed, stream_id)
 	require.NoError(t, err)
 
 	// Sampling from an empty set
@@ -235,14 +252,16 @@ func TestEmptySamples(t *testing.T) {
 // TestState tests the function State()
 func TestState(t *testing.T) {
 	// create a seed
-	len := 16 * 3 // 3 internal xorshifts
+	len := 32 * 3 // 3 internal chacha20s
 	seed := make([]byte, len)
 	for i := 0; i < len; i++ {
 		seed[i] = byte(rand.Intn(256))
 	}
+	stream_id := make([]byte, 12)
 	// create an rng
-	rng, err := NewRand(seed)
+	rng, err := NewRand(seed, stream_id)
 	require.NoError(t, err)
+
 	// evolve the internal state of the rng
 	iterations := rand.Intn(100)
 	for i := 0; i < iterations; i++ {
@@ -250,14 +269,17 @@ func TestState(t *testing.T) {
 	}
 	// get the internal state of the rng
 	state := rng.State()
+	state_clone := rng.State()
+	require.True(t, bytes.Equal(state, state_clone), "State is not deterministic")
 	// seed a new rng with the internal state
-	secondRng, err := NewRand(state)
+	secondRng, err := Restore(state)
 	require.NoError(t, err)
+	require.True(t, bytes.Equal(state, secondRng.State()), "State o Restore is not identity")
 	// test the 2 rngs are giving identical outputs
 	iterations = rand.Intn(100)
 	for i := 0; i < iterations; i++ {
 		rand1 := rng.UintN(1024)
 		rand2 := secondRng.UintN(1024)
-		require.Equal(t, rand1, rand2, "the 2 rngs are not identical")
+		require.Equal(t, rand1, rand2, "the 2 rngs are not identical on round %d", i)
 	}
 }
