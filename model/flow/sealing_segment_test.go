@@ -92,7 +92,6 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		require.Equal(t, segment.Lowest().ID(), block1.ID())
 	})
 
-
 	t.Run("should return valid sealing segment", func(t *testing.T) {
 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
 		builder := flow.NewSealingSegmentBuilder(resultLookup)
