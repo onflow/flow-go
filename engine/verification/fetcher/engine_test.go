@@ -159,7 +159,7 @@ func testProcessAssignChunkHappyPath(t *testing.T, chunkNum int, assignedNum int
 	// chunk data responses, and notify the consumer that it is done with processing chunk.
 	s.metrics.On("OnVerifiableChunkSentToVerifier").Return().Times(len(verifiableChunks))
 	verifierWG := mockVerifierEngine(t, s.verifier, verifiableChunks)
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators))
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators.ToList()))
 
 	// passes chunk data requests in parallel.
 	processWG := &sync.WaitGroup{}
@@ -253,7 +253,7 @@ func TestProcessAssignChunkSealedAfterRequest(t *testing.T) {
 	})
 
 	// fetcher engine should notify
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators))
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators.ToList()))
 
 	// passes chunk data requests in parallel.
 	processWG := &sync.WaitGroup{}
@@ -456,7 +456,7 @@ func TestSkipChunkOfSealedBlock(t *testing.T) {
 	// expects processing notifier being invoked upon sealed chunk detected,
 	// which means the termination of processing a sealed chunk on fetcher engine
 	// side.
-	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators))
+	mockChunkConsumerNotifier(t, s.chunkConsumerNotifier, flow.GetIDs(locators.ToList()))
 
 	for _, locator := range locators {
 		e.ProcessAssignedChunk(locator)

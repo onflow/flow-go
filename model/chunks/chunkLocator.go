@@ -32,3 +32,22 @@ func ChunkLocatorID(resultID flow.Identifier, chunkIndex uint64) flow.Identifier
 
 // LocatorMap maps keeps chunk locators based on their locator id.
 type LocatorMap map[flow.Identifier]*Locator
+
+func (l LocatorMap) ToList() LocatorList {
+	locatorList := LocatorList{}
+	for _, locator := range l {
+		locatorList = append(locatorList, locator)
+	}
+
+	return locatorList
+}
+
+type LocatorList []*Locator
+
+func (l LocatorList) ToMap() LocatorMap {
+	locatorMap := make(LocatorMap)
+	for _, locator := range l {
+		locatorMap[locator.ID()] = locator
+	}
+	return locatorMap
+}
