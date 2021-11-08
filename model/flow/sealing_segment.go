@@ -35,8 +35,10 @@ func (segment *SealingSegment) Lowest() *Block {
 }
 
 var (
-	ErrSegmentMissingSeal    = fmt.Errorf("sealing segment failed sanity check: highest block in segment does not contain seal for lowest")
-	ErrSegmentBlocksWrongLen = fmt.Errorf("sealing segment is required to have atleast 2 blocks")
+	ErrSegmentMissingSeal        = fmt.Errorf("sealing segment failed sanity check: highest block in segment does not contain seal for lowest")
+	ErrSegmentBlocksWrongLen     = fmt.Errorf("sealing segment failed sanity check: must have atleast 2 blocks")
+	ErrSegmentInvalidBlockHeight = fmt.Errorf("sealing segment failed sanity check: blocks must be in ascending order")
+	ErrSegmentResultLookup = fmt.Errorf("failed to lookup execution result")
 )
 
 type SealingSegmentBuilder struct {
@@ -48,17 +50,25 @@ type SealingSegmentBuilder struct {
 
 // AddBlock appends block to blocks
 func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
+	//sanity check: block should be 1 height higher than current highest
+	if !builder.isValidHeight(block) {
+		 return fmt.Errorf("invalid block height (%x): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
+	}
+
 	resultsByID := block.Payload.Results.Lookup()
 	for _, receipt := range block.Payload.Receipts {
 		if _, ok := builder.includedResults[receipt.ResultID]; ok {
+			fmt.Printf("HERE\n\n")
 			continue
 		}
 
 		if _, ok := resultsByID[receipt.ResultID]; !ok {
 			result, err := builder.resultLookup(receipt.ResultID)
 			if err != nil {
-				return fmt.Errorf("could not get execution result (%s): %w", receipt.ResultID, err)
+				return fmt.Errorf("%w: (%x) %v", ErrSegmentResultLookup,receipt.ResultID, err)
 			}
+			fmt.Printf("HERE 2 %x\n\n", result.ID())
+
 			builder.addExecutionResult(result)
 			builder.includedResults[receipt.ResultID] = result
 		}
@@ -84,13 +94,45 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 		return nil, fmt.Errorf("expect at least 2 blocks in a sealing segment, but actually got %v: %w", len(segment.Blocks), ErrSegmentBlocksWrongLen)
 	}
 
-	for _, seal := range segment.Highest().Payload.Seals {
-		if seal.BlockID == segment.Lowest().ID() {
-			return segment, nil
+	if !builder.hasValidSeal() {
+		return nil, fmt.Errorf("sealing segment missing seal lowest (%x) highest (%x): %w", segment.Lowest().ID(), segment.Highest().ID(), ErrSegmentMissingSeal)
+	}
+
+	return segment, nil
+}
+
+// isValidHeight returns true block is exactly 1 height higher than the current highest block in the segment
+func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
+	if builder.highest() == nil {
+		return true
+	}
+
+	return block.Header.Height == builder.highest().Header.Height+1
+}
+
+// hasValidSeal returns true if highest block in the segment contains a seal for the lowest block
+func (builder *SealingSegmentBuilder) hasValidSeal() bool {
+	for _, seal := range builder.highest().Payload.Seals {
+		if seal.BlockID == builder.lowest().ID() {
+			return true
 		}
 	}
 
-	return nil, ErrSegmentMissingSeal
+	return false
+}
+
+// highest returns highest block in segment
+func (builder *SealingSegmentBuilder) highest() *Block {
+	if len(builder.blocks) == 0 {
+		return nil
+	}
+
+	return builder.blocks[len(builder.blocks)-1]
+}
+
+// lowest returns lowest block in segment
+func (builder *SealingSegmentBuilder) lowest() *Block {
+	return builder.blocks[0]
 }
 
 // NewSealingSegmentBuilder returns *SealingSegmentBuilder
