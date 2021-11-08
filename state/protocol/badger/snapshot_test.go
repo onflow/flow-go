@@ -5,7 +5,6 @@ package badger_test
 import (
 	"context"
 	"errors"
-	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -410,25 +409,13 @@ func TestSealingSegment(t *testing.T) {
 			segment, err := state.AtBlockID(block5.ID()).SealingSegment()
 			require.NoError(t, err)
 
-			fmt.Printf("BLOCK1: %x\n", block1.ID())
-			fmt.Printf("BLOCK2: %x\n", block2.ID())
-			fmt.Printf("BLOCK3: %x\n", block3.ID())
-			fmt.Printf("BLOCK4: %x\n", block4.ID())
-			fmt.Printf("BLOCK5: %x\n\n\n", block5.ID())
-
 			require.Len(t, segment.Blocks, 4)
-
-			for i, block := range segment.Blocks {
-				fmt.Printf("BLOCK%x: %x\n", i, block.ID())
-			}
 
 			_, found := segment.ExecutionResults.Lookup()[resultA.ID()]
 			require.True(t, found)
-			_, found = segment.ExecutionResults.Lookup()[receiptB.ExecutionResult.ID()]
-			require.True(t, found)
 
 			// ResultA should only be added once even though it is referenced in 2 different blocks
-			require.Len(t, segment.ExecutionResults, 2)
+			require.Len(t, segment.ExecutionResults, 1)
 		})
 	})
 }
