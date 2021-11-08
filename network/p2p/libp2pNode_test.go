@@ -41,7 +41,7 @@ const tickForAssertEventually = 100 * time.Millisecond
 // "0.0.0.0:<selected-port-by-os>
 const defaultAddress = "0.0.0.0:0"
 
-var rootBlockID = unittest.IdentifierFixture()
+var sporkID = unittest.IdentifierFixture()
 
 type LibP2PNodeTestSuite struct {
 	suite.Suite
@@ -102,7 +102,7 @@ func (suite *LibP2PNodeTestSuite) TestMultiAddress() {
 func (suite *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
 	// creates a single
 	key := generateNetworkingKey(suite.T())
-	node, _ := NodeFixture(suite.T(), suite.logger, key, rootBlockID, nil, false, defaultAddress)
+	node, _ := NodeFixture(suite.T(), suite.logger, key, sporkID, nil, false, defaultAddress)
 
 	// stops the created node
 	done, err := node.Stop()
@@ -188,7 +188,7 @@ func (suite *LibP2PNodeTestSuite) TestCreateStream() {
 
 	id2 := identities[1]
 
-	flowProtocolID := FlowProtocolID(rootBlockID)
+	flowProtocolID := FlowProtocolID(sporkID)
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(suite.T(), 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 
@@ -677,7 +677,7 @@ func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testin
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
 		key := generateNetworkingKey(suite.T())
-		node, identity := NodeFixture(suite.T(), suite.logger, key, rootBlockID, handler, allowList, defaultAddress)
+		node, identity := NodeFixture(suite.T(), suite.logger, key, sporkID, handler, allowList, defaultAddress)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
@@ -686,7 +686,7 @@ func (suite *LibP2PNodeTestSuite) NodesFixture(count int, handler func(t *testin
 
 // NodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
-func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID flow.Identifier, handler func(t *testing.T) network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
+func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, sporkID flow.Identifier, handler func(t *testing.T) network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
 
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(address))
 
@@ -709,7 +709,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	connManager := NewConnManager(log, noopMetrics)
 
 	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
-		SetSporkID(rootID).
+		SetSporkID(sporkID).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
