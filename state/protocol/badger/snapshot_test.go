@@ -5,11 +5,10 @@ package badger_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
-
-	"github.com/onflow/flow-go/storage/badger/operation"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
@@ -309,75 +308,130 @@ func TestSealingSegment(t *testing.T) {
 		})
 	})
 
-	// test sealing segment where a block contains a ExecutionReceipt that
-	// references a ExecutionResult contained in a different block.
-	// the sealing segment should contain any ExecutionResults that were
-	// missing from a blocks payload in the SealingSegment.ExecutionResults field
-	// ROOT -> B1(Rec_1) -> B2[Res_1, Rec_2, Res_2] -> B3(Rec_3, Res_3, Seal_B1) -> B4 -> B5(Rec_4, Res_4, Seal_B4)
-	t.Run("sealing segment decoupled execution results and receipts", func(t *testing.T) {
+	// test sealing segment where you have a chain that is 5 blocks long and the block 5 has a seal for block 2.
+	// block 2 also contains a receipt but no result.
+	// root -> B1[Result_A, Receipt_A_1] -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3 -> B4 -> B5 (Seal_B2)
+	t.Run("sealing segment with 4 blocks and 1 execution result decoupled", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
-			require.NoError(t, err)
 			// simulate scenario where execution result is missing from block payload
 			// SealingSegment() should get result from results db and store it on ExecutionReceipts
 			// field on SealingSegment
+			resultA := unittest.ExecutionResultFixture()
+			receiptA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultA))
+			receiptA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultA))
+
+			// receipt b also contains result b
+			receiptB := unittest.ExecutionReceiptFixture()
+
 			block1 := unittest.BlockWithParentFixture(head)
-			receipt1 := unittest.ReceiptForBlockFixture(&block1)
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receiptA1)))
 
-			// insert result from receipt1
-			err := db.Update(func(txn *badger.Txn) error {
-				err := db.Update(operation.InsertExecutionResult(&receipt1.ExecutionResult))
-				require.NoError(t, err)
-				return nil
-			})
-			require.NoError(t, err)
-
-			block1.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(receipt1)))
-			err = state.Extend(context.Background(), &block1)
-			require.NoError(t, err)
-
-			// block2 contains result1 referenced in receipt1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
-			receipt2 := unittest.ReceiptForBlockFixture(&block2)
-			block2.SetPayload(unittest.PayloadFixture(unittest.WithExecutionResults(&receipt1.ExecutionResult), unittest.WithReceipts(receipt2)))
-			err = state.Extend(context.Background(), &block2)
-			require.NoError(t, err)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receiptB), unittest.WithReceiptsAndNoResults(receiptA2)))
 
-			// build the block sealing block 1
 			block3 := unittest.BlockWithParentFixture(block2.Header)
-			receipt3, seal1 := unittest.ReceiptAndSealForBlock(&block1)
-			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt3), unittest.WithSeals(seal1)))
-			err = state.Extend(context.Background(), &block3)
-			require.NoError(t, err)
-
 			block4 := unittest.BlockWithParentFixture(block3.Header)
-			err = state.Extend(context.Background(), &block4)
-			require.NoError(t, err)
 
 			block5 := unittest.BlockWithParentFixture(block4.Header)
-			receipt4, seal4 := unittest.ReceiptAndSealForBlock(&block4)
-			block5.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt4), unittest.WithSeals(seal4)))
+			receiptForSeal, seal := unittest.ReceiptAndSealForBlock(&block2)
+			block5.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal), unittest.WithReceipts(receiptForSeal)))
+
+			err := state.Extend(context.Background(), &block1)
+			require.NoError(t, err)
+			err = state.Extend(context.Background(), &block2)
+			require.NoError(t, err)
+			err = state.Extend(context.Background(), &block3)
+			require.NoError(t, err)
+			err = state.Extend(context.Background(), &block4)
+			require.NoError(t, err)
 			err = state.Extend(context.Background(), &block5)
 			require.NoError(t, err)
 
-			segment, err := state.AtBlockID(block3.ID()).SealingSegment()
+			segment, err := state.AtBlockID(block5.ID()).SealingSegment()
 			require.NoError(t, err)
 
-			assert.Len(t, segment.Blocks, 3)
+			require.Len(t, segment.Blocks, 4)
 
-			_, found := segment.ExecutionResults.Lookup()[receipt1.Meta().ResultID]
-			assert.True(t, found)
-
-			// no blocks in this segment have missing execution results
-			segment, err = state.AtBlockID(block5.ID()).SealingSegment()
-			require.NoError(t, err)
-
-			assert.Len(t, segment.Blocks, 2)
-			assert.Len(t, segment.ExecutionResults, 0, "expected none of the blocks to have missing results, ExecutionResults should be empty")
+			_, found := segment.ExecutionResults.Lookup()[resultA.ID()]
+			require.True(t, found)
+			require.Len(t, segment.ExecutionResults, 1)
 		})
 	})
 
-}
+	// test sealing segment where you have a chain that is 5 blocks long and the block 5 has a seal for block 2.
+	// even though block2 & block3 both reference ResultA it should be added to the segment execution results list once.
+	// block3 also references ResultB so it should exists in the segment execution results as well.
+	// root -> B1[Result_A, Receipt_A_1] -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3[Receipt_B_2, Receipt_A_3] -> B4 -> B5 (Seal_B2)
+	t.Run("sealing segment with 4 blocks and 2 execution result decoupled", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			// simulate scenario where execution result is missing from block payload
+			// SealingSegment() should get result from results db and store it on ExecutionReceipts
+			// field on SealingSegment
+			resultA := unittest.ExecutionResultFixture()
 
+			// 3 execution receipts for Result_A
+			receiptA1 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultA))
+			receiptA2 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultA))
+			receiptA3 := unittest.ExecutionReceiptFixture(unittest.WithResult(resultA))
+
+			// receipt b also contains result b
+			receiptB := unittest.ExecutionReceiptFixture()
+			// get second receipt for Result_B, now we have 2 receipts for a single execution result
+			receiptB2 := unittest.ExecutionReceiptFixture(unittest.WithResult(&receiptB.ExecutionResult))
+
+			block1 := unittest.BlockWithParentFixture(head)
+			block1.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receiptA1)))
+
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receiptB), unittest.WithReceiptsAndNoResults(receiptA2)))
+
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(receiptB2, receiptA3)))
+
+			block4 := unittest.BlockWithParentFixture(block3.Header)
+
+			block5 := unittest.BlockWithParentFixture(block4.Header)
+			receiptForSeal, seal := unittest.ReceiptAndSealForBlock(&block2)
+			block5.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal), unittest.WithReceipts(receiptForSeal)))
+
+			require.NoError(t, err)
+
+			err = state.Extend(context.Background(), &block1)
+			require.NoError(t, err)
+			err = state.Extend(context.Background(), &block2)
+			require.NoError(t, err)
+			err = state.Extend(context.Background(), &block3)
+			require.NoError(t, err)
+			err = state.Extend(context.Background(), &block4)
+			require.NoError(t, err)
+			err = state.Extend(context.Background(), &block5)
+			require.NoError(t, err)
+
+			segment, err := state.AtBlockID(block5.ID()).SealingSegment()
+			require.NoError(t, err)
+
+			fmt.Printf("BLOCK1: %x\n", block1.ID())
+			fmt.Printf("BLOCK2: %x\n", block2.ID())
+			fmt.Printf("BLOCK3: %x\n", block3.ID())
+			fmt.Printf("BLOCK4: %x\n", block4.ID())
+			fmt.Printf("BLOCK5: %x\n\n\n", block5.ID())
+
+			require.Len(t, segment.Blocks, 4)
+
+			for i, block := range segment.Blocks {
+				fmt.Printf("BLOCK%x: %x\n", i, block.ID())
+			}
+
+			_, found := segment.ExecutionResults.Lookup()[resultA.ID()]
+			require.True(t, found)
+			_, found = segment.ExecutionResults.Lookup()[receiptB.ExecutionResult.ID()]
+			require.True(t, found)
+
+			// ResultA should only be added once even though it is referenced in 2 different blocks
+			require.Len(t, segment.ExecutionResults, 2)
+		})
+	})
+}
 func TestLatestSealedResult(t *testing.T) {
 	identities := unittest.CompleteIdentitySet()
 	rootSnapshot := unittest.RootSnapshotFixture(identities)
