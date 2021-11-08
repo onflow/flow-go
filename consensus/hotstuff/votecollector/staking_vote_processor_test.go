@@ -15,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
@@ -243,7 +244,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 	// signers hold objects that are created with private key and can sign votes and proposals
 	signers := make(map[flow.Identifier]*verification.CombinedSignerV2)
-	// prepare staking signers, each signer has it's own private/public key pair
+	// prepare staking signers, each signer has its own private/public key pair
 	stakingSigners := unittest.IdentityListFixture(7, func(identity *flow.Identity) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
@@ -286,8 +287,16 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
+		// create verifier that will do crypto checks of created QC
+		verifier := verification.NewSingleVerifierV2(committee, encoding.CollectorVoteTag)
+		forks := &mockhotstuff.Forks{}
+		// create validator which will do compliance and crypto checked of created QC
+		validator := hotstuffvalidator.New(committee, forks, verifier)
+		// check if QC is valid against parent
+		err := validator.ValidateQC(qc, block)
+		require.NoError(t, err)
+
 		qcCreated = true
-		// TODO: add checks for QC validity
 	}
 
 	voteProcessorFactory := NewStakingVoteProcessorFactory(unittest.Logger(), committee, onQCCreated)
