@@ -8,7 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -57,9 +57,9 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	committee := &mocks.Committee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
-	merger := modulesig.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
+	packer := signature.NewConsensusSigDataPacker(committee)
 	// TODO: to be replaced with factory methods that creates signer and verifier
-	verifier := NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, merger)
+	verifier := NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, packer)
 
 	proposal, err := signer.CreateProposal(block)
 	require.NoError(t, err)
@@ -110,9 +110,9 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	committee := &mocks.Committee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
-	merger := modulesig.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
+	packer := signature.NewConsensusSigDataPacker(committee)
 	// TODO: to be replaced with factory methods that creates signer and verifier
-	verifier := NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, merger)
+	verifier := NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, packer)
 
 	proposal, err := signer.CreateProposal(block)
 	require.NoError(t, err)

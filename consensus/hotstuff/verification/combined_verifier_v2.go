@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package verification
@@ -11,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	modulesig "github.com/onflow/flow-go/module/signature"
 )
 
@@ -25,21 +25,21 @@ type CombinedVerifierV2 struct {
 	staking        hash.Hasher
 	beacon         hash.Hasher
 	keysAggregator *stakingKeysAggregator
-	merger         module.Merger
+	packer         hotstuff.Packer
 }
 
 // NewCombinedVerifier creates a new combined verifier with the given dependencies.
 // - the hotstuff committee's state is used to retrieve the public keys for the staking signature;
 // - the staking tag is used to create hasher to verify staking signatures;
 // - the beacon tag is used to create hasher to verify random beacon signatures;
-// - the merger is used to combined & split staking & random beacon signatures;
-func NewCombinedVerifierV2(committee hotstuff.Committee, stakingTag string, beaconTag string, merger module.Merger) *CombinedVerifierV2 {
+// - the packer is used to unpack QC for verification;
+func NewCombinedVerifierV2(committee hotstuff.Committee, stakingTag string, beaconTag string, packer hotstuff.Packer) *CombinedVerifierV2 {
 	return &CombinedVerifierV2{
 		committee:      committee,
 		staking:        crypto.NewBLSKMAC(stakingTag),
 		beacon:         crypto.NewBLSKMAC(beaconTag),
 		keysAggregator: newStakingKeysAggregator(),
-		merger:         merger,
+		packer:         packer,
 	}
 }
 
@@ -105,9 +105,8 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 		return false, fmt.Errorf("could not get dkg: %w", err)
 	}
 
-	// TODO: to be replaced by packer.Unpack method
-	// split the aggregated staking & beacon signatures
-	stakingAggSig, beaconThresSig, err := c.merger.Split(sigData)
+	// unpack sig data using packer
+	blockSigData, err := c.packer.Unpack(block.BlockID, signers.NodeIDs(), sigData)
 	if err != nil {
 		return false, fmt.Errorf("could not split signature: %w", modulesig.ErrInvalidFormat)
 	}
@@ -116,7 +115,7 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 	// TODO: verify if batch verification is faster
 
 	// verify the beacon signature first
-	beaconValid, err := dkg.GroupKey().Verify(beaconThresSig, msg, c.beacon)
+	beaconValid, err := dkg.GroupKey().Verify(blockSigData.ReconstructedRandomBeaconSig, msg, c.beacon)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
@@ -134,7 +133,7 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 	if err != nil {
 		return false, fmt.Errorf("could not compute aggregated key: %w", err)
 	}
-	stakingValid, err := aggregatedKey.Verify(stakingAggSig, msg, c.staking)
+	stakingValid, err := aggregatedKey.Verify(blockSigData.AggregatedStakingSig, msg, c.staking)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}
