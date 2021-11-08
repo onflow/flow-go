@@ -76,6 +76,23 @@ func TestSealingSegmentBuilder_AddBlock(t *testing.T) {
 
 // TestSealingSegmentBuilder_SealingSegment checks behavior and sanity checks when building sealing segment
 func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
+	t.Run("should return valid root sealing segment", func(t *testing.T) {
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
+		builder := flow.NewSealingSegmentBuilder(resultLookup)
+
+		block1 := unittest.BlockFixture()
+
+		err := builder.AddBlock(&block1)
+		require.NoError(t, err)
+
+		segment, err := builder.SealingSegment()
+		require.NoError(t, err)
+
+		require.Equal(t, segment.Highest().ID(), block1.ID())
+		require.Equal(t, segment.Lowest().ID(), block1.ID())
+	})
+
+
 	t.Run("should return valid sealing segment", func(t *testing.T) {
 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
 		builder := flow.NewSealingSegmentBuilder(resultLookup)
