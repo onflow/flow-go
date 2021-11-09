@@ -177,53 +177,6 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 	}
 }
 
-// TestCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
-func (suite *LibP2PNodeTestSuite) TestCreateStream() {
-	count := 2
-
-	// Creates nodes
-	nodes, identities := NodesFixtureWithHandler(suite.T(), count, nil, false)
-	defer StopNodes(suite.T(), nodes)
-
-	id2 := identities[1]
-
-	flowProtocolID := FlowProtocolID(rootBlockID)
-	// Assert that there is no outbound stream to the target yet
-	require.Equal(suite.T(), 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
-
-	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
-	var streams []network.Stream
-	for i := 0; i < 100; i++ {
-		pInfo, err := PeerAddressInfo(*id2)
-		require.NoError(suite.T(), err)
-		nodes[0].host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-		anotherStream, err := nodes[0].CreateStream(context.Background(), pInfo.ID)
-		// Assert that a stream was returned without error
-		require.NoError(suite.T(), err)
-		require.NotNil(suite.T(), anotherStream)
-		// assert that the stream count within libp2p incremented (a new stream was created)
-		require.Equal(suite.T(), i+1, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
-		// assert that the same connection is reused
-		require.Len(suite.T(), nodes[0].host.Network().Conns(), 1)
-		streams = append(streams, anotherStream)
-	}
-
-	// reverse loop to close all the streams
-	for i := 99; i >= 0; i-- {
-		s := streams[i]
-		wg := sync.WaitGroup{}
-		wg.Add(1)
-		go func() {
-			err := s.Close()
-			assert.NoError(suite.T(), err)
-			wg.Done()
-		}()
-		wg.Wait()
-		// assert that the stream count within libp2p decremented
-		require.Equal(suite.T(), i, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
-	}
-}
-
 // TestNoBackoffWhenCreateStream checks that backoff is not enabled between attempts to connect to a remote peer
 // for one-to-one direct communication.
 func (suite *LibP2PNodeTestSuite) TestNoBackoffWhenCreatingStream() {

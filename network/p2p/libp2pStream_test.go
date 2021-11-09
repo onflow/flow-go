@@ -21,8 +21,6 @@ import (
 
 // TestStreamClosing tests 1-1 communication with streams closed using libp2p2 handler.FullClose
 func TestStreamClosing(t *testing.T) {
-	// suite.T().Skip("QUARANTINED as FLAKY: closing network.Stream.Close() often errors in handler function, thereby failing this test")
-
 	count := 10
 	ctx, cancel := context.WithCancel(context.Background())
 	var msgRegex = regexp.MustCompile("^hello[0-9]")
@@ -103,4 +101,51 @@ func mockStreamHandlerForMessages(t *testing.T, ctx context.Context, msgCount in
 
 	}
 	return h, streamCloseWG
+}
+
+// TestCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
+func TestCreateStream(t *testing.T) {
+	count := 2
+
+	// Creates nodes
+	nodes, identities := NodesFixtureWithHandler(t, count, nil, false)
+	defer StopNodes(t, nodes)
+
+	id2 := identities[1]
+
+	flowProtocolID := FlowProtocolID(rootBlockID)
+	// Assert that there is no outbound stream to the target yet
+	require.Equal(t, 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+
+	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
+	var streams []network.Stream
+	for i := 0; i < 100; i++ {
+		pInfo, err := PeerAddressInfo(*id2)
+		require.NoError(t, err)
+		nodes[0].host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
+		anotherStream, err := nodes[0].CreateStream(context.Background(), pInfo.ID)
+		// Assert that a stream was returned without error
+		require.NoError(t, err)
+		require.NotNil(t, anotherStream)
+		// assert that the stream count within libp2p incremented (a new stream was created)
+		require.Equal(t, i+1, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+		// assert that the same connection is reused
+		require.Len(t, nodes[0].host.Network().Conns(), 1)
+		streams = append(streams, anotherStream)
+	}
+
+	// reverse loop to close all the streams
+	for i := 99; i >= 0; i-- {
+		s := streams[i]
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			err := s.Close()
+			assert.NoError(t, err)
+			wg.Done()
+		}()
+		wg.Wait()
+		// assert that the stream count within libp2p decremented
+		require.Equal(t, i, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+	}
 }
