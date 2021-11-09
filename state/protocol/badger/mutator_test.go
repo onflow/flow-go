@@ -1210,7 +1210,10 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 	t.Run("epoch transition without commit event - should continue with fallback epoch", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
-		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
+		metricsMock := new(mockmodule.ComplianceMetrics)
+		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
+
+		util.RunWithFullProtocolStateAndMetrics(t, rootSnapshot, metricsMock, func(db *badger.DB, state *protocol.MutableState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
 			result, _, err := rootSnapshot.SealedResult()
@@ -1262,8 +1265,15 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 			block4 := unittest.BlockWithParentFixture(block3.Header)
 			block4.Header.View = epoch1Setup.FinalView + 1
 
+			// inserting block 4 should trigger EECC
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+
 			err = state.Extend(context.Background(), &block4)
 			require.NoError(t, err)
+
+			// epoch metrics should not be emitted
+			metricsMock.AssertNotCalled(t, "EpochTransition", epoch2Setup.Counter, mock.Anything)
+			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch2Setup.Counter)
 		})
 	})
 
@@ -1274,6 +1284,9 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 	t.Run("epoch transition without setup event - should continue with fallback epoch", func(t *testing.T) {
 
 		rootSnapshot := unittest.RootSnapshotFixture(participants)
+		metricsMock := new(mockmodule.ComplianceMetrics)
+		mockMetricsForRootSnapshot(metricsMock, rootSnapshot)
+
 		util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *protocol.MutableState) {
 			head, err := rootSnapshot.Head()
 			require.NoError(t, err)
@@ -1311,8 +1324,15 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 			block4 := unittest.BlockWithParentFixture(block3.Header)
 			block4.Header.View = epoch1Setup.FinalView + 1
 
+			// inserting block 4 should trigger EECC
+			metricsMock.On("EpochEmergencyFallbackTriggered").Once()
+
 			err = state.Extend(context.Background(), &block4)
 			require.NoError(t, err)
+
+			// epoch metrics should not be emitted
+			metricsMock.AssertNotCalled(t, "EpochTransition", epoch1Setup.Counter+1, mock.Anything)
+			metricsMock.AssertNotCalled(t, "CurrentEpochCounter", epoch1Setup.Counter+1)
 		})
 	})
 }
@@ -1701,4 +1721,21 @@ func assertEpochEmergencyFallbackTriggered(t *testing.T, db *badger.DB) {
 	err := db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
 	require.NoError(t, err)
 	assert.True(t, triggered)
+}
+
+// mockMetricsForRootSnapshot mocks the given metrics mock object to expect all
+// metrics which are set during bootstrapping and building blocks.
+func mockMetricsForRootSnapshot(metricsMock *mockmodule.ComplianceMetrics, rootSnapshot *inmem.Snapshot) {
+	metricsMock.On("CurrentEpochCounter", rootSnapshot.Encodable().Epochs.Current.Counter)
+	metricsMock.On("CurrentEpochPhase", rootSnapshot.Encodable().Phase)
+	metricsMock.On("CurrentEpochFinalView", rootSnapshot.Encodable().Epochs.Current.FinalView)
+	metricsMock.On("CommittedEpochFinalView", rootSnapshot.Encodable().Epochs.Current.FinalView)
+	metricsMock.On("CurrentDKGPhase1FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase1FinalView)
+	metricsMock.On("CurrentDKGPhase2FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase2FinalView)
+	metricsMock.On("CurrentDKGPhase3FinalView", rootSnapshot.Encodable().Epochs.Current.DKGPhase3FinalView)
+	metricsMock.On("BlockSealed", mock.Anything)
+	metricsMock.On("BlockFinalized", mock.Anything)
+	metricsMock.On("FinalizedHeight", mock.Anything)
+	metricsMock.On("SealedHeight", mock.Anything)
+
 }
