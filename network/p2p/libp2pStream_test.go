@@ -149,3 +149,40 @@ func TestCreateStream(t *testing.T) {
 		require.Equal(t, i, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 	}
 }
+
+// TestCreateStreamIsConcurrencySafe tests that the CreateStream is concurrency safe
+func TestCreateStreamIsConcurrencySafe(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	defer cancel()
+	// create two nodes
+	nodes, identities := NodesFixtureWithHandler(t, 2, nil, false)
+	defer StopNodes(t, nodes)
+	require.Len(t, identities, 2)
+	nodeInfo1, err := PeerAddressInfo(*identities[1])
+	require.NoError(t, err)
+
+	wg := sync.WaitGroup{}
+
+	// create a gate which gates the call to CreateStream for all concurrent go routines
+	gate := make(chan struct{})
+
+	createStream := func() {
+		<-gate
+		nodes[0].host.Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
+		_, err := nodes[0].CreateStream(ctx, nodeInfo1.ID)
+		assert.NoError(t, err) // assert that stream was successfully created
+		wg.Done()
+	}
+
+	// kick off 10 concurrent calls to CreateStream
+	for i := 0; i < 10; i++ {
+		wg.Add(1)
+		go createStream()
+	}
+	// open the gate by closing the channel
+	close(gate)
+
+	// no call should block
+	unittest.AssertReturnsBefore(t, wg.Wait, 10*time.Second)
+}

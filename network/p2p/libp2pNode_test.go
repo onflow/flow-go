@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -374,41 +373,6 @@ func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrent() {
 	unittest.RequireNeverClosedWithin(suite.T(), blockedCallCh, 1*time.Millisecond,
 		"CreateStream attempt to the unresponsive peer did not block after connecting to good node")
 
-}
-
-// TestCreateStreamIsConcurrencySafe tests that the CreateStream is concurrency safe
-func (suite *LibP2PNodeTestSuite) TestCreateStreamIsConcurrencySafe() {
-
-	// create two nodes
-	nodes, identities := NodesFixtureWithHandler(suite.T(), 2, nil, false)
-	defer StopNodes(suite.T(), nodes)
-	require.Len(suite.T(), identities, 2)
-	nodeInfo1, err := PeerAddressInfo(*identities[1])
-	require.NoError(suite.T(), err)
-
-	wg := sync.WaitGroup{}
-
-	// create a gate which gates the call to CreateStream for all concurrent go routines
-	gate := make(chan struct{})
-
-	createStream := func() {
-		<-gate
-		nodes[0].host.Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
-		_, err := nodes[0].CreateStream(suite.ctx, nodeInfo1.ID)
-		assert.NoError(suite.T(), err) // assert that stream was successfully created
-		wg.Done()
-	}
-
-	// kick off 10 concurrent calls to CreateStream
-	for i := 0; i < 10; i++ {
-		wg.Add(1)
-		go createStream()
-	}
-	// open the gate by closing the channel
-	close(gate)
-
-	// no call should block
-	unittest.AssertReturnsBefore(suite.T(), wg.Wait, 10*time.Second)
 }
 
 // TestPing tests that a node can ping another node
