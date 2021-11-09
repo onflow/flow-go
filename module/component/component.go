@@ -121,34 +121,19 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 }
 
 // ReadyFunc is called within a ComponentWorker function to indicate that the worker is ready
-// ComponentManager's Ready channel is closed when all workers are ready. This is also the
-// signal used to indicate that the workers returned by lookup are ready.
+// ComponentManager's Ready channel is closed when all workers are ready.
 type ReadyFunc func()
-
-// LookupFunc returns a ReadyDoneAware interface for the worker identified by id, and a boolean
-// signalling if the worker exists.
-// workerID can be prefixed with ! to get a ReadyDoneAware interface for the collection of all
-// workers EXCEPT the id provided. This is particularly useful if there is a main worker that has
-// shutdown logic that should only run after all other workers have shutdown.
-//
-// The ReadyDoneAware interface returned by this function can be used to synchronize with the
-// worker associated with workerID.
-// Caution: waiting on workers can easily create deadlocks. use with care
-type LookupFunc func(workerID string) (module.ReadyDoneAware, bool)
 
 // ComponentWorker represents a worker routine of a component.
 // It takes a SignalerContext which can be used to throw any irrecoverable errors it encounters,
 // as well as a ReadyFunc which must be called to signal that it is ready. The ComponentManager
 // waits until all workers have signaled that they are ready before closing its own Ready channel.
-// It additionally takes a LookupFunc which allows the worker function to get a ReadyDoneAware
-// interface for any other worker routine. This provides a convenient interface for managing
-// inter worker dependencies.
-type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc, lookup LookupFunc)
+type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
 
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
 	// AddWorker adds a worker routine for the ComponentManager
-	AddWorker(string, ComponentWorker) ComponentManagerBuilder
+	AddWorker(ComponentWorker) ComponentManagerBuilder
 
 	// Build builds and returns a new ComponentManager instance
 	Build() *ComponentManager
@@ -160,34 +145,24 @@ type ComponentManagerBuilder interface {
 }
 
 type componentManagerBuilderImpl struct {
-	mu              sync.Mutex
-	built           bool
-	serialStart     bool
-	workers         []*worker
-	workersRegistry map[string]module.ReadyDoneAware
+	mu          sync.Mutex
+	built       bool
+	serialStart bool
+	workers     []ComponentWorker
 }
 
 // NewComponentManagerBuilder returns a new ComponentManagerBuilder
 func NewComponentManagerBuilder() ComponentManagerBuilder {
 	return &componentManagerBuilderImpl{
-		mu:              sync.Mutex{},
-		workersRegistry: make(map[string]module.ReadyDoneAware),
+		mu: sync.Mutex{},
 	}
 }
 
-func (c *componentManagerBuilderImpl) AddWorker(id string, f ComponentWorker) ComponentManagerBuilder {
+func (c *componentManagerBuilderImpl) AddWorker(f ComponentWorker) ComponentManagerBuilder {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if _, exists := c.workersRegistry[id]; exists {
-		// worker ids must be unique. adding duplicate ids will break the lookupWorker function which
-		// may result in incorrect dependency ordering
-		panic(fmt.Sprintf("worker with id %s already exists", id))
-	}
-
-	worker := newWorker(id, f)
-	c.workers = append(c.workers, worker)
-	c.workersRegistry[id] = worker
+	c.workers = append(c.workers, f)
 	return c
 }
 
@@ -215,13 +190,12 @@ func (c *componentManagerBuilderImpl) Build() *ComponentManager {
 	c.built = true
 
 	return &ComponentManager{
-		started:         atomic.NewBool(false),
-		ready:           make(chan struct{}),
-		done:            make(chan struct{}),
-		shutdownSignal:  make(chan struct{}),
-		serialStart:     c.serialStart,
-		workers:         c.workers,
-		workersRegistry: c.workersRegistry,
+		started:        atomic.NewBool(false),
+		ready:          make(chan struct{}),
+		done:           make(chan struct{}),
+		shutdownSignal: make(chan struct{}),
+		serialStart:    c.serialStart,
+		workers:        c.workers,
 	}
 }
 
@@ -234,9 +208,8 @@ type ComponentManager struct {
 	done           chan struct{}
 	shutdownSignal chan struct{}
 
-	serialStart     bool
-	workers         []*worker
-	workersRegistry map[string]module.ReadyDoneAware
+	serialStart bool
+	workers     []ComponentWorker
 }
 
 // Start initiates the ComponentManager by launching all worker routines.
@@ -267,55 +240,39 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 		}
 	}()
 
+	var workersReady sync.WaitGroup
+	var workersDone sync.WaitGroup
+	workersReady.Add(len(c.workers))
+	workersDone.Add(len(c.workers))
+
 	// launch workers
-	running := make([]module.ReadyDoneAware, len(c.workers))
-	for i, worker := range c.workers {
+	for _, worker := range c.workers {
 		worker := worker
-		running[i] = worker
-		go worker.run(signalerCtx, c.lookupWorker)
-		if c.serialStart {
-			if err := util.WaitClosed(parent, worker.Ready()); err != nil {
-				break
-			}
-		}
+		go func() {
+			defer workersDone.Done()
+			var readyOnce sync.Once
+			worker(signalerCtx, func() {
+				readyOnce.Do(func() {
+					workersReady.Done()
+				})
+			})
+		}()
 	}
 
 	// launch goroutine to close ready channel
-	go c.waitForReady(running)
+	go c.waitForReady(&workersReady)
 
 	// launch goroutine to close done channel
-	go c.waitForDone(running)
+	go c.waitForDone(&workersDone)
 }
 
-// lookupWorker returns a ReadyDoneAware interface for the worker specified by ID
-// Prefix id with ! to get a ReadyDoneAware interface for the collection of all workers except the
-// provided id.
-func (c *ComponentManager) lookupWorker(id string) (module.ReadyDoneAware, bool) {
-	if id[0] == '!' {
-		workers := []module.ReadyDoneAware{}
-		for wid, w := range c.workersRegistry {
-			if wid != id[1:] {
-				workers = append(workers, w)
-			}
-		}
-		if len(workers) == 0 {
-			return nil, false
-		}
-
-		return module.NewCustomReadyDoneAware(util.AllReady(workers...), util.AllDone(workers...)), true
-	}
-
-	worker, exists := c.workersRegistry[id]
-	return worker, exists
-}
-
-func (c *ComponentManager) waitForReady(workers []module.ReadyDoneAware) {
-	<-util.AllReady(workers...)
+func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
+	workersReady.Wait()
 	close(c.ready)
 }
 
-func (c *ComponentManager) waitForDone(workers []module.ReadyDoneAware) {
-	<-util.AllDone(workers...)
+func (c *ComponentManager) waitForDone(workersDone *sync.WaitGroup) {
+	workersDone.Wait()
 	close(c.done)
 }
 
@@ -337,43 +294,4 @@ func (c *ComponentManager) Done() <-chan struct{} {
 // If this is called before Start, a nil channel will be returned.
 func (c *ComponentManager) ShutdownSignal() <-chan struct{} {
 	return c.shutdownSignal
-}
-
-type worker struct {
-	id    string
-	f     ComponentWorker
-	ready chan struct{}
-	done  chan struct{}
-}
-
-func newWorker(id string, f ComponentWorker) *worker {
-	return &worker{
-		id:    id,
-		f:     f,
-		ready: make(chan struct{}),
-		done:  make(chan struct{}),
-	}
-}
-
-// run calls the worker's ComponentWorker function, and manages the ReadyDoneAware interface
-func (w *worker) run(ctx irrecoverable.SignalerContext, lookup LookupFunc) {
-	defer close(w.done)
-
-	var readyOnce sync.Once
-	w.f(ctx, func() {
-		readyOnce.Do(func() {
-			close(w.ready)
-		})
-	}, lookup)
-}
-
-// Ready returns a channel which is closed once all the worker routines have been launched and
-// are ready.
-func (w *worker) Ready() <-chan struct{} {
-	return w.ready
-}
-
-// Done returns a channel which is closed once the worker has shut down.
-func (w *worker) Done() <-chan struct{} {
-	return w.done
 }

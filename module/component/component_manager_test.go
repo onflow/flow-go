@@ -217,7 +217,7 @@ func ComponentWorker(t *rapid.T, id int, next WSTProvider) component.ComponentWo
 		t.Logf("[worker %v] %v\n", id, msg)
 	}
 
-	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc, lookup component.LookupFunc) {
+	return func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		var state WorkerState
 		goto startingUp
 
@@ -510,7 +510,7 @@ func (c *ComponentManagerMachine) Init(t *rapid.T) {
 	for i := 0; i < numWorkers; i++ {
 		wtc, wtp := MakeWorkerTransitionFuncs()
 		c.workerTransitionConsumers[i] = wtc
-		cmb.AddWorker("main", ComponentWorker(t, i, wtp))
+		cmb.AddWorker(ComponentWorker(t, i, wtp))
 	}
 
 	c.cm = cmb.Build()

@@ -6,7 +6,6 @@ import (
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/engine/ghost/engine"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/validator"
 )
@@ -35,7 +34,7 @@ func main() {
 			node.MsgValidators = validators
 			return nil
 		}).
-		Component("RPC engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			rpcEng, err := engine.New(node.Network, node.Logger, node.Me, node.State, rpcConf)
 			return rpcEng, err
 		}).

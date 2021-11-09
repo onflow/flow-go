@@ -27,6 +27,10 @@ import (
 
 const NotSet = "not set"
 
+type BuilderFunc func(nodeConfig *NodeConfig) error
+type ComponentBuilderFunc func(node *NodeConfig) (module.ReadyDoneAware, error)
+type BackgroundComponentBuilderFunc func(node *NodeConfig) (component.Component, error)
+
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
 	// BaseFlags reads the command line arguments common to all nodes
