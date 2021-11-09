@@ -4,6 +4,14 @@ import (
 	"fmt"
 )
 
+const (
+	// expected length of a root sealing segment
+	rootSegmentBlocksLen = 1
+
+	// expected view of the block in a root sealing segment
+	rootSegmentBlockView = 0
+)
+
 // SealingSegment is the chain segment such that the last block (greatest
 // height) is this snapshot's reference block and the first (least height)
 // is the most recently sealed block as of this snapshot (ie. the block
@@ -39,6 +47,7 @@ var (
 	ErrSegmentBlocksWrongLen     = fmt.Errorf("sealing segment failed sanity check: must have atleast 2 blocks")
 	ErrSegmentInvalidBlockHeight = fmt.Errorf("sealing segment failed sanity check: blocks must be in ascending order")
 	ErrSegmentResultLookup       = fmt.Errorf("failed to lookup execution result")
+	ErrInvalidRootSegmentView    = fmt.Errorf("invalid root sealing segment block view")
 )
 
 type SealingSegmentBuilder struct {
@@ -94,6 +103,11 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 
 	// if root sealing segment skip seal sanity check
 	if len(segment.Blocks) == 1 {
+
+		if !builder.isValidRootSegment() {
+			return nil, fmt.Errorf("root sealing segment block has the wrong view got (%d) expected (%d): %w", segment.Highest().Header.View, rootSegmentBlockView, ErrInvalidRootSegmentView)
+		}
+
 		return segment, nil
 	}
 
@@ -115,13 +129,19 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 
 // hasValidSeal returns true if highest block in the segment contains a seal for the lowest block
 func (builder *SealingSegmentBuilder) hasValidSeal() bool {
+	lowest := builder.lowest().ID()
 	for _, seal := range builder.highest().Payload.Seals {
-		if seal.BlockID == builder.lowest().ID() {
+		if seal.BlockID == lowest {
 			return true
 		}
 	}
 
 	return false
+}
+
+// isValidRootSegment will check that the block in the root segment has a view of 0
+func (builder *SealingSegmentBuilder) isValidRootSegment() bool {
+	return len(builder.blocks) == rootSegmentBlocksLen && builder.highest().Header.View == rootSegmentBlockView
 }
 
 // highest returns highest block in segment
