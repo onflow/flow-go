@@ -31,7 +31,7 @@ func TestTrieOperations(t *testing.T) {
 	p1 := pathByUint8s([]uint8{uint8(53), uint8(74)})
 	v1 := payloadBySlices([]byte{'A'}, []byte{'A'})
 
-	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(nt, []ledger.Path{p1}, []ledger.Payload{*v1})
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(nt, []ledger.Path{p1}, []ledger.Payload{*v1}, true)
 	require.NoError(t, err)
 
 	// Add trie
