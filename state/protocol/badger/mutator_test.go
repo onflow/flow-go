@@ -988,7 +988,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 		})
 
 		// expect a setup event with wrong final view to trigger EECC without error
-		t.Run("invalid final view", func(t *testing.T) {
+		t.Run("invalid final view (EECC)", func(t *testing.T) {
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.FinalView = block1.Header.View
 			})
@@ -1002,7 +1002,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 		})
 
 		// expect a setup event with empty seed to trigger EECC without error
-		t.Run("empty seed", func(t *testing.T) {
+		t.Run("empty seed (EECC)", func(t *testing.T) {
 			_, receipt, seal := createSetup(func(setup *flow.EpochSetup) {
 				setup.RandomSource = nil
 			})
@@ -1090,7 +1090,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		require.NoError(t, err)
 
 		// expect a commit event with wrong counter to trigger EECC without error
-		t.Run("inconsistent counter", func(t *testing.T) {
+		t.Run("inconsistent counter (EECC)", func(t *testing.T) {
 			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
 				commit.Counter = epoch2Setup.Counter + 1
 			})
@@ -1104,7 +1104,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		})
 
 		// expect a commit event with wrong cluster QCs to trigger EECC without error
-		t.Run("inconsistent cluster QCs", func(t *testing.T) {
+		t.Run("inconsistent cluster QCs (EECC)", func(t *testing.T) {
 			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
 				commit.ClusterQCs = append(commit.ClusterQCs, flow.ClusterQCVoteDataFromQC(unittest.QuorumCertificateFixture()))
 			})
@@ -1118,7 +1118,7 @@ func TestExtendEpochCommitInvalid(t *testing.T) {
 		})
 
 		// expect a commit event with wrong dkg participants to trigger EECC without error
-		t.Run("inconsistent DKG participants", func(t *testing.T) {
+		t.Run("inconsistent DKG participants (EECC)", func(t *testing.T) {
 			_, receipt, seal := createCommit(&block3, func(commit *flow.EpochCommit) {
 				// add an extra dkg key
 				commit.DKGParticipantKeys = append(commit.DKGParticipantKeys, unittest.KeyFixture(crypto.BLSBLS12381).PublicKey())
