@@ -1016,7 +1016,7 @@ func (fnb *FlowNodeBuilder) Build() Node {
 		ComponentManager: fnb.componentBuilder.Build(),
 		NodeConfig:       fnb.NodeConfig,
 		Logger:           fnb.Logger,
-		postShutdown:     fnb.postShutdown,
+		DB:               fnb.DB,
 	}
 }
 
@@ -1075,15 +1075,6 @@ func (fnb *FlowNodeBuilder) handlePreInit(f BuilderFunc) error {
 
 func (fnb *FlowNodeBuilder) handlePostInit(f BuilderFunc) error {
 	return f(fnb.NodeConfig)
-}
-
-func (fnb *FlowNodeBuilder) closeDatabase() {
-	err := fnb.DB.Close()
-	if err != nil {
-		fnb.Logger.Error().
-			Err(err).
-			Msg("could not close database")
-	}
 }
 
 func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
