@@ -20,14 +20,6 @@ type Component interface {
 	module.ReadyDoneAware
 }
 
-type NoopComponent struct{}
-
-var _ Component = (*NoopComponent)(nil)
-
-func (c *NoopComponent) Start(irrecoverable.SignalerContext) {}
-func (c *NoopComponent) Ready() <-chan struct{}              { return nil }
-func (c *NoopComponent) Done() <-chan struct{}               { return nil }
-
 type ComponentFactory func() (Component, error)
 
 // OnError reacts to an irrecoverable error

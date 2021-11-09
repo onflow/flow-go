@@ -138,11 +138,11 @@ func (suite *TopologyTestSuite) generateSystem(acc, col, con, exe, ver, cluster 
 	flow.IdentityList,
 	[]network.SubscriptionManager) {
 
-	collector, _, _ := test.GenerateIDs(suite.T(), suite.logger, col, test.DryRun, true, unittest.WithRole(flow.RoleCollection))
-	access, _, _ := test.GenerateIDs(suite.T(), suite.logger, acc, test.DryRun, true, unittest.WithRole(flow.RoleAccess))
-	consensus, _, _ := test.GenerateIDs(suite.T(), suite.logger, con, test.DryRun, true, unittest.WithRole(flow.RoleConsensus))
-	verification, _, _ := test.GenerateIDs(suite.T(), suite.logger, ver, test.DryRun, true, unittest.WithRole(flow.RoleVerification))
-	execution, _, _ := test.GenerateIDs(suite.T(), suite.logger, exe, test.DryRun, true, unittest.WithRole(flow.RoleExecution))
+	collector, _, _ := test.GenerateIDs(suite.T(), suite.logger, col, test.DryRun, true, []func(*flow.Identity){unittest.WithRole(flow.RoleCollection)}, nil)
+	access, _, _ := test.GenerateIDs(suite.T(), suite.logger, acc, test.DryRun, true, []func(*flow.Identity){unittest.WithRole(flow.RoleAccess)}, nil)
+	consensus, _, _ := test.GenerateIDs(suite.T(), suite.logger, con, test.DryRun, true, []func(*flow.Identity){unittest.WithRole(flow.RoleConsensus)}, nil)
+	verification, _, _ := test.GenerateIDs(suite.T(), suite.logger, ver, test.DryRun, true, []func(*flow.Identity){unittest.WithRole(flow.RoleVerification)}, nil)
+	execution, _, _ := test.GenerateIDs(suite.T(), suite.logger, exe, test.DryRun, true, []func(*flow.Identity){unittest.WithRole(flow.RoleExecution)}, nil)
 
 	ids := flow.IdentityList{}
 	ids = ids.Union(collector)

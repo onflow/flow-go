@@ -63,14 +63,6 @@ type state struct {
 	a [25]uint64 // main state of the hash
 }
 
-// New256 creates a new SHA3-256 hash.
-// Its generic security strength is 256 bits against preimage attacks,
-// and 128 bits against collision attacks.
-func new256() *state {
-	d := &state{}
-	return d
-}
-
 // xor a buffer into the state at a given index.
 func xorInAtIndex(d *state, buf []byte, index int) {
 	n := len(buf) >> 3
