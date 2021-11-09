@@ -310,6 +310,7 @@ func TestSealingSegment(t *testing.T) {
 	// test sealing segment where you have a chain that is 5 blocks long and the block 5 has a seal for block 2.
 	// block 2 also contains a receipt but no result.
 	// root -> B1[Result_A, Receipt_A_1] -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3 -> B4 -> B5 (Seal_B2)
+	// the segment for B5 should be `[B2,B3,B4,B5] + [Result_A]`
 	t.Run("sealing segment with 4 blocks and 1 execution result decoupled", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			// simulate scenario where execution result is missing from block payload
