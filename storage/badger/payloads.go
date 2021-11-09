@@ -41,8 +41,6 @@ func (p *Payloads) storeTx(blockID flow.Identifier, payload *flow.Payload) func(
 	// in storage. If execution result is not present in either of those places, we error.
 	// ATTENTION: this is unnecessarily complex if we have execution receipt which points an execution result
 	// which is not included in current payload but was incorporated in one of previous blocks.
-	// TODO: refactor receipt/results storages to support new type of storing/retrieving where execution receipt
-	// and execution result is decoupled.
 
 	return func(tx *transaction.Tx) error {
 

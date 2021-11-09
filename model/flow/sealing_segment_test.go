@@ -92,6 +92,20 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		require.Equal(t, segment.Lowest().ID(), block1.ID())
 	})
 
+	t.Run("should return ErrInvalidRootSegmentView for root sealing segment block not 0", func(t *testing.T) {
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
+		builder := flow.NewSealingSegmentBuilder(resultLookup)
+
+		block1 := unittest.BlockFixture()
+		block1.Header.View = uint64(1)
+
+		err := builder.AddBlock(&block1)
+		require.NoError(t, err)
+
+		_, err = builder.SealingSegment()
+		require.ErrorIs(t, err, flow.ErrInvalidRootSegmentView)
+	})
+
 	t.Run("should return valid sealing segment", func(t *testing.T) {
 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
 		builder := flow.NewSealingSegmentBuilder(resultLookup)
