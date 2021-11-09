@@ -13,7 +13,9 @@ import (
 	"go.uber.org/atomic"
 	"pgregory.net/rapid"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -21,6 +23,8 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
@@ -760,16 +764,19 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 	})
 }
 
-// TestCombinedVoteProcessorV2_BuildVerifyQC tests a complete path from creating votes to collecting votes and then
+// TestCombinedVoteProcessorV3_BuildVerifyQC tests a complete path from creating votes to collecting votes and then
 // building & verifying QC.
 // We start with leader proposing a block, then new leader collects votes and builds a QC.
 // Need to verify that QC that was produced is valid and can be embedded in new proposal.
 func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
-	t.Skip("This test is skipped due to missing RandomBeaconReconstructor impl")
+	t.Skip("This test doesn't work since we are missing CombinedSignerV3 and CombinedVerifierV3")
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
 	view := uint64(20)
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
+
+	dkgData, err := run.RunFastKG(8, unittest.RandomBytes(32))
+	require.NoError(t, err)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
 	signers := make(map[flow.Identifier]*verification.CombinedSignerV2)
@@ -790,12 +797,19 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		staking := msig.NewSingleSigner(encoding.ConsensusVoteTag, me)
 		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
 	})
-	beaconSigners := unittest.IdentityListFixture(8, func(identity *flow.Identity) {
+	beaconSigners := unittest.IdentityListFixture(len(dkgData.PrivKeyShares))
+	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
+	for index, identity := range beaconSigners {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
-		dkgKey := unittest.DKGParticipantPriv()
-		identity.NodeID = dkgKey.NodeID
+		dkgKey := &dkg.DKGParticipantPriv{
+			NodeID: identity.NodeID,
+			RandomBeaconPrivKey: encodable.RandomBeaconPrivKey{
+				PrivateKey: dkgData.PrivKeyShares[index],
+			},
+			GroupIndex: index,
+		}
 
 		keys := &storagemock.DKGKeys{}
 		// there is DKG key for this epoch
@@ -808,7 +822,11 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 
 		staking := msig.NewSingleSigner(encoding.ConsensusVoteTag, me)
 		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
-	})
+		dkgParticipants[identity.NodeID] = flow.DKGParticipant{
+			Index:    uint(index),
+			KeyShare: dkgData.PubKeyShares[index],
+		}
+	}
 
 	leader := stakingSigners[0]
 
@@ -817,8 +835,10 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 
 	allIdentities := append(stakingSigners, beaconSigners...)
 
-	committee := &mockhotstuff.Committee{}
-	committee.On("Identities", block.BlockID, mock.Anything).Return(allIdentities, nil)
+	newLeader := beaconSigners[0]
+
+	committee, err := committees.NewStaticCommittee(allIdentities, newLeader.NodeID, dkgParticipants, dkgData.PubGroupKey)
+	require.NoError(t, err)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 
@@ -859,7 +879,6 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	voteProcessorFactory := &VoteProcessorFactory{
 		baseFactory: baseFactory.Create,
 	}
-
 	voteProcessor, err := voteProcessorFactory.Create(proposal)
 	require.NoError(t, err)
 
