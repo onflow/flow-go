@@ -19,7 +19,7 @@ func isValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, activeSetup *fl
 	// We should only have a single epoch setup event per epoch.
 	if status.NextEpoch.SetupID != flow.ZeroID {
 		// true iff EpochSetup event for NEXT epoch was already included before
-		return protocol.NewInvalidServiceEventError("duplicate epoch setup service event")
+		return protocol.NewInvalidServiceEventError("duplicate epoch setup service event: %x", status.NextEpoch.SetupID)
 	}
 
 	// The setup event should have the counter increased by one.
@@ -145,7 +145,7 @@ func isValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, extendingSet
 	// We should only have a single epoch commit event per epoch.
 	if status.NextEpoch.CommitID != flow.ZeroID {
 		// true iff EpochCommit event for NEXT epoch was already included before
-		return protocol.NewInvalidServiceEventError("duplicate epoch commit service event")
+		return protocol.NewInvalidServiceEventError("duplicate epoch commit service event: %x", status.NextEpoch.CommitID)
 	}
 
 	// The epoch setup event needs to happen before the commit.
