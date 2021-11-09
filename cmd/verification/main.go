@@ -27,7 +27,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	"github.com/onflow/flow-go/module/chunks"
-	"github.com/onflow/flow-go/module/component"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
@@ -173,7 +172,7 @@ func main() {
 			syncCore, err = synchronization.New(node.Logger, synchronization.DefaultConfig())
 			return err
 		}).
-		Component("verifier engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("verifier engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			rt := fvm.NewInterpreterRuntime()
 			vm := fvm.NewVirtualMachine(rt)
 			vmCtx := fvm.NewContext(node.Logger, node.FvmOptions...)
@@ -190,7 +189,7 @@ func main() {
 				approvalStorage)
 			return verifierEng, err
 		}).
-		Component("chunk consumer, requester, and fetcher engines", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("chunk consumer, requester, and fetcher engines", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			requesterEngine, err = vereq.New(
 				node.Logger,
 				node.State,
@@ -232,7 +231,7 @@ func main() {
 
 			return chunkConsumer, nil
 		}).
-		Component("assigner engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("assigner engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var chunkAssigner module.ChunkAssigner
 			chunkAssigner, err = chunks.NewChunkAssigner(chunkAlpha, node.State)
 			if err != nil {
@@ -251,7 +250,7 @@ func main() {
 
 			return assignerEngine, nil
 		}).
-		Component("block consumer", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("block consumer", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var initBlockHeight uint64
 
 			blockConsumer, initBlockHeight, err = blockconsumer.NewBlockConsumer(
@@ -279,7 +278,7 @@ func main() {
 
 			return blockConsumer, nil
 		}).
-		Component("follower engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("follower engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 			// initialize cleaner for DB
 			cleaner := storage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
@@ -341,7 +340,7 @@ func main() {
 
 			return followerEng, nil
 		}).
-		Component("finalized snapshot", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("finalized snapshot", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
 			if err != nil {
 				return nil, fmt.Errorf("could not create finalized snapshot cache: %w", err)
@@ -349,7 +348,7 @@ func main() {
 
 			return finalizedHeader, nil
 		}).
-		Component("sync engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("sync engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			sync, err := synceng.New(
 				node.Logger,
 				node.Metrics.Engine,

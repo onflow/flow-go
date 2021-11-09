@@ -28,7 +28,8 @@ type Node interface {
 type FlowNodeImp struct {
 	*component.ComponentManager
 	*NodeConfig
-	Logger zerolog.Logger
+	Logger       zerolog.Logger
+	postShutdown func()
 }
 
 // Run calls Start() to start all the node modules and components. It also sets up a channel to gracefully shut
@@ -61,13 +62,15 @@ func (node *FlowNodeImp) Run() {
 	node.Logger.Info().Msgf("%s node shutting down", node.BaseConfig.NodeRole)
 	cancel()
 
-	sigCtx, _ = util.WithSignal(ctx, signalChan)
+	sigCtx, _ = util.WithSignal(context.Background(), signalChan)
 	doneCtx, _ := util.WithDone(sigCtx, node.Done())
 	if err := util.WaitError(doneCtx, errChan); err != nil {
 		node.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error during shutdown")
 	} else if errors.Is(sigCtx.Err(), util.ErrSignalReceived) {
 		node.Logger.Fatal().Msg("node shutdown aborted")
 	}
+
+	node.postShutdown()
 
 	node.Logger.Info().Msgf("%s node shutdown complete", node.BaseConfig.NodeRole)
 	os.Exit(0)

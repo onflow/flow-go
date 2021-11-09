@@ -45,26 +45,6 @@ func (n *NoopReadyDoneAware) Done() <-chan struct{} {
 	return done
 }
 
-// CustomReadyDoneAware is a ReadyDoneAware implementation that allows the instantiator
-// to provide the ready/done channels. This is useful for building aggregate interfaces
-// e.g. a collection of ReadyDoneAware objects, or a WaitGroup based approach.
-type CustomReadyDoneAware struct {
-	ready <-chan struct{}
-	done  <-chan struct{}
-}
-
-func NewCustomReadyDoneAware(ready, done <-chan struct{}) *CustomReadyDoneAware {
-	return &CustomReadyDoneAware{ready, done}
-}
-
-func (c *CustomReadyDoneAware) Ready() <-chan struct{} {
-	return c.ready
-}
-
-func (c *CustomReadyDoneAware) Done() <-chan struct{} {
-	return c.done
-}
-
 var ErrMultipleStartup = errors.New("component may only be started once")
 
 // Startable provides an interface to start a component. Once started, the component
