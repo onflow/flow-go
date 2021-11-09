@@ -68,6 +68,8 @@ func TestStreamClosing(t *testing.T) {
 	unittest.RequireReturnsBefore(t, streamCloseWG.Wait, 1*time.Second, "could not close stream at receiver side")
 }
 
+// mockStreamHandlerForMessages creates a stream handler that expects receiving `msgCount` unique messages that match the input regexp.
+// The returned wait group will be unlocked when all messages are completely received and associated streams are closed.
 func mockStreamHandlerForMessages(t *testing.T, ctx context.Context, msgCount int, msgRegexp *regexp.Regexp) (network.StreamHandler, *sync.WaitGroup) {
 	streamCloseWG := &sync.WaitGroup{}
 	streamCloseWG.Add(msgCount)
