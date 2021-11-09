@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
@@ -186,7 +185,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			anb.rpcConf.TransportCredentials = credentials.NewTLS(tlsConfig)
 			return nil
 		}).
-		Component("RPC engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			anb.RpcEng = rpc.New(
 				node.Logger,
 				node.State,
@@ -210,7 +209,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			)
 			return anb.RpcEng, nil
 		}).
-		Component("ingestion engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("ingestion engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			var err error
 
 			anb.RequestEng, err = requester.New(
@@ -237,7 +236,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 
 			return anb.IngestEng, nil
 		}).
-		Component("requester engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+		Component("requester engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// We initialize the requester engine inside the ingestion engine due to the mutual dependency. However, in
 			// order for it to properly start and shut down, we should still return it as its own engine here, so it can
 			// be handled by the scaffold.
@@ -249,7 +248,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 		var proxyEngine *splitter.Engine
 
 		anb.
-			Component("unstaked sync request proxy", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+			Component("unstaked sync request proxy", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				proxyEngine = splitter.New(node.Logger, engine.PublicSyncCommittee)
 
 				// register the proxy engine with the unstaked network
@@ -261,7 +260,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 
 				return proxyEngine, nil
 			}).
-			Component("unstaked sync request handler", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+			Component("unstaked sync request handler", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 				syncRequestHandler := synceng.NewRequestHandlerEngine(
 					node.Logger.With().Bool("unstaked", true).Logger(),
 					unstaked.NewUnstakedEngineCollector(node.Metrics.Engine),
@@ -282,7 +281,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 			})
 	}
 
-	anb.Component("ping engine", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	anb.Component("ping engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		ping, err := pingeng.New(
 			node.Logger,
 			node.State,
@@ -304,7 +303,7 @@ func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the staked node
 func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	builder.Component("unstaked network", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	builder.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 		libP2PFactory := builder.initLibP2PFactory(builder.NodeID, builder.NodeConfig.NetworkKey)
 

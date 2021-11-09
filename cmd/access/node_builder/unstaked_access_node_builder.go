@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/module/metrics"
@@ -252,9 +251,11 @@ func (anb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(node *cmd.NodeCon
 			Address:       anb.BindAddr,
 		}
 
-		me, err := local.New(self, nil)
-		anb.MustNot(err).Msg("could not initialize local")
-		node.Me = me
+		var err error
+		node.Me, err = local.New(self, nil)
+		if err != nil {
+			return fmt.Errorf("could not initialize local: %w", err)
+		}
 		return nil
 	}
 }
@@ -298,7 +299,7 @@ func (anb *UnstakedAccessNodeBuilder) Build() cmd.Node {
 // enqueueUnstakedNetworkInit enqueues the unstaked network component initialized for the unstaked node
 func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 
-	anb.Component("unstaked network", func(node *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	anb.Component("unstaked network", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
 		// Network Metrics
 		// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
@@ -328,7 +329,7 @@ func (anb *UnstakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 // discovered by other unstaked ANs if it subscribes to a topic before connecting to the staked AN. Hence, the need
 // of an explicit connect to the staked AN before the node attempts to subscribe to topics.
 func (anb *UnstakedAccessNodeBuilder) enqueueConnectWithStakedAN() {
-	anb.Component("upstream connector", func(_ *cmd.NodeConfig, lookup component.LookupFunc) (module.ReadyDoneAware, error) {
+	anb.Component("upstream connector", func(_ *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 		return newUpstreamConnector(anb.bootstrapIdentities, anb.LibP2PNode, anb.Logger), nil
 	})
 }
