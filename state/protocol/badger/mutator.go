@@ -754,6 +754,10 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 		}
 		ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), parentStatus.Copy()))
 		ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered()))
+		ops = append(ops, func(tx *transaction.Tx) error {
+			tx.OnSucceed(m.metrics.EpochEmergencyFallbackTriggered)
+			return nil
+		})
 		return ops, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("could not determine epoch status: %w", err)
