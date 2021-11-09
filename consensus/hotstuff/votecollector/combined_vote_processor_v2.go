@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -33,6 +34,7 @@ type combinedVoteProcessorFactoryBaseV2 struct {
 	committee   hotstuff.Committee
 	onQCCreated hotstuff.OnQCCreated
 	packer      hotstuff.Packer
+	dkg         hotstuff.DKG
 }
 
 // Create creates CombinedVoteProcessorV2 for processing votes for the given block.
@@ -51,7 +53,19 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(block *model.Block) (hotstuf
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	rbRector := &signature.RandomBeaconReconstructor{} // TODO: initialize properly when ready
+	publicKeyShares := make([]crypto.PublicKey, 0, len(allParticipants))
+	for _, participant := range allParticipants {
+		pk, err := f.dkg.KeyShare(participant.NodeID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get random beacon key share for %x: %w", participant.NodeID, err)
+		}
+		publicKeyShares = append(publicKeyShares, pk)
+	}
+
+	threshold := msig.RandomBeaconThreshold(int(f.dkg.Size()))
+	randomBeaconInspector, err := signature.NewRandomBeaconInspector(f.dkg.GroupKey(), publicKeyShares, threshold, msg)
+
+	rbRector := signature.NewRandomBeaconReconstructor(f.dkg, randomBeaconInspector)
 
 	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
 
