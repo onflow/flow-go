@@ -67,7 +67,7 @@ func (c *Client) Broadcast(msg model.BroadcastDKGMessage) error {
 	}
 
 	// get latest sealed block to execute transaction
-	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, true)
+	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, false)
 	if err != nil {
 		return fmt.Errorf("could not get latest block from node: %w", err)
 	}
@@ -171,7 +171,7 @@ func (c *Client) SubmitResult(groupPublicKey crypto.PublicKey, publicKeys []cryp
 	}
 
 	// get latest sealed block to execute transaction
-	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, true)
+	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, false)
 	if err != nil {
 		return fmt.Errorf("could not get latest block from node: %w", err)
 	}
