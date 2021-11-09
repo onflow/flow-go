@@ -83,13 +83,12 @@ func NewStakingVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Commi
 // participant can sign with its staking key; thereby it contributes only to consensus but
 // not the random beacon. There should be an economic incentive for the nodes to preferably
 // sign with their random beacon key.
-func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, dkg hotstuff.DKG, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
+func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
 	base := &combinedVoteProcessorFactoryBaseV2{
 		log:         log,
 		committee:   committee,
 		onQCCreated: onQCCreated,
 		packer:      signature.NewConsensusSigDataPacker(committee),
-		dkg:         dkg,
 	}
 	return &VoteProcessorFactory{
 		baseFactory: base.Create,

@@ -34,7 +34,6 @@ type combinedVoteProcessorFactoryBaseV2 struct {
 	committee   hotstuff.Committee
 	onQCCreated hotstuff.OnQCCreated
 	packer      hotstuff.Packer
-	dkg         hotstuff.DKG
 }
 
 // Create creates CombinedVoteProcessorV2 for processing votes for the given block.
@@ -54,19 +53,30 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(block *model.Block) (hotstuf
 	}
 
 	publicKeyShares := make([]crypto.PublicKey, 0, len(allParticipants))
+	dkg, err := f.committee.DKG(block.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
+	}
 	for _, participant := range allParticipants {
-		pk, err := f.dkg.KeyShare(participant.NodeID)
+		pk, err := dkg.KeyShare(participant.NodeID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get random beacon key share for %x: %w", participant.NodeID, err)
+			continue
+			//return nil, fmt.Errorf("could not get random beacon key share for %x: %w", participant.NodeID, err)
 		}
 		publicKeyShares = append(publicKeyShares, pk)
 	}
 
-	threshold := msig.RandomBeaconThreshold(int(f.dkg.Size()))
-	randomBeaconInspector, err := signature.NewRandomBeaconInspector(f.dkg.GroupKey(), publicKeyShares, threshold, msg)
+	if len(publicKeyShares) != int(dkg.Size()) {
+		return nil, fmt.Errorf("invalid number of random beacon participants")
+	}
 
-	rbRector := signature.NewRandomBeaconReconstructor(f.dkg, randomBeaconInspector)
+	threshold := msig.RandomBeaconThreshold(int(dkg.Size()))
+	randomBeaconInspector, err := signature.NewRandomBeaconInspector(dkg.GroupKey(), publicKeyShares, threshold, msg)
+	if err != nil {
+		return nil, fmt.Errorf("could not create random beacon inspector: %w", err)
+	}
 
+	rbRector := signature.NewRandomBeaconReconstructor(dkg, randomBeaconInspector)
 	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
 
 	return &CombinedVoteProcessorV2{
