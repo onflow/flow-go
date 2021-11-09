@@ -82,7 +82,7 @@ func (c *QCContractClient) SubmitVote(ctx context.Context, vote *model.Vote) err
 		return fmt.Errorf("could not get account: %w", err)
 	}
 
-	// get latest sealed block to execute transaction
+	// get latest finalized block to execute transaction
 	latestBlock, err := c.FlowClient.GetLatestBlock(ctx, false)
 	if err != nil {
 		return fmt.Errorf("could not get latest block from node: %w", err)
