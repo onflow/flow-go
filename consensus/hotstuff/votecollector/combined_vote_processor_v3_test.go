@@ -2,6 +2,13 @@ package votecollector
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module/local"
+	modulemock "github.com/onflow/flow-go/module/mock"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"math/rand"
 	"sync"
 	"testing"
@@ -751,4 +758,116 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 			t.Fatalf("Assertions weren't met, staking weight: %v, threshold weight: %v", stakingTotalWeight, thresholdTotalWeight)
 		}
 	})
+}
+
+// TestCombinedVoteProcessorV2_BuildVerifyQC tests a complete path from creating votes to collecting votes and then
+// building & verifying QC.
+// We start with leader proposing a block, then new leader collects votes and builds a QC.
+// Need to verify that QC that was produced is valid and can be embedded in new proposal.
+func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
+	t.Skip("This test is skipped due to missing RandomBeaconReconstructor impl")
+	epochCounter := uint64(3)
+	epochLookup := &modulemock.EpochLookup{}
+	view := uint64(20)
+	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
+
+	// signers hold objects that are created with private key and can sign votes and proposals
+	signers := make(map[flow.Identifier]*verification.CombinedSignerV2)
+	// prepare staking signers, each signer has it's own private/public key pair
+	stakingSigners := unittest.IdentityListFixture(3, func(identity *flow.Identity) {
+		stakingPriv := unittest.StakingPrivKeyFixture()
+		identity.StakingPubKey = stakingPriv.PublicKey()
+
+		keys := &storagemock.DKGKeys{}
+		// there is no DKG key for this epoch
+		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
+
+		beaconSignerStore := msig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+
+		me, err := local.New(nil, stakingPriv)
+		require.NoError(t, err)
+
+		staking := msig.NewSingleSigner(encoding.ConsensusVoteTag, me)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
+	})
+	beaconSigners := unittest.IdentityListFixture(8, func(identity *flow.Identity) {
+		stakingPriv := unittest.StakingPrivKeyFixture()
+		identity.StakingPubKey = stakingPriv.PublicKey()
+
+		dkgKey := unittest.DKGParticipantPriv()
+		identity.NodeID = dkgKey.NodeID
+
+		keys := &storagemock.DKGKeys{}
+		// there is DKG key for this epoch
+		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
+
+		beaconSignerStore := msig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+
+		me, err := local.New(nil, stakingPriv)
+		require.NoError(t, err)
+
+		staking := msig.NewSingleSigner(encoding.ConsensusVoteTag, me)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
+	})
+
+	leader := stakingSigners[0]
+
+	block := helper.MakeBlock(helper.WithBlockView(view),
+		helper.WithBlockProposer(leader.NodeID))
+
+	allIdentities := append(stakingSigners, beaconSigners...)
+
+	committee := &mockhotstuff.Committee{}
+	committee.On("Identities", block.BlockID, mock.Anything).Return(allIdentities, nil)
+
+	votes := make([]*model.Vote, 0, len(allIdentities))
+
+	// first staking signer will be leader collecting votes for proposal
+	// prepare votes for every member of committee except leader
+	for _, signer := range allIdentities[1:] {
+		vote, err := signers[signer.NodeID].CreateVote(block)
+		require.NoError(t, err)
+		votes = append(votes, vote)
+	}
+
+	// create and sign proposal
+	proposal, err := signers[leader.NodeID].CreateProposal(block)
+	require.NoError(t, err)
+
+	qcCreated := false
+	onQCCreated := func(qc *flow.QuorumCertificate) {
+		packer := signature.NewConsensusSigDataPacker(committee)
+
+		// create verifier that will do crypto checks of created QC
+		verifier := verification.NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, packer)
+		forks := &mockhotstuff.Forks{}
+		// create validator which will do compliance and crypto checked of created QC
+		validator := hotstuffvalidator.New(committee, forks, verifier)
+		// check if QC is valid against parent
+		err := validator.ValidateQC(qc, block)
+		require.NoError(t, err)
+
+		qcCreated = true
+	}
+
+	baseFactory := &combinedVoteProcessorFactoryBaseV3{
+		log:         unittest.Logger(),
+		committee:   committee,
+		onQCCreated: onQCCreated,
+		packer:      signature.NewConsensusSigDataPacker(committee),
+	}
+	voteProcessorFactory := &VoteProcessorFactory{
+		baseFactory: baseFactory.Create,
+	}
+
+	voteProcessor, err := voteProcessorFactory.Create(proposal)
+	require.NoError(t, err)
+
+	// process votes by new leader, this will result in producing new QC
+	for _, vote := range votes {
+		err := voteProcessor.Process(vote)
+		require.NoError(t, err)
+	}
+
+	require.True(t, qcCreated)
 }

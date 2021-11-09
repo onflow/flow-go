@@ -746,6 +746,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 // We start with leader proposing a block, then new leader collects votes and builds a QC.
 // Need to verify that QC that was produced is valid and can be embedded in new proposal.
 func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
+	t.Skip("This test is skipped due to missing RandomBeaconReconstructor impl")
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
 	view := uint64(20)
