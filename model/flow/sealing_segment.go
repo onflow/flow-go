@@ -52,7 +52,7 @@ type SealingSegmentBuilder struct {
 func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	//sanity check: block should be 1 height higher than current highest
 	if !builder.isValidHeight(block) {
-		return fmt.Errorf("invalid block height (%x): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
+		return fmt.Errorf("invalid block height (%d): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
 	}
 
 	// cache results in included results
