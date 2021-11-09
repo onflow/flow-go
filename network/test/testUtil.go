@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	datastore "github.com/ipfs/go-datastore/examples"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
@@ -38,6 +37,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -428,13 +428,17 @@ func networkPayloadFixture(t *testing.T, size uint) []byte {
 func MakeBlockstore(t *testing.T, name string) (blockstore.Blockstore, func()) {
 	dsDir := filepath.Join(os.TempDir(), name)
 	require.NoError(t, os.RemoveAll(dsDir))
-	err := os.Mkdir(dsDir, os.ModeDir)
+	err := os.Mkdir(dsDir, 0755)
 	require.NoError(t, err)
 
-	ds, err := datastore.NewDatastore(dsDir)
+	opts := badger.
+		DefaultOptions(dsDir).
+		WithTTL(30 * time.Minute)
+
+	bs, err := badger.NewBlockstore(opts)
 	require.NoError(t, err)
 
-	return blockstore.NewBlockstore(ds.(*datastore.Datastore)), func() {
+	return bs, func() {
 		require.NoError(t, os.RemoveAll(dsDir))
 	}
 }
