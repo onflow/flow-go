@@ -599,6 +599,11 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		events = append(events, func() { m.metrics.CurrentEpochPhase(flow.EpochPhaseStaking) })
 	}
 
+	// if EECC is triggered, update metric
+	if epochFallbackTriggered {
+		m.metrics.EpochEmergencyFallbackTriggered()
+	}
+
 	// FIFTH: Persist updates in database
 	// * Add this block to the height-indexed set of finalized blocks.
 	// * Update the largest finalized height to this block's height.
@@ -743,14 +748,12 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 		// by the protocol state to fall in the same epoch as its parent.
 		//
 		// CAUTION: this is inconsistent with the FinalView value specified in the epoch.
-		fmt.Printf("handleServiceEvents: emergency epoch chain continuation triggered at block id: %x, height: %d\n", block.ID(), block.Header.Height)
 		parentStatus, err := m.epoch.statuses.ByBlockID(block.Header.ParentID)
 		if err != nil {
 			return nil, fmt.Errorf("internal error constructing EECC from parent's epoch status: %w", err)
 		}
 		ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), parentStatus.Copy()))
 		ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered()))
-		// TODO set metric for the above
 		return ops, nil
 	} else if err != nil {
 		return nil, fmt.Errorf("could not determine epoch status: %w", err)
@@ -831,12 +834,6 @@ SealLoop:
 	ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), epochStatus))
 
 	return ops, nil
-}
-
-func (m *FollowerState) isEpochEmergencyFallbackTriggered() (bool, error) {
-	var triggered bool
-	err := m.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
-	return triggered, err
 }
 
 // MarkValid marks the block as valid in protocol state, and triggers

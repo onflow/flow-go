@@ -558,6 +558,16 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 	state.metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
 	state.metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
 
+	// EECC - check whether the epoch emergency fallback flag has been set
+	// in the database. If so, skip updating any epoch-related metrics.
+	epochFallbackTriggered, err := state.isEpochEmergencyFallbackTriggered()
+	if err != nil {
+		return fmt.Errorf("could not check epoch emergency fallback flag: %w", err)
+	}
+	if epochFallbackTriggered {
+		state.metrics.EpochEmergencyFallbackTriggered()
+	}
+
 	return nil
 }
 
@@ -598,4 +608,10 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 	}
 
 	return nil
+}
+
+func (m *State) isEpochEmergencyFallbackTriggered() (bool, error) {
+	var triggered bool
+	err := m.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
+	return triggered, err
 }
