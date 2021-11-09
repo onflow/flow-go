@@ -79,9 +79,7 @@ func mockStreamHandlerForMessages(t *testing.T, ctx context.Context, msgCount in
 				str, err := rw.ReadString('\n')
 				if err != nil {
 					if errors.Is(err, io.EOF) {
-						fmt.Printf("[debug] stream closing: %v -> %v \n", s.Conn().LocalMultiaddr(), s.Conn().RemoteMultiaddr())
 						err := s.Close()
-						fmt.Printf("[debug] stream closed: %v -> %v\n", s.Conn().LocalMultiaddr(), s.Conn().RemoteMultiaddr())
 						require.NoError(t, err)
 
 						streamCloseWG.Done()
