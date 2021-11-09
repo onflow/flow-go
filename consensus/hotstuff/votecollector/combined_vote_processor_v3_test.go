@@ -2,13 +2,6 @@ package votecollector
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
-	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
-	"github.com/onflow/flow-go/consensus/hotstuff/verification"
-	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/module/local"
-	modulemock "github.com/onflow/flow-go/module/mock"
-	storagemock "github.com/onflow/flow-go/storage/mock"
 	"math/rand"
 	"sync"
 	"testing"
@@ -24,9 +17,16 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/local"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
+	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
