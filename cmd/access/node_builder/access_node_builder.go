@@ -114,7 +114,7 @@ func DefaultAccessNodeConfig() *AccessNodeConfig {
 			SecureGRPCListenAddr:      "0.0.0.0:9001",
 			HTTPListenAddr:            "0.0.0.0:8000",
 			RESTListenAddr:            "0.0.0.0:8080",
-			ServeRESTAPI:              true,
+			ServeRESTAPI:              false,
 			CollectionAddr:            "",
 			HistoricalAccessAddrs:     "",
 			CollectionClientTimeout:   3 * time.Second,
