@@ -419,3 +419,93 @@ func TestDeserializeInvalidTailingBits(t *testing.T) {
 	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
 	require.Contains(t, fmt.Sprintf("%v", err), "remaining bits")
 }
+
+// TestPackUnpackWithoutRBAggregatedSig test that a packed data without random beacon signers and
+// aggregated random beacon sig can be correctly packed and unpacked
+// given the consensus committee [A, B, C]
+// [A, B, C] are non-random beacon nodes
+// aggregated staking sigs are from [A,B,C]
+// no aggregated random beacon sigs
+// no random beacon signers
+func TestPackUnpackWithoutRBAggregatedSig(t *testing.T) {
+	identities := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
+	committee := identities.NodeIDs()
+
+	// prepare data for testing
+	blockID := unittest.IdentifierFixture()
+
+	blockSigData := &hotstuff.BlockSignatureData{
+		StakingSigners:               committee,
+		RandomBeaconSigners:          nil,
+		AggregatedStakingSig:         unittest.SignatureFixture(),
+		AggregatedRandomBeaconSig:    nil,
+		ReconstructedRandomBeaconSig: unittest.SignatureFixture(),
+	}
+
+	// create packer with the committee
+	packer := newPacker(identities)
+
+	// pack & unpack
+	signerIDs, sig, err := packer.Pack(blockID, blockSigData)
+	require.NoError(t, err)
+
+	unpacked, err := packer.Unpack(blockID, signerIDs, sig)
+	require.NoError(t, err)
+
+	// check that the unpack data match with the original data
+	require.Equal(t, blockSigData.StakingSigners, unpacked.StakingSigners)
+	require.Equal(t, blockSigData.AggregatedStakingSig, unpacked.AggregatedStakingSig)
+	require.Equal(t, blockSigData.ReconstructedRandomBeaconSig, unpacked.ReconstructedRandomBeaconSig)
+
+	// we need to specifically test if it's empty, it has to be by test definition
+	require.Empty(t, unpacked.RandomBeaconSigners)
+	require.Empty(t, unpacked.AggregatedRandomBeaconSig)
+
+	// check the packed signer IDs
+	expectedSignerIDs := append([]flow.Identifier{}, blockSigData.StakingSigners...)
+	require.Equal(t, expectedSignerIDs, signerIDs)
+}
+
+// TestPackWithoutRBAggregatedSig tests that packer correctly handles BlockSignatureData
+// with different structure format, more specifically there is no difference between
+// nil and empty slices for RandomBeaconSigners and AggregatedRandomBeaconSig.
+func TestPackWithoutRBAggregatedSig(t *testing.T) {
+	identities := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
+	committee := identities.NodeIDs()
+
+	// prepare data for testing
+	blockID := unittest.IdentifierFixture()
+
+	aggregatedSig := unittest.SignatureFixture()
+	reconstructedSig := unittest.SignatureFixture()
+
+	blockSigDataWithEmptySlices := &hotstuff.BlockSignatureData{
+		StakingSigners:               committee,
+		RandomBeaconSigners:          []flow.Identifier{},
+		AggregatedStakingSig:         aggregatedSig,
+		AggregatedRandomBeaconSig:    []byte{},
+		ReconstructedRandomBeaconSig: reconstructedSig,
+	}
+
+	blockSigDataWithNils := &hotstuff.BlockSignatureData{
+		StakingSigners:               committee,
+		RandomBeaconSigners:          nil,
+		AggregatedStakingSig:         aggregatedSig,
+		AggregatedRandomBeaconSig:    nil,
+		ReconstructedRandomBeaconSig: reconstructedSig,
+	}
+
+	// create packer with the committee
+	packer := newPacker(identities)
+
+	// pack
+	signerIDs_A, sig_A, err := packer.Pack(blockID, blockSigDataWithEmptySlices)
+	require.NoError(t, err)
+
+	signerIDs_B, sig_B, err := packer.Pack(blockID, blockSigDataWithNils)
+	require.NoError(t, err)
+
+	// should be the same
+	require.Equal(t, signerIDs_A, signerIDs_B)
+	require.Equal(t, sig_A, sig_B)
+}
