@@ -39,7 +39,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	// there is DKG key for this epoch
 	keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
 
-	beaconSignerStore := modulesig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+	beaconKeyStore := modulesig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := unittest.IdentityFixture()
@@ -49,7 +49,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	me, err := local.New(nil, stakingPriv)
 	require.NoError(t, err)
 	staking := modulesig.NewSingleSigner(encoding.ConsensusVoteTag, me)
-	signer := NewCombinedSignerV2(staking, beaconSignerStore, signerID)
+	signer := NewCombinedSignerV2(staking, beaconKeyStore, signerID)
 
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
@@ -92,7 +92,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	// there is no DKG key for this epoch
 	keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
 
-	beaconSignerStore := modulesig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+	beaconKeyStore := modulesig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := unittest.IdentityFixture()
@@ -102,7 +102,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	me, err := local.New(nil, stakingPriv)
 	require.NoError(t, err)
 	staking := modulesig.NewSingleSigner(encoding.ConsensusVoteTag, me)
-	signer := NewCombinedSignerV2(staking, beaconSignerStore, signerID)
+	signer := NewCombinedSignerV2(staking, beaconKeyStore, signerID)
 
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)

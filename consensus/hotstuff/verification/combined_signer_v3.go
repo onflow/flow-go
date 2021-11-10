@@ -7,6 +7,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -23,7 +26,8 @@ import (
 // random beacon key if it is available.
 type CombinedSignerV3 struct {
 	staking           module.MsgSigner
-	beaconSignerStore module.RandomBeaconSignerStore
+	beaconSignerStore module.RandomBeaconKeyStore
+	hasher            hash.Hasher
 	signerID          flow.Identifier
 }
 
@@ -36,12 +40,13 @@ type CombinedSignerV3 struct {
 func NewCombinedSignerV3(
 	committee hotstuff.Committee,
 	staking module.MsgSigner,
-	beaconSignerStore module.RandomBeaconSignerStore,
+	beaconSignerStore module.RandomBeaconKeyStore,
 	signerID flow.Identifier) *CombinedSignerV3 {
 
 	sc := &CombinedSignerV3{
 		staking:           staking,
 		beaconSignerStore: beaconSignerStore,
+		hasher:            crypto.NewBLSKMAC(encoding.RandomBeaconTag),
 		signerID:          signerID,
 	}
 	return sc
@@ -96,7 +101,7 @@ func (c *CombinedSignerV3) genSigData(block *model.Block) ([]byte, error) {
 	// create the message to be signed and generate signatures
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	beacon, err := c.beaconSignerStore.GetSigner(block.View)
+	beaconKey, err := c.beaconSignerStore.ByView(block.View)
 	if err != nil {
 		if errors.Is(err, module.DKGIncompleteError) {
 			// if the node didn't complete DKG, then using the staking key to sign the block as a
@@ -113,7 +118,7 @@ func (c *CombinedSignerV3) genSigData(block *model.Block) ([]byte, error) {
 
 	// if the node is a DKG node and has completed DKG, then using the random beacon key
 	// to sign the block
-	beaconShare, err := beacon.Sign(msg)
+	beaconShare, err := beaconKey.Sign(msg, c.hasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate beacon signature: %w", err)
 	}

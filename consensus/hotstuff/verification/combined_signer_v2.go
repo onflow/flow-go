@@ -6,6 +6,9 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -24,24 +27,27 @@ import (
 // The difference between V2 and V3 is that V2 will sign 2 sigs, whereas
 // V3 only sign 1 sig.
 type CombinedSignerV2 struct {
-	staking           module.MsgSigner
-	beaconSignerStore module.RandomBeaconSignerStore
-	signerID          flow.Identifier
+	staking        module.MsgSigner
+	beaconKeyStore module.RandomBeaconKeyStore
+	hasher         hash.Hasher
+	signerID       flow.Identifier
 }
 
 // NewCombinedSignerV2 creates a new combined signer with the given dependencies:
 // - the staking signer is used to create and verify aggregatable signatures for Hotstuff
-// - the beaconSignerStore is used to get threshold-signers by epoch/view;
+// - the beaconKeyStore is used to get threshold-signers by epoch/view;
 // - the signer ID is used as the identity when creating signatures;
 func NewCombinedSignerV2(
 	staking module.MsgSigner,
-	beaconSignerStore module.RandomBeaconSignerStore,
-	signerID flow.Identifier) *CombinedSignerV2 {
+	beaconKeyStore module.RandomBeaconKeyStore,
+	signerID flow.Identifier,
+) *CombinedSignerV2 {
 
 	sc := &CombinedSignerV2{
-		staking:           staking,
-		beaconSignerStore: beaconSignerStore,
-		signerID:          signerID,
+		staking:        staking,
+		beaconKeyStore: beaconKeyStore,
+		hasher:         crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		signerID:       signerID,
 	}
 	return sc
 }
@@ -104,7 +110,7 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)
 	}
 
-	beacon, err := c.beaconSignerStore.GetSigner(block.View)
+	beaconKey, err := c.beaconKeyStore.ByView(block.View)
 	if err != nil {
 		if errors.Is(err, module.DKGIncompleteError) {
 			return stakingSig, nil
@@ -114,7 +120,7 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 
 	// if the node is a DKG node and has completed DKG, then using the random beacon key
 	// to sign the block
-	beaconShare, err := beacon.Sign(msg)
+	beaconShare, err := beaconKey.Sign(msg, c.hasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate beacon signature: %w", err)
 	}

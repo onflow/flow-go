@@ -4,22 +4,22 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 )
 
-type EpochAwareRandomBeaconSignerStore struct {
-	epochLookup module.EpochLookup          // used to fetch epoch counter by view
-	keys        storage.DKGKeys             // used to fetch DKG private key by epoch
-	signers     map[uint64]module.MsgSigner // cache of signers by epoch
+type EpochAwareRandomBeaconKeyStore struct {
+	epochLookup module.EpochLookup           // used to fetch epoch counter by view
+	keys        storage.DKGKeys              // used to fetch DKG private key by epoch
+	privateKeys map[uint64]crypto.PrivateKey // cache of privateKeys by epoch
 }
 
-func NewEpochAwareRandomBeaconSignerStore(epochLookup module.EpochLookup, keys storage.DKGKeys) *EpochAwareRandomBeaconSignerStore {
-	return &EpochAwareRandomBeaconSignerStore{
+func NewEpochAwareRandomBeaconKeyStore(epochLookup module.EpochLookup, keys storage.DKGKeys) *EpochAwareRandomBeaconKeyStore {
+	return &EpochAwareRandomBeaconKeyStore{
 		epochLookup: epochLookup,
 		keys:        keys,
-		signers:     make(map[uint64]module.MsgSigner),
+		privateKeys: make(map[uint64]crypto.PrivateKey),
 	}
 }
 
@@ -31,7 +31,7 @@ func NewEpochAwareRandomBeaconSignerStore(epochLookup module.EpochLookup, keys s
 //  - (nil, protocol.ErrEpochNotCommitted) if no epoch found for given view
 //  - (nil, DKGIncompleteError) if DKG was not completed in the epoch of the view
 //  - (nil, error) if there is any exception
-func (s *EpochAwareRandomBeaconSignerStore) GetSigner(view uint64) (module.MsgSigner, error) {
+func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey, error) {
 	// fetching the epoch by view, if epoch is found, then DKG must have been completed
 	epoch, err := s.epochLookup.EpochForViewWithFallback(view)
 	if err != nil {
@@ -47,22 +47,22 @@ func (s *EpochAwareRandomBeaconSignerStore) GetSigner(view uint64) (module.MsgSi
 	// 2. DKG has completed, but we failed to generate our private key, and we marked in the database
 	// 		that there is no DKG key for this epoch
 	// 3. DKG has completed, but we
-	signer, ok := s.signers[epoch]
+	key, ok := s.privateKeys[epoch]
 	if ok {
-		// A nil signer means that we don't have a Random Beacon key for this epoch.
-		if signer == nil {
+		// A nil key means that we don't have a Random Beacon key for this epoch.
+		if key == nil {
 			return nil, fmt.Errorf("did not complete DKG for epoch %v, at view %v: %w",
 				epoch, view, module.DKGIncompleteError)
 		}
-		return signer, nil
+		return key, nil
 	}
 
-	privDKGData, hasDKGKey, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
+	privBeaconKeyData, hasRandomBeaconKey, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
 	// this is an edge case where the epoch has determined, but the result of whether we have the DKG
 	// private key info or not is not found in the database.
 	// in this case, we will trigger as if we failed the DKG.
 	if errors.Is(err, storage.ErrNotFound) {
-		s.signers[epoch] = nil
+		s.privateKeys[epoch] = nil
 		return nil, fmt.Errorf("DKG result not found in database for epoch %v, at view %v: %w",
 			epoch, view, module.DKGIncompleteError)
 	}
@@ -75,18 +75,18 @@ func (s *EpochAwareRandomBeaconSignerStore) GetSigner(view uint64) (module.MsgSi
 	// if DKG was not completed, there will be no DKG private key, since this fact
 	// never change, we can cache a nil signer for this epoch, so that we this function
 	// is called again for the same epoch, we don't need to query database.
-	if !hasDKGKey {
-		s.signers[epoch] = nil
+	if !hasRandomBeaconKey {
+		s.privateKeys[epoch] = nil
 		return nil, fmt.Errorf("didn't complete DKG for epoch %v, at view %v: %w",
 			epoch, view, module.DKGIncompleteError)
 	}
 
 	// DKG was completed and a random beacon key is available,
 	// create a random beacon signer that holds the private key and cache it for the epoch
-	signer = NewRandomBeaconSigner(encoding.RandomBeaconTag, privDKGData.RandomBeaconPrivKey)
-	s.signers[epoch] = signer
+	key = privBeaconKeyData.RandomBeaconPrivKey
+	s.privateKeys[epoch] = key
 
-	return signer, nil
+	return key, nil
 }
 
 // SingleBeaconSignerStore implements the msgSigner interface. It only
