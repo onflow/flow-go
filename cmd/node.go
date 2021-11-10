@@ -43,9 +43,12 @@ type FlowNodeImp struct {
 // Any unhandled irrecoverable errors thrown in child components will propagate up to here and result in a fatal
 // error
 // It will call the given cleanup function before exiting, which usually close the database.
+// The cleanup wall ALWAYS be called no matter running into any irrecoverable error or not.
 func (node *FlowNodeImp) Run(cleanup func() error) {
 	// blocking
 	err := node.run()
+
+	node.Logger.Warn().Err(err).Msg("closing database before exiting")
 
 	// no matter there is irrecoverable error or not, we will do the cleanup before exiting.
 	dbErr := cleanup()
@@ -126,6 +129,13 @@ func (node *FlowNodeImp) run() error {
 func waitUntilStopped(done <-chan struct{}, errChan <-chan error, signalChan <-chan os.Signal) (bool, error) {
 	select {
 	case <-done:
+		// to avoid a race condition, check the err chan again to make sure we don't
+		// miss an error
+		select {
+		case err := <-errChan:
+			return false, err
+		default:
+		}
 		return false, nil
 	case err := <-errChan:
 		return false, err
