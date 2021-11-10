@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"os/signal"
@@ -100,16 +99,7 @@ func (node *FlowNodeImp) run() error {
 	node.Logger.Info().Msgf("received termination signal, graceful shutting down %s node", node.BaseConfig.NodeRole)
 	cancel()
 
-	// block till one of the following three event happen:
-	//   1) all components have been gracefully stopped
-	//   2) irrecoverable error triggered during the graceful shutdown
-	//   3) another termination signal is received
-	select {
-	case <-node.Done():
-	case exception := <-errChan:
-		err = exception
-	case <-signalChan:
-	}
+	stoppedBySigTerm, err := waitUntilStopped(node.Done(), errChan, signalChan)
 
 	// if irrecoverable error is encountered during graceful shutdown, return the irrecoverable error
 	if err != nil {
@@ -117,10 +107,29 @@ func (node *FlowNodeImp) run() error {
 	}
 
 	// if another termination signal is received, start forcing an exit
-	if errors.Is(sigCtx.Err(), util.ErrSignalReceived) {
+	if stoppedBySigTerm {
 		return fmt.Errorf("received termination signal, aborting graceful shutdown, shutting down now")
 	}
 
 	node.Logger.Info().Msgf("%s node's all components have stopped gracefully", node.BaseConfig.NodeRole)
 	return nil
+}
+
+// block till one of the following three event happen:
+//   1) all components have been gracefully stopped
+//   2) irrecoverable error triggered during the graceful shutdown
+//   3) another termination signal is received
+// it returns:
+//   - (false, nil) for case 1
+//   - (false, err) for case 2
+//   - (true, nil) for case 3
+func waitUntilStopped(done <-chan struct{}, errChan <-chan error, signalChan <-chan os.Signal) (bool, error) {
+	select {
+	case <-done:
+		return false, nil
+	case err := <-errChan:
+		return false, err
+	case <-signalChan:
+		return true, nil
+	}
 }
