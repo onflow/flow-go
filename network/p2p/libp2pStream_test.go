@@ -120,8 +120,9 @@ func TestCreateStream(t *testing.T) {
 	require.Equal(t, 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
+	streamCount := 100
 	var streams []network.Stream
-	for i := 0; i < 100; i++ {
+	for i := 0; i < streamCount; i++ {
 		pInfo, err := PeerAddressInfo(*id2)
 		require.NoError(t, err)
 		nodes[0].host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
@@ -137,7 +138,7 @@ func TestCreateStream(t *testing.T) {
 	}
 
 	// reverse loop to close all the streams
-	for i := 99; i >= 0; i-- {
+	for i := streamCount - 1; i >= 0; i-- {
 		s := streams[i]
 		wg := sync.WaitGroup{}
 		wg.Add(1)
