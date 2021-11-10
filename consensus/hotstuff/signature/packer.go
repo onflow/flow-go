@@ -33,9 +33,9 @@ type signatureData struct {
 	// the order of each sig type matches the order of corresponding signer IDs
 	SigType []byte
 
-	AggregatedStakingSig      []byte
-	AggregatedRandomBeaconSig []byte
-	RandomBeacon              crypto.Signature
+	AggregatedStakingSig         []byte
+	AggregatedRandomBeaconSig    []byte
+	ReconstructedRandomBeaconSig crypto.Signature
 }
 
 // Pack serializes the block signature data into raw bytes, suitable to creat a QC.
@@ -80,16 +80,16 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	}
 
 	// serialize the sig type for compaction
-	serialized, err := serializeToBytes(sigTypes)
+	serialized, err := serializeToBitVector(sigTypes)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not serialize sig types to bytes at block: %v, %w", blockID, err)
 	}
 
 	data := signatureData{
-		SigType:                   serialized,
-		AggregatedStakingSig:      sig.AggregatedStakingSig,
-		AggregatedRandomBeaconSig: sig.AggregatedRandomBeaconSig,
-		RandomBeacon:              sig.ReconstructedRandomBeaconSig,
+		SigType:                      serialized,
+		AggregatedStakingSig:         sig.AggregatedStakingSig,
+		AggregatedRandomBeaconSig:    sig.AggregatedRandomBeaconSig,
+		ReconstructedRandomBeaconSig: sig.ReconstructedRandomBeaconSig,
 	}
 
 	// encode the structured data into raw bytes
@@ -158,42 +158,44 @@ func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flo
 		RandomBeaconSigners:          randomBeaconSigners,
 		AggregatedStakingSig:         data.AggregatedStakingSig,
 		AggregatedRandomBeaconSig:    data.AggregatedRandomBeaconSig,
-		ReconstructedRandomBeaconSig: data.RandomBeacon,
+		ReconstructedRandomBeaconSig: data.ReconstructedRandomBeaconSig,
 	}, nil
 }
 
 // the total number of bytes required to fit the `count` number of bits
 func bytesCount(count int) int {
-	totalBytes := count / 8
-	if count%8 > 0 {
-		totalBytes++
-	}
-	return totalBytes
+	return (count + 7) >> 3
 }
 
-// serializeToBytes encodes the given sigTypes into a bit vector.
+// serializeToBitVector encodes the given sigTypes into a bit vector.
 // We append tailing `0`s to the vector to represent it as bytes.
-func serializeToBytes(sigTypes []hotstuff.SigType) ([]byte, error) {
+func serializeToBitVector(sigTypes []hotstuff.SigType) ([]byte, error) {
 	totalBytes := bytesCount(len(sigTypes))
 	bytes := make([]byte, 0, totalBytes)
-	// a sig type can be converted into one bit.
-	// so every 8 sig types will fit into one byte.
-	// iterate through every 8 sig types, for each sig type in each
-	// group, convert into each bit, and fill the bit into the byte.
+	// a sig type can be converted into one bit, the type at index 0 being converted into the least significant bit:
+	// the random beacon type is mapped to 1, while the staking type is mapped to 0.
 	// the remaining unfilled bits in the last byte will be 0
-	for byt := 0; byt < len(sigTypes); byt += 8 {
-		b := byte(0)
-		offset := 7
-		for pos := byt; pos < byt+8 && pos < len(sigTypes); pos++ {
-			sigType := sigTypes[pos]
+	const initialMask = byte(1 << 7) //
 
-			if !sigType.Valid() {
-				return nil, fmt.Errorf("invalid sig type: %v at pos %v", sigType, pos)
-			}
-
-			b ^= byte(sigType) << offset
-			offset--
+	b := byte(0)
+	mask := initialMask
+	// iterate through every 8 sig types, and convert it into a byte
+	for pos, sigType := range sigTypes {
+		if sigType == hotstuff.SigTypeRandomBeacon {
+			b ^= mask // set a bit to one
+		} else if sigType != hotstuff.SigTypeStaking {
+			return nil, fmt.Errorf("invalid sig type: %v at pos %v", sigType, pos)
 		}
+
+		mask >>= 1     // move to the next bit
+		if mask == 0 { // this happens every 8 loop ietartions
+			bytes = append(bytes, b)
+			b = byte(0)
+			mask = initialMask
+		}
+	}
+	// add the last byte when the length is not multiple of 8
+	if mask != initialMask {
 		bytes = append(bytes, b)
 	}
 	return bytes, nil

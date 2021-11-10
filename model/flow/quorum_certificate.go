@@ -20,7 +20,7 @@ type QuorumCertificate struct {
 	// - SigType []byte, bit-vector indicating the type of sig produced by the signer.
 	// - AggregatedStakingSig crypto.Signature,
 	// - AggregatedRandomBeaconSig crypto.Signature
-	// - RandomBeacon crypto.Signature
+	// - ReconstrcutedRandomBeaconSig crypto.Signature
 	// For collector cluster HotStuff, SigData is simply the aggregated staking signatures
 	// from all signers.
 	SigData []byte

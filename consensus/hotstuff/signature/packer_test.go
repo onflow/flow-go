@@ -216,7 +216,7 @@ func TestInvalidSigType(t *testing.T) {
 func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 	t.Run("nothing", func(t *testing.T) {
 		expected := []hotstuff.SigType{}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{}, bytes)
 
@@ -227,7 +227,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 
 	t.Run("1 SigTypeStaking", func(t *testing.T) {
 		expected := []hotstuff.SigType{hotstuff.SigTypeStaking}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0}, bytes)
 
@@ -238,7 +238,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 
 	t.Run("1 SigTypeRandomBeacon", func(t *testing.T) {
 		expected := []hotstuff.SigType{hotstuff.SigTypeRandomBeacon}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{1 << 7}, bytes)
 
@@ -252,7 +252,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 			hotstuff.SigTypeRandomBeacon,
 			hotstuff.SigTypeRandomBeacon,
 		}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{1<<7 + 1<<6}, bytes)
 
@@ -267,7 +267,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		for i := 0; i < count; i++ {
 			expected = append(expected, hotstuff.SigTypeRandomBeacon)
 		}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{255}, bytes)
 
@@ -282,7 +282,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		for i := 0; i < count; i++ {
 			expected = append(expected, hotstuff.SigTypeStaking)
 		}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0}, bytes)
 
@@ -297,7 +297,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		for i := 0; i < count; i++ {
 			expected = append(expected, hotstuff.SigTypeRandomBeacon)
 		}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{255, 1 << 7}, bytes)
 
@@ -312,7 +312,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		for i := 0; i < count; i++ {
 			expected = append(expected, hotstuff.SigTypeStaking)
 		}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{0, 0}, bytes)
 
@@ -327,7 +327,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		for i := 0; i < count; i++ {
 			expected = append(expected, hotstuff.SigTypeRandomBeacon)
 		}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{255, 255}, bytes)
 
@@ -345,7 +345,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		for i := 0; i < staking; i++ {
 			expected = append(expected, hotstuff.SigTypeStaking)
 		}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		require.Equal(t, []byte{1<<7 + 1<<6 + 1<<5}, bytes)
 
@@ -363,7 +363,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		for i := 0; i < random; i++ {
 			expected = append(expected, hotstuff.SigTypeRandomBeacon)
 		}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		// 00011110
 		require.Equal(t, []byte{1<<4 + 1<<3 + 1<<2 + 1<<1}, bytes)
@@ -382,7 +382,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		for i := 0; i < random; i++ {
 			expected = append(expected, hotstuff.SigTypeRandomBeacon)
 		}
-		bytes, err := serializeToBytes(expected)
+		bytes, err := serializeToBitVector(expected)
 		require.NoError(t, err)
 		// 00011110, 10000000
 		require.Equal(t, []byte{1<<4 + 1<<3 + 1<<2 + 1<<1 + 1, 1 << 7}, bytes)
@@ -399,7 +399,7 @@ func TestDeserializeMismatchingBytes(t *testing.T) {
 	for i := 0; i < count; i++ {
 		expected = append(expected, hotstuff.SigTypeStaking)
 	}
-	bytes, err := serializeToBytes(expected)
+	bytes, err := serializeToBitVector(expected)
 	require.NoError(t, err)
 
 	for invalidCount := 0; invalidCount < 100; invalidCount++ {
