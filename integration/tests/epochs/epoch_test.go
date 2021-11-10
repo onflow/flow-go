@@ -145,9 +145,6 @@ func (s *Suite) TestEpochJoin() {
 	result := s.SetApprovedNodesScript(ctx, env, append(s.net.Identities().NodeIDs(), info.NodeID)...)
 	require.NoError(s.T(), result.Error)
 
-	//nodeIDCDC, err := cadence.NewString(info.NodeID.String())
-	//require.NoError(s.T(), err)
-
 	// ensure node ID in approved list
 	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
 	require.Contains(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(info.NodeID.String()), fmt.Sprintf("expected new node to be in approved nodes list: %x", info.NodeID))
