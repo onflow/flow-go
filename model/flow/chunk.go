@@ -111,16 +111,3 @@ func (cl ChunkList) ByIndex(i uint64) (*Chunk, bool) {
 func (cl ChunkList) Len() int {
 	return len(cl)
 }
-
-// Less returns true if element i in the ChunkList is less than j based on its chunk ID.
-// Otherwise it returns true.
-// It satisfies the sort.Interface making the ChunkList sortable.
-func (cl ChunkList) Less(i, j int) bool {
-	return cl[i].ID().String() < cl[j].ID().String()
-}
-
-// Swap swaps the element i and j in the ChunkList.
-// It satisfies the sort.Interface making the ChunkList sortable.
-func (cl ChunkList) Swap(i, j int) {
-	cl[j], cl[i] = cl[i], cl[j]
-}
