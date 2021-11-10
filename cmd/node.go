@@ -100,10 +100,16 @@ func (node *FlowNodeImp) run() error {
 	node.Logger.Info().Msgf("received termination signal, graceful shutting down %s node", node.BaseConfig.NodeRole)
 	cancel()
 
-	doneCtx, _ := util.WithDone(sigCtx, node.Done())
-	// block till either all components have been gracefully stopped or another termination signal is received
-	// to force exit
-	err = util.WaitError(doneCtx, errChan)
+	// block till one of the following three event happen:
+	//   1) all components have been gracefully stopped
+	//   2) irrecoverable error triggered during the graceful shutdown
+	//   3) another termination signal is received
+	select {
+	case <-node.Done():
+	case exception := <-errChan:
+		err = exception
+	case <-signalChan:
+	}
 
 	// if irrecoverable error is encountered during graceful shutdown, return the irrecoverable error
 	if err != nil {
