@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module/component"
@@ -23,8 +22,9 @@ type Node interface {
 
 	// Run initiates all common components (logger, database, protocol state etc.)
 	// then starts each component. It also sets up a channel to gracefully shut
-	// down each component if a SIGINT is received.
-	Run()
+	// down each component if a SIGTERM is received.
+	// It will call the given cleanup function before exiting, which usually close the database.
+	Run(cleanup func() error)
 }
 
 // FlowNodeImp is created by the FlowNodeBuilder with all components ready to be
@@ -36,7 +36,6 @@ type FlowNodeImp struct {
 	*component.ComponentManager
 	*NodeConfig
 	Logger zerolog.Logger
-	DB     *badger.DB
 }
 
 // Run calls Start() to start all the node components. It also sets up a channel to gracefully shut
@@ -44,20 +43,22 @@ type FlowNodeImp struct {
 // Since, Run is a blocking call it should only be used when running a node as it's own independent process.
 // Any unhandled irrecoverable errors thrown in child components will propagate up to here and result in a fatal
 // error
-func (node *FlowNodeImp) Run() {
+// It will call the given cleanup function before exiting, which usually close the database.
+func (node *FlowNodeImp) Run(cleanup func() error) {
 	// blocking
 	err := node.run()
 
-	if err != nil {
-		dbErr := node.closeDatabase()
-		if dbErr != nil {
-			node.Logger.Fatal().Err(err).Msgf("failed to close database: %v", dbErr)
-		}
+	// no matter there is irrecoverable error or not, we will do the cleanup before exiting.
+	dbErr := cleanup()
+	if dbErr != nil {
+		node.Logger.Fatal().Err(err).Msgf("failed to run cleanup before exiting: %s", dbErr)
+	}
 
+	if err != nil {
 		node.Logger.Fatal().Err(err).Msgf("exit now")
 	}
 
-	node.Logger.Info().Msgf("database closed, %s node has stopped gracefully", node.BaseConfig.NodeRole)
+	node.Logger.Info().Msgf("%s node has stopped gracefully", node.BaseConfig.NodeRole)
 	os.Exit(0)
 }
 
@@ -116,10 +117,4 @@ func (node *FlowNodeImp) run() error {
 
 	node.Logger.Info().Msgf("%s node's all components have stopped gracefully", node.BaseConfig.NodeRole)
 	return nil
-}
-
-// Since DB and SecretsDB are the same badger DB instance,
-// we only need to stop one of them
-func (node *FlowNodeImp) closeDatabase() error {
-	return node.DB.Close()
 }

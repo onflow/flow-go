@@ -108,6 +108,9 @@ type NodeBuilder interface {
 	// are initialized
 	PostInit(f BuilderFunc) NodeBuilder
 
+	// PostShutdown is called before exiting the program, usually for closing database.
+	PostShutdown() error
+
 	// RegisterBadgerMetrics registers all badger related metrics
 	RegisterBadgerMetrics() error
 

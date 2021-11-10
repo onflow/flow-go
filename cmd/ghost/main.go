@@ -40,5 +40,5 @@ func main() {
 		}).
 		SerialStart().
 		Build().
-		Run()
+		Run(nodeBuilder.PostShutdown)
 }

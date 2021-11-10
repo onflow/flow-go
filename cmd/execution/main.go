@@ -564,7 +564,7 @@ func main() {
 		}).
 		SerialStart().
 		Build().
-		Run()
+		Run(nodeBuilder.PostShutdown)
 }
 
 // copy the checkpoint files from the bootstrap folder to the execution state folder

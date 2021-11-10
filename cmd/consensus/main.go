@@ -764,7 +764,7 @@ func main() {
 		}).
 		SerialStart().
 		Build().
-		Run()
+		Run(nodeBuilder.PostShutdown)
 }
 
 func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPriv, error) {

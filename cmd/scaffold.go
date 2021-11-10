@@ -879,6 +879,10 @@ func (fnb *FlowNodeBuilder) PostInit(f BuilderFunc) NodeBuilder {
 	return fnb
 }
 
+func (fnb *FlowNodeBuilder) PostShutdown() error {
+	return fnb.closeDatabase()
+}
+
 type Option func(*BaseConfig)
 
 func WithBootstrapDir(bootstrapDir string) Option {
@@ -1016,7 +1020,6 @@ func (fnb *FlowNodeBuilder) Build() Node {
 		ComponentManager: fnb.componentBuilder.Build(),
 		NodeConfig:       fnb.NodeConfig,
 		Logger:           fnb.Logger,
-		DB:               fnb.DB,
 	}
 }
 
@@ -1065,10 +1068,6 @@ func (fnb *FlowNodeBuilder) onStart(ctx irrecoverable.SignalerContext) {
 	}
 }
 
-func (fnb *FlowNodeBuilder) postShutdown() {
-	fnb.closeDatabase()
-}
-
 func (fnb *FlowNodeBuilder) handlePreInit(f BuilderFunc) error {
 	return f(fnb.NodeConfig)
 }
@@ -1077,6 +1076,13 @@ func (fnb *FlowNodeBuilder) handlePostInit(f BuilderFunc) error {
 	return f(fnb.NodeConfig)
 }
 
+func (fnb *FlowNodeBuilder) closeDatabase() error {
+	err := fnb.DB.Close()
+	if err != nil {
+		return fmt.Errorf("could not close database: %w", err)
+	}
+	return nil
+}
 func (fnb *FlowNodeBuilder) extraFlagsValidation() error {
 	if fnb.extraFlagCheck != nil {
 		err := fnb.extraFlagCheck()

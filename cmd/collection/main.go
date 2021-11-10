@@ -508,7 +508,7 @@ func main() {
 		}).
 		SerialStart().
 		Build().
-		Run()
+		Run(nodeBuilder.PostShutdown)
 }
 
 // createQCContractClient creates QC contract client
