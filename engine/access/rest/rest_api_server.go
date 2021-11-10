@@ -16,9 +16,7 @@ func NewRestAPIServer(api *APIHandler, listenAddress string, logger zerolog.Logg
 
 	router := mux.NewRouter().StrictSlash(true)
 	for _, route := range apiRoutes(api) {
-		var handler http.Handler
-		handler = route.HandlerFunc
-		handler = newHandler(handler, route.Name, logger)
+		handler := newHandler(route.HandlerFunc, route.Name, logger)
 		router.
 			Methods(route.Method).
 			Path(route.Pattern).

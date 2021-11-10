@@ -67,6 +67,7 @@ func (restAPI *APIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 				restAPI.errorResponse(w, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", id), errorLogger)
 				return
 			}
+			errorLogger.Error().Err(err).Str("block_id", id).Msg("failed to look up block")
 			restAPI.errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("failed to look up block with ID %s", id), errorLogger)
 			return
 		}
@@ -75,13 +76,15 @@ func (restAPI *APIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 
 	encodedBlocks, err := json.Marshal(blocks)
 	if err != nil {
-		restAPI.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
+		errorLogger.Error().Err(err).Msg("failed to encode blocks")
+		restAPI.errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
 		return
 	}
 
 	_, err = w.Write(encodedBlocks)
 	if err != nil {
-		restAPI.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
+		errorLogger.Error().Err(err).Msg("failed to write response")
+		restAPI.errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
