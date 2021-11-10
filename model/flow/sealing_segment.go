@@ -52,7 +52,7 @@ var (
 
 type SealingSegmentBuilder struct {
 	resultLookup    func(resultID Identifier) (*ExecutionResult, error)
-	includedResults map[Identifier]*ExecutionResult
+	includedResults map[Identifier]bool
 	blocks          []*Block
 	results         []*ExecutionResult
 }
@@ -67,7 +67,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	// cache results in included results
 	// they could be referenced in a future block in the segment
 	for _, result := range block.Payload.Results.Lookup() {
-		builder.includedResults[result.ID()] = result
+		builder.includedResults[result.ID()] = true
 	}
 
 	for _, receipt := range block.Payload.Receipts {
@@ -78,7 +78,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 			}
 
 			builder.addExecutionResult(result)
-			builder.includedResults[receipt.ResultID] = result
+			builder.includedResults[receipt.ResultID] = true
 		}
 	}
 	builder.blocks = append(builder.blocks, block)
@@ -186,7 +186,7 @@ func (builder *SealingSegmentBuilder) lowest() *Block {
 func NewSealingSegmentBuilder(resultLookup func(resultID Identifier) (*ExecutionResult, error)) *SealingSegmentBuilder {
 	return &SealingSegmentBuilder{
 		resultLookup:    resultLookup,
-		includedResults: make(map[Identifier]*ExecutionResult),
+		includedResults: make(map[Identifier]bool),
 		blocks:          make([]*Block, 0),
 		results:         make(ExecutionResultList, 0),
 	}
