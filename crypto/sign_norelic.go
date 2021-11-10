@@ -1,4 +1,3 @@
-//go:build !relic
 // +build !relic
 
 package crypto
