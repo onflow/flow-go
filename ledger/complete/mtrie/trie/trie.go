@@ -182,9 +182,9 @@ func read(payloads []*ledger.Payload, paths []ledger.Path, head *node.Node) {
 //   * requires _all_ paths to have a length of mt.Height bits.
 // CAUTION: `updatedPaths` and `updatedPayloads` are permuted IN-PLACE for optimized processing.
 // TODO: move consistency checks from MForest to here, to make API safe and self-contained
-func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload) (*MTrie, error) {
+func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, updatedPayloads []ledger.Payload, prune bool) (*MTrie, error) {
 	parentRoot := parentTrie.root
-	updatedRoot := update(ledger.NodeMaxHeight, parentRoot, updatedPaths, updatedPayloads, nil)
+	updatedRoot := update(ledger.NodeMaxHeight, parentRoot, updatedPaths, updatedPayloads, nil, prune)
 	updatedTrie, err := NewMTrie(updatedRoot)
 	if err != nil {
 		return nil, fmt.Errorf("constructing updated trie failed: %w", err)
@@ -201,6 +201,7 @@ func NewTrieWithUpdatedRegisters(parentTrie *MTrie, updatedPaths []ledger.Path, 
 func update(
 	nodeHeight int, parentNode *node.Node,
 	paths []ledger.Path, payloads []ledger.Payload, compactLeaf *node.Node,
+	prune bool,
 ) *node.Node {
 	// No new paths to write
 	if len(paths) == 0 {
@@ -208,13 +209,13 @@ func update(
 		if compactLeaf != nil {
 			// create a new node for the compact leaf path and payload. The old node shouldn't
 			// be recycled as it is still used by the tree copy before the update.
-			return node.NewLeaf(*compactLeaf.Path(), compactLeaf.Payload(), nodeHeight)
+			return node.NewLeaf(*compactLeaf.Path(), compactLeaf.Payload().DeepCopy(), nodeHeight)
 		}
 		return parentNode
 	}
 
 	if len(paths) == 1 && parentNode == nil && compactLeaf == nil {
-		return node.NewLeaf(paths[0], &payloads[0], nodeHeight)
+		return node.NewLeaf(paths[0], payloads[0].DeepCopy(), nodeHeight)
 	}
 
 	if parentNode != nil && parentNode.IsLeaf() { // if we're here then compactLeaf == nil
@@ -226,7 +227,7 @@ func update(
 				// the case where the recursion stops: only one path to update
 				if len(paths) == 1 {
 					if !parentNode.Payload().Equals(&payloads[i]) {
-						return node.NewLeaf(paths[i], &payloads[i], nodeHeight)
+						return node.NewLeaf(paths[i], payloads[i].DeepCopy(), nodeHeight)
 					}
 					// avoid creating a new node when the same payload is written
 					return parentNode
@@ -279,17 +280,17 @@ func update(
 	parallelRecursionThreshold := 16
 	if len(lpaths) < parallelRecursionThreshold || len(rpaths) < parallelRecursionThreshold {
 		// runtime optimization: if there are _no_ updates for either left or right sub-tree, proceed single-threaded
-		lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
-		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
+		lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
+		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune)
 	} else {
 		// runtime optimization: process the left child is a separate thread
 		wg := sync.WaitGroup{}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf)
+			lChild = update(nodeHeight-1, lchildParent, lpaths, lpayloads, lcompactLeaf, prune)
 		}()
-		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf)
+		rChild = update(nodeHeight-1, rchildParent, rpaths, rpayloads, rcompactLeaf, prune)
 		wg.Wait()
 	}
 
@@ -298,7 +299,13 @@ func update(
 	if lChild == lchildParent && rChild == rchildParent {
 		return parentNode
 	}
-	return node.NewInterimNode(nodeHeight, lChild, rChild)
+
+	n := node.NewInterimNode(nodeHeight, lChild, rChild)
+
+	if prune {
+		return n.Compactify()
+	}
+	return n
 }
 
 // UnsafeProofs provides proofs for the given paths.
