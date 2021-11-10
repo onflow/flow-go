@@ -235,11 +235,6 @@ func WriteMachineAccountFile(
 	accountAddress flow.Address,
 	accountKey encodable.MachineAccountPrivKey,
 	write WriteJSONFileFunc) error {
-	// ensure the chain ID is for a transient chain, where it is possible to
-	// infer machine account addresses this way
-	if !chainID.Transient() {
-		return fmt.Errorf("cannot write default machine account files for non-transient network")
-	}
 
 	info := bootstrap.NodeMachineAccountInfo{
 		Address:           accountAddress.HexWithPrefix(),
