@@ -154,7 +154,8 @@ func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 		}
 	}
 
-	for _, seal := range builder.highest().Payload.Seals {
+	// highest contains seals check if seal for lowest exists
+	for _, seal := range highest.Payload.Seals {
 		if seal.BlockID == lowestID {
 			return true
 		}
