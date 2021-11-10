@@ -60,14 +60,9 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(block *model.Block) (hotstuf
 	for _, participant := range allParticipants {
 		pk, err := dkg.KeyShare(participant.NodeID)
 		if err != nil {
-			continue
-			//return nil, fmt.Errorf("could not get random beacon key share for %x: %w", participant.NodeID, err)
+			return nil, fmt.Errorf("could not get random beacon key share for %x: %w", participant.NodeID, err)
 		}
 		publicKeyShares = append(publicKeyShares, pk)
-	}
-
-	if len(publicKeyShares) != int(dkg.Size()) {
-		return nil, fmt.Errorf("invalid number of random beacon participants")
 	}
 
 	threshold := msig.RandomBeaconThreshold(int(dkg.Size()))
