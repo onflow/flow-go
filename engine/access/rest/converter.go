@@ -30,7 +30,7 @@ func toBlockHeader(flowHeader *flow.Header) *generated.BlockHeader {
 func toBlockPayload(flowPayload *flow.Payload) *generated.BlockPayload {
 	return &generated.BlockPayload{
 		CollectionGuarantees: toCollectionGuarantees(flowPayload.Guarantees),
-		BlockSeals:           blockSeals(flowPayload.Seals),
+		BlockSeals:           toBlockSeals(flowPayload.Seals),
 	}
 }
 
@@ -54,15 +54,15 @@ func toCollectionGuarantee(flowCollGuarantee *flow.CollectionGuarantee) generate
 	}
 }
 
-func blockSeals(flowSeals []*flow.Seal) []generated.BlockSeal {
+func toBlockSeals(flowSeals []*flow.Seal) []generated.BlockSeal {
 	seals := make([]generated.BlockSeal, len(flowSeals))
 	for i, seal := range flowSeals {
-		seals[i] = blockSeal(seal)
+		seals[i] = toBlockSeal(seal)
 	}
 	return seals
 }
 
-func blockSeal(flowSeal *flow.Seal) generated.BlockSeal {
+func toBlockSeal(flowSeal *flow.Seal) generated.BlockSeal {
 	return generated.BlockSeal{
 		BlockId:  flowSeal.BlockID.String(),
 		ResultId: flowSeal.ResultID.String(),
