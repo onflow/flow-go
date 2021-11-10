@@ -38,6 +38,7 @@ func TestSealingSegmentBuilder_AddBlock(t *testing.T) {
 		segment, err := builder.SealingSegment()
 		require.NoError(t, err)
 
+		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1, &block2}, segment.Blocks)
 		require.Equal(t, block2.ID(), segment.Highest().ID())
 		require.Equal(t, block1.ID(), segment.Lowest().ID())
 
@@ -81,29 +82,16 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		builder := flow.NewSealingSegmentBuilder(resultLookup)
 
 		block1 := unittest.BlockFixture()
-
+		block1.Header.View = 0
 		err := builder.AddBlock(&block1)
 		require.NoError(t, err)
 
 		segment, err := builder.SealingSegment()
 		require.NoError(t, err)
 
+		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1}, segment.Blocks)
 		require.Equal(t, segment.Highest().ID(), block1.ID())
 		require.Equal(t, segment.Lowest().ID(), block1.ID())
-	})
-
-	t.Run("should return ErrInvalidRootSegmentView for root sealing segment block not 0", func(t *testing.T) {
-		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
-		builder := flow.NewSealingSegmentBuilder(resultLookup)
-
-		block1 := unittest.BlockFixture()
-		block1.Header.View = uint64(1)
-
-		err := builder.AddBlock(&block1)
-		require.NoError(t, err)
-
-		_, err = builder.SealingSegment()
-		require.ErrorIs(t, err, flow.ErrInvalidRootSegmentView)
 	})
 
 	t.Run("should return valid sealing segment", func(t *testing.T) {
@@ -127,21 +115,103 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		require.Equal(t, segment.Lowest().ID(), block1.ID())
 	})
 
-	t.Run("should return ErrSegmentMissingSeal if highest block does not contain seal for lowest", func(t *testing.T) {
+	// test that when the highest block in the segment does not contain seals but the first ancestor of highest
+	// does contain a seal for lowest we return a valid sealing segment.
+	t.Run("should return valid sealing segment if ancestor of highest seals lowest", func(t *testing.T) {
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
+		builder := flow.NewSealingSegmentBuilder(resultLookup)
+
+		block1 := unittest.BlockFixture()
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		receipt, seal := unittest.ReceiptAndSealForBlock(&block1)
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt), unittest.WithSeals(seal)))
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+
+		err := builder.AddBlock(&block1)
+		require.NoError(t, err)
+		err = builder.AddBlock(&block2)
+		require.NoError(t, err)
+
+		err = builder.AddBlock(&block3)
+		require.NoError(t, err)
+
+		segment, err := builder.SealingSegment()
+		require.NoError(t, err)
+
+		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1, &block2, &block3}, segment.Blocks)
+		require.Equal(t, segment.Highest().ID(), block3.ID())
+		require.Equal(t, segment.Lowest().ID(), block1.ID())
+	})
+
+	t.Run("should return ErrInvalidRootSegmentView for root sealing segment with a block view not equal to 0", func(t *testing.T) {
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
+		builder := flow.NewSealingSegmentBuilder(resultLookup)
+
+		block1 := unittest.BlockFixture()
+		block1.Header.View = uint64(1)
+
+		err := builder.AddBlock(&block1)
+		require.NoError(t, err)
+
+		_, err = builder.SealingSegment()
+		require.ErrorIs(t, err, flow.ErrInvalidRootSegmentView)
+	})
+
+	t.Run("should return ErrSegmentMissingSeal if highest block contains seals but does not contain seal for lowest", func(t *testing.T) {
 		block1 := unittest.BlockFixture()
 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
 		builder := flow.NewSealingSegmentBuilder(resultLookup)
 
 		block2 := unittest.BlockWithParentFixture(block1.Header)
+		receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(seal1)))
 
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		receipt2, seal2 := unittest.ReceiptAndSealForBlock(&block2)
+		block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal2)))
 		err := builder.AddBlock(&block1)
 		require.NoError(t, err)
 
 		err = builder.AddBlock(&block2)
 		require.NoError(t, err)
 
+		err = builder.AddBlock(&block3)
+		require.NoError(t, err)
+
 		_, err = builder.SealingSegment()
-		require.True(t, errors.Is(err, flow.ErrSegmentMissingSeal))
+		require.ErrorIs(t, err, flow.ErrSegmentMissingSeal)
+	})
+
+	t.Run("should return ErrSegmentMissingSeal if highest block contains no seals and first ancestor with seals does not seal lowest", func(t *testing.T) {
+		block0 := unittest.BlockFixture()
+		block1 := unittest.BlockWithParentFixture(block0.Header)
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
+		builder := flow.NewSealingSegmentBuilder(resultLookup)
+
+		block2 := unittest.BlockWithParentFixture(block1.Header)
+		receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(seal1)))
+
+		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block4 := unittest.BlockWithParentFixture(block3.Header)
+
+		err := builder.AddBlock(&block0)
+		require.NoError(t, err)
+
+		err = builder.AddBlock(&block1)
+		require.NoError(t, err)
+
+		err = builder.AddBlock(&block2)
+		require.NoError(t, err)
+
+		err = builder.AddBlock(&block3)
+		require.NoError(t, err)
+
+		err = builder.AddBlock(&block4)
+		require.NoError(t, err)
+
+		_, err = builder.SealingSegment()
+		require.ErrorIs(t, err, flow.ErrSegmentMissingSeal)
 	})
 
 	t.Run("should return ErrSegmentBlocksWrongLen if sealing segment is built with no blocks", func(t *testing.T) {

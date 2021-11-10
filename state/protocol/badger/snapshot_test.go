@@ -196,9 +196,10 @@ func TestSealingSegment(t *testing.T) {
 			actual, err := state.AtBlockID(head.ID()).SealingSegment()
 			require.NoError(t, err)
 
+			assert.Len(t, actual.ExecutionResults, 0)
 			assert.Len(t, actual.Blocks, 1)
 			assert.Equal(t, len(expected.Blocks), len(actual.Blocks))
-			assertSegmentBlocksOrder(t, expected.Blocks, actual.Blocks)
+			unittest.AssertEqualBlocksLenAndOrder(t, expected.Blocks, actual.Blocks)
 		})
 	})
 
@@ -220,21 +221,12 @@ func TestSealingSegment(t *testing.T) {
 			err = state.Extend(context.Background(), &block2)
 			require.NoError(t, err)
 
-			block3 := unittest.BlockWithParentFixture(block2.Header)
-			err = state.Extend(context.Background(), &block3)
-			require.NoError(t, err)
-
-			s := state.AtBlockID(block3.ID())
-
-			segment, err := s.SealingSegment()
+			segment, err := state.AtBlockID(block2.ID()).SealingSegment()
 			require.NoError(t, err)
 			// sealing segment should contain B1 and B2
 			// B2 is reference of snapshot, B1 is latest sealed
-			assert.Len(t, segment.Blocks, 2)
-			assertSegmentBlocksOrder(t, []*flow.Block{&block1, &block2}, segment.Blocks)
-
-			assert.Equal(t, block1.ID(), segment.Blocks[0].ID())
-			assert.Equal(t, block2.ID(), segment.Blocks[1].ID())
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1, &block2}, segment.Blocks)
+			assert.Len(t, segment.ExecutionResults, 0)
 		})
 	})
 
@@ -269,6 +261,7 @@ func TestSealingSegment(t *testing.T) {
 			segment, err := state.AtBlockID(blockN.ID()).SealingSegment()
 			require.NoError(t, err)
 
+			assert.Len(t, segment.ExecutionResults, 0)
 			// sealing segment should cover range [B1, BN]
 			assert.Len(t, segment.Blocks, 102)
 			// first and last blocks should be B1, BN
@@ -309,7 +302,7 @@ func TestSealingSegment(t *testing.T) {
 
 			// sealing segment should be [B2, B3, B4]
 			require.Len(t, segment.Blocks, 3)
-			assertSegmentBlocksOrder(t, []*flow.Block{&block2, &block3, &block4}, segment.Blocks)
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block2, &block3, &block4}, segment.Blocks)
 
 			require.Len(t, segment.ExecutionResults, 0)
 		})
@@ -359,7 +352,7 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Len(t, segment.Blocks, 4)
-			assertSegmentBlocksOrder(t, []*flow.Block{&block2, &block3, &block4, &block5}, segment.Blocks)
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block2, &block3, &block4, &block5}, segment.Blocks)
 			_, found := segment.ExecutionResults.Lookup()[resultA.ID()]
 			require.True(t, found)
 			require.Len(t, segment.ExecutionResults, 1)
@@ -419,7 +412,7 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 
 			require.Len(t, segment.Blocks, 4)
-			assertSegmentBlocksOrder(t, []*flow.Block{&block2, &block3, &block4}, segment.Blocks)
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block2, &block3, &block4, &block5}, segment.Blocks)
 
 			_, found := segment.ExecutionResults.Lookup()[resultA.ID()]
 			require.True(t, found)
@@ -428,14 +421,37 @@ func TestSealingSegment(t *testing.T) {
 			require.Len(t, segment.ExecutionResults, 1)
 		})
 	})
-}
 
-// assertSegmentBlocksOrder asserts that both slices of sealing segment blocks have the same len and blocks are in the same order
-func assertSegmentBlocksOrder(t *testing.T, expectedBlocks, actualSegmentBlocks []*flow.Block) {
-	require.Equal(t, len(expectedBlocks), len(actualSegmentBlocks))
-	for i, block := range expectedBlocks {
-		require.Equal(t, block.ID(), actualSegmentBlocks[i].ID())
-	}
+	t.Run("sealing segment where highest block in segment does not seal lowest", func(t *testing.T) {
+		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
+			// build a block to seal
+			block1 := unittest.BlockWithParentFixture(head)
+			err := state.Extend(context.Background(), &block1)
+			require.NoError(t, err)
+
+			// build a block sealing block1
+			block2 := unittest.BlockWithParentFixture(block1.Header)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(seal1)))
+			err = state.Extend(context.Background(), &block2)
+			require.NoError(t, err)
+
+			block3 := unittest.BlockWithParentFixture(block2.Header)
+			err = state.Extend(context.Background(), &block3)
+			require.NoError(t, err)
+
+			s := state.AtBlockID(block3.ID())
+
+			segment, err := s.SealingSegment()
+			require.NoError(t, err)
+			// sealing segment should contain B1 and B2
+			// B2 is reference of snapshot, B1 is latest sealed
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1, &block2, &block3}, segment.Blocks)
+			assert.Len(t, segment.ExecutionResults, 0)
+
+		})
+	})
+
 }
 
 func TestLatestSealedResult(t *testing.T) {
