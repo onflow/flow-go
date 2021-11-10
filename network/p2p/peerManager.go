@@ -24,7 +24,7 @@ type Connector interface {
 }
 
 // DefaultPeerUpdateInterval is default duration for which the peer manager waits in between attempts to update peer connections
-var DefaultPeerUpdateInterval = time.Duration(1<<63 - 1) // setting to max
+var DefaultPeerUpdateInterval = 10 * time.Minute
 
 // PeerManager adds and removes connections to peers periodically and on request
 type PeerManager struct {
