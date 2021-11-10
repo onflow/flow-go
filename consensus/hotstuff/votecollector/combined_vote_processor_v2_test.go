@@ -2,7 +2,6 @@ package votecollector
 
 import (
 	"errors"
-	"github.com/onflow/flow-go/state/protocol/inmem"
 
 	"math/rand"
 	"sync"
@@ -31,6 +30,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
