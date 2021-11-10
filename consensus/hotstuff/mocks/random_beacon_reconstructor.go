@@ -14,8 +14,8 @@ type RandomBeaconReconstructor struct {
 	mock.Mock
 }
 
-// HasSufficientShares provides a mock function with given fields:
-func (_m *RandomBeaconReconstructor) HasSufficientShares() bool {
+// EnoughShares provides a mock function with given fields:
+func (_m *RandomBeaconReconstructor) EnoughShares() bool {
 	ret := _m.Called()
 
 	var r0 bool
@@ -73,22 +73,15 @@ func (_m *RandomBeaconReconstructor) TrustedAdd(signerID flow.Identifier, sig cr
 }
 
 // Verify provides a mock function with given fields: signerID, sig
-func (_m *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
+func (_m *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	ret := _m.Called(signerID, sig)
 
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.Identifier, crypto.Signature) bool); ok {
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.Identifier, crypto.Signature) error); ok {
 		r0 = rf(signerID, sig)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Error(0)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.Identifier, crypto.Signature) error); ok {
-		r1 = rf(signerID, sig)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
