@@ -220,7 +220,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte{}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -231,7 +231,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte{0}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -242,7 +242,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte{1 << 7}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -256,7 +256,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte{1<<7 + 1<<6}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -271,7 +271,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte{255}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -286,7 +286,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte{0}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -301,7 +301,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte{255, 1 << 7}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -316,7 +316,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte{0, 0}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -331,7 +331,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte{255, 255}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -349,7 +349,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, []byte{1<<7 + 1<<6 + 1<<5}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -368,7 +368,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		// 00011110
 		require.Equal(t, []byte{1<<4 + 1<<3 + 1<<2 + 1<<1}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -387,7 +387,7 @@ func TestSerializeAndDeserializeSigTypes(t *testing.T) {
 		// 00011110, 10000000
 		require.Equal(t, []byte{1<<4 + 1<<3 + 1<<2 + 1<<1 + 1, 1 << 7}, bytes)
 
-		types, err := deserializeFromBytes(bytes, len(expected))
+		types, err := deserializeFromBitVector(bytes, len(expected))
 		require.NoError(t, err)
 		require.Equal(t, expected, types)
 	})
@@ -407,14 +407,14 @@ func TestDeserializeMismatchingBytes(t *testing.T) {
 			// skip correct count
 			continue
 		}
-		_, err := deserializeFromBytes(bytes, invalidCount)
+		_, err := deserializeFromBitVector(bytes, invalidCount)
 		require.Error(t, err, fmt.Sprintf("invalid count: %v", invalidCount))
 		require.True(t, errors.Is(err, signature.ErrInvalidFormat), fmt.Sprintf("invalid count: %v", invalidCount))
 	}
 }
 
 func TestDeserializeInvalidTailingBits(t *testing.T) {
-	_, err := deserializeFromBytes([]byte{255, 1<<7 + 1<<1}, 9)
+	_, err := deserializeFromBitVector([]byte{255, 1<<7 + 1<<1}, 9)
 	require.Error(t, err)
 	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
 	require.Contains(t, fmt.Sprintf("%v", err), "remaining bits")

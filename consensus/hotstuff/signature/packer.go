@@ -116,7 +116,7 @@ func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flo
 	}
 
 	// deserialize the compact sig types
-	sigTypes, err := deserializeFromBytes(data.SigType, len(signerIDs))
+	sigTypes, err := deserializeFromBitVector(data.SigType, len(signerIDs))
 	if err != nil {
 		return nil, fmt.Errorf("failed to deserialize sig types from bytes: %w", err)
 	}
@@ -201,47 +201,43 @@ func serializeToBitVector(sigTypes []hotstuff.SigType) ([]byte, error) {
 	return bytes, nil
 }
 
-// deserializeFromBytes decodes the sig types from the given bit vector
+// deserializeFromBitVector decodes the sig types from the given bit vector
 // - serialized: bit-vector, one bit for each signer (tailing `0`s appended to make full bytes)
 // - count: the total number of sig types to be deserialized from the given bytes
 // It returns:
 // - (sigTypes, nil) if successfully deserialized sig types
 // - (nil, signature.ErrInvalidFormat) if the number of serialized bytes doesn't match the given number of sig types
 // - (nil, signature.ErrInvalidFormat) if the remaining bits in the last byte are not all 0s
-func deserializeFromBytes(serialized []byte, count int) ([]hotstuff.SigType, error) {
+func deserializeFromBitVector(serialized []byte, count int) ([]hotstuff.SigType, error) {
 	types := make([]hotstuff.SigType, 0, count)
 
-	// validate the length of serialized
-	// it must have enough bytes to fit the `count` number of bits
+	// validate the length of serialized vector
+	// it must be equal to the bytes required to fit exactly `count` number of bits
 	totalBytes := bytesCount(count)
-
 	if len(serialized) != totalBytes {
 		return nil, fmt.Errorf("encoding sig types of %d signers requires %d bytes but got %d bytes: %w",
 			count, totalBytes, len(serialized), signature.ErrInvalidFormat)
 	}
 
 	// parse each bit in the bit-vector, bit 0 is SigTypeStaking, bit 1 is SigTypeRandomBeacon
+	var byt byte
+	var offset int
 	for i := 0; i < count; i++ {
-		byt := serialized[i/8]
-		offset := 7 - (i % 8)
-		posMask := byte(1 << offset)
-		if byt&posMask == 0 {
+		byt = serialized[i>>3]
+		offset = 7 - (i & 7)
+		mask := byte(1 << offset)
+		if byt&mask == 0 {
 			types = append(types, hotstuff.SigTypeStaking)
 		} else {
 			types = append(types, hotstuff.SigTypeRandomBeacon)
 		}
 	}
 
-	// if there are remaining bits, they must be all `0`s
-	if count%8 > 0 {
-		// since we've validated the length of serialized, then the last byte
-		// must contain the remaining bits
-		last := serialized[len(serialized)-1]
-		remainings := last << (count % 8) // shift away the last used bits
-		if remainings != byte(0) {
-			return nil, fmt.Errorf("the remaining bits are expect to be all 0s, but actually are %v: %w",
-				remainings, signature.ErrInvalidFormat)
-		}
+	// remaining bits (if any), they must be all `0`s
+	remainings := byt << (8 - offset)
+	if remainings != byte(0) {
+		return nil, fmt.Errorf("the remaining bits are expected to be all 0s, but are %v: %w",
+			remainings, signature.ErrInvalidFormat)
 	}
 
 	return types, nil
