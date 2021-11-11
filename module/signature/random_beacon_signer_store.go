@@ -29,7 +29,7 @@ func NewEpochAwareRandomBeaconKeyStore(epochLookup module.EpochLookup, keys stor
 // It returns:
 //  - (signer, nil) if DKG was completed in the epoch of the view, signer is not nil
 //  - (nil, protocol.ErrEpochNotCommitted) if no epoch found for given view
-//  - (nil, DKGIncompleteError) if DKG was not completed in the epoch of the view
+//  - (nil, DKGFailError) if DKG failed locally in the epoch of the view
 //  - (nil, error) if there is any exception
 func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey, error) {
 	// fetching the epoch by view, if epoch is found, then DKG must have been completed
@@ -39,13 +39,13 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	}
 
 	// when DKG has completed,
-	// 		1. if a node successfully generated the DKG key, the private key will be stored in database.
-	//    2. if a node failed to generate the DKG key, we will save a record in database to indicate this
-	//       node has no DKG key for this epoch
-	// with the epoch, we can lookup my DKG key for the epoch. There are 3 cases:
+	// 1. if a node successfully generated the DKG key, the private key will be stored in database.
+	// 2. if a node failed to generate the DKG key, we will save a record in database to indicate this
+	//       node has no private key for this epoch
+	// with the epoch, we can lookup my random beacon private key for the epoch. There are 3 cases:
 	// 1. DKG has completed, and the private key is stored in database, and we can retrieve it (happy path)
-	// 2. DKG has completed, but we failed to generate our private key, and we marked in the database
-	// 		that there is no DKG key for this epoch
+	// 2. DKG has completed, but we failed it, and we marked in the database
+	// 		that there is no private key for this epoch
 	// 3. DKG has completed, but we
 	key, ok := s.privateKeys[epoch]
 	if ok {
@@ -58,7 +58,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	}
 
 	privBeaconKeyData, hasRandomBeaconKey, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
-	// this is an edge case where the epoch has determined, but the result of whether we have the DKG
+	// this is an edge case where the epoch has determined, but the result of whether we have the
 	// private key info or not is not found in the database.
 	// in this case, we will trigger as if we failed the DKG.
 	if errors.Is(err, storage.ErrNotFound) {
