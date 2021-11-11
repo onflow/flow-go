@@ -91,7 +91,6 @@ func (suite *RestAPITestSuite) SetupTest() {
 		SecureGRPCListenAddr:   anyPort,
 		HTTPListenAddr:         anyPort,
 		RESTListenAddr:         anyPort,
-		ServeRESTAPI:           true,
 	}
 
 	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,

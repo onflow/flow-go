@@ -35,8 +35,7 @@ type Config struct {
 	SecureGRPCListenAddr      string                           // the secure GRPC server address as ip:port
 	TransportCredentials      credentials.TransportCredentials // the secure GRPC credentials
 	HTTPListenAddr            string                           // the HTTP web proxy address as ip:port
-	ServeRESTAPI              bool                             // flag to enable the REST API server
-	RESTListenAddr            string                           // the REST server address as ip:port (ignored if ServeRESTAPI is false)
+	RESTListenAddr            string                           // the REST server address as ip:port (if empty the REST server will not be started)
 	CollectionAddr            string                           // the address of the upstream collection node
 	HistoricalAccessAddrs     string                           // the list of all access nodes from previous spork
 	MaxMsgSize                int                              // GRPC max message size
@@ -204,7 +203,7 @@ func (e *Engine) Ready() <-chan struct{} {
 	e.unit.Launch(e.serveUnsecureGRPC)
 	e.unit.Launch(e.serveSecureGRPC)
 	e.unit.Launch(e.serveGRPCWebProxy)
-	if e.config.ServeRESTAPI {
+	if e.config.RESTListenAddr != "" {
 		e.unit.Launch(e.serveREST)
 	}
 	return e.unit.Ready()
