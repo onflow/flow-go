@@ -218,23 +218,6 @@ func postProcessTestRun(packageResultMap map[string]*PackageResult) {
 		}
 
 		for _, testResults := range packageResult.TestMap {
-			for j, testResult := range testResults {
-				// found nil test - test with no result - due to `go test` bug where using fmt.Printf() without a newline causes that test to not have a result
-				// example:
-				// func Test1(t *testing.T) {
-				//   fmt.Printf("hello from test")
-				// }
-				if testResult.Result == "" {
-					// separate nil test results from regular test results
-					packageResult.NilTests = append(packageResult.NilTests, testResult)
-					// reslice test results without nil test - need to be careful that testResults slice isn't too small to be resliced
-					if len(testResults) >= j+1 {
-						copy(testResults[j:], testResults[j+1:])
-					}
-					// truncate last test result to complete reslicing - if this was the last test result, slice will be empty
-					testResults = testResults[:len(testResults)-1]
-				}
-			}
 			packageResult.Tests = append(packageResult.Tests, testResults...)
 		}
 
