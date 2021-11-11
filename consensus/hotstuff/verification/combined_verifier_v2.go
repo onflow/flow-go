@@ -16,7 +16,7 @@ import (
 	modulesig "github.com/onflow/flow-go/module/signature"
 )
 
-// CombinedVerifier is a verifier capable of verifying two signatures, one for each
+// CombinedVerifierV2 is a verifier capable of verifying two signatures, one for each
 // scheme. The first type is a signature from a staking signer,
 // which verifies either a single or an aggregated signature. The second type is
 // a signature from a random beacon signer, which verifies either the signature share or
@@ -29,7 +29,7 @@ type CombinedVerifierV2 struct {
 	merger         module.Merger
 }
 
-// NewCombinedVerifier creates a new combined verifier with the given dependencies.
+// NewCombinedVerifierV2 creates a new combined verifier with the given dependencies.
 // - the hotstuff committee's state is used to retrieve the public keys for the staking signature;
 // - the merger is used to combine and split staking and random beacon signatures;
 func NewCombinedVerifierV2(committee hotstuff.Committee, merger module.Merger) *CombinedVerifierV2 {

@@ -8,7 +8,10 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	modulesig "github.com/onflow/flow-go/module/signature"
@@ -58,6 +61,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	merger := modulesig.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 	verifier := NewCombinedVerifierV2(committee, merger)
 
+	// check that a created proposal can be verified by a verifier
 	proposal, err := signer.CreateProposal(block)
 	require.NoError(t, err)
 
@@ -65,6 +69,17 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	valid, err := verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
 	require.NoError(t, err)
 	require.Equal(t, true, valid)
+
+	// check that a created proposal's signature is a combined staking sig and random beacon sig
+	msg := MakeVoteMessage(block.View, block.BlockID)
+	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(encoding.ConsensusVoteTag))
+	require.NoError(t, err)
+
+	beaconSig, err := dkgKey.RandomBeaconPrivKey.Sign(msg, crypto.NewBLSKMAC(encoding.RandomBeaconTag))
+	require.NoError(t, err)
+
+	expectedSig := signature.EncodeDoubleSig(stakingSig, beaconSig)
+	require.Equal(t, expectedSig, proposal.SigData)
 }
 
 // Test that when DKG key is not available for a view, a signed block can pass the validation
@@ -120,4 +135,12 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	valid, err := verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
 	require.NoError(t, err)
 	require.Equal(t, true, valid)
+
+	// check that a created proposal's signature is a combined staking sig and random beacon sig
+	msg := MakeVoteMessage(block.View, block.BlockID)
+	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(encoding.ConsensusVoteTag))
+	require.NoError(t, err)
+
+	// check the signature only has staking sig
+	require.Equal(t, stakingSig, crypto.Signature(proposal.SigData))
 }
