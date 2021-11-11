@@ -3,6 +3,7 @@ package access
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/http"
 	"os"
 	"testing"
@@ -16,6 +17,7 @@ import (
 	"github.com/stretchr/testify/suite"
 
 	accessmock "github.com/onflow/flow-go/engine/access/mock"
+	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/engine/access/rpc"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -108,7 +110,7 @@ func TestRestAPI(t *testing.T) {
 
 func (suite *RestAPITestSuite) TestRestAPICall() {
 
-	suite.Run("GetBlockByID - happy path", func() {
+	suite.Run("GetBlockByID for a single ID - happy path", func() {
 
 		collections := unittest.CollectionListFixture(1)
 		block := unittest.BlockWithGuaranteesFixture(
@@ -127,6 +129,34 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		assert.Equal(suite.T(), block.ID().String(), blocks[0].Header.Id)
 	})
 
+	suite.Run("GetBlockByID for multiple IDs - happy path", func() {
+
+		client := suite.restAPIClient()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		blockIDs := make([]string, rest.MaxAllowedBlockIDsCnt)
+		blocks := make([]*flow.Block, rest.MaxAllowedBlockIDsCnt)
+		for i := range blockIDs {
+			id := unittest.IdentifierFixture()
+			blockIDs[i] = id.String()
+			collections := unittest.CollectionListFixture(1)
+			block := unittest.BlockWithGuaranteesFixture(
+				unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+			)
+			blocks[i] = block
+			suite.blocks.On("ByID", id).Return(block, nil).Once()
+		}
+
+		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, nil)
+		require.NoError(suite.T(), err)
+		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
+		assert.Len(suite.T(), blocks, rest.MaxAllowedBlockIDsCnt)
+		for i, b := range blocks {
+			assert.Equal(suite.T(), b.ID().String(), actualBlocks[i].Header.Id)
+		}
+	})
+
 	suite.Run("GetBlockByID with a non-existing block ID", func() {
 
 		nonExistingBlockID := unittest.IdentifierFixture()
@@ -137,7 +167,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		defer cancel()
 
 		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{nonExistingBlockID.String()}, nil)
-		assertError(suite.T(), resp, err, http.StatusNotFound, "not found")
+		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", nonExistingBlockID.String()))
 	})
 
 	suite.Run("GetBlockByID with an invalid block ID", func() {
@@ -150,6 +180,52 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{invalidBlockID}, nil)
 		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("invalid ID %s", invalidBlockID))
 	})
+
+	suite.Run("GetBlockByID with more than the permissible number of block IDs", func() {
+
+		client := suite.restAPIClient()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		// lower the max allowed block ID count on the server for the test
+		rest.MaxAllowedBlockIDsCnt = 10
+		blockIDs := make([]string, rest.MaxAllowedBlockIDsCnt+1)
+		for i := range blockIDs {
+			blockIDs[i] = unittest.IdentifierFixture().String()
+		}
+
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, nil)
+		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", rest.MaxAllowedBlockIDsCnt))
+	})
+
+	suite.Run("GetBlockByID with one non-existing block ID", func() {
+
+		client := suite.restAPIClient()
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		blockIDs := make([]string, rest.MaxAllowedBlockIDsCnt)
+		rand.Seed(time.Now().Unix())
+		invalidBlockIndex := rand.Intn(len(blockIDs))
+		for i := range blockIDs {
+			id := unittest.IdentifierFixture()
+			blockIDs[i] = id.String()
+			if i == invalidBlockIndex {
+				// return a storage not found error for one of block ID in the request
+				suite.blocks.On("ByID", id).Return(nil, storage.ErrNotFound).Once()
+				continue
+			}
+			collections := unittest.CollectionListFixture(1)
+			block := unittest.BlockWithGuaranteesFixture(
+				unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+			)
+			suite.blocks.On("ByID", id).Return(block, nil).Once()
+		}
+
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, nil)
+		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", blockIDs[invalidBlockIndex]))
+	})
+
 }
 
 func (suite *RestAPITestSuite) TearDownTest() {
