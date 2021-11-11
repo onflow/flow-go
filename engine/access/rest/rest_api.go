@@ -76,9 +76,13 @@ func (restAPI *APIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 		blocks[i] = toBlock(flowBlock)
 	}
 
-	encodedBlocks, err := json.Marshal(blocks)
+	restAPI.jsonResponse(w, blocks, errorLogger)
+}
+
+func (restAPI *APIHandler) jsonResponse(w http.ResponseWriter, responsePayload interface{}, errorLogger zerolog.Logger) {
+	encodedBlocks, err := json.Marshal(responsePayload)
 	if err != nil {
-		errorLogger.Error().Err(err).Msg("failed to encode blocks")
+		errorLogger.Error().Err(err).Msg("failed to encode response")
 		restAPI.errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
 		return
 	}

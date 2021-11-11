@@ -25,8 +25,11 @@ func NewRestAPIServer(api *APIHandler, listenAddress string, logger zerolog.Logg
 	}
 
 	return &http.Server{
-		Addr:    listenAddress,
-		Handler: router,
+		Addr:         listenAddress,
+		Handler:      router,
+		WriteTimeout: time.Second * 15,
+		ReadTimeout:  time.Second * 15,
+		IdleTimeout:  time.Second * 60,
 	}
 }
 
