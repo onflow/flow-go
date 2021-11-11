@@ -27,9 +27,10 @@ import (
 // The difference between V2 and V3 is that V2 will sign 2 sigs, whereas
 // V3 only sign 1 sig.
 type CombinedSignerV2 struct {
-	staking        module.MsgSigner
+	staking        module.Local
+	stakingHasher  hash.Hasher
 	beaconKeyStore module.RandomBeaconKeyStore
-	hasher         hash.Hasher
+	beaconHasher   hash.Hasher
 	signerID       flow.Identifier
 }
 
@@ -38,15 +39,16 @@ type CombinedSignerV2 struct {
 // - the beaconKeyStore is used to get threshold-signers by epoch/view;
 // - the signer ID is used as the identity when creating signatures;
 func NewCombinedSignerV2(
-	staking module.MsgSigner,
+	staking module.Local,
 	beaconKeyStore module.RandomBeaconKeyStore,
 	signerID flow.Identifier,
 ) *CombinedSignerV2 {
 
 	sc := &CombinedSignerV2{
 		staking:        staking,
+		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
 		beaconKeyStore: beaconKeyStore,
-		hasher:         crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		beaconHasher:   crypto.NewBLSKMAC(encoding.RandomBeaconTag),
 		signerID:       signerID,
 	}
 	return sc
@@ -105,7 +107,7 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 	// create the message to be signed and generate signatures
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	stakingSig, err := c.staking.Sign(msg)
+	stakingSig, err := c.staking.Sign(msg, c.stakingHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)
 	}
@@ -120,7 +122,7 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 
 	// if the node is a DKG node and has completed DKG, then using the random beacon key
 	// to sign the block
-	beaconShare, err := beaconKey.Sign(msg, c.hasher)
+	beaconShare, err := beaconKey.Sign(msg, c.beaconHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate beacon signature: %w", err)
 	}
