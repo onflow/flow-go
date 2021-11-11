@@ -88,22 +88,3 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 
 	return key, nil
 }
-
-// SingleBeaconSignerStore implements the msgSigner interface. It only
-// keeps one signer and is not epoch-aware. It is used only for the
-// bootstrapping process.
-type SingleBeaconSignerStore struct {
-	signer module.MsgSigner
-}
-
-// NewSingleSignerStore instantiates a new SingleSignerStore.
-func NewSingleBeaconSignerStore(signer module.MsgSigner) *SingleBeaconSignerStore {
-	return &SingleBeaconSignerStore{
-		signer: signer,
-	}
-}
-
-// GetThresholdSigner returns the signer.
-func (s *SingleBeaconSignerStore) GetSigner(view uint64) (module.MsgSigner, error) {
-	return s.signer, nil
-}

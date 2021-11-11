@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
-// TODO : to replaced by MsgSigner in V2
+// TODO : to be removed
 // Signer is a simple cryptographic signer that can sign a simple message to
 // generate a signature, and verify the signature against the message.
 type Signer interface {
@@ -45,12 +45,6 @@ type ThresholdSignerStore interface {
 	//  - (nil, DKGIncompleteError) if the node doesn't have beacon keys in the epoch of the view
 	//  - (nil, error) if there is any exception
 	GetThresholdSigner(view uint64) (ThresholdSigner, error)
-}
-
-// MsgSigner signs a given message and produces a signature
-// TODO: could be renamed to Signer once the original Signer is replaced with MsgSigner
-type MsgSigner interface {
-	Sign(msg []byte) (crypto.Signature, error)
 }
 
 // RandomBeaconKeyStore returns the random beacon private key for the given view,

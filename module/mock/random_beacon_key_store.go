@@ -3,7 +3,7 @@
 package mock
 
 import (
-	module "github.com/onflow/flow-go/module"
+	crypto "github.com/onflow/flow-go/crypto"
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -12,16 +12,16 @@ type RandomBeaconKeyStore struct {
 	mock.Mock
 }
 
-// GetSigner provides a mock function with given fields: view
-func (_m *RandomBeaconKeyStore) GetSigner(view uint64) (module.MsgSigner, error) {
+// ByView provides a mock function with given fields: view
+func (_m *RandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey, error) {
 	ret := _m.Called(view)
 
-	var r0 module.MsgSigner
-	if rf, ok := ret.Get(0).(func(uint64) module.MsgSigner); ok {
+	var r0 crypto.PrivateKey
+	if rf, ok := ret.Get(0).(func(uint64) crypto.PrivateKey); ok {
 		r0 = rf(view)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(module.MsgSigner)
+			r0 = ret.Get(0).(crypto.PrivateKey)
 		}
 	}
 

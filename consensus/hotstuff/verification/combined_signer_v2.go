@@ -13,7 +13,7 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// CombinedSignerV2 creates votes for the main consensus. 
+// CombinedSignerV2 creates votes for the main consensus.
 // When a participant votes for a block, it _always_ provide the staking signature
 // as part of their vote. Furthermore, the participant can _optionally_
 // also provide a random beacon signature. Through their staking signature, a
