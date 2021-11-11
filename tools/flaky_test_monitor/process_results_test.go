@@ -126,7 +126,6 @@ func checkTestRuns(t *testing.T, expectedTestRun TestRun, actualTestRun TestRun)
 
 		// check all regular and nil tests results of each package
 		checkTestResults(t, expectedPackageResults.Tests, actualPackageResults.Tests)
-		checkTestResults(t, expectedPackageResults.NilTests, actualPackageResults.NilTests)
 	}
 	// finally, compare the entire actual test run against what's expected - if there were any discrepancies they should have been caught by now
 	require.Equal(t, expectedTestRun, actualTestRun)

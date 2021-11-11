@@ -49,13 +49,12 @@ func (testRun *TestRun) save(fileName string) {
 
 // models test result of an entire package which can have multiple tests
 type PackageResult struct {
-	Package  string                  `json:"package"`
-	Result   string                  `json:"result"`
-	Elapsed  float32                 `json:"elapsed"`
-	Output   []string                `json:"output"`
-	Tests    []TestResult            `json:"tests"`
-	NilTests []TestResult            `json:"nil_tests"`
-	TestMap  map[string][]TestResult `json:"-"`
+	Package string                  `json:"package"`
+	Result  string                  `json:"result"`
+	Elapsed float32                 `json:"elapsed"`
+	Output  []string                `json:"output"`
+	Tests   []TestResult            `json:"tests"`
+	TestMap map[string][]TestResult `json:"-"`
 }
 
 // models result of a single test that's part of a larger package result
