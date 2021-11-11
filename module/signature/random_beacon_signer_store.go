@@ -23,11 +23,11 @@ func NewEpochAwareRandomBeaconKeyStore(epochLookup module.EpochLookup, keys stor
 	}
 }
 
-// GetSigner returns the threshold-signer for signing objects at a
+// GetSigner returns the random beacon signer for signing objects at a
 // given view. The view determines the epoch, which determines the DKG private
 // key underlying the signer.
 // It returns:
-//  - (signer, nil) if DKG was completed in the epoch of the view, signer is not nil
+//  - (signer, nil) if DKG succeeded locally in the epoch of the view, signer is not nil
 //  - (nil, protocol.ErrEpochNotCommitted) if no epoch found for given view
 //  - (nil, DKGFailError) if DKG failed locally in the epoch of the view
 //  - (nil, error) if there is any exception

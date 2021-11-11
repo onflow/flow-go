@@ -13,16 +13,13 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// CombinedSignerV2 creates votes for the main consensus. Per protocol specification
-// a consensus participant can vote for a block by _either_ signing the block with
-// its staking key _or_ with its random beacon key.
-// If the participant provides signs with its random beacon key, it contributes to
-// hotstuff _and_ the random beacon. A staking signature _only_ contributes to
-// hotstuff. The latter is a useful fallback for a node that failed to properly
-// participate in the DKG.
-// The default behaviour of a node is to contribute to both the random beacon and
-// hotstuff, as it will yield higher rewards. Therefore, we always sign with the
-// random beacon key if it is available.
+// CombinedSignerV2 creates votes for the main consensus. 
+// When a participant votes for a block, it _always_ provide the staking signature
+// as part of their vote. Furthermore, the participant can _optionally_
+// also provide a random beacon signature. Through their staking signature, a
+// participant always contributes to HotStuff's progress. Participation in the random
+// beacon is optional (but encouraged). This allows nodes that failed the DKG to
+// still contribute only to consensus (as fallback).
 // TODO: to be replaced by CombinedSignerV3 for mature V2 solution.
 // The difference between V2 and V3 is that V2 will sign 2 sigs, whereas
 // V3 only sign 1 sig.
@@ -99,8 +96,8 @@ func (c *CombinedSignerV2) CreateVote(block *model.Block) (*model.Vote, error) {
 
 // genSigData generates the signature data for our local node for the given block.
 // It returns:
-//  - (stakingSig, nil) if there is no DKG private key  The sig is 48 bytes long
-//  - (stakingSig+randomBeaconSig, nil) if there is DKG private key. The sig is 96 bytes long
+//  - (stakingSig, nil) if there is no random beacon private key  The sig is 48 bytes long
+//  - (stakingSig+randomBeaconSig, nil) if there is a random beacon private key. The sig is 96 bytes long
 //  - (nil, error) if there is any exception
 func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 
@@ -120,7 +117,7 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 		return nil, fmt.Errorf("could not get threshold signer for view %d: %w", block.View, err)
 	}
 
-	// if the node is a DKG node and has completed DKG, then using the random beacon key
+	// if the node is a Random Beacon participant and has completed its DKG, then using the random beacon key
 	// to sign the block
 	beaconShare, err := beaconKey.Sign(msg, c.beaconHasher)
 	if err != nil {

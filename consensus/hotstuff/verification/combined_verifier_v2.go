@@ -15,10 +15,10 @@ import (
 	modulesig "github.com/onflow/flow-go/module/signature"
 )
 
-// CombinedVerifier is a verifier capable of verifying two signatures for each
-// verifying operation. The first type is a signature from an aggregating signer,
-// which verifies either the single or the aggregated signature. The second type is
-// a signature from a threshold signer, which verifies either the signature share or
+// CombinedVerifier is a verifier capable of verifying two signatures, one for each
+// scheme. The first type is a signature from a staking signer,
+// which verifies either a single or an aggregated signature. The second type is
+// a signature from a random beacon signer, which verifies either the signature share or
 // the reconstructed threshold signature.
 type CombinedVerifierV2 struct {
 	committee      hotstuff.Committee
@@ -32,7 +32,7 @@ type CombinedVerifierV2 struct {
 // - the hotstuff committee's state is used to retrieve the public keys for the staking signature;
 // - the staking tag is used to create hasher to verify staking signatures;
 // - the beacon tag is used to create hasher to verify random beacon signatures;
-// - the merger is used to combined & split staking & random beacon signatures;
+// - the merger is used to combine and split staking and random beacon signatures;
 func NewCombinedVerifierV2(committee hotstuff.Committee, stakingTag string, beaconTag string, merger module.Merger) *CombinedVerifierV2 {
 	return &CombinedVerifierV2{
 		committee:      committee,
@@ -102,7 +102,7 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
-		return false, fmt.Errorf("could not get dkg: %w", err)
+		return false, fmt.Errorf("could not get dkg data: %w", err)
 	}
 
 	// TODO: to be replaced by packer.Unpack method
@@ -113,9 +113,8 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 	}
 
 	msg := MakeVoteMessage(block.View, block.BlockID)
-	// TODO: verify if batch verification is faster
 
-	// verify the beacon signature first
+	// verify the beacon signature first since it is faster to verify (no public key aggregation needed)
 	beaconValid, err := dkg.GroupKey().Verify(beaconThresSig, msg, c.beacon)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
@@ -130,6 +129,7 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 	// VerifyMany would only take the signature and the new list of signers (a bit vector preferably)
 	// as inputs. A new struct needs to be used for each epoch since the list of participants is upadted.
 
+       // TODO: update to use module/signature.PublicKeyAggregator
 	aggregatedKey, err := c.keysAggregator.aggregatedStakingKey(signers)
 	if err != nil {
 		return false, fmt.Errorf("could not compute aggregated key: %w", err)

@@ -116,7 +116,7 @@ func (c *CombinedSignerV3) genSigData(block *model.Block) ([]byte, error) {
 		return nil, fmt.Errorf("could not get threshold signer for view %d: %w", block.View, err)
 	}
 
-	// if the node is a DKG node and has completed DKG, then using the random beacon key
+	// if the node is a Random Beacon participant and has completed its DKG, then using the random beacon key
 	// to sign the block
 	beaconShare, err := beaconKey.Sign(msg, c.hasher)
 	if err != nil {
