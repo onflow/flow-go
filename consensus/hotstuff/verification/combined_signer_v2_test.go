@@ -106,6 +106,10 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	dkg.On("KeyShare", signerID).Return(pk, nil)
 
 	committee := &mocks.Committee{}
+	// even if the node failed DKG, and has no random beacon private key,
+	// but other nodes, who completed and succeeded DKG, have a public key
+	// for this failed node, which can be used to verify signature from
+	// this failed node.
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	merger := modulesig.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
