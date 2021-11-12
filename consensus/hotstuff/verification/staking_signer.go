@@ -3,9 +3,7 @@ package verification
 import (
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
@@ -95,5 +93,5 @@ func (c *StakingSigner) genSigData(block *model.Block) ([]byte, error) {
 		return nil, fmt.Errorf("could not generate staking signature: %w", err)
 	}
 
-	return signature.EncodeSingleSig(hotstuff.SigTypeStaking, stakingSig), nil
+	return stakingSig, nil
 }

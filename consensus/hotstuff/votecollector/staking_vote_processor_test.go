@@ -278,7 +278,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
 		// create verifier that will do crypto checks of created QC
-		verifier := verification.NewStakingVerifier(committee)
+		verifier := verification.NewStakingVerifier()
 		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
 		validator := hotstuffvalidator.New(committee, forks, verifier)
