@@ -18,7 +18,6 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -279,7 +278,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
 		// create verifier that will do crypto checks of created QC
-		verifier := verification.NewSingleVerifierV2(committee, encoding.CollectorVoteTag)
+		verifier := verification.NewStakingVerifier(committee)
 		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
 		validator := hotstuffvalidator.New(committee, forks, verifier)
