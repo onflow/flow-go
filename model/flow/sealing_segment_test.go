@@ -15,8 +15,6 @@ import (
 func TestSealingSegmentBuilder_AddBlock(t *testing.T) {
 
 	// this test builds a valid sealing segment and adds 1 missing execution result to SealingSegment.ExecutionResults
-	// B1(Rec_1) -> B2
-	// expected sealing segment: SealingSegment{Blocks[B1, B2], ExecutionResults[Res_1]}
 	t.Run("should add blocks and missing results", func(t *testing.T) {
 		block1 := unittest.BlockFixture()
 		receipt1 := unittest.ReceiptForBlockFixture(&block1)
@@ -30,7 +28,9 @@ func TestSealingSegmentBuilder_AddBlock(t *testing.T) {
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal)))
+
+		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal)))
 
 		err := builder.AddBlock(&block1)
 		require.NoError(t, err)
@@ -41,11 +41,14 @@ func TestSealingSegmentBuilder_AddBlock(t *testing.T) {
 		err = builder.AddBlock(&block3)
 		require.NoError(t, err)
 
+		err = builder.AddBlock(&block4)
+		require.NoError(t, err)
+
 		segment, err := builder.SealingSegment()
 		require.NoError(t, err)
 
-		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1, &block2, &block3}, segment.Blocks)
-		require.Equal(t, block3.ID(), segment.Highest().ID())
+		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1, &block2, &block3, &block4}, segment.Blocks)
+		require.Equal(t, block4.ID(), segment.Highest().ID())
 		require.Equal(t, block1.ID(), segment.Lowest().ID())
 
 		_, ok := segment.ExecutionResults.Lookup()[receipt1.ExecutionResult.ID()]
@@ -107,9 +110,10 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		block1 := unittest.BlockFixture()
 		block2 := unittest.BlockWithParentFixture(block1.Header)
 		block3 := unittest.BlockWithParentFixture(block2.Header)
+		block4 := unittest.BlockWithParentFixture(block3.Header)
 		receipt, seal := unittest.ReceiptAndSealForBlock(&block1)
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
-		block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal)))
+		block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal)))
 
 		err := builder.AddBlock(&block1)
 		require.NoError(t, err)
@@ -117,11 +121,13 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		require.NoError(t, err)
 		err = builder.AddBlock(&block3)
 		require.NoError(t, err)
-
+		err = builder.AddBlock(&block4)
+		require.NoError(t, err)
 		segment, err := builder.SealingSegment()
 		require.NoError(t, err)
 
-		require.Equal(t, segment.Highest().ID(), block3.ID())
+		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1, &block2, &block3, &block4}, segment.Blocks)
+		require.Equal(t, segment.Highest().ID(), block4.ID())
 		require.Equal(t, segment.Lowest().ID(), block1.ID())
 	})
 
@@ -138,9 +144,11 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal)))
 
 		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal)))
+
+		block5 := unittest.BlockWithParentFixture(block4.Header)
 
 		err := builder.AddBlock(&block1)
 		require.NoError(t, err)
@@ -153,11 +161,14 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		err = builder.AddBlock(&block4)
 		require.NoError(t, err)
 
+		err = builder.AddBlock(&block5)
+		require.NoError(t, err)
+
 		segment, err := builder.SealingSegment()
 		require.NoError(t, err)
 
-		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1, &block2, &block3, &block4}, segment.Blocks)
-		require.Equal(t, segment.Highest().ID(), block4.ID())
+		unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1, &block2, &block3, &block4, &block5}, segment.Blocks)
+		require.Equal(t, segment.Highest().ID(), block5.ID())
 		require.Equal(t, segment.Lowest().ID(), block1.ID())
 	})
 
@@ -187,7 +198,9 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2)))
 
 		block4 := unittest.BlockWithParentFixture(block3.Header)
-		block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal2)))
+
+		block5 := unittest.BlockWithParentFixture(block4.Header)
+		block5.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal2)))
 
 		err := builder.AddBlock(&block1)
 		require.NoError(t, err)
@@ -199,6 +212,9 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		require.NoError(t, err)
 
 		err = builder.AddBlock(&block4)
+		require.NoError(t, err)
+
+		err = builder.AddBlock(&block5)
 		require.NoError(t, err)
 
 		_, err = builder.SealingSegment()
@@ -217,10 +233,11 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
 
 		block3 := unittest.BlockWithParentFixture(block2.Header)
-		block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
 
 		block4 := unittest.BlockWithParentFixture(block3.Header)
+		block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
 
+		block5 := unittest.BlockWithParentFixture(block4.Header)
 		err := builder.AddBlock(&block0)
 		require.NoError(t, err)
 
@@ -234,6 +251,9 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		require.NoError(t, err)
 
 		err = builder.AddBlock(&block4)
+		require.NoError(t, err)
+
+		err = builder.AddBlock(&block5)
 		require.NoError(t, err)
 
 		_, err = builder.SealingSegment()
