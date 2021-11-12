@@ -7,8 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/onflow/flow-go/module/util"
-
 	"github.com/onflow/flow-go/engine"
 
 	"github.com/sethvargo/go-retry"
@@ -50,7 +48,6 @@ type Broker struct {
 	me                 module.Local               // used for signing bcast messages
 	myIndex            int                        // index of this instance in the committee
 	dkgContractClients []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
-	fallbackStrategy   module.FallbackStrategy
 	tunnel             *BrokerTunnel            // channels through which the broker communicates with the network engine
 	privateMsgCh       chan messages.DKGMessage // channel to forward incoming private messages to consumers
 	broadcastMsgCh     chan messages.DKGMessage // channel to forward incoming broadcast messages to consumers
@@ -78,7 +75,6 @@ func NewBroker(
 		me:                 me,
 		myIndex:            myIndex,
 		dkgContractClients: dkgContractClients,
-		fallbackStrategy:   util.NewDefaultFallbackStrategy(len(dkgContractClients) - 1),
 		tunnel:             tunnel,
 		privateMsgCh:       make(chan messages.DKGMessage),
 		broadcastMsgCh:     make(chan messages.DKGMessage),
@@ -88,11 +84,6 @@ func NewBroker(
 	go b.listen()
 
 	return b
-}
-
-// dkgContractClient returns active dkg contract client
-func (b *Broker) dkgContractClient() module.DKGContractClient {
-	return b.dkgContractClients[b.fallbackStrategy.ClientIndex()]
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -217,7 +208,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 
 	onMaxConsecutiveRetries := func(totalAttempts, clientIndex int) {
 		dkgContractClient = b.dkgContractClients[clientIndex]
-		b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, b.fallbackStrategy.ClientIndex())
+		b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
 	afterConsecutiveFailures := retrymw.AfterConsecutiveFailures(retryMaxConsecutiveFailures, len(b.dkgContractClients)-1, maxedExpRetry, onMaxConsecutiveRetries)
 
@@ -265,7 +256,7 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 
 	onMaxConsecutiveRetries := func(totalAttempts, clientIndex int) {
 		dkgContractClient = b.dkgContractClients[clientIndex]
-		b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, b.fallbackStrategy.ClientIndex())
+		b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
 	afterConsecutiveFailures := retrymw.AfterConsecutiveFailures(retryMaxConsecutiveFailures, len(b.dkgContractClients)-1, maxedExpRetry, onMaxConsecutiveRetries)
 	err = retry.Do(context.Background(), afterConsecutiveFailures, func(ctx context.Context) error {
