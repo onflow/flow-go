@@ -30,19 +30,25 @@ type WeightedSignatureAggregator struct {
 var _ hotstuff.WeightedSignatureAggregator = &WeightedSignatureAggregator{}
 
 // NewWeightedSignatureAggregator returns a weighted aggregator initialized with a list of flow
-// identities, a message and a domain separation tag. The identities represent the list of all
-// possible signers.
+// identities, their respective public keys, a message and a domain separation tag. The identities
+// represent the list of all possible signers.
 //
 // The constructor errors engine.InvalidInputError if:
 // - the list of identities is empty
-// - if an identity doesn't hold a valid staking key.
+// - if the length of keys does not match the lenth of identities
+// - if one of the keys is not a valid public key.
 //
 // A weighted aggregator is used for one aggregation only. A new instance should be used for each use.
 func NewWeightedSignatureAggregator(
 	ids flow.IdentityList, // list of all possible signers
+	pks []crypto.PublicKey, // list of corresponding public keys
 	message []byte, // message to get an aggregated signature for
 	dsTag string, // domain separation tag used by the signature
 ) (*WeightedSignatureAggregator, error) {
+
+	if len(ids) != len(pks) {
+		return nil, engine.NewInvalidInputErrorf("keys length %d and identites length %d do not match", len(pks), len(ids))
+	}
 
 	// build the internal map for a faster look-up
 	idToInfo := make(map[flow.Identifier]signerInfo)
@@ -54,11 +60,7 @@ func NewWeightedSignatureAggregator(
 	}
 
 	// build a low level crypto aggregator
-	publicKeys := make([]crypto.PublicKey, 0, len(ids))
-	for _, id := range ids {
-		publicKeys = append(publicKeys, id.StakingPubKey)
-	}
-	agg, err := signature.NewSignatureAggregatorSameMessage(message, dsTag, publicKeys)
+	agg, err := signature.NewSignatureAggregatorSameMessage(message, dsTag, pks)
 	if err != nil {
 		return nil, fmt.Errorf("new signature aggregator failed: %w", err)
 	}

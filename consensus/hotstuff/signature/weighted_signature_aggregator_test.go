@@ -2,7 +2,6 @@ package signature
 
 import (
 	"crypto/rand"
-	"errors"
 	"sync"
 	"testing"
 
@@ -11,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
@@ -20,14 +20,10 @@ import (
 func createAggregationData(t *testing.T, signersNumber int) (
 	hotstuff.WeightedSignatureAggregator,
 	flow.IdentityList,
+	[]crypto.PublicKey,
 	[]crypto.Signature,
 	[]byte,
-	string) {
-	// create identities
-	ids := make([]*flow.Identity, 0, signersNumber)
-	for i := 0; i < signersNumber; i++ {
-		ids = append(ids, unittest.IdentityFixture())
-	}
+	hash.Hasher) {
 
 	// create message and tag
 	msgLen := 100
@@ -36,53 +32,27 @@ func createAggregationData(t *testing.T, signersNumber int) (
 	hasher := crypto.NewBLSKMAC(tag)
 
 	// create keys, identities and signatures
+	ids := make([]*flow.Identity, 0, signersNumber)
 	sigs := make([]crypto.Signature, 0, signersNumber)
+	pks := make([]crypto.PublicKey, 0, signersNumber)
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
 	for i := 0; i < signersNumber; i++ {
+		// id
+		ids = append(ids, unittest.IdentityFixture())
 		// keys
 		_, err := rand.Read(seed)
 		require.NoError(t, err)
 		sk, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 		require.NoError(t, err)
-		ids[i].StakingPubKey = sk.PublicKey()
+		pks = append(pks, sk.PublicKey())
 		// signatures
 		sig, err := sk.Sign(msg, hasher)
 		require.NoError(t, err)
 		sigs = append(sigs, sig)
 	}
-	aggregator, err := NewWeightedSignatureAggregator(ids, msg, tag)
+	aggregator, err := NewWeightedSignatureAggregator(ids, pks, msg, tag)
 	require.NoError(t, err)
-	return aggregator, ids, sigs, msg, tag
-}
-
-func verifyAggregate(signers []flow.Identifier,
-	ids flow.IdentityList,
-	sig []byte,
-	msg []byte,
-	tag string) (bool, error) {
-	// query identity using identifier
-	// done linearly just for testing
-	getIdentity := func(signer flow.Identifier) *flow.Identity {
-		for _, id := range ids {
-			if id.NodeID == signer {
-				return id
-			}
-		}
-		return nil
-	}
-
-	// get keys
-	keys := make([]crypto.PublicKey, 0, len(ids))
-	for _, signer := range signers {
-		id := getIdentity(signer)
-		if id == nil {
-			return false, errors.New("unexpected test error")
-		}
-		keys = append(keys, id.StakingPubKey)
-	}
-	// verify signature
-	hasher := crypto.NewBLSKMAC(tag)
-	return crypto.VerifyBLSSignatureOneMessage(keys, sig, msg, hasher)
+	return aggregator, ids, pks, sigs, msg, hasher
 }
 
 func TestWeightedSignatureAggregator(t *testing.T) {
@@ -95,28 +65,35 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 
 		signer := unittest.IdentityFixture()
 		// identity with empty key
-		_, err := NewWeightedSignatureAggregator(flow.IdentityList{signer}, msg, tag)
+		_, err := NewWeightedSignatureAggregator(flow.IdentityList{signer}, []crypto.PublicKey{nil}, msg, tag)
 		assert.Error(t, err)
 		assert.True(t, engine.IsInvalidInputError(err))
-		// wrong key types
+		// wrong key type
 		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
 		_, err = rand.Read(seed)
 		require.NoError(t, err)
 		sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
 		require.NoError(t, err)
-		signer.StakingPubKey = sk.PublicKey()
-		_, err = NewWeightedSignatureAggregator(flow.IdentityList{signer}, msg, tag)
+		pk := sk.PublicKey()
+		_, err = NewWeightedSignatureAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk}, msg, tag)
 		assert.Error(t, err)
 		assert.True(t, engine.IsInvalidInputError(err))
 		// empty signers
-		_, err = NewWeightedSignatureAggregator(flow.IdentityList{}, msg, tag)
+		_, err = NewWeightedSignatureAggregator(flow.IdentityList{}, []crypto.PublicKey{}, msg, tag)
+		assert.Error(t, err)
+		assert.True(t, engine.IsInvalidInputError(err))
+		// mismatching input lengths
+		sk, err = crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+		require.NoError(t, err)
+		pk = sk.PublicKey()
+		_, err = NewWeightedSignatureAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk, pk}, msg, tag)
 		assert.Error(t, err)
 		assert.True(t, engine.IsInvalidInputError(err))
 	})
 
 	// Happy paths
 	t.Run("happy path and thread safety", func(t *testing.T) {
-		aggregator, ids, sigs, msg, tag := createAggregationData(t, signersNum)
+		aggregator, ids, pks, sigs, msg, hasher := createAggregationData(t, signersNum)
 		// only add a subset of the signatures
 		subSet := signersNum / 2
 		expectedWeight := uint64(0)
@@ -141,7 +118,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		wg.Wait()
 		signers, agg, err := aggregator.Aggregate()
 		assert.NoError(t, err)
-		ok, err := verifyAggregate(signers, ids, agg, msg, tag)
+		ok, err := crypto.VerifyBLSSignatureOneMessage(pks[subSet:], agg, msg, hasher)
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		// check signers
@@ -162,7 +139,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		}
 		signers, agg, err = aggregator.Aggregate()
 		assert.NoError(t, err)
-		ok, err = verifyAggregate(signers, ids, agg, msg, tag)
+		ok, err = crypto.VerifyBLSSignatureOneMessage(pks, agg, msg, hasher)
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		// check signers
@@ -178,7 +155,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 
 	// Unhappy paths
 	t.Run("invalid signer ID", func(t *testing.T) {
-		aggregator, _, sigs, _, _ := createAggregationData(t, signersNum)
+		aggregator, _, _, sigs, _, _ := createAggregationData(t, signersNum)
 		// generate an ID that is not in the node ID list
 		invalidId := unittest.IdentityFixture().NodeID
 
@@ -194,7 +171,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 	})
 
 	t.Run("duplicate signature", func(t *testing.T) {
-		aggregator, ids, sigs, _, _ := createAggregationData(t, signersNum)
+		aggregator, ids, _, sigs, _, _ := createAggregationData(t, signersNum)
 		expectedWeight := uint64(0)
 		// add signatures
 		for i, sig := range sigs {
@@ -226,7 +203,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 	})
 
 	t.Run("invalid signature", func(t *testing.T) {
-		aggregator, ids, sigs, _, _ := createAggregationData(t, signersNum)
+		aggregator, ids, _, sigs, _, _ := createAggregationData(t, signersNum)
 		// corrupt sigs[0]
 		sigs[0][4] ^= 1
 		// test Verify
