@@ -121,9 +121,8 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 	if !beaconValid {
 		return false, nil
 	}
-	// verify the aggregated staking signature next (more costly)
-	
 
+	// verify the aggregated staking signature next (more costly)
 	// TODO: update to use module/signature.PublicKeyAggregator
 	aggregatedKey, err := c.keysAggregator.aggregatedStakingKey(signers)
 	if err != nil {
