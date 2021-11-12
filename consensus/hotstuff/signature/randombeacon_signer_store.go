@@ -9,11 +9,14 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// EpochAwareRandomBeaconKeyStore provides an abstraction to query random beacon private key
+// for a given view.
+// Internally it indexes and caches the private keys by epoch.
 type EpochAwareRandomBeaconKeyStore struct {
 	epochLookup module.EpochLookup // used to fetch epoch counter by view
 	keys        storage.DKGKeys    // used to fetch DKG private key by epoch
 
-	mu          sync.Mutex                   // to ensure concurrent read/write to privateKeys
+	mu          sync.RWMutex                 // to ensure concurrent read/write to privateKeys
 	privateKeys map[uint64]crypto.PrivateKey // cache of privateKeys by epoch
 }
 
@@ -25,7 +28,7 @@ func NewEpochAwareRandomBeaconKeyStore(epochLookup module.EpochLookup, keys stor
 	}
 }
 
-// GetSigner returns the random beacon signer for signing objects at a
+// ByView returns the random beacon signer for signing objects at a
 // given view. The view determines the epoch, which determines the DKG private
 // key underlying the signer.
 // It returns:
@@ -87,7 +90,8 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 func (s *EpochAwareRandomBeaconKeyStore) readKey(epoch uint64) (crypto.PrivateKey, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.privateKeys[epoch]
+	key, found := s.privateKeys[epoch]
+	return key, found
 }
 
 func (s *EpochAwareRandomBeaconKeyStore) writeKey(epoch uint64, key crypto.PrivateKey) {

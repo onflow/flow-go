@@ -29,6 +29,7 @@ func RandomBeaconThreshold(size int) int {
 	return (size - 1) / 2
 }
 
+// TODO: to be removed  in V2
 // NewThresholdVerifier creates a new threshold verifier. *Important*: the
 // threshold provider can only verify signatures in the context of the provided
 // KMAC tag.
@@ -61,6 +62,7 @@ type ThresholdProvider struct {
 	priv crypto.PrivateKey
 }
 
+// TODO: to be removed in V2
 // NewThresholdProvider creates new threshold provider, using the given private
 // key share to generate signature shares. *Important*: the threshold provider
 // can only create and verify signatures in the context of the provided KMAC tag.
