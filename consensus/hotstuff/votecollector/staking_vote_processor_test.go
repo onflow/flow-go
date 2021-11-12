@@ -23,7 +23,6 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
-	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -248,10 +247,6 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	stakingSigners := unittest.IdentityListFixture(7, func(identity *flow.Identity) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
-
-		keys := &storagemock.DKGKeys{}
-		// there is no DKG key for this epoch
-		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
 
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
