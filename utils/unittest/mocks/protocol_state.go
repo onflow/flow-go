@@ -106,6 +106,13 @@ func (ps *ProtocolState) Final() protocol.Snapshot {
 		pendings := pending(ps, finalID)
 		mocked.ReturnArguments = mock.Arguments{pendings, nil}
 	}
+
+	mocked = snapshot.On("ValidDescendants")
+	mocked.RunFn = func(args mock.Arguments) {
+		// not concurrent safe
+		pendings := pending(ps, finalID)
+		mocked.ReturnArguments = mock.Arguments{pendings, nil}
+	}
 	return snapshot
 }
 
