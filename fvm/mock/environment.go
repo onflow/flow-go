@@ -67,6 +67,52 @@ func (_m *Environment) AddEncodedAccountKey(address common.Address, publicKey []
 	return r0
 }
 
+// AggregateBLSPublicKeys provides a mock function with given fields: keys
+func (_m *Environment) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	ret := _m.Called(keys)
+
+	var r0 *runtime.PublicKey
+	if rf, ok := ret.Get(0).(func([]*runtime.PublicKey) *runtime.PublicKey); ok {
+		r0 = rf(keys)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(*runtime.PublicKey)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]*runtime.PublicKey) error); ok {
+		r1 = rf(keys)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// AggregateBLSSignatures provides a mock function with given fields: sigs
+func (_m *Environment) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+	ret := _m.Called(sigs)
+
+	var r0 []byte
+	if rf, ok := ret.Get(0).(func([][]byte) []byte); ok {
+		r0 = rf(sigs)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]byte)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([][]byte) error); ok {
+		r1 = rf(sigs)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // AllocateStorageIndex provides a mock function with given fields: owner
 func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
 	ret := _m.Called(owner)
@@ -83,6 +129,27 @@ func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, e
 	var r1 error
 	if rf, ok := ret.Get(1).(func([]byte) error); ok {
 		r1 = rf(owner)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// BLSVerifyPOP provides a mock function with given fields: pk, s
+func (_m *Environment) BLSVerifyPOP(pk *runtime.PublicKey, s []byte) (bool, error) {
+	ret := _m.Called(pk, s)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(*runtime.PublicKey, []byte) bool); ok {
+		r0 = rf(pk, s)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(*runtime.PublicKey, []byte) error); ok {
+		r1 = rf(pk, s)
 	} else {
 		r1 = ret.Error(1)
 	}
