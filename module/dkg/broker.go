@@ -48,12 +48,12 @@ type Broker struct {
 	me                 module.Local               // used for signing bcast messages
 	myIndex            int                        // index of this instance in the committee
 	dkgContractClients []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
-	tunnel             *BrokerTunnel            // channels through which the broker communicates with the network engine
-	privateMsgCh       chan messages.DKGMessage // channel to forward incoming private messages to consumers
-	broadcastMsgCh     chan messages.DKGMessage // channel to forward incoming broadcast messages to consumers
-	messageOffset      uint                     // offset for next broadcast messages to fetch
-	shutdownCh         chan struct{}            // channel to stop the broker from listening
-	broadcasts         uint                     // broadcasts counts the number of successful broadcasts
+	tunnel             *BrokerTunnel              // channels through which the broker communicates with the network engine
+	privateMsgCh       chan messages.DKGMessage   // channel to forward incoming private messages to consumers
+	broadcastMsgCh     chan messages.DKGMessage   // channel to forward incoming broadcast messages to consumers
+	messageOffset      uint                       // offset for next broadcast messages to fetch
+	shutdownCh         chan struct{}              // channel to stop the broker from listening
+	broadcasts         uint                       // broadcasts counts the number of successful broadcasts
 }
 
 // NewBroker instantiates a new epoch-specific broker capable of communicating

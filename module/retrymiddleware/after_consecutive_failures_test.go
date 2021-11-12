@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/model/messages"
-	"github.com/onflow/flow-go/module/mock"
-	"github.com/sethvargo/go-retry"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/sethvargo/go-retry"
+	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/module/mock"
 )
 
 // TestAfterConsecutiveFailures test that the middleware executes the onConsecutiveFailures func as expected
@@ -36,7 +38,7 @@ func TestAfterConsecutiveFailures(t *testing.T) {
 
 	// every 2 failures we will update our dkgContractClient
 	maxConsecutiveRetries := 2
-	numOfClients := len(clients)-1
+	numOfClients := len(clients) - 1
 
 	expRetry, err := retry.NewConstant(1000 * time.Millisecond)
 	if err != nil {

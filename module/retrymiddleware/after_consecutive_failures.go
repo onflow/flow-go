@@ -1,9 +1,10 @@
 package retrymiddleware
 
 import (
-	"github.com/sethvargo/go-retry"
 	"sync"
 	"time"
+
+	"github.com/sethvargo/go-retry"
 )
 
 // OnMaxConsecutiveFailures func that gets invoked when max consecutive failures has been reached
