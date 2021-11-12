@@ -243,7 +243,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
-	signers := make(map[flow.Identifier]*verification.CombinedSignerV2)
+	signers := make(map[flow.Identifier]*verification.StakingSigner)
 	// prepare staking signers, each signer has its own private/public key pair
 	stakingSigners := unittest.IdentityListFixture(7, func(identity *flow.Identity) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
@@ -253,14 +253,10 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		// there is no DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
 
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
-
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		staking := msig.NewSingleSigner(encoding.CollectorVoteTag, me)
-		// TODO: replace this with something else, we don't need combined signer for collector cluster or do we?
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewStakingSigner(me, identity.NodeID)
 	})
 
 	leader := stakingSigners[0]
