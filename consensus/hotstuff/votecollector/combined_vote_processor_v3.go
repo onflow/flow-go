@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -48,12 +49,33 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(block *model.Block) (hotstuf
 	// message that has to be verified against aggregated signature
 	msg := verification.MakeVoteMessage(block.View, block.BlockID)
 
-	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.ConsensusVoteTag)
+	// prepare the staking public keys of participants
+	stakingKeys := make([]crypto.PublicKey, 0, len(allParticipants))
+	for _, participant := range allParticipants {
+		stakingKeys = append(stakingKeys, participant.StakingPubKey)
+	}
+
+	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, encoding.ConsensusVoteTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
 
-	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.ConsensusVoteTag)
+	dkg, err := f.committee.DKG(block.BlockID)
+	if err != nil {
+		return nil, fmt.Errorf("could not get DKG info at block %v: %w", block.BlockID, err)
+	}
+
+	// prepare the random beacon public keys of participants
+	beaconKeys := make([]crypto.PublicKey, 0, len(allParticipants))
+	for _, participant := range allParticipants {
+		pk, err := dkg.KeyShare(participant.NodeID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get random beacon key share for %x: %w", participant.NodeID, err)
+		}
+		beaconKeys = append(beaconKeys, pk)
+	}
+
+	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, encoding.ConsensusVoteTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
 	}
