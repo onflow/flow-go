@@ -272,7 +272,7 @@ func TestSealingSegment(t *testing.T) {
 
 	// test sealing segment where the segment blocks contain seals for
 	// ancestor blocks prior to the sealing segment
-	// ROOT -> B1 -> B2 -> B3(S1) -> B4(S2)
+	// ROOT -> B1 -> B2(R1) -> B3(R2, S1) -> B4 -> B5(S2)
 	// Expected sealing segment: [B2, B3, B4]
 	t.Run("overlapping sealing segment", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
@@ -280,29 +280,35 @@ func TestSealingSegment(t *testing.T) {
 			block1 := unittest.BlockWithParentFixture(head)
 			err := state.Extend(context.Background(), &block1)
 			require.NoError(t, err)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
 
 			block2 := unittest.BlockWithParentFixture(block1.Header)
+			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
 			err = state.Extend(context.Background(), &block2)
 			require.NoError(t, err)
 
+			receipt2, seal2 := unittest.ReceiptAndSealForBlock(&block2)
+
 			block3 := unittest.BlockWithParentFixture(block2.Header)
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
-			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(seal1)))
+			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal1)))
 			err = state.Extend(context.Background(), &block3)
 			require.NoError(t, err)
 
 			block4 := unittest.BlockWithParentFixture(block3.Header)
-			receipt2, seal2 := unittest.ReceiptAndSealForBlock(&block2)
-			block4.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal2)))
 			err = state.Extend(context.Background(), &block4)
 			require.NoError(t, err)
 
-			segment, err := state.AtBlockID(block4.ID()).SealingSegment()
+			block5 := unittest.BlockWithParentFixture(block4.Header)
+			block5.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal2)))
+			err = state.Extend(context.Background(), &block5)
+			require.NoError(t, err)
+
+			segment, err := state.AtBlockID(block5.ID()).SealingSegment()
 			require.NoError(t, err)
 
 			// sealing segment should be [B2, B3, B4]
-			require.Len(t, segment.Blocks, 3)
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block2, &block3, &block4}, segment.Blocks)
+			require.Len(t, segment.Blocks, 4)
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block2, &block3, &block4, &block5}, segment.Blocks)
 
 			require.Len(t, segment.ExecutionResults, 0)
 		})
@@ -310,7 +316,7 @@ func TestSealingSegment(t *testing.T) {
 
 	// test sealing segment where you have a chain that is 5 blocks long and the block 5 has a seal for block 2.
 	// block 2 also contains a receipt but no result.
-	// root -> B1[Result_A, Receipt_A_1] -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3 -> B4 -> B5 (Seal_B2)
+	// root -> B1[Result_A, Receipt_A_1] -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3(Receipt_for_seal) -> B4 -> B5 (Seal_B2)
 	// the segment for B5 should be `[B2,B3,B4,B5] + [Result_A]`
 	t.Run("sealing segment with 4 blocks and 1 execution result decoupled", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
@@ -329,13 +335,15 @@ func TestSealingSegment(t *testing.T) {
 
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receiptB), unittest.WithReceiptsAndNoResults(receiptA2)))
+			receiptForSeal, seal := unittest.ReceiptAndSealForBlock(&block2)
 
 			block3 := unittest.BlockWithParentFixture(block2.Header)
+			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receiptForSeal)))
+
 			block4 := unittest.BlockWithParentFixture(block3.Header)
 
 			block5 := unittest.BlockWithParentFixture(block4.Header)
-			receiptForSeal, seal := unittest.ReceiptAndSealForBlock(&block2)
-			block5.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal), unittest.WithReceipts(receiptForSeal)))
+			block5.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal)))
 
 			err := state.Extend(context.Background(), &block1)
 			require.NoError(t, err)
@@ -362,7 +370,7 @@ func TestSealingSegment(t *testing.T) {
 	// test sealing segment where you have a chain that is 5 blocks long and the block 5 has a seal for block 2.
 	// even though block2 & block3 both reference ResultA it should be added to the segment execution results list once.
 	// block3 also references ResultB so it should exists in the segment execution results as well.
-	// root -> B1[Result_A, Receipt_A_1] -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3[Receipt_B_2, Receipt_A_3] -> B4 -> B5 (Seal_B2)
+	// root -> B1[Result_A, Receipt_A_1] -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3[Receipt_B_2, Receipt_for_seal, Receipt_A_3] -> B4 -> B5 (Seal_B2)
 	t.Run("sealing segment with 4 blocks and 2 execution result decoupled", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			// simulate scenario where execution result is missing from block payload
@@ -386,14 +394,15 @@ func TestSealingSegment(t *testing.T) {
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receiptB), unittest.WithReceiptsAndNoResults(receiptA2)))
 
+			receiptForSeal, seal := unittest.ReceiptAndSealForBlock(&block2)
+
 			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(receiptB2, receiptA3)))
+			block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receiptForSeal), unittest.WithReceiptsAndNoResults(receiptB2, receiptA3)))
 
 			block4 := unittest.BlockWithParentFixture(block3.Header)
 
 			block5 := unittest.BlockWithParentFixture(block4.Header)
-			receiptForSeal, seal := unittest.ReceiptAndSealForBlock(&block2)
-			block5.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal), unittest.WithReceipts(receiptForSeal)))
+			block5.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal)))
 
 			require.NoError(t, err)
 
@@ -437,21 +446,25 @@ func TestSealingSegment(t *testing.T) {
 			require.NoError(t, err)
 
 			block3 := unittest.BlockWithParentFixture(block2.Header)
-			block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
 			err = state.Extend(context.Background(), &block3)
 			require.NoError(t, err)
 
 			block4 := unittest.BlockWithParentFixture(block3.Header)
+			block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
 			err = state.Extend(context.Background(), &block4)
 			require.NoError(t, err)
 
-			s := state.AtBlockID(block4.ID())
+			block5 := unittest.BlockWithParentFixture(block4.Header)
+			err = state.Extend(context.Background(), &block5)
+			require.NoError(t, err)
+
+			s := state.AtBlockID(block5.ID())
 
 			segment, err := s.SealingSegment()
 			require.NoError(t, err)
 			// sealing segment should contain B1 and B2
 			// B2 is reference of snapshot, B1 is latest sealed
-			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1, &block2, &block3, &block4}, segment.Blocks)
+			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{&block1, &block2, &block3, &block4, &block5}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 0)
 
 		})
