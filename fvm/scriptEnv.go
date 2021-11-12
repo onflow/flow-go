@@ -17,9 +17,8 @@ import (
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm/blueprints"
-	cryptoFVM "github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
 	"github.com/onflow/flow-go/fvm/programs"
@@ -494,8 +493,8 @@ func (e *ScriptEnv) Hash(data []byte, tag string, hashAlgorithm runtime.HashAlgo
 		defer sp.Finish()
 	}
 
-	hashAlgo := cryptoFVM.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
-	return cryptoFVM.HashWithTag(hashAlgo, tag, data)
+	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
+	return crypto.HashWithTag(hashAlgo, tag, data)
 }
 
 func (e *ScriptEnv) VerifySignature(
@@ -511,7 +510,7 @@ func (e *ScriptEnv) VerifySignature(
 		defer sp.Finish()
 	}
 
-	valid, err := cryptoFVM.VerifySignatureFromRuntime(
+	valid, err := crypto.VerifySignatureFromRuntime(
 		e.ctx.SignatureVerifier,
 		signature,
 		tag,
@@ -529,7 +528,7 @@ func (e *ScriptEnv) VerifySignature(
 }
 
 func (e *ScriptEnv) ValidatePublicKey(pk *runtime.PublicKey) (bool, error) {
-	return cryptoFVM.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
+	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
 
 // Block Environment Functions
@@ -723,33 +722,13 @@ func (e *ScriptEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, erro
 }
 
 func (e *ScriptEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error) {
-	key, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pk.PublicKey)
-	if err != nil {
-		return false, err
-	}
-	return cryptoFVM.VerifyPOP(key, sig)
+	return crypto.VerifyPOP(pk, sig)
 }
 
 func (e *ScriptEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
-	return cryptoFVM.AggregateSignatures(sigs)
+	return crypto.AggregateSignatures(sigs)
 }
 
 func (e *ScriptEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
-	pks := make([]crypto.PublicKey, 0, len(keys))
-	for _, key := range keys {
-		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, key.PublicKey)
-		if err != nil {
-			return nil, err
-		}
-		pks = append(pks, pk)
-	}
-	pk, err := cryptoFVM.AggregatePublicKeys(pks)
-	if err != nil {
-		return nil, err
-	}
-
-	return &runtime.PublicKey{
-		PublicKey: pk.Encode(),
-		SignAlgo:  cryptoFVM.CryptoToRuntimeSigningAlgorithm(crypto.BLSBLS12381),
-	}, nil
+	return crypto.AggregatePublicKeys(keys)
 }

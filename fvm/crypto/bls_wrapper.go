@@ -3,6 +3,7 @@
 package crypto
 
 import (
+	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 )
@@ -12,7 +13,7 @@ func NewBLSKMAC(_ string) hash.Hasher {
 }
 
 // VerifyPOP verifies a proof of possession (PoP) for the receiver public key; currently only works for BLS
-func VerifyPOP(pk crypto.PublicKey, s crypto.Signature) (bool, error) {
+func VerifyPOP(pk *runtime.PublicKey, s crypto.Signature) (bool, error) {
 	panic("VerifyPOP not supported with non-relic build")
 }
 
@@ -22,6 +23,6 @@ func AggregateSignatures(sigs [][]byte) (crypto.Signature, error) {
 }
 
 // AggregatePublicKeys aggregate multiple public keys into one; currently only works for BLS
-func AggregatePublicKeys(keys []crypto.PublicKey) (crypto.PublicKey, error) {
+func AggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	panic("AggregatePublicKeys not supported with non-relic build")
 }
