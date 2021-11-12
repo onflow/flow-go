@@ -18,12 +18,10 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
-	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -243,24 +241,16 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
-	signers := make(map[flow.Identifier]*verification.CombinedSignerV2)
+	signers := make(map[flow.Identifier]*verification.StakingSigner)
 	// prepare staking signers, each signer has its own private/public key pair
 	stakingSigners := unittest.IdentityListFixture(7, func(identity *flow.Identity) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
-		keys := &storagemock.DKGKeys{}
-		// there is no DKG key for this epoch
-		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
-
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
-
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		staking := msig.NewSingleSigner(encoding.CollectorVoteTag, me)
-		// TODO: replace this with something else, we don't need combined signer for collector cluster or do we?
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewStakingSigner(me, identity.NodeID)
 	})
 
 	leader := stakingSigners[0]
@@ -288,7 +278,7 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
 		// create verifier that will do crypto checks of created QC
-		verifier := verification.NewSingleVerifierV2(committee, encoding.CollectorVoteTag)
+		verifier := verification.NewStakingVerifier()
 		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
 		validator := hotstuffvalidator.New(committee, forks, verifier)

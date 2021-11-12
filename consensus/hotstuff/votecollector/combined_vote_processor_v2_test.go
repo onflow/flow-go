@@ -25,7 +25,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -785,13 +784,12 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		// there is no DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
 
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+		beaconSignerStore := msig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		staking := msig.NewSingleSigner(encoding.ConsensusVoteTag, me)
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
 	}
 
 	for _, identity := range beaconSigners {
@@ -812,13 +810,12 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		// there is DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
 
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+		beaconSignerStore := msig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		staking := msig.NewSingleSigner(encoding.ConsensusVoteTag, me)
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
 	}
 
 	leader := stakingSigners[0]
@@ -835,8 +832,8 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	require.NoError(t, err)
 
 	committee := &mockhotstuff.Committee{}
-	committee.On("Identities", mock.Anything, mock.Anything).Return(allIdentities, nil)
-	committee.On("DKG", mock.Anything).Return(inmemDKG, nil)
+	committee.On("Identities", block.BlockID, mock.Anything).Return(allIdentities, nil)
+	committee.On("DKG", block.BlockID).Return(inmemDKG, nil)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 
@@ -857,7 +854,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		packer := signature.NewConsensusSigDataPacker(committee)
 
 		// create verifier that will do crypto checks of created QC
-		verifier := verification.NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, packer)
+		verifier := verification.NewCombinedVerifierV2(committee, packer)
 		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
 		validator := hotstuffvalidator.New(committee, forks, verifier)

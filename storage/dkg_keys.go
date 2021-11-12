@@ -5,16 +5,18 @@ import (
 )
 
 type DKGKeys interface {
-	// insert the DKG private key to database when DKG was completed, and a DKG private key was successfully generated.
+	// insert the random beacon private key to database when DKG didn't fail locally
+	// (the node completed DKG  and a private key was successfully generated)
 	InsertMyDKGPrivateInfo(epochCounter uint64, key *dkg.DKGParticipantPriv) error
 
-	// insert a record in database to indicate that when DKG was completed, the node failed DKG, there is no DKG key generated.
+	// insert a record in database to indicate that the DKG was completed,
+	// but the node failed to properly participate, i.e. there is no valid private random beacon key.
 	InsertNoDKGPrivateInfo(epochCounter uint64) error
 
-	// receive the DKG key for the given Epoch, it returns:
-	// - (key, true, nil) when DKG was completed, and a DKG private key was saved
-	// - (nil, false, nil) when DKG was completed, but no DKG private key was saved
-	// - (nil, false, storage.ErrNotFound) no DKG private key is found in database, it's unknown whether a DKG key was generated
+	// look up the random beacon private key for the given Epoch, it returns:
+	// - (key, true, nil) when DKG succeeded locally ( DKG completed locally, and a non-nil private key was saved)
+	// - (nil, false, nil) when DKG completed locally, but no non-nil private key was saved
+	// - (nil, false, storage.ErrNotFound) no private key is found in database
 	// - (nil, false, error) for other exceptions
 	RetrieveMyDKGPrivateInfo(epochCounter uint64) (*dkg.DKGParticipantPriv, bool, error)
 }

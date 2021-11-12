@@ -15,7 +15,6 @@ import (
 
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -25,7 +24,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -789,13 +787,12 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		// there is no DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
 
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+		beaconSignerStore := msig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		staking := msig.NewSingleSigner(encoding.ConsensusVoteTag, me)
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
 	})
 	beaconSigners := unittest.IdentityListFixture(len(dkgData.PrivKeyShares))
 	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
@@ -815,13 +812,13 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		// there is DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
 
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+		beaconSignerStore := msig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		staking := msig.NewSingleSigner(encoding.ConsensusVoteTag, me)
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
+
 		dkgParticipants[identity.NodeID] = flow.DKGParticipant{
 			Index:    uint(index),
 			KeyShare: dkgData.PubKeyShares[index],
@@ -835,10 +832,8 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 
 	allIdentities := append(stakingSigners, beaconSigners...)
 
-	newLeader := beaconSigners[0]
-
-	committee, err := committees.NewStaticCommittee(allIdentities, newLeader.NodeID, dkgParticipants, dkgData.PubGroupKey)
-	require.NoError(t, err)
+	committee := &mockhotstuff.Committee{}
+	committee.On("Identities", block.BlockID, mock.Anything).Return(allIdentities, nil)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 
@@ -859,7 +854,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		packer := signature.NewConsensusSigDataPacker(committee)
 
 		// create verifier that will do crypto checks of created QC
-		verifier := verification.NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, packer)
+		verifier := verification.NewCombinedVerifierV2(committee, packer)
 		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
 		validator := hotstuffvalidator.New(committee, forks, verifier)
