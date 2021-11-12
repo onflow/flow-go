@@ -727,11 +727,11 @@ func (e *ScriptEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error
 	if err != nil {
 		return false, err
 	}
-	return crypto.VerifyPOP(key, sig)
+	return cryptoFVM.VerifyPOP(key, sig)
 }
 
 func (e *ScriptEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
-	return crypto.AggregateSignatures(sigs)
+	return cryptoFVM.AggregateSignatures(sigs)
 }
 
 func (e *ScriptEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
@@ -743,7 +743,7 @@ func (e *ScriptEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.
 		}
 		pks = append(pks, pk)
 	}
-	pk, err := crypto.AggregatePublicKeys(pks)
+	pk, err := cryptoFVM.AggregatePublicKeys(pks)
 	if err != nil {
 		return nil, err
 	}
