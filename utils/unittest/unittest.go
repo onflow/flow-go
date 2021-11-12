@@ -270,8 +270,5 @@ func Concurrently(n int, f func(int)) {
 
 // AssertEqualBlocksLenAndOrder asserts that both a segment of blocks have the same len and blocks are in the same order
 func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlocks []*flow.Block) {
-	require.Equal(t, len(expectedBlocks), len(actualSegmentBlocks))
-	for i, block := range expectedBlocks {
-		require.Equal(t, block.ID(), actualSegmentBlocks[i].ID())
-	}
+	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
 }
