@@ -11,33 +11,33 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	modulesig "github.com/onflow/flow-go/module/signature"
 )
 
-// CombinedVerifier is a verifier capable of verifying two signatures for each
-// verifying operation. The first type is a signature from an aggregating signer,
-// which verifies either the single or the aggregated signature. The second type is
-// a signature from a threshold signer, which verifies either the signature share or
+// CombinedVerifierV2 is a verifier capable of verifying two signatures, one for each
+// scheme. The first type is a signature from a staking signer,
+// which verifies either a single or an aggregated signature. The second type is
+// a signature from a random beacon signer, which verifies either the signature share or
 // the reconstructed threshold signature.
 type CombinedVerifierV2 struct {
 	committee      hotstuff.Committee
-	staking        hash.Hasher
-	beacon         hash.Hasher
+	stakingHasher  hash.Hasher
+	beaconHasher   hash.Hasher
 	keysAggregator *stakingKeysAggregator
 	packer         hotstuff.Packer
 }
 
-// NewCombinedVerifier creates a new combined verifier with the given dependencies.
+// NewCombinedVerifierV2 creates a new combined verifier with the given dependencies.
 // - the hotstuff committee's state is used to retrieve the public keys for the staking signature;
-// - the staking tag is used to create hasher to verify staking signatures;
-// - the beacon tag is used to create hasher to verify random beacon signatures;
+// - the merger is used to combine and split staking and random beacon signatures;
 // - the packer is used to unpack QC for verification;
-func NewCombinedVerifierV2(committee hotstuff.Committee, stakingTag string, beaconTag string, packer hotstuff.Packer) *CombinedVerifierV2 {
+func NewCombinedVerifierV2(committee hotstuff.Committee, packer hotstuff.Packer) *CombinedVerifierV2 {
 	return &CombinedVerifierV2{
 		committee:      committee,
-		staking:        crypto.NewBLSKMAC(stakingTag),
-		beacon:         crypto.NewBLSKMAC(beaconTag),
+		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+		beaconHasher:   crypto.NewBLSKMAC(encoding.RandomBeaconTag),
 		keysAggregator: newStakingKeysAggregator(),
 		packer:         packer,
 	}
@@ -65,15 +65,9 @@ func (c *CombinedVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, b
 		return false, fmt.Errorf("could not get dkg: %w", err)
 	}
 
-	// get the signer dkg key share
-	beaconPubKey, err := dkg.KeyShare(signer.NodeID)
-	if err != nil {
-		return false, fmt.Errorf("could not get random beacon key share for %x: %w", signer.NodeID, err)
-	}
-
 	// verify each signature against the message
 	// TODO: check if using batch verification is faster (should be yes)
-	stakingValid, err := signer.StakingPubKey.Verify(stakingSig, msg, c.staking)
+	stakingValid, err := signer.StakingPubKey.Verify(stakingSig, msg, c.stakingHasher)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}
@@ -86,7 +80,13 @@ func (c *CombinedVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, b
 		return true, nil
 	}
 
-	beaconValid, err := beaconPubKey.Verify(beaconShare, msg, c.beacon)
+	// if there is beacon share, there must be beacon public key
+	beaconPubKey, err := dkg.KeyShare(signer.NodeID)
+	if err != nil {
+		return false, fmt.Errorf("could not get random beacon key share for %x: %w", signer.NodeID, err)
+	}
+
+	beaconValid, err := beaconPubKey.Verify(beaconShare, msg, c.beaconHasher)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
@@ -102,7 +102,7 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
-		return false, fmt.Errorf("could not get dkg: %w", err)
+		return false, fmt.Errorf("could not get dkg data: %w", err)
 	}
 
 	// unpack sig data using packer
@@ -112,10 +112,9 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 	}
 
 	msg := MakeVoteMessage(block.View, block.BlockID)
-	// TODO: verify if batch verification is faster
 
-	// verify the beacon signature first
-	beaconValid, err := dkg.GroupKey().Verify(blockSigData.ReconstructedRandomBeaconSig, msg, c.beacon)
+	// verify the beacon signature first since it is faster to verify (no public key aggregation needed)
+	beaconValid, err := dkg.GroupKey().Verify(blockSigData.ReconstructedRandomBeaconSig, msg, c.beaconHasher)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
@@ -129,11 +128,12 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 	// VerifyMany would only take the signature and the new list of signers (a bit vector preferably)
 	// as inputs. A new struct needs to be used for each epoch since the list of participants is upadted.
 
+	// TODO: update to use module/signature.PublicKeyAggregator
 	aggregatedKey, err := c.keysAggregator.aggregatedStakingKey(signers)
 	if err != nil {
 		return false, fmt.Errorf("could not compute aggregated key: %w", err)
 	}
-	stakingValid, err := aggregatedKey.Verify(blockSigData.AggregatedStakingSig, msg, c.staking)
+	stakingValid, err := aggregatedKey.Verify(blockSigData.AggregatedStakingSig, msg, c.stakingHasher)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}

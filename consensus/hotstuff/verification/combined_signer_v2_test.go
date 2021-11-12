@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -39,7 +40,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	// there is DKG key for this epoch
 	keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
 
-	beaconSignerStore := modulesig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+	beaconKeyStore := modulesig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := unittest.IdentityFixture()
@@ -48,8 +49,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 
 	me, err := local.New(nil, stakingPriv)
 	require.NoError(t, err)
-	staking := modulesig.NewSingleSigner(encoding.ConsensusVoteTag, me)
-	signer := NewCombinedSignerV2(staking, beaconSignerStore, signerID)
+	signer := NewCombinedSignerV2(me, beaconKeyStore, signerID)
 
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
@@ -58,9 +58,9 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	packer := signature.NewConsensusSigDataPacker(committee)
-	// TODO: to be replaced with factory methods that creates signer and verifier
-	verifier := NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, packer)
+	verifier := NewCombinedVerifierV2(committee, packer)
 
+	// check that a created proposal can be verified by a verifier
 	proposal, err := signer.CreateProposal(block)
 	require.NoError(t, err)
 
@@ -68,6 +68,17 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	valid, err := verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
 	require.NoError(t, err)
 	require.Equal(t, true, valid)
+
+	// check that a created proposal's signature is a combined staking sig and random beacon sig
+	msg := MakeVoteMessage(block.View, block.BlockID)
+	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(encoding.ConsensusVoteTag))
+	require.NoError(t, err)
+
+	beaconSig, err := dkgKey.RandomBeaconPrivKey.Sign(msg, crypto.NewBLSKMAC(encoding.RandomBeaconTag))
+	require.NoError(t, err)
+
+	expectedSig := signature.EncodeDoubleSig(stakingSig, beaconSig)
+	require.Equal(t, expectedSig, proposal.SigData)
 }
 
 // Test that when DKG key is not available for a view, a signed block can pass the validation
@@ -92,7 +103,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	// there is no DKG key for this epoch
 	keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
 
-	beaconSignerStore := modulesig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+	beaconKeyStore := modulesig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := unittest.IdentityFixture()
@@ -101,18 +112,20 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 
 	me, err := local.New(nil, stakingPriv)
 	require.NoError(t, err)
-	staking := modulesig.NewSingleSigner(encoding.ConsensusVoteTag, me)
-	signer := NewCombinedSignerV2(staking, beaconSignerStore, signerID)
+	signer := NewCombinedSignerV2(me, beaconKeyStore, signerID)
 
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
 
 	committee := &mocks.Committee{}
+	// even if the node failed DKG, and has no random beacon private key,
+	// but other nodes, who completed and succeeded DKG, have a public key
+	// for this failed node, which can be used to verify signature from
+	// this failed node.
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	packer := signature.NewConsensusSigDataPacker(committee)
-	// TODO: to be replaced with factory methods that creates signer and verifier
-	verifier := NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, packer)
+	verifier := NewCombinedVerifierV2(committee, packer)
 
 	proposal, err := signer.CreateProposal(block)
 	require.NoError(t, err)
@@ -121,4 +134,12 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	valid, err := verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
 	require.NoError(t, err)
 	require.Equal(t, true, valid)
+
+	// check that a created proposal's signature is a combined staking sig and random beacon sig
+	msg := MakeVoteMessage(block.View, block.BlockID)
+	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(encoding.ConsensusVoteTag))
+	require.NoError(t, err)
+
+	// check the signature only has staking sig
+	require.Equal(t, stakingSig, crypto.Signature(proposal.SigData))
 }

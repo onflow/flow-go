@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 )
 
-// TODO : to replaced by MsgSigner in V2
+// TODO : to be removed
 // Signer is a simple cryptographic signer that can sign a simple message to
 // generate a signature, and verify the signature against the message.
 type Signer interface {
@@ -37,7 +37,7 @@ var (
 	DKGIncompleteError = errors.New("incomplete dkg")
 )
 
-// TODO: to be replaced by RandomBeaconSignerStore
+// TODO: to be replaced by RandomBeaconKeyStore
 // ThresholdSignerStore returns the threshold signer object by view
 type ThresholdSignerStore interface {
 	// It returns:
@@ -47,18 +47,11 @@ type ThresholdSignerStore interface {
 	GetThresholdSigner(view uint64) (ThresholdSigner, error)
 }
 
-// MsgSigner signs a given message and produces a signature
-// TODO: could be renamed to Signer once the original Signer is replaced with MsgSigner
-type MsgSigner interface {
-	Sign(msg []byte) (crypto.Signature, error)
-}
-
-// RandomBeaconSignerStore returns the signer for the given view, and it internally caches
-// signer objects by epoch. And epoch is determined by view.
-type RandomBeaconSignerStore interface {
+// RandomBeaconKeyStore returns the random beacon private key for the given view,
+type RandomBeaconKeyStore interface {
 	// It returns:
 	//  - (signer, nil) if the node has beacon keys in the epoch of the view
 	//  - (nil, DKGIncompleteError) if the node doesn't have beacon keys in the epoch of the view
 	//  - (nil, error) if there is any exception
-	GetSigner(view uint64) (MsgSigner, error)
+	ByView(view uint64) (crypto.PrivateKey, error)
 }

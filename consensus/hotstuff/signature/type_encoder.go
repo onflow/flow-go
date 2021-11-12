@@ -41,8 +41,8 @@ func DecodeSingleSig(sigData []byte) (hotstuff.SigType, crypto.Signature, error)
 // into one sigData.
 func EncodeDoubleSig(stakingSig crypto.Signature, beaconSig crypto.Signature) []byte {
 	encoded := make([]byte, 0, len(stakingSig)+len(beaconSig))
-	encoded = append(encoded, stakingSig[:]...)
-	encoded = append(encoded, beaconSig[:]...)
+	encoded = append(encoded, stakingSig...)
+	encoded = append(encoded, beaconSig...)
 	return encoded
 }
 
