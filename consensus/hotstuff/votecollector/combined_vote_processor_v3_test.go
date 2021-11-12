@@ -21,7 +21,6 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
@@ -782,13 +781,12 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		// there is no DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
 
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+		beaconSignerStore := msig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		staking := msig.NewSingleSigner(encoding.ConsensusVoteTag, me)
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
 	})
 	beaconSigners := unittest.IdentityListFixture(8, func(identity *flow.Identity) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
@@ -801,13 +799,12 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		// there is DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
 
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconSignerStore(epochLookup, keys)
+		beaconSignerStore := msig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		staking := msig.NewSingleSigner(encoding.ConsensusVoteTag, me)
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(staking, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
 	})
 
 	leader := stakingSigners[0]
@@ -839,7 +836,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		packer := signature.NewConsensusSigDataPacker(committee)
 
 		// create verifier that will do crypto checks of created QC
-		verifier := verification.NewCombinedVerifierV2(committee, encoding.ConsensusVoteTag, encoding.RandomBeaconTag, packer)
+		verifier := verification.NewCombinedVerifierV2(committee, packer)
 		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
 		validator := hotstuffvalidator.New(committee, forks, verifier)
