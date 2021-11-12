@@ -8,7 +8,7 @@ import (
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
-SigLen := crypto.SignatureLenBLSBLS12381
+const SigLen = crypto.SignatureLenBLSBLS12381
 
 // EncodeSingleSig encodes a single signature into signature data as required by the consensus design.
 func EncodeSingleSig(sigType hotstuff.SigType, sig crypto.Signature) []byte {
