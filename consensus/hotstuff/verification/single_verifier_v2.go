@@ -20,6 +20,7 @@ import (
 type SingleVerifierV2 struct {
 	committee      hotstuff.Committee
 	staking        hash.Hasher
+        // TODO: to be replaced by module/signature.PublicKeyAggregator in V2
 	keysAggregator *stakingKeysAggregator
 }
 
@@ -34,7 +35,7 @@ func NewSingleVerifierV2(committee hotstuff.Committee, stakingTag string) *Singl
 	}
 }
 
-// VerifyVote verifies the validity of a combined signature from a vote.
+// VerifyVote verifies the validity of a single signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
 // TODO: return error only, because when the sig is invalid, the returned bool
@@ -54,7 +55,6 @@ func (v *SingleVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, blo
 	}
 
 	// verify each signature against the message
-	// TODO: check if using batch verification is faster (should be yes)
 	stakingValid, err := signer.StakingPubKey.Verify(stakingSig, msg, v.staking)
 	if err != nil {
 		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
@@ -66,14 +66,11 @@ func (v *SingleVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, blo
 	return true, nil
 }
 
-// VerifyQC verifies the validity of a combined signature on a quorum certificate.
+// VerifyQC verifies the validity of a single signature on a quorum certificate.
+// 
+// In the single verification case, `sigData` represents a single signature (`crypto.Signature`).
 func (v *SingleVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
 	// verify the aggregated staking signature
-	// TODO: eventually VerifyMany will be a method of a stateful struct. The struct would
-	// hold the message, all the participants keys, the latest verification aggregated public key,
-	// as well as the latest list of signers (preferably a bit vector, using indices).
-	// VerifyMany would only take the signature and the new list of signers (a bit vector preferably)
-	// as inputs. A new struct needs to be used for each epoch since the list of participants is updated.
 
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
