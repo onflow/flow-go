@@ -51,6 +51,8 @@ func addResetCmdFlags() {
 // resetRun generates `resetEpoch` transaction arguments from a root protocol state snapshot and writes it to a JSON file
 func resetRun(cmd *cobra.Command, args []string) {
 
+	stdout := cmd.OutOrStdout()
+
 	// determine the source we will use for retrieving the root state snapshot,
 	// prioritizing downloading from a GCP bucket
 	var (
@@ -62,13 +64,15 @@ func resetRun(cmd *cobra.Command, args []string) {
 		url := fmt.Sprintf(rootSnapshotBucketURL, flagBucketNetworkName)
 		snapshot, err = getSnapshotFromBucket(url)
 		if err != nil {
-			log.Fatal().Err(err).Str("url", url).Msg("failed to retrieve root snapshot from bucket")
+			log.Error().Err(err).Str("url", url).Msg("failed to retrieve root snapshot from bucket")
+			return
 		}
 	} else if flagBootDir != "" {
 		path := filepath.Join(flagBootDir, bootstrap.PathRootProtocolStateSnapshot)
 		snapshot, err = getSnapshotFromLocalBootstrapDir(path)
 		if err != nil {
-			log.Fatal().Err(err).Str("path", path).Msg("failed to retrieve root snapshot from local bootstrap directory")
+			log.Error().Err(err).Str("path", path).Msg("failed to retrieve root snapshot from local bootstrap directory")
+			return
 		}
 	} else {
 		log.Fatal().Msg("must provide a source for root snapshot (specify either --boot-dir or --bucket-network-name)")
@@ -84,7 +88,7 @@ func resetRun(cmd *cobra.Command, args []string) {
 	}
 
 	// write JSON args to stdout
-	_, err = os.Stdout.Write(encodedTxArgs)
+	_, err = stdout.Write(encodedTxArgs)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not write jsoncdc encoded arguments")
 	}
