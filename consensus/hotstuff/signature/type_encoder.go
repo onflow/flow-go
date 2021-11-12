@@ -8,6 +8,8 @@ import (
 	msig "github.com/onflow/flow-go/module/signature"
 )
 
+SigLen := crypto.SignatureLenBLSBLS12381
+
 // EncodeSingleSig encodes a single signature into signature data as required by the consensus design.
 func EncodeSingleSig(sigType hotstuff.SigType, sig crypto.Signature) []byte {
 	t := byte(sigType)
@@ -49,12 +51,11 @@ func DecodeSingleSig(sigData []byte) (hotstuff.SigType, crypto.Signature, error)
 //  - nil, nil, ErrInvalidFormat if the sig type is invalid (covers nil or empty sigData)
 func DecodeDoubleSig(sigData []byte) (crypto.Signature, crypto.Signature, error) {
 	sigLength := len(sigData)
-	blsSigLen := crypto.SignatureLenBLSBLS12381
 	switch sigLength {
-	case blsSigLen:
+	case SigLen:
 		return sigData, nil, nil
-	case 2 * blsSigLen:
-		return sigData[:blsSigLen], sigData[blsSigLen:], nil
+	case 2 * SigLen:
+		return sigData[:SigLen], sigData[SigLen:], nil
 	}
 
 	return nil, nil, fmt.Errorf("invalid sig data length %d: %w", sigLength, msig.ErrInvalidFormat)
