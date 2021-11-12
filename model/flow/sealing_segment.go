@@ -52,7 +52,7 @@ var (
 
 type SealingSegmentBuilder struct {
 	resultLookup    func(resultID Identifier) (*ExecutionResult, error)
-	includedResults map[Identifier]bool
+	includedResults map[Identifier]struct{}
 	blocks          []*Block
 	results         []*ExecutionResult
 }
@@ -67,7 +67,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	// cache results in included results
 	// they could be referenced in a future block in the segment
 	for _, result := range block.Payload.Results.Lookup() {
-		builder.includedResults[result.ID()] = true
+		builder.includedResults[result.ID()] = struct{}{}
 	}
 
 	for _, receipt := range block.Payload.Receipts {
@@ -78,7 +78,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 			}
 
 			builder.addExecutionResult(result)
-			builder.includedResults[receipt.ResultID] = true
+			builder.includedResults[receipt.ResultID] = struct{}{}
 		}
 	}
 	builder.blocks = append(builder.blocks, block)
@@ -92,30 +92,11 @@ func (builder *SealingSegmentBuilder) addExecutionResult(result *ExecutionResult
 
 // SealingSegment will check if the highest block has a seal for the lowest block in the segment
 func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) {
-	segment := &SealingSegment{
-		Blocks:           builder.blocks,
-		ExecutionResults: builder.results,
+	if err := builder.validateSegment(); err != nil {
+		return nil, fmt.Errorf("failed to validate sealing segment: %w", err)
 	}
 
-	if len(segment.Blocks) < 1 {
-		return nil, fmt.Errorf("expect at least 2 blocks in a sealing segment or 1 block in the case of root segments, but actually got %v: %w", len(segment.Blocks), ErrSegmentBlocksWrongLen)
-	}
-
-	// if root sealing segment skip seal sanity check
-	if len(segment.Blocks) == 1 {
-
-		if !builder.isValidRootSegment() {
-			return nil, fmt.Errorf("root sealing segment block has the wrong view got (%d) expected (%d): %w", segment.Highest().Header.View, rootSegmentBlockView, ErrInvalidRootSegmentView)
-		}
-
-		return segment, nil
-	}
-
-	if !builder.hasValidSeal() {
-		return nil, fmt.Errorf("sealing segment missing seal lowest (%x) highest (%x): %w", segment.Lowest().ID(), segment.Highest().ID(), ErrSegmentMissingSeal)
-	}
-
-	return segment, nil
+	return &SealingSegment{builder.blocks, builder.results}, nil
 }
 
 // isValidHeight returns true block is exactly 1 height higher than the current highest block in the segment
@@ -169,6 +150,29 @@ func (builder *SealingSegmentBuilder) isValidRootSegment() bool {
 	return len(builder.blocks) == rootSegmentBlocksLen && builder.highest().Header.View == rootSegmentBlockView
 }
 
+// validateSegment will validate if builder satisfies conditions for a valid sealing segment
+func (builder *SealingSegmentBuilder) validateSegment() error {
+	// sealing cannot be empty
+	if len(builder.blocks) < 1 {
+		return fmt.Errorf("expect at least 2 blocks in a sealing segment or 1 block in the case of root segments, but actually got %v: %w", len(builder.blocks), ErrSegmentBlocksWrongLen)
+	}
+
+	// if root sealing segment skip seal sanity check
+	if len(builder.blocks) == 1 {
+		if !builder.isValidRootSegment() {
+			return fmt.Errorf("root sealing segment block has the wrong view got (%d) expected (%d): %w", builder.highest().Header.View, rootSegmentBlockView, ErrInvalidRootSegmentView)
+		}
+
+		return nil
+	}
+
+	if !builder.hasValidSeal() {
+		return fmt.Errorf("sealing segment missing seal lowest (%x) highest (%x): %w", builder.lowest().ID(), builder.highest().ID(), ErrSegmentMissingSeal)
+	}
+
+	return nil
+}
+
 // highest returns highest block in segment
 func (builder *SealingSegmentBuilder) highest() *Block {
 	if len(builder.blocks) == 0 {
@@ -187,7 +191,7 @@ func (builder *SealingSegmentBuilder) lowest() *Block {
 func NewSealingSegmentBuilder(resultLookup func(resultID Identifier) (*ExecutionResult, error)) *SealingSegmentBuilder {
 	return &SealingSegmentBuilder{
 		resultLookup:    resultLookup,
-		includedResults: make(map[Identifier]bool),
+		includedResults: make(map[Identifier]struct{}),
 		blocks:          make([]*Block, 0),
 		results:         make(ExecutionResultList, 0),
 	}
