@@ -53,7 +53,7 @@ func (c *CombinedVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, b
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// split the two signatures from the vote
-	// TODO: move DecodeDoubleSig to merger.Split
+	// TODO: to be replaced by packer
 	stakingSig, beaconShare, err := signature.DecodeDoubleSig(sigData)
 	if err != nil {
 		return false, fmt.Errorf("could not split signature: %w", modulesig.ErrInvalidFormat)

@@ -111,7 +111,7 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 
 	beaconKey, err := c.beaconKeyStore.ByView(block.View)
 	if err != nil {
-		if errors.Is(err, module.DKGIncompleteError) {
+		if errors.Is(err, module.DKGFailError) {
 			return stakingSig, nil
 		}
 		return nil, fmt.Errorf("could not get threshold signer for view %d: %w", block.View, err)
