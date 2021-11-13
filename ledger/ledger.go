@@ -184,61 +184,37 @@ func (k *Key) Size() int {
 	return size
 }
 
-// this is a helper function to help optimize CanonicalForm
-func (kp *KeyPart) store(arr []byte, offset int) int {
-	t := strconv.Itoa(int(kp.Type))
-	n := offset
-
-	arr[n] = byte('/')
-	n++
-	lenT := len(t)
-	lenValue := len(kp.Value)
-
-	for i := 0; i < lenT; i++ {
-		arr[n] = t[i]
-		n++
-	}
-	arr[n] = byte('/')
-	n++
-	for i := 0; i < lenValue; i++ {
-		arr[n] = kp.Value[i]
-		n++
-	}
-
-	// return the actual size
-	return n - offset
-}
-
 // CanonicalForm returns a byte slice describing the key
 // Warning, Changing this has an impact on how leaf hashes are computed
 // don't use this to reconstruct the key later
 func (k *Key) CanonicalForm() []byte {
 	// calculate the size of the byte array
 
-	// the maximum size of a uint16, is 5 characters, so
-	// this is using 10 as an estimate
+	// the maximum size of a uint16 is 5 characters, so
+	// this is using 10 for the estimate, to include the two '/'
+	// characters and an extra 3 characters for padding safety
 
-	requiredLen := 0
+	constant := 10
+
+	requiredLen := constant * len(k.KeyParts)
 	for _, kp := range k.KeyParts {
-		requiredLen += 10
 		requiredLen += len(kp.Value)
 	}
-	retval := make([]byte, requiredLen)
 
-	// get the exact size
-	requiredLen = 0
+	retval := make([]byte, 0, requiredLen)
+
 	for _, kp := range k.KeyParts {
-		requiredLen += kp.store(retval, requiredLen)
+		typeNumber := strconv.Itoa(int(kp.Type))
+
+		retval = append(retval, byte('/'))
+		retval = append(retval, []byte(typeNumber)...)
+		retval = append(retval, byte('/'))
+		retval = append(retval, kp.Value...)
 	}
 
-	// create an array with the correct size and copy
-	// the estimated into it.
-	corrected := make([]byte, requiredLen)
-	for i := 0; i < requiredLen; i++ {
-		corrected[i] = retval[i]
-	}
-
-	return corrected
+	// create a byte slice with the correct size and copy
+	// the estimated string into it.
+	return retval
 }
 
 func (k *Key) String() string {
