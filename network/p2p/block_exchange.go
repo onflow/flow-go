@@ -2,8 +2,6 @@ package p2p
 
 import (
 	"context"
-	"errors"
-	"fmt"
 
 	bitswap "github.com/ipfs/go-bitswap"
 	bsnet "github.com/ipfs/go-bitswap/network"
@@ -20,8 +18,6 @@ import (
 
 var _ network.BlockExchange = (*BlockExchange)(nil)
 var _ network.BlockExchangeFetcher = (*BlockExchangeSession)(nil)
-var _ network.BlocksPromise = (*BlocksPromise)(nil)
-var _ network.BlocksRequest = (*BlocksRequest)(nil)
 
 type BlockExchange struct {
 	bstore    blockstore.Blockstore
@@ -48,12 +44,8 @@ func NewBlockExchange(
 	}
 }
 
-func (e *BlockExchange) GetBlocks(cids ...cid.Cid) network.BlocksPromise {
-	return &BlocksPromise{
-		blocks: func(ctx context.Context) (<-chan blocks.Block, error) {
-			return e.bs.GetBlocks(ctx, cids)
-		},
-	}
+func (e *BlockExchange) GetBlocks(ctx context.Context, cids ...cid.Cid) (<-chan blocks.Block, error) {
+	return e.bs.GetBlocks(ctx, cids)
 }
 
 func (e *BlockExchange) HasBlock(block blocks.Block) error {
@@ -80,49 +72,6 @@ func NewBlockExchangeSession(ctx context.Context, ex *BlockExchange) *BlockExcha
 	}
 }
 
-func (s *BlockExchangeSession) GetBlocks(cids ...cid.Cid) network.BlocksPromise {
-	return &BlocksPromise{
-		blocks: func(ctx context.Context) (<-chan blocks.Block, error) {
-			return s.session.GetBlocks(ctx, cids)
-		},
-	}
-}
-
-type BlocksPromise struct {
-	blocks func(context.Context) (<-chan blocks.Block, error)
-}
-
-func (p *BlocksPromise) ForEach(cb func(blocks.Block)) network.BlocksRequest {
-	return &BlocksRequest{
-		forEach: cb,
-		blocks:  p.blocks,
-	}
-}
-
-type BlocksRequest struct {
-	forEach func(blocks.Block)
-	blocks  func(context.Context) (<-chan blocks.Block, error)
-}
-
-func (p *BlocksRequest) Send(ctx context.Context) (<-chan struct{}, error) {
-	cb := p.forEach
-
-	if cb == nil {
-		return nil, errors.New("handler must be set by calling ForEach before request can be sent")
-	}
-
-	blocks, err := p.blocks(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get channel for blocks: %w", err)
-	}
-
-	done := make(chan struct{})
-	go func() {
-		for block := range blocks {
-			p.forEach(block)
-		}
-		close(done)
-	}()
-
-	return done, nil
+func (s *BlockExchangeSession) GetBlocks(ctx context.Context, cids ...cid.Cid) (<-chan blocks.Block, error) {
+	return s.session.GetBlocks(ctx, cids)
 }

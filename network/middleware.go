@@ -83,23 +83,7 @@ type BlockExchange interface {
 
 // BlockExchangeFetcher is an interface for requesting blocks from a BlockExchange.
 type BlockExchangeFetcher interface {
-	GetBlocks(cids ...cid.Cid) BlocksPromise
-}
-
-// Example
-//
-//  done, err := bex.GetBlocks(blocksToGet...).ForEach(func(b blocks.Block) {
-//    // [...]
-//  }).Send(ctx)
-type BlocksPromise interface {
-	// ForEach is used to register a callback to handle received blocks
-	ForEach(cb func(blocks.Block)) BlocksRequest
-}
-
-// BlocksRequest represents a request for blocks on the Bitswap network.
-type BlocksRequest interface {
-	// Send initiates the request
-	Send(ctx context.Context) (<-chan struct{}, error)
+	GetBlocks(ctx context.Context, cids ...cid.Cid) (<-chan blocks.Block, error)
 }
 
 // Overlay represents the interface that middleware uses to interact with the

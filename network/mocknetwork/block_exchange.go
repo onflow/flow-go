@@ -23,26 +23,34 @@ func (_m *BlockExchange) Close() {
 	_m.Called()
 }
 
-// GetBlocks provides a mock function with given fields: cids
-func (_m *BlockExchange) GetBlocks(cids ...cid.Cid) network.BlocksPromise {
+// GetBlocks provides a mock function with given fields: ctx, cids
+func (_m *BlockExchange) GetBlocks(ctx context.Context, cids ...cid.Cid) (<-chan blocks.Block, error) {
 	_va := make([]interface{}, len(cids))
 	for _i := range cids {
 		_va[_i] = cids[_i]
 	}
 	var _ca []interface{}
+	_ca = append(_ca, ctx)
 	_ca = append(_ca, _va...)
 	ret := _m.Called(_ca...)
 
-	var r0 network.BlocksPromise
-	if rf, ok := ret.Get(0).(func(...cid.Cid) network.BlocksPromise); ok {
-		r0 = rf(cids...)
+	var r0 <-chan blocks.Block
+	if rf, ok := ret.Get(0).(func(context.Context, ...cid.Cid) <-chan blocks.Block); ok {
+		r0 = rf(ctx, cids...)
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(network.BlocksPromise)
+			r0 = ret.Get(0).(<-chan blocks.Block)
 		}
 	}
 
-	return r0
+	var r1 error
+	if rf, ok := ret.Get(1).(func(context.Context, ...cid.Cid) error); ok {
+		r1 = rf(ctx, cids...)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // GetSession provides a mock function with given fields: ctx
