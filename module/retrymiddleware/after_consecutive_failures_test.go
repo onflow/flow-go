@@ -38,7 +38,6 @@ func TestAfterConsecutiveFailures(t *testing.T) {
 
 	// every 2 failures we will update our dkgContractClient
 	maxConsecutiveRetries := 2
-	numOfClients := len(clients) - 1
 
 	expRetry, err := retry.NewConstant(1000 * time.Millisecond)
 	if err != nil {
@@ -46,9 +45,15 @@ func TestAfterConsecutiveFailures(t *testing.T) {
 	}
 	maxedExpRetry := retry.WithMaxRetries(5, expRetry)
 
-	var dkgContractClient *mock.DKGContractClient
 	// after 2 consecutive failures fallback to next DKGContractClient
-	afterConsecutiveFailures := AfterConsecutiveFailures(maxConsecutiveRetries, numOfClients, maxedExpRetry, func(totalAttempts, clientIndex int) {
+	clientIndex := 0
+	dkgContractClient := clients[clientIndex]
+	afterConsecutiveFailures := AfterConsecutiveFailures(maxConsecutiveRetries, maxedExpRetry, func(totalAttempts int) {
+		if clientIndex == len(clients)-1 {
+			clientIndex = 0
+		} else {
+			clientIndex++
+		}
 		dkgContractClient = clients[clientIndex]
 	})
 
@@ -60,4 +65,8 @@ func TestAfterConsecutiveFailures(t *testing.T) {
 		return retry.RetryableError(err)
 	})
 	require.Error(t, err)
+
+	a.AssertExpectations(t)
+	b.AssertExpectations(t)
+	c.AssertExpectations(t)
 }
