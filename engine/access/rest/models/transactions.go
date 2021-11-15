@@ -93,9 +93,8 @@ func (t *TransactionRequest) ToFlow() (*flow.TransactionBody, error) {
 
 // TransactionFromRequest creates a flow transaction from request payload and validates data.
 func TransactionFromRequest(body io.ReadCloser) (*flow.TransactionBody, error) {
-	decoder := json.NewDecoder(body)
 	var tr TransactionRequest
-	err := decoder.Decode(&tr)
+	err := decodeJSON(body, tr)
 	if err != nil {
 		return nil, err
 	}
