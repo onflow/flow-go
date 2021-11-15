@@ -138,10 +138,9 @@ func (b *Broker) Broadcast(data []byte) {
 		}
 		maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
 
-		clientIndex := 0
-		dkgContractClient := b.dkgContractClients[clientIndex]
+		clientIndex, dkgContractClient := b.updateContractClient(b.lastSuccessfulClientIndex, true)
 		onMaxConsecutiveRetries := func(totalAttempts int) {
-			clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
+			clientIndex, dkgContractClient = b.updateContractClient(clientIndex, false)
 			b.log.Warn().Msgf("broadcast: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 		}
 		afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, maxedExpRetry, onMaxConsecutiveRetries)
@@ -155,6 +154,8 @@ func (b *Broker) Broadcast(data []byte) {
 				return retry.RetryableError(err)
 			}
 
+			// update our last successful client index for future calls
+			b.lastSuccessfulClientIndex = clientIndex
 			return nil
 		})
 
@@ -207,10 +208,9 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	}
 	maxedExpRetry := retry.WithMaxRetries(retryMaxRead, expRetry)
 
-	clientIndex := 0
-	dkgContractClient := b.dkgContractClients[clientIndex]
+	clientIndex, dkgContractClient := b.updateContractClient(b.lastSuccessfulClientIndex, true)
 	onMaxConsecutiveRetries := func(totalAttempts int) {
-		clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
+		clientIndex, dkgContractClient = b.updateContractClient(clientIndex, false)
 		b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
 	afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, maxedExpRetry, onMaxConsecutiveRetries)
@@ -222,6 +222,9 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 			err = fmt.Errorf("could not read broadcast messages(offset: %d, ref: %v): %w", b.messageOffset, referenceBlock, err)
 			return retry.RetryableError(err)
 		}
+
+		// update our last successful client index for future calls
+		b.lastSuccessfulClientIndex = clientIndex
 		return nil
 	})
 	// Various network conditions can result in errors while reading DKG messages
@@ -256,10 +259,9 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 	}
 	maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
 
-	clientIndex := 0
-	dkgContractClient := b.dkgContractClients[clientIndex]
+	clientIndex, dkgContractClient := b.updateContractClient(b.lastSuccessfulClientIndex, true)
 	onMaxConsecutiveRetries := func(totalAttempts int) {
-		clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
+		clientIndex, dkgContractClient = b.updateContractClient(clientIndex, false)
 		b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
 	afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, maxedExpRetry, onMaxConsecutiveRetries)
@@ -269,6 +271,9 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 			b.log.Error().Err(err).Msg("error submitting DKG result, retrying")
 			return retry.RetryableError(err)
 		}
+
+		// update our last successful client index for future calls
+		b.lastSuccessfulClientIndex = clientIndex
 		return nil
 	})
 
@@ -287,7 +292,13 @@ func (b *Broker) Shutdown() {
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
-func (b *Broker) updateContractClient(clientIndex int) (int, module.DKGContractClient) {
+// updateContractClient will return the last successful client index by default for all initial operations or else
+// it will return the appropriate client index with respect to last successful and number of client.
+func (b *Broker) updateContractClient(clientIndex int, init bool) (int, module.DKGContractClient) {
+	if init {
+		return b.lastSuccessfulClientIndex, b.dkgContractClients[b.lastSuccessfulClientIndex]
+	}
+
 	if clientIndex == b.lastSuccessfulClientIndex {
 		if clientIndex == len(b.dkgContractClients)-1 {
 			clientIndex = 0

@@ -105,10 +105,9 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		log.Fatal().Err(err).Msg("create retry mechanism")
 	}
 
-	clientIndex := 0
-	qcContractClient := voter.qcContractClients[clientIndex]
+	clientIndex, qcContractClient := voter.updateContractClient(voter.lastSuccessfulClientIndex, true)
 	onMaxConsecutiveRetries := func(totalAttempts int) {
-		clientIndex, qcContractClient = voter.updateContractClient(clientIndex)
+		clientIndex, qcContractClient = voter.updateContractClient(clientIndex, false)
 		log.Warn().Msgf("retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
 	afterConsecutiveRetries := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, retry.WithJitterPercent(retryJitter, expRetry), onMaxConsecutiveRetries)
@@ -130,6 +129,8 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 			return retry.RetryableError(err)
 		} else if voted {
 			log.Info().Msg("already voted - exiting QC vote process...")
+			// update our last successful client index for future calls
+			voter.lastSuccessfulClientIndex = clientIndex
 			return nil
 		}
 
@@ -144,14 +145,23 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 
 		log.Info().Msg("successfully submitted vote - exiting QC vote process...")
 
+		// update our last successful client index for future calls
+		voter.lastSuccessfulClientIndex = clientIndex
 		return nil
 	})
 
 	return err
 }
 
-func (voter *RootQCVoter) updateContractClient(clientIndex int) (int, module.QCContractClient) {
-	if clientIndex == voter.lastSuccessfulClientIndex {
+// updateContractClient will return the last successful client index by default for all initial operations or else
+// it will return the appropriate client index with respect to last successful and number of client.
+func (voter *RootQCVoter) updateContractClient(clientIndex int, init bool) (int, module.QCContractClient) {
+	// if initial call return lastSuccessfulClientIndex will either be the index of the last successful client or 0
+	if init {
+		return voter.lastSuccessfulClientIndex, voter.qcContractClients[voter.lastSuccessfulClientIndex]
+	}
+
+	if clientIndex == voter.lastSuccessfulClientIndex  {
 		if clientIndex == len(voter.qcContractClients)-1 {
 			clientIndex = 0
 		} else {
