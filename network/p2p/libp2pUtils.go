@@ -170,6 +170,10 @@ func pingProtocolId(rootBlockID flow.Identifier) protocol.ID {
 	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID.String())
 }
 
+func GzipCompressedProtocolId(rootBlockID flow.Identifier) protocol.ID {
+	return protocol.ID()
+}
+
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
 // A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
 // flow.Identity           ---> peer.AddrInfo
