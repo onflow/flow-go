@@ -161,7 +161,7 @@ func (voter *RootQCVoter) updateContractClient(clientIndex int, init bool) (int,
 		return voter.lastSuccessfulClientIndex, voter.qcContractClients[voter.lastSuccessfulClientIndex]
 	}
 
-	if clientIndex == voter.lastSuccessfulClientIndex  {
+	if clientIndex == voter.lastSuccessfulClientIndex {
 		if clientIndex == len(voter.qcContractClients)-1 {
 			clientIndex = 0
 		} else {
