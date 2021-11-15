@@ -13,7 +13,6 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -43,8 +42,6 @@ func (suite *BlockExchangeTestSuite) SetupTest() {
 	suite.networks = networks
 	suite.cancel = cancel
 
-	var blockstores []blockstore.Blockstore
-
 	blockExchangeChannel := network.Channel("block-exchange")
 
 	for i, net := range networks {
@@ -52,8 +49,7 @@ func (suite *BlockExchangeTestSuite) SetupTest() {
 		block := blocks.NewBlock([]byte(fmt.Sprintf("foo%v", i)))
 		suite.blockCids = append(suite.blockCids, block.Cid())
 		require.NoError(suite.T(), bstore.Put(block))
-		blockstores = append(blockstores, bstore)
-		bex, err := net.RegisterBlockExchange(blockExchangeChannel, blockstores[i])
+		bex, err := net.RegisterBlockExchange(blockExchangeChannel, bstore)
 		require.NoError(suite.T(), err)
 		suite.blockExchanges = append(suite.blockExchanges, bex)
 	}
@@ -72,9 +68,11 @@ func (suite *BlockExchangeTestSuite) TestGetBlocks() {
 	for i, bex := range suite.blockExchanges {
 		// check that we can get all other blocks
 		var blocksToGet []cid.Cid
+		unreceivedBlocks := make(map[cid.Cid]struct{})
 		for j, blockCid := range suite.blockCids {
 			if j != i {
 				blocksToGet = append(blocksToGet, blockCid)
+				unreceivedBlocks[blockCid] = struct{}{}
 			}
 		}
 
@@ -84,85 +82,73 @@ func (suite *BlockExchangeTestSuite) TestGetBlocks() {
 		blocks, err := bex.GetBlocks(ctx, blocksToGet...)
 		suite.Require().NoError(err)
 
-		blocksReceived := make(map[cid.Cid]struct{})
 		for block := range blocks {
-			blocksReceived[block.Cid()] = struct{}{}
+			delete(unreceivedBlocks, block.Cid())
 		}
 
-		for _, blockCid := range blocksToGet {
-			_, blockReceived := blocksReceived[blockCid]
-			assert.True(suite.T(), blockReceived, "block %v not received by node %v", blockCid, i)
+		for c := range unreceivedBlocks {
+			suite.T().Errorf("Block %v not received by node %v", c, i)
 		}
 	}
 }
 
-// func (suite *BlockExchangeTestSuite) TestGetBlocksWithSession() {
-// 	for i, bex := range suite.blockExchanges {
-// 		// check that we can get all other blocks in a single session
-// 		blocksToGet := make(map[cid.Cid]struct{})
-// 		for j, blockCid := range suite.blockCids {
-// 			if j != i {
-// 				blocksToGet[blockCid] = struct{}{}
-// 			}
-// 		}
+func (suite *BlockExchangeTestSuite) TestGetBlocksWithSession() {
+	for i, bex := range suite.blockExchanges {
+		// check that we can get all other blocks in a single session
+		blocksToGet := make(map[cid.Cid]struct{})
+		for j, blockCid := range suite.blockCids {
+			if j != i {
+				blocksToGet[blockCid] = struct{}{}
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var blockChans []<-chan blocks.Block
+		session := bex.GetSession(ctx)
+		for blockCid := range blocksToGet {
+			blocks, err := session.GetBlocks(ctx, blockCid)
+			suite.Require().NoError(err)
+			blockChans = append(blockChans, blocks)
+		}
+		for block := range util.MergeChannels(blockChans).(<-chan blocks.Block) {
+			delete(blocksToGet, block.Cid())
+		}
+		for blockCid := range blocksToGet {
+			suite.T().Errorf("block %v not received by node %v", blockCid, i)
+		}
+	}
+}
 
-// 		ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(5*time.Second))
-
-// 		var doneChans []<-chan struct{}
-// 		session := bex.GetSession(ctx)
-// 		for blockCid := range blocksToGet {
-// 			done, err := session.GetBlocks(blockCid).ForEach(func(b blocks.Block) {
-// 				delete(blocksToGet, blockCid)
-// 			}).Send(ctx)
-// 			require.NoError(suite.T(), err)
-// 			doneChans = append(doneChans, done)
-// 		}
-
-// 		<-util.AllClosed(doneChans...)
-// 		cancel()
-
-// 		for blockCid := range blocksToGet {
-// 			assert.Fail(suite.T(), "missing block", "block %v not received by node %v", blockCid, i)
-// 		}
-// 	}
-// }
-
-// func (suite *BlockExchangeTestSuite) TestHas() {
-// 	ctx, cancel := context.WithDeadline(context.Background(), time.Now().Add(10*time.Second))
-// 	var doneChans []<-chan struct{}
-
-// 	blocksReceived := make(map[int]map[cid.Cid]bool)
-// 	for i, bex := range suite.blockExchanges {
-// 		blocksReceived[i] = make(map[cid.Cid]bool)
-
-// 		// check that peers are updated when we get a new block
-// 		var blocksToGet []cid.Cid
-// 		for j := 0; j < suite.numNetworks; j++ {
-// 			if j != i {
-// 				block := blocks.NewBlock([]byte(fmt.Sprintf("bar%v", i)))
-// 				blocksToGet = append(blocksToGet, block.Cid())
-// 				blocksReceived[i][block.Cid()] = false
-// 			}
-// 		}
-
-// 		done, err := bex.GetBlocks(blocksToGet...).ForEach(func(b blocks.Block) {
-// 			blocksReceived[i][b.Cid()] = true
-// 		}).Send(ctx)
-// 		require.NoError(suite.T(), err)
-// 		doneChans = append(doneChans, done)
-// 	}
-
-// 	for i, bex := range suite.blockExchanges {
-// 		err := bex.HasBlock(blocks.NewBlock([]byte(fmt.Sprintf("bar%v", i))))
-// 		require.NoError(suite.T(), err)
-// 	}
-
-// 	<-util.AllClosed(doneChans...)
-// 	cancel()
-
-// 	for i, cids := range blocksReceived {
-// 		for c, received := range cids {
-// 			assert.True(suite.T(), received, "block %v not received by node %v", c, i)
-// 		}
-// 	}
-// }
+func (suite *BlockExchangeTestSuite) TestHas() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	var blockChans []<-chan blocks.Block
+	unreceivedBlocks := make([]map[cid.Cid]struct{}, len(suite.blockExchanges))
+	for i, bex := range suite.blockExchanges {
+		unreceivedBlocks[i] = make(map[cid.Cid]struct{})
+		// check that peers are updated when we get a new block
+		var blocksToGet []cid.Cid
+		for j := 0; j < suite.numNetworks; j++ {
+			if j != i {
+				block := blocks.NewBlock([]byte(fmt.Sprintf("bar%v", i)))
+				blocksToGet = append(blocksToGet, block.Cid())
+				unreceivedBlocks[i][block.Cid()] = struct{}{}
+			}
+		}
+		blocks, err := bex.GetBlocks(ctx, blocksToGet...)
+		suite.Require().NoError(err)
+		blockChans = append(blockChans, blocks)
+	}
+	for i, bex := range suite.blockExchanges {
+		err := bex.HasBlock(blocks.NewBlock([]byte(fmt.Sprintf("bar%v", i))))
+		suite.Require().NoError(err)
+	}
+	for i, blocks := range blockChans {
+		for block := range blocks {
+			delete(unreceivedBlocks[i], block.Cid())
+		}
+		for c := range unreceivedBlocks[i] {
+			suite.Assert().Fail("block %v not received by node %v", c, i)
+		}
+	}
+}
