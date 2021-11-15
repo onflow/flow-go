@@ -380,9 +380,10 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	seals := stdmap.NewIncorporatedResultSeals(1000)
 	pendingReceipts := stdmap.NewPendingReceipts(node.Headers, 1000)
 
+	ingestionCore := consensusingest.NewCore(node.Log, node.Tracer, node.Metrics, node.State,
+		node.Headers, guarantees)
 	// receive collections
-	ingestionEngine, err := consensusingest.New(node.Log, node.Tracer, node.Metrics, node.Metrics, node.Metrics, node.Net, node.State,
-		node.Headers, node.Me, guarantees)
+	ingestionEngine, err := consensusingest.New(node.Log, node.Metrics, node.Net, node.Me, ingestionCore)
 	require.Nil(t, err)
 
 	// request receipts from execution nodes
@@ -645,7 +646,7 @@ func ExecutionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		followerEng,
 		syncCore,
 		finalizedHeader,
-		id.NewFilteredIdentifierProvider(
+		id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),

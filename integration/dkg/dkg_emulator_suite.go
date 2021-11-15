@@ -2,10 +2,7 @@ package dkg
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/module"
 	"os"
-
-	"github.com/onflow/flow-go/module"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -22,12 +19,14 @@ import (
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	sdktemplates "github.com/onflow/flow-go-sdk/templates"
 	"github.com/onflow/flow-go-sdk/test"
+
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/dkg"
 	emulatormod "github.com/onflow/flow-go/module/emulator"
 	"github.com/onflow/flow-go/network/stub"

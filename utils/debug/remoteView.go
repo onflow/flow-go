@@ -6,9 +6,10 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/onflow/flow/protobuf/go/flow/execution"
+
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow/protobuf/go/flow/execution"
 )
 
 // RemoteView provides a view connected to a live execution node to read the registers

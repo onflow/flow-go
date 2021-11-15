@@ -69,7 +69,7 @@ type Engine struct {
 
 func New(
 	logger zerolog.Logger,
-	net module.Network,
+	net network.Network,
 	me module.Local,
 	request module.Requester,
 	state protocol.State,

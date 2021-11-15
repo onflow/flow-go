@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 )
@@ -76,7 +77,7 @@ func (h *ProgramsHandler) mergeState(state *state.State) error {
 		h.masterState.SetActiveState(h.viewsStack[len(h.viewsStack)-1].state)
 	}
 
-	return h.masterState.State().MergeState(state, h.masterState.EnforceLimit)
+	return h.masterState.State().MergeState(state, h.masterState.EnforceInteractionLimits())
 }
 
 func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, bool) {
@@ -90,7 +91,11 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 		if view != nil { // handle view not set (ie. for non-address locations
 			err := h.mergeState(view)
 			if err != nil {
-				panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
+				// ignore LedgerIntractionLimitExceededError errors
+				var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
+				if !errors.As(err, &interactionLimiExceededErr) {
+					panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
+				}
 			}
 		}
 		return program, true
@@ -127,13 +132,13 @@ func (h *ProgramsHandler) Cleanup() error {
 
 	for i := stackLen - 1; i > 0; i-- {
 		entry := h.viewsStack[i]
-		err := h.viewsStack[i-1].state.MergeState(entry.state, h.masterState.EnforceLimit)
+		err := h.viewsStack[i-1].state.MergeState(entry.state, h.masterState.EnforceInteractionLimits())
 		if err != nil {
 			return fmt.Errorf("cannot merge state while cleanup: %w", err)
 		}
 	}
 
-	err := h.initialState.MergeState(h.viewsStack[0].state, h.masterState.EnforceLimit)
+	err := h.initialState.MergeState(h.viewsStack[0].state, h.masterState.EnforceInteractionLimits())
 	if err != nil {
 		return err
 	}

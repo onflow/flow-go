@@ -59,10 +59,10 @@ func extractExecutionState(
 	reporters := []ledger.Reporter{}
 
 	if migrate {
-		storageFormatV6Migration := mgr.StorageFormatV6Migration{
-			Log:       log,
-			OutputDir: outputDir,
-		}
+		//storageFormatV6Migration := mgr.StorageFormatV6Migration{
+		//	Log:       log,
+		//	OutputDir: outputDir,
+		//}
 
 		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
 			Log:       log,
@@ -70,8 +70,7 @@ func extractExecutionState(
 		}
 
 		migrations = []ledger.Migration{
-			mgr.PruneMigration,
-			storageFormatV6Migration.Migrate,
+			//storageFormatV6Migration.Migrate,
 			storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration, // we need post migration pruning before deploying trie update pruning
 		}

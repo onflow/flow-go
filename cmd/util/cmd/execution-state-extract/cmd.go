@@ -124,6 +124,7 @@ func run(*cobra.Command, []string) {
 		!flagNoMigration,
 		!flagNoReport,
 	)
+
 	if err != nil {
 		log.Fatal().Err(err).Msgf("error extracting the execution state: %s", err.Error())
 	}

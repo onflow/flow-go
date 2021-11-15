@@ -342,4 +342,3 @@ nodeToBeReturned := NewInterimNode(height, newlChild, newrChild)
  return nodeToBeReturned
 }
 ```
-

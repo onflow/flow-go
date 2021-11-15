@@ -426,9 +426,9 @@ func (a *StatefulAccounts) GetValue(address flow.Address, key string) (flow.Regi
 
 func (a *StatefulAccounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
 	if isController {
-		return a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key, a.stateHolder.EnforceLimit)
+		return a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key, a.stateHolder.EnforceInteractionLimits())
 	}
-	return a.stateHolder.State().Get(string(address.Bytes()), "", key, a.stateHolder.EnforceLimit)
+	return a.stateHolder.State().Get(string(address.Bytes()), "", key, a.stateHolder.EnforceInteractionLimits())
 }
 
 // SetValue sets a value in address' storage
@@ -443,9 +443,9 @@ func (a *StatefulAccounts) setValue(address flow.Address, isController bool, key
 	}
 
 	if isController {
-		return a.stateHolder.State().Set(string(address.Bytes()), string(address.Bytes()), key, value, a.stateHolder.EnforceLimit)
+		return a.stateHolder.State().Set(string(address.Bytes()), string(address.Bytes()), key, value, a.stateHolder.EnforceInteractionLimits())
 	}
-	return a.stateHolder.State().Set(string(address.Bytes()), "", key, value, a.stateHolder.EnforceLimit)
+	return a.stateHolder.State().Set(string(address.Bytes()), "", key, value, a.stateHolder.EnforceInteractionLimits())
 }
 
 func (a *StatefulAccounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
@@ -509,10 +509,10 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 // TODO handle errors
 func (a *StatefulAccounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
-		_, _ = a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key, a.stateHolder.EnforceLimit)
+		_, _ = a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key, a.stateHolder.EnforceInteractionLimits())
 		return
 	}
-	_, _ = a.stateHolder.State().Get(string(address.Bytes()), "", key, a.stateHolder.EnforceLimit)
+	_, _ = a.stateHolder.State().Get(string(address.Bytes()), "", key, a.stateHolder.EnforceInteractionLimits())
 }
 
 func (a *StatefulAccounts) TouchContract(contractName string, address flow.Address) {

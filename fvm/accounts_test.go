@@ -1199,8 +1199,8 @@ func TestGetAccountKey(t *testing.T) {
 							"weight: 1000.00000000, "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 							"isRevoked: false, "+
-							"keyIndex: %d)"+
-							byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
+							"keyIndex: %d)",
+						byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
 						i,
 					)
 

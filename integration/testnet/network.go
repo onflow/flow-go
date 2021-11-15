@@ -275,6 +275,23 @@ func NewNetworkConfig(name string, nodes []NodeConfig, opts ...NetworkConfigOpt)
 	return c
 }
 
+func NewNetworkConfigWithEpochConfig(name string, nodes []NodeConfig, viewsInStakingAuction, viewsInDKGPhase, viewsInEpoch uint64, opts ...NetworkConfigOpt) NetworkConfig {
+	c := NetworkConfig{
+		Nodes:                 nodes,
+		Name:                  name,
+		NClusters:             1, // default to 1 cluster
+		ViewsInStakingAuction: viewsInStakingAuction,
+		ViewsInDKGPhase:       viewsInDKGPhase,
+		ViewsInEpoch:          viewsInEpoch,
+	}
+
+	for _, apply := range opts {
+		apply(&c)
+	}
+
+	return c
+}
+
 func WithViewsInStakingAuction(views uint64) func(*NetworkConfig) {
 	return func(config *NetworkConfig) {
 		config.ViewsInStakingAuction = views
@@ -472,7 +489,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		bootstrapDir:       bootstrapDir,
 	}
 
-	// at-least 2 full access nodes must be configure in your test suite
+	// check that at-least 2 full access nodes must be configure in your test suite
 	// in order to provide a secure GRPC connection for LN & SN nodes
 	accessNodeIDS := make([]string, 0)
 	for _, n := range confs {
@@ -487,15 +504,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		err = flowNetwork.AddNode(t, bootstrapDir, nodeConf)
 		require.NoError(t, err)
 
-		anIDS := strings.Join(accessNodeIDS, ",")
-
 		// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
 		if nodeConf.Role == flow.RoleConsensus || nodeConf.Role == flow.RoleCollection {
 			// ghost containers don't participate in the network skip any SN/LN ghost containers
 			if !nodeConf.Ghost {
 				nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
 				nodeContainer.addFlag("insecure-access-api", "false")
-				nodeContainer.addFlag("access-node-ids", anIDS)
+				nodeContainer.addFlag("access-node-ids", "*")
 			}
 		}
 	}
@@ -771,10 +786,7 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	// TODO: currently just stashing a dummy key as staking key to prevent the nodeinfo.Type() function from
 	// returning an error. Eventually, a new key type NodeInfoTypePrivateUnstaked needs to be defined
 	// (see issue: https://github.com/onflow/flow-go/issues/1214)
-	dummyStakingKey, err := unittest.StakingKey()
-	if err != nil {
-		return nil, err
-	}
+	dummyStakingKey := unittest.StakingPrivKeyFixture()
 
 	for _, conf := range confs {
 		info := bootstrap.NewPrivateNodeInfo(
@@ -994,16 +1006,10 @@ func setupKeys(networkConf NetworkConfig) ([]ContainerConfig, error) {
 	roleCounter := make(map[flow.Role]int)
 
 	// get networking keys for all nodes
-	networkKeys, err := unittest.NetworkingKeys(nNodes)
-	if err != nil {
-		return nil, err
-	}
+	networkKeys := unittest.NetworkingKeys(nNodes)
 
 	// get staking keys for all nodes
-	stakingKeys, err := unittest.StakingKeys(nNodes)
-	if err != nil {
-		return nil, err
-	}
+	stakingKeys := unittest.StakingKeys(nNodes)
 
 	// create node container configs and corresponding public identities
 	confs := make([]ContainerConfig, 0, nNodes)

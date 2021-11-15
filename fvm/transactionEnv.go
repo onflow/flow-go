@@ -720,6 +720,9 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		defer sp.Finish()
 	}
 
+	e.sth.DisableLimitEnforcement() // don't enforce limit during account creation
+	defer e.sth.EnableLimitEnforcement()
+
 	flowAddress, err := e.addressGenerator.NextAddress()
 	if err != nil {
 		return address, err
@@ -766,6 +769,8 @@ func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvAddAccountKey)
 		defer sp.Finish()
 	}
+	e.sth.DisableLimitEnforcement() // don't enforce limit during adding a key
+	defer e.sth.EnableLimitEnforcement()
 
 	err := e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {

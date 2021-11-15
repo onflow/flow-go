@@ -11,8 +11,9 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool/epochs"
+	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/cluster"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -30,19 +31,19 @@ var ErrUnstakedForEpoch = fmt.Errorf("we are not a staked node in the epoch")
 // EpochComponents represents all dependencies for running an epoch.
 type EpochComponents struct {
 	state    cluster.State
-	prop     module.Engine
-	sync     module.Engine
+	prop     network.Engine
+	sync     network.Engine
 	hotstuff module.HotStuff
 }
 
 // Ready starts all epoch components.
 func (ec *EpochComponents) Ready() <-chan struct{} {
-	return lifecycle.AllReady(ec.prop, ec.sync, ec.hotstuff)
+	return util.AllReady(ec.prop, ec.sync, ec.hotstuff)
 }
 
 // Done stops all epoch components.
 func (ec *EpochComponents) Done() <-chan struct{} {
-	return lifecycle.AllDone(ec.prop, ec.sync, ec.hotstuff)
+	return util.AllDone(ec.prop, ec.sync, ec.hotstuff)
 }
 
 // Engine is the epoch manager, which coordinates the lifecycle of other modules
@@ -120,7 +121,7 @@ func (e *Engine) Ready() <-chan struct{} {
 		for _, epoch := range e.epochs {
 			epochs = append(epochs, epoch)
 		}
-		<-lifecycle.AllReady(epochs...)
+		<-util.AllReady(epochs...)
 	}, func() {
 		// check the current phase on startup, in case we are in setup phase
 		// and haven't yet voted for the next root QC
@@ -144,7 +145,7 @@ func (e *Engine) Done() <-chan struct{} {
 		for _, epoch := range e.epochs {
 			epochs = append(epochs, epoch)
 		}
-		<-lifecycle.AllDone(epochs...)
+		<-util.AllDone(epochs...)
 	})
 }
 

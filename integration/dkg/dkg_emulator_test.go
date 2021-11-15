@@ -108,6 +108,12 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		}
 	}
 
+	// before ending the test and awaiting successful completion, ensure we leave
+	// the dkg client in an enabled state
+	for _, node := range nodes {
+		node.dkgContractClient.Enable()
+	}
+
 	for _, n := range nodes {
 		n.Done()
 	}
@@ -195,5 +201,6 @@ func (s *DKGSuite) TestNodesDown() {
 // between consensus node and access node, as well as connection issues between
 // access node and execution node, or the execution node being down).
 func (s *DKGSuite) TestEmulatorProblems() {
+	s.T().Skip("flaky test - quarantined")
 	s.runTest(numberOfNodes, true)
 }

@@ -49,7 +49,7 @@ func New(
 	log zerolog.Logger,
 	metrics module.VerificationMetrics,
 	tracer module.Tracer,
-	net module.Network,
+	net network.Network,
 	state protocol.State,
 	me module.Local,
 	chVerif module.ChunkVerifier,

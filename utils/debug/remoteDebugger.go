@@ -2,10 +2,11 @@ package debug
 
 import (
 	"github.com/onflow/cadence"
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
 )
 
 type RemoteDebugger struct {
@@ -67,6 +68,10 @@ func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, b
 	}
 	tx := fvm.Transaction(txBody, 0)
 	err := d.vm.Run(d.ctx, tx, view, programs.NewEmptyPrograms())
+	if err != nil {
+		return nil, err
+	}
+	err = view.Cache.Persist()
 	if err != nil {
 		return nil, err
 	}
