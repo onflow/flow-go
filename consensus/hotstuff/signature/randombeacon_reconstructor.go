@@ -12,16 +12,16 @@ import (
 // The implementation wraps the hotstuff.RandomBeaconInspector and translates the signer identity into signer index.
 // It has knowledge about DKG to be able to map signerID to signerIndex
 type RandomBeaconReconstructor struct {
-	dkg                   hotstuff.DKG                   // to lookup signer index by signer ID
-	randomBeaconInspector hotstuff.RandomBeaconInspector // a stateful object for this block. It's used for both storing all sig shares and producing the node's own share by signing the block
+	hotstuff.RandomBeaconInspector              // a stateful object for this block. It's used for both storing all sig shares and producing the node's own share by signing the block
+	dkg                            hotstuff.DKG // to lookup signer index by signer ID
 }
 
 var _ hotstuff.RandomBeaconReconstructor = &RandomBeaconReconstructor{}
 
 func NewRandomBeaconReconstructor(dkg hotstuff.DKG, randomBeaconInspector hotstuff.RandomBeaconInspector) *RandomBeaconReconstructor {
 	return &RandomBeaconReconstructor{
+		RandomBeaconInspector: randomBeaconInspector,
 		dkg:                   dkg,
-		randomBeaconInspector: randomBeaconInspector,
 	}
 }
 
@@ -38,7 +38,7 @@ func (r *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.
 	if err != nil {
 		return fmt.Errorf("could not map signerID %v to signerIndex: %w", signerID, err)
 	}
-	return r.randomBeaconInspector.Verify(int(signerIndex), sig)
+	return r.RandomBeaconInspector.Verify(int(signerIndex), sig)
 }
 
 // TrustedAdd adds a share to the internal signature shares store.
@@ -61,25 +61,5 @@ func (r *RandomBeaconReconstructor) TrustedAdd(signerID flow.Identifier, sig cry
 	if err != nil {
 		return false, fmt.Errorf("could not map signerID %v to signerIndex: %w", signerID, err)
 	}
-	return r.randomBeaconInspector.TrustedAdd(int(signerIndex), sig)
-}
-
-// EnoughShares indicates whether enough shares have been accumulated in order to reconstruct
-// a group signature. The function is thread-safe.
-func (r *RandomBeaconReconstructor) EnoughShares() bool {
-	return r.randomBeaconInspector.EnoughShares()
-}
-
-// Reconstruct reconstructs the group signature. The function is thread-safe but locks
-// its internal state, thereby permitting only one routine at a time.
-//
-// Returns:
-// - (signature, nil) if no error occurred
-// - (nil, crypto.notEnoughSharesError) if not enough shares were collected
-// - (nil, crypto.invalidInputsError) if at least one collected share does not serialize to a valid BLS signature,
-//    or if the constructed signature failed to verify against the group public key and stored message. This post-verification
-//    is required  for safety, as `TrustedAdd` allows adding invalid signatures.
-// - (nil, error) for any other unexpected error.
-func (r *RandomBeaconReconstructor) Reconstruct() (crypto.Signature, error) {
-	return r.randomBeaconInspector.Reconstruct()
+	return r.RandomBeaconInspector.TrustedAdd(int(signerIndex), sig)
 }

@@ -777,7 +777,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	require.NoError(t, err)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
-	signers := make(map[flow.Identifier]*verification.CombinedSignerV2)
+	signers := make(map[flow.Identifier]*verification.CombinedSignerV3)
 	// prepare staking signers, each signer has it's own private/public key pair
 	stakingSigners := unittest.IdentityListFixture(3, func(identity *flow.Identity) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
@@ -792,7 +792,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV3(me, beaconSignerStore, identity.NodeID)
 	})
 	beaconSigners := unittest.IdentityListFixture(len(dkgData.PrivKeyShares))
 	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
@@ -817,7 +817,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV3(me, beaconSignerStore, identity.NodeID)
 
 		dkgParticipants[identity.NodeID] = flow.DKGParticipant{
 			Index:    uint(index),
