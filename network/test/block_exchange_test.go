@@ -8,6 +8,8 @@ import (
 
 	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
+	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/rs/zerolog"
@@ -24,7 +26,6 @@ type BlockExchangeTestSuite struct {
 	suite.Suite
 
 	cancel         context.CancelFunc
-	cleanupFuncs   []func()
 	networks       []*p2p.Network
 	blockExchanges []network.BlockExchange
 	blockCids      []cid.Cid
@@ -47,8 +48,7 @@ func (suite *BlockExchangeTestSuite) SetupTest() {
 	blockExchangeChannel := network.Channel("block-exchange")
 
 	for i, net := range networks {
-		bstore, cleanupFunc := MakeBlockstore(suite.T(), fmt.Sprintf("bs%v", i))
-		suite.cleanupFuncs = append(suite.cleanupFuncs, cleanupFunc)
+		bstore := blockstore.NewBlockstore(sync.MutexWrap(datastore.NewMapDatastore()))
 		block := blocks.NewBlock([]byte(fmt.Sprintf("foo%v", i)))
 		suite.blockCids = append(suite.blockCids, block.Cid())
 		require.NoError(suite.T(), bstore.Put(block))
@@ -61,9 +61,6 @@ func (suite *BlockExchangeTestSuite) SetupTest() {
 
 func (suite *BlockExchangeTestSuite) TearDownTest() {
 	suite.cancel()
-	for _, cleanupFunc := range suite.cleanupFuncs {
-		cleanupFunc()
-	}
 	netDoneChans := make([]<-chan struct{}, len(suite.networks))
 	for i, net := range suite.networks {
 		netDoneChans[i] = net.Done()
@@ -84,10 +81,10 @@ func (suite *BlockExchangeTestSuite) TestGetBlocks() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		blocksReceived := make(map[cid.Cid]struct{})
 		blocks, err := bex.GetBlocks(ctx, blocksToGet...)
 		suite.Require().NoError(err)
 
+		blocksReceived := make(map[cid.Cid]struct{})
 		for block := range blocks {
 			blocksReceived[block.Cid()] = struct{}{}
 		}

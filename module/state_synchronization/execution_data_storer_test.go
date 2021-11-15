@@ -8,6 +8,9 @@ import (
 
 	"cloud.google.com/go/storage"
 	"github.com/fxamacker/cbor/v2"
+	"github.com/ipfs/go-datastore"
+	"github.com/ipfs/go-datastore/sync"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/iterator"
@@ -17,7 +20,6 @@ import (
 	cborcodec "github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/compressor"
-	"github.com/onflow/flow-go/network/test"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -57,8 +59,7 @@ func TestExecutionDataStorer(t *testing.T) {
 		require.NoError(t, err)
 		defer reader.Close()
 
-		bstore, cleanup := test.MakeBlockstore(t, "state-diff-storer-test")
-		defer cleanup()
+		bstore := blockstore.NewBlockstore(sync.MutexWrap(datastore.NewMapDatastore()))
 
 		sdp, err := NewExecutionDataStorer(&cborcodec.Codec{}, compressor.NewLz4Compressor(), bstore)
 		require.NoError(t, err)
