@@ -166,7 +166,7 @@ func FlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
 	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID.String())
 }
 
-func generatePingProtcolID(rootBlockID flow.Identifier) protocol.ID {
+func pingProtocolId(rootBlockID flow.Identifier) protocol.ID {
 	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID.String())
 }
 

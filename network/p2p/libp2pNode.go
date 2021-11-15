@@ -310,7 +310,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 
 	if builder.pingInfoProvider != nil {
-		pingLibP2PProtocolID := generatePingProtcolID(*builder.rootBlockID)
+		pingLibP2PProtocolID := pingProtocolId(*builder.rootBlockID)
 		pingService := NewPingService(libp2pHost, pingLibP2PProtocolID, builder.pingInfoProvider, node.logger)
 		node.pingService = pingService
 	}
