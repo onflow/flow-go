@@ -15,13 +15,15 @@ import (
 func NewRestAPIServer(api *APIHandler, listenAddress string, logger zerolog.Logger) *http.Server {
 
 	router := mux.NewRouter().StrictSlash(true)
+	v1Subrouter := router.PathPrefix("/v1").Subrouter()
+	v1Subrouter.Use(LoggingMiddleware(logger))
+
 	for _, route := range apiRoutes(api) {
-		handler := newHandler(route.HandlerFunc, route.Name, logger)
-		router.
+		v1Subrouter.
 			Methods(route.Method).
 			Path(route.Pattern).
 			Name(route.Name).
-			Handler(handler)
+			Handler(route.HandlerFunc)
 	}
 
 	return &http.Server{
@@ -40,114 +42,71 @@ func apiRoutes(api *APIHandler) generated.Routes {
 		generated.Route{
 			Name:        "AccountsAddressGet",
 			Method:      strings.ToUpper("Get"),
-			Pattern:     "/v1/accounts/{address}",
+			Pattern:     "/accounts/{address}",
 			HandlerFunc: api.NotImplemented,
 		},
 
 		generated.Route{
 			Name:        "BlocksGet",
 			Method:      strings.ToUpper("Get"),
-			Pattern:     "/v1/blocks",
+			Pattern:     "/blocks",
 			HandlerFunc: api.NotImplemented,
 		},
 
 		generated.Route{
 			Name:        "BlocksIdGet",
 			Method:      strings.ToUpper("Get"),
-			Pattern:     "/v1/blocks/{id}",
+			Pattern:     "/blocks/{id}",
 			HandlerFunc: api.BlocksIdGet,
 		},
 
 		generated.Route{
 			Name:        "CollectionsIdGet",
 			Method:      strings.ToUpper("Get"),
-			Pattern:     "/v1/collections/{id}",
+			Pattern:     "/collections/{id}",
 			HandlerFunc: api.NotImplemented,
 		},
 
 		generated.Route{
 			Name:        "ExecutionResultsGet",
 			Method:      strings.ToUpper("Get"),
-			Pattern:     "/v1/execution_results",
+			Pattern:     "/execution_results",
 			HandlerFunc: api.NotImplemented,
 		},
 
 		generated.Route{
 			Name:        "ExecutionResultsIdGet",
 			Method:      strings.ToUpper("Get"),
-			Pattern:     "/v1/execution_results/{id}",
+			Pattern:     "/execution_results/{id}",
 			HandlerFunc: api.NotImplemented,
 		},
 
 		generated.Route{
 			Name:        "ScriptsPost",
 			Method:      strings.ToUpper("Post"),
-			Pattern:     "/v1/scripts",
+			Pattern:     "/scripts",
 			HandlerFunc: api.NotImplemented,
 		},
 
 		generated.Route{
 			Name:        "TransactionResultsTransactionIdGet",
 			Method:      strings.ToUpper("Get"),
-			Pattern:     "/v1/transaction_results/{transaction_id}",
+			Pattern:     "/transaction_results/{transaction_id}",
 			HandlerFunc: api.NotImplemented,
 		},
 
 		generated.Route{
 			Name:        "TransactionsIdGet",
 			Method:      strings.ToUpper("Get"),
-			Pattern:     "/v1/transactions/{id}",
+			Pattern:     "/transactions/{id}",
 			HandlerFunc: api.NotImplemented,
 		},
 
 		generated.Route{
 			Name:        "TransactionsPost",
 			Method:      strings.ToUpper("Post"),
-			Pattern:     "/v1/transactions",
+			Pattern:     "/transactions",
 			HandlerFunc: api.NotImplemented,
 		},
 	}
-}
-
-// newHandler creates a request handler which adds a logger interceptor to each request to log the request method, uri,
-// duration and response code
-func newHandler(inner http.Handler, name string, logger zerolog.Logger) http.Handler {
-	apiLogger := logger.With().Str("route_name", name).Logger()
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		respWriter := newResponseWriter(w)
-		inner.ServeHTTP(respWriter, r)
-		if respWriter.statusCode == http.StatusOK {
-			apiLogger.Info().Str("method", r.Method).
-				Str("uri", r.RequestURI).
-				Str("client_ip", r.RemoteAddr).
-				Str("user_agent", r.UserAgent()).
-				Dur("duration", time.Since(start)).
-				Int("response_code", respWriter.statusCode).
-				Msg("api")
-		} else {
-			apiLogger.Error().Str("method", r.Method).
-				Str("uri", r.RequestURI).
-				Str("client_ip", r.RemoteAddr).
-				Str("user_agent", r.UserAgent()).
-				Dur("duration", time.Since(start)).
-				Int("response_code", respWriter.statusCode).
-				Msg("api")
-		}
-	})
-}
-
-// responseWriter is a wrapper around http.ResponseWriter and helps capture the response code
-type responseWriter struct {
-	http.ResponseWriter
-	statusCode int
-}
-
-func newResponseWriter(w http.ResponseWriter) *responseWriter {
-	return &responseWriter{w, http.StatusOK}
-}
-
-func (rw *responseWriter) WriteHeader(code int) {
-	rw.statusCode = code
-	rw.ResponseWriter.WriteHeader(code)
 }
