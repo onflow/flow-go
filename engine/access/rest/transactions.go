@@ -11,16 +11,19 @@ func (a *APIHandler) TransactionByID(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := models.IDFromRequest(vars["id"])
 	if err != nil {
+		a.errorResponse(w, http.StatusBadRequest, err.Error(), a.logger) // todo fix this
 		return
 	}
 
 	tx, err := a.backend.GetTransaction(r.Context(), id)
 	if err != nil {
+		a.errorResponse(w, http.StatusBadRequest, err.Error(), a.logger)
 		return
 	}
 
 	res, err := models.TransactionToJSON(tx, nil)
 	if err != nil {
+		a.errorResponse(w, http.StatusBadRequest, err.Error(), a.logger)
 		return
 	}
 
