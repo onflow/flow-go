@@ -39,7 +39,7 @@ func (c *TransactionSequenceNumberChecker) checkAndIncrementSequenceNumber(
 	parentState := sth.State()
 	childState := sth.NewChild()
 	defer func() {
-		if mergeError := parentState.MergeState(childState); mergeError != nil {
+		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
 			panic(mergeError)
 		}
 		sth.SetActiveState(parentState)

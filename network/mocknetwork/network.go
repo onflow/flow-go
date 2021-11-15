@@ -3,7 +3,9 @@
 package mocknetwork
 
 import (
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+
 	mock "github.com/stretchr/testify/mock"
 
 	network "github.com/onflow/flow-go/network"
@@ -62,6 +64,29 @@ func (_m *Network) Register(channel network.Channel, engine network.Engine) (net
 	var r1 error
 	if rf, ok := ret.Get(1).(func(network.Channel, network.Engine) error); ok {
 		r1 = rf(channel, engine)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// RegisterBlockExchange provides a mock function with given fields: channel, store
+func (_m *Network) RegisterBlockExchange(channel network.Channel, store blockstore.Blockstore) (network.BlockExchange, error) {
+	ret := _m.Called(channel, store)
+
+	var r0 network.BlockExchange
+	if rf, ok := ret.Get(0).(func(network.Channel, blockstore.Blockstore) network.BlockExchange); ok {
+		r0 = rf(channel, store)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(network.BlockExchange)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(network.Channel, blockstore.Blockstore) error); ok {
+		r1 = rf(channel, store)
 	} else {
 		r1 = ret.Error(1)
 	}
