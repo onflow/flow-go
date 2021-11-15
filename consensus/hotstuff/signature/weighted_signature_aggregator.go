@@ -41,7 +41,7 @@ var _ hotstuff.WeightedSignatureAggregator = &WeightedSignatureAggregator{}
 // A weighted aggregator is used for one aggregation only. A new instance should be used for each use.
 func NewWeightedSignatureAggregator(
 	ids flow.IdentityList, // list of all possible signers
-	pks []crypto.PublicKey, // list of corresponding public keys
+	pks []crypto.PublicKey, // list of corresponding public keys used for signature verifications
 	message []byte, // message to get an aggregated signature for
 	dsTag string, // domain separation tag used by the signature
 ) (*WeightedSignatureAggregator, error) {
