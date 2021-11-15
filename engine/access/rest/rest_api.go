@@ -11,8 +11,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
-	"github.com/onflow/flow-go/engine/access/rpc/backend"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -22,11 +22,11 @@ var MaxAllowedBlockIDsCnt = BlockIDCntLimit
 
 // RestAPIHandler provides the implementation of each of the REST API
 type APIHandler struct {
-	backend *backend.Backend
+	backend access.API
 	logger  zerolog.Logger
 }
 
-func NewRestAPIHandler(backend *backend.Backend, logger zerolog.Logger) *APIHandler {
+func NewRestAPIHandler(backend access.API, logger zerolog.Logger) *APIHandler {
 	return &APIHandler{
 		backend: backend,
 		logger:  logger,
