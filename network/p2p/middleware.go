@@ -194,7 +194,7 @@ func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
 	return result
 }
 
-// Me returns the flow identifier of the this middleware
+// Me returns the flow identifier of this middleware
 func (m *Middleware) Me() flow.Identifier {
 	return m.me
 }
