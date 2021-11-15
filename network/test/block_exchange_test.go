@@ -28,6 +28,7 @@ type BlockExchangeTestSuite struct {
 	cancel         context.CancelFunc
 	networks       []*p2p.Network
 	blockExchanges []network.BlockExchange
+	blockstores    []blockstore.Blockstore
 	blockCids      []cid.Cid
 	numNetworks    int
 }
@@ -50,11 +51,11 @@ func (suite *BlockExchangeTestSuite) SetupTest() {
 	blockExchangeChannel := network.Channel("block-exchange")
 
 	for i, net := range networks {
-		bstore := blockstore.NewBlockstore(sync.MutexWrap(datastore.NewMapDatastore()))
+		suite.blockstores = append(suite.blockstores, blockstore.NewBlockstore(sync.MutexWrap(datastore.NewMapDatastore())))
 		block := blocks.NewBlock([]byte(fmt.Sprintf("foo%v", i)))
 		suite.blockCids = append(suite.blockCids, block.Cid())
-		require.NoError(suite.T(), bstore.Put(block))
-		bex, err := net.RegisterBlockExchange(blockExchangeChannel, bstore)
+		require.NoError(suite.T(), suite.blockstores[i].Put(block))
+		bex, err := net.RegisterBlockExchange(blockExchangeChannel, suite.blockstores[i])
 		require.NoError(suite.T(), err)
 		suite.blockExchanges = append(suite.blockExchanges, bex)
 	}
@@ -74,6 +75,7 @@ func (suite *BlockExchangeTestSuite) TestGetBlocks() {
 		// check that we can get all other blocks
 		var blocksToGet []cid.Cid
 		unreceivedBlocks := make(map[cid.Cid]struct{})
+		fmt.Println(i)
 		for j, blockCid := range suite.blockCids {
 			if j != i {
 				blocksToGet = append(blocksToGet, blockCid)
@@ -127,11 +129,12 @@ func (suite *BlockExchangeTestSuite) TestGetBlocksWithSession() {
 func (suite *BlockExchangeTestSuite) TestHas() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
 	var blockChans []<-chan blocks.Block
 	unreceivedBlocks := make([]map[cid.Cid]struct{}, len(suite.blockExchanges))
 	for i, bex := range suite.blockExchanges {
 		unreceivedBlocks[i] = make(map[cid.Cid]struct{})
-		// check that peers are updated when we get a new block
+		// check that peers are notified when we have a new block
 		var blocksToGet []cid.Cid
 		for j := 0; j < suite.numNetworks; j++ {
 			if j != i {
@@ -144,10 +147,24 @@ func (suite *BlockExchangeTestSuite) TestHas() {
 		suite.Require().NoError(err)
 		blockChans = append(blockChans, blocks)
 	}
+
+	// check that blocks are not received until Has is called by the server
+	suite.Require().Never(func() bool {
+		for _, blockChan := range blockChans {
+			select {
+			case <-blockChan:
+				return true
+			default:
+			}
+		}
+		return false
+	}, time.Second, 100*time.Millisecond)
+
 	for i, bex := range suite.blockExchanges {
 		err := bex.HasBlock(blocks.NewBlock([]byte(fmt.Sprintf("bar%v", i))))
 		suite.Require().NoError(err)
 	}
+
 	for i, blocks := range blockChans {
 		for block := range blocks {
 			delete(unreceivedBlocks[i], block.Cid())
