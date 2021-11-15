@@ -726,10 +726,11 @@ func (m *FollowerState) epochStatus(block *flow.Header) (*flow.EpochStatus, erro
 // operations to insert service events for blocks that include them.
 //
 // Return values:
-//  * ops: pending data base operations to persist this processing step
+//  * ops: pending database operations to persist this processing step
 //  * error: no errors expected during normal operations
 func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transaction.Tx) error, error) {
 	var ops []func(*transaction.Tx) error
+	blockID := block.ID()
 
 	// Determine epoch status for block's CURRENT epoch.
 	//
@@ -752,8 +753,8 @@ func (m *FollowerState) handleServiceEvents(block *flow.Block) ([]func(*transact
 		if err != nil {
 			return nil, fmt.Errorf("internal error constructing EECC from parent's epoch status: %w", err)
 		}
-		ops = append(ops, m.epoch.statuses.StoreTx(block.ID(), parentStatus.Copy()))
-		ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered()))
+		ops = append(ops, m.epoch.statuses.StoreTx(blockID, parentStatus.Copy()))
+		ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered(blockID)))
 		ops = append(ops, func(tx *transaction.Tx) error {
 			tx.OnSucceed(m.metrics.EpochEmergencyFallbackTriggered)
 			return nil
@@ -797,7 +798,7 @@ SealLoop:
 				if protocol.IsInvalidServiceEventError(err) {
 					// EECC - we have observed an invalid service event, which is
 					// an unrecoverable failure. Flag this in the DB and exit
-					ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered()))
+					ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered(blockID)))
 					break SealLoop
 				}
 
@@ -818,7 +819,7 @@ SealLoop:
 				if protocol.IsInvalidServiceEventError(err) {
 					// EECC - we have observed an invalid service event, which is
 					// an unrecoverable failure. Flag this in the DB and exit
-					ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered()))
+					ops = append(ops, transaction.WithTx(operation.SetEpochEmergencyFallbackTriggered(blockID)))
 					break SealLoop
 				}
 
