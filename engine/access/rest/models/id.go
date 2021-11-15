@@ -2,8 +2,9 @@ package models
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"regexp"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type ID struct {

@@ -3,9 +3,10 @@ package models
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"io"
 	"regexp"
+
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type transactionSignatureRequest struct {

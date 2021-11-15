@@ -1,9 +1,10 @@
 package rest
 
 import (
+	"net/http"
+
 	"github.com/gorilla/mux"
 	"github.com/onflow/flow-go/engine/access/rest/models"
-	"net/http"
 )
 
 // TransactionByID retrieves a transaction by provided transaction ID.
