@@ -63,6 +63,7 @@ const (
 	codeEpochSetup     = 61 // EpochSetup service event, keyed by ID
 	codeEpochCommit    = 62 // EpochCommit service event, keyed by ID
 	codeDKGPrivateInfo = 63 // DKGPrivateInfo, keyed by epoch counter
+	codeDKGStarted     = 64 // flag that the DKG for an epoch has been started
 
 	// job queue consumers and producers
 	codeJobConsumerProcessed = 70
