@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"testing"
 	"time"
 
 	blocks "github.com/ipfs/go-block-format"
@@ -29,6 +30,10 @@ type BlockExchangeTestSuite struct {
 	blockExchanges []network.BlockExchange
 	blockCids      []cid.Cid
 	numNetworks    int
+}
+
+func TestBlockExchange(t *testing.T) {
+	suite.Run(t, new(BlockExchangeTestSuite))
 }
 
 func (suite *BlockExchangeTestSuite) SetupTest() {
