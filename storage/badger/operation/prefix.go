@@ -16,9 +16,13 @@ const (
 	codeDBType = 2 // specifies a database type
 
 	// codes for views with special meaning
-	codeStartedView           = 10 // latest view hotstuff started
-	codeVotedView             = 11 // latest view hotstuff voted on
+	codeStartedView = 10 // latest view hotstuff started
+	codeVotedView   = 11 // latest view hotstuff voted on
+
+	// codes for fields associated with the root state
 	codeRootQuorumCertificate = 12
+	codeSporkID               = 13
+	codeProtocolVersion       = 14
 
 	// code for heights with special meaning
 	codeFinalizedHeight         = 20 // latest finalized block height

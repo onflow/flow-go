@@ -99,14 +99,15 @@ func DefaultLibP2PNodeFactory(
 	me flow.Identifier,
 	address string,
 	flowKey fcrypto.PrivateKey,
-	rootBlockID flow.Identifier,
+	sporkID flow.Identifier,
 	idProvider id.IdentityProvider,
 	maxPubSubMsgSize int,
 	metrics module.NetworkMetrics,
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
 	role string,
-	streamFactory LibP2PStreamCompressorWrapperFunc) (LibP2PFactoryFunc, error) {
+	streamFactory LibP2PStreamCompressorWrapperFunc,
+) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
@@ -118,15 +119,13 @@ func DefaultLibP2PNodeFactory(
 
 	if role != "ghost" {
 		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
-			return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(
-				h.ID(), rootBlockID, idProvider,
-			)), nil
+			return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(h.ID(), idProvider)), nil
 		})
 	}
 
 	return func(ctx context.Context) (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
-			SetRootBlockID(rootBlockID).
+			SetSporkID(sporkID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
 			SetPubsubOptions(psOpts...).
@@ -139,7 +138,7 @@ func DefaultLibP2PNodeFactory(
 }
 
 type NodeBuilder interface {
-	SetRootBlockID(flow.Identifier) NodeBuilder
+	SetSporkID(flow.Identifier) NodeBuilder
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
 	SetPubsubOptions(...PubsubOption) NodeBuilder
@@ -154,7 +153,7 @@ type NodeBuilder interface {
 
 type DefaultLibP2PNodeBuilder struct {
 	id               flow.Identifier
-	rootBlockID      *flow.Identifier
+	sporkID          flow.Identifier
 	logger           zerolog.Logger
 	connGater        *ConnGater
 	connMngr         connmgr.ConnManager
@@ -191,8 +190,8 @@ func (builder *DefaultLibP2PNodeBuilder) SetTopicValidation(enabled bool) NodeBu
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId flow.Identifier) NodeBuilder {
-	builder.rootBlockID = &rootBlockId
+func (builder *DefaultLibP2PNodeBuilder) SetSporkID(sporkID flow.Identifier) NodeBuilder {
+	builder.sporkID = sporkID
 	return builder
 }
 
@@ -249,10 +248,10 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, errors.New("unable to create libp2p pubsub: factory function not provided")
 	}
 
-	if builder.rootBlockID == nil {
-		return nil, errors.New("root block ID must be provided")
+	if builder.sporkID == flow.ZeroID {
+		return nil, errors.New("spork ID must be provided")
 	}
-	node.flowLibP2PProtocolID = FlowProtocolID(*builder.rootBlockID)
+	node.flowLibP2PProtocolID = FlowProtocolID(builder.sporkID)
 
 	var opts []config.Option
 
@@ -310,7 +309,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 
 	if builder.pingInfoProvider != nil {
-		pingLibP2PProtocolID := generatePingProtcolID(*builder.rootBlockID)
+		pingLibP2PProtocolID := generatePingProtocolID(builder.sporkID)
 		pingService := NewPingService(libp2pHost, pingLibP2PProtocolID, builder.pingInfoProvider, node.logger)
 		node.pingService = pingService
 	}
