@@ -219,7 +219,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		// run peer manager with the specified interval and let is also prune connections
 		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
-		mwOpts = append(mwOpts, p2p.WithPeerManager(peerManagerFactory))
+		mwOpts = append(mwOpts, p2p.WithPeerManager(peerManagerFactory), p2p.WithConnectionGating(true))
 
 		fnb.Middleware = p2p.NewMiddleware(
 			fnb.Logger,
@@ -228,7 +228,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Metrics.Network,
 			fnb.RootBlock.ID(),
 			fnb.BaseConfig.UnicastMessageTimeout,
-			true,
 			fnb.IDTranslator,
 			mwOpts...,
 		)

@@ -39,8 +39,6 @@ import (
 
 var sporkID = unittest.IdentifierFixture()
 
-const DryRun = true
-
 type PeerTag struct {
 	peer peer.ID
 	tag  string
@@ -94,20 +92,21 @@ func NewTagWatchingConnManager(log zerolog.Logger, idProvider id.IdentityProvide
 }
 
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
-// If `dryRunMode` is set to true, it returns an empty slice instead of libp2p nodes, assuming that slice is never going
-// to get used.
 func GenerateIDs(
 	t *testing.T,
 	logger zerolog.Logger,
 	n int,
-	dryRunMode, connGating bool,
-	idOpts []func(*flow.Identity),
-	dhtOpts []dht.Option,
+	opts ...func(*optsConfig),
 ) (flow.IdentityList, []*p2p.Node, []observable.Observable) {
 	libP2PNodes := make([]*p2p.Node, n)
 	tagObservables := make([]observable.Observable, n)
 
-	identities := unittest.IdentityListFixture(n, idOpts...)
+	o := &optsConfig{}
+	for _, opt := range opts {
+		opt(o)
+	}
+
+	identities := unittest.IdentityListFixture(n, o.idOpts...)
 
 	idProvider := id.NewFixedIdentityProvider(identities)
 
@@ -118,12 +117,10 @@ func GenerateIDs(
 		require.NoError(t, err)
 		port := "0"
 
-		if !dryRunMode {
-			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, connGating, idProvider, dhtOpts...)
+		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, o.connectionGating, idProvider, o.dhtOpts...)
 
-			_, port, err = libP2PNodes[i].GetIPPort()
-			require.NoError(t, err)
-		}
+		_, port, err = libP2PNodes[i].GetIPPort()
+		require.NoError(t, err)
 
 		identities[i].Address = fmt.Sprintf("0.0.0.0:%s", port)
 		identities[i].NetworkPubKey = key.PublicKey()
@@ -133,10 +130,15 @@ func GenerateIDs(
 }
 
 // GenerateMiddlewares creates and initializes middleware instances for all the identities
-func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, enablePeerManagementAndConnectionGating bool) ([]network.Middleware, []*UpdatableIDProvider) {
+func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.IdentityList, libP2PNodes []*p2p.Node, opts ...func(*optsConfig)) ([]network.Middleware, []*UpdatableIDProvider) {
 	metrics := metrics.NewNoopCollector()
 	mws := make([]network.Middleware, len(identities))
 	idProviders := make([]*UpdatableIDProvider, len(identities))
+
+	o := &optsConfig{}
+	for _, opt := range opts {
+		opt(o)
+	}
 
 	for i, id := range identities {
 		// casts libP2PNode instance to a local variable to avoid closure
@@ -149,7 +151,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 
 		idProviders[i] = NewUpdatableIDProvider(identities)
 
-		peerManagerFactory := p2p.PeerManagerFactory(nil)
+		peerManagerFactory := p2p.PeerManagerFactory(o.peerManagerOpts)
 
 		// creating middleware of nodes
 		mws[i] = p2p.NewMiddleware(logger,
@@ -158,9 +160,9 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			metrics,
 			sporkID,
 			p2p.DefaultUnicastTimeout,
-			enablePeerManagementAndConnectionGating,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
 			p2p.WithPeerManager(peerManagerFactory),
+			p2p.WithConnectionGating(o.connectionGating),
 		)
 	}
 	return mws, idProviders
@@ -174,7 +176,7 @@ func GenerateNetworks(t *testing.T,
 	csize int,
 	tops []network.Topology,
 	sms []network.SubscriptionManager,
-	dryRunMode bool) ([]network.Network, context.CancelFunc) {
+) ([]network.Network, context.CancelFunc) {
 	count := len(ids)
 	nets := make([]network.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -222,37 +224,64 @@ func GenerateNetworks(t *testing.T,
 	ctx, cancel := context.WithCancel(context.Background())
 	netCtx, errChan := irrecoverable.WithSignaler(ctx)
 
-	// if dryrun then don't actually start the network
-	if !dryRunMode {
-		go func() {
-			select {
-			case err := <-errChan:
-				t.Error("networks encountered fatal error", err)
-			case <-ctx.Done():
-				return
-			}
-		}()
-
-		for _, net := range nets {
-			net.Start(netCtx)
-			<-net.Ready()
+	go func() {
+		select {
+		case err := <-errChan:
+			t.Error("networks encountered fatal error", err)
+		case <-ctx.Done():
+			return
 		}
+	}()
+
+	for _, net := range nets {
+		net.Start(netCtx)
+		<-net.Ready()
 	}
+
 	return nets, cancel
 }
 
 // GenerateIDsAndMiddlewares returns nodeIDs, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
-	dryRunMode bool,
 	logger zerolog.Logger,
-	idOpts []func(*flow.Identity),
-	dhtOpts []dht.Option,
+	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
-	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, dryRunMode, true, idOpts, dhtOpts)
-	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, true)
+	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, opts...)
+	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, opts...)
 	return ids, mws, protectObservables, providers
+}
+
+type optsConfig struct {
+	idOpts           []func(*flow.Identity)
+	dhtOpts          []dht.Option
+	peerManagerOpts  []p2p.Option
+	connectionGating bool
+}
+
+func WithIdentityOpts(idOpts ...func(*flow.Identity)) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.idOpts = idOpts
+	}
+}
+
+func WithDHTOpts(dhtOpts ...dht.Option) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.dhtOpts = dhtOpts
+	}
+}
+
+func WithPeerManagerOpts(peerManagerOpts ...p2p.Option) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.peerManagerOpts = peerManagerOpts
+	}
+}
+
+func WithConnectionGating(enabled bool) func(*optsConfig) {
+	return func(o *optsConfig) {
+		o.connectionGating = enabled
+	}
 }
 
 func GenerateIDsMiddlewaresNetworks(t *testing.T,
@@ -260,14 +289,12 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []network.Topology,
-	dryRun bool,
-	idOpts []func(*flow.Identity),
-	dhtOpts []dht.Option,
+	opts ...func(*optsConfig),
 ) (flow.IdentityList, []network.Middleware, []network.Network, []observable.Observable, context.CancelFunc) {
 
-	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, dryRun, log, idOpts, dhtOpts)
+	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks, netCancel := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
+	networks, netCancel := GenerateNetworks(t, log, ids, mws, csize, tops, sms)
 	return ids, mws, networks, observables, netCancel
 }
 

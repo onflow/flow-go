@@ -94,6 +94,12 @@ func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 	}
 }
 
+func WithConnectionGating(enabled bool) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.connectionGating = enabled
+	}
+}
+
 // NewMiddleware creates a new middleware instance
 // libP2PNodeFactory is the factory used to create a LibP2PNode
 // flowID is this node's Flow ID
@@ -110,7 +116,6 @@ func NewMiddleware(
 	metrics module.NetworkMetrics,
 	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
-	connectionGating bool,
 	idTranslator IDTranslator,
 	opts ...MiddlewareOption,
 ) *Middleware {
@@ -129,7 +134,7 @@ func NewMiddleware(
 		rootBlockID:           rootBlockID,
 		validators:            DefaultValidators(log, flowID),
 		unicastMessageTimeout: unicastMessageTimeout,
-		connectionGating:      connectionGating,
+		connectionGating:      false,
 		peerManagerFactory:    nil,
 		idTranslator:          idTranslator,
 	}

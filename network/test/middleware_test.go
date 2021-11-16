@@ -99,7 +99,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger, nil, nil)
+	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -140,8 +140,8 @@ func (m *MiddlewareTestSuite) SetupTest() {
 // the addresses of the staked network participants.
 func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// create a new staked identity
-	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1, false, false, nil, nil)
-	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, false)
+	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
+	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)

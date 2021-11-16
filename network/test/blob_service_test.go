@@ -11,15 +11,33 @@ import (
 	"github.com/ipfs/go-datastore"
 	"github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
+	"go.uber.org/atomic"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/topology"
 )
+
+// conditionalTopology is a topology that behaves like the underlying topology when the condition is true,
+// otherwise returns an empty identity list.
+type conditionalTopology struct {
+	top       network.Topology
+	condition func() bool
+}
+
+var _ network.Topology = (*conditionalTopology)(nil)
+
+func (t *conditionalTopology) GenerateFanout(ids flow.IdentityList, channels network.ChannelList) (flow.IdentityList, error) {
+	if t.condition() {
+		return t.top.GenerateFanout(ids, channels)
+	} else {
+		return flow.IdentityList{}, nil
+	}
+}
 
 type BlobServiceTestSuite struct {
 	suite.Suite
@@ -47,28 +65,21 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 	logger := zerolog.New(os.Stdout)
 
+	// Bitswap listens to connect events but doesn't iterate over existing connections, and fixing this without
+	// race conditions is tricky given the way the code is architected. As a result, libP2P hosts must first listen
+	// on Bitswap before connecting to each other, otherwise their Bitswap requests may never reach each other.
+	// See https://github.com/ipfs/go-bitswap/issues/525 for more details.
+	topologyActive := atomic.NewBool(false)
 	tops := make([]network.Topology, suite.numNodes)
 	for i := 0; i < suite.numNodes; i++ {
-		tops[i] = topology.NewFullyConnectedTopology()
+		tops[i] = &conditionalTopology{topology.NewFullyConnectedTopology(), topologyActive.Load}
 	}
+
 	ids, mws, networks, _, cancel := GenerateIDsMiddlewaresNetworks(
-		suite.T(), suite.numNodes, logger, 100, tops, false, nil, []dht.Option{p2p.AsServer(true)},
+		suite.T(), suite.numNodes, logger, 100, tops, WithDHTOpts(p2p.AsServer(true)), WithPeerManagerOpts(p2p.WithInterval(time.Second)),
 	)
 	suite.networks = networks
 	suite.cancel = cancel
-
-	suite.Require().Eventually(func() bool {
-		for i, mw := range mws {
-			for j := i + 1; j < suite.numNodes; j++ {
-				connected, err := mw.IsConnected(ids[j].NodeID)
-				suite.Require().NoError(err)
-				if !connected {
-					return false
-				}
-			}
-		}
-		return true
-	}, 3*time.Second, 100*time.Millisecond)
 
 	blobExchangeChannel := network.Channel("blob-exchange")
 
@@ -82,6 +93,21 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		suite.Require().NoError(err)
 		suite.blobServices = append(suite.blobServices, blobService)
 	}
+
+	// let nodes connect to each other only after they are all listening on Bitswap
+	topologyActive.Store(true)
+	suite.Require().Eventually(func() bool {
+		for i, mw := range mws {
+			for j := i + 1; j < suite.numNodes; j++ {
+				connected, err := mw.IsConnected(ids[j].NodeID)
+				suite.Require().NoError(err)
+				if !connected {
+					return false
+				}
+			}
+		}
+		return true
+	}, 3*time.Second, 100*time.Millisecond)
 }
 
 func (suite *BlobServiceTestSuite) TearDownTest() {
