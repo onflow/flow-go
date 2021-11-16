@@ -134,7 +134,7 @@ func (suite *BlobServiceTestSuite) TestGetBlobs() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		blobs := bex.GetBlobs(ctx, blobsToGet)
+		blobs := bex.GetBlobs(ctx, blobsToGet...)
 
 		for blob := range blobs {
 			delete(unreceivedBlobs, blob.Cid())
@@ -146,78 +146,76 @@ func (suite *BlobServiceTestSuite) TestGetBlobs() {
 	}
 }
 
-// func (suite *BlobServiceTestSuite) TestGetBlobsWithSession() {
-// 	for i, bex := range suite.blobExchanges {
-// 		// check that we can get all other blobs in a single session
-// 		blobsToGet := make(map[cid.Cid]struct{})
-// 		for j, blobCid := range suite.blobCids {
-// 			if j != i {
-// 				blobsToGet[blobCid] = struct{}{}
-// 			}
-// 		}
-// 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-// 		defer cancel()
-// 		var blobChans []<-chan blobs.Blob
-// 		session := bex.GetSession(ctx)
-// 		for blobCid := range blobsToGet {
-// 			blobs, err := session.GetBlobs(ctx, blobCid)
-// 			suite.Require().NoError(err)
-// 			blobChans = append(blobChans, blobs)
-// 		}
-// 		for blob := range util.MergeChannels(blobChans).(<-chan blobs.Blob) {
-// 			delete(blobsToGet, blob.Cid())
-// 		}
-// 		for blobCid := range blobsToGet {
-// 			suite.T().Errorf("blob %v not received by node %v", blobCid, i)
-// 		}
-// 	}
-// }
+func (suite *BlobServiceTestSuite) TestGetBlobsWithSession() {
+	for i, bex := range suite.blobServices {
+		// check that we can get all other blobs in a single session
+		blobsToGet := make(map[cid.Cid]struct{})
+		for j, blobCid := range suite.blobCids {
+			if j != i {
+				blobsToGet[blobCid] = struct{}{}
+			}
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		var blobChans []<-chan network.Blob
+		session := bex.GetSession(ctx)
+		for blobCid := range blobsToGet {
+			blobs := session.GetBlobs(ctx, blobCid)
+			blobChans = append(blobChans, blobs)
+		}
+		for blob := range util.MergeChannels(blobChans).(<-chan network.Blob) {
+			delete(blobsToGet, blob.Cid())
+		}
+		for blobCid := range blobsToGet {
+			suite.T().Errorf("blob %v not received by node %v", blobCid, i)
+		}
+	}
+}
 
-// func (suite *BlobServiceTestSuite) TestHas() {
-// 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-// 	defer cancel()
+func (suite *BlobServiceTestSuite) TestHas() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-// 	var blobChans []<-chan blobs.Blob
-// 	unreceivedBlobs := make([]map[cid.Cid]struct{}, len(suite.blobExchanges))
-// 	for i, bex := range suite.blobExchanges {
-// 		unreceivedBlobs[i] = make(map[cid.Cid]struct{})
-// 		// check that peers are notified when we have a new blob
-// 		var blobsToGet []cid.Cid
-// 		for j := 0; j < suite.numNodes; j++ {
-// 			if j != i {
-// 				blob := blobs.NewBlob([]byte(fmt.Sprintf("bar%v", i)))
-// 				blobsToGet = append(blobsToGet, blob.Cid())
-// 				unreceivedBlobs[i][blob.Cid()] = struct{}{}
-// 			}
-// 		}
-// 		blobs, err := bex.GetBlobs(ctx, blobsToGet...)
-// 		suite.Require().NoError(err)
-// 		blobChans = append(blobChans, blobs)
-// 	}
+	var blobChans []<-chan network.Blob
+	unreceivedBlobs := make([]map[cid.Cid]struct{}, len(suite.blobServices))
+	for i, bex := range suite.blobServices {
+		unreceivedBlobs[i] = make(map[cid.Cid]struct{})
+		// check that peers are notified when we have a new blob
+		var blobsToGet []cid.Cid
+		for j := 0; j < suite.numNodes; j++ {
+			if j != i {
+				blob := network.NewBlob([]byte(fmt.Sprintf("bar%v", i)))
+				blobsToGet = append(blobsToGet, blob.Cid())
+				unreceivedBlobs[i][blob.Cid()] = struct{}{}
+			}
+		}
+		blobs := bex.GetBlobs(ctx, blobsToGet...)
+		blobChans = append(blobChans, blobs)
+	}
 
-// 	// check that blobs are not received until Has is called by the server
-// 	suite.Require().Never(func() bool {
-// 		for _, blobChan := range blobChans {
-// 			select {
-// 			case <-blobChan:
-// 				return true
-// 			default:
-// 			}
-// 		}
-// 		return false
-// 	}, time.Second, 100*time.Millisecond)
+	// check that blobs are not received until Has is called by the server
+	suite.Require().Never(func() bool {
+		for _, blobChan := range blobChans {
+			select {
+			case <-blobChan:
+				return true
+			default:
+			}
+		}
+		return false
+	}, time.Second, 100*time.Millisecond)
 
-// 	for i, bex := range suite.blobExchanges {
-// 		err := bex.HasBlob(blobs.NewBlob([]byte(fmt.Sprintf("bar%v", i))))
-// 		suite.Require().NoError(err)
-// 	}
+	for i, bex := range suite.blobServices {
+		err := bex.AddBlob(ctx, network.NewBlob([]byte(fmt.Sprintf("bar%v", i))))
+		suite.Require().NoError(err)
+	}
 
-// 	for i, blobs := range blobChans {
-// 		for blob := range blobs {
-// 			delete(unreceivedBlobs[i], blob.Cid())
-// 		}
-// 		for c := range unreceivedBlobs[i] {
-// 			suite.Assert().Fail("blob %v not received by node %v", c, i)
-// 		}
-// 	}
-// }
+	for i, blobs := range blobChans {
+		for blob := range blobs {
+			delete(unreceivedBlobs[i], blob.Cid())
+		}
+		for c := range unreceivedBlobs[i] {
+			suite.Assert().Fail("blob %v not received by node %v", c, i)
+		}
+	}
+}
