@@ -13,11 +13,13 @@ import (
 	"strings"
 )
 
+// StatusError provides custom error with http status.
 type StatusError interface {
 	error
 	Status() int
 }
 
+// RestError is implementation of status error.
 type RestError struct {
 	status      int
 	userMessage string
@@ -43,6 +45,7 @@ func NewBadRequest(msg string, err error) *RestError {
 	}
 }
 
+// Status returns error http status code.
 func (e *RestError) Status() int {
 	return e.status
 }
@@ -51,6 +54,9 @@ func (e *RestError) Error() string {
 	return e.err.Error()
 }
 
+// Handler is custom http handler implementing custom handler function.
+// Handler function allows easier handling of errors and responses as it
+// wraps functionality for handling error and responses outside of endpoint handling.
 type Handler struct {
 	logger      zerolog.Logger
 	backend     access.API
@@ -123,6 +129,7 @@ func errorResponse(
 	}
 }
 
+// jsonDecode provides safe JSON decoding with sufficient erro handling.
 func jsonDecode(body io.ReadCloser, dst interface{}) error {
 	// validate size
 
