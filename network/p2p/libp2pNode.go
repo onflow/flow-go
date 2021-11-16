@@ -57,7 +57,6 @@ const (
 	// TODO: is this a sensible value?
 	findPeerQueryTimeout = 10 * time.Second
 
-	// stream compression factories
 	NoCompression   = "no-compression"
 	GzipCompression = "gzip-compression"
 )
@@ -67,7 +66,7 @@ type LibP2PFactoryFunc func(context.Context) (*Node, error)
 
 // LibP2PStreamCompressorFactoryFunc translates name of a stream factory to its corresponding stream compressor factory
 // function.
-func LibP2PStreamCompressorFactoryFunc(factory string) (p2pstream.StreamFactory, error) {
+func LibP2PStreamCompressorFactoryFunc(factory string) (p2pstream.UnicastProtocol, error) {
 	switch factory {
 	case NoCompression:
 		return &p2pstream.PlainStream{}, nil
@@ -92,7 +91,7 @@ func DefaultLibP2PNodeFactory(
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
 	role string,
-	streamFactory p2pstream.StreamFactory) (LibP2PFactoryFunc, error) {
+	streamFactory p2pstream.UnicastProtocol) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
@@ -134,7 +133,7 @@ type NodeBuilder interface {
 	SetTopicValidation(bool) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
 	SetResolver(*dns.Resolver) NodeBuilder
-	SetStreamCompressor(p2pstream.StreamFactory) NodeBuilder
+	SetStreamCompressor(p2pstream.UnicastProtocol) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -146,7 +145,7 @@ type DefaultLibP2PNodeBuilder struct {
 	connMngr         connmgr.ConnManager
 	pingInfoProvider PingInfoProvider
 	resolver         *dns.Resolver
-	streamFactory    p2pstream.StreamFactory
+	streamFactory    p2pstream.UnicastProtocol
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
@@ -212,7 +211,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *dns.Resolver) Nod
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetStreamCompressor(streamFactory p2pstream.StreamFactory) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetStreamCompressor(streamFactory p2pstream.UnicastProtocol) NodeBuilder {
 	builder.streamFactory = streamFactory
 	return builder
 }
@@ -342,7 +341,7 @@ type Node struct {
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
-	streamFactory        p2pstream.StreamFactory
+	streamFactory        p2pstream.UnicastProtocol
 	pingService          *PingService
 	connMgr              connmgr.ConnManager
 	dht                  *dht.IpfsDHT
