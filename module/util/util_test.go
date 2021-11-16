@@ -5,11 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
 	realmodule "github.com/onflow/flow-go/module"
 	module "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
 )
 
 // TestAllReady tests that AllReady closes its returned Ready channel only once

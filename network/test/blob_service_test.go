@@ -29,7 +29,7 @@ type BlobServiceTestSuite struct {
 	blobServices []network.BlobService
 	datastores   []datastore.Batching
 	blobCids     []cid.Cid
-	numNetworks  int
+	numNodes     int
 }
 
 func TestBlobExchange(t *testing.T) {
@@ -43,23 +43,23 @@ func (suite *BlobServiceTestSuite) putBlob(ds datastore.Batching, blob network.B
 }
 
 func (suite *BlobServiceTestSuite) SetupTest() {
-	suite.numNetworks = 3
+	suite.numNodes = 3
 
 	logger := zerolog.New(os.Stdout)
 
-	tops := make([]network.Topology, suite.numNetworks)
-	for i := 0; i < suite.numNetworks; i++ {
+	tops := make([]network.Topology, suite.numNodes)
+	for i := 0; i < suite.numNodes; i++ {
 		tops[i] = topology.NewFullyConnectedTopology()
 	}
 	ids, mws, networks, _, cancel := GenerateIDsMiddlewaresNetworks(
-		suite.T(), suite.numNetworks, logger, 100, tops, false, nil, []dht.Option{p2p.AsServer(true)},
+		suite.T(), suite.numNodes, logger, 100, tops, false, nil, []dht.Option{p2p.AsServer(true)},
 	)
 	suite.networks = networks
 	suite.cancel = cancel
 
 	suite.Require().Eventually(func() bool {
 		for i, mw := range mws {
-			for j := i + 1; j < suite.numNetworks; j++ {
+			for j := i + 1; j < suite.numNodes; j++ {
 				connected, err := mw.IsConnected(ids[j].NodeID)
 				suite.Require().NoError(err)
 				if !connected {
@@ -157,7 +157,7 @@ func (suite *BlobServiceTestSuite) TestGetBlobs() {
 // 		unreceivedBlobs[i] = make(map[cid.Cid]struct{})
 // 		// check that peers are notified when we have a new blob
 // 		var blobsToGet []cid.Cid
-// 		for j := 0; j < suite.numNetworks; j++ {
+// 		for j := 0; j < suite.numNodes; j++ {
 // 			if j != i {
 // 				blob := blobs.NewBlob([]byte(fmt.Sprintf("bar%v", i)))
 // 				blobsToGet = append(blobsToGet, blob.Cid())
