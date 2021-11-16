@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"fmt"
+	"runtime/debug"
 	"strings"
 
 	"github.com/onflow/cadence/runtime"
@@ -63,6 +64,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			}
 
 			if strings.Contains(fmt.Sprintf("%v", r), "[Error Code: 1106]") {
+				ctx.Logger.Error().Str("trace", string(debug.Stack())).Msg("VM LedgerIntractionLimitExceeded panic")
 				err = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
 				return
 			}
