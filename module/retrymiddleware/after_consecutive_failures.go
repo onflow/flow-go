@@ -1,7 +1,6 @@
 package retrymiddleware
 
 import (
-	"sync"
 	"time"
 
 	"github.com/sethvargo/go-retry"
@@ -13,14 +12,9 @@ type OnMaxConsecutiveFailures func(currentAttempt int)
 // AfterConsecutiveFailures returns a retry middleware will invoke the OnMaxConsecutiveFailures callback when ever maxConsecutiveFailures
 // has been reached for a retry operation
 func AfterConsecutiveFailures(maxConsecutiveFailures int, next retry.Backoff, f OnMaxConsecutiveFailures) retry.Backoff {
-	var (
-		l       sync.Mutex
-		attempt int
-	)
+	var attempt int
 
 	return retry.BackoffFunc(func() (time.Duration, bool) {
-		l.Lock()
-		defer l.Unlock()
 		attempt++
 
 		// if we have reached maxConsecutiveFailures failures update client index
