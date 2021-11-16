@@ -138,9 +138,9 @@ func (b *Broker) Broadcast(data []byte) {
 		}
 		maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
 
-		clientIndex, dkgContractClient := b.updateContractClient(b.lastSuccessfulClientIndex, true)
+		clientIndex, dkgContractClient := b.getInitialContractClient()
 		onMaxConsecutiveRetries := func(totalAttempts int) {
-			clientIndex, dkgContractClient = b.updateContractClient(clientIndex, false)
+			clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
 			b.log.Warn().Msgf("broadcast: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 		}
 		afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, maxedExpRetry, onMaxConsecutiveRetries)
@@ -155,7 +155,7 @@ func (b *Broker) Broadcast(data []byte) {
 			}
 
 			// update our last successful client index for future calls
-			b.lastSuccessfulClientIndex = clientIndex
+			b.updateLastSuccessfulClient(clientIndex)
 			return nil
 		})
 
@@ -208,9 +208,9 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	}
 	maxedExpRetry := retry.WithMaxRetries(retryMaxRead, expRetry)
 
-	clientIndex, dkgContractClient := b.updateContractClient(b.lastSuccessfulClientIndex, true)
+	clientIndex, dkgContractClient := b.getInitialContractClient()
 	onMaxConsecutiveRetries := func(totalAttempts int) {
-		clientIndex, dkgContractClient = b.updateContractClient(clientIndex, false)
+		clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
 		b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
 	afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, maxedExpRetry, onMaxConsecutiveRetries)
@@ -224,7 +224,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 		}
 
 		// update our last successful client index for future calls
-		b.lastSuccessfulClientIndex = clientIndex
+		b.updateLastSuccessfulClient(clientIndex)
 		return nil
 	})
 	// Various network conditions can result in errors while reading DKG messages
@@ -259,9 +259,9 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 	}
 	maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
 
-	clientIndex, dkgContractClient := b.updateContractClient(b.lastSuccessfulClientIndex, true)
+	clientIndex, dkgContractClient := b.getInitialContractClient()
 	onMaxConsecutiveRetries := func(totalAttempts int) {
-		clientIndex, dkgContractClient = b.updateContractClient(clientIndex, false)
+		clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
 		b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
 	afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, maxedExpRetry, onMaxConsecutiveRetries)
@@ -273,7 +273,7 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 		}
 
 		// update our last successful client index for future calls
-		b.lastSuccessfulClientIndex = clientIndex
+		b.updateLastSuccessfulClient(clientIndex)
 		return nil
 	})
 
@@ -294,11 +294,7 @@ func (b *Broker) Shutdown() {
 
 // updateContractClient will return the last successful client index by default for all initial operations or else
 // it will return the appropriate client index with respect to last successful and number of client.
-func (b *Broker) updateContractClient(clientIndex int, init bool) (int, module.DKGContractClient) {
-	if init {
-		return b.lastSuccessfulClientIndex, b.dkgContractClients[b.lastSuccessfulClientIndex]
-	}
-
+func (b *Broker) updateContractClient(clientIndex int) (int, module.DKGContractClient) {
 	if clientIndex == b.lastSuccessfulClientIndex {
 		if clientIndex == len(b.dkgContractClients)-1 {
 			clientIndex = 0
@@ -310,6 +306,18 @@ func (b *Broker) updateContractClient(clientIndex int, init bool) (int, module.D
 	}
 
 	return clientIndex, b.dkgContractClients[clientIndex]
+}
+
+// getInitialContractClient will return the last successful contract client or the initial
+func (b *Broker) getInitialContractClient()  (int, module.DKGContractClient)  {
+	return b.lastSuccessfulClientIndex, b.dkgContractClients[b.lastSuccessfulClientIndex]
+}
+
+// updateLastSuccessfulClient set lastSuccessfulClientIndex in concurrency safe way
+func  (b *Broker) updateLastSuccessfulClient(clientIndex int)  {
+	b.unit.Lock()
+	b.lastSuccessfulClientIndex = clientIndex
+	b.unit.Unlock()
 }
 
 // listen is a blocking call that processes incoming messages from the network
