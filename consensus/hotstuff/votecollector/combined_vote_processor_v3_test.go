@@ -769,7 +769,6 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 // We start with leader proposing a block, then new leader collects votes and builds a QC.
 // Need to verify that QC that was produced is valid and can be embedded in new proposal.
 func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
-	t.Skip("This test doesn't work since we are missing CombinedVerifierV3")
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
 	view := uint64(20)
@@ -874,7 +873,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		packer := signature.NewConsensusSigDataPacker(committee)
 
 		// create verifier that will do crypto checks of created QC
-		verifier := verification.NewCombinedVerifierV2(committee, packer)
+		verifier := verification.NewCombinedVerifierV3(committee, packer)
 		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
 		validator := hotstuffvalidator.New(committee, forks, verifier)
