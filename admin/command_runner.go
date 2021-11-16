@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -268,20 +269,31 @@ func (r *CommandRunner) runCommand(ctx context.Context, command string, data int
 	var handleResult interface{}
 	var handleErr error
 
-	if handler := r.getHandler(command); handler != nil {
-		if handleResult, handleErr = handler(ctx, req); handleErr != nil {
-			if errors.Is(handleErr, context.Canceled) {
-				return nil, status.Error(codes.Canceled, "client canceled")
-			} else if errors.Is(handleErr, context.DeadlineExceeded) {
-				return nil, status.Error(codes.DeadlineExceeded, "request timed out")
-			} else {
-				s, _ := status.FromError(handleErr)
-				return nil, s.Err()
-			}
+	handler := r.getHandler(command)
+
+	if handler == nil {
+		return nil, status.Error(codes.Unimplemented, fmt.Sprintf("invalid command: %v. Available commands: %v", command, r.availableCommands()))
+	}
+
+	if handleResult, handleErr = handler(ctx, req); handleErr != nil {
+		if errors.Is(handleErr, context.Canceled) {
+			return nil, status.Error(codes.Canceled, "client canceled")
+		} else if errors.Is(handleErr, context.DeadlineExceeded) {
+			return nil, status.Error(codes.DeadlineExceeded, "request timed out")
+		} else {
+			s, _ := status.FromError(handleErr)
+			return nil, s.Err()
 		}
-	} else {
-		return nil, status.Error(codes.Unimplemented, "invalid command")
 	}
 
 	return handleResult, nil
+}
+
+// return the name of all available commands
+func (r *CommandRunner) availableCommands() string {
+	commands := make([]string, 0)
+	for cmd := range r.handlers {
+		commands = append(commands, cmd)
+	}
+	return strings.Join(commands, ",")
 }
