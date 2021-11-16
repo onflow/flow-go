@@ -309,12 +309,12 @@ func (b *Broker) updateContractClient(clientIndex int) (int, module.DKGContractC
 }
 
 // getInitialContractClient will return the last successful contract client or the initial
-func (b *Broker) getInitialContractClient()  (int, module.DKGContractClient)  {
+func (b *Broker) getInitialContractClient() (int, module.DKGContractClient) {
 	return b.lastSuccessfulClientIndex, b.dkgContractClients[b.lastSuccessfulClientIndex]
 }
 
 // updateLastSuccessfulClient set lastSuccessfulClientIndex in concurrency safe way
-func  (b *Broker) updateLastSuccessfulClient(clientIndex int)  {
+func (b *Broker) updateLastSuccessfulClient(clientIndex int) {
 	b.unit.Lock()
 	b.lastSuccessfulClientIndex = clientIndex
 	b.unit.Unlock()

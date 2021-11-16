@@ -3,8 +3,9 @@ package epochs
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine"
 	"time"
+
+	"github.com/onflow/flow-go/engine"
 
 	"github.com/onflow/flow-go/module/retrymiddleware"
 
