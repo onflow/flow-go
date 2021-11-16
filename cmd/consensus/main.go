@@ -118,6 +118,7 @@ func main() {
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
 		dkgKeyStore             *bstorage.DKGKeys
+		dkgStateStore           *bstorage.DKGState
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -173,6 +174,10 @@ func main() {
 		}).
 		Module("dkg key storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			dkgKeyStore, err = bstorage.NewDKGKeys(node.Metrics.Cache, node.SecretsDB)
+			return err
+		}).
+		Module("dkg state storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			dkgStateStore, err = bstorage.NewDKGState(node.SecretsDB)
 			return err
 		}).
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -747,6 +752,7 @@ func main() {
 				node.Me,
 				node.State,
 				dkgKeyStore,
+				dkgStateStore,
 				dkgmodule.NewControllerFactory(
 					node.Logger,
 					node.Me,

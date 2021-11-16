@@ -1,11 +1,12 @@
 package dkg
 
 import (
-	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/module"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -84,6 +85,8 @@ func createNode(
 	// participation in the DKG run
 	dkgKeys, err := badger.NewDKGKeys(core.Metrics, core.SecretsDB)
 	require.NoError(t, err)
+	dkgState, err := badger.NewDKGState(core.PublicDB)
+	require.NoError(t, err)
 
 	// configure the state snapthost at firstBlock to return the desired
 	// Epochs
@@ -145,6 +148,7 @@ func createNode(
 		core.Me,
 		core.State,
 		dkgKeys,
+		dkgState,
 		dkg.NewControllerFactory(
 			controllerFactoryLogger,
 			core.Me,
