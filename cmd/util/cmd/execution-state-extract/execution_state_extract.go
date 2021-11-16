@@ -72,7 +72,7 @@ func extractExecutionState(
 		migrations = []ledger.Migration{
 			//storageFormatV6Migration.Migrate,
 			storageUsedUpdateMigration.Migrate,
-			mgr.PruneMigration, // we need post migration pruning before deploying trie update pruning
+			mgr.PruneMigration,
 		}
 	}
 	if report {
