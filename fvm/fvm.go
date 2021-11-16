@@ -64,6 +64,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			if e, ok := r.(error); ok {
 				le := errors.NewLedgerIntractionLimitExceededError(0, 0)
 				if ok := errors.As(e, &le); ok {
+					err = le
 					return
 				}
 			}
