@@ -175,7 +175,7 @@ func serializeToBitVector(sigTypes []hotstuff.SigType) ([]byte, error) {
 	// a sig type can be converted into one bit, the type at index 0 being converted into the least significant bit:
 	// the random beacon type is mapped to 1, while the staking type is mapped to 0.
 	// the remaining unfilled bits in the last byte will be 0
-	const initialMask = byte(1 << 7) //
+	const initialMask = byte(1 << 7)
 
 	b := byte(0)
 	mask := initialMask
@@ -188,7 +188,7 @@ func serializeToBitVector(sigTypes []hotstuff.SigType) ([]byte, error) {
 		}
 
 		mask >>= 1     // move to the next bit
-		if mask == 0 { // this happens every 8 loop ietartions
+		if mask == 0 { // this happens every 8 loop iterations
 			bytes = append(bytes, b)
 			b = byte(0)
 			mask = initialMask
