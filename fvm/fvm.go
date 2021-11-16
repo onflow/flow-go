@@ -2,7 +2,7 @@ package fvm
 
 import (
 	"fmt"
-	"runtime/debug"
+	"strings"
 
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
@@ -62,15 +62,10 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 				return
 			}
 
-			//if e, ok := r.(error); ok {
-			//	le := errors.NewLedgerIntractionLimitExceededError(0, 0)
-			//	if ok := errors.As(e, &le); ok {
-			//		err = le
-			//		return
-			//	}
-			//}
-
-			ctx.Logger.Error().Str("trace", string(debug.Stack())).Msg("Unrecoverable VM panic")
+			if strings.Contains(fmt.Sprintf("%v", r), "[Error Code: 1106]") {
+				err = errors.NewLedgerIntractionLimitExceededError(0, 0)
+				return
+			}
 
 			panic(r)
 		}
