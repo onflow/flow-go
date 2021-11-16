@@ -15,7 +15,7 @@ import (
 const (
 	DefaultMaxKeySize         = 16_000      // ~16KB
 	DefaultMaxValueSize       = 256_000_000 // ~256MB
-	DefaultMaxInteractionSize = 20_000_000  // ~20MB
+	DefaultMaxInteractionSize = 30_000_000  // ~30MB
 )
 
 type mapKey struct {
