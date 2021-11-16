@@ -13,6 +13,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/onflow/atree"
+	"github.com/opentracing/opentracing-go"
 	"github.com/rs/zerolog"
 	"github.com/schollz/progressbar/v3"
 
@@ -923,6 +924,10 @@ func (m migrationRuntimeInterface) GetAccountContractNames(_ runtime.Address) ([
 
 func (m migrationRuntimeInterface) AllocateStorageIndex(_ []byte) (atree.StorageIndex, error) {
 	panic("unexpected AllocateStorageIndex call")
+}
+
+func (m migrationRuntimeInterface) RecordTrace(_ string, _ common.Location, _ time.Duration, _ []opentracing.LogRecord) {
+	panic("unexpected RecordTrace call")
 }
 
 func cborMeLink(value []byte) string {

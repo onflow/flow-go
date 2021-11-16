@@ -326,6 +326,10 @@ func (e *ErrorReturningRuntime) InvokeContractFunction(_ common.AddressLocation,
 	panic("InvokeContractFunction not expected")
 }
 
+func (e *ErrorReturningRuntime) SetTracingEnabled(_ bool) {
+	panic("SetTracingEnabled not expected")
+}
+
 func encodeContractNames(contractNames []string) ([]byte, error) {
 	sort.Strings(contractNames)
 	var buf bytes.Buffer
