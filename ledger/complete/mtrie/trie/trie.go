@@ -294,17 +294,21 @@ func update(
 		wg.Wait()
 	}
 
-	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
-	// payload is re-written at a register.
-	if lChild == lchildParent && rChild == rchildParent {
-		return parentNode
+	if !parentNode.IsLeaf() {
+		// mitigate storage exhaustion attack: avoids creating a new node when the exact same
+		// payload is re-written at a register.
+		if lChild == lchildParent && rChild == rchildParent {
+			return parentNode
+		}
 	}
 
+	// In case the parent node was a leaf, we _cannot reuse_ it, because we potentially
+	// updated registers in the sub-trie
 	n := node.NewInterimNode(nodeHeight, lChild, rChild)
-
 	if prune {
 		return n.Compactify()
 	}
+
 	return n
 }
 
