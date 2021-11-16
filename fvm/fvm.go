@@ -61,6 +61,13 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 				return
 			}
 
+			if e, ok := r.(error); ok {
+				le := errors.NewLedgerIntractionLimitExceededError(0, 0)
+				if ok := errors.As(e, &le); ok {
+					return
+				}
+			}
+
 			panic(r)
 		}
 	}()
