@@ -6,10 +6,10 @@ import (
 
 type ProtocolBuilder struct {
 	host     host.Host
-	unicasts UnicastProtocolList
+	unicasts []Protocol
 }
 
-func (builder *ProtocolBuilder) WithUnicastProtocol(u UnicastProtocol) *ProtocolBuilder {
+func (builder *ProtocolBuilder) WithUnicastProtocol(u Protocol) *ProtocolBuilder {
 	builder.unicasts = append(builder.unicasts, u)
 
 	return builder
