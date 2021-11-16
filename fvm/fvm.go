@@ -2,9 +2,6 @@ package fvm
 
 import (
 	"fmt"
-	"runtime/debug"
-	"strings"
-
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
@@ -60,12 +57,6 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			//
 			if encodingErr, ok := r.(interpreter.EncodingUnsupportedValueError); ok {
 				err = errors.NewEncodingUnsupportedValueError(encodingErr.Value, encodingErr.Path)
-				return
-			}
-
-			if strings.Contains(fmt.Sprintf("%v", r), "[Error Code: 1106]") {
-				ctx.Logger.Error().Str("trace", string(debug.Stack())).Msg("VM LedgerIntractionLimitExceeded panic")
-				err = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
 				return
 			}
 
