@@ -80,9 +80,9 @@ func (e *Engine) checkLastSealed(finalizedID flow.Identifier) error {
 	}
 
 	blockID := seal.BlockID
-	// sealedCommit := seal.FinalState
+	sealedCommit := seal.FinalState
 
-	_, err = e.execState.StateCommitmentByBlockID(e.unit.Ctx(), blockID)
+	mycommit, err := e.execState.StateCommitmentByBlockID(e.unit.Ctx(), blockID)
 	if errors.Is(err, storage.ErrNotFound) {
 		// have not executed the sealed block yet
 		// in other words, this can't detect execution fork, if the execution is behind
@@ -94,16 +94,17 @@ func (e *Engine) checkLastSealed(finalizedID flow.Identifier) error {
 		return fmt.Errorf("could not get my state commitment OnFinalizedBlock, blockID: %v", blockID)
 	}
 
-	// no need to check the state commitments
-	// if mycommit != sealedCommit {
-	// 	sealed, err := e.state.AtBlockID(blockID).Head()
-	// 	if err != nil {
-	// 		return fmt.Errorf("could not get sealed block when checkLastSealed: %v, err: %w", blockID, err)
-	// 	}
+	if mycommit != sealedCommit {
+		sealed, err := e.state.AtBlockID(blockID).Head()
+		if err != nil {
+			return fmt.Errorf("could not get sealed block when checkLastSealed: %v, err: %w", blockID, err)
+		}
 
-	// 	return fmt.Errorf("execution result is different from the sealed result, height: %v, block_id: %v, sealed_commit: %x, my_commit: %x",
-	// 		sealed.Height, blockID, sealedCommit, mycommit)
-	// }
+		// we expect the state commitments not to match so just log them gracefully
+		e.log.Info().Str("block_id", blockID.String()).Uint64("block_height", sealed.Height).Msgf("expected state commitment diff for block (%v) : sealed commit %x, our commit %x", sealedCommit, mycommit)
+		// return fmt.Errorf("execution result is different from the sealed result, height: %v, block_id: %v, sealed_commit: %x, my_commit: %x",
+		// sealed.Height, blockID, sealedCommit, mycommit)
+	}
 
 	return nil
 }
