@@ -9,8 +9,8 @@ type ProtocolBuilder struct {
 	unicasts UnicastProtocolList
 }
 
-func (builder *ProtocolBuilder) WithStreamFactory(factory) *ProtocolBuilder {
-	builder.unicasts = append(builder.unicasts, factory)
+func (builder *ProtocolBuilder) WithUnicastProtocol(u UnicastProtocol) *ProtocolBuilder {
+	builder.unicasts = append(builder.unicasts, u)
 
 	return builder
 }
