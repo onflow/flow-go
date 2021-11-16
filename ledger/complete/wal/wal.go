@@ -1,7 +1,9 @@
 package wal
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"sort"
 	"time"
 
@@ -12,11 +14,14 @@ import (
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/complete/mtrie"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/flattener"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/utils/io"
 )
 
 const SegmentSize = 32 * 1024 * 1024
+
+var disable = false
 
 type DiskWAL struct {
 	wal            *prometheusWAL.WAL
@@ -28,6 +33,7 @@ type DiskWAL struct {
 	diskUpdateLimiter *time.Ticker
 	metrics           module.WALMetrics
 	dir               string
+	disabled          bool
 }
 
 // TODO use real logger and metrics, but that would require passing them to Trie storage
@@ -104,6 +110,7 @@ func (w *DiskWAL) RecordDelete(rootHash ledger.RootHash) error {
 }
 
 func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
+
 	return w.Replay(
 		func(forestSequencing *flattener.FlattenedForest) error {
 			rebuiltTries, err := flattener.RebuildTries(forestSequencing)
@@ -117,11 +124,34 @@ func (w *DiskWAL) ReplayOnForest(forest *mtrie.Forest) error {
 			return nil
 		},
 		func(update *ledger.TrieUpdate) error {
-			_, err := forest.Update(update)
-			return err
+
+			if !w.disabled {
+				_, err := forest.Update(update)
+				if err != nil {
+					fmt.Println(err.Error())
+				}
+			}
+			fmt.Println(">>>>", update.RootHash.String())
+
+			waitingHash, err := flow.HexStringToIdentifier("0f045d7f5e7ae523c08cea0159786eac043b5f16d1e731f32f2ef0875c23d96d")
+			if err != nil {
+				panic(err)
+			}
+			if bytes.Equal(waitingHash[:], update.RootHash[:]) {
+				encodedUpdate := EncodeUpdate(update)
+				err := ioutil.WriteFile("update.bin", encodedUpdate, 0644)
+				if err != nil {
+					panic(err)
+				}
+				fmt.Println("found the target trie, dumping as json")
+				w.disabled = true
+			}
+			return nil
 		},
 		func(rootHash ledger.RootHash) error {
-			forest.RemoveTrie(rootHash)
+			if !w.disabled {
+				forest.RemoveTrie(rootHash)
+			}
 			return nil
 		},
 	)

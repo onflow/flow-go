@@ -103,6 +103,11 @@ func (l *Ledger) InitialState() ledger.State {
 	return ledger.State(l.forest.GetEmptyRootHash())
 }
 
+// Forest returns the forest
+func (l *Ledger) Forest() *mtrie.Forest {
+	return l.forest
+}
+
 // Get read the values of the given keys at the given state
 // it returns the values in the same order as given registerIDs and errors (if any)
 func (l *Ledger) Get(query *ledger.Query) (values []ledger.Value, err error) {
