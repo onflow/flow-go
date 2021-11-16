@@ -222,15 +222,15 @@ func (_m *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 }
 
 // SealingSegment provides a mock function with given fields:
-func (_m *Snapshot) SealingSegment() ([]*flow.Block, error) {
+func (_m *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 	ret := _m.Called()
 
-	var r0 []*flow.Block
-	if rf, ok := ret.Get(0).(func() []*flow.Block); ok {
+	var r0 *flow.SealingSegment
+	if rf, ok := ret.Get(0).(func() *flow.SealingSegment); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*flow.Block)
+			r0 = ret.Get(0).(*flow.SealingSegment)
 		}
 	}
 
