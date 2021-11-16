@@ -82,23 +82,23 @@ func Bootstrap(
 		return nil, fmt.Errorf("cannot bootstrap invalid root snapshot: %w", err)
 	}
 
+	segment, err := root.SealingSegment()
+	if err != nil {
+		return nil, fmt.Errorf("could not get sealing segment: %w", err)
+	}
+
 	err = operation.RetryOnConflictTx(db, transaction.Update, func(tx *transaction.Tx) error {
-
-		// 1) insert each block in the root chain segment
-		err = state.bootstrapSealingSegment(root)(tx)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap sealing chain segment: %w", err)
-		}
-
-		segment, err := root.SealingSegment()
-		if err != nil {
-			return fmt.Errorf("could not get sealing segment: %w", err)
-		}
 		// sealing segment is in ascending height order, so the tail is the
 		// oldest ancestor and head is the newest child in the segment
 		// TAIL <- ... <- HEAD
-		head := segment[len(segment)-1] // reference block of the snapshot
-		tail := segment[0]              // last sealed block
+		highest := segment.Highest() // reference block of the snapshot
+		lowest := segment.Lowest()   // last sealed block
+
+		// bootstrap the sealing segment
+		err = state.bootstrapSealingSegment(segment, highest)(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
+		}
 
 		// 2) insert the root execution result and seal into the database and index it
 		err = transaction.WithTx(state.bootstrapSealedResult(root))(tx)
@@ -133,10 +133,10 @@ func Bootstrap(
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
 		}
-		state.metrics.BlockSealed(tail)
-		state.metrics.SealedHeight(tail.Header.Height)
-		state.metrics.FinalizedHeight(head.Header.Height)
-		for _, block := range segment {
+		state.metrics.BlockSealed(lowest)
+		state.metrics.SealedHeight(lowest.Header.Height)
+		state.metrics.FinalizedHeight(highest.Header.Height)
+		for _, block := range segment.Blocks {
 			state.metrics.BlockFinalized(block)
 		}
 
@@ -151,15 +151,21 @@ func Bootstrap(
 
 // bootstrapSealingSegment inserts all blocks and associated metadata for the
 // protocol state root snapshot to disk.
-func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*transaction.Tx) error {
+func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *flow.Block) func(tx *transaction.Tx) error {
 	return func(tx *transaction.Tx) error {
-		segment, err := root.SealingSegment()
-		if err != nil {
-			return fmt.Errorf("could not get sealing segment: %w", err)
-		}
-		head := segment[len(segment)-1]
 
-		for i, block := range segment {
+		for _, result := range segment.ExecutionResults {
+			err := transaction.WithTx(operation.SkipDuplicates(operation.InsertExecutionResult(result)))(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert execution result: %w", err)
+			}
+			err = transaction.WithTx(operation.IndexExecutionResult(result.BlockID, result.ID()))(tx)
+			if err != nil {
+				return fmt.Errorf("could not index execution result: %w", err)
+			}
+		}
+
+		for i, block := range segment.Blocks {
 			blockID := block.ID()
 			height := block.Header.Height
 
@@ -186,7 +192,7 @@ func (state *State) bootstrapSealingSegment(root protocol.Snapshot) func(*transa
 		}
 
 		// insert an empty child index for the final block in the segment
-		err = transaction.WithTx(operation.InsertBlockChildren(head.ID(), nil))(tx)
+		err := transaction.WithTx(operation.InsertBlockChildren(head.ID(), nil))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
 		}
@@ -236,29 +242,29 @@ func (state *State) bootstrapStatePointers(root protocol.Snapshot) func(*badger.
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
-		head := segment[len(segment)-1]
-		tail := segment[0]
+		highest := segment.Highest()
+		lowest := segment.Lowest()
 
 		// insert initial views for HotStuff
-		err = operation.InsertStartedView(head.Header.ChainID, head.Header.View)(tx)
+		err = operation.InsertStartedView(highest.Header.ChainID, highest.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
-		err = operation.InsertVotedView(head.Header.ChainID, head.Header.View)(tx)
+		err = operation.InsertVotedView(highest.Header.ChainID, highest.Header.View)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert started view: %w", err)
 		}
 
 		// insert height pointers
-		err = operation.InsertRootHeight(head.Header.Height)(tx)
+		err = operation.InsertRootHeight(highest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert root height: %w", err)
 		}
-		err = operation.InsertFinalizedHeight(head.Header.Height)(tx)
+		err = operation.InsertFinalizedHeight(highest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert finalized height: %w", err)
 		}
-		err = operation.InsertSealedHeight(tail.Header.Height)(tx)
+		err = operation.InsertSealedHeight(lowest.Header.Height)(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert sealed height: %w", err)
 		}
@@ -391,7 +397,7 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress 
 		if err != nil {
 			return fmt.Errorf("could not get sealing segment: %w", err)
 		}
-		for _, block := range segment {
+		for _, block := range segment.Blocks {
 			blockID := block.ID()
 			err = state.epoch.statuses.StoreTx(blockID, status)(tx)
 			if err != nil {

@@ -20,10 +20,27 @@ func TestProcessTestRun(t *testing.T) {
 		"1 count all pass":                "test-result-crypto-hash-1-count-pass.json",
 		"1 count 1 fail the rest pass":    "test-result-crypto-hash-1-count-fail.json",
 		"1 count 2 skipped the rest pass": "test-result-crypto-hash-1-count-skip-pass.json",
-		"1 count skip all packages":       "test-result-crypto-hash-1-count-skip-all-packages.json", //raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
-		"2 count all pass":                "test-result-crypto-hash-2-count-pass.json",
-		"10 count all pass":               "test-result-crypto-hash-10-count-pass.json",
-		"10 count some failures":          "test-result-crypto-hash-10-count-fail.json",
+
+		// raw results generated with: go test -json -count 1 --tags relic ./utils/unittest/...
+		"1 count skip all packages": "test-result-crypto-hash-1-count-skip-all-packages.json",
+		"2 count all pass":          "test-result-crypto-hash-2-count-pass.json",
+		"10 count all pass":         "test-result-crypto-hash-10-count-pass.json",
+		"10 count some failures":    "test-result-crypto-hash-10-count-fail.json",
+
+		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
+		// this is a single unit test that produces a nil test result
+		// "1 count single nil test": "test-result-nil-test-single-1-count-pass.json",
+
+		//raw results generated with: go test -v -tags relic -count=5 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
+		//for testing that re-slicing logic works when there are multiple nil tests in a row
+		// "5 nil tests in a row": "test-result-nil-test-single-5-count-pass.json",
+
+		//for testing that re-slicing logic works when there is a normal test at the of a test run with multiple nil tests in front of it
+		// "4 nil tests in a row, 1 normal test": "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
+
+		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
+		// this is a group of unit tests with a single nil test result
+		// "3 count nil test with normal tests": "test-result-nil-test-others-normal-3-count-pass.json",
 	}
 
 	for k, testJsonData := range testDataMap {
@@ -107,27 +124,32 @@ func checkTestRuns(t *testing.T, expectedTestRun TestRun, actualTestRun TestRun)
 			require.Equal(t, expectedPackageResults.Output[packageOutputIndex], actualPackageResults.Output[packageOutputIndex])
 		}
 
-		// check all tests results of each package
-		require.Equal(t, len(expectedPackageResults.Tests), len(actualPackageResults.Tests))
-		for testResultIndex := range expectedPackageResults.Tests {
-
-			expectedTestResult := expectedPackageResults.Tests[testResultIndex]
-			actualTestResult := actualPackageResults.Tests[testResultIndex]
-
-			// check all outputs of each test result
-			require.Equal(t, len(expectedTestResult.Output), len(actualTestResult.Output), fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestResult.Test))
-			for testResultOutputIndex := range expectedTestResult.Output {
-				require.Equal(t, expectedTestResult.Output[testResultOutputIndex], actualTestResult.Output[testResultOutputIndex], fmt.Sprintf("PackageResult[%d] TestResult[%d] Output[%d]", packageIndex, testResultIndex, testResultOutputIndex))
-			}
-
-			require.Equal(t, expectedTestResult.Package, actualTestResult.Package)
-			require.Equal(t, expectedTestResult.Test, actualTestResult.Test)
-			require.Equal(t, expectedTestResult.Elapsed, actualTestResult.Elapsed, fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestResult.Test))
-			require.Equal(t, expectedTestResult.Result, actualTestResult.Result)
-		}
+		// check all regular and nil tests results of each package
+		checkTestResults(t, expectedPackageResults.Tests, actualPackageResults.Tests)
 	}
 	// finally, compare the entire actual test run against what's expected - if there were any discrepancies they should have been caught by now
 	require.Equal(t, expectedTestRun, actualTestRun)
+}
+
+// checks regular and nil test results
+func checkTestResults(t *testing.T, expectedTestResults []TestResult, actualTestResults []TestResult) {
+	require.Equal(t, len(expectedTestResults), len(actualTestResults))
+	for testResultIndex := range expectedTestResults {
+
+		expectedTestResult := expectedTestResults[testResultIndex]
+		actualTestResult := actualTestResults[testResultIndex]
+
+		// check all outputs of each test result
+		require.Equal(t, len(expectedTestResult.Output), len(actualTestResult.Output), fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestResult.Test))
+		for testResultOutputIndex := range expectedTestResult.Output {
+			require.Equal(t, expectedTestResult.Output[testResultOutputIndex], actualTestResult.Output[testResultOutputIndex], fmt.Sprintf("TestResult[%d] Output[%d]", testResultIndex, testResultOutputIndex))
+		}
+
+		require.Equal(t, expectedTestResult.Package, actualTestResult.Package)
+		require.Equal(t, expectedTestResult.Test, actualTestResult.Test)
+		require.Equal(t, expectedTestResult.Elapsed, actualTestResult.Elapsed, fmt.Sprintf("TestResult[%d].Test: %s", testResultIndex, actualTestResult.Test))
+		require.Equal(t, expectedTestResult.Result, actualTestResult.Result)
+	}
 }
 
 // read raw results from local json file - for testing
