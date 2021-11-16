@@ -85,9 +85,9 @@ func NewLeaf(path ledger.Path,
 		path:     path,
 		payload:  payload,
 		maxDepth: 0,
-		regCount: uint64(1),
+		regCount: 1,
 	}
-	n.computeAndStoreHash()
+	n.hashValue = n.computeHash()
 	return n
 }
 
@@ -114,7 +114,7 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 		maxDepth: utils.MaxUint16(lMaxDepth, rMaxDepth) + 1,
 		regCount: lRegCount + rRegCount,
 	}
-	n.computeAndStoreHash()
+	n.hashValue = n.computeHash()
 	return n
 }
 
@@ -129,8 +129,8 @@ func (n *Node) copyAndPromoteLeafNode(isRight bool) *Node {
 		height:   n.height + 1,
 		path:     n.path,
 		payload:  n.payload,
-		maxDepth: n.maxDepth,
-		regCount: n.regCount,
+		maxDepth: 0,
+		regCount: 1,
 	}
 	if isRight {
 		newNode.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(n.height), n.hashValue)
@@ -138,12 +138,6 @@ func (n *Node) copyAndPromoteLeafNode(isRight bool) *Node {
 		newNode.hashValue = hash.HashInterNode(n.hashValue, ledger.GetDefaultHashForHeight(n.height))
 	}
 	return newNode
-}
-
-// computeAndStoreHash computes the node's hash value and
-// stores the result in the nodes internal `hashValue` field
-func (n *Node) computeAndStoreHash() {
-	n.hashValue = n.computeHash()
 }
 
 // Compactify checks if the subtree represented by an interim-node can be simplified to its most concise representation by looking only at its direct children. The
@@ -175,24 +169,23 @@ func (n *Node) Compactify() *Node {
 		rChildEmpty = n.rChild.isDefaultNode()
 	}
 	if rChildEmpty && lChildEmpty {
-		// if both children are empty this is the same as as a default leafs
+		// if both children are empty this is the same as a default leaf
 		return nil
 	}
+	// If we reach the following code, at least one child must be a non-default node
 
 	// if childNode is non empty
 	if rChildEmpty {
 		if !lChildEmpty && n.lChild.IsLeaf() {
 			return n.lChild.copyAndPromoteLeafNode(false)
 		}
-		// this would replace empty nodes with nil
-		n.rChild = nil
+		return NewInterimNode(n.height, n.lChild, nil)
 	}
 	if lChildEmpty {
 		if !rChildEmpty && n.rChild.IsLeaf() {
 			return n.rChild.copyAndPromoteLeafNode(true)
 		}
-		// this would replace empty nodes with nil
-		n.lChild = nil
+		return NewInterimNode(n.height, nil, n.rChild)
 	}
 
 	// else no change needed
@@ -289,15 +282,16 @@ func (n *Node) RegCount() uint64 {
 // If the node is not a leaf, the function returns `nil`.
 func (n *Node) Path() *ledger.Path {
 	if n.IsLeaf() {
-		return &n.path
+		p := n.path // copy to avoid external modification
+		return &p
 	}
 	return nil
 }
 
-// Payload returns the the Node's payload.
+// Payload returns the Node's payload.
 // Do NOT MODIFY returned slices!
 func (n *Node) Payload() *ledger.Payload {
-	return n.payload
+	return n.payload.DeepCopy()
 }
 
 // LeftChild returns the the Node's left child.
