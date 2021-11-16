@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -12,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/rs/zerolog"
+	"strings"
 
 	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/stretchr/testify/require"
@@ -22,6 +22,10 @@ import (
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+const (
+	defaultPort = "3569"
 )
 
 type Suite struct {
@@ -71,7 +75,7 @@ func (s *Suite) SetupTest() {
 		ghostConNode,
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs tests", confs, 100, 50, 280)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs tests", confs, 200, 50, 380)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
@@ -117,6 +121,7 @@ type StakedNodeOperationInfo struct {
 	MachineAccountAddress   flow.Address
 	MachineAccountKey       sdkcrypto.PrivateKey
 	MachineAccountPublicKey flow.AccountPublicKey
+	ContainerName           string
 }
 
 // StakeNode will generate initial keys needed for a SN/LN node and onboard this node using the following steps;
@@ -143,16 +148,11 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	)
 	require.NoError(s.T(), err)
 
-	stakeAmount, err := s.client.TokenAmountByRole(role)
+	_, stakeAmount, err := s.client.TokenAmountByRole(role)
 	require.NoError(s.T(), err)
 
 	// fund account with token amount to stake
-	result, err := s.fundAccount(ctx, stakingAccountAddress, stakeAmount)
-	require.NoError(s.T(), err)
-	require.NoError(s.T(), result.Error)
-
-	// fund account for storage
-	result, err = s.fundAccount(ctx, stakingAccountAddress, "10.0")
+	result, err := s.fundAccount(ctx, stakingAccountAddress, fmt.Sprintf("%f", stakeAmount+10.0))
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
@@ -166,10 +166,12 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 
 	// if node has a machine account key encode it
 	var encMachinePubKey []byte
-	if machineAccountKey != nil  {
+	if machineAccountKey != nil {
 		encMachinePubKey, err = flow.EncodeRuntimeAccountPublicKey(machineAccountPubKey)
 		require.NoError(s.T(), err)
 	}
+
+	containerName := fmt.Sprintf("epochs-test-join-%s-%s", role, nodeID)
 
 	// register node using staking collection
 	result, err = s.registerNode(
@@ -179,14 +181,19 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		stakingAccount,
 		nodeID,
 		role,
-		"localhost:9000",
-		networkingKey.PublicKey().String()[2:],
-		stakingKey.PublicKey().String()[2:],
-		stakeAmount,
+		s.getNodeAddress(containerName),
+		strings.TrimPrefix(networkingKey.PublicKey().String(), "0x"),
+		strings.TrimPrefix(stakingKey.PublicKey().String(), "0x"),
+		fmt.Sprintf("%f", stakeAmount),
 		hex.EncodeToString(encMachinePubKey),
 	)
+	fmt.Printf("REGISTER NODE DONE \n\n")
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
+
+	result = s.SetApprovedNodesScript(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
+	require.NoError(s.T(), result.Error)
+	fmt.Printf("SetApprovedNodesScript DONE: \n\n")
 
 	return &StakedNodeOperationInfo{
 		NodeID:                  nodeID,
@@ -198,7 +205,12 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		NetworkingKey:           networkingKey,
 		MachineAccountKey:       machineAccountKey,
 		MachineAccountPublicKey: machineAccountPubKey,
+		ContainerName:           containerName,
 	}
+}
+
+func (s *Suite) getNodeAddress(name string) string {
+	return fmt.Sprintf("%s:%s", name, defaultPort)
 }
 
 // transfers tokens to receiver from service account
@@ -264,7 +276,6 @@ func (s *Suite) createAccount(ctx context.Context,
 
 	addr, err := s.client.CreateAccount(ctx, accountKey, payerAccount, payer, sdk.Identifier(latestBlockID))
 	require.NoError(s.T(), err)
-
 	return addr, nil
 }
 
@@ -334,12 +345,11 @@ func (s *Suite) registerNode(
 
 	result, err := s.client.WaitForSealed(ctx, registerNodeTx.ID())
 	require.NoError(s.T(), err)
-
 	return result, nil
 }
 
 func (s *Suite) ExecuteGetProposedTableScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
-	v, err := s.client.ExecuteScriptBytes(ctx, 	templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 	return v
 }

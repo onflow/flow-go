@@ -6,8 +6,10 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/stretchr/testify/suite"
 	"testing"
+	"time"
 
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
@@ -138,12 +140,9 @@ func (s *Suite) TestEpochJoin() {
 	env := utils.LocalnetEnv()
 
 	role := flow.RoleAccess
+
 	// stake a new node
 	info := s.StakeNode(ctx, env, role)
-	testContainerName := fmt.Sprintf("epochs-test-join-%s-%s", info.Role, info.NodeID)
-
-	result := s.SetApprovedNodesScript(ctx, env, append(s.net.Identities().NodeIDs(), info.NodeID)...)
-	require.NoError(s.T(), result.Error)
 
 	// ensure node ID in approved list
 	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
@@ -154,49 +153,33 @@ func (s *Suite) TestEpochJoin() {
 	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), fmt.Sprintf("expected new node to be in proposed table: %x", info.NodeID))
 
 	nodeConfig := testnet.NewNodeConfig(role, testnet.WithID(info.NodeID))
-	testContainerConfig := testnet.NewContainerConfig(testContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
+	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
 	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-	epoch := snapshot.Epochs().Current()
-
-	epochFirstView, err := epoch.FirstView()
-	require.NoError(s.T(), err)
-	epochDKGPhase1Final, err := epoch.DKGPhase1FinalView()
-	require.NoError(s.T(), err)
-
-	s.BlockState.WaitForSealedView(s.T(), epochFirstView)
-	s.BlockState.WaitForSealedView(s.T(), epochDKGPhase1Final)
-
-	snapshot, err = s.client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-	phase, err := snapshot.Phase()
-	require.NoError(s.T(), err)
-	require.True(s.T(), phase == flow.EpochPhaseSetup)
-
 	// download root snapshot from access node, wait until we are in the epoch setup phase
 	// the following is never satisfied because ID is never found in snapshot
-	//var snapshot *inmem.Snapshot
-	//for {
-	//	snapshot, err = s.client.GetLatestProtocolSnapshot(ctx)
-	//	require.NoError(s.T(), err)
-	//
-	//	currentPhase, err := snapshot.Phase()
-	//	require.NoError(s.T(), err)
-	//
-	//	// uncomment to check if identity inside
-	//	//_, err = snapshot.Identity(info.NodeID)
-	//	if currentPhase == flow.EpochPhaseCommitted && err != nil {
-	//		break
-	//	}
-	//}
+	var snapshot *inmem.Snapshot
+	for {
+		snapshot, err = s.client.GetLatestProtocolSnapshot(ctx)
+		require.NoError(s.T(), err)
+
+		currentPhase, err := snapshot.Phase()
+		require.NoError(s.T(), err)
+		fmt.Printf("\n\nPHASE: %s\n\n", currentPhase)
+
+		// uncomment to check if identity inside
+		//_, err = snapshot.Identity(info.NodeID)
+		if currentPhase == flow.EpochPhaseCommitted {
+			break
+		}
+
+		time.Sleep(time.Second)
+	}
 
 	//add our container to the network
 	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
 	require.NoError(s.T(), err, "failed to add container to network")
-
 	//start our test container
 	testContainer := s.net.ContainerByID(info.NodeID)
 	testContainer.WriteRootSnapshot(snapshot)
