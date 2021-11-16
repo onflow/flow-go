@@ -81,7 +81,8 @@ func (h *Handlers) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 	h.jsonResponse(w, blocks, errorLogger)
 }
 
-func (h *Handlers) TransactionIDGet(w http.ResponseWriter, r *http.Request) {
+// GetTransactionByID gets a transaction by requested ID.
+func (h *Handlers) GetTransactionByID(w http.ResponseWriter, r *http.Request) {
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger() // todo(sideninja) refactor this to be initialized for us
 
 	vars := mux.Vars(r)
@@ -95,8 +96,31 @@ func (h *Handlers) TransactionIDGet(w http.ResponseWriter, r *http.Request) {
 		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("transaction fetching error: %w", err), errorLogger)
 	}
 
-	res := transactionResponse(tx)
-	h.jsonResponse(w, res, errorLogger)
+	h.jsonResponse(w, transactionResponse(tx), errorLogger)
+}
+
+// CreateTransaction creates a new transaction from provided payload.
+func (h *Handlers) CreateTransaction(w http.ResponseWriter, r *http.Request) {
+	var txBody generated.TransactionsBody
+	err := h.jsonDecode(r.Body, &txBody)
+	if err != nil {
+		h.errorResponse(w, http.StatusBadRequest, err.Error(), h.logger)
+		return
+	}
+
+	tx, err := toTransaction(&txBody)
+	if err != nil {
+		h.errorResponse(w, http.StatusBadRequest, err.Error(), h.logger) // todo(sideninja) use refactor err func
+		return
+	}
+
+	err = h.backend.SendTransaction(r.Context(), &tx)
+	if err != nil {
+		h.errorResponse(w, http.StatusBadRequest, err.Error(), h.logger)
+		return
+	}
+
+	h.jsonResponse(w, transactionResponse(&tx), h.logger)
 }
 
 func (h *Handlers) jsonResponse(w http.ResponseWriter, responsePayload interface{}, errorLogger zerolog.Logger) {
