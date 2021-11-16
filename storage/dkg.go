@@ -15,6 +15,9 @@ type DKGKeys interface {
 // DKG instances.
 type DKGState interface {
 
-	// DKGStarted sets the flag indicating the DKG has started for the given epoch.
-	DKGStarted(epochCounter uint64) error
+	// SetDKGStarted sets the flag indicating the DKG has started for the given epoch.
+	SetDKGStarted(epochCounter uint64) error
+
+	// GetDKGStarted checks whether the DKG has been started for the given epoch.
+	GetDKGStarted(epochCounter uint64) (bool, error)
 }
