@@ -34,11 +34,10 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
 	flownet "github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/p2p/compressed"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	p2pstream "github.com/onflow/flow-go/network/p2p/stream"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -66,27 +65,14 @@ const (
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func(context.Context) (*Node, error)
 
-// LibP2PStreamCompressorWrapperFunc is a wrapper function that plugs in compression for streams.
-type LibP2PStreamCompressorWrapperFunc func(libp2pnet.Stream) (libp2pnet.Stream, error)
-
-// WithoutCompression reflects the input stream without a compression.
-func WithoutCompression(s libp2pnet.Stream) (libp2pnet.Stream, error) {
-	return s, nil
-}
-
-// WithGzipCompression creates and returns a gzip-compressed stream out of input stream.
-func WithGzipCompression(s libp2pnet.Stream) (libp2pnet.Stream, error) {
-	return compressed.NewCompressedStream(s, compressor.GzipStreamCompressor{})
-}
-
 // LibP2PStreamCompressorFactoryFunc translates name of a stream factory to its corresponding stream compressor factory
 // function.
-func LibP2PStreamCompressorFactoryFunc(factory string) (LibP2PStreamCompressorWrapperFunc, error) {
+func LibP2PStreamCompressorFactoryFunc(factory string) (p2pstream.StreamFactory, error) {
 	switch factory {
 	case NoCompression:
-		return WithoutCompression, nil
+		return &p2pstream.PlainStream{}, nil
 	case GzipCompression:
-		return WithGzipCompression, nil
+		return &p2pstream.GzipStream{}, nil
 	default:
 		return nil, fmt.Errorf("unknown stream factory: %s", factory)
 	}
@@ -106,7 +92,7 @@ func DefaultLibP2PNodeFactory(
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
 	role string,
-	streamFactory LibP2PStreamCompressorWrapperFunc) (LibP2PFactoryFunc, error) {
+	streamFactory p2pstream.StreamFactory) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
@@ -148,7 +134,7 @@ type NodeBuilder interface {
 	SetTopicValidation(bool) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
 	SetResolver(*dns.Resolver) NodeBuilder
-	SetStreamCompressor(LibP2PStreamCompressorWrapperFunc) NodeBuilder
+	SetStreamCompressor(p2pstream.StreamFactory) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -160,7 +146,7 @@ type DefaultLibP2PNodeBuilder struct {
 	connMngr         connmgr.ConnManager
 	pingInfoProvider PingInfoProvider
 	resolver         *dns.Resolver
-	streamFactory    LibP2PStreamCompressorWrapperFunc
+	streamFactory    p2pstream.StreamFactory
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
@@ -226,19 +212,19 @@ func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *dns.Resolver) Nod
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetStreamCompressor(streamFactory LibP2PStreamCompressorWrapperFunc) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetStreamCompressor(streamFactory p2pstream.StreamFactory) NodeBuilder {
 	builder.streamFactory = streamFactory
 	return builder
 }
 
 func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	node := &Node{
-		id:               builder.id,
-		topics:           make(map[flownet.Topic]*pubsub.Topic),
-		subs:             make(map[flownet.Topic]*pubsub.Subscription),
-		logger:           builder.logger,
-		topicValidation:  builder.topicValidation,
-		compressedStream: WithoutCompression,
+		id:              builder.id,
+		topics:          make(map[flownet.Topic]*pubsub.Topic),
+		subs:            make(map[flownet.Topic]*pubsub.Subscription),
+		logger:          builder.logger,
+		topicValidation: builder.topicValidation,
+		streamFactory:   &p2pstream.PlainStream{},
 	}
 
 	if builder.hostMaker == nil {
@@ -286,7 +272,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 
 	if builder.streamFactory != nil {
-		node.compressedStream = builder.streamFactory
+		node.streamFactory = builder.streamFactory
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -356,7 +342,7 @@ type Node struct {
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
-	compressedStream     LibP2PStreamCompressorWrapperFunc
+	streamFactory        p2pstream.StreamFactory
 	pingService          *PingService
 	connMgr              connmgr.ConnManager
 	dht                  *dht.IpfsDHT
@@ -562,7 +548,7 @@ func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttemp
 		return s, dialAddr, errs
 	}
 
-	s, err := n.compressedStream(s)
+	s, err := n.streamFactory.NewStream(s)
 	if err != nil {
 		return nil, dialAddr, fmt.Errorf("could not create compressed stream: %w", err)
 	}
@@ -724,7 +710,7 @@ func (n *Node) Host() host.Host {
 func (n *Node) SetFlowProtocolStreamHandler(handler libp2pnet.StreamHandler) {
 	n.host.SetStreamHandler(n.flowLibP2PProtocolID, func(s libp2pnet.Stream) {
 		// converts incoming libp2p stream to a compressed stream
-		s, err := n.compressedStream(s)
+		s, err := n.streamFactory.NewStream(s)
 		if err != nil {
 			n.logger.Error().Err(err).Msg("could not create compressed stream")
 			return

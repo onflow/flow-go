@@ -171,7 +171,7 @@ func pingProtocolId(rootBlockID flow.Identifier) protocol.ID {
 }
 
 func GzipCompressedProtocolId(rootBlockID flow.Identifier) protocol.ID {
-	return protocol.ID()
+	return protocol.ID(FlowLibP2PProtocolGzipCompressedOneToOne + rootBlockID.String())
 }
 
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
