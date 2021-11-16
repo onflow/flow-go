@@ -5,7 +5,6 @@ package verification
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/utils/slices"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -15,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	modulesig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/utils/slices"
 )
 
 // CombinedVerifierV3 is a verifier capable of verifying two signatures, one for each
@@ -122,6 +122,9 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 
 	verifyAggregatedSignature := func(pubKeys []crypto.PublicKey, aggregatedSig crypto.Signature, hasher hash.Hasher) (bool, error) {
 		keysAggregator, err := modulesig.NewPublicKeyAggregator(pubKeys)
+		if err != nil {
+			return false, fmt.Errorf("could not create pub key aggregator: %w", err)
+		}
 		aggregatedKey, err := keysAggregator.KeyAggregate(slices.MakeRange(0, len(pubKeys)-1))
 		if err != nil {
 			return false, fmt.Errorf("could not compute aggregated key: %w", err)
@@ -159,7 +162,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	for _, signerID := range blockSigData.StakingSigners {
 		identity, ok := signerIdentities[signerID]
 		if !ok {
-			return false, fmt.Errorf("invalid signer identity %v: %w", signerID)
+			return false, fmt.Errorf("invalid signer identity %v", signerID)
 		}
 		stakingPubKeys = append(stakingPubKeys, identity.StakingPubKey)
 	}
