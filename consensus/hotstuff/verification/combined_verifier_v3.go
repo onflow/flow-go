@@ -20,7 +20,7 @@ import (
 // CombinedVerifierV3 is a verifier capable of verifying two signatures, one for each
 // scheme. The first type is a signature from a staking signer,
 // which verifies either a single or an aggregated signature. The second type is
-// a signature from a random beacon signer, which verifies either the signature share or
+// a signature from a random beacon signer, which verifies both the signature share and
 // the reconstructed threshold signature.
 type CombinedVerifierV3 struct {
 	committee     hotstuff.Committee
