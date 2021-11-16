@@ -47,7 +47,13 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(block *model.Block) (hotstuf
 	// message that has to be verified against aggregated signature
 	msg := verification.MakeVoteMessage(block.View, block.BlockID)
 
-	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.ConsensusVoteTag)
+	// prepare the staking public keys of participants
+	stakingKeys := make([]crypto.PublicKey, 0, len(allParticipants))
+	for _, participant := range allParticipants {
+		stakingKeys = append(stakingKeys, participant.StakingPubKey)
+	}
+
+	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, encoding.ConsensusVoteTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}

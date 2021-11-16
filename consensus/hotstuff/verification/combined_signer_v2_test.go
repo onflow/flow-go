@@ -40,7 +40,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	// there is DKG key for this epoch
 	keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
 
-	beaconKeyStore := modulesig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := unittest.IdentityFixture()
@@ -103,7 +103,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	// there is no DKG key for this epoch
 	keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
 
-	beaconKeyStore := modulesig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := unittest.IdentityFixture()

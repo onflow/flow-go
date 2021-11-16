@@ -2,7 +2,6 @@ package votecollector
 
 import (
 	"errors"
-
 	"math/rand"
 	"sync"
 	"testing"
@@ -20,6 +19,7 @@ import (
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
@@ -111,9 +111,10 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_VoteNotForProposal() {
 // TestProcess_InvalidSignatureFormat ensures that we process signatures only with valid format.
 // If we have received vote with signature in invalid format we should return with sentinel error
 func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignatureFormat() {
-	// valid length is 48 or 96
+
+	// valid length is SigLen or 2*SigLen
 	generator := rapid.IntRange(0, 128).Filter(func(value int) bool {
-		return value != 48 && value != 96
+		return value != hsig.SigLen && value != 2*hsig.SigLen
 	})
 	rapid.Check(s.T(), func(t *rapid.T) {
 		// create a signature with invalid length
@@ -158,7 +159,7 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignature() {
 	})
 	s.Run("staking-double-sig", func() {
 		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
-		stakingSig := crypto.Signature(doubleSigVote.SigData[:48])
+		stakingSig := crypto.Signature(doubleSigVote.SigData[:hsig.SigLen])
 
 		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, stakingSig).Return(msig.ErrInvalidFormat).Once()
 
@@ -183,8 +184,8 @@ func (s *CombinedVoteProcessorV2TestSuite) TestProcess_InvalidSignature() {
 	// test same cases for beacon signature
 	s.Run("beacon-sig", func() {
 		doubleSigVote := unittest.VoteForBlockFixture(s.proposal.Block, VoteWithDoubleSig())
-		stakingSig := crypto.Signature(doubleSigVote.SigData[:48])
-		beaconSig := crypto.Signature(doubleSigVote.SigData[48:])
+		stakingSig := crypto.Signature(doubleSigVote.SigData[:hsig.SigLen])
+		beaconSig := crypto.Signature(doubleSigVote.SigData[hsig.SigLen:])
 
 		// staking sig valid, beacon sig invalid
 		s.stakingAggregator.On("Verify", doubleSigVote.SignerID, stakingSig).Return(nil).Once()
@@ -534,7 +535,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
 
 		expectStakingAggregatorCalls := func(vote *model.Vote) {
-			expectedSig := crypto.Signature(vote.SigData[:48])
+			expectedSig := crypto.Signature(vote.SigData[:hsig.SigLen])
 			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				signerID := args.Get(0).(flow.Identifier)
@@ -557,7 +558,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCCorrectness(testifyT *testing
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer
 			expectStakingAggregatorCalls(vote)
-			expectedSig := crypto.Signature(vote.SigData[48:])
+			expectedSig := crypto.Signature(vote.SigData[hsig.SigLen:])
 			reconstructor.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				collectedShares.Inc()
@@ -684,7 +685,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 		votes := make([]*model.Vote, 0, stakingSignersCount+beaconSignersCount)
 
 		expectStakingAggregatorCalls := func(vote *model.Vote, stake uint64) {
-			expectedSig := crypto.Signature(vote.SigData[:48])
+			expectedSig := crypto.Signature(vote.SigData[:hsig.SigLen])
 			stakingAggregator.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			stakingAggregator.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				stakingTotalWeight.Add(stake)
@@ -702,7 +703,7 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 			vote := unittest.VoteForBlockFixture(processor.Block(), VoteWithDoubleSig())
 			vote.SignerID = signer.ID()
 			expectStakingAggregatorCalls(vote, signer.Stake)
-			expectedSig := crypto.Signature(vote.SigData[48:])
+			expectedSig := crypto.Signature(vote.SigData[hsig.SigLen:])
 			reconstructor.On("Verify", vote.SignerID, expectedSig).Return(nil).Maybe()
 			reconstructor.On("TrustedAdd", vote.SignerID, expectedSig).Run(func(args mock.Arguments) {
 				collectedShares.Inc()
@@ -784,7 +785,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		// there is no DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
 
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
@@ -810,7 +811,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		// there is DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
 
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
@@ -880,7 +881,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 func VoteWithStakingSig() func(*model.Vote) {
 	return func(vote *model.Vote) {
-		vote.SigData = unittest.RandomBytes(48)
+		vote.SigData = unittest.RandomBytes(hsig.SigLen)
 	}
 }
 

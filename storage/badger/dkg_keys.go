@@ -71,7 +71,8 @@ func (k *DKGKeys) InsertMyDKGPrivateInfo(epochCounter uint64, info *dkg.DKGParti
 	return operation.RetryOnConflictTx(k.db, transaction.Update, k.storeTx(epochCounter, info))
 }
 
-// InsertNoDKGPrivateInfo insert a record in database to indicate that when DKG was completed, the node failed DKG, there is no DKG key generated.
+// InsertNoDKGPrivateInfo insert a record in database to indicate that when DKG was completed,
+// the node failed DKG, there is no DKG key generated.
 func (k *DKGKeys) InsertNoDKGPrivateInfo(epochCounter uint64) error {
 	return operation.RetryOnConflictTx(k.db, transaction.Update, k.storeTx(epochCounter, nil))
 }

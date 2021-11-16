@@ -19,6 +19,7 @@ import (
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
@@ -787,7 +788,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		// there is no DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
 
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
@@ -812,7 +813,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		// there is DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
 
-		beaconSignerStore := msig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
