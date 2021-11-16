@@ -6,4 +6,7 @@ import (
 
 type StreamFactory interface {
 	NewStream(s libp2pnet.Stream) (libp2pnet.Stream, error)
+	Handler() libp2pnet.StreamHandler
 }
+
+type StreamFactoryList []StreamFactory
