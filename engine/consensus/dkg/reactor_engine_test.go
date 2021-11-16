@@ -122,8 +122,10 @@ func (suite *ReactorSuite) SetupTest() {
 	suite.epochQuery.Add(suite.nextEpoch)
 	suite.snapshot = new(protocol.Snapshot)
 	suite.snapshot.On("Epochs").Return(suite.epochQuery)
+	suite.snapshot.On("Head").Return(suite.firstBlock, nil)
 	suite.state = new(protocol.State)
 	suite.state.On("AtBlockID", suite.firstBlock.ID()).Return(suite.snapshot)
+	suite.state.On("Final").Return(suite.snapshot)
 
 	// ensure that an attempt is made to insert the expected dkg private share
 	// for the next epoch.
@@ -139,6 +141,7 @@ func (suite *ReactorSuite) SetupTest() {
 		}).
 		Return(nil).
 		Once()
+	suite.dkgState = new(storage.DKGState)
 	suite.dkgState.On("SetDKGStarted", suite.NextEpochCounter()).Return(nil).Once()
 
 	// we will ensure that the controller state transitions get called appropriately
@@ -165,6 +168,7 @@ func (suite *ReactorSuite) SetupTest() {
 		suite.local,
 		suite.state,
 		suite.dkgKeys,
+		suite.dkgState,
 		suite.factory,
 		suite.viewEvents,
 	)
@@ -174,10 +178,10 @@ func (suite *ReactorSuite) SetupTest() {
 // after a phase transition from StakingPhase->SetupPhase.
 func (suite *ReactorSuite) TestRunDKG_PhaseTransition() {
 
-	// protocol event indicating the setup phase is starting
-	suite.engine.EpochSetupPhaseStarted(suite.epochCounter, suite.firstBlock)
 	// the dkg for this epoch has not been started
 	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(false, nil).Once()
+	// protocol event indicating the setup phase is starting
+	suite.engine.EpochSetupPhaseStarted(suite.epochCounter, suite.firstBlock)
 
 	for view := uint64(100); view <= 250; view += dkg.DefaultPollStep {
 		suite.viewEvents.BlockFinalized(suite.blocksByView[view])
@@ -258,6 +262,7 @@ func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 	keyStorage := new(storage.DKGKeys)
 	keyStorage.On("RetrieveMyDKGPrivateInfo", currentCounter+1).Return(dkgParticipantPrivInfo, nil)
 	factory := new(module.DKGControllerFactory)
+	dkgState := new(storage.DKGState)
 
 	nextDKG := new(protocol.DKG)
 	nextDKG.On("KeyShare", dkgParticipantPrivInfo.NodeID).Return(privKey.PublicKey(), nil)
@@ -298,6 +303,7 @@ func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 		me,
 		state,
 		keyStorage,
+		dkgState,
 		factory,
 		viewEvents,
 	)
