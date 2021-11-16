@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -62,8 +63,8 @@ func (co *tagsObserver) OnComplete() {
 type MiddlewareTestSuite struct {
 	suite.Suite
 	sync.RWMutex
-	size      int               // used to determine number of middlewares under test
-	mws       []*p2p.Middleware // used to keep track of middlewares under test
+	size      int                  // used to determine number of middlewares under test
+	mws       []network.Middleware // used to keep track of middlewares under test
 	ov        []*mocknetwork.Overlay
 	obs       chan string // used to keep track of Protect events tagged by pubsub messages
 	ids       []*flow.Identity

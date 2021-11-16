@@ -19,7 +19,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -29,7 +28,7 @@ import (
 type EchoEngineTestSuite struct {
 	suite.Suite
 	ConduitWrapper                   // used as a wrapper around conduit methods
-	nets           []*p2p.Network    // used to keep track of the networks
+	nets           []network.Network // used to keep track of the networks
 	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
 	cancel         context.CancelFunc
 }

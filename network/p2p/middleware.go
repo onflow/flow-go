@@ -255,7 +255,6 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	// create and use a peer manager if a peer manager factory was passed in during initialization
 	if m.peerManagerFactory != nil {
-
 		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, m.topologyPeers, m.log)
 		if err != nil {
 			return fmt.Errorf("failed to create peer manager: %w", err)
