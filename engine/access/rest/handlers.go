@@ -22,22 +22,22 @@ const BlockIDCntLimit = 50
 
 var MaxAllowedBlockIDsCnt = BlockIDCntLimit
 
-// RestAPIHandler provides the implementation of each of the REST API
-type APIHandler struct {
+// Handlers provide collection of handlers used by the API server
+type Handlers struct {
 	backend access.API
 	logger  zerolog.Logger
 }
 
-func NewRestAPIHandler(backend access.API, logger zerolog.Logger) *APIHandler {
-	return &APIHandler{
+func NewHandlers(backend access.API, logger zerolog.Logger) *Handlers {
+	return &Handlers{
 		backend: backend,
 		logger:  logger,
 	}
 }
 
-func (restAPI *APIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
-	// create a logger for the request
-	errorLogger := restAPI.logger.With().Str("request_url", r.URL.String()).Logger()
+func (h *Handlers) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
+	// create h logger for the request
+	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
@@ -53,70 +53,70 @@ func (restAPI *APIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 	blocks := make([]*generated.Block, len(ids))
 
 	if len(ids) > MaxAllowedBlockIDsCnt {
-		restAPI.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", MaxAllowedBlockIDsCnt), errorLogger)
+		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at h time", MaxAllowedBlockIDsCnt), errorLogger)
 		return
 	}
 
 	for i, id := range ids {
 		flowID, err := flow.HexStringToIdentifier(id)
 		if err != nil {
-			restAPI.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID %s", id), errorLogger)
+			h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID %s", id), errorLogger)
 			return
 		}
 
-		flowBlock, err := restAPI.backend.GetBlockByID(r.Context(), flowID)
+		flowBlock, err := h.backend.GetBlockByID(r.Context(), flowID)
 		if err != nil {
 			// if error has GRPC code NotFound, the return HTTP NotFound error
 			if status.Code(err) == codes.NotFound {
-				restAPI.errorResponse(w, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", id), errorLogger)
+				h.errorResponse(w, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", id), errorLogger)
 				return
 			}
 			errorLogger.Error().Err(err).Str("block_id", id).Msg("failed to look up block")
-			restAPI.errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("failed to look up block with ID %s", id), errorLogger)
+			h.errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("failed to look up block with ID %s", id), errorLogger)
 			return
 		}
 		blocks[i] = blockResponse(flowBlock)
 	}
 
-	restAPI.jsonResponse(w, blocks, errorLogger)
+	h.jsonResponse(w, blocks, errorLogger)
 }
 
-func (restAPI *APIHandler) TransactionIDGet(w http.ResponseWriter, r *http.Request) {
-	errorLogger := restAPI.logger.With().Str("request_url", r.URL.String()).Logger() // todo(sideninja) refactor this to be initialized for us
+func (h *Handlers) TransactionIDGet(w http.ResponseWriter, r *http.Request) {
+	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger() // todo(sideninja) refactor this to be initialized for us
 
 	vars := mux.Vars(r)
 	id, err := toID(vars["id"])
 	if err != nil {
-		restAPI.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID"), errorLogger)
+		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID"), errorLogger)
 	}
 
-	tx, err := restAPI.backend.GetTransaction(r.Context(), id)
+	tx, err := h.backend.GetTransaction(r.Context(), id)
 	if err != nil {
-		restAPI.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("transaction fetching error: %w", err), errorLogger)
+		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("transaction fetching error: %w", err), errorLogger)
 	}
 
 	res := transactionResponse(tx)
-	restAPI.jsonResponse(w, res, errorLogger)
+	h.jsonResponse(w, res, errorLogger)
 }
 
-func (restAPI *APIHandler) jsonResponse(w http.ResponseWriter, responsePayload interface{}, errorLogger zerolog.Logger) {
+func (h *Handlers) jsonResponse(w http.ResponseWriter, responsePayload interface{}, errorLogger zerolog.Logger) {
 	encodedBlocks, err := json.Marshal(responsePayload)
 	if err != nil {
 		errorLogger.Error().Err(err).Msg("failed to encode response")
-		restAPI.errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
+		h.errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
 		return
 	}
 
 	_, err = w.Write(encodedBlocks)
 	if err != nil {
 		errorLogger.Error().Err(err).Msg("failed to write response")
-		restAPI.errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
+		h.errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
-func (restAPI *APIHandler) jsonDecode(body io.ReadCloser, dst interface{}) error {
+func (h *Handlers) jsonDecode(body io.ReadCloser, dst interface{}) error {
 	// validate size
 
 	dec := json.NewDecoder(body)
@@ -160,21 +160,21 @@ func (restAPI *APIHandler) jsonDecode(body io.ReadCloser, dst interface{}) error
 
 	err = dec.Decode(&struct{}{})
 	if err != io.EOF {
-		msg := "Request body must only contain a single JSON object"
+		msg := "Request body must only contain h single JSON object"
 		return &badRequest{status: http.StatusBadRequest, msg: msg}
 	}
 
 	return nil
 }
 
-func (restAPI *APIHandler) NotImplemented(w http.ResponseWriter, r *http.Request) {
+func (h *Handlers) NotImplemented(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
 // errorResponse sends an HTTP error response to the client with the given return code and a model error with the given
 // response message in the response body
-func (restAPI *APIHandler) errorResponse(w http.ResponseWriter, returnCode int, responseMessage string, logger zerolog.Logger) {
+func (h *Handlers) errorResponse(w http.ResponseWriter, returnCode int, responseMessage string, logger zerolog.Logger) {
 	w.WriteHeader(returnCode)
 	modelError := generated.ModelError{
 		Code:    int32(returnCode),
