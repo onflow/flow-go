@@ -37,7 +37,7 @@ import (
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
-	p2pstream "github.com/onflow/flow-go/network/p2p/stream"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
 )
@@ -56,26 +56,10 @@ const (
 	// timeout for FindPeer queries to the DHT
 	// TODO: is this a sensible value?
 	findPeerQueryTimeout = 10 * time.Second
-
-	NoCompression   = "no-compression"
-	GzipCompression = "gzip-compression"
 )
 
 // LibP2PFactoryFunc is a factory function type for generating libp2p Node instances.
 type LibP2PFactoryFunc func(context.Context) (*Node, error)
-
-// LibP2PStreamCompressorFactoryFunc translates name of a stream factory to its corresponding stream compressor factory
-// function.
-func LibP2PStreamCompressorFactoryFunc(factory string) (p2pstream.UnicastProtocol, error) {
-	switch factory {
-	case NoCompression:
-		return &p2pstream.PlainStream{}, nil
-	case GzipCompression:
-		return &p2pstream.GzipStream{}, nil
-	default:
-		return nil, fmt.Errorf("unknown stream factory: %s", factory)
-	}
-}
 
 // DefaultLibP2PNodeFactory returns a LibP2PFactoryFunc which generates the libp2p host initialized with the
 // default options for the host, the pubsub and the ping service.
@@ -91,7 +75,7 @@ func DefaultLibP2PNodeFactory(
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
 	role string,
-	streamFactory p2pstream.UnicastProtocol) (LibP2PFactoryFunc, error) {
+	unicastProtocols []unicast.ProtocolName) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
@@ -720,7 +704,6 @@ func (n *Node) SetFlowProtocolStreamHandler(handler libp2pnet.StreamHandler) {
 
 // IsConnected returns true is address is a direct peer of this node else false
 func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
-	// query libp2p for connectedness status of this peer
 	isConnected := n.host.Network().Connectedness(peerID) == libp2pnet.Connected
 	return isConnected, nil
 }
