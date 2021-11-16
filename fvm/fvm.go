@@ -63,7 +63,7 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 			}
 
 			if strings.Contains(fmt.Sprintf("%v", r), "[Error Code: 1106]") {
-				err = errors.NewLedgerIntractionLimitExceededError(0, 0)
+				err = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
 				return
 			}
 
