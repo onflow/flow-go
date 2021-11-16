@@ -101,4 +101,7 @@ type Snapshot interface {
 	// methods may return errors, since the Epoch Preparation Protocol may be
 	// in-progress and incomplete for the epoch.
 	Epochs() EpochQuery
+
+	// Params returns global parameters of the state this snapshot is taken from.
+	Params() GlobalParams
 }
