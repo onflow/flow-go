@@ -139,6 +139,7 @@ func (suite *ReactorSuite) SetupTest() {
 		}).
 		Return(nil).
 		Once()
+	suite.dkgState.On("SetDKGStarted", suite.NextEpochCounter()).Return(nil).Once()
 
 	// we will ensure that the controller state transitions get called appropriately
 	suite.controller = new(module.DKGController)
@@ -175,6 +176,8 @@ func (suite *ReactorSuite) TestRunDKG_PhaseTransition() {
 
 	// protocol event indicating the setup phase is starting
 	suite.engine.EpochSetupPhaseStarted(suite.epochCounter, suite.firstBlock)
+	// the dkg for this epoch has not been started
+	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(false, nil).Once()
 
 	for view := uint64(100); view <= 250; view += dkg.DefaultPollStep {
 		suite.viewEvents.BlockFinalized(suite.blocksByView[view])
@@ -184,6 +187,54 @@ func (suite *ReactorSuite) TestRunDKG_PhaseTransition() {
 	time.Sleep(50 * time.Millisecond)
 	suite.controller.AssertExpectations(suite.T())
 	suite.dkgKeys.AssertExpectations(suite.T())
+}
+
+// TestRunDKG_StartupInSetupPhase tests that the DKG is started and completed
+// successfully when the engine starts up during the EpochSetup phase, and the
+// DKG for this epoch has not been started previously. This is the case for
+// consensus nodes joining the network at an epoch boundary.
+//
+func (suite *ReactorSuite) TestRunDKG_StartupInSetupPhase() {
+
+	// we are in the EpochSetup phase
+	suite.snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil).Once()
+	// the dkg for this epoch has not been started
+	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(false, nil).Once()
+
+	// start up the engine
+	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
+
+	for view := uint64(100); view <= 250; view += dkg.DefaultPollStep {
+		suite.viewEvents.BlockFinalized(suite.blocksByView[view])
+	}
+
+	// check that the appropriate callbacks were registered
+	time.Sleep(50 * time.Millisecond)
+	suite.controller.AssertExpectations(suite.T())
+	suite.dkgKeys.AssertExpectations(suite.T())
+}
+
+// TestRunDKG_StartupInSetupPhase_DKGAlreadyStarted tests that the DKG is NOT
+// started, when the engine starts up during the EpochSetup phase, and the DKG
+// for this epoch HAS been started previously. This will be the case for
+// consensus nodes which restart during the DKG.
+//
+func (suite *ReactorSuite) TestRunDKG_StartupInSetupPhase_DKGAlreadyStarted() {
+
+	// we are in the EpochSetup phase
+	suite.snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil).Once()
+	// the dkg for this epoch has been started
+	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(true, nil).Once()
+
+	// start up the engine
+	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
+
+	// we should not have instantiated the DKG
+	suite.factory.AssertNotCalled(suite.T(), "Create",
+		dkgmodule.CanonicalInstanceID(suite.firstBlock.ChainID, suite.NextEpochCounter()),
+		suite.committee,
+		mock.Anything,
+	)
 }
 
 // TestReactorEngine_EpochCommittedPhaseStarted ensures that we are logging
