@@ -54,7 +54,7 @@ func (c *CombinedVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, b
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// split the two signatures from the vote
-	// TODO: move DecodeDoubleSig to merger.Split
+	// TODO: to be replaced by packer
 	stakingSig, beaconShare, err := signature.DecodeDoubleSig(sigData)
 	if err != nil {
 		return false, fmt.Errorf("could not split signature: %w", modulesig.ErrInvalidFormat)
@@ -121,13 +121,8 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 	if !beaconValid {
 		return false, nil
 	}
-	// verify the aggregated staking signature next (more costly)
-	// TODO: eventually VerifyMany will be a method of a stateful struct. The struct would
-	// hold the message, all the participants keys, the latest verification aggregated public key,
-	// as well as the latest list of signers (preferably a bit vector, using indices).
-	// VerifyMany would only take the signature and the new list of signers (a bit vector preferably)
-	// as inputs. A new struct needs to be used for each epoch since the list of participants is upadted.
 
+	// verify the aggregated staking signature next (more costly)
 	// TODO: update to use module/signature.PublicKeyAggregator
 	aggregatedKey, err := c.keysAggregator.aggregatedStakingKey(signers)
 	if err != nil {

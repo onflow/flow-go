@@ -33,8 +33,9 @@ type ThresholdSigner interface {
 }
 
 var (
-	// DKGIncompleteError indicates that the node did not manage to obtain beacon keys from DKG at a certain view
-	DKGIncompleteError = errors.New("incomplete dkg")
+	// DKGFailError indicates that the node has completed DKG, but failed to genereate private key
+	// in the given epoch
+	DKGFailError = errors.New("dkg failed, no DKG private key generated")
 )
 
 // TODO: to be replaced by RandomBeaconKeyStore
@@ -42,7 +43,7 @@ var (
 type ThresholdSignerStore interface {
 	// It returns:
 	//  - (signer, nil) if the node has beacon keys in the epoch of the view
-	//  - (nil, DKGIncompleteError) if the node doesn't have beacon keys in the epoch of the view
+	//  - (nil, DKGFailError) if the node doesn't have beacon keys in the epoch of the view
 	//  - (nil, error) if there is any exception
 	GetThresholdSigner(view uint64) (ThresholdSigner, error)
 }
@@ -51,7 +52,7 @@ type ThresholdSignerStore interface {
 type RandomBeaconKeyStore interface {
 	// It returns:
 	//  - (signer, nil) if the node has beacon keys in the epoch of the view
-	//  - (nil, DKGIncompleteError) if the node doesn't have beacon keys in the epoch of the view
+	//  - (nil, DKGFailError) if the node doesn't have beacon keys in the epoch of the view
 	//  - (nil, error) if there is any exception
 	ByView(view uint64) (crypto.PrivateKey, error)
 }

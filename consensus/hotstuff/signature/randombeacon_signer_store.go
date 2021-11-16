@@ -1,17 +1,22 @@
 package signature
 
 import (
-	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
 )
 
+// EpochAwareRandomBeaconKeyStore provides an abstraction to query random beacon private key
+// for a given view.
+// Internally it indexes and caches the private keys by epoch.
 type EpochAwareRandomBeaconKeyStore struct {
-	epochLookup module.EpochLookup           // used to fetch epoch counter by view
-	keys        storage.DKGKeys              // used to fetch DKG private key by epoch
+	epochLookup module.EpochLookup // used to fetch epoch counter by view
+	keys        storage.DKGKeys    // used to fetch DKG private key by epoch
+
+	mu          sync.RWMutex                 // to ensure concurrent read/write to privateKeys
 	privateKeys map[uint64]crypto.PrivateKey // cache of privateKeys by epoch
 }
 
@@ -23,7 +28,7 @@ func NewEpochAwareRandomBeaconKeyStore(epochLookup module.EpochLookup, keys stor
 	}
 }
 
-// GetSigner returns the random beacon signer for signing objects at a
+// ByView returns the random beacon signer for signing objects at a
 // given view. The view determines the epoch, which determines the DKG private
 // key underlying the signer.
 // It returns:
@@ -42,31 +47,24 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	// 1. if a node successfully generated the DKG key, the private key will be stored in database.
 	// 2. if a node failed to generate the DKG key, we will save a record in database to indicate this
 	//       node has no private key for this epoch
-	// with the epoch, we can lookup my random beacon private key for the epoch. There are 3 cases:
+	// within the epoch, we can lookup my random beacon private key for the epoch. There are 3 cases:
 	// 1. DKG has completed, and the private key is stored in database, and we can retrieve it (happy path)
 	// 2. DKG has completed, but we failed it, and we marked in the database
-	// 		that there is no private key for this epoch
-	// 3. DKG has completed, but we
-	key, ok := s.privateKeys[epoch]
+	// 		that there is no private key for this epoch (unhappy path)
+	// 3. DKG has completed, but for some reason we don't find the private key in the database (exception)
+	// 4. DKG was not completed (fatal error, we should not run into with EECC, becauwe we still stay at
+	// 		the current Epoch where DKG has completed.
+	key, ok := s.readKey(epoch)
 	if ok {
 		// A nil key means that we don't have a Random Beacon key for this epoch.
 		if key == nil {
 			return nil, fmt.Errorf("did not complete DKG for epoch %v, at view %v: %w",
-				epoch, view, module.DKGIncompleteError)
+				epoch, view, module.DKGFailError)
 		}
 		return key, nil
 	}
 
 	privBeaconKeyData, hasRandomBeaconKey, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
-	// this is an edge case where the epoch has determined, but the result of whether we have the
-	// private key info or not is not found in the database.
-	// in this case, we will trigger as if we failed the DKG.
-	if errors.Is(err, storage.ErrNotFound) {
-		s.privateKeys[epoch] = nil
-		return nil, fmt.Errorf("DKG result not found in database for epoch %v, at view %v: %w",
-			epoch, view, module.DKGIncompleteError)
-	}
-
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve DKG private key for epoch counter %v, at view %v, err: %w",
 			epoch, view, err)
@@ -76,15 +74,28 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	// never change, we can cache a nil signer for this epoch, so that we this function
 	// is called again for the same epoch, we don't need to query database.
 	if !hasRandomBeaconKey {
-		s.privateKeys[epoch] = nil
+		s.writeKey(epoch, nil)
 		return nil, fmt.Errorf("didn't complete DKG for epoch %v, at view %v: %w",
-			epoch, view, module.DKGIncompleteError)
+			epoch, view, module.DKGFailError)
 	}
 
 	// DKG was completed and a random beacon key is available,
 	// create a random beacon signer that holds the private key and cache it for the epoch
 	key = privBeaconKeyData.RandomBeaconPrivKey
-	s.privateKeys[epoch] = key
+	s.writeKey(epoch, key)
 
 	return key, nil
+}
+
+func (s *EpochAwareRandomBeaconKeyStore) readKey(epoch uint64) (crypto.PrivateKey, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	key, found := s.privateKeys[epoch]
+	return key, found
+}
+
+func (s *EpochAwareRandomBeaconKeyStore) writeKey(epoch uint64, key crypto.PrivateKey) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.privateKeys[epoch] = key
 }
