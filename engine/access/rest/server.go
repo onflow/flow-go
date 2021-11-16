@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"net/http"
 	"strings"
@@ -12,7 +13,7 @@ import (
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
-func NewServer(handlers *Handlers, listenAddress string, logger zerolog.Logger) *http.Server {
+func NewServer(handlers *Handlers, backend access.API, listenAddress string, logger zerolog.Logger) *http.Server {
 
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
@@ -30,6 +31,14 @@ func NewServer(handlers *Handlers, listenAddress string, logger zerolog.Logger) 
 			Handler(route.HandlerFunc)
 	}
 
+	for _, h := range apiHandlers(logger, backend) {
+		v1SubRouter.
+			Methods(h.method).
+			Path(h.pattern).
+			Name(h.name).
+			HandlerFunc(h.ServeHTTP)
+	}
+
 	return &http.Server{
 		Addr:         listenAddress,
 		Handler:      router,
@@ -37,6 +46,17 @@ func NewServer(handlers *Handlers, listenAddress string, logger zerolog.Logger) 
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
 	}
+}
+
+func apiHandlers(logger zerolog.Logger, backend access.API) []Handler {
+	return []Handler{{
+		logger:      logger,
+		backend:     backend,
+		method:      "GET",
+		pattern:     "/transactions/{id}",
+		name:        "GetTransactionByID",
+		handlerFunc: GetTransactionByID,
+	}}
 }
 
 // apiRoutes returns the Gorilla Mux routes for each of the API defined in the rest definition
