@@ -41,7 +41,7 @@ type TransactionEnv struct {
 	contracts          *handler.ContractHandler
 	accountKeys        *handler.AccountKeyHandler
 	metrics            *handler.MetricsHandler
-	computationHandler handler.ComputationMeteringHandler
+	computationHandler *handler.ComputationMeteringHandler
 	eventHandler       *handler.EventHandler
 	addressGenerator   flow.AddressGenerator
 	rng                *rand.Rand
@@ -61,6 +61,7 @@ func NewTransactionEnvironment(
 	tx *flow.TransactionBody,
 	txIndex uint32,
 	traceSpan opentracing.Span,
+	computationHandler *handler.ComputationMeteringHandler,
 ) *TransactionEnv {
 
 	accounts := state.NewAccounts(sth)
@@ -75,7 +76,7 @@ func NewTransactionEnvironment(
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
-	computationHandler := handler.NewComputationMeteringHandler(computationLimit(ctx, tx))
+	// computationLimit(ctx, tx)
 
 	env := &TransactionEnv{
 		vm:                 vm,
@@ -105,18 +106,6 @@ func NewTransactionEnvironment(
 	}
 
 	return env
-}
-
-func computationLimit(ctx Context, tx *flow.TransactionBody) uint64 {
-	// if gas limit is set to zero fallback to the gas limit set by the context
-	if tx.GasLimit == 0 {
-		// if context gasLimit is also zero, fallback to the default gas limit
-		if ctx.GasLimit == 0 {
-			return DefaultGasLimit
-		}
-		return ctx.GasLimit
-	}
-	return tx.GasLimit
 }
 
 func (e *TransactionEnv) TxIndex() uint32 {
@@ -213,6 +202,7 @@ func (e *TransactionEnv) GetValue(owner, key []byte) ([]byte, error) {
 		return nil, fmt.Errorf("getting value failed: %w", err)
 	}
 	valueByteSize = len(v)
+	e.computationHandler.AddUsed(uint64(valueByteSize), "GetValue")
 	return v, nil
 }
 
@@ -225,6 +215,7 @@ func (e *TransactionEnv) SetValue(owner, key, value []byte) error {
 		)
 		defer sp.Finish()
 	}
+	e.computationHandler.AddUsed(uint64(len(value)), "SetValue")
 
 	err := e.accounts.SetValue(
 		flow.BytesToAddress(owner),
@@ -243,6 +234,8 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "ValueExists")
+
 	v, err := e.GetValue(owner, key)
 	if err != nil {
 		return false, fmt.Errorf("checking value existence failed: %w", err)
@@ -253,6 +246,7 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
 func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (uint64, error) {
+	e.computationHandler.AddUsed(1, "AllocateStorageIndex")
 	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
 		return 0, fmt.Errorf("storage address allocation failed: %w", err)
@@ -265,6 +259,8 @@ func (e *TransactionEnv) GetStorageUsed(address common.Address) (value uint64, e
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageUsed)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetStorageUsed")
 
 	value, err = e.accounts.GetStorageUsed(flow.Address(address))
 	if err != nil {
@@ -279,6 +275,8 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetStorageCapacity)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetStorageCapacity")
 
 	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
 	result, invokeErr := accountStorageCapacity(address)
@@ -308,6 +306,8 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "GetAccountBalance")
+
 	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountBalance(address)
 
@@ -323,6 +323,8 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountBalance)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetAccountAvailableBalance")
 
 	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
 	result, invokeErr := accountAvailableBalance(address)
@@ -344,6 +346,9 @@ func (e *TransactionEnv) ResolveLocation(
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvResolveLocation)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "ResolveLocation")
+
 	addressLocation, isAddress := location.(common.AddressLocation)
 
 	// if the location is not an address location, e.g. an identifier location (`import Crypto`),
@@ -410,6 +415,7 @@ func (e *TransactionEnv) GetCode(location runtime.Location) ([]byte, error) {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetCode)
 		defer sp.Finish()
 	}
+	e.computationHandler.AddUsed(1, "GetCode")
 
 	contractLocation, ok := location.(common.AddressLocation)
 	if !ok {
@@ -437,6 +443,8 @@ func (e *TransactionEnv) GetAccountContractNames(address runtime.Address) ([]str
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "GetAccountContractNames")
+
 	a := flow.Address(address)
 
 	freezeError := e.accounts.CheckAccountNotFrozen(a)
@@ -452,6 +460,8 @@ func (e *TransactionEnv) GetProgram(location common.Location) (*interpreter.Prog
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetProgram)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetProgram")
 
 	if addressLocation, ok := location.(common.AddressLocation); ok {
 		address := flow.Address(addressLocation.Address)
@@ -475,6 +485,8 @@ func (e *TransactionEnv) SetProgram(location common.Location, program *interpret
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvSetProgram)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "SetProgram")
 
 	err := e.programs.Set(location, program)
 	if err != nil {
@@ -506,6 +518,8 @@ func (e *TransactionEnv) EmitEvent(event cadence.Event) error {
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "EmitEvent")
+
 	return e.eventHandler.EmitEvent(event, e.txID, e.txIndex, e.tx.Payer)
 }
 
@@ -523,6 +537,8 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "GetAccountContractNames")
+
 	if e.uuidGenerator == nil {
 		return 0, errors.NewOperationNotSupportedError("GenerateUUID")
 	}
@@ -539,7 +555,7 @@ func (e *TransactionEnv) GetComputationLimit() uint64 {
 }
 
 func (e *TransactionEnv) SetComputationUsed(used uint64) error {
-	return e.computationHandler.AddUsed(used)
+	return e.computationHandler.AddUsed(used, "function_or_loop_call")
 }
 
 func (e *TransactionEnv) GetComputationUsed() uint64 {
@@ -691,6 +707,7 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvCreateAccount)
 		defer sp.Finish()
 	}
+	e.computationHandler.AddUsed(1, "CreateAccount")
 
 	flowAddress, err := e.addressGenerator.NextAddress()
 	if err != nil {
@@ -797,6 +814,7 @@ func (e *TransactionEnv) GetAccountKey(address runtime.Address, keyIndex int) (*
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetAccountKey)
 		defer sp.Finish()
 	}
+	e.computationHandler.AddUsed(1, "GetAccountKey")
 
 	accKey, err := e.accountKeys.GetAccountKey(address, keyIndex)
 	if err != nil {
@@ -826,6 +844,8 @@ func (e *TransactionEnv) UpdateAccountContractCode(address runtime.Address, name
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "UpdateAccountContractCode")
+
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
 		return fmt.Errorf("updating account contract code failed: %w", err)
@@ -845,6 +865,8 @@ func (e *TransactionEnv) GetAccountContractCode(address runtime.Address, name st
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "GetAccountContractCode")
+
 	code, err = e.GetCode(common.AddressLocation{
 		Address: address,
 		Name:    name,
@@ -861,6 +883,7 @@ func (e *TransactionEnv) RemoveAccountContractCode(address runtime.Address, name
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvRemoveAccountContractCode)
 		defer sp.Finish()
 	}
+	e.computationHandler.AddUsed(1, "RemoveAccountContractCode")
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
@@ -918,16 +941,19 @@ func (e *TransactionEnv) RecordTrace(operation string, location common.Location,
 
 func (e *TransactionEnv) ProgramParsed(location common.Location, duration time.Duration) {
 	e.RecordTrace("parseProgram", location, duration, nil)
+	e.computationHandler.AddUsed(1, "ProgramParsed")
 	e.metrics.ProgramParsed(location, duration)
 }
 
 func (e *TransactionEnv) ProgramChecked(location common.Location, duration time.Duration) {
 	e.RecordTrace("checkProgram", location, duration, nil)
+	e.computationHandler.AddUsed(1, "ProgramChecked")
 	e.metrics.ProgramChecked(location, duration)
 }
 
 func (e *TransactionEnv) ProgramInterpreted(location common.Location, duration time.Duration) {
 	e.RecordTrace("interpretProgram", location, duration, nil)
+	e.computationHandler.AddUsed(1, "ProgramInterpreted")
 	e.metrics.ProgramInterpreted(location, duration)
 }
 

@@ -366,7 +366,7 @@ func (e *blockComputer) executeTransaction(
 
 	txResult := flow.TransactionResult{
 		TransactionID:   tx.ID,
-		ComputationUsed: tx.ComputationUsed,
+		ComputationUsed: tx.ComputationMeteringHandler.Used(),
 	}
 
 	if tx.Err != nil {
@@ -405,15 +405,26 @@ func (e *blockComputer) executeTransaction(
 	res.AddEvents(collectionIndex, tx.Events)
 	res.AddServiceEvents(tx.ServiceEvents)
 	res.AddTransactionResult(&txResult)
-	res.AddComputationUsed(tx.ComputationUsed)
+	res.AddComputationUsed(tx.ComputationMeteringHandler.Used())
 
 	e.log.Info().
 		Str("txHash", tx.ID.String()).
 		Str("traceID", traceID).
 		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
+		Uint64("computationUsed", tx.ComputationMeteringHandler.Used()).
 		Msg("transaction executed")
 
-	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationUsed, len(tx.Events), tx.Err != nil)
+	d := zerolog.Dict()
+	for s, u := range tx.ComputationMeteringHandler.Weights() {
+		d.Uint64(s, u)
+	}
+	e.log.Error().
+		Str("txHash", tx.ID.String()).
+		Dict("weights", d).
+		Int64("timeSpentInMS", time.Since(startedAt).Milliseconds()).
+		Msg("transaction executed")
+
+	e.metrics.ExecutionTransactionExecuted(time.Since(startedAt), tx.ComputationMeteringHandler.Used(), len(tx.Events), tx.Err != nil)
 	return nil
 }
 

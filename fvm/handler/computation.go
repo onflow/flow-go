@@ -2,12 +2,14 @@ package handler
 
 import "fmt"
 
+type ComputationCostLabel string
+
 // ComputationMeter meters computation usage
 type ComputationMeter interface {
 	// Limit gets computation limit
 	Limit() uint64
 	// AddUsed adds more computation used to the current computation used
-	AddUsed(used uint64) error
+	AddUsed(amount uint64, label ComputationCostLabel) error
 	// Used gets the current computation used
 	Used() uint64
 }
@@ -27,23 +29,24 @@ type SubComputationMeter interface {
 	// Commit()
 }
 
-// ComputationMeteringHandler handles computation metering on a transaction level
-type ComputationMeteringHandler interface {
-	ComputationMeter
-	StartSubMeter(limit uint64) SubComputationMeter
-}
-
 type computationMeter struct {
-	used  uint64
-	limit uint64
+	used    uint64
+	limit   uint64
+	handler *ComputationMeteringHandler
 }
 
 func (c *computationMeter) Limit() uint64 {
 	return c.limit
 }
 
-func (c *computationMeter) AddUsed(used uint64) error {
-	c.used += used
+func (c *computationMeter) AddUsed(amount uint64, label ComputationCostLabel) error {
+	c.handler.weights[string(label)] += amount
+	costFactor, ok := c.handler.factors[string(label)]
+	if !ok {
+		costFactor = 1
+	}
+
+	c.used += costFactor * amount
 	return nil
 }
 
@@ -55,8 +58,7 @@ var _ ComputationMeter = &computationMeter{}
 
 type subComputationMeter struct {
 	computationMeter
-	parent  ComputationMeter
-	handler *computationMeteringHandler
+	parent ComputationMeter
 }
 
 func (s *subComputationMeter) Discard() error {
@@ -69,42 +71,62 @@ func (s *subComputationMeter) Discard() error {
 
 var _ SubComputationMeter = &subComputationMeter{}
 
-type computationMeteringHandler struct {
+type ComputationMeteringHandler struct {
 	computation ComputationMeter
+	factors     map[string]uint64
+	weights     map[string]uint64
 }
 
-func (c *computationMeteringHandler) StartSubMeter(limit uint64) SubComputationMeter {
+func (c *ComputationMeteringHandler) StartSubMeter(limit uint64) SubComputationMeter {
 	m := &subComputationMeter{
 		computationMeter: computationMeter{
-			limit: limit,
+			limit:   limit,
+			handler: c,
 		},
-		parent:  c.computation,
-		handler: c,
+		parent: c.computation,
 	}
 
 	c.computation = m
 	return m
 }
 
-var _ ComputationMeteringHandler = &computationMeteringHandler{}
+type ComputationMeteringOption func(*ComputationMeteringHandler)
 
-func NewComputationMeteringHandler(computationLimit uint64) ComputationMeteringHandler {
-	return &computationMeteringHandler{
-		computation: &computationMeter{
-			limit: computationLimit,
-		},
+var _ ComputationMeter = &ComputationMeteringHandler{}
+
+func NewComputationMeteringHandler(computationLimit uint64, options ...ComputationMeteringOption) *ComputationMeteringHandler {
+	h := &ComputationMeteringHandler{
+		weights: map[string]uint64{},
+	}
+	h.computation = &computationMeter{
+		limit:   computationLimit,
+		handler: h,
+	}
+
+	for _, o := range options {
+		o(h)
+	}
+	return h
+}
+
+func WithCoumputationWeightFactors(weightFactors map[string]uint64) ComputationMeteringOption {
+	return func(handler *ComputationMeteringHandler) {
+		handler.factors = weightFactors
 	}
 }
 
-func (c *computationMeteringHandler) Limit() uint64 {
+func (c *ComputationMeteringHandler) Limit() uint64 {
 	return c.computation.Limit()
 }
 
-func (c *computationMeteringHandler) AddUsed(used uint64) error {
-	used = c.computation.Used() + used
-	return c.computation.AddUsed(used)
+func (c *ComputationMeteringHandler) AddUsed(amount uint64, label ComputationCostLabel) error {
+	return c.computation.AddUsed(amount, label)
 }
 
-func (c *computationMeteringHandler) Used() uint64 {
+func (c *ComputationMeteringHandler) Used() uint64 {
 	return c.computation.Used()
+}
+
+func (c *ComputationMeteringHandler) Weights() map[string]uint64 {
+	return c.weights
 }

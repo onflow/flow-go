@@ -63,7 +63,7 @@ func (i *TransactionInvoker) Process(
 
 	parentState := sth.State()
 	childState := sth.NewChild()
-	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+	env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, proc.ComputationMeteringHandler)
 	predeclaredValues := valueDeclarations(ctx, env)
 
 	defer func() {
@@ -115,7 +115,7 @@ func (i *TransactionInvoker) Process(
 			proc.ServiceEvents = make([]flow.Event, 0)
 
 			// reset env
-			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+			env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, proc.ComputationMeteringHandler)
 		}
 
 		location := common.TransactionLocation(proc.ID[:])
@@ -188,7 +188,7 @@ func (i *TransactionInvoker) Process(
 			Msg("transaction executed with error")
 
 		// reset env
-		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span)
+		env = NewTransactionEnvironment(*ctx, vm, sth, programs, proc.Transaction, proc.TxIndex, span, proc.ComputationMeteringHandler)
 
 		// try to deduct fees again, to get the fee deduction events
 		feesError = i.deductTransactionFees(env, proc)
@@ -221,9 +221,8 @@ func (i *TransactionInvoker) Process(
 			Msg("transaction executed successfully")
 	}
 
-	// if tx failed this will only contain fee deduction logs and computation
+	// if tx failed this will only contain fee deduction logs
 	proc.Logs = append(proc.Logs, env.Logs()...)
-	proc.ComputationUsed = proc.ComputationUsed + env.GetComputationUsed()
 
 	// based on the contract updates we decide how to clean up the programs
 	// for failed transactions we also do the same as
@@ -243,7 +242,7 @@ func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *Tr
 	}
 
 	// start a new computation meter for deducting transaction fees.
-	subMeter := env.computationHandler.StartSubMeter(DefaultGasLimit)
+	subMeter := env.computationHandler.StartSubMeter(DefaultComputationLimit)
 	defer func() {
 		merr := subMeter.Discard()
 		if merr == nil {

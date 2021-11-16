@@ -2,6 +2,7 @@ package fvm
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/fvm/handler"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/cadence/runtime"
@@ -18,20 +19,22 @@ func Script(code []byte) *ScriptProcedure {
 	scriptHash := hash.DefaultHasher.ComputeHash(code)
 
 	return &ScriptProcedure{
-		Script: code,
-		ID:     flow.HashToID(scriptHash),
+		Script:                     code,
+		ID:                         flow.HashToID(scriptHash),
+		ComputationMeteringHandler: handler.NewComputationMeteringHandler(DefaultComputationLimit),
 	}
 }
 
 type ScriptProcedure struct {
-	ID        flow.Identifier
-	Script    []byte
-	Arguments [][]byte
-	Value     cadence.Value
-	Logs      []string
-	Events    []flow.Event
-	GasUsed   uint64
-	Err       errors.Error
+	ID                         flow.Identifier
+	Script                     []byte
+	Arguments                  [][]byte
+	Value                      cadence.Value
+	Logs                       []string
+	Events                     []flow.Event
+	GasUsed                    uint64
+	Err                        errors.Error
+	ComputationMeteringHandler *handler.ComputationMeteringHandler
 }
 
 type ScriptProcessor interface {
@@ -78,7 +81,7 @@ func (i ScriptInvoker) Process(
 	sth *state.StateHolder,
 	programs *programs.Programs,
 ) error {
-	env := NewScriptEnvironment(ctx, vm, sth, programs)
+	env := NewScriptEnvironment(ctx, vm, sth, programs, proc.ComputationMeteringHandler)
 	location := common.ScriptLocation(proc.ID[:])
 	value, err := vm.Runtime.ExecuteScript(
 		runtime.Script{

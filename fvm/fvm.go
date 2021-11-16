@@ -55,6 +55,10 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 				err = errors.NewEncodingUnsupportedValueError(encodingErr.Value, encodingErr.Path)
 				return
 			}
+			if interactionErr, ok := r.(*errors.LedgerIntractionLimitExceededError); ok {
+				err = interactionErr
+				return
+			}
 
 			panic(r)
 		}

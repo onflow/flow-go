@@ -2,9 +2,16 @@ package fvm_test
 
 import (
 	"context"
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
+	"io"
+	"math/rand"
+	"os"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
@@ -86,10 +93,9 @@ type BasicBlockExecutor struct {
 	serviceAccount        *TestBenchAccount
 }
 
-func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain) *BasicBlockExecutor {
+func NewBasicBlockExecutor(tb testing.TB, chain flow.Chain, logger zerolog.Logger) *BasicBlockExecutor {
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)
-	logger := zerolog.Nop()
 
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
@@ -223,16 +229,61 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 	return accounts
 }
 
+type logExtractor struct {
+	TimeSpent map[string]uint64
+	Weights   map[string]map[string]uint64
+	Columns   map[string]struct{}
+}
+
+type txWeights struct {
+	TXHash        string
+	TimeSpentInMS uint64
+	Weights       map[string]uint64
+}
+
+func (l *logExtractor) Write(p []byte) (n int, err error) {
+	if strings.Contains(string(p), "weights") {
+		w := txWeights{}
+		err := json.Unmarshal(p, &w)
+
+		if err != nil {
+
+			// if error is not nil
+			// print error
+			fmt.Println(err)
+		} else {
+			l.TimeSpent[w.TXHash] = w.TimeSpentInMS
+			l.Weights[w.TXHash] = w.Weights
+			for s := range w.Weights {
+				l.Columns[s] = struct{}{}
+			}
+		}
+	}
+	return len(p), nil
+}
+
+var _ io.Writer = &logExtractor{}
+
 // BenchmarkRuntimeEmptyTransaction simulates executing blocks with `transactionsPerBlock`
 // where each transaction is an empty transaction
 func BenchmarkRuntimeTransaction(b *testing.B) {
+	rand.Seed(time.Now().UnixNano())
+
 	transactionsPerBlock := 10
 
 	chain := flow.Testnet.Chain()
 
-	benchTransaction := func(b *testing.B, tx string) {
+	logE := &logExtractor{
+		TimeSpent: map[string]uint64{},
+		Weights:   map[string]map[string]uint64{},
+		Columns:   map[string]struct{}{},
+	}
 
-		blockExecutor := NewBasicBlockExecutor(b, chain)
+	benchTransaction := func(b *testing.B, tx func() string) {
+
+		logger := zerolog.New(logE).Level(zerolog.InfoLevel)
+
+		blockExecutor := NewBasicBlockExecutor(b, chain, logger)
 		serviceAccount := blockExecutor.ServiceAccount(b)
 
 		// Create an account private key.
@@ -254,12 +305,11 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			}
 			`)
 
-		btx := []byte(tx)
-
 		b.ResetTimer() // setup done, lets start measuring
 		for i := 0; i < b.N; i++ {
 			transactions := make([]*flow.TransactionBody, transactionsPerBlock)
 			for j := 0; j < transactionsPerBlock; j++ {
+				btx := []byte(tx())
 
 				txBody := flow.NewTransactionBody().
 					SetScript(btx).
@@ -282,8 +332,10 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 
 	longString := strings.Repeat("0", 1000)
 
-	templateTx := func(prepare string) string {
-		return fmt.Sprintf(`
+	templateTx := func(prepare string) func() string {
+
+		return func() string {
+			return fmt.Sprintf(`
 			import FungibleToken from 0x%s
 			import FlowToken from 0x%s
 			import TestContract from 0x%s
@@ -291,12 +343,13 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			transaction(){
 				prepare(signer: AuthAccount){
 					var i = 0
-					while i < 100 {
+					while i < %d {
 						i = i + 1
 			%s
 					}
 				}
-			}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), "754aed9de6197641", prepare)
+			}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), "754aed9de6197641", rand.Intn(300)+1, prepare)
+		}
 	}
 
 	b.Run("reference tx", func(b *testing.B) {
@@ -366,6 +419,39 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	b.Run("emit event", func(b *testing.B) {
 		benchTransaction(b, templateTx(`TestContract.emit()`))
 	})
+	var data [][]string
+	columns := []string{"tx"}
+	for s := range logE.Columns {
+		columns = append(columns, s)
+	}
+	columns = append(columns, "ms")
+
+	data = append(data, columns)
+
+	for s, u := range logE.TimeSpent {
+		cdata := make([]string, len(columns))
+		cdata[0] = s
+		for i := 1; i < len(columns)-1; i++ {
+			cdata[i] = strconv.FormatUint(logE.Weights[s][columns[i]], 10)
+		}
+		cdata[len(columns)-1] = strconv.FormatUint(u, 10)
+		data = append(data, cdata)
+	}
+
+	f, err := os.Create("data.csv")
+	defer f.Close()
+
+	if err != nil {
+
+		panic("")
+	}
+
+	w := csv.NewWriter(f)
+	err = w.WriteAll(data)
+
+	if err != nil {
+		panic("")
+	}
 }
 
 const TransferTxTemplate = `
@@ -393,7 +479,7 @@ const TransferTxTemplate = `
 
 // BenchmarkRuntimeNFTBatchTransfer runs BenchRunNFTBatchTransfer with BasicBlockExecutor
 func BenchmarkRuntimeNFTBatchTransfer(b *testing.B) {
-	blockExecutor := NewBasicBlockExecutor(b, flow.Testnet.Chain())
+	blockExecutor := NewBasicBlockExecutor(b, flow.Testnet.Chain(), zerolog.Nop())
 
 	// Create an account private key.
 	privateKeys, err := testutil.GenerateAccountPrivateKeys(3)

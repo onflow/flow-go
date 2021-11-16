@@ -40,7 +40,7 @@ type ScriptEnv struct {
 	programs           *handler.ProgramsHandler
 	accountKeys        *handler.AccountKeyHandler
 	metrics            *handler.MetricsHandler
-	computationHandler handler.ComputationMeteringHandler
+	computationHandler *handler.ComputationMeteringHandler
 	uuidGenerator      *state.UUIDGenerator
 	logs               []string
 	rng                *rand.Rand
@@ -60,6 +60,7 @@ func NewScriptEnvironment(
 	vm *VirtualMachine,
 	sth *state.StateHolder,
 	programs *programs.Programs,
+	computationHandler *handler.ComputationMeteringHandler,
 ) *ScriptEnv {
 
 	accounts := state.NewAccounts(sth)
@@ -67,7 +68,6 @@ func NewScriptEnvironment(
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
-	computationHandler := handler.NewComputationMeteringHandler(ctx.GasLimit)
 
 	env := &ScriptEnv{
 		ctx:                ctx,
@@ -434,7 +434,7 @@ func (e *ScriptEnv) GetComputationLimit() uint64 {
 }
 
 func (e *ScriptEnv) SetComputationUsed(used uint64) error {
-	return e.computationHandler.AddUsed(used)
+	return e.computationHandler.AddUsed(used, "function_or_loop_call")
 }
 
 func (e *ScriptEnv) GetComputationUsed() uint64 {
