@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -46,7 +47,13 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(block *model.Block) (hotstuf
 	// message that has to be verified against aggregated signature
 	msg := verification.MakeVoteMessage(block.View, block.BlockID)
 
-	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, msg, encoding.ConsensusVoteTag)
+	// prepare the staking public keys of participants
+	stakingKeys := make([]crypto.PublicKey, 0, len(allParticipants))
+	for _, participant := range allParticipants {
+		stakingKeys = append(stakingKeys, participant.StakingPubKey)
+	}
+
+	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, encoding.ConsensusVoteTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
 	}
