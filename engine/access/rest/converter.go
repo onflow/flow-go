@@ -9,70 +9,10 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// Converter provides the conversion function to/from the Swagger object to Flow objects
+// Converter provides functionality to convert from request models generated using
+// open api spec and flow models.
 
-func toBlock(flowBlock *flow.Block) *generated.Block {
-	return &generated.Block{
-		Header:  toBlockHeader(flowBlock.Header),
-		Payload: toBlockPayload(flowBlock.Payload),
-	}
-}
-
-func toBlockHeader(flowHeader *flow.Header) *generated.BlockHeader {
-	return &generated.BlockHeader{
-		Id:                   flowHeader.ID().String(),
-		ParentId:             flowHeader.ParentID.String(),
-		Height:               int32(flowHeader.Height),
-		Timestamp:            flowHeader.Timestamp,
-		ParentVoterSignature: fmt.Sprint(flowHeader.ParentVoterSigData),
-	}
-}
-
-func toBlockPayload(flowPayload *flow.Payload) *generated.BlockPayload {
-	return &generated.BlockPayload{
-		CollectionGuarantees: toCollectionGuarantees(flowPayload.Guarantees),
-		BlockSeals:           toBlockSeals(flowPayload.Seals),
-	}
-}
-
-func toCollectionGuarantees(flowCollGuarantee []*flow.CollectionGuarantee) []generated.CollectionGuarantee {
-	collectionGuarantees := make([]generated.CollectionGuarantee, len(flowCollGuarantee))
-	for i, flowCollGuarantee := range flowCollGuarantee {
-		collectionGuarantees[i] = toCollectionGuarantee(flowCollGuarantee)
-	}
-	return collectionGuarantees
-}
-
-func toCollectionGuarantee(flowCollGuarantee *flow.CollectionGuarantee) generated.CollectionGuarantee {
-	signerIDs := make([]string, len(flowCollGuarantee.SignerIDs))
-	for i, signerID := range flowCollGuarantee.SignerIDs {
-		signerIDs[i] = signerID.String()
-	}
-	return generated.CollectionGuarantee{
-		CollectionId: flowCollGuarantee.CollectionID.String(),
-		SignerIds:    signerIDs,
-		Signature:    base64.StdEncoding.EncodeToString(flowCollGuarantee.Signature.Bytes()),
-	}
-}
-
-func toBlockSeals(flowSeals []*flow.Seal) []generated.BlockSeal {
-	seals := make([]generated.BlockSeal, len(flowSeals))
-	for i, seal := range flowSeals {
-		seals[i] = toBlockSeal(seal)
-	}
-	return seals
-}
-
-func toBlockSeal(flowSeal *flow.Seal) generated.BlockSeal {
-	return generated.BlockSeal{
-		BlockId:  flowSeal.BlockID.String(),
-		ResultId: flowSeal.ResultID.String(),
-	}
-}
-
-/**
-Flow section - converting request data to flow models with validation
-*/
+// Flow section - converting request data to flow models with validation.
 
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
@@ -180,9 +120,7 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 	}, nil
 }
 
-/**
-Response section - converting flow models to response models
-*/
+// Response section - converting flow models to response models.
 
 func proposalKeyResponse(key *flow.ProposalKey) *generated.ProposalKey {
 	return &generated.ProposalKey{
@@ -231,5 +169,64 @@ func transactionResponse(tx *flow.TransactionBody) *generated.Transaction {
 		PayloadSignatures:  transactionSignatureResponse(tx.PayloadSignatures),
 		EnvelopeSignatures: transactionSignatureResponse(tx.EnvelopeSignatures),
 		Result:             nil, // todo(sideninja) should we provide result, maybe have a wait for result http long pulling system would be super helpful (with reasonable timeout) but careful about resources and dos
+	}
+}
+
+func blockResponse(flowBlock *flow.Block) *generated.Block {
+	return &generated.Block{
+		Header:  blockHeaderResponse(flowBlock.Header),
+		Payload: blockPayloadResponse(flowBlock.Payload),
+	}
+}
+
+func blockHeaderResponse(flowHeader *flow.Header) *generated.BlockHeader {
+	return &generated.BlockHeader{
+		Id:                   flowHeader.ID().String(),
+		ParentId:             flowHeader.ParentID.String(),
+		Height:               int32(flowHeader.Height),
+		Timestamp:            flowHeader.Timestamp,
+		ParentVoterSignature: fmt.Sprint(flowHeader.ParentVoterSigData),
+	}
+}
+
+func blockPayloadResponse(flowPayload *flow.Payload) *generated.BlockPayload {
+	return &generated.BlockPayload{
+		CollectionGuarantees: collectionGuaranteesResponse(flowPayload.Guarantees),
+		BlockSeals:           blockSealsResponse(flowPayload.Seals),
+	}
+}
+
+func collectionGuaranteesResponse(flowCollGuarantee []*flow.CollectionGuarantee) []generated.CollectionGuarantee {
+	collectionGuarantees := make([]generated.CollectionGuarantee, len(flowCollGuarantee))
+	for i, flowCollGuarantee := range flowCollGuarantee {
+		collectionGuarantees[i] = collectionGuaranteeResponse(flowCollGuarantee)
+	}
+	return collectionGuarantees
+}
+
+func collectionGuaranteeResponse(flowCollGuarantee *flow.CollectionGuarantee) generated.CollectionGuarantee {
+	signerIDs := make([]string, len(flowCollGuarantee.SignerIDs))
+	for i, signerID := range flowCollGuarantee.SignerIDs {
+		signerIDs[i] = signerID.String()
+	}
+	return generated.CollectionGuarantee{
+		CollectionId: flowCollGuarantee.CollectionID.String(),
+		SignerIds:    signerIDs,
+		Signature:    base64.StdEncoding.EncodeToString(flowCollGuarantee.Signature.Bytes()),
+	}
+}
+
+func blockSealsResponse(flowSeals []*flow.Seal) []generated.BlockSeal {
+	seals := make([]generated.BlockSeal, len(flowSeals))
+	for i, seal := range flowSeals {
+		seals[i] = blockSealResponse(seal)
+	}
+	return seals
+}
+
+func blockSealResponse(flowSeal *flow.Seal) generated.BlockSeal {
+	return generated.BlockSeal{
+		BlockId:  flowSeal.BlockID.String(),
+		ResultId: flowSeal.ResultID.String(),
 	}
 }
