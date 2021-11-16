@@ -2,6 +2,7 @@ package votecollector
 
 import (
 	"errors"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"math/rand"
 	"sync"
 	"testing"
@@ -768,19 +769,34 @@ func TestCombinedVoteProcessorV3_PropertyCreatingQCLiveness(testifyT *testing.T)
 // We start with leader proposing a block, then new leader collects votes and builds a QC.
 // Need to verify that QC that was produced is valid and can be embedded in new proposal.
 func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
-	t.Skip("This test doesn't work since we are missing CombinedSignerV3 and CombinedVerifierV3")
+	t.Skip("This test doesn't work since we are missing CombinedVerifierV3")
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
 	view := uint64(20)
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
-	dkgData, err := run.RunFastKG(8, unittest.RandomBytes(32))
+	dkgData, err := run.RunFastKG(11, unittest.RandomBytes(32))
 	require.NoError(t, err)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
 	signers := make(map[flow.Identifier]*verification.CombinedSignerV3)
+
 	// prepare staking signers, each signer has it's own private/public key pair
-	stakingSigners := unittest.IdentityListFixture(3, func(identity *flow.Identity) {
+	// stakingSigners sign only with staking key, meaning they have failed DKG
+	stakingSigners := unittest.IdentityListFixture(3)
+	beaconSigners := unittest.IdentityListFixture(8)
+	allIdentities := append(stakingSigners, beaconSigners...)
+	require.Equal(t, len(dkgData.PubKeyShares), len(allIdentities))
+	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
+	// fill dkg participants data
+	for index, identity := range allIdentities {
+		dkgParticipants[identity.NodeID] = flow.DKGParticipant{
+			Index:    uint(index),
+			KeyShare: dkgData.PubKeyShares[index],
+		}
+	}
+
+	for _, identity := range stakingSigners {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
@@ -794,19 +810,20 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewCombinedSignerV3(me, beaconSignerStore, identity.NodeID)
-	})
-	beaconSigners := unittest.IdentityListFixture(len(dkgData.PrivKeyShares))
-	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
-	for index, identity := range beaconSigners {
+	}
+
+	for _, identity := range beaconSigners {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
+
+		participantData := dkgParticipants[identity.NodeID]
 
 		dkgKey := &dkg.DKGParticipantPriv{
 			NodeID: identity.NodeID,
 			RandomBeaconPrivKey: encodable.RandomBeaconPrivKey{
-				PrivateKey: dkgData.PrivKeyShares[index],
+				PrivateKey: dkgData.PrivKeyShares[participantData.Index],
 			},
-			GroupIndex: index,
+			GroupIndex: int(participantData.Index),
 		}
 
 		keys := &storagemock.DKGKeys{}
@@ -819,11 +836,6 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewCombinedSignerV3(me, beaconSignerStore, identity.NodeID)
-
-		dkgParticipants[identity.NodeID] = flow.DKGParticipant{
-			Index:    uint(index),
-			KeyShare: dkgData.PubKeyShares[index],
-		}
 	}
 
 	leader := stakingSigners[0]
@@ -831,10 +843,17 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	block := helper.MakeBlock(helper.WithBlockView(view),
 		helper.WithBlockProposer(leader.NodeID))
 
-	allIdentities := append(stakingSigners, beaconSigners...)
+	inmemDKG, err := inmem.DKGFromEncodable(inmem.EncodableDKG{
+		GroupKey: encodable.RandomBeaconPubKey{
+			PublicKey: dkgData.PubGroupKey,
+		},
+		Participants: dkgParticipants,
+	})
+	require.NoError(t, err)
 
 	committee := &mockhotstuff.Committee{}
 	committee.On("Identities", block.BlockID, mock.Anything).Return(allIdentities, nil)
+	committee.On("DKG", block.BlockID).Return(inmemDKG, nil)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 

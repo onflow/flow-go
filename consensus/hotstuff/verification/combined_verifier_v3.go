@@ -35,11 +35,10 @@ type CombinedVerifierV3 struct {
 // - the packer is used to unpack QC for verification;
 func NewCombinedVerifierV3(committee hotstuff.Committee, packer hotstuff.Packer) *CombinedVerifierV3 {
 	return &CombinedVerifierV3{
-		committee:      committee,
-		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
-		beaconHasher:   crypto.NewBLSKMAC(encoding.RandomBeaconTag),
-		keysAggregator: newStakingKeysAggregator(),
-		packer:         packer,
+		committee:     committee,
+		stakingHasher: crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+		beaconHasher:  crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		packer:        packer,
 	}
 }
 
@@ -126,14 +125,15 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	// VerifyMany would only take the signature and the new list of signers (a bit vector preferably)
 	// as inputs. A new struct needs to be used for each epoch since the list of participants is updated.
 
-	// TODO: update to use module/signature.PublicKeyAggregator
-	aggregatedKey, err := c.stakingKeysAggregator.aggregatedStakingKey(signers)
-	if err != nil {
-		return false, fmt.Errorf("could not compute aggregated key: %w", err)
-	}
-	stakingValid, err := aggregatedKey.Verify(blockSigData.AggregatedStakingSig, msg, c.stakingHasher)
-	if err != nil {
-		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
-	}
-	return stakingValid, nil
+	panic("implement me")
+	//// TODO: update to use module/signature.PublicKeyAggregator
+	//aggregatedKey, err := c.stakingKeysAggregator.aggregatedStakingKey(signers)
+	//if err != nil {
+	//	return false, fmt.Errorf("could not compute aggregated key: %w", err)
+	//}
+	//stakingValid, err := aggregatedKey.Verify(blockSigData.AggregatedStakingSig, msg, c.stakingHasher)
+	//if err != nil {
+	//	return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
+	//}
+	//return stakingValid, nil
 }
