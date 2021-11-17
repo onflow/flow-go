@@ -1,4 +1,4 @@
-package rest
+package middleware
 
 import (
 	"net/http"

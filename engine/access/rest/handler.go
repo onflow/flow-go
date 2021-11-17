@@ -180,3 +180,15 @@ func jsonDecode(body io.ReadCloser, dst interface{}) error {
 
 	return nil
 }
+
+// NotImplemented handler returns an error explaining the endpoint is not yet implemented
+func NotImplemented(
+	_ http.ResponseWriter,
+	_ *http.Request,
+	_ map[string]string,
+	_ access.API,
+	_ zerolog.Logger,
+) (interface{}, StatusError) {
+	err := fmt.Errorf("endpoint not implemented")
+	return nil, NewRestError(http.StatusNotImplemented, err.Error(), err)
+}
