@@ -214,7 +214,6 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	if builder.rootBlockID == nil {
 		return nil, errors.New("root block ID must be provided")
 	}
-	node.rootBlockId = *builder.rootBlockID
 	node.flowLibP2PProtocolID = FlowProtocolID(*builder.rootBlockID)
 
 	var opts []config.Option
@@ -257,6 +256,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, err
 	}
 	node.host = libp2pHost
+	node.unicastManager = unicast.NewProtocolBuilder(builder.logger, node.host, *builder.rootBlockID)
 
 	node.pCache, err = newProtocolPeerCache(node.logger, libp2pHost)
 	if err != nil {
@@ -310,7 +310,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	sync.Mutex
-	rootBlockId          flow.Identifier
+	unicastManager       *unicast.ProtocolBuilder
 	connGater            *ConnGater                             // used to provide white listing
 	host                 host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
 	pubSub               *pubsub.PubSub                         // reference to the libp2p PubSub component
@@ -441,7 +441,7 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 			lg.Debug().Msg("address not found in peer store, but found in dht search")
 		}
 	}
-	stream, dialAddrs, err := n.tryCreateNewStream(ctx, peerID, maxConnectAttempt)
+	stream, dialAddrs, err := n.unicastManager.CreateStream(ctx, peerID, maxConnectAttempt)
 	if err != nil {
 		return nil, flownet.NewPeerUnreachableError(fmt.Errorf("could not create stream (peer_id: %s, dialing address(s): %v): %w", peerID,
 			dialAddrs, err))
@@ -601,11 +601,13 @@ func (n *Node) Host() host.Host {
 	return n.host
 }
 
-func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler) error {
-	builder := unicast.NewProtocolBuilder(n.logger, n.host, n.rootBlockId, defaultHandler)
-	err := builder.Register(n.unicastProtocols)
-	if err != nil {
-		return fmt.Errorf("could not register unicast protocls")
+func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler, preferred []unicast.ProtocolName) error {
+	n.unicastManager.WithDefaultHandler(defaultHandler)
+	for _, p := range preferred {
+		err := n.unicastManager.Register(p)
+		if err != nil {
+			return fmt.Errorf("could not register unicast protocls")
+		}
 	}
 
 	return nil
