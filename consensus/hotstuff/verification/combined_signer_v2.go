@@ -96,8 +96,8 @@ func (c *CombinedSignerV2) CreateVote(block *model.Block) (*model.Vote, error) {
 
 // genSigData generates the signature data for our local node for the given block.
 // It returns:
-//  - (stakingSig, nil) if there is no random beacon private key  The sig is 48 bytes long
-//  - (stakingSig+randomBeaconSig, nil) if there is a random beacon private key. The sig is 96 bytes long
+//  - (stakingSig, nil) if there is no random beacon private key.
+//  - (stakingSig+randomBeaconSig, nil) if there is a random beacon private key.
 //  - (nil, error) if there is any exception
 func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 
@@ -117,7 +117,7 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 		return nil, fmt.Errorf("could not get threshold signer for view %d: %w", block.View, err)
 	}
 
-	// if the node is a Random Beacon participant and has completed its DKG, then using the random beacon key
+	// if the node is a Random Beacon participant and has succeeded DKG, then using the random beacon key
 	// to sign the block
 	beaconShare, err := beaconKey.Sign(msg, c.beaconHasher)
 	if err != nil {

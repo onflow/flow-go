@@ -104,7 +104,7 @@ func (c *CombinedSignerV3) genSigData(block *model.Block) ([]byte, error) {
 	beaconKey, err := c.beaconKeyStore.ByView(block.View)
 	if err != nil {
 		if errors.Is(err, module.DKGFailError) {
-			// if the node didn't complete DKG, then using the staking key to sign the block as a
+			// if the node failed DKG, then using the staking key to sign the block as a
 			// fallback
 			stakingSig, err := c.staking.Sign(msg, c.stakingHasher)
 			if err != nil {
@@ -113,7 +113,7 @@ func (c *CombinedSignerV3) genSigData(block *model.Block) ([]byte, error) {
 
 			return signature.EncodeSingleSig(hotstuff.SigTypeStaking, stakingSig), nil
 		}
-		return nil, fmt.Errorf("could not get threshold signer for view %d: %w", block.View, err)
+		return nil, fmt.Errorf("could not get random beacon private key for view %d: %w", block.View, err)
 	}
 
 	// if the node is a Random Beacon participant and has completed its DKG, then using the random beacon key

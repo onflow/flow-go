@@ -66,7 +66,7 @@ func (k *DKGKeys) retrieveTx(epochCounter uint64) func(tx *badger.Txn) (*dkg.DKG
 	}
 }
 
-// InsertMyDKGPrivateInfo insert the DKG private key to database when DKG was completed, and a DKG private key was successfully generated.
+// InsertMyDKGPrivateInfo insert the private key to database when DKG succeeded.
 func (k *DKGKeys) InsertMyDKGPrivateInfo(epochCounter uint64, info *dkg.DKGParticipantPriv) error {
 	return operation.RetryOnConflictTx(k.db, transaction.Update, k.storeTx(epochCounter, info))
 }
