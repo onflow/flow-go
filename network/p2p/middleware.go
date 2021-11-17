@@ -245,7 +245,7 @@ func (m *Middleware) start(ctx context.Context) error {
 	}
 
 	m.libP2PNode = libP2PNode
-	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
+	m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream)
 
 	m.UpdateNodeAddresses()
 
