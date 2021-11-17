@@ -13,47 +13,6 @@ import (
 	"strings"
 )
 
-// StatusError provides custom error with http status.
-type StatusError interface {
-	error
-	Status() int
-}
-
-// RestError is implementation of status error.
-type RestError struct {
-	status      int
-	userMessage string
-	err         error
-}
-
-// NewRestError creates an error returned to user with provided status
-// user displayed message and internal error
-func NewRestError(status int, msg string, err error) *RestError {
-	return &RestError{
-		status:      status,
-		userMessage: msg,
-		err:         err,
-	}
-}
-
-// NewBadRequest creates a new bad request rest error.
-func NewBadRequest(msg string, err error) *RestError {
-	return &RestError{
-		status:      http.StatusBadRequest,
-		userMessage: msg,
-		err:         err,
-	}
-}
-
-// Status returns error http status code.
-func (e *RestError) Status() int {
-	return e.status
-}
-
-func (e *RestError) Error() string {
-	return e.err.Error()
-}
-
 // Handler is custom http handler implementing custom handler function.
 // Handler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
