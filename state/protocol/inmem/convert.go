@@ -34,6 +34,7 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal: %w", err)
 	}
+
 	snap.SealingSegment, err = from.SealingSegment()
 	if err != nil {
 		return nil, fmt.Errorf("could not get sealing segment: %w", err)
@@ -208,11 +209,14 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 	}
 
 	snap := SnapshotFromEncodable(EncodableSnapshot{
-		Head:              root.Header,
-		Identities:        setup.Participants,
-		LatestSeal:        seal,
-		LatestResult:      result,
-		SealingSegment:    []*flow.Block{root},
+		Head:         root.Header,
+		Identities:   setup.Participants,
+		LatestSeal:   seal,
+		LatestResult: result,
+		SealingSegment: &flow.SealingSegment{
+			Blocks:           []*flow.Block{root},
+			ExecutionResults: make(flow.ExecutionResultList, 0),
+		},
 		QuorumCertificate: qc,
 		Phase:             flow.EpochPhaseStaking,
 		Epochs:            epochs,

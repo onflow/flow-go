@@ -1,14 +1,15 @@
 package rest
 
 import (
-	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/gorilla/mux"
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
+
+	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 )
 
@@ -18,10 +19,12 @@ func NewServer(handlers *Handlers, backend access.API, listenAddress string, log
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
+	lm := NewLoggingMiddleware(logger)
 	// common middleware for all request
-	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
+	v1SubRouter.Use(lm.RequestStart())
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
+	v1SubRouter.Use(lm.RequestEnd())
 
 	for _, route := range apiRoutes(handlers) {
 		v1SubRouter.

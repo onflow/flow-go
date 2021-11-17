@@ -86,6 +86,9 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 	}
 
 	payer, err := toAddress(tx.Payer)
+	if err != nil {
+		return flow.TransactionBody{}, err
+	}
 
 	auths := make([]flow.Address, len(tx.Authorizers))
 	for _, auth := range tx.Authorizers {

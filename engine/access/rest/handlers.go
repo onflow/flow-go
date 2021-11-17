@@ -53,7 +53,7 @@ func (h *Handlers) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 	blocks := make([]*generated.Block, len(ids))
 
 	if len(ids) > MaxAllowedBlockIDsCnt {
-		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at h time", MaxAllowedBlockIDsCnt), errorLogger)
+		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", MaxAllowedBlockIDsCnt), errorLogger)
 		return
 	}
 
@@ -86,14 +86,15 @@ func (h *Handlers) GetTransactionByID(w http.ResponseWriter, r *http.Request) {
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger() // todo(sideninja) refactor this to be initialized for us
 
 	vars := mux.Vars(r)
-	id, err := toID(vars["id"])
+	idFromRequest := vars["id"]
+	id, err := toID(idFromRequest)
 	if err != nil {
-		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID"), errorLogger)
+		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID: %s", idFromRequest), errorLogger)
 	}
 
 	tx, err := h.backend.GetTransaction(r.Context(), id)
 	if err != nil {
-		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("transaction fetching error: %w", err), errorLogger)
+		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("transaction fetching error: %s", err.Error()), errorLogger)
 	}
 
 	h.jsonResponse(w, transactionResponse(tx), errorLogger)
@@ -157,7 +158,7 @@ func (h *Handlers) jsonDecode(body io.ReadCloser, dst interface{}) error {
 			return &badRequest{status: http.StatusBadRequest, msg: msg}
 
 		case errors.Is(err, io.ErrUnexpectedEOF):
-			msg := fmt.Sprintf("Request body contains badly-formed JSON")
+			msg := "Request body contains badly-formed JSON"
 			return &badRequest{status: http.StatusBadRequest, msg: msg}
 
 		case errors.As(err, &unmarshalTypeError):
