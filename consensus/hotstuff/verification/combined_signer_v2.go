@@ -114,7 +114,7 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 		if errors.Is(err, module.DKGFailError) {
 			return stakingSig, nil
 		}
-		return nil, fmt.Errorf("could not get threshold signer for view %d: %w", block.View, err)
+		return nil, fmt.Errorf("could not get random beacon private key for view %d: %w", block.View, err)
 	}
 
 	// if the node is a Random Beacon participant and has succeeded DKG, then using the random beacon key

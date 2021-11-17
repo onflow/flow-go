@@ -70,7 +70,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 			epoch, view, err)
 	}
 
-	// if DKG was not completed, there will be no DKG private key, since this fact
+	// if DKG failed, there will be no random beacon private key, since this fact
 	// never change, we can cache a nil signer for this epoch, so that we this function
 	// is called again for the same epoch, we don't need to query database.
 	if !hasRandomBeaconKey {
