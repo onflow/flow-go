@@ -930,6 +930,18 @@ func (m migrationRuntimeInterface) RecordTrace(_ string, _ common.Location, _ ti
 	panic("unexpected RecordTrace call")
 }
 
+func (m migrationRuntimeInterface) BLSVerifyPOP(_ *runtime.PublicKey, _ []byte) (bool, error) {
+	panic("unexpected BLSVerifyPOP call")
+}
+
+func (m migrationRuntimeInterface) BLSAggregateSignatures(_ [][]byte) ([]byte, error) {
+	panic("unexpected BLSAggregateSignatures call")
+}
+
+func (m migrationRuntimeInterface) BLSAggregatePublicKeys(_ []*runtime.PublicKey) (*runtime.PublicKey, error) {
+	panic("unexpected BLSAggregatePublicKeys call")
+}
+
 func cborMeLink(value []byte) string {
 	return fmt.Sprintf("http://cbor.me/?bytes=%x", value)
 }

@@ -67,8 +67,31 @@ func (_m *Environment) AddEncodedAccountKey(address common.Address, publicKey []
 	return r0
 }
 
-// AggregateBLSPublicKeys provides a mock function with given fields: keys
-func (_m *Environment) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+// AllocateStorageIndex provides a mock function with given fields: owner
+func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	ret := _m.Called(owner)
+
+	var r0 atree.StorageIndex
+	if rf, ok := ret.Get(0).(func([]byte) atree.StorageIndex); ok {
+		r0 = rf(owner)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(atree.StorageIndex)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]byte) error); ok {
+		r1 = rf(owner)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
+// BLSAggregatePublicKeys provides a mock function with given fields: keys
+func (_m *Environment) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	ret := _m.Called(keys)
 
 	var r0 *runtime.PublicKey
@@ -90,8 +113,8 @@ func (_m *Environment) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runti
 	return r0, r1
 }
 
-// AggregateBLSSignatures provides a mock function with given fields: sigs
-func (_m *Environment) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+// BLSAggregateSignatures provides a mock function with given fields: sigs
+func (_m *Environment) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 	ret := _m.Called(sigs)
 
 	var r0 []byte
@@ -106,29 +129,6 @@ func (_m *Environment) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
 	var r1 error
 	if rf, ok := ret.Get(1).(func([][]byte) error); ok {
 		r1 = rf(sigs)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// AllocateStorageIndex provides a mock function with given fields: owner
-func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
-	ret := _m.Called(owner)
-
-	var r0 atree.StorageIndex
-	if rf, ok := ret.Get(0).(func([]byte) atree.StorageIndex); ok {
-		r0 = rf(owner)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(atree.StorageIndex)
-		}
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func([]byte) error); ok {
-		r1 = rf(owner)
 	} else {
 		r1 = ret.Error(1)
 	}
