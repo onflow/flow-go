@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
+	"github.com/onflow/flow-go/engine/access/rest/middleware"
 
 	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
