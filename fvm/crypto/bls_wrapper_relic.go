@@ -34,6 +34,7 @@ func AggregateSignatures(sigs [][]byte) (crypto.Signature, error) {
 func AggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	pks := make([]crypto.PublicKey, 0, len(keys))
 	for _, key := range keys {
+                // TODO: avoid validating the public keys again since Cadence makes sure runtime keys have been validated. This requires exporting an unsafe function in the crypto package. 
 		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, key.PublicKey)
 		if err != nil {
 			return nil, err

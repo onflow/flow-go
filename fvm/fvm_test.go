@@ -1901,7 +1901,7 @@ func TestBLSCryptoFunctions(t *testing.T) {
 		
 								pub fun main(
 									publicKey: [UInt8],
-									signature: [UInt8]
+									proof: [UInt8]
 								): Bool {
 									let p = PublicKey(
 										publicKey: publicKey, 
