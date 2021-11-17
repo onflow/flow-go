@@ -10,7 +10,7 @@ import (
 	"net/http"
 )
 
-// getBlocksByID gets blocks by provided ID array.
+// getBlocksByID gets blocks by provided ID or collection of IDs.
 func getBlocksByID(
 	w http.ResponseWriter,
 	r *http.Request,
