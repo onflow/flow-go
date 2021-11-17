@@ -1,4 +1,4 @@
-package rest
+package middleware
 
 import (
 	"context"
@@ -32,24 +32,24 @@ func commonQueryParamMiddleware(queryParamName string) mux.MiddlewareFunc {
 	}
 }
 
+// QueryExpandable middleware extracts out the 'expand' query param field if present in the request
+func QueryExpandable() mux.MiddlewareFunc {
+	return commonQueryParamMiddleware(expandQueryParam)
+}
+
+// QuerySelect middleware extracts out the 'select' query param field if present in the request
+func QuerySelect() mux.MiddlewareFunc {
+	return commonQueryParamMiddleware(selectQueryParam)
+}
+
 func getField(ctx context.Context, key string) ([]string, bool) {
 	contextKey := ctxKeyType(key)
 	u, ok := ctx.Value(contextKey).([]string)
 	return u, ok
 }
 
-// Expandable Middleware reads the 'expand' query param if present in the request and its it to the Request context
-func ExpandableMiddleware() mux.MiddlewareFunc {
-	return commonQueryParamMiddleware(expandQueryParam)
-}
-
 func GetFieldsToExpand(ctx context.Context) ([]string, bool) {
 	return getField(ctx, expandQueryParam)
-}
-
-// Select Middleware reads the 'select' query param if present in the request and its it to the Request context
-func SelectMiddleware() mux.MiddlewareFunc {
-	return commonQueryParamMiddleware(selectQueryParam)
 }
 
 func GetFieldsToSelect(ctx context.Context) ([]string, bool) {

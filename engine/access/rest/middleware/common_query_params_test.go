@@ -1,4 +1,4 @@
-package rest
+package middleware
 
 import (
 	"net/http"
@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCommonQueryParamMiddlewares test the two common query param middlewares - expand and select
+// TestCommonQueryParamMiddlewares test the two common query param middleware - expand and select
 func TestCommonQueryParamMiddlewares(t *testing.T) {
 
 	testFunc := func(expandList, selectList []string) {
@@ -20,11 +20,11 @@ func TestCommonQueryParamMiddlewares(t *testing.T) {
 			expectedSelectList: selectList,
 		}
 
-		// setup the router to use the test handler and the ExpandableMiddleware and SelectMiddleware
+		// setup the router to use the test handler and the QueryExpandable and QuerySelect
 		r := mux.NewRouter()
 		r.Handle("/", th.getHandler())
-		r.Use(ExpandableMiddleware())
-		r.Use(SelectMiddleware())
+		r.Use(QueryExpandable())
+		r.Use(QuerySelect())
 
 		// create request
 		req, err := http.NewRequest("GET", "/", nil)
