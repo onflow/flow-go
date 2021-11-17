@@ -14,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	modulesig "github.com/onflow/flow-go/module/signature"
-	"github.com/onflow/flow-go/utils/slices"
 )
 
 // CombinedVerifierV3 is a verifier capable of verifying two signatures, one for each
@@ -53,7 +52,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 
 	sigType, sig, err := signature.DecodeSingleSig(sigData)
 	if err != nil {
-		return false, fmt.Errorf("could not decode signature for block %v: %w", block.BlockID,  modulesig.ErrInvalidFormat)
+		return false, fmt.Errorf("could not decode signature for block %v: %w", block.BlockID, err)
 	}
 
 	switch sigType {
@@ -121,11 +120,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	// verify the aggregated staking and beacon signatures next (more costly)
 
 	verifyAggregatedSignature := func(pubKeys []crypto.PublicKey, aggregatedSig crypto.Signature, hasher hash.Hasher) (bool, error) {
-		keysAggregator, err := modulesig.NewPublicKeyAggregator(pubKeys)
-		if err != nil {
-			return false, fmt.Errorf("could not create pub key aggregator: %w", err)
-		}
-		aggregatedKey, err := keysAggregator.KeyAggregate(slices.MakeRange(0, len(pubKeys)-1))
+		aggregatedKey, err := crypto.AggregateBLSPublicKeys(pubKeys)
 		if err != nil {
 			return false, fmt.Errorf("could not compute aggregated key: %w", err)
 		}
