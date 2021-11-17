@@ -385,7 +385,7 @@ func Test_DifferentiateEmptyVsLeaf(t *testing.T) {
 	//  * de-allocate the compactified leaf (■), i.e. set its payload to nil.
 	//  * also set a previously already unallocated register to nil as well
 	unallocatedRegister := leftSubTriePath[0]            // copy path to leaf and modify it (next line)
-	unallocatedRegister[len(unallocatedRegister)-1] += 1 // path differs only in the last byte, i.e. register is also in the left Sub-Trie
+	unallocatedRegister[len(unallocatedRegister)-1] ^= 1 // path differs only in the last byte, i.e. register is also in the left Sub-Trie
 	updatedPaths := append(leftSubTriePath, unallocatedRegister)
 	updatedPayloads := []ledger.Payload{*ledger.EmptyPayload(), *ledger.EmptyPayload()}
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(startTrie, updatedPaths, updatedPayloads, true)
