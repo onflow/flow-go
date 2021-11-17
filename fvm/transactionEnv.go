@@ -1002,10 +1002,10 @@ func (e *TransactionEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, 
 	return crypto.VerifyPOP(pk, sig)
 }
 
-func (e *TransactionEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+func (e *TransactionEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 	return crypto.AggregateSignatures(sigs)
 }
 
-func (e *TransactionEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+func (e *TransactionEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	return crypto.AggregatePublicKeys(keys)
 }

@@ -725,10 +725,10 @@ func (e *ScriptEnv) BLSVerifyPOP(pk *runtime.PublicKey, sig []byte) (bool, error
 	return crypto.VerifyPOP(pk, sig)
 }
 
-func (e *ScriptEnv) AggregateBLSSignatures(sigs [][]byte) ([]byte, error) {
+func (e *ScriptEnv) BLSAggregateSignatures(sigs [][]byte) ([]byte, error) {
 	return crypto.AggregateSignatures(sigs)
 }
 
-func (e *ScriptEnv) AggregateBLSPublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
+func (e *ScriptEnv) BLSAggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	return crypto.AggregatePublicKeys(keys)
 }
