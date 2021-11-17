@@ -220,6 +220,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	if builder.rootBlockID == nil {
 		return nil, errors.New("root block ID must be provided")
 	}
+	node.rootBlockId = *builder.rootBlockID
 	node.flowLibP2PProtocolID = FlowProtocolID(*builder.rootBlockID)
 
 	var opts []config.Option
@@ -315,6 +316,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	sync.Mutex
+	rootBlockId          flow.Identifier
 	connGater            *ConnGater                             // used to provide white listing
 	host                 host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
 	pubSub               *pubsub.PubSub                         // reference to the libp2p PubSub component
@@ -701,8 +703,14 @@ func (n *Node) SetFlowProtocolStreamHandler(handler libp2pnet.StreamHandler) {
 	})
 }
 
-func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler) {
+func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler) error {
+	builder := unicast.NewProtocolBuilder(n.logger, n.host, n.rootBlockId, defaultHandler)
+	err := builder.Register(n.unicastProtocols)
+	if err != nil {
+		return fmt.Errorf("could not register unicast protocls")
+	}
 
+	return nil
 }
 
 // IsConnected returns true is address is a direct peer of this node else false
