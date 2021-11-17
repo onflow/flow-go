@@ -53,6 +53,61 @@ func TestHead(t *testing.T) {
 	})
 }
 
+// TestSnapshot_Params tests retrieving global protocol state parameters from
+// a protocol state snapshot.
+func TestSnapshot_Params(t *testing.T) {
+	participants := unittest.IdentityListFixture(5, unittest.WithAllRoles())
+	rootSnapshot := unittest.RootSnapshotFixture(participants)
+
+	expectedChainID, err := rootSnapshot.Params().ChainID()
+	require.NoError(t, err)
+	expectedSporkID, err := rootSnapshot.Params().SporkID()
+	require.NoError(t, err)
+	expectedProtocolVersion, err := rootSnapshot.Params().ProtocolVersion()
+	require.NoError(t, err)
+
+	rootHeader, err := rootSnapshot.Head()
+	require.NoError(t, err)
+
+	util.RunWithFullProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.MutableState) {
+		// build some non-root blocks
+		head := rootHeader
+		const nBlocks = 10
+		for i := 0; i < nBlocks; i++ {
+			next := unittest.BlockWithParentFixture(head)
+			err = state.Extend(context.Background(), &next)
+			require.NoError(t, err)
+			err = state.Finalize(context.Background(), next.ID())
+			require.NoError(t, err)
+			head = next.Header
+		}
+
+		// test params from both root, final, and in between
+		snapshots := []protocol.Snapshot{
+			state.AtHeight(0),
+			state.AtHeight(uint64(rand.Intn(nBlocks))),
+			state.Final(),
+		}
+		for _, snapshot := range snapshots {
+			t.Run("should be able to get chain ID from snapshot", func(t *testing.T) {
+				chainID, err := snapshot.Params().ChainID()
+				require.NoError(t, err)
+				assert.Equal(t, expectedChainID, chainID)
+			})
+			t.Run("should be able to get spork ID from snapshot", func(t *testing.T) {
+				sporkID, err := snapshot.Params().SporkID()
+				require.NoError(t, err)
+				assert.Equal(t, expectedSporkID, sporkID)
+			})
+			t.Run("should be able to get protocol version from snapshot", func(t *testing.T) {
+				protocolVersion, err := snapshot.Params().ProtocolVersion()
+				require.NoError(t, err)
+				assert.Equal(t, expectedProtocolVersion, protocolVersion)
+			})
+		}
+	})
+}
+
 // TestSnapshot_Descendants builds a sample chain with next structure:
 // A (finalized) <- B <- C <- D <- E <- F
 //               <- G <- H <- I <- J
