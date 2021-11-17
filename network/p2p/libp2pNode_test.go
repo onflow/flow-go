@@ -4,11 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
 	"testing"
 	"time"
 
-	golog "github.com/ipfs/go-log"
 	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -18,7 +16,6 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"github.com/stretchr/testify/suite"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
@@ -38,33 +35,9 @@ const defaultAddress = "0.0.0.0:0"
 
 var rootBlockID = unittest.IdentifierFixture()
 
-type LibP2PNodeTestSuite struct {
-	suite.Suite
-	ctx    context.Context
-	cancel context.CancelFunc // used to cancel the context
-	logger zerolog.Logger
-}
-
-// TestLibP2PNodesTestSuite runs all the test methods in this test suit
-func TestLibP2PNodesTestSuite(t *testing.T) {
-	suite.Run(t, new(LibP2PNodeTestSuite))
-}
-
-// SetupTests initiates the test setups prior to each test
-func (suite *LibP2PNodeTestSuite) SetupTest() {
-	suite.logger = zerolog.New(os.Stderr).Level(zerolog.DebugLevel)
-	golog.SetAllLoggers(golog.LevelError)
-	suite.ctx, suite.cancel = context.WithCancel(context.Background())
-}
-
-func (suite *LibP2PNodeTestSuite) TearDownTest() {
-	suite.cancel()
-}
-
-// TestMultiAddress evaluates correct translations from
-// dns and ip4 to libp2p multi-address
-func (suite *LibP2PNodeTestSuite) TestMultiAddress() {
-	key := generateNetworkingKey(suite.T())
+// TestMultiAddress evaluates correct translations from dns and ip4 to libp2p multi-address
+func TestMultiAddress(t *testing.T) {
+	key := generateNetworkingKey(t)
 
 	tt := []struct {
 		identity     *flow.Identity
@@ -86,112 +59,114 @@ func (suite *LibP2PNodeTestSuite) TestMultiAddress() {
 
 	for _, tc := range tt {
 		ip, port, _, err := networkingInfo(*tc.identity)
-		require.NoError(suite.T(), err)
+		require.NoError(t, err)
 
 		actualAddress := MultiAddressStr(ip, port)
-		assert.Equal(suite.T(), tc.multiaddress, actualAddress, "incorrect multi-address translation")
+		assert.Equal(t, tc.multiaddress, actualAddress, "incorrect multi-address translation")
 	}
 
 }
 
-func (suite *LibP2PNodeTestSuite) TestSingleNodeLifeCycle() {
-	// creates a single
-	key := generateNetworkingKey(suite.T())
-	node, _ := NodeFixture(suite.T(), suite.logger, key, rootBlockID, nil, false, defaultAddress)
+// TestSingleNodeLifeCycle evaluates correct lifecycle translation from start to stop the node
+func TestSingleNodeLifeCycle(t *testing.T) {
+	key := generateNetworkingKey(t)
+	node, _ := nodeFixture(t, unittest.Logger(), key, rootBlockID, nil, false, defaultAddress)
 
-	// stops the created node
 	done, err := node.Stop()
-	assert.NoError(suite.T(), err)
-	<-done
+	unittest.RequireCloseBefore(t, done, 100*time.Millisecond, "could not stop node on time")
+	assert.NoError(t, err)
 }
 
 // TestGetPeerInfo evaluates the deterministic translation between the nodes address and
 // their libp2p info. It generates an address, and checks whether repeated translations
 // yields the same info or not.
-func (suite *LibP2PNodeTestSuite) TestGetPeerInfo() {
+func TestGetPeerInfo(t *testing.T) {
 	for i := 0; i < 10; i++ {
-		key := generateNetworkingKey(suite.T())
+		key := generateNetworkingKey(t)
 
 		// creates node-i identity
 		identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress("1.1.1.1:0"))
 
 		// translates node-i address into info
 		info, err := PeerAddressInfo(*identity)
-		require.NoError(suite.T(), err)
+		require.NoError(t, err)
 
 		// repeats the translation for node-i
 		for j := 0; j < 10; j++ {
 			rinfo, err := PeerAddressInfo(*identity)
-			require.NoError(suite.T(), err)
-			assert.True(suite.T(), rinfo.String() == info.String(), "inconsistent id generated")
+			require.NoError(t, err)
+			assert.True(t, rinfo.String() == info.String(), "inconsistent id generated")
 		}
 	}
 }
 
 // TestAddPeers checks if nodes can be added as peers to a given node
-func (suite *LibP2PNodeTestSuite) TestAddPeers() {
+func TestAddPeers(t *testing.T) {
 	count := 3
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// create nodes
-	nodes, identities := NodesFixtureWithHandler(suite.T(), count, nil, false)
-	defer StopNodes(suite.T(), nodes)
+	nodes, identities := nodesFixtureWithHandler(t, count, nil, false)
+	defer stopNodes(t, nodes)
 
 	// add the remaining nodes to the first node as its set of peers
 	for _, identity := range identities[1:] {
 		peerInfo, err := PeerAddressInfo(*identity)
-		require.NoError(suite.T(), err)
-		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, peerInfo))
+		require.NoError(t, err)
+		require.NoError(t, nodes[0].AddPeer(ctx, peerInfo))
 	}
 
 	// Checks if both of the other nodes have been added as peers to the first node
-	assert.Len(suite.T(), nodes[0].host.Network().Peers(), count-1)
+	assert.Len(t, nodes[0].host.Network().Peers(), count-1)
 }
 
 // TestRemovePeers checks if nodes can be removed as peers from a given node
-func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
-
+func TestRemovePeers(t *testing.T) {
 	count := 3
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// create nodes
-	nodes, identities := NodesFixtureWithHandler(suite.T(), count, nil, false)
+	nodes, identities := nodesFixtureWithHandler(t, count, nil, false)
 	peerInfos, errs := peerInfosFromIDs(identities)
-	assert.Len(suite.T(), errs, 0)
-	defer StopNodes(suite.T(), nodes)
+	assert.Len(t, errs, 0)
+	defer stopNodes(t, nodes)
 
 	// add nodes two and three to the first node as its peers
 	for _, pInfo := range peerInfos[1:] {
-		require.NoError(suite.T(), nodes[0].AddPeer(suite.ctx, pInfo))
+		require.NoError(t, nodes[0].AddPeer(ctx, pInfo))
 	}
 
 	// check if all other nodes have been added as peers to the first node
-	assert.Len(suite.T(), nodes[0].host.Network().Peers(), count-1)
+	assert.Len(t, nodes[0].host.Network().Peers(), count-1)
 
 	// disconnect from each peer and assert that the connection no longer exists
 	for _, pInfo := range peerInfos[1:] {
-		require.NoError(suite.T(), nodes[0].RemovePeer(pInfo.ID))
-		assert.Equal(suite.T(), network.NotConnected, nodes[0].host.Network().Connectedness(pInfo.ID))
+		require.NoError(t, nodes[0].RemovePeer(pInfo.ID))
+		assert.Equal(t, network.NotConnected, nodes[0].host.Network().Connectedness(pInfo.ID))
 	}
 }
 
 // TestPing tests that a node can ping another node
-func (suite *LibP2PNodeTestSuite) TestPing() {
+func TestPing(t *testing.T) {
 
 	// creates two nodes
-	nodes, identities := NodesFixtureWithHandler(suite.T(), 2, nil, false)
-	defer StopNodes(suite.T(), nodes)
+	nodes, identities := nodesFixtureWithHandler(t, 2, nil, false)
+	defer stopNodes(t, nodes)
 
 	node1 := nodes[0]
 	node2 := nodes[1]
 	node1Id := *identities[0]
 	node2Id := *identities[1]
 
-	_, expectedVersion, expectedHeight, expectedView := MockPingInfoProvider()
+	_, expectedVersion, expectedHeight, expectedView := mockPingInfoProvider()
 
 	// test node1 can ping node 2
-	testPing(suite.T(), node1, node2Id, expectedVersion, expectedHeight, expectedView)
+	testPing(t, node1, node2Id, expectedVersion, expectedHeight, expectedView)
 
 	// test node 2 can ping node 1
-	testPing(suite.T(), node2, node1Id, expectedVersion, expectedHeight, expectedView)
+	testPing(t, node2, node1Id, expectedVersion, expectedHeight, expectedView)
 }
 
 func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion string, expectedHeight uint64, expectedView uint64) {
@@ -208,24 +183,24 @@ func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion 
 	assert.Equal(t, expectedView, resp.HotstuffView)
 }
 
-func (suite *LibP2PNodeTestSuite) TestConnectionGatingBootstrap() {
+func TestConnectionGatingBootstrap(t *testing.T) {
 	// Create a Node with AllowList = false
-	node, identity := NodesFixtureWithHandler(suite.T(), 1, nil, false)
+	node, identity := nodesFixtureWithHandler(t, 1, nil, false)
 	node1 := node[0]
 	node1Id := identity[0]
-	defer StopNode(suite.T(), node1)
+	defer stopNode(t, node1)
 	node1Info, err := PeerAddressInfo(*node1Id)
-	assert.NoError(suite.T(), err)
+	assert.NoError(t, err)
 
-	suite.Run("updating allowlist of node w/o ConnGater does not crash", func() {
+	t.Run("updating allowlist of node w/o ConnGater does not crash", func(t *testing.T) {
 		// node1 allowlists node1
 		node1.UpdateAllowList(peer.IDSlice{node1Info.ID})
 	})
 }
 
-// NodesFixtureWithHandler creates a number of LibP2PNodes with the given callback function for stream handling.
+// nodesFixtureWithHandler creates a number of LibP2PNodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func NodesFixtureWithHandler(t *testing.T, count int, handler network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
+func nodesFixtureWithHandler(t *testing.T, count int, handler network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*Node
@@ -233,7 +208,7 @@ func NodesFixtureWithHandler(t *testing.T, count int, handler network.StreamHand
 	defer func() {
 		if err != nil && nodes != nil {
 			// stops all nodes upon an error in starting even one single node
-			StopNodes(t, nodes)
+			stopNodes(t, nodes)
 		}
 	}()
 
@@ -242,16 +217,16 @@ func NodesFixtureWithHandler(t *testing.T, count int, handler network.StreamHand
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
 		key := generateNetworkingKey(t)
-		node, identity := NodeFixture(t, unittest.Logger(), key, rootBlockID, handler, allowList, defaultAddress)
+		node, identity := nodeFixture(t, unittest.Logger(), key, rootBlockID, handler, allowList, defaultAddress)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
 	return nodes, identities
 }
 
-// NodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
+// nodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
-func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID flow.Identifier, handler network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
+func nodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID flow.Identifier, handler network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
 
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(address))
 
@@ -264,7 +239,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		handlerFunc = func(network.Stream) {}
 	}
 
-	pingInfoProvider, _, _, _ := MockPingInfoProvider()
+	pingInfoProvider, _, _, _ := mockPingInfoProvider()
 
 	// dns resolver
 	resolver := dns.NewResolver(metrics.NewNoopCollector())
@@ -306,7 +281,7 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	return n, *identity
 }
 
-func MockPingInfoProvider() (*mocknetwork.PingInfoProvider, string, uint64, uint64) {
+func mockPingInfoProvider() (*mocknetwork.PingInfoProvider, string, uint64, uint64) {
 	version := "version_1"
 	height := uint64(5000)
 	view := uint64(10)
@@ -317,15 +292,15 @@ func MockPingInfoProvider() (*mocknetwork.PingInfoProvider, string, uint64, uint
 	return pingInfoProvider, version, height, view
 }
 
-// StopNodes stop all nodes in the input slice
-func StopNodes(t *testing.T, nodes []*Node) {
+// stopNodes stop all nodes in the input slice
+func stopNodes(t *testing.T, nodes []*Node) {
 	for _, n := range nodes {
-		StopNode(t, n)
+		stopNode(t, n)
 	}
 	fmt.Println("[debug] nodes stopped")
 }
 
-func StopNode(t *testing.T, node *Node) {
+func stopNode(t *testing.T, node *Node) {
 	addr := node.host.Addrs()
 	fmt.Printf("[debug] stopping %v\n", addr)
 	done, err := node.Stop()

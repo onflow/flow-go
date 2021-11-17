@@ -22,7 +22,7 @@ func TestRcvCacheTestSuite(t *testing.T) {
 	suite.Run(t, new(RcvCacheTestSuite))
 }
 
-// SetupTest creates a new cache
+// setupTest creates a new cache
 func (r *RcvCacheTestSuite) SetupTest() {
 	const size = 10
 

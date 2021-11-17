@@ -163,7 +163,7 @@ func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
 		}
 
 		// Subscribes to the test topic
-		s, err := n.Subscribe(suite.ctx, topic)
+		s, err := n.Subscribe(topic)
 		require.NoError(suite.T(), err)
 
 		// kick off the reader
@@ -235,7 +235,7 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 
 		connManager := NewConnManager(logger, noopMetrics)
 
-		pingInfoProvider, _, _, _ := MockPingInfoProvider()
+		pingInfoProvider, _, _, _ := mockPingInfoProvider()
 
 		resolver := dns.NewResolver(noopMetrics)
 
@@ -258,7 +258,7 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 	return nodes
 }
 
-// StopNodes stop all nodes in the input slice
+// stopNodes stop all nodes in the input slice
 func (suite *DHTTestSuite) StopNodes(nodes []*Node) {
 	for _, n := range nodes {
 		done, err := n.Stop()

@@ -58,7 +58,7 @@ func TestTopicValidator(t *testing.T) {
 	sub2, err := node2.Subscribe(badTopic, stakedValidator)
 	require.NoError(t, err)
 	// the unstaked node subscribes to the topic WITHOUT the topic validator
-	unstakedSub, err := unstakedNode.Subscribe(context.TODO(), badTopic)
+	unstakedSub, err := unstakedNode.Subscribe(badTopic)
 	require.NoError(t, err)
 
 	// assert that the nodes are connected as expected

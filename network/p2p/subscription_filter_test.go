@@ -39,13 +39,13 @@ func TestFilterSubscribe(t *testing.T) {
 
 	badTopic := engine.TopicFromChannel(engine.SyncCommittee, rootBlockID)
 
-	sub1, err := node1.Subscribe(context.TODO(), badTopic)
+	sub1, err := node1.Subscribe(badTopic)
 	require.NoError(t, err)
 
-	sub2, err := node2.Subscribe(context.TODO(), badTopic)
+	sub2, err := node2.Subscribe(badTopic)
 	require.NoError(t, err)
 
-	unstakedSub, err := unstakedNode.Subscribe(context.TODO(), badTopic)
+	unstakedSub, err := unstakedNode.Subscribe(badTopic)
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
