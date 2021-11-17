@@ -13,6 +13,9 @@ import (
 // Converter provides functionality to convert from request models generated using
 // open api spec and flow models.
 
+const MaxAllowedIDs = 50 // todo(sideninja) discuss if we should restrict maximum on all IDs collection or is anywhere required more thant this
+var MaxAllowedBlockIDs = MaxAllowedIDs
+
 // Flow section - converting request data to flow models with validation.
 
 func toID(id string) (flow.Identifier, error) {
@@ -31,19 +34,18 @@ func toIDs(ids string) ([]flow.Identifier, error) {
 
 	reqIDs := strings.Fields(ids)
 
-	const maxAllowedIDs = 50 // todo(sideninja) discuss if we should restrict maximum on all IDs collection or is anywhere required more thant this
-	if len(reqIDs) > maxAllowedIDs {
-		return nil, fmt.Errorf("at most %d Block IDs can be requested at a time", maxAllowedIDs)
+	if len(reqIDs) > MaxAllowedBlockIDs {
+		return nil, fmt.Errorf("at most %d Block IDs can be requested at a time", MaxAllowedBlockIDs)
 	}
 
 	resIDs := make([]flow.Identifier, len(reqIDs))
-	for _, id := range reqIDs {
+	for i, id := range reqIDs {
 		resID, err := toID(id)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid ID %s", id)
 		}
 
-		resIDs = append(resIDs, resID)
+		resIDs[i] = resID
 	}
 
 	return resIDs, nil

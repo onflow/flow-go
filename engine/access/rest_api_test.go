@@ -123,8 +123,8 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 
 		blocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, nil)
 		require.NoError(suite.T(), err)
-		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
-		assert.Len(suite.T(), blocks, 1)
+		require.Equal(suite.T(), http.StatusOK, resp.StatusCode)
+		require.Len(suite.T(), blocks, 1)
 		assert.Equal(suite.T(), block.ID().String(), blocks[0].Header.Id)
 	})
 
@@ -134,8 +134,8 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		blockIDs := make([]string, rest.MaxAllowedBlockIDsCnt)
-		blocks := make([]*flow.Block, rest.MaxAllowedBlockIDsCnt)
+		blockIDs := make([]string, rest.MaxAllowedBlockIDs)
+		blocks := make([]*flow.Block, rest.MaxAllowedBlockIDs)
 		for i := range blockIDs {
 			id := unittest.IdentifierFixture()
 			blockIDs[i] = id.String()
@@ -150,7 +150,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, nil)
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
-		assert.Len(suite.T(), blocks, rest.MaxAllowedBlockIDsCnt)
+		assert.Len(suite.T(), blocks, rest.MaxAllowedBlockIDs)
 		for i, b := range blocks {
 			assert.Equal(suite.T(), b.ID().String(), actualBlocks[i].Header.Id)
 		}
@@ -187,14 +187,14 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		defer cancel()
 
 		// lower the max allowed block ID count on the server for the test
-		rest.MaxAllowedBlockIDsCnt = 10
-		blockIDs := make([]string, rest.MaxAllowedBlockIDsCnt+1)
+		rest.MaxAllowedBlockIDs = 10
+		blockIDs := make([]string, rest.MaxAllowedBlockIDs+1)
 		for i := range blockIDs {
 			blockIDs[i] = unittest.IdentifierFixture().String()
 		}
 
 		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, nil)
-		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", rest.MaxAllowedBlockIDsCnt))
+		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", rest.MaxAllowedBlockIDs))
 	})
 
 	suite.Run("GetBlockByID with one non-existing block ID", func() {
@@ -203,7 +203,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		blockIDs := make([]string, rest.MaxAllowedBlockIDsCnt)
+		blockIDs := make([]string, rest.MaxAllowedBlockIDs)
 		rand.Seed(time.Now().Unix())
 		invalidBlockIndex := rand.Intn(len(blockIDs))
 		for i := range blockIDs {

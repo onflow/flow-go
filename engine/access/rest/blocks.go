@@ -2,12 +2,14 @@ package rest
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
+	"net/http"
+
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"net/http"
+
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
 // getBlocksByID gets blocks by provided ID or collection of IDs.
@@ -20,14 +22,14 @@ func getBlocksByID(
 ) (interface{}, StatusError) {
 	ids, err := toIDs(vars["id"])
 	if err != nil {
-		return nil, NewBadRequestError("invalid provided IDs", err)
+		return nil, NewBadRequestError(err.Error(), err)
 	}
 
 	blocks := make([]*generated.Block, len(ids))
 	for i, id := range ids {
 		flowBlock, err := backend.GetBlockByID(r.Context(), id)
 		if err != nil {
-			msg := fmt.Sprintf("block with id %s not found", id.String())
+			msg := fmt.Sprintf("block with ID %s not found", id.String())
 			// if error has GRPC code NotFound, then return HTTP NotFound error
 			if status.Code(err) == codes.NotFound {
 				return nil, NewNotFoundError(msg, err)

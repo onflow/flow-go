@@ -29,7 +29,7 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 			Methods(h.method).
 			Path(h.pattern).
 			Name(h.name).
-			HandlerFunc(h.ServeHTTP)
+			Handler(h)
 	}
 
 	return &http.Server{
@@ -41,8 +41,8 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 	}
 }
 
-func apiHandlers(logger zerolog.Logger, backend access.API) []Handler {
-	return []Handler{
+func apiHandlers(logger zerolog.Logger, backend access.API) []*Handler {
+	return []*Handler{
 		// Transactions
 		{
 			logger:      logger,

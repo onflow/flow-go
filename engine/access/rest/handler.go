@@ -4,13 +4,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gorilla/mux"
-	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
-	"github.com/rs/zerolog"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/gorilla/mux"
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
 // Handler is custom http handler implementing custom handler function.
@@ -32,12 +34,17 @@ type Handler struct {
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
+	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
+
 	// execute handler function and check for error
-	response, err := h.handlerFunc(w, r, mux.Vars(r), h.backend, h.logger)
+	response, err := h.handlerFunc(w, r, mux.Vars(r), h.backend, errorLogger)
 	if err != nil {
 		switch e := err.(type) {
 		case StatusError:
-			errorResponse(w, e.Status(), e.Error(), h.logger)
+			errorResponse(w, e.Status(), e.UserMessage(), h.logger)
 		default:
 			errorResponse(w, http.StatusInternalServerError, e.Error(), h.logger)
 		}
@@ -108,7 +115,7 @@ func jsonDecode(body io.ReadCloser, dst interface{}) error {
 			return NewBadRequestError(msg, err)
 
 		case errors.Is(err, io.ErrUnexpectedEOF):
-			msg := fmt.Sprintf("Request body contains badly-formed JSON")
+			msg := "Request body contains badly-formed JSON"
 			return NewBadRequestError(msg, err)
 
 		case errors.As(err, &unmarshalTypeError):
@@ -135,7 +142,7 @@ func jsonDecode(body io.ReadCloser, dst interface{}) error {
 
 	err = dec.Decode(&struct{}{})
 	if err != io.EOF {
-		msg := "Request body must only contain h single JSON object"
+		msg := "Request body must only contain a single JSON object"
 		return NewBadRequestError(msg, err)
 	}
 
@@ -150,6 +157,5 @@ func NotImplemented(
 	_ access.API,
 	_ zerolog.Logger,
 ) (interface{}, StatusError) {
-	err := fmt.Errorf("endpoint not implemented")
-	return nil, NewRestError(http.StatusNotImplemented, err.Error(), err)
+	return nil, NewRestError(http.StatusNotImplemented, "endpoint not implemented", nil)
 }

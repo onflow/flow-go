@@ -1,10 +1,12 @@
 package rest
 
 import (
+	"net/http"
+
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
-	"github.com/rs/zerolog"
-	"net/http"
 )
 
 // getTransactionByID gets a transaction by requested ID.

@@ -4,8 +4,9 @@ import "net/http"
 
 // StatusError provides custom error with http status.
 type StatusError interface {
-	error
-	Status() int
+	error                // this is the actual error that occured
+	Status() int         // the HTTP status code to return
+	UserMessage() string // the error message to return to the client
 }
 
 // RestError is implementation of status error.
@@ -23,6 +24,10 @@ func NewRestError(status int, msg string, err error) *RestError {
 		userMessage: msg,
 		err:         err,
 	}
+}
+
+func (restError *RestError) UserMessage() string {
+	return restError.userMessage
 }
 
 // NewNotFoundError creates a new not found rest error.
