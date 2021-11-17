@@ -168,7 +168,7 @@ func (suite *LibP2PNodeTestSuite) TestRemovePeers() {
 
 	// disconnect from each peer and assert that the connection no longer exists
 	for _, pInfo := range peerInfos[1:] {
-		require.NoError(suite.T(), nodes[0].RemovePeer(suite.ctx, pInfo.ID))
+		require.NoError(suite.T(), nodes[0].RemovePeer(pInfo.ID))
 		assert.Equal(suite.T(), network.NotConnected, nodes[0].host.Network().Connectedness(pInfo.ID))
 	}
 }

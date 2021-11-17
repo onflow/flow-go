@@ -140,7 +140,7 @@ func (n *Node) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
 }
 
 // RemovePeer closes the connection with the peer.
-func (n *Node) RemovePeer(ctx context.Context, peerID peer.ID) error {
+func (n *Node) RemovePeer(peerID peer.ID) error {
 	err := n.host.Network().ClosePeer(peerID)
 	if err != nil {
 		return fmt.Errorf("failed to remove peer %s: %w", peerID, err)
