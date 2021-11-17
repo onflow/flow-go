@@ -75,7 +75,7 @@ func DefaultLibP2PNodeFactory(
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
 	role string,
-	unicastProtocols []unicast.ProtocolName) (LibP2PFactoryFunc, error) {
+	unicastCompressedProtocols []unicast.ProtocolName) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
@@ -102,7 +102,7 @@ func DefaultLibP2PNodeFactory(
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			SetResolver(resolver).
-			SetStreamCompressor(streamFactory).
+			WithUnicastProtocols(unicastCompressedProtocols).
 			Build(ctx)
 	}, nil
 }
@@ -117,7 +117,7 @@ type NodeBuilder interface {
 	SetTopicValidation(bool) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
 	SetResolver(*dns.Resolver) NodeBuilder
-	SetStreamCompressor(p2pstream.UnicastProtocol) NodeBuilder
+	WithUnicastProtocols([]unicast.ProtocolName) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -129,7 +129,7 @@ type DefaultLibP2PNodeBuilder struct {
 	connMngr         connmgr.ConnManager
 	pingInfoProvider PingInfoProvider
 	resolver         *dns.Resolver
-	streamFactory    p2pstream.UnicastProtocol
+	unicastProtocols []unicast.ProtocolName
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
@@ -195,8 +195,8 @@ func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *dns.Resolver) Nod
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetStreamCompressor(streamFactory p2pstream.UnicastProtocol) NodeBuilder {
-	builder.streamFactory = streamFactory
+func (builder *DefaultLibP2PNodeBuilder) WithUnicastProtocols(unicastProtocols []unicast.ProtocolName) NodeBuilder {
+	builder.unicastProtocols = unicastProtocols
 	return builder
 }
 
@@ -207,7 +207,6 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		subs:            make(map[flownet.Topic]*pubsub.Subscription),
 		logger:          builder.logger,
 		topicValidation: builder.topicValidation,
-		streamFactory:   &p2pstream.PlainStream{},
 	}
 
 	if builder.hostMaker == nil {
@@ -254,8 +253,8 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		opts = append(opts, libp2p.MultiaddrResolver(libp2pResolver))
 	}
 
-	if builder.streamFactory != nil {
-		node.streamFactory = builder.streamFactory
+	if builder.unicastProtocols != nil {
+		node.unicastProtocols = builder.unicastProtocols
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -275,7 +274,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 			return nil, err
 		}
 		node.dht = kdht
-		builder.pubSubOpts = append(builder.pubSubOpts, WithDHTDiscovery(kdht))
+		builder.pubSubOpts = append(builder.pubSubOpts, withDHTDiscovery(kdht))
 	}
 
 	if builder.pingInfoProvider != nil {
@@ -325,7 +324,7 @@ type Node struct {
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
-	streamFactory        p2pstream.UnicastProtocol
+	unicastProtocols     []unicast.ProtocolName
 	pingService          *PingService
 	connMgr              connmgr.ConnManager
 	dht                  *dht.IpfsDHT
@@ -702,6 +701,10 @@ func (n *Node) SetFlowProtocolStreamHandler(handler libp2pnet.StreamHandler) {
 	})
 }
 
+func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler) {
+
+}
+
 // IsConnected returns true is address is a direct peer of this node else false
 func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
 	isConnected := n.host.Network().Connectedness(peerID) == libp2pnet.Connected
@@ -798,7 +801,7 @@ func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 	}
 }
 
-func WithDHTDiscovery(kdht *dht.IpfsDHT) PubsubOption {
+func withDHTDiscovery(kdht *dht.IpfsDHT) PubsubOption {
 	return func(ctx context.Context, host host.Host) (pubsub.Option, error) {
 		routingDiscovery := discovery.NewRoutingDiscovery(kdht)
 		return pubsub.WithDiscovery(routingDiscovery), nil
