@@ -20,21 +20,27 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// retryMaxPublish is the maximum number of times the broker will attempt to broadcast
-// a message or publish a result
-const retryMaxPublish = 8
+const (
+	// retryMaxPublish is the maximum number of times the broker will attempt to broadcast
+	// a message or publish a result
+	retryMaxPublish = 8
 
-// retryMaxRead is the max number of times the broker will attempt to read messages
-const retryMaxRead = 3
+	// retryMaxRead is the max number of times the broker will attempt to read messages
+	retryMaxRead = 3
 
-// retryMilliseconds is the number of milliseconds to wait between retries
-const retryMilliseconds = 1000 * time.Millisecond
+	// retryDuration is the initial duration to wait between retries for all retryable
+	// requests - increases exponentially for subsequent retries
+	retryDuration = 1000 * time.Millisecond
+
+	// retryJitterPercent is the percentage jitter to introduce to each retry interval
+	// for all retryable requests
+	retryJitterPercent = 25 // 25%
+)
 
 // Broker is an implementation of the DKGBroker interface which is intended to
-// be used in conjuction with the DKG MessagingEngine for private messages, and
+// be used in conjunction with the DKG MessagingEngine for private messages, and
 // with the DKG smart-contract for broadcast messages.
 type Broker struct {
-	sync.Mutex
 	log                     zerolog.Logger
 	unit                    *engine.Unit
 	dkgInstanceID           string                     // unique identifier of the current dkg run (prevent replay attacks)
@@ -48,7 +54,11 @@ type Broker struct {
 	broadcastMsgCh          chan messages.DKGMessage   // channel to forward incoming broadcast messages to consumers
 	messageOffset           uint                       // offset for next broadcast messages to fetch
 	shutdownCh              chan struct{}              // channel to stop the broker from listening
-	broadcasts              uint                       // broadcasts counts the number of successful broadcasts
+
+	broadcasts    uint       // broadcasts counts the number of successful broadcasts
+	broadcastLock sync.Mutex // protects access to broadcasts count variable
+
+	pollLock sync.Mutex // lock around polls to read inbound broadcasts
 }
 
 // NewBroker instantiates a new epoch-specific broker capable of communicating
@@ -126,7 +136,7 @@ func (b *Broker) Broadcast(data []byte) {
 		// NOTE: We're counting the number of times the underlying DKG
 		// requested a broadcast so we can detect an unhappy path. Thus incrementing
 		// broadcasts before we perform the broadcasts is okay.
-		b.unit.Lock()
+		b.broadcastLock.Lock()
 		if b.broadcasts > 0 {
 			// The Warn log is used by the integration tests to check if this method
 			// is called more than once within one epoch.
@@ -135,21 +145,22 @@ func (b *Broker) Broadcast(data []byte) {
 			b.log.Info().Msgf("DKG message broadcast with header %d", data[0])
 		}
 		b.broadcasts++
-		b.unit.Unlock()
+		b.broadcastLock.Unlock()
 
 		bcastMsg, err := b.prepareBroadcastMessage(data)
 		if err != nil {
 			b.log.Fatal().Err(err).Msg("failed to create broadcast message")
 		}
 
-		expRetry, err := retry.NewExponential(retryMilliseconds)
+		expRetry, err := retry.NewExponential(retryDuration)
 		if err != nil {
 			b.log.Fatal().Err(err).Msg("create retry mechanism")
 		}
 		maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
+		backoff := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
 
 		attempts := 1
-		err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
+		err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 			err := b.dkgContractClient().Broadcast(bcastMsg)
 			if err != nil {
 				b.log.Error().Err(err).Msgf("error broadcasting, retrying (%d)", attempts)
@@ -205,18 +216,23 @@ func (b *Broker) GetBroadcastMsgCh() <-chan messages.DKGMessage {
 // block whose seal is finalized. The function doesn't return until the received
 // messages are processed by the consumer because b.msgCh is not buffered.
 func (b *Broker) Poll(referenceBlock flow.Identifier) error {
-	b.Lock()
-	defer b.Unlock()
 
-	expRetry, err := retry.NewExponential(retryMilliseconds)
+	// We only issue one poll at a time to avoid delivering duplicate broadcast messages.
+	// The messageOffset determines which messages are retrieved by a Poll,
+	// and is not updated until the end of this function.
+	b.pollLock.Lock()
+	defer b.pollLock.Unlock()
+
+	expRetry, err := retry.NewExponential(retryDuration)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
 	maxedExpRetry := retry.WithMaxRetries(retryMaxRead, expRetry)
+	backoff := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
 
 	var msgs []messages.BroadcastDKGMessage
 	attempts := 0
-	err = retry.Do(b.unit.Ctx(), maxedExpRetry, func(ctx context.Context) error {
+	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 		attempts++
 		// retry with next fallback client after 2 failed attempts
 		if attempts%2 == 0 {
@@ -232,7 +248,7 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 		return nil
 	})
 	// Various network conditions can result in errors while reading DKG messages
-	// We will read any messages during the next poll because messageOffset is not increased
+	// We will read any missed messages during the next poll because messageOffset is not increased
 	if err != nil {
 		b.log.Error().Err(err).Msg("failed to read messages")
 		return nil
@@ -241,30 +257,36 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	for _, msg := range msgs {
 		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
+			// CAUTION: potential slashable offense
 			b.log.Error().Err(err).Msg("bad broadcast message")
 			continue
 		}
 		if !ok {
-			b.log.Debug().Msg("invalid signature on broadcast dkg message")
+			// CAUTION: potential slashable offense
+			b.log.Error().Msg("invalid signature on broadcast dkg message")
 			continue
 		}
 		b.log.Debug().Msgf("forwarding broadcast message to controller")
 		b.broadcastMsgCh <- msg.DKGMessage
 	}
+
+	// update message offset to use for future polls, this avoids forwarding the
+	// same message more than once
 	b.messageOffset += uint(len(msgs))
 	return nil
 }
 
 // SubmitResult publishes the result of the DKG protocol to the smart contract.
 func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.PublicKey) error {
-	expRetry, err := retry.NewExponential(retryMilliseconds)
+	expRetry, err := retry.NewExponential(retryDuration)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
 	maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
+	backoff := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
 
 	attempts := 0
-	err = retry.Do(context.Background(), maxedExpRetry, func(ctx context.Context) error {
+	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
 		attempts++
 		// retry with next fallback client after 2 failed attempts
 		if attempts%2 == 0 {
@@ -361,6 +383,12 @@ func (b *Broker) prepareBroadcastMessage(data []byte) (messages.BroadcastDKGMess
 
 // verifyBroadcastMessage checks the DKG instance and Origin of a broadcast
 // message, as well as the signature against the staking key of the sender.
+// Returns:
+// * true, nil if the message contents are valid and have a valid signature
+// * false, nil if the message contents are valid but have an invalid signature
+// * false, err if the message contents are invalid, or could not be checked,
+//   or the signature could not be checked
+// TODO differentiate errors
 func (b *Broker) verifyBroadcastMessage(bcastMsg messages.BroadcastDKGMessage) (bool, error) {
 	err := b.checkMessageInstanceAndOrigin(bcastMsg.DKGMessage)
 	if err != nil {
