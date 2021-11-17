@@ -17,10 +17,12 @@ func NewRestAPIServer(api *APIHandler, listenAddress string, logger zerolog.Logg
 	router := mux.NewRouter().StrictSlash(true)
 	v1Subrouter := router.PathPrefix("/v1").Subrouter()
 
+	lm := NewLoggingMiddleware(logger)
 	// common middlewares for all request
-	v1Subrouter.Use(LoggingMiddleware(logger))
+	v1Subrouter.Use(lm.RequestStart())
 	v1Subrouter.Use(ExpandableMiddleware())
 	v1Subrouter.Use(SelectMiddleware())
+	v1Subrouter.Use(lm.RequestEnd())
 
 	for _, route := range apiRoutes(api) {
 		v1Subrouter.
