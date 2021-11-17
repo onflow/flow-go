@@ -277,7 +277,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 // customized with options
 func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host,
 	error) {
-	defaultOptions, err := DefaultLibP2POptions(address, key)
+	defaultOptions, err := defaultLibP2POptions(address, key)
 	if err != nil {
 		return nil, err
 	}
@@ -293,8 +293,8 @@ func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateK
 	return libP2PHost, nil
 }
 
-// DefaultLibP2POptions creates and returns the standard LibP2P host options that are used for the Flow Libp2p network
-func DefaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Option, error) {
+// defaultLibP2POptions creates and returns the standard LibP2P host options that are used for the Flow Libp2p network
+func defaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Option, error) {
 
 	libp2pKey, err := keyutils.LibP2PPrivKeyFromFlow(key)
 	if err != nil {
