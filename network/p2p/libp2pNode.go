@@ -199,7 +199,7 @@ func (n *Node) GetIPPort() (string, string, error) {
 // Subscribe subscribes the node to the given topic and returns the subscription
 // Currently only one subscriber is allowed per topic.
 // NOTE: A node will receive its own published messages.
-func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ...validator.MessageValidator) (*pubsub.Subscription, error) {
+func (n *Node) Subscribe(topic flownet.Topic, validators ...validator.MessageValidator) (*pubsub.Subscription, error) {
 	n.Lock()
 	defer n.Unlock()
 

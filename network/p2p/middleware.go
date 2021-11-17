@@ -410,7 +410,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 		validators = append(validators, psValidator.StakedValidator(m.ov.Identity))
 	}
 
-	s, err := m.libP2PNode.Subscribe(m.ctx, topic, validators...)
+	s, err := m.libP2PNode.Subscribe(topic, validators...)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
 	}

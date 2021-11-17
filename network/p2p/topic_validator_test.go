@@ -53,9 +53,9 @@ func TestTopicValidator(t *testing.T) {
 	require.NoError(t, unstakedNode.AddPeer(context.TODO(), *host.InfoFromHost(node1.host)))
 
 	// node1 and node2 subscribe to the topic with the topic validator
-	sub1, err := node1.Subscribe(context.TODO(), badTopic, stakedValidator)
+	sub1, err := node1.Subscribe(badTopic, stakedValidator)
 	require.NoError(t, err)
-	sub2, err := node2.Subscribe(context.TODO(), badTopic, stakedValidator)
+	sub2, err := node2.Subscribe(badTopic, stakedValidator)
 	require.NoError(t, err)
 	// the unstaked node subscribes to the topic WITHOUT the topic validator
 	unstakedSub, err := unstakedNode.Subscribe(context.TODO(), badTopic)
