@@ -389,11 +389,13 @@ func Test_DifferentiateEmptyVsLeaf(t *testing.T) {
 	updatedPaths := append(leftSubTriePath, unallocatedRegister)
 	updatedPayloads := []ledger.Payload{*ledger.EmptyPayload(), *ledger.EmptyPayload()}
 	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(startTrie, updatedPaths, updatedPayloads, true)
+	require.NoError(t, err)
 
 	// The updated trie should equal to a trie containing only the right sub-Trie
 	expectedUpdatedRootHashHex := "576e12a7ef5c760d5cc808ce50e9297919b21b87656b0cc0d9fe8a1a589cf42c"
 	require.Equal(t, expectedUpdatedRootHashHex, hashToString(updatedTrie.RootHash()))
 	referenceTrie, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), rightSubTriePath, rightSubTriePayload, true)
+	require.NoError(t, err)
 	require.Equal(t, expectedUpdatedRootHashHex, hashToString(referenceTrie.RootHash()))
 }
 

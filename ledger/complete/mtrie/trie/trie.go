@@ -294,12 +294,12 @@ func update(
 		wg.Wait()
 	}
 
-	if !parentNode.IsLeaf() {
-		// mitigate storage exhaustion attack: avoids creating a new node when the exact same
-		// payload is re-written at a register.
-		if lChild == lchildParent && rChild == rchildParent {
-			return parentNode
-		}
+	// mitigate storage exhaustion attack: avoids creating a new node when the exact same
+	// payload is re-written at a register. CAUTION: we only check that the children are
+	// unchanged. This is only sufficient for interim nodes (for leaf nodes, the children
+	// might be unachged, i.e. both nil, but the payload could have changed).
+	if !parentNode.IsLeaf() && lChild == lchildParent && rChild == rchildParent {
+		return parentNode
 	}
 
 	// In case the parent node was a leaf, we _cannot reuse_ it, because we potentially
