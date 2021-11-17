@@ -46,6 +46,14 @@ func (p *Params) ChainID() (flow.ChainID, error) {
 	return p.state.root.Header.ChainID, nil
 }
 
+func (p *Params) SporkID() (flow.Identifier, error) {
+	return flow.ZeroID, fmt.Errorf("not implemented")
+}
+
+func (p *Params) ProtocolVersion() (uint, error) {
+	return 0, fmt.Errorf("not implemented")
+}
+
 func (p *Params) Root() (*flow.Header, error) {
 	return p.state.root.Header, nil
 }

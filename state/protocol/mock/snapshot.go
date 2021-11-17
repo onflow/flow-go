@@ -145,6 +145,22 @@ func (_m *Snapshot) Identity(nodeID flow.Identifier) (*flow.Identity, error) {
 	return r0, r1
 }
 
+// Params provides a mock function with given fields:
+func (_m *Snapshot) Params() protocol.GlobalParams {
+	ret := _m.Called()
+
+	var r0 protocol.GlobalParams
+	if rf, ok := ret.Get(0).(func() protocol.GlobalParams); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(protocol.GlobalParams)
+		}
+	}
+
+	return r0
+}
+
 // Phase provides a mock function with given fields:
 func (_m *Snapshot) Phase() (flow.EpochPhase, error) {
 	ret := _m.Called()

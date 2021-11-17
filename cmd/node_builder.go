@@ -168,6 +168,7 @@ type NodeConfig struct {
 	RootResult                    *flow.ExecutionResult
 	RootSeal                      *flow.Seal
 	RootChainID                   flow.ChainID
+	SporkID                       flow.Identifier
 	SkipNwAddressBasedValidations bool
 }
 

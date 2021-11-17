@@ -1,14 +1,11 @@
 package middleware
 
 import (
-	"context"
 	"net/http"
 	"strings"
 
 	"github.com/gorilla/mux"
 )
-
-type ctxKeyType string
 
 const expandQueryParam = "expand"
 const selectQueryParam = "select"
@@ -24,8 +21,7 @@ func commonQueryParamMiddleware(queryParamName string) mux.MiddlewareFunc {
 			if values, ok := req.URL.Query()[queryParamName]; ok {
 				values := strings.Split(values[0], ",")
 				// save the query param value in the request context
-				contextKey := ctxKeyType(queryParamName)
-				req = req.WithContext(context.WithValue(req.Context(), contextKey, values))
+				req = addRequestAttribute(req, queryParamName, values)
 			}
 			handler.ServeHTTP(w, req)
 		})
@@ -42,16 +38,19 @@ func QuerySelect() mux.MiddlewareFunc {
 	return commonQueryParamMiddleware(selectQueryParam)
 }
 
-func getField(ctx context.Context, key string) ([]string, bool) {
-	contextKey := ctxKeyType(key)
-	u, ok := ctx.Value(contextKey).([]string)
-	return u, ok
+func getField(req *http.Request, key string) ([]string, bool) {
+	value, found := getRequestAttribute(req, key)
+	if !found {
+		return nil, false
+	}
+	valueAsStringSlice, ok := value.([]string)
+	return valueAsStringSlice, ok
 }
 
-func GetFieldsToExpand(ctx context.Context) ([]string, bool) {
-	return getField(ctx, expandQueryParam)
+func GetFieldsToExpand(req *http.Request) ([]string, bool) {
+	return getField(req, expandQueryParam)
 }
 
-func GetFieldsToSelect(ctx context.Context) ([]string, bool) {
-	return getField(ctx, selectQueryParam)
+func GetFieldsToSelect(req *http.Request) ([]string, bool) {
+	return getField(req, selectQueryParam)
 }
