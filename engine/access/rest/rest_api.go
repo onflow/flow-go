@@ -73,7 +73,7 @@ func (restAPI *APIHandler) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 			restAPI.errorResponse(w, http.StatusInternalServerError, fmt.Sprintf("failed to look up block with ID %s", id), errorLogger)
 			return
 		}
-		blocks[i] = toBlock(flowBlock)
+		blocks[i] = blockResponse(flowBlock)
 	}
 
 	restAPI.jsonResponse(w, blocks, errorLogger)

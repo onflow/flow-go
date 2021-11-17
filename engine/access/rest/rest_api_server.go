@@ -6,9 +6,8 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/engine/access/rest/generated"
+	"github.com/rs/zerolog"
 )
 
 // NewRestAPIServer returns an HTTP server initialized with the REST API handler
