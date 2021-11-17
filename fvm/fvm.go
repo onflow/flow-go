@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
 	"github.com/rs/zerolog"
 
 	errors "github.com/onflow/flow-go/fvm/errors"
@@ -49,21 +48,6 @@ func (vm *VirtualMachine) Run(ctx Context, proc Procedure, v state.View, program
 		state.WithMaxValueSizeAllowed(ctx.MaxStateValueSize),
 		state.WithMaxInteractionSizeAllowed(ctx.MaxStateInteractionSize))
 	sth := state.NewStateHolder(st)
-
-	defer func() {
-		if r := recover(); r != nil {
-
-			// Cadence may fail to encode certain values.
-			// Return an error for now, which will cause transactions to revert.
-			//
-			if encodingErr, ok := r.(interpreter.EncodingUnsupportedValueError); ok {
-				err = errors.NewEncodingUnsupportedValueError(encodingErr.Value, encodingErr.Path)
-				return
-			}
-
-			panic(r)
-		}
-	}()
 
 	err = proc.Run(vm, ctx, sth, programs)
 	if err != nil {
