@@ -12,11 +12,11 @@ import (
 )
 
 type StreamFactory interface {
-	SetStreamHandler(pid protocol.ID, handler network.StreamHandler)
-	DialAddress(pid protocol.ID) []multiaddr.Multiaddr
-	ClearBackoff(pid peer.ID)
-	Connect(ctx context.Context, pi peer.AddrInfo) error
-	NewStream(ctx context.Context, p peer.ID, pids ...protocol.ID) (network.Stream, error)
+	SetStreamHandler(protocol.ID, network.StreamHandler)
+	DialAddress(peer.ID) []multiaddr.Multiaddr
+	ClearBackoff(peer.ID)
+	Connect(context.Context, peer.AddrInfo) error
+	NewStream(context.Context, peer.ID, ...protocol.ID) (network.Stream, error)
 }
 
 type LibP2PStreamFactory struct {
