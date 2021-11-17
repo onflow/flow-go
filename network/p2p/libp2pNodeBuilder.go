@@ -110,7 +110,7 @@ func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcr
 	return &DefaultLibP2PNodeBuilder{
 		id: id,
 		pubSubMaker: func(ctx context.Context, h host.Host, opts ...pubsub.Option) (*pubsub.PubSub, error) {
-			return DefaultPubSub(ctx, h, opts...)
+			return defaultPubSub(ctx, h, opts...)
 		},
 		hostMaker: func(ctx context.Context, opts ...config.Option) (host.Host, error) {
 			return DefaultLibP2PHost(ctx, address, flowKey, opts...)
@@ -332,8 +332,8 @@ func DefaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	return options, nil
 }
 
-// DefaultPubSub returns initializes and returns a GossipSub object for the given libp2p host and options
-func DefaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Option) (*pubsub.PubSub, error) {
+// defaultPubSub returns initializes and returns a GossipSub object for the given libp2p host and options
+func defaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Option) (*pubsub.PubSub, error) {
 	// Creating a new PubSub instance of the type GossipSub with psOption
 	pubSub, err := pubsub.NewGossipSub(ctx, host, psOption...)
 	if err != nil {
