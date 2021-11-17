@@ -31,7 +31,7 @@ func PingProtocolId(rootBlockID flow.Identifier) protocol.ID {
 	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID.String())
 }
 
-type ProtocolBuilder struct {
+type Manager struct {
 	logger         zerolog.Logger
 	host           host.Host
 	unicasts       []Protocol
@@ -39,41 +39,38 @@ type ProtocolBuilder struct {
 	rootBlockId    flow.Identifier
 }
 
-func NewProtocolBuilder(logger zerolog.Logger, host host.Host, rootBlockId flow.Identifier) *ProtocolBuilder {
-
-	builder := &ProtocolBuilder{
+func NewUnicastManager(logger zerolog.Logger, host host.Host, rootBlockId flow.Identifier) *Manager {
+	return &Manager{
 		logger:      logger,
 		host:        host,
 		rootBlockId: rootBlockId,
 	}
-
-	return builder
 }
 
-func (builder *ProtocolBuilder) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
-	defaultProtocolID := FlowProtocolID(builder.rootBlockId)
-	builder.defaultHandler = defaultHandler
+func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
+	defaultProtocolID := FlowProtocolID(m.rootBlockId)
+	m.defaultHandler = defaultHandler
 
-	builder.unicasts = []Protocol{
+	m.unicasts = []Protocol{
 		&PlainStream{
 			protocolId: defaultProtocolID,
 			handler:    defaultHandler,
 		},
 	}
 
-	builder.host.SetStreamHandler(defaultProtocolID, defaultHandler)
+	m.host.SetStreamHandler(defaultProtocolID, defaultHandler)
 }
 
-func (builder *ProtocolBuilder) Register(unicast ProtocolName) error {
+func (m *Manager) Register(unicast ProtocolName) error {
 	factory, err := ToProtocolFactory(unicast)
 	if err != nil {
 		return fmt.Errorf("could not translate protocol name into factory: %w", err)
 	}
 
-	u := factory(builder.logger, builder.rootBlockId, builder.defaultHandler)
+	u := factory(m.logger, m.rootBlockId, m.defaultHandler)
 
-	builder.unicasts = append(builder.unicasts, u)
-	builder.host.SetStreamHandler(u.ProtocolId(), u.Handler())
+	m.unicasts = append(m.unicasts, u)
+	m.host.SetStreamHandler(u.ProtocolId(), u.Handler())
 
 	return nil
 }
@@ -84,11 +81,11 @@ func (builder *ProtocolBuilder) Register(unicast ProtocolName) error {
 //
 // Note that in case an existing TCP connection underneath to `peerID` exists, that connection is utilized for creating a new stream.
 // The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
-func (builder *ProtocolBuilder) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
+func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	var errs error
 
-	for i := len(builder.unicasts) - 1; i >= 0; i-- {
-		s, addrs, err := builder.createStreamWithProtocol(ctx, builder.unicasts[i].ProtocolId(), peerID, maxAttempts)
+	for i := len(m.unicasts) - 1; i >= 0; i-- {
+		s, addrs, err := m.createStreamWithProtocol(ctx, m.unicasts[i].ProtocolId(), peerID, maxAttempts)
 		if err != nil {
 			errs = multierror.Append(errs, err)
 			continue
@@ -101,7 +98,7 @@ func (builder *ProtocolBuilder) CreateStream(ctx context.Context, peerID peer.ID
 	return nil, nil, fmt.Errorf("could not create stream on any available unicast protocol: %w", errs)
 }
 
-func (builder *ProtocolBuilder) createStreamWithProtocol(ctx context.Context,
+func (m *Manager) createStreamWithProtocol(ctx context.Context,
 	protocolID protocol.ID,
 	peerID peer.ID,
 	maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
@@ -124,7 +121,7 @@ func (builder *ProtocolBuilder) createStreamWithProtocol(ctx context.Context,
 		// Hence, explicitly cancel the dial back off (if any) and try connecting again
 
 		// cancel the dial back off (if any), since we want to connect immediately
-		network := builder.host.Network()
+		network := m.host.Network()
 		dialAddr = network.Peerstore().Addrs(peerID)
 		if swm, ok := network.(*swarm.Swarm); ok {
 			swm.Backoff().Clear(peerID)
@@ -138,7 +135,7 @@ func (builder *ProtocolBuilder) createStreamWithProtocol(ctx context.Context,
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
-		err := builder.host.Connect(ctx, peer.AddrInfo{ID: peerID})
+		err := m.host.Connect(ctx, peer.AddrInfo{ID: peerID})
 		if err != nil {
 
 			// if the connection was rejected due to invalid node id, skip the re-attempt
@@ -156,7 +153,7 @@ func (builder *ProtocolBuilder) createStreamWithProtocol(ctx context.Context,
 		}
 
 		// creates stream using stream factory
-		s, err = builder.host.NewStream(ctx, peerID, protocolID)
+		s, err = m.host.NewStream(ctx, peerID, protocolID)
 		if err != nil {
 			// if the stream creation failed due to invalid protocol id, skip the re-attempt
 			if strings.Contains(err.Error(), "protocol not supported") {

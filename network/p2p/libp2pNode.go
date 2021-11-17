@@ -243,7 +243,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, err
 	}
 	node.host = libp2pHost
-	node.unicastManager = unicast.NewProtocolBuilder(builder.logger, node.host, *builder.rootBlockID)
+	node.unicastManager = unicast.NewUnicastManager(builder.logger, node.host, *builder.rootBlockID)
 
 	node.pCache, err = newProtocolPeerCache(node.logger, libp2pHost)
 	if err != nil {
@@ -297,7 +297,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	sync.Mutex
-	unicastManager       *unicast.ProtocolBuilder
+	unicastManager       *unicast.Manager
 	connGater            *ConnGater                             // used to provide white listing
 	host                 host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
 	pubSub               *pubsub.PubSub                         // reference to the libp2p PubSub component

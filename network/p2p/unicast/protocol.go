@@ -13,7 +13,6 @@ import (
 
 // Flow Libp2p protocols
 const (
-
 	// FlowLibP2PProtocolCommonPrefix is the common prefix for all Libp2p protocol IDs used for Flow
 	// ALL Flow libp2p protocols must start with this prefix.
 	FlowLibP2PProtocolCommonPrefix = "/flow"
