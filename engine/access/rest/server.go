@@ -19,7 +19,7 @@ func NewServer(handlers *Handlers, listenAddress string, logger zerolog.Logger) 
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
-	lm := NewLoggingMiddleware(logger)
+	lm := middleware.NewLoggingMiddleware(logger)
 	// common middleware for all request
 	v1SubRouter.Use(lm.RequestStart())
 	v1SubRouter.Use(middleware.QueryExpandable())

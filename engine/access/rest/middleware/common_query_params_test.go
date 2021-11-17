@@ -97,11 +97,11 @@ type testHandler struct {
 
 func (th *testHandler) getHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		actualExpandList, expandListPopulated := GetFieldsToExpand(r.Context())
+		actualExpandList, expandListPopulated := GetFieldsToExpand(r)
 		require.Equal(th.t, len(th.expectedExpandList), len(actualExpandList))
 		require.Equal(th.t, len(th.expectedExpandList) != 0, expandListPopulated)
 
-		actualSelectList, selectListPopulated := GetFieldsToSelect(r.Context())
+		actualSelectList, selectListPopulated := GetFieldsToSelect(r)
 		require.Equal(th.t, len(th.expectedSelectList), len(actualSelectList))
 		require.Equal(th.t, len(th.expectedSelectList) != 0, selectListPopulated)
 
