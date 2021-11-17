@@ -295,7 +295,7 @@ func main() {
 						return err
 					}
 					if !hasRandomBeaconKey {
-						return fmt.Errorf("no DKG private key for epoch %v", counter)
+						return fmt.Errorf("no random beacon private key for epoch %v", counter)
 					}
 					return nil
 				}

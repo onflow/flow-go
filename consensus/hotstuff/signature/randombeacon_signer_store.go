@@ -58,7 +58,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	if ok {
 		// A nil key means that we don't have a Random Beacon key for this epoch.
 		if key == nil {
-			return nil, fmt.Errorf("did not complete DKG for epoch %v, at view %v: %w",
+			return nil, fmt.Errorf("DKG for epoch %v failed, at view %v: %w",
 				epoch, view, module.DKGFailError)
 		}
 		return key, nil
@@ -66,7 +66,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 
 	privBeaconKeyData, hasRandomBeaconKey, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
 	if err != nil {
-		return nil, fmt.Errorf("could not retrieve DKG private key for epoch counter %v, at view %v, err: %w",
+		return nil, fmt.Errorf("could not retrieve random beacon private key for epoch counter %v, at view %v, err: %w",
 			epoch, view, err)
 	}
 
@@ -75,7 +75,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	// is called again for the same epoch, we don't need to query database.
 	if !hasRandomBeaconKey {
 		s.writeKey(epoch, nil)
-		return nil, fmt.Errorf("didn't complete DKG for epoch %v, at view %v: %w",
+		return nil, fmt.Errorf("DKG for epoch %v failed, at view %v: %w",
 			epoch, view, module.DKGFailError)
 	}
 
