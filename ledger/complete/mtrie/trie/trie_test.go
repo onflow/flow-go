@@ -346,7 +346,7 @@ func TestSplitByPath(t *testing.T) {
 //         of its child-subtries were affected by the update.
 //    (ii) If the vertex is a leaf, only checking that neither child-subtries were affected by the update is insufficient.
 //         This is because the register the leaf represents might itself be affected by the update.
-//    Condition (ii) is particularly subtle, if there are register updates in the subtie of the leaf:
+//    Condition (ii) is particularly subtle, if there are register updates in the subtrie of the leaf:
 //     * From an API perspective, it is a legal operation to set an unallocated register to nil (essentially a no-op).
 //     * Though, the Trie-update algorithm only realizes that the register is already unallocated, once it traverses
 //       into the respective sub-trie. When bubbling up from the recursion, nothing has changed in the children of ■
