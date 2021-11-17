@@ -12,7 +12,7 @@ import (
 // The implementation wraps the hotstuff.RandomBeaconInspector and translates the signer identity into signer index.
 // It has knowledge about DKG to be able to map signerID to signerIndex
 type RandomBeaconReconstructor struct {
-	hotstuff.RandomBeaconInspector              // a stateful object for this block. It's used for both storing all sig shares and producing the node's own share by signing the block
+	hotstuff.RandomBeaconInspector              // a stateful object for this epoch. It's used for both verifying all sig shares and reconstructing the threshold signature.
 	dkg                            hotstuff.DKG // to lookup signer index by signer ID
 }
 
