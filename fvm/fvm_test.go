@@ -1833,18 +1833,14 @@ func TestBLSMultiSignature(t *testing.T) {
 		name       string
 		seedLength int
 		algorithm  crypto.SigningAlgorithm
-		hasher     func() hash.Hasher
-	}
-
-	kmac := func() hash.Hasher {
-		return crypto.NewBLSKMAC("test tag")
 	}
 
 	signatureAlgorithms := []signatureAlgorithm{
-		{"BLS_BLS12_381", crypto.KeyGenSeedMinLenBLSBLS12381, crypto.BLSBLS12381, kmac},
-		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256, hash.NewSHA3_256},
-		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1, hash.NewSHA3_256},
+		{"BLS_BLS12_381", crypto.KeyGenSeedMinLenBLSBLS12381, crypto.BLSBLS12381},
+		{"ECDSA_P256", crypto.KeyGenSeedMinLenECDSAP256, crypto.ECDSAP256},
+		{"ECDSA_secp256k1", crypto.KeyGenSeedMinLenECDSASecp256k1, crypto.ECDSASecp256k1},
 	}
+	BLSsignatureAlgorithm := signatureAlgorithms[0]
 
 	randomSK := func(t *testing.T, signatureAlgorithm signatureAlgorithm) crypto.PrivateKey {
 		seed := make([]byte, signatureAlgorithm.seedLength)
@@ -1856,8 +1852,8 @@ func TestBLSMultiSignature(t *testing.T) {
 		return sk
 	}
 
-	testVerifyPoPWithAlgo := func(signatureAlgorithm signatureAlgorithm) {
-		t.Run(signatureAlgorithm.name+"/verifyBLSPoP", newVMTest().run(
+	testVerifyPoPWithAlgo := func() {
+		t.Run("verifyBLSPoP", newVMTest().run(
 			func(
 				t *testing.T,
 				vm *fvm.VirtualMachine,
@@ -1867,9 +1863,10 @@ func TestBLSMultiSignature(t *testing.T) {
 				programs *programs.Programs,
 			) {
 
-				code := []byte(
-					fmt.Sprintf(
-						`
+				code := func(signatureAlgorithm signatureAlgorithm) []byte {
+					return []byte(
+						fmt.Sprintf(
+							`
 								import Crypto
 		
 								pub fun main(
@@ -1883,63 +1880,87 @@ func TestBLSMultiSignature(t *testing.T) {
 									return p.verifyPoP(proof)
 								}
 								`,
-						signatureAlgorithm.name,
-					),
-				)
-				t.Run("correct key", func(t *testing.T) {
+							signatureAlgorithm.name,
+						),
+					)
+				}
 
-					sk := randomSK(t, signatureAlgorithm)
+				t.Run("valid and correct BLS key", func(t *testing.T) {
+
+					sk := randomSK(t, BLSsignatureAlgorithm)
 					publicKey := testutil.BytesToCadenceArray(
 						sk.PublicKey().Encode(),
 					)
 
-					var proof []byte
-					switch signatureAlgorithm.algorithm {
-					case crypto.BLSBLS12381:
-						var err error
-						proof, err = crypto.BLSGeneratePOP(sk)
-						require.NoError(t, err)
-					case crypto.ECDSAP256, crypto.ECDSASecp256k1:
-						// this test is going to error, so it doesn't matter what we use
-						proof = sk.Encode()
-					}
-
+					proof, err := crypto.BLSGeneratePOP(sk)
+					require.NoError(t, err)
 					pop := testutil.BytesToCadenceArray(
 						proof,
 					)
-					script := fvm.Script(code).WithArguments(
+
+					script := fvm.Script(code(BLSsignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(publicKey),
 						jsoncdc.MustEncode(pop),
 					)
 
-					err := vm.Run(ctx, script, view, programs)
+					err = vm.Run(ctx, script, view, programs)
 					assert.NoError(t, err)
 					assert.NoError(t, script.Err)
-					switch signatureAlgorithm.algorithm {
-					case crypto.BLSBLS12381:
-						assert.Equal(t, cadence.NewBool(true), script.Value)
-					case crypto.ECDSAP256, crypto.ECDSASecp256k1:
-						assert.Equal(t, cadence.NewBool(false), script.Value)
-					}
+					assert.Equal(t, cadence.NewBool(true), script.Value)
+
 				})
-				t.Run("incorrect key", func(t *testing.T) {
-					sk := randomSK(t, signatureAlgorithm)
+
+				t.Run("valid but incorrect BLS key", func(t *testing.T) {
+
+					sk := randomSK(t, BLSsignatureAlgorithm)
 					publicKey := testutil.BytesToCadenceArray(
 						sk.PublicKey().Encode(),
 					)
-					privateKey := testutil.BytesToCadenceArray(
-						sk.Encode(),
+
+					otherSk := randomSK(t, BLSsignatureAlgorithm)
+					proof, err := crypto.BLSGeneratePOP(otherSk)
+					require.NoError(t, err)
+
+					pop := testutil.BytesToCadenceArray(
+						proof,
 					)
-					script := fvm.Script(code).WithArguments(
+					script := fvm.Script(code(BLSsignatureAlgorithm)).WithArguments(
 						jsoncdc.MustEncode(publicKey),
-						jsoncdc.MustEncode(privateKey),
+						jsoncdc.MustEncode(pop),
 					)
 
-					err := vm.Run(ctx, script, view, programs)
+					err = vm.Run(ctx, script, view, programs)
 					assert.NoError(t, err)
 					assert.NoError(t, script.Err)
 					assert.Equal(t, cadence.NewBool(false), script.Value)
+
 				})
+
+				for _, signatureAlgorithm := range signatureAlgorithms[1:] {
+					t.Run("non BLS key/"+signatureAlgorithm.name, func(t *testing.T) {
+						sk := randomSK(t, signatureAlgorithm)
+						publicKey := testutil.BytesToCadenceArray(
+							sk.PublicKey().Encode(),
+						)
+
+						random := make([]byte, crypto.SignatureLenBLSBLS12381)
+						_, err := rand.Read(random)
+						require.NoError(t, err)
+						pop := testutil.BytesToCadenceArray(
+							random,
+						)
+
+						script := fvm.Script(code(signatureAlgorithm)).WithArguments(
+							jsoncdc.MustEncode(publicKey),
+							jsoncdc.MustEncode(pop),
+						)
+
+						err = vm.Run(ctx, script, view, programs)
+						assert.NoError(t, err)
+						assert.NoError(t, script.Err)
+						assert.Equal(t, cadence.NewBool(false), script.Value)
+					})
+				}
 			},
 		))
 	}
@@ -1978,18 +1999,11 @@ func TestBLSMultiSignature(t *testing.T) {
 					sks := make([]crypto.PrivateKey, 0, numSigs)
 					sigs := make([]crypto.Signature, 0, numSigs)
 
-					// set to BLS
-					signatureAlgorithm := signatureAlgorithms[0]
-					hasher := signatureAlgorithm.hasher()
-
+					kmac := crypto.NewBLSKMAC("test tag")
 					for i := 0; i < numSigs; i++ {
-						sk := randomSK(t, signatureAlgorithm)
+						sk := randomSK(t, BLSsignatureAlgorithm)
 						// generate a valid BLS signature
-						s, err := sk.Sign(input, hasher)
-						// for non-BLS algorithms, alter the signature to get an invalid BLS signature
-						if signatureAlgorithm.algorithm != crypto.BLSBLS12381 {
-							s[4] ^= 1
-						}
+						s, err := sk.Sign(input, kmac)
 						require.NoError(t, err)
 
 						sks = append(sks, sk)
@@ -2012,16 +2026,11 @@ func TestBLSMultiSignature(t *testing.T) {
 					err = vm.Run(ctx, script, view, programs)
 					assert.NoError(t, err)
 					assert.NoError(t, script.Err)
-					switch signatureAlgorithm.algorithm {
-					case crypto.BLSBLS12381:
 
-						expectedSig, err := crypto.AggregateBLSSignatures(sigs)
-						require.NoError(t, err)
-
-						assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedSig)}, script.Value)
-					case crypto.ECDSAP256, crypto.ECDSASecp256k1:
-						assert.Equal(t, cadence.Optional{Value: cadence.Value(nil)}, script.Value)
-					}
+					expectedSig, err := crypto.AggregateBLSSignatures(sigs)
+					require.NoError(t, err)
+					assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedSig)}, script.Value)
+					//assert.Equal(t, cadence.Optional{Value: cadence.Value(nil)}, script.Value)
 				})
 			},
 		))
@@ -2105,8 +2114,8 @@ func TestBLSMultiSignature(t *testing.T) {
 		))
 	}
 
+	testVerifyPoPWithAlgo()
 	for i := 0; i < len(signatureAlgorithms); i++ {
-		testVerifyPoPWithAlgo(signatureAlgorithms[i])
 		testKeyAggregationWithAlgo(signatureAlgorithms[i])
 	}
 	// test signature aggregation for BLS only
