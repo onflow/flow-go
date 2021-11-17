@@ -222,7 +222,10 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, err
 	}
 	node.host = libp2pHost
-	node.unicastManager = unicast.NewUnicastManager(builder.logger, node.host, *builder.rootBlockID)
+	node.unicastManager = unicast.NewUnicastManager(
+		builder.logger,
+		unicast.NewLibP2PStreamFactory(node.host),
+		*builder.rootBlockID)
 
 	node.pCache, err = newProtocolPeerCache(node.logger, libp2pHost)
 	if err != nil {
