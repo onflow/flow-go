@@ -1857,21 +1857,19 @@ func TestBLSMultiSignature(t *testing.T) {
 	}
 
 	testVerifyPoPWithAlgo := func(signatureAlgorithm signatureAlgorithm) {
+		t.Run(signatureAlgorithm.name+"/verifyBLSPoP", newVMTest().run(
+			func(
+				t *testing.T,
+				vm *fvm.VirtualMachine,
+				chain flow.Chain,
+				ctx fvm.Context,
+				view state.View,
+				programs *programs.Programs,
+			) {
 
-		t.Run(signatureAlgorithm.name, func(t *testing.T) {
-			t.Run("verifyBLSPoP", newVMTest().run(
-				func(
-					t *testing.T,
-					vm *fvm.VirtualMachine,
-					chain flow.Chain,
-					ctx fvm.Context,
-					view state.View,
-					programs *programs.Programs,
-				) {
-
-					code := []byte(
-						fmt.Sprintf(
-							`
+				code := []byte(
+					fmt.Sprintf(
+						`
 								import Crypto
 		
 								pub fun main(
@@ -1885,71 +1883,68 @@ func TestBLSMultiSignature(t *testing.T) {
 									return p.verifyPoP(proof)
 								}
 								`,
-							signatureAlgorithm.name,
-						),
+						signatureAlgorithm.name,
+					),
+				)
+				t.Run("correct key", func(t *testing.T) {
+
+					sk := randomSK(t, signatureAlgorithm)
+					publicKey := testutil.BytesToCadenceArray(
+						sk.PublicKey().Encode(),
 					)
-					t.Run("correct key", func(t *testing.T) {
 
-						sk := randomSK(t, signatureAlgorithm)
-						publicKey := testutil.BytesToCadenceArray(
-							sk.PublicKey().Encode(),
-						)
+					var proof []byte
+					switch signatureAlgorithm.algorithm {
+					case crypto.BLSBLS12381:
+						var err error
+						proof, err = crypto.BLSGeneratePOP(sk)
+						require.NoError(t, err)
+					case crypto.ECDSAP256, crypto.ECDSASecp256k1:
+						// this test is going to error, so it doesn't matter what we use
+						proof = sk.Encode()
+					}
 
-						var proof []byte
-						switch signatureAlgorithm.algorithm {
-						case crypto.BLSBLS12381:
-							var err error
-							proof, err = crypto.BLSGeneratePOP(sk)
-							require.NoError(t, err)
-						case crypto.ECDSAP256, crypto.ECDSASecp256k1:
-							// this test is going to error, so it doesn't matter what we use
-							proof = sk.Encode()
-						}
+					pop := testutil.BytesToCadenceArray(
+						proof,
+					)
+					script := fvm.Script(code).WithArguments(
+						jsoncdc.MustEncode(publicKey),
+						jsoncdc.MustEncode(pop),
+					)
 
-						pop := testutil.BytesToCadenceArray(
-							proof,
-						)
-						script := fvm.Script(code).WithArguments(
-							jsoncdc.MustEncode(publicKey),
-							jsoncdc.MustEncode(pop),
-						)
-
-						err := vm.Run(ctx, script, view, programs)
-						assert.NoError(t, err)
-						assert.NoError(t, script.Err)
-						switch signatureAlgorithm.algorithm {
-						case crypto.BLSBLS12381:
-							assert.Equal(t, cadence.NewBool(true), script.Value)
-						case crypto.ECDSAP256, crypto.ECDSASecp256k1:
-							assert.Equal(t, cadence.NewBool(false), script.Value)
-						}
-					})
-					t.Run("incorrect key", func(t *testing.T) {
-						sk := randomSK(t, signatureAlgorithm)
-						publicKey := testutil.BytesToCadenceArray(
-							sk.PublicKey().Encode(),
-						)
-						privateKey := testutil.BytesToCadenceArray(
-							sk.Encode(),
-						)
-						script := fvm.Script(code).WithArguments(
-							jsoncdc.MustEncode(publicKey),
-							jsoncdc.MustEncode(privateKey),
-						)
-
-						err := vm.Run(ctx, script, view, programs)
-						assert.NoError(t, err)
-						assert.NoError(t, script.Err)
+					err := vm.Run(ctx, script, view, programs)
+					assert.NoError(t, err)
+					assert.NoError(t, script.Err)
+					switch signatureAlgorithm.algorithm {
+					case crypto.BLSBLS12381:
+						assert.Equal(t, cadence.NewBool(true), script.Value)
+					case crypto.ECDSAP256, crypto.ECDSASecp256k1:
 						assert.Equal(t, cadence.NewBool(false), script.Value)
-					})
-				},
-			))
-		})
+					}
+				})
+				t.Run("incorrect key", func(t *testing.T) {
+					sk := randomSK(t, signatureAlgorithm)
+					publicKey := testutil.BytesToCadenceArray(
+						sk.PublicKey().Encode(),
+					)
+					privateKey := testutil.BytesToCadenceArray(
+						sk.Encode(),
+					)
+					script := fvm.Script(code).WithArguments(
+						jsoncdc.MustEncode(publicKey),
+						jsoncdc.MustEncode(privateKey),
+					)
+
+					err := vm.Run(ctx, script, view, programs)
+					assert.NoError(t, err)
+					assert.NoError(t, script.Err)
+					assert.Equal(t, cadence.NewBool(false), script.Value)
+				})
+			},
+		))
 	}
 
 	testBLSSignatureAggregation := func() {
-
-		//t.Run(signatureAlgorithm.name, func(t *testing.T) {
 		t.Run("aggregateBLSSignatures", newVMTest().run(
 			func(
 				t *testing.T,
@@ -2030,26 +2025,24 @@ func TestBLSMultiSignature(t *testing.T) {
 				})
 			},
 		))
-		//})
 	}
 
 	testKeyAggregationWithAlgo := func(signatureAlgorithm signatureAlgorithm) {
-		t.Run(signatureAlgorithm.name, func(t *testing.T) {
-			t.Run("aggregateBLSPublicKeys", newVMTest().run(
-				func(
-					t *testing.T,
-					vm *fvm.VirtualMachine,
-					chain flow.Chain,
-					ctx fvm.Context,
-					view state.View,
-					programs *programs.Programs,
-				) {
+		t.Run(signatureAlgorithm.name+"/aggregateBLSPublicKeys", newVMTest().run(
+			func(
+				t *testing.T,
+				vm *fvm.VirtualMachine,
+				chain flow.Chain,
+				ctx fvm.Context,
+				view state.View,
+				programs *programs.Programs,
+			) {
 
-					pkNum := 100
+				pkNum := 100
 
-					code := []byte(
-						fmt.Sprintf(
-							`
+				code := []byte(
+					fmt.Sprintf(
+						`
 								import Crypto
 		
 								pub fun main(
@@ -2065,52 +2058,51 @@ func TestBLSMultiSignature(t *testing.T) {
 									return AggregateBLSPublicKeys(pks)?.publicKey
 								}
 								`,
-							signatureAlgorithm.name,
-						),
+						signatureAlgorithm.name,
+					),
+				)
+
+				t.Run("", func(t *testing.T) {
+					pks := make([]crypto.PublicKey, 0, pkNum)
+					publicKeys := make([]cadence.Value, 0, pkNum)
+
+					// create the signatures
+					for i := 0; i < pkNum; i++ {
+						sk := randomSK(t, signatureAlgorithm)
+						pks = append(pks, sk.PublicKey())
+						publicKeys = append(
+							publicKeys,
+							testutil.BytesToCadenceArray(sk.PublicKey().Encode()),
+						)
+					}
+
+					script := fvm.Script(code).WithArguments(
+						jsoncdc.MustEncode(cadence.Array{
+							Values: publicKeys,
+							ArrayType: cadence.VariableSizedArrayType{
+								ElementType: cadence.VariableSizedArrayType{
+									ElementType: cadence.UInt8Type{},
+								},
+							},
+						}),
 					)
 
-					t.Run("", func(t *testing.T) {
-						pks := make([]crypto.PublicKey, 0, pkNum)
-						publicKeys := make([]cadence.Value, 0, pkNum)
+					err := vm.Run(ctx, script, view, programs)
+					assert.NoError(t, err)
+					assert.NoError(t, script.Err)
+					switch signatureAlgorithm.algorithm {
+					case crypto.BLSBLS12381:
 
-						// create the signatures
-						for i := 0; i < pkNum; i++ {
-							sk := randomSK(t, signatureAlgorithm)
-							pks = append(pks, sk.PublicKey())
-							publicKeys = append(
-								publicKeys,
-								testutil.BytesToCadenceArray(sk.PublicKey().Encode()),
-							)
-						}
+						expectedPk, err := crypto.AggregateBLSPublicKeys(pks)
+						require.NoError(t, err)
 
-						script := fvm.Script(code).WithArguments(
-							jsoncdc.MustEncode(cadence.Array{
-								Values: publicKeys,
-								ArrayType: cadence.VariableSizedArrayType{
-									ElementType: cadence.VariableSizedArrayType{
-										ElementType: cadence.UInt8Type{},
-									},
-								},
-							}),
-						)
-
-						err := vm.Run(ctx, script, view, programs)
-						assert.NoError(t, err)
-						assert.NoError(t, script.Err)
-						switch signatureAlgorithm.algorithm {
-						case crypto.BLSBLS12381:
-
-							expectedPk, err := crypto.AggregateBLSPublicKeys(pks)
-							require.NoError(t, err)
-
-							assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedPk.Encode())}, script.Value)
-						case crypto.ECDSAP256, crypto.ECDSASecp256k1:
-							assert.Equal(t, cadence.Optional{Value: cadence.Value(nil)}, script.Value)
-						}
-					})
-				},
-			))
-		})
+						assert.Equal(t, cadence.Optional{Value: testutil.BytesToCadenceArray(expectedPk.Encode())}, script.Value)
+					case crypto.ECDSAP256, crypto.ECDSASecp256k1:
+						assert.Equal(t, cadence.Optional{Value: cadence.Value(nil)}, script.Value)
+					}
+				})
+			},
+		))
 	}
 
 	for i := 0; i < len(signatureAlgorithms); i++ {
