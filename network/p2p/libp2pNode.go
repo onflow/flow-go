@@ -96,7 +96,6 @@ func DefaultLibP2PNodeFactory(
 			SetPingInfoProvider(pingInfoProvider).
 			SetLogger(log).
 			SetResolver(resolver).
-			WithUnicastProtocols(unicastCompressedProtocols).
 			Build(ctx)
 	}, nil
 }
@@ -111,7 +110,6 @@ type NodeBuilder interface {
 	SetTopicValidation(bool) NodeBuilder
 	SetLogger(zerolog.Logger) NodeBuilder
 	SetResolver(*dns.Resolver) NodeBuilder
-	WithUnicastProtocols([]unicast.ProtocolName) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
@@ -123,7 +121,6 @@ type DefaultLibP2PNodeBuilder struct {
 	connMngr         connmgr.ConnManager
 	pingInfoProvider PingInfoProvider
 	resolver         *dns.Resolver
-	unicastProtocols []unicast.ProtocolName
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
 	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
 	pubSubOpts       []PubsubOption
@@ -189,11 +186,6 @@ func (builder *DefaultLibP2PNodeBuilder) SetResolver(resolver *dns.Resolver) Nod
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) WithUnicastProtocols(unicastProtocols []unicast.ProtocolName) NodeBuilder {
-	builder.unicastProtocols = unicastProtocols
-	return builder
-}
-
 func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, error) {
 	node := &Node{
 		id:              builder.id,
@@ -245,10 +237,6 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		}
 
 		opts = append(opts, libp2p.MultiaddrResolver(libp2pResolver))
-	}
-
-	if builder.unicastProtocols != nil {
-		node.unicastProtocols = builder.unicastProtocols
 	}
 
 	libp2pHost, err := builder.hostMaker(ctx, opts...)
@@ -320,7 +308,6 @@ type Node struct {
 	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
 	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
-	unicastProtocols     []unicast.ProtocolName
 	pingService          *PingService
 	connMgr              connmgr.ConnManager
 	dht                  *dht.IpfsDHT
