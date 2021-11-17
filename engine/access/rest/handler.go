@@ -46,6 +46,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// serialise response to JSON and handler errors
 	encodedResponse, encErr := json.Marshal(response)
 	if encErr != nil {
 		h.logger.Error().Err(err).Msg("failed to encode response")
@@ -53,6 +54,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// write response to response stream
 	_, writeErr := w.Write(encodedResponse)
 	if writeErr != nil {
 		h.logger.Error().Err(err).Msg("failed to write response")
