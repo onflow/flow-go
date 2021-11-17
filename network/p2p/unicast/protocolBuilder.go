@@ -27,26 +27,34 @@ const maxConnectAttemptSleepDuration = 5
 type ProtocolBuilder struct {
 	logger         zerolog.Logger
 	host           host.Host
-	defaultUnicast Protocol
 	unicasts       []Protocol
+	defaultHandler libp2pnet.StreamHandler
 	rootBlockId    flow.Identifier
 }
 
-func NewProtocolBuilder(logger zerolog.Logger, host host.Host, rootBlockId flow.Identifier, defaultHandler libp2pnet.StreamHandler) *ProtocolBuilder {
+func NewProtocolBuilder(logger zerolog.Logger, host host.Host, rootBlockId flow.Identifier) *ProtocolBuilder {
 
 	builder := &ProtocolBuilder{
 		logger:      logger,
 		host:        host,
 		rootBlockId: rootBlockId,
-		defaultUnicast: &PlainStream{
-			protocolId: p2p.FlowProtocolID(rootBlockId),
+	}
+
+	return builder
+}
+
+func (builder *ProtocolBuilder) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
+	defaultProtocolID := p2p.FlowProtocolID(builder.rootBlockId)
+	builder.defaultHandler = defaultHandler
+
+	builder.unicasts = []Protocol{
+		&PlainStream{
+			protocolId: defaultProtocolID,
 			handler:    defaultHandler,
 		},
 	}
 
-	builder.host.SetStreamHandler(builder.defaultUnicast.ProtocolId(), builder.defaultUnicast.Handler())
-
-	return builder
+	builder.host.SetStreamHandler(defaultProtocolID, defaultHandler)
 }
 
 func (builder *ProtocolBuilder) Register(unicast ProtocolName) error {
@@ -55,8 +63,10 @@ func (builder *ProtocolBuilder) Register(unicast ProtocolName) error {
 		return fmt.Errorf("could not translate protocol name into factory: %w", err)
 	}
 
-	p := factory(builder.logger, builder.rootBlockId, builder.defaultUnicast.Handler())
-	builder.host.SetStreamHandler(p.ProtocolId(), p.Handler())
+	u := factory(builder.logger, builder.rootBlockId, builder.defaultHandler)
+
+	builder.unicasts = append(builder.unicasts, u)
+	builder.host.SetStreamHandler(u.ProtocolId(), u.Handler())
 
 	return nil
 }
