@@ -103,28 +103,28 @@ func jsonDecode(body io.ReadCloser, dst interface{}) error {
 		switch {
 		case errors.As(err, &syntaxError):
 			msg := fmt.Sprintf("Request body contains badly-formed JSON (at position %d)", syntaxError.Offset)
-			return &badRequest{status: http.StatusBadRequest, msg: msg}
+			return NewBadRequestError(msg, err)
 
 		case errors.Is(err, io.ErrUnexpectedEOF):
 			msg := fmt.Sprintf("Request body contains badly-formed JSON")
-			return &badRequest{status: http.StatusBadRequest, msg: msg}
+			return NewBadRequestError(msg, err)
 
 		case errors.As(err, &unmarshalTypeError):
 			msg := fmt.Sprintf("Request body contains an invalid value for the %q field (at position %d)", unmarshalTypeError.Field, unmarshalTypeError.Offset)
-			return &badRequest{status: http.StatusBadRequest, msg: msg}
+			return NewBadRequestError(msg, err)
 
 		case strings.HasPrefix(err.Error(), "json: unknown field "):
 			fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
 			msg := fmt.Sprintf("Request body contains unknown field %s", fieldName)
-			return &badRequest{status: http.StatusBadRequest, msg: msg}
+			return NewBadRequestError(msg, err)
 
 		case errors.Is(err, io.EOF):
 			msg := "Request body must not be empty"
-			return &badRequest{status: http.StatusBadRequest, msg: msg}
+			return NewBadRequestError(msg, err)
 
 		case err.Error() == "http: request body too large":
 			msg := "Request body must not be larger than 1MB"
-			return &badRequest{status: http.StatusRequestEntityTooLarge, msg: msg}
+			return NewRestError(http.StatusRequestEntityTooLarge, msg, err)
 
 		default:
 			return err
@@ -134,7 +134,7 @@ func jsonDecode(body io.ReadCloser, dst interface{}) error {
 	err = dec.Decode(&struct{}{})
 	if err != io.EOF {
 		msg := "Request body must only contain h single JSON object"
-		return &badRequest{status: http.StatusBadRequest, msg: msg}
+		return NewBadRequestError(msg, err)
 	}
 
 	return nil
