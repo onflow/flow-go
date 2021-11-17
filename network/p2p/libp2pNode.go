@@ -5,9 +5,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math/rand"
 	"net"
-	"strings"
 	"sync"
 	"time"
 
@@ -21,7 +19,6 @@ import (
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	swarm "github.com/libp2p/go-libp2p-swarm"
 	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-tcp-transport"
@@ -49,9 +46,6 @@ const (
 
 	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
 	maxConnectAttempt = 3
-
-	// maximum number of milliseconds to wait between attempts for a 1-1 direct connection
-	maxConnectAttemptSleepDuration = 5
 
 	// timeout for FindPeer queries to the DHT
 	// TODO: is this a sensible value?
@@ -457,89 +451,6 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 	return stream, nil
 }
 
-// tryCreateNewStream makes at most `maxAttempts` to create a stream with the peer.
-// This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
-// remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'.
-//
-// Note that in case an existing TCP connection underneath to `peerID` exists, that connection is utilized for creating a new stream.
-// The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
-func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
-	var errs error
-	var s libp2pnet.Stream
-	var retries = 0
-	var dialAddr []multiaddr.Multiaddr // address on which we dial peerID
-	for ; retries < maxAttempts; retries++ {
-		select {
-		case <-ctx.Done():
-			return nil, nil, fmt.Errorf("context done before stream could be created (retry attempt: %d, errors: %w)", retries, errs)
-		default:
-		}
-
-		// libp2p internally uses swarm dial - https://github.com/libp2p/go-libp2p-swarm/blob/master/swarm_dial.go
-		// to connect to a peer. Swarm dial adds a back off each time it fails connecting to a peer. While this is
-		// the desired behaviour for pub-sub (1-k style of communication) for 1-1 style we want to retry the connection
-		// immediately without backing off and fail-fast.
-		// Hence, explicitly cancel the dial back off (if any) and try connecting again
-
-		// cancel the dial back off (if any), since we want to connect immediately
-		network := n.host.Network()
-		dialAddr = network.Peerstore().Addrs(peerID)
-		if swm, ok := network.(*swarm.Swarm); ok {
-			swm.Backoff().Clear(peerID)
-		}
-
-		// if this is a retry attempt, wait for some time before retrying
-		if retries > 0 {
-			// choose a random interval between 0 to 5
-			// (to ensure that this node and the target node don't attempt to reconnect at the same time)
-			r := rand.Intn(maxConnectAttemptSleepDuration)
-			time.Sleep(time.Duration(r) * time.Millisecond)
-		}
-
-		err := n.AddPeer(ctx, peer.AddrInfo{ID: peerID})
-		if err != nil {
-
-			// if the connection was rejected due to invalid node id, skip the re-attempt
-			if strings.Contains(err.Error(), "failed to negotiate security protocol") {
-				return s, dialAddr, fmt.Errorf("invalid node id: %w", err)
-			}
-
-			// if the connection was rejected due to allowlisting, skip the re-attempt
-			if errors.Is(err, swarm.ErrGaterDisallowedConnection) {
-				return s, dialAddr, fmt.Errorf("target node is not on the approved list of nodes: %w", err)
-			}
-
-			errs = multierror.Append(errs, err)
-			continue
-		}
-
-		// creates stream using stream factory
-		s, err = n.host.NewStream(ctx, peerID, n.flowLibP2PProtocolID)
-		if err != nil {
-			// if the stream creation failed due to invalid protocol id, skip the re-attempt
-			if strings.Contains(err.Error(), "protocol not supported") {
-				return nil, dialAddr, fmt.Errorf("remote node is running on a different spork: %w, protocol attempted: %s", err,
-					n.flowLibP2PProtocolID)
-			}
-			errs = multierror.Append(errs, err)
-			continue
-		}
-
-		break
-	}
-
-	if retries == maxAttempts {
-		return s, dialAddr, errs
-	}
-
-	s, err := n.streamFactory.NewStream(s)
-	if err != nil {
-		return nil, dialAddr, fmt.Errorf("could not create compressed stream: %w", err)
-	}
-
-	return s, dialAddr, nil
-}
-
 // GetIPPort returns the IP and Port the libp2p node is listening on.
 func (n *Node) GetIPPort() (string, string, error) {
 	return IPPortFromMultiAddress(n.host.Network().ListenAddresses()...)
@@ -688,19 +599,6 @@ func (n *Node) UpdateAllowList(peers peer.IDSlice) {
 // Host returns pointer to host object of node.
 func (n *Node) Host() host.Host {
 	return n.host
-}
-
-// SetFlowProtocolStreamHandler sets the stream handler of Flow libp2p Protocol
-func (n *Node) SetFlowProtocolStreamHandler(handler libp2pnet.StreamHandler) {
-	n.host.SetStreamHandler(n.flowLibP2PProtocolID, func(s libp2pnet.Stream) {
-		// converts incoming libp2p stream to a compressed stream
-		s, err := n.streamFactory.NewStream(s)
-		if err != nil {
-			n.logger.Error().Err(err).Msg("could not create compressed stream")
-			return
-		}
-		handler(s)
-	})
 }
 
 func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler) error {
