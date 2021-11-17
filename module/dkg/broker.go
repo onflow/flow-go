@@ -30,7 +30,7 @@ const (
 
 	// retryDuration is the initial duration to wait between retries for all retryable
 	// requests - increases exponentially for subsequent retries
-	retryDuration = 1000 * time.Millisecond
+	retryDuration = time.Second
 
 	// retryJitterPercent is the percentage jitter to introduce to each retry interval
 	// for all retryable requests
