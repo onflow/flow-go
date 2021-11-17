@@ -79,7 +79,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 			epoch, view, module.DKGFailError)
 	}
 
-	// DKG was completed and a random beacon key is available,
+	// DKG succeeded and a random beacon key is available,
 	// create a random beacon signer that holds the private key and cache it for the epoch
 	key = privBeaconKeyData.RandomBeaconPrivKey
 	s.writeKey(epoch, key)
