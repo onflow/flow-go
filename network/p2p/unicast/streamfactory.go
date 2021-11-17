@@ -23,6 +23,10 @@ type LibP2PStreamFactory struct {
 	host host.Host
 }
 
+func NewLibP2PStreamFactory(h host.Host) StreamFactory {
+	return &LibP2PStreamFactory{host: h}
+}
+
 func (l *LibP2PStreamFactory) SetStreamHandler(pid protocol.ID, handler network.StreamHandler) {
 	l.host.SetStreamHandler(pid, handler)
 }
