@@ -90,7 +90,7 @@ func (c *StakingSigner) genSigData(block *model.Block) ([]byte, error) {
 
 	stakingSig, err := c.staking.Sign(msg, c.stakingHasher)
 	if err != nil {
-		return nil, fmt.Errorf("could not generate staking signature: %w", err)
+		return nil, fmt.Errorf("could not generate staking signature for block (%v) at view %v: %w", block.BlockID, block.View, err)
 	}
 
 	return stakingSig, nil
