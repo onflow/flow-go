@@ -4,32 +4,23 @@ package p2p
 import (
 	"context"
 	"fmt"
-	"net"
 	"sync"
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
-	tptu "github.com/libp2p/go-libp2p-transport-upgrader"
-	"github.com/libp2p/go-libp2p/config"
-	"github.com/libp2p/go-tcp-transport"
-	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
-	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/dns"
-	"github.com/onflow/flow-go/network/p2p/keyutils"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 	"github.com/onflow/flow-go/utils/logging"
@@ -357,101 +348,4 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 func (n *Node) IsConnected(peerID peer.ID) (bool, error) {
 	isConnected := n.host.Network().Connectedness(peerID) == libp2pnet.Connected
 	return isConnected, nil
-}
-
-// DefaultLibP2PHost returns a libp2p host initialized to listen on the given address and using the given private key and
-// customized with options
-func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateKey, options ...config.Option) (host.Host,
-	error) {
-	defaultOptions, err := DefaultLibP2POptions(address, key)
-	if err != nil {
-		return nil, err
-	}
-
-	allOptions := append(defaultOptions, options...)
-
-	// create the libp2p host
-	libP2PHost, err := libp2p.New(ctx, allOptions...)
-	if err != nil {
-		return nil, fmt.Errorf("could not create libp2p host: %w", err)
-	}
-
-	return libP2PHost, nil
-}
-
-// DefaultLibP2POptions creates and returns the standard LibP2P host options that are used for the Flow Libp2p network
-func DefaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Option, error) {
-
-	libp2pKey, err := keyutils.LibP2PPrivKeyFromFlow(key)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate libp2p key: %w", err)
-	}
-
-	ip, port, err := net.SplitHostPort(address)
-	if err != nil {
-		return nil, fmt.Errorf("could not split node address %s:%w", address, err)
-	}
-
-	sourceMultiAddr, err := multiaddr.NewMultiaddr(MultiAddressStr(ip, port))
-	if err != nil {
-		return nil, fmt.Errorf("failed to translate Flow address to Libp2p multiaddress: %w", err)
-	}
-
-	// create a transport which disables port reuse and web socket.
-	// Port reuse enables listening and dialing from the same TCP port (https://github.com/libp2p/go-reuseport)
-	// While this sounds great, it intermittently causes a 'broken pipe' error
-	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
-	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
-	transport := libp2p.Transport(func(u *tptu.Upgrader) *tcp.TcpTransport {
-		tpt := tcp.NewTCPTransport(u)
-		tpt.DisableReuseport = true
-		return tpt
-	})
-
-	// gather all the options for the libp2p node
-	options := []config.Option{
-		libp2p.ListenAddrs(sourceMultiAddr), // set the listen address
-		libp2p.Identity(libp2pKey),          // pass in the networking key
-		transport,                           // set the protocol
-	}
-
-	return options, nil
-}
-
-// DefaultPubSub returns initializes and returns a GossipSub object for the given libp2p host and options
-func DefaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Option) (*pubsub.PubSub, error) {
-	// Creating a new PubSub instance of the type GossipSub with psOption
-	pubSub, err := pubsub.NewGossipSub(ctx, host, psOption...)
-	if err != nil {
-		return nil, fmt.Errorf("could not create libp2p gossipsub: %w", err)
-	}
-	return pubSub, nil
-}
-
-// PubsubOption generates a libp2p pubsub.Option from the given context and host
-type PubsubOption func(ctx context.Context, host host.Host) (pubsub.Option, error)
-
-func PubSubOptionWrapper(option pubsub.Option) PubsubOption {
-	return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
-		return option, nil
-	}
-}
-
-func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
-	return []PubsubOption{
-		// skip message signing
-		PubSubOptionWrapper(pubsub.WithMessageSigning(true)),
-		// skip message signature
-		PubSubOptionWrapper(pubsub.WithStrictSignatureVerification(true)),
-		// set max message size limit for 1-k PubSub messaging
-		PubSubOptionWrapper(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
-		// no discovery
-	}
-}
-
-func withDHTDiscovery(kdht *dht.IpfsDHT) PubsubOption {
-	return func(ctx context.Context, host host.Host) (pubsub.Option, error) {
-		routingDiscovery := discovery.NewRoutingDiscovery(kdht)
-		return pubsub.WithDiscovery(routingDiscovery), nil
-	}
 }
