@@ -108,8 +108,11 @@ func createNode(
 	epochQuery.Add(nextEpoch)
 	snapshot := new(protocolmock.Snapshot)
 	snapshot.On("Epochs").Return(epochQuery)
+	snapshot.On("Phase").Return(flow.EpochPhaseStaking, nil)
+	snapshot.On("Head").Return(firstBlock, nil)
 	state := new(protocolmock.MutableState)
 	state.On("AtBlockID", firstBlock).Return(snapshot)
+	state.On("Final").Return(snapshot)
 	core.State = state
 
 	// brokerTunnel is used to communicate between the messaging engine and the
