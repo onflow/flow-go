@@ -54,5 +54,5 @@ func createTransaction(
 		return nil, NewBadRequestError("failed to send transaction", err)
 	}
 
-	return tx, nil
+	return transactionResponse(&tx), nil
 }
