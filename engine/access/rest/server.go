@@ -57,8 +57,8 @@ func apiHandlers(logger zerolog.Logger, backend access.API) []Handler {
 		backend:     backend,
 		method:      "GET",
 		pattern:     "/transactions/{id}",
-		name:        "GetTransactionByID",
-		handlerFunc: GetTransactionByID,
+		name:        "getTransactionByID",
+		handlerFunc: getTransactionByID,
 	}}
 }
 
