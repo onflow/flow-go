@@ -20,7 +20,7 @@ type GzipStream struct {
 	logger         zerolog.Logger
 }
 
-func NewGzipCompressedUnicast(rootBlockID flow.Identifier, defaultHandler libp2pnet.StreamHandler, logger zerolog.Logger) *GzipStream {
+func NewGzipCompressedUnicast(logger zerolog.Logger, rootBlockID flow.Identifier, defaultHandler libp2pnet.StreamHandler) *GzipStream {
 	return &GzipStream{
 		protocolId:     p2p.GzipCompressedProtocolId(rootBlockID),
 		defaultHandler: defaultHandler,
