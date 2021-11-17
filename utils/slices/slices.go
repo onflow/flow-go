@@ -26,6 +26,7 @@ func EnsureByteSliceSize(b []byte, length int) []byte {
 	return stateBytes
 }
 
+// MakeRange returns a slice of int from [min, max]
 func MakeRange(min, max int) []int {
 	a := make([]int, max-min+1)
 	for i := range a {

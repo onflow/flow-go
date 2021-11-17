@@ -55,7 +55,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(block *model.Block) (hotstuf
 
 	stakingSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, stakingKeys, msg, encoding.ConsensusVoteTag)
 	if err != nil {
-		return nil, fmt.Errorf("could not create aggregator for staking signatures: %w", err)
+		return nil, fmt.Errorf("could not create aggregator for staking signatures at block %v: %w", block.BlockID, err)
 	}
 
 	publicKeyShares := make([]crypto.PublicKey, 0, len(allParticipants))
@@ -66,7 +66,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(block *model.Block) (hotstuf
 	for _, participant := range allParticipants {
 		pk, err := dkg.KeyShare(participant.NodeID)
 		if err != nil {
-			return nil, fmt.Errorf("could not get random beacon key share for %x: %w", participant.NodeID, err)
+			return nil, fmt.Errorf("could not get random beacon key share for %x at block %v: %w", participant.NodeID, block.BlockID, err)
 		}
 		publicKeyShares = append(publicKeyShares, pk)
 	}
@@ -74,7 +74,7 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(block *model.Block) (hotstuf
 	threshold := msig.RandomBeaconThreshold(int(dkg.Size()))
 	randomBeaconInspector, err := signature.NewRandomBeaconInspector(dkg.GroupKey(), publicKeyShares, threshold, msg)
 	if err != nil {
-		return nil, fmt.Errorf("could not create random beacon inspector: %w", err)
+		return nil, fmt.Errorf("could not create random beacon inspector at block %v: %w", block.BlockID, err)
 	}
 
 	rbRector := signature.NewRandomBeaconReconstructor(dkg, randomBeaconInspector)

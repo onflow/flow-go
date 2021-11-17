@@ -53,7 +53,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 
 	sigType, sig, err := signature.DecodeSingleSig(sigData)
 	if err != nil {
-		return false, fmt.Errorf("could not decode signature: %w", modulesig.ErrInvalidFormat)
+		return false, fmt.Errorf("could not decode signature for block %v: %w", block.BlockID,  modulesig.ErrInvalidFormat)
 	}
 
 	switch sigType {
@@ -61,10 +61,10 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 		// verify each signature against the message
 		stakingValid, err := signer.StakingPubKey.Verify(sig, msg, c.stakingHasher)
 		if err != nil {
-			return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
+			return false, fmt.Errorf("internal error while verifying staking signature for block %v: %w", block.BlockID, err)
 		}
 		if !stakingValid {
-			return false, fmt.Errorf("invalid staking sig")
+			return false, fmt.Errorf("invalid staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 		}
 	case hotstuff.SigTypeRandomBeacon:
 		dkg, err := c.committee.DKG(block.BlockID)
@@ -75,16 +75,16 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 		// if there is beacon share, there must be beacon public key
 		beaconPubKey, err := dkg.KeyShare(signer.NodeID)
 		if err != nil {
-			return false, fmt.Errorf("could not get random beacon key share for %x: %w", signer.NodeID, err)
+			return false, fmt.Errorf("could not get random beacon key share for %x at block %v: %w", signer.NodeID, block.BlockID, err)
 		}
 
 		beaconValid, err := beaconPubKey.Verify(sig, msg, c.beaconHasher)
 		if err != nil {
-			return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
+			return false, fmt.Errorf("internal error while verifying beacon signature for block %v: %w", block.BlockID, err)
 		}
 
 		if !beaconValid {
-			return false, fmt.Errorf("invalid beacon sig")
+			return false, fmt.Errorf("invalid beacon sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 		}
 	default:
 		return false, fmt.Errorf("invalid signature type %d: %w", sigType, modulesig.ErrInvalidFormat)
