@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/validator"
 	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -67,6 +68,7 @@ type Middleware struct {
 	wg                         *sync.WaitGroup
 	libP2PNode                 *Node
 	libP2PNodeFactory          LibP2PFactoryFunc
+	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
 	rootBlockID                flow.Identifier
@@ -85,6 +87,12 @@ type MiddlewareOption func(*Middleware)
 func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.validators = validators
+	}
+}
+
+func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.preferredUnicasts = unicasts
 	}
 }
 
@@ -245,7 +253,10 @@ func (m *Middleware) start(ctx context.Context) error {
 	}
 
 	m.libP2PNode = libP2PNode
-	m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream)
+	err = m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
+	if err != nil {
+		return fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err)
+	}
 
 	m.UpdateNodeAddresses()
 

@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -115,7 +116,7 @@ func TestCreateStream(t *testing.T) {
 
 	id2 := identities[1]
 
-	flowProtocolID := FlowProtocolID(rootBlockID)
+	flowProtocolID := unicast.FlowProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(t, 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 
@@ -208,7 +209,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	pInfo, err := PeerAddressInfo(*id2)
 	require.NoError(t, err)
 	nodes[0].host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-	maxTimeToWait := maxConnectAttempt * maxConnectAttemptSleepDuration * time.Millisecond
+	maxTimeToWait := maxConnectAttempt * unicast.MaxConnectAttemptSleepDuration * time.Millisecond
 
 	// need to add some buffer time so that RequireReturnsBefore waits slightly longer than maxTimeToWait to avoid
 	// a race condition

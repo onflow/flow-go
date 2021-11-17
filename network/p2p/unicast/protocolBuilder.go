@@ -18,11 +18,18 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/network/p2p"
 )
 
-// maximum number of milliseconds to wait between attempts for a 1-1 direct connection
-const maxConnectAttemptSleepDuration = 5
+// MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
+const MaxConnectAttemptSleepDuration = 5
+
+func FlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID.String())
+}
+
+func PingProtocolId(rootBlockID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID.String())
+}
 
 type ProtocolBuilder struct {
 	logger         zerolog.Logger
@@ -44,7 +51,7 @@ func NewProtocolBuilder(logger zerolog.Logger, host host.Host, rootBlockId flow.
 }
 
 func (builder *ProtocolBuilder) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
-	defaultProtocolID := p2p.FlowProtocolID(builder.rootBlockId)
+	defaultProtocolID := FlowProtocolID(builder.rootBlockId)
 	builder.defaultHandler = defaultHandler
 
 	builder.unicasts = []Protocol{
@@ -127,7 +134,7 @@ func (builder *ProtocolBuilder) createStreamWithProtocol(ctx context.Context,
 		if retries > 0 {
 			// choose a random interval between 0 to 5
 			// (to ensure that this node and the target node don't attempt to reconnect at the same time)
-			r := rand.Intn(maxConnectAttemptSleepDuration)
+			r := rand.Intn(MaxConnectAttemptSleepDuration)
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 

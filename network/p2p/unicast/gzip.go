@@ -7,11 +7,14 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/compressor"
-	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/compressed"
 )
 
 const GzipCompressionUnicast = ProtocolName("gzip-compression")
+
+func gzipCompressedProtocolId(rootBlockID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2PProtocolGzipCompressedOneToOne + rootBlockID.String())
+}
 
 // GzipStream is a stream compression creates and returns a gzip-compressed stream out of input stream.
 type GzipStream struct {
@@ -22,7 +25,7 @@ type GzipStream struct {
 
 func NewGzipCompressedUnicast(logger zerolog.Logger, rootBlockID flow.Identifier, defaultHandler libp2pnet.StreamHandler) *GzipStream {
 	return &GzipStream{
-		protocolId:     p2p.GzipCompressedProtocolId(rootBlockID),
+		protocolId:     gzipCompressedProtocolId(rootBlockID),
 		defaultHandler: defaultHandler,
 		logger:         logger.With().Str("subsystem", "gzip-unicast").Logger(),
 	}

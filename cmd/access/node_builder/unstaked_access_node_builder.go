@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 )
 
@@ -80,7 +81,7 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
 				var result flow.IdentifierList
 
-				pids := anb.LibP2PNode.GetPeersForProtocol(p2p.FlowProtocolID(anb.RootBlock.ID()))
+				pids := anb.LibP2PNode.GetPeersForProtocol(unicast.FlowProtocolID(anb.RootBlock.ID()))
 
 				for _, pid := range pids {
 					// exclude own Identifier
@@ -212,10 +213,6 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 	)
 
 	return func(ctx context.Context) (*p2p.Node, error) {
-		streamFactory, err := p2p.LibP2PStreamCompressorFactoryFunc(builder.BaseConfig.LibP2PStreamCompression)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert stream factory: %w", err)
-		}
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
 			SetRootBlockID(builder.RootBlock.ID()).
 			SetConnectionManager(connManager).
@@ -225,7 +222,6 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
 			SetPubsubOptions(psOpts...).
-			SetStreamCompressor(streamFactory).
 			Build(ctx)
 		if err != nil {
 			return nil, err

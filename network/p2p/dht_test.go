@@ -247,11 +247,11 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 			SetResolver(resolver).
 			SetLogger(logger).
 			SetTopicValidation(false).
-			SetStreamCompressor(WithGzipCompression).
 			Build(suite.ctx)
 		require.NoError(suite.T(), err)
 
-		n.SetFlowProtocolStreamHandler(handlerFunc)
+		err = n.WithDefaultUnicastProtocol(handlerFunc, nil)
+		require.NoError(suite.T(), err)
 
 		nodes = append(nodes, n)
 	}

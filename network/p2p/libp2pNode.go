@@ -68,8 +68,7 @@ func DefaultLibP2PNodeFactory(
 	metrics module.NetworkMetrics,
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
-	role string,
-	unicastCompressedProtocols []unicast.ProtocolName) (LibP2PFactoryFunc, error) {
+	role string) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
@@ -206,7 +205,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	if builder.rootBlockID == nil {
 		return nil, errors.New("root block ID must be provided")
 	}
-	node.flowLibP2PProtocolID = FlowProtocolID(*builder.rootBlockID)
+	node.flowLibP2PProtocolID = unicast.FlowProtocolID(*builder.rootBlockID)
 
 	var opts []config.Option
 
@@ -261,7 +260,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 
 	if builder.pingInfoProvider != nil {
-		pingLibP2PProtocolID := pingProtocolId(*builder.rootBlockID)
+		pingLibP2PProtocolID := unicast.PingProtocolId(*builder.rootBlockID)
 		pingService := NewPingService(libp2pHost, pingLibP2PProtocolID, builder.pingInfoProvider, node.logger)
 		node.pingService = pingService
 	}

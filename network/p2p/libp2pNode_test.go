@@ -279,7 +279,6 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
 		SetTopicValidation(false).
-		SetStreamCompressor(WithGzipCompression).
 		SetLogger(log)
 
 	if allowList {
@@ -291,7 +290,8 @@ func NodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	n, err := builder.Build(ctx)
 	require.NoError(t, err)
 
-	n.SetFlowProtocolStreamHandler(handlerFunc)
+	err = n.WithDefaultUnicastProtocol(handlerFunc, nil)
+	require.NoError(t, err)
 
 	require.Eventuallyf(t, func() bool {
 		ip, p, err := n.GetIPPort()

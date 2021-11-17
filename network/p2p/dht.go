@@ -8,6 +8,7 @@ import (
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
 // This produces a new IPFS DHT
@@ -56,6 +57,6 @@ func WithBootstrapPeers(bootstrapNodes flow.IdentityList) (dht.Option, error) {
 
 func defaultDHTOptions() []dht.Option {
 	return []dht.Option{
-		dht.ProtocolPrefix(FlowLibP2PProtocolCommonPrefix),
+		dht.ProtocolPrefix(unicast.FlowLibP2PProtocolCommonPrefix),
 	}
 }
