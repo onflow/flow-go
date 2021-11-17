@@ -209,9 +209,9 @@ func (n *Node) Subscribe(ctx context.Context, topic flownet.Topic, validators ..
 	var err error
 	if !found {
 		if n.topicValidation {
-			topic_validator := validator.TopicValidator(validators...)
+			topicValidator := validator.TopicValidator(validators...)
 			if err := n.pubSub.RegisterTopicValidator(
-				topic.String(), topic_validator, pubsub.WithValidatorInline(true),
+				topic.String(), topicValidator, pubsub.WithValidatorInline(true),
 			); err != nil {
 				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
 				return nil, fmt.Errorf("failed to register topic validator: %w", err)
