@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/libp2p/go-libp2p-core/host"
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
@@ -33,17 +32,17 @@ func PingProtocolId(rootBlockID flow.Identifier) protocol.ID {
 
 type Manager struct {
 	logger         zerolog.Logger
-	host           host.Host
+	streamFactory  StreamFactory
 	unicasts       []Protocol
 	defaultHandler libp2pnet.StreamHandler
 	rootBlockId    flow.Identifier
 }
 
-func NewUnicastManager(logger zerolog.Logger, host host.Host, rootBlockId flow.Identifier) *Manager {
+func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, rootBlockId flow.Identifier) *Manager {
 	return &Manager{
-		logger:      logger,
-		host:        host,
-		rootBlockId: rootBlockId,
+		logger:        logger,
+		streamFactory: streamFactory,
+		rootBlockId:   rootBlockId,
 	}
 }
 
@@ -58,7 +57,7 @@ func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 		},
 	}
 
-	m.host.SetStreamHandler(defaultProtocolID, defaultHandler)
+	m.streamFactory.SetStreamHandler(defaultProtocolID, defaultHandler)
 }
 
 func (m *Manager) Register(unicast ProtocolName) error {
@@ -70,7 +69,7 @@ func (m *Manager) Register(unicast ProtocolName) error {
 	u := factory(m.logger, m.rootBlockId, m.defaultHandler)
 
 	m.unicasts = append(m.unicasts, u)
-	m.host.SetStreamHandler(u.ProtocolId(), u.Handler())
+	m.streamFactory.SetStreamHandler(u.ProtocolId(), u.Handler())
 
 	return nil
 }
@@ -121,11 +120,8 @@ func (m *Manager) createStreamWithProtocol(ctx context.Context,
 		// Hence, explicitly cancel the dial back off (if any) and try connecting again
 
 		// cancel the dial back off (if any), since we want to connect immediately
-		network := m.host.Network()
-		dialAddr = network.Peerstore().Addrs(peerID)
-		if swm, ok := network.(*swarm.Swarm); ok {
-			swm.Backoff().Clear(peerID)
-		}
+		dialAddr = m.streamFactory.DialAddress(peerID)
+		m.streamFactory.ClearBackoff(peerID)
 
 		// if this is a retry attempt, wait for some time before retrying
 		if retries > 0 {
@@ -135,7 +131,7 @@ func (m *Manager) createStreamWithProtocol(ctx context.Context,
 			time.Sleep(time.Duration(r) * time.Millisecond)
 		}
 
-		err := m.host.Connect(ctx, peer.AddrInfo{ID: peerID})
+		err := m.streamFactory.Connect(ctx, peer.AddrInfo{ID: peerID})
 		if err != nil {
 
 			// if the connection was rejected due to invalid node id, skip the re-attempt
@@ -153,7 +149,7 @@ func (m *Manager) createStreamWithProtocol(ctx context.Context,
 		}
 
 		// creates stream using stream factory
-		s, err = m.host.NewStream(ctx, peerID, protocolID)
+		s, err = m.streamFactory.NewStream(ctx, peerID, protocolID)
 		if err != nil {
 			// if the stream creation failed due to invalid protocol id, skip the re-attempt
 			if strings.Contains(err.Error(), "protocol not supported") {
