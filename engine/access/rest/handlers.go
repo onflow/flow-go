@@ -90,11 +90,13 @@ func (h *Handlers) GetTransactionByID(w http.ResponseWriter, r *http.Request) {
 	id, err := toID(idFromRequest)
 	if err != nil {
 		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID: %s", idFromRequest), errorLogger)
+		return
 	}
 
 	tx, err := h.backend.GetTransaction(r.Context(), id)
 	if err != nil {
 		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("transaction fetching error: %s", err.Error()), errorLogger)
+		return
 	}
 
 	h.jsonResponse(w, transactionResponse(tx), errorLogger)
