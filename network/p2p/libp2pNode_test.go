@@ -50,7 +50,9 @@ func TestMultiAddress(t *testing.T) {
 // TestSingleNodeLifeCycle evaluates correct lifecycle translation from start to stop the node
 func TestSingleNodeLifeCycle(t *testing.T) {
 	key := generateNetworkingKey(t)
-	node, _ := nodeFixture(t, unittest.Logger(), key, rootBlockID, defaultAddress)
+	node, _ := nodeFixture(t,
+		withNetworkingPrivateKey(key),
+		withRootBlockId(rootBlockID))
 
 	done, err := node.Stop()
 	unittest.RequireCloseBefore(t, done, 100*time.Millisecond, "could not stop node on time")
