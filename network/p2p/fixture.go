@@ -33,19 +33,42 @@ const defaultAddress = "0.0.0.0:0"
 
 var rootBlockID = unittest.IdentifierFixture()
 
+type nodeFixtureParameters struct {
+	handlerFunc network.StreamHandler
+	allowList   bool
+}
+
+type nodeFixtureParameterOption func(*nodeFixtureParameters)
+
+func withDefaultStreamHandler(handler network.StreamHandler) nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.handlerFunc = handler
+	}
+}
+
+func withAllowListEnabled() nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.allowList = true
+	}
+}
+
 // nodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
-func nodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootID flow.Identifier, handler network.StreamHandler, allowList bool, address string) (*Node, flow.Identity) {
-
+func nodeFixture(t *testing.T,
+	log zerolog.Logger,
+	key fcrypto.PrivateKey,
+	rootID flow.Identifier,
+	address string,
+	opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
 	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(address))
 
-	var handlerFunc network.StreamHandler
-	if handler != nil {
-		// use the callback that has been passed in
-		handlerFunc = handler
-	} else {
-		// use a default call back
-		handlerFunc = func(network.Stream) {}
+	parameters := &nodeFixtureParameters{
+		handlerFunc: func(network.Stream) {},
+		allowList:   false,
+	}
+
+	for _, opt := range opts {
+		opt(parameters)
 	}
 
 	pingInfoProvider, _, _, _ := mockPingInfoProvider()
@@ -65,7 +88,7 @@ func nodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 		SetTopicValidation(false).
 		SetLogger(log)
 
-	if allowList {
+	if parameters.allowList {
 		connGater := NewConnGater(log)
 		builder.SetConnectionGater(connGater)
 	}
@@ -74,7 +97,7 @@ func nodeFixture(t *testing.T, log zerolog.Logger, key fcrypto.PrivateKey, rootI
 	n, err := builder.Build(ctx)
 	require.NoError(t, err)
 
-	err = n.WithDefaultUnicastProtocol(handlerFunc, nil)
+	err = n.WithDefaultUnicastProtocol(parameters.handlerFunc, nil)
 	require.NoError(t, err)
 
 	require.Eventuallyf(t, func() bool {
@@ -167,7 +190,7 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 
 // nodesFixtureWithHandler creates a number of LibP2PNodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func nodesFixtureWithHandler(t *testing.T, count int, handler network.StreamHandler, allowList bool) ([]*Node, flow.IdentityList) {
+func nodesFixtureWithHandler(t *testing.T, count int, opts ...nodeFixtureParameterOption) ([]*Node, flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*Node
@@ -184,7 +207,12 @@ func nodesFixtureWithHandler(t *testing.T, count int, handler network.StreamHand
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
 		key := generateNetworkingKey(t)
-		node, identity := nodeFixture(t, unittest.Logger(), key, rootBlockID, handler, allowList, defaultAddress)
+		node, identity := nodeFixture(t,
+			unittest.Logger(),
+			key,
+			rootBlockID,
+			defaultAddress,
+			opts...)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
