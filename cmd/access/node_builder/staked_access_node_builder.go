@@ -210,7 +210,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier
 
 	return func(ctx context.Context) (*p2p.Node, error) {
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
-			SetSporkId(builder.SporkID).
+			SetSporkID(builder.SporkID).
 			// no connection gater
 			SetConnectionManager(connManager).
 			// act as a DHT server

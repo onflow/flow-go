@@ -21,7 +21,7 @@ func createNode(
 		psOpts = DefaultPubsubOptions(DefaultMaxPubSubMsgSize)
 	}
 	libp2pNode, err := NewDefaultLibP2PNodeBuilder(nodeID, "0.0.0.0:0", networkKey).
-		SetSporkId(sporkID).
+		SetSporkID(sporkID).
 		SetPubsubOptions(psOpts...).
 		Build(context.TODO())
 	require.NoError(t, err)

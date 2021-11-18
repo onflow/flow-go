@@ -104,7 +104,7 @@ func nodeFixture(t *testing.T, sporkId flow.Identifier, opts ...nodeFixtureParam
 	connManager := NewConnManager(logger, noopMetrics)
 
 	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, parameters.address, parameters.key).
-		SetSporkId(sporkId).
+		SetSporkID(sporkId).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).

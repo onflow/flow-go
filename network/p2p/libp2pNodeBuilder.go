@@ -65,7 +65,7 @@ func DefaultLibP2PNodeFactory(
 
 	return func(ctx context.Context) (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
-			SetSporkId(sporkId).
+			SetSporkID(sporkId).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
 			SetPubsubOptions(psOpts...).
@@ -77,7 +77,7 @@ func DefaultLibP2PNodeFactory(
 }
 
 type NodeBuilder interface {
-	SetSporkId(flow.Identifier) NodeBuilder
+	SetSporkID(flow.Identifier) NodeBuilder
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
 	SetPubsubOptions(...PubsubOption) NodeBuilder
@@ -127,7 +127,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetTopicValidation(enabled bool) NodeBu
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetSporkId(sporkId flow.Identifier) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetSporkID(sporkId flow.Identifier) NodeBuilder {
 	builder.sporkId = &sporkId
 	return builder
 }
