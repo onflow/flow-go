@@ -133,12 +133,9 @@ func stopNodes(t *testing.T, nodes []*Node) {
 }
 
 func stopNode(t *testing.T, node *Node) {
-	addr := node.host.Addrs()
-	fmt.Printf("[debug] stopping %v\n", addr)
 	done, err := node.Stop()
 	assert.NoError(t, err)
 	<-done
-	fmt.Printf("[debug] stopped %v\n", addr)
 }
 
 // generateNetworkingKey is a test helper that generates a ECDSA flow key pair.
