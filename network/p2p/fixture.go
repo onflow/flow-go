@@ -213,7 +213,7 @@ func nodesFixture(t *testing.T, count int, opts ...nodeFixtureParameterOption) (
 		// create a node on localhost with a random port assigned by the OS
 		key := generateNetworkingKey(t)
 		node, identity := nodeFixture(t,
-			unittest.Logger(),
+			unittest.Logger().Level(zerolog.ErrorLevel),
 			key,
 			rootBlockID,
 			defaultAddress,
