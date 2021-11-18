@@ -32,8 +32,6 @@ const tickForAssertEventually = 100 * time.Millisecond
 // "0.0.0.0:<selected-port-by-os>
 const defaultAddress = "0.0.0.0:0"
 
-var rootBlockID = unittest.IdentifierFixture()
-
 type nodeFixtureParameters struct {
 	handlerFunc network.StreamHandler
 	unicasts    []unicast.ProtocolName
@@ -93,7 +91,7 @@ func nodeFixture(t *testing.T, opts ...nodeFixtureParameterOption) (*Node, flow.
 		unicasts:    nil,
 		key:         generateNetworkingKey(t),
 		address:     defaultAddress,
-		rootBlockId: rootBlockID,
+		rootBlockId: unittest.IdentifierFixture(),
 	}
 
 	for _, opt := range opts {
@@ -231,10 +229,10 @@ func nodesFixture(t *testing.T, count int, opts ...nodeFixtureParameterOption) (
 
 	// creating nodes
 	var identities flow.IdentityList
+	rootBlockId := unittest.IdentifierFixture()
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
-		key := generateNetworkingKey(t)
-		node, identity := nodeFixture(t, append(opts, withNetworkingPrivateKey(key))...)
+		node, identity := nodeFixture(t, append(opts, withRootBlockId(rootBlockId))...)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}

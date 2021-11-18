@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -108,19 +109,24 @@ func mockStreamHandlerForMessages(t *testing.T, ctx context.Context, msgCount in
 }
 
 func TestCreateStream_WithDefaultUnicast(t *testing.T) {
-	testCreateStream(t, nil, unicast.FlowProtocolID(rootBlockID))
+	rootBlockId := unittest.IdentifierFixture()
+	testCreateStream(t, rootBlockId, nil, unicast.FlowProtocolID(rootBlockId))
 }
 
 func TestCreateStream_WithPreferredGzipUnicast(t *testing.T) {
-	testCreateStream(t, []unicast.ProtocolName{unicast.GzipCompressionUnicast}, unicast.FlowGzipProtocolId(rootBlockID))
+	rootBlockId := unittest.IdentifierFixture()
+	testCreateStream(t, rootBlockId, []unicast.ProtocolName{unicast.GzipCompressionUnicast}, unicast.FlowGzipProtocolId(rootBlockId))
 }
 
 // testCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
-func testCreateStream(t *testing.T, unicasts []unicast.ProtocolName, protocolID core.ProtocolID) {
+func testCreateStream(t *testing.T, rootBlockId flow.Identifier, unicasts []unicast.ProtocolName, protocolID core.ProtocolID) {
 	count := 2
 
 	// Creates nodes
-	nodes, identities := nodesFixture(t, count, withPreferredUnicasts(unicasts))
+	nodes, identities := nodesFixture(t,
+		count,
+		withPreferredUnicasts(unicasts),
+		withRootBlockId(rootBlockId))
 	defer stopNodes(t, nodes)
 
 	id2 := identities[1]

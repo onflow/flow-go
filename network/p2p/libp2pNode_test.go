@@ -51,8 +51,7 @@ func TestMultiAddress(t *testing.T) {
 func TestSingleNodeLifeCycle(t *testing.T) {
 	key := generateNetworkingKey(t)
 	node, _ := nodeFixture(t,
-		withNetworkingPrivateKey(key),
-		withRootBlockId(rootBlockID))
+		withNetworkingPrivateKey(key))
 
 	done, err := node.Stop()
 	unittest.RequireCloseBefore(t, done, 100*time.Millisecond, "could not stop node on time")

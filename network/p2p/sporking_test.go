@@ -43,9 +43,10 @@ func TestSporkingTestSuite(t *testing.T) {
 func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
+	rootBlockId := unittest.IdentifierFixture()
 	node1, id1 := nodeFixture(suite.T(),
 		withNetworkingPrivateKey(node1key),
-		withRootBlockId(rootBlockID))
+		withRootBlockId(rootBlockId))
 
 	defer stopNode(suite.T(), node1)
 	suite.T().Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
@@ -55,7 +56,7 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	node2key := generateNetworkingKey(suite.T())
 	node2, id2 := nodeFixture(suite.T(),
 		withNetworkingPrivateKey(node2key),
-		withRootBlockId(rootBlockID))
+		withRootBlockId(rootBlockId))
 
 	peerInfo2, err := PeerAddressInfo(id2)
 	require.NoError(suite.T(), err)
@@ -73,7 +74,7 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	assert.False(suite.T(), node2key.Equals(node2keyNew))
 	node2, id2New := nodeFixture(suite.T(),
 		withNetworkingPrivateKey(node2keyNew),
-		withRootBlockId(rootBlockID),
+		withRootBlockId(rootBlockId),
 		withNetworkingAddress(id2.Address))
 
 	defer stopNode(suite.T(), node2)

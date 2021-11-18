@@ -227,6 +227,7 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 	}()
 
 	handlerFunc := func(network.Stream) {}
+	rootBlockId := unittest.IdentifierFixture()
 
 	// creating nodes
 	for i := 1; i <= count; i++ {
@@ -240,7 +241,7 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 		resolver := dns.NewResolver(noopMetrics)
 
 		n, err := NewDefaultLibP2PNodeBuilder(flow.Identifier{}, "0.0.0.0:0", key).
-			SetRootBlockID(rootBlockID).
+			SetRootBlockID(rootBlockId).
 			SetConnectionManager(connManager).
 			SetDHTOptions(AsServer(dhtServer)).
 			SetPingInfoProvider(pingInfoProvider).
