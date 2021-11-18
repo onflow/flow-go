@@ -134,7 +134,7 @@ func (suite *BlobServiceTestSuite) TestGetBlobs() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		blobs := bex.GetBlobs(ctx, blobsToGet...)
+		blobs := bex.GetBlobs(ctx, blobsToGet)
 
 		for blob := range blobs {
 			delete(unreceivedBlobs, blob.Cid())
@@ -157,17 +157,10 @@ func (suite *BlobServiceTestSuite) TestGetBlobsWithSession() {
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		var blobChans []<-chan network.Blob
 		session := bex.GetSession(ctx)
 		for blobCid := range blobsToGet {
-			blobs := session.GetBlobs(ctx, blobCid)
-			blobChans = append(blobChans, blobs)
-		}
-		for blob := range util.MergeChannels(blobChans).(<-chan network.Blob) {
-			delete(blobsToGet, blob.Cid())
-		}
-		for blobCid := range blobsToGet {
-			suite.T().Errorf("blob %v not received by node %v", blobCid, i)
+			_, err := session.GetBlob(ctx, blobCid)
+			suite.Assert().NoError(err)
 		}
 	}
 }
@@ -189,7 +182,7 @@ func (suite *BlobServiceTestSuite) TestHas() {
 				unreceivedBlobs[i][blob.Cid()] = struct{}{}
 			}
 		}
-		blobs := bex.GetBlobs(ctx, blobsToGet...)
+		blobs := bex.GetBlobs(ctx, blobsToGet)
 		blobChans = append(blobChans, blobs)
 	}
 
