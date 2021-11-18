@@ -36,8 +36,6 @@ type Handler struct {
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
 	// execute handler function and check for error
@@ -63,6 +61,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// write response to response stream
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	_, writeErr := w.Write(encodedResponse)
 	if writeErr != nil {
 		h.logger.Error().Err(err).Msg("failed to write response")
