@@ -24,12 +24,14 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 	v1SubRouter.Use(middleware.QuerySelect())
 	v1SubRouter.Use(lm.RequestEnd())
 
-	for _, h := range apiHandlers(logger, backend) {
-		v1SubRouter.
+	for _, r := range routeDefinitions() {
+		h := NewHandler(logger, backend, r.apiHandlerFunc)
+		route := v1SubRouter.
 			Methods(h.method).
 			Path(h.pattern).
 			Name(h.name).
 			Handler(h)
+		h.route = route
 	}
 
 	return &http.Server{
@@ -41,45 +43,43 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 	}
 }
 
-func apiHandlers(logger zerolog.Logger, backend access.API) []*Handler {
-	return []*Handler{
+type routeDefinition struct {
+	name        string
+	method      string
+	pattern     string
+	apiHandlerFunc ApiHandlerFunc
+}
+
+func routeDefinitions() []routeDefinition {
+	return []routeDefinition{
 		// Transactions
 		{
-			logger:      logger,
-			backend:     backend,
 			method:      "GET",
 			pattern:     "/transactions/{id}",
 			name:        "getTransactionByID",
-			handlerFunc: getTransactionByID,
+			apiHandlerFunc: getTransactionByID,
 		}, {
-			logger:      logger,
-			backend:     backend,
 			method:      "POST",
 			pattern:     "/transactions",
 			name:        "createTransaction",
-			handlerFunc: createTransaction,
+			apiHandlerFunc: createTransaction,
 		},
 		// Blocks
 		{
-			logger:      logger,
-			backend:     backend,
 			method:      "GET",
 			pattern:     "/blocks/{id}",
 			name:        "getBlocksByID",
-			handlerFunc: getBlocksByID,
+			apiHandlerFunc: getBlocksByID,
 		}, {
-			logger:      logger,
-			backend:     backend,
 			method:      "GET",
 			pattern:     "/blocks",
-			handlerFunc: NotImplemented,
+			apiHandlerFunc: NotImplemented,
 		},
 		// Collections
 		{
-			logger:      logger,
-			backend:     backend,
 			method:      "GET",
 			pattern:     "/collections/{id}",
-			handlerFunc: NotImplemented,
+			apiHandlerFunc: NotImplemented,
 		}, {}}
 }
+

@@ -15,6 +15,15 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
+type ApiHandlerFunc func(
+	w http.ResponseWriter,
+	r *http.Request,
+	vars map[string]string,
+	backend access.API,
+	logger zerolog.Logger,
+) (interface{}, StatusError)
+
+
 // Handler is custom http handler implementing custom handler function.
 // Handler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
@@ -24,15 +33,17 @@ type Handler struct {
 	method      string
 	pattern     string
 	name        string
-	handlerFunc func(
-		w http.ResponseWriter,
-		r *http.Request,
-		vars map[string]string,
-		backend access.API,
-		logger zerolog.Logger,
-	) (interface{}, StatusError)
+	route *mux.Route
+	apiHandlerFunc ApiHandlerFunc
 }
 
+func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandlerFunc) *Handler {
+	return &Handler{
+		logger: logger,
+		backend: backend,
+		apiHandlerFunc: handlerFunc,
+	}
+}
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
@@ -40,13 +51,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
 	// execute handler function and check for error
-	response, err := h.handlerFunc(w, r, mux.Vars(r), h.backend, errorLogger)
+	response, err := h.apiHandlerFunc(w, r, mux.Vars(r), h.backend, errorLogger)
 	if err != nil {
 		switch e := err.(type) {
 		case StatusError:
-			errorResponse(w, e.Status(), e.UserMessage(), h.logger)
+			errorResponse(w, e.Status(), e.UserMessage(), errorLogger)
 		default:
-			errorResponse(w, http.StatusInternalServerError, e.Error(), h.logger)
+			errorResponse(w, http.StatusInternalServerError, e.Error(), errorLogger)
 		}
 
 		// stop going further
@@ -57,7 +68,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	encodedResponse, encErr := json.Marshal(response)
 	if encErr != nil {
 		h.logger.Error().Err(err).Msg("failed to encode response")
-		errorResponse(w, http.StatusInternalServerError, "error generating response", h.logger)
+		errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
 		return
 	}
 
@@ -65,7 +76,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	_, writeErr := w.Write(encodedResponse)
 	if writeErr != nil {
 		h.logger.Error().Err(err).Msg("failed to write response")
-		errorResponse(w, http.StatusInternalServerError, "error generating response", h.logger)
+		errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
 		return
 	}
 
@@ -158,4 +169,8 @@ func NotImplemented(
 	_ zerolog.Logger,
 ) (interface{}, StatusError) {
 	return nil, NewRestError(http.StatusNotImplemented, "endpoint not implemented", nil)
+}
+
+func (h *Handler) linkGenerator() {
+	h.route.
 }
