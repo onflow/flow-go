@@ -25,11 +25,7 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 	v1SubRouter.Use(lm.RequestEnd())
 
 	for _, h := range apiHandlers(logger, backend) {
-		v1SubRouter.
-			Methods(h.method).
-			Path(h.pattern).
-			Name(h.name).
-			Handler(h)
+		h.addToRouter(v1SubRouter)
 	}
 
 	return &http.Server{

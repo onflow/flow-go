@@ -21,13 +21,14 @@ import (
 type Handler struct {
 	logger      zerolog.Logger
 	backend     access.API
+	route       *mux.Route
 	method      string
 	pattern     string
 	name        string
 	handlerFunc func(
-		w http.ResponseWriter,
-		r *http.Request,
-		vars map[string]string,
+		w http.ResponseWriter, // todo(sideninja) think about removing
+		r *http.Request, // todo(sideninja) think about removing and just exposing context
+		vars map[string]string, // todo(sideninja) think about passing as custom struct containing fields such as getParams, body, parsed expanded and link queries etc
 		backend access.API,
 		logger zerolog.Logger,
 	) (interface{}, StatusError)
@@ -70,6 +71,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// addToRouter adds handler to provided router
+func (h *Handler) addToRouter(router *mux.Router) {
+	router.
+		Methods(h.method).
+		Path(h.pattern).
+		Name(h.name).
+		Handler(h)
+
+	h.route = router.Get(h.name)
 }
 
 // errorResponse sends an HTTP error response to the client with the given return code
