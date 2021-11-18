@@ -134,7 +134,7 @@ func stopNodes(t *testing.T, nodes []*Node) {
 func stopNode(t *testing.T, node *Node) {
 	done, err := node.Stop()
 	assert.NoError(t, err)
-	<-done
+	unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop node on ime")
 }
 
 // generateNetworkingKey is a test helper that generates a ECDSA flow key pair.
