@@ -129,7 +129,6 @@ func stopNodes(t *testing.T, nodes []*Node) {
 	for _, n := range nodes {
 		stopNode(t, n)
 	}
-	fmt.Println("[debug] nodes stopped")
 }
 
 func stopNode(t *testing.T, node *Node) {
