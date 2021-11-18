@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	core "github.com/libp2p/go-libp2p-core"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
@@ -107,15 +108,15 @@ func mockStreamHandlerForMessages(t *testing.T, ctx context.Context, msgCount in
 }
 
 func TestCreateStream_WithDefaultUnicast(t *testing.T) {
-	testCreateStream(t, nil)
+	testCreateStream(t, nil, unicast.FlowProtocolID(rootBlockID))
 }
 
 func TestCreateStream_WithPreferredGzipUnicast(t *testing.T) {
-	testCreateStream(t, []unicast.ProtocolName{unicast.GzipCompressionUnicast})
+	testCreateStream(t, []unicast.ProtocolName{unicast.GzipCompressionUnicast}, unicast.FlowGzipProtocolId(rootBlockID))
 }
 
-// TestCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
-func testCreateStream(t *testing.T, unicasts []unicast.ProtocolName) {
+// testCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
+func testCreateStream(t *testing.T, unicasts []unicast.ProtocolName, protocolID core.ProtocolID) {
 	count := 2
 
 	// Creates nodes
@@ -124,9 +125,8 @@ func testCreateStream(t *testing.T, unicasts []unicast.ProtocolName) {
 
 	id2 := identities[1]
 
-	flowProtocolID := unicast.FlowProtocolID(rootBlockID)
 	// Assert that there is no outbound stream to the target yet
-	require.Equal(t, 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+	require.Equal(t, 0, CountStream(nodes[0].host, nodes[1].host.ID(), protocolID, network.DirOutbound))
 
 	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
 	streamCount := 100
@@ -140,7 +140,7 @@ func testCreateStream(t *testing.T, unicasts []unicast.ProtocolName) {
 		require.NoError(t, err)
 		require.NotNil(t, anotherStream)
 		// assert that the stream count within libp2p incremented (a new stream was created)
-		require.Equal(t, i+1, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+		require.Equal(t, i+1, CountStream(nodes[0].host, nodes[1].host.ID(), protocolID, network.DirOutbound))
 		// assert that the same connection is reused
 		require.Len(t, nodes[0].host.Network().Conns(), 1)
 		streams = append(streams, anotherStream)
@@ -158,9 +158,57 @@ func testCreateStream(t *testing.T, unicasts []unicast.ProtocolName) {
 		}()
 		wg.Wait()
 		// assert that the stream count within libp2p decremented
-		require.Equal(t, i, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+		require.Equal(t, i, CountStream(nodes[0].host, nodes[1].host.ID(), protocolID, network.DirOutbound))
 	}
 }
+
+//// testCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
+//func TestCreateStream_FallBack(t *testing.T) {
+//	count := 2
+//
+//	// Creates nodes: one with preferred gzip, and other one with default protocol
+//	thisNode, thisId := nodeFixture(t, withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
+//	otherNode, otherId := nodeFixture(t)
+//
+//	defer stopNodes(t, []*Node{thisNode, otherNode})
+//
+//
+//	// Assert that there is no outbound stream to the target yet
+//	require.Equal(t, 0, CountStream(thisNode.host, otherNode.host.ID(), , network.DirOutbound))
+//
+//	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
+//	streamCount := 100
+//	var streams []network.Stream
+//	for i := 0; i < streamCount; i++ {
+//		pInfo, err := PeerAddressInfo(*id2)
+//		require.NoError(t, err)
+//		nodes[0].host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
+//		anotherStream, err := nodes[0].CreateStream(context.Background(), pInfo.ID)
+//		// Assert that a stream was returned without error
+//		require.NoError(t, err)
+//		require.NotNil(t, anotherStream)
+//		// assert that the stream count within libp2p incremented (a new stream was created)
+//		require.Equal(t, i+1, CountStream(nodes[0].host, nodes[1].host.ID(), protocolID, network.DirOutbound))
+//		// assert that the same connection is reused
+//		require.Len(t, nodes[0].host.Network().Conns(), 1)
+//		streams = append(streams, anotherStream)
+//	}
+//
+//	// reverse loop to close all the streams
+//	for i := streamCount - 1; i >= 0; i-- {
+//		s := streams[i]
+//		wg := sync.WaitGroup{}
+//		wg.Add(1)
+//		go func() {
+//			err := s.Close()
+//			assert.NoError(t, err)
+//			wg.Done()
+//		}()
+//		wg.Wait()
+//		// assert that the stream count within libp2p decremented
+//		require.Equal(t, i, CountStream(nodes[0].host, nodes[1].host.ID(), protocolID, network.DirOutbound))
+//	}
+//}
 
 // TestCreateStreamIsConcurrencySafe tests that the CreateStream is concurrency safe
 func TestCreateStreamIsConcurrencySafe(t *testing.T) {
