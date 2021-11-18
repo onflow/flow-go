@@ -43,21 +43,14 @@ func TestSporkingTestSuite(t *testing.T) {
 func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
-	rootBlockId := unittest.IdentifierFixture()
-	node1, id1 := nodeFixture(suite.T(),
-		rootBlockId,
-		withNetworkingPrivateKey(node1key))
-
-	defer stopNode(suite.T(), node1)
+	node1, id1 := NodeFixture(suite.T(), suite.logger, node1key, sporkID, nil, false, defaultAddress)
+	defer StopNode(suite.T(), node1)
 	suite.T().Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
 	suite.T().Logf("libp2p ID for %s: %s", node1.id.String(), node1.host.ID())
 
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(suite.T())
-	node2, id2 := nodeFixture(suite.T(),
-		rootBlockId,
-		withNetworkingPrivateKey(node2key))
-
+	node2, id2 := NodeFixture(suite.T(), suite.logger, node2key, sporkID, nil, false, defaultAddress)
 	peerInfo2, err := PeerAddressInfo(id2)
 	require.NoError(suite.T(), err)
 
@@ -72,10 +65,8 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// start node2 with the same name, ip and port but with the new key
 	node2keyNew := generateNetworkingKey(suite.T())
 	assert.False(suite.T(), node2key.Equals(node2keyNew))
-	node2, id2New := nodeFixture(suite.T(),
-		rootBlockId,
-		withNetworkingPrivateKey(node2keyNew),
-		withNetworkingAddress(id2.Address))
+	node2, id2New := NodeFixture(suite.T(), suite.logger, node2keyNew, sporkID, nil, false, id2.Address)
+	defer StopNode(suite.T(), node2)
 
 	defer stopNode(suite.T(), node2)
 

@@ -128,7 +128,13 @@ func Bootstrap(
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
 
-		// 6) set metric values
+		// 6) initialize spork params
+		err = transaction.WithTx(state.bootstrapSporkInfo(root))(tx)
+		if err != nil {
+			return fmt.Errorf("could not bootstrap spork info: %w", err)
+		}
+
+		// 7) set metric values
 		err = state.updateEpochMetrics(root)
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
@@ -409,6 +415,34 @@ func (state *State) bootstrapEpoch(root protocol.Snapshot, verifyNetworkAddress 
 	}
 }
 
+// bootstrapSporkInfo bootstraps the protocol state with information about the
+// spork which is used to disambiguate Flow networks.
+func (state *State) bootstrapSporkInfo(root protocol.Snapshot) func(*badger.Txn) error {
+	return func(tx *badger.Txn) error {
+		params := root.Params()
+
+		sporkID, err := params.SporkID()
+		if err != nil {
+			return fmt.Errorf("could not get spork ID: %w", err)
+		}
+		err = operation.InsertSporkID(sporkID)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert spork ID: %w", err)
+		}
+
+		version, err := params.ProtocolVersion()
+		if err != nil {
+			return fmt.Errorf("could not get protocol version: %w", err)
+		}
+		err = operation.InsertProtocolVersion(version)(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert protocol version: %w", err)
+		}
+
+		return nil
+	}
+}
+
 func OpenState(
 	metrics module.ComplianceMetrics,
 	db *badger.DB,
@@ -440,42 +474,42 @@ func OpenState(
 	return state, nil
 }
 
-func (s *State) Params() protocol.Params {
-	return &Params{state: s}
+func (state *State) Params() protocol.Params {
+	return &Params{state: state}
 }
 
-func (s *State) Sealed() protocol.Snapshot {
+func (state *State) Sealed() protocol.Snapshot {
 	// retrieve the latest sealed height
 	var sealed uint64
-	err := s.db.View(operation.RetrieveSealedHeight(&sealed))
+	err := state.db.View(operation.RetrieveSealedHeight(&sealed))
 	if err != nil {
 		return invalid.NewSnapshot(fmt.Errorf("could not retrieve sealed height: %w", err))
 	}
-	return s.AtHeight(sealed)
+	return state.AtHeight(sealed)
 }
 
-func (s *State) Final() protocol.Snapshot {
+func (state *State) Final() protocol.Snapshot {
 	// retrieve the latest finalized height
 	var finalized uint64
-	err := s.db.View(operation.RetrieveFinalizedHeight(&finalized))
+	err := state.db.View(operation.RetrieveFinalizedHeight(&finalized))
 	if err != nil {
 		return invalid.NewSnapshot(fmt.Errorf("could not retrieve finalized height: %w", err))
 	}
-	return s.AtHeight(finalized)
+	return state.AtHeight(finalized)
 }
 
-func (s *State) AtHeight(height uint64) protocol.Snapshot {
+func (state *State) AtHeight(height uint64) protocol.Snapshot {
 	// retrieve the block ID for the finalized height
 	var blockID flow.Identifier
-	err := s.db.View(operation.LookupBlockHeight(height, &blockID))
+	err := state.db.View(operation.LookupBlockHeight(height, &blockID))
 	if err != nil {
 		return invalid.NewSnapshot(fmt.Errorf("could not look up block by height: %w", err))
 	}
-	return NewSnapshot(s, blockID)
+	return NewSnapshot(state, blockID)
 }
 
-func (s *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
-	return NewSnapshot(s, blockID)
+func (state *State) AtBlockID(blockID flow.Identifier) protocol.Snapshot {
+	return NewSnapshot(state, blockID)
 }
 
 // newState initializes a new state backed by the provided a badger database,
@@ -564,6 +598,16 @@ func (state *State) updateEpochMetrics(snap protocol.Snapshot) error {
 	state.metrics.CurrentDKGPhase2FinalView(dkgPhase2FinalView)
 	state.metrics.CurrentDKGPhase3FinalView(dkgPhase3FinalView)
 
+	// EECC - check whether the epoch emergency fallback flag has been set
+	// in the database. If so, skip updating any epoch-related metrics.
+	epochFallbackTriggered, err := state.isEpochEmergencyFallbackTriggered()
+	if err != nil {
+		return fmt.Errorf("could not check epoch emergency fallback flag: %w", err)
+	}
+	if epochFallbackTriggered {
+		state.metrics.EpochEmergencyFallbackTriggered()
+	}
+
 	return nil
 }
 
@@ -604,4 +648,10 @@ func (state *State) updateCommittedEpochFinalView(snap protocol.Snapshot) error 
 	}
 
 	return nil
+}
+
+func (m *State) isEpochEmergencyFallbackTriggered() (bool, error) {
+	var triggered bool
+	err := m.db.View(operation.CheckEpochEmergencyFallbackTriggered(&triggered))
+	return triggered, err
 }

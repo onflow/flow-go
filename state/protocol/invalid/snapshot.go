@@ -2,6 +2,7 @@ package invalid
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state/protocol"
 )
 
 // Snapshot represents a snapshot referencing an invalid block, or for
@@ -56,4 +57,8 @@ func (u *Snapshot) ValidDescendants() ([]flow.Identifier, error) {
 
 func (u *Snapshot) Seed(_ ...uint32) ([]byte, error) {
 	return nil, u.err
+}
+
+func (u *Snapshot) Params() protocol.GlobalParams {
+	return &Params{u.err}
 }

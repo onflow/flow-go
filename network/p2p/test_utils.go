@@ -14,14 +14,14 @@ func createNode(
 	t *testing.T,
 	nodeID flow.Identifier,
 	networkKey crypto.PrivateKey,
-	rootBlockID flow.Identifier,
+	sporkID flow.Identifier,
 	psOpts ...PubsubOption,
 ) *Node {
 	if len(psOpts) == 0 {
 		psOpts = DefaultPubsubOptions(DefaultMaxPubSubMsgSize)
 	}
 	libp2pNode, err := NewDefaultLibP2PNodeBuilder(nodeID, "0.0.0.0:0", networkKey).
-		SetRootBlockID(rootBlockID).
+		SetSporkID(sporkID).
 		SetPubsubOptions(psOpts...).
 		Build(context.TODO())
 	require.NoError(t, err)

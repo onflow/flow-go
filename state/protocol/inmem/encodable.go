@@ -16,6 +16,7 @@ type EncodableSnapshot struct {
 	QuorumCertificate *flow.QuorumCertificate
 	Phase             flow.EpochPhase
 	Epochs            EncodableEpochs
+	Params            EncodableParams
 }
 
 // EncodableEpochs is the encoding format for protocol.EpochQuery
@@ -59,4 +60,11 @@ type EncodableCluster struct {
 	Members   flow.IdentityList
 	RootBlock *cluster.Block
 	RootQC    *flow.QuorumCertificate
+}
+
+// EncodableParams is the encoding format for protocol.GlobalParams
+type EncodableParams struct {
+	ChainID         flow.ChainID
+	SporkID         flow.Identifier
+	ProtocolVersion uint
 }

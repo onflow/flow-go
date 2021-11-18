@@ -75,7 +75,38 @@ func FromSnapshot(from protocol.Snapshot) (*Snapshot, error) {
 		snap.Epochs.Next = &next.enc
 	}
 
+	// convert global state parameters
+	params, err := FromParams(from.Params())
+	if err != nil {
+		return nil, fmt.Errorf("could not get params: %w", err)
+	}
+	snap.Params = params.enc
+
 	return &Snapshot{snap}, nil
+}
+
+// FromParams converts any protocol.GlobalParams to a memory-backed Params.
+func FromParams(from protocol.GlobalParams) (*Params, error) {
+
+	var (
+		params EncodableParams
+		err    error
+	)
+
+	params.ChainID, err = from.ChainID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get chain id: %w", err)
+	}
+	params.SporkID, err = from.SporkID()
+	if err != nil {
+		return nil, fmt.Errorf("could not get spork id: %w", err)
+	}
+	params.ProtocolVersion, err = from.ProtocolVersion()
+	if err != nil {
+		return nil, fmt.Errorf("could not get protocol version: %w", err)
+	}
+
+	return &Params{params}, nil
 }
 
 // FromEpoch converts any protocol.Epoch to a memory-backed Epoch.
@@ -190,6 +221,18 @@ func ClusterFromEncodable(enc EncodableCluster) (*Cluster, error) {
 // root bootstrap state. This is used to bootstrap the protocol state for
 // genesis or post-spork states.
 func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, seal *flow.Seal, qc *flow.QuorumCertificate) (*Snapshot, error) {
+	return SnapshotFromBootstrapStateWithProtocolVersion(root, result, seal, qc, flow.DefaultProtocolVersion)
+}
+
+// SnapshotFromBootstrapStateWithProtocolVersion is SnapshotFromBootstrapState
+// with a caller-specified protocol version.
+func SnapshotFromBootstrapStateWithProtocolVersion(
+	root *flow.Block,
+	result *flow.ExecutionResult,
+	seal *flow.Seal,
+	qc *flow.QuorumCertificate,
+	version uint,
+) (*Snapshot, error) {
 
 	setup, ok := result.ServiceEvents[0].Event.(*flow.EpochSetup)
 	if !ok {
@@ -208,6 +251,12 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 		Current: current.enc,
 	}
 
+	params := EncodableParams{
+		ChainID:         root.Header.ChainID, // chain ID must match the root block
+		SporkID:         root.ID(),           // use root block ID as the unique spork identifier
+		ProtocolVersion: version,             // major software version for this spork
+	}
+
 	snap := SnapshotFromEncodable(EncodableSnapshot{
 		Head:         root.Header,
 		Identities:   setup.Participants,
@@ -220,6 +269,7 @@ func SnapshotFromBootstrapState(root *flow.Block, result *flow.ExecutionResult, 
 		QuorumCertificate: qc,
 		Phase:             flow.EpochPhaseStaking,
 		Epochs:            epochs,
+		Params:            params,
 	})
 	return snap, nil
 }

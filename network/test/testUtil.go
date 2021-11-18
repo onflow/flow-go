@@ -41,7 +41,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var rootBlockID = unittest.IdentifierFixture()
+var sporkID = unittest.IdentifierFixture()
 
 const DryRun = true
 
@@ -160,7 +160,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			factory,
 			id.NodeID,
 			metrics,
-			rootBlockID,
+			sporkID,
 			p2p.DefaultUnicastTimeout,
 			enablePeerManagementAndConnectionGating,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
@@ -314,7 +314,7 @@ func generateLibP2PNode(t *testing.T,
 	resolver := dns.NewResolver(noopMetrics)
 
 	builder := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
-		SetRootBlockID(rootBlockID).
+		SetSporkID(sporkID).
 		SetConnectionGater(connGater).
 		SetConnectionManager(connManager).
 		SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
