@@ -106,7 +106,7 @@ func nodeFixture(t *testing.T,
 	n, err := builder.Build(ctx)
 	require.NoError(t, err)
 
-	err = n.WithDefaultUnicastProtocol(parameters.handlerFunc, nil)
+	err = n.WithDefaultUnicastProtocol(parameters.handlerFunc, parameters.unicasts)
 	require.NoError(t, err)
 
 	require.Eventuallyf(t, func() bool {

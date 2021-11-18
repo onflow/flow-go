@@ -110,12 +110,16 @@ func TestCreateStream_WithDefaultUnicast(t *testing.T) {
 	testCreateStream(t, nil)
 }
 
+func TestCreateStream_WithPreferredGzipUnicast(t *testing.T) {
+	testCreateStream(t, []unicast.ProtocolName{unicast.GzipCompressionUnicast})
+}
+
 // TestCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
 func testCreateStream(t *testing.T, unicasts []unicast.ProtocolName) {
 	count := 2
 
 	// Creates nodes
-	nodes, identities := nodesFixture(t, count)
+	nodes, identities := nodesFixture(t, count, withPreferredUnicasts(unicasts))
 	defer stopNodes(t, nodes)
 
 	id2 := identities[1]
