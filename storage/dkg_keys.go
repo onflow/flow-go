@@ -7,10 +7,12 @@ import (
 type DKGKeys interface {
 	// insert the random beacon private key to database when DKG didn't fail locally
 	// (the node completed DKG  and a private key was successfully generated)
+	// During normal operations, no error returns are expected.
 	InsertMyDKGPrivateInfo(epochCounter uint64, key *dkg.DKGParticipantPriv) error
 
 	// insert a record in database to indicate that the DKG was completed,
 	// but the node failed to properly participate, i.e. there is no valid private random beacon key.
+	// During normal operations, no error returns are expected.
 	InsertNoDKGPrivateInfo(epochCounter uint64) error
 
 	// look up the random beacon private key for the given Epoch, it returns:
