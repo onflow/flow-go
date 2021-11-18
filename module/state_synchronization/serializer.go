@@ -58,7 +58,11 @@ func (s *serializer) writePrototype(w io.Writer, v interface{}) error {
 		_, err = w.Write([]byte{code})
 	}
 
-	return fmt.Errorf("failed to write code: %w", err)
+	if err != nil {
+		return fmt.Errorf("failed to write code: %w", err)
+	}
+
+	return nil
 }
 
 func (s *serializer) Serialize(w io.Writer, v interface{}) error {

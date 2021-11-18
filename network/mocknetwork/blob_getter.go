@@ -40,19 +40,12 @@ func (_m *BlobGetter) GetBlob(ctx context.Context, c cid.Cid) (blocks.Block, err
 }
 
 // GetBlobs provides a mock function with given fields: ctx, ks
-func (_m *BlobGetter) GetBlobs(ctx context.Context, ks ...cid.Cid) <-chan blocks.Block {
-	_va := make([]interface{}, len(ks))
-	for _i := range ks {
-		_va[_i] = ks[_i]
-	}
-	var _ca []interface{}
-	_ca = append(_ca, ctx)
-	_ca = append(_ca, _va...)
-	ret := _m.Called(_ca...)
+func (_m *BlobGetter) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan blocks.Block {
+	ret := _m.Called(ctx, ks)
 
 	var r0 <-chan blocks.Block
-	if rf, ok := ret.Get(0).(func(context.Context, ...cid.Cid) <-chan blocks.Block); ok {
-		r0 = rf(ctx, ks...)
+	if rf, ok := ret.Get(0).(func(context.Context, []cid.Cid) <-chan blocks.Block); ok {
+		r0 = rf(ctx, ks)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(<-chan blocks.Block)

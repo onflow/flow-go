@@ -19,57 +19,71 @@ const (
 
 var ErrBlobTreeDepthExceeded = errors.New("blob tree depth exceeded")
 
-// ExecutionDataStorer handles storing and loading execution data from a blobservice
-type ExecutionDataStorer struct {
+// ExecutionDataService handles adding and getting execution data from a blobservice
+type ExecutionDataService struct {
 	serializer  *serializer
 	blobService network.BlobService
 	maxBlobSize int
 }
 
-func NewExecutionDataStorer(
+func NewExecutionDataService(
 	codec encoding.Codec,
 	compressor network.Compressor,
 	blobService network.BlobService,
-) *ExecutionDataStorer {
-	return &ExecutionDataStorer{&serializer{codec, compressor}, blobService, defaultMaxBlobSize}
+) *ExecutionDataService {
+	return &ExecutionDataService{&serializer{codec, compressor}, blobService, defaultMaxBlobSize}
 }
 
-func (s *ExecutionDataStorer) receiveBlobs(parent context.Context, br *BlobReceiver) ([]cid.Cid, error) {
+func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *BlobReceiver) ([]network.Blob, error) {
+	var blobs []network.Blob
+	var err error
+
+	for i := 0; i < defaultBlobBatchSize; i++ {
+		var blob network.Blob
+		blob, err = br.Receive()
+
+		if err != nil {
+			break
+		}
+
+		blobs = append(blobs, blob)
+	}
+
+	return blobs, err
+}
+
+func (s *ExecutionDataService) receiveBlobs(parent context.Context, br *BlobReceiver) ([]cid.Cid, error) {
 	defer br.Close()
 
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 
-	var blobs []network.Blob
 	var cids []cid.Cid
 
 	for {
-		blob, err := br.Receive()
+		batch, recvErr := s.receiveBatch(ctx, br)
 
-		if err != nil {
-			if errors.Is(err, ErrClosedBlobChannel) {
-				break
-			}
-
-			return nil, err
+		for _, blob := range batch {
+			cids = append(cids, blob.Cid())
 		}
 
-		blobs = append(blobs, blob)
-		cids = append(cids, blob.Cid())
+		if err := s.blobService.AddBlobs(ctx, batch); err != nil {
+			return nil, fmt.Errorf("failed to add blobs to blobservice: %w", err)
+		}
 
-		if len(blobs) == defaultBlobBatchSize {
-			if err := s.blobService.AddBlobs(ctx, blobs...); err != nil {
-				return nil, fmt.Errorf("failed to add blobs to blobservice: %w", err)
+		if recvErr != nil {
+			if recvErr != ErrClosedBlobChannel {
+				return nil, recvErr
 			}
 
-			blobs = nil
+			break
 		}
 	}
 
 	return cids, nil
 }
 
-func (s *ExecutionDataStorer) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) {
+func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) {
 	bcw, br := IncomingBlobChannel(s.maxBlobSize)
 
 	done := make(chan struct{})
@@ -98,7 +112,7 @@ func (s *ExecutionDataStorer) addBlobs(ctx context.Context, v interface{}) ([]ci
 }
 
 // Add constructs a blob tree for the given ExecutionData and adds it to the blobservice, and then returns the root CID.
-func (s *ExecutionDataStorer) Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error) {
+func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error) {
 	cids, err := s.addBlobs(ctx, sd)
 
 	if err != nil {
@@ -116,13 +130,13 @@ func (s *ExecutionDataStorer) Add(ctx context.Context, sd *ExecutionData) (cid.C
 	}
 }
 
-func (s *ExecutionDataStorer) sendBlobs(parent context.Context, bs *BlobSender, cids []cid.Cid) error {
+func (s *ExecutionDataService) sendBlobs(parent context.Context, bs *BlobSender, cids []cid.Cid) error {
 	defer bs.Close()
 
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 
-	blobChan := s.blobService.GetBlobs(ctx, cids...)
+	blobChan := s.blobService.GetBlobs(ctx, cids)
 	cachedBlobs := make(map[cid.Cid]network.Blob)
 
 	for _, c := range cids {
@@ -155,7 +169,7 @@ func (s *ExecutionDataStorer) sendBlobs(parent context.Context, bs *BlobSender, 
 	return nil
 }
 
-func (s *ExecutionDataStorer) findBlob(
+func (s *ExecutionDataService) findBlob(
 	blobChan <-chan network.Blob,
 	target cid.Cid,
 	cache map[cid.Cid]network.Blob,
@@ -177,7 +191,7 @@ func (s *ExecutionDataStorer) findBlob(
 	return nil, &BlobNotFoundError{target}
 }
 
-func (s *ExecutionDataStorer) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
+func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
 	bcr, bs := OutgoingBlobChannel()
 
 	done := make(chan struct{})
@@ -210,7 +224,7 @@ func (s *ExecutionDataStorer) getBlobs(ctx context.Context, cids []cid.Cid) (int
 }
 
 // Get gets the ExecutionData for the given root CID from the blobservice.
-func (s *ExecutionDataStorer) Get(ctx context.Context, c cid.Cid) (*ExecutionData, error) {
+func (s *ExecutionDataService) Get(ctx context.Context, c cid.Cid) (*ExecutionData, error) {
 	cids := []cid.Cid{c}
 
 	for i := uint(0); i < defaultMaxBlobTreeDepth; i++ {

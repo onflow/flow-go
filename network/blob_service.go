@@ -33,7 +33,7 @@ type BlobGetter interface {
 	// be canceled). In that case, it will close the channel early. It is up
 	// to the consumer to detect this situation and keep track which blobs
 	// it has received and which it hasn't.
-	GetBlobs(ctx context.Context, ks ...cid.Cid) <-chan Blob
+	GetBlobs(ctx context.Context, ks []cid.Cid) <-chan Blob
 }
 
 // BlobService is a hybrid blob datastore. It stores data in a local
@@ -48,7 +48,7 @@ type BlobService interface {
 
 	// AddBlobs adds a slice of blobs at the same time using batching
 	// capabilities of the underlying datastore whenever possible.
-	AddBlobs(ctx context.Context, bs ...Blob) error
+	AddBlobs(ctx context.Context, bs []Blob) error
 
 	// DeleteBlob deletes the given blob from the blobservice.
 	DeleteBlob(ctx context.Context, c cid.Cid) error
@@ -82,7 +82,7 @@ func (bs *blobService) GetBlob(ctx context.Context, c cid.Cid) (Blob, error) {
 	return bs.blockService.GetBlock(ctx, c)
 }
 
-func (bs *blobService) GetBlobs(ctx context.Context, ks ...cid.Cid) <-chan Blob {
+func (bs *blobService) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan Blob {
 	return bs.blockService.GetBlocks(ctx, ks)
 }
 
@@ -90,7 +90,7 @@ func (bs *blobService) AddBlob(ctx context.Context, b Blob) error {
 	return bs.blockService.AddBlock(ctx, b)
 }
 
-func (bs *blobService) AddBlobs(ctx context.Context, blobs ...Blob) error {
+func (bs *blobService) AddBlobs(ctx context.Context, blobs []Blob) error {
 	return bs.blockService.AddBlocks(ctx, blobs)
 }
 
@@ -116,6 +116,6 @@ func (s *blobServiceSession) GetBlob(ctx context.Context, c cid.Cid) (Blob, erro
 	return s.session.GetBlock(ctx, c)
 }
 
-func (s *blobServiceSession) GetBlobs(ctx context.Context, ks ...cid.Cid) <-chan Blob {
+func (s *blobServiceSession) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan Blob {
 	return s.session.GetBlocks(ctx, ks)
 }
