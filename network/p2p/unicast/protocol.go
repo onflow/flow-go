@@ -34,6 +34,18 @@ func IsFlowProtocolStream(s libp2pnet.Stream) bool {
 	return strings.HasPrefix(p, FlowLibP2PProtocolCommonPrefix)
 }
 
+func FlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID.String())
+}
+
+func PingProtocolId(rootBlockID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID.String())
+}
+
+func FlowGzipProtocolId(rootBlockID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2PProtocolGzipCompressedOneToOne + rootBlockID.String())
+}
+
 type ProtocolName string
 type ProtocolFactory func(zerolog.Logger, flow.Identifier, libp2pnet.StreamHandler) Protocol
 

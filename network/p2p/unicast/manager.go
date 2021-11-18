@@ -22,14 +22,6 @@ import (
 // MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
 const MaxConnectAttemptSleepDuration = 5
 
-func FlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
-	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID.String())
-}
-
-func PingProtocolId(rootBlockID flow.Identifier) protocol.ID {
-	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID.String())
-}
-
 type Manager struct {
 	logger         zerolog.Logger
 	streamFactory  StreamFactory
