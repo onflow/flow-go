@@ -55,8 +55,8 @@ func NewNode(height int,
 	payload *ledger.Payload,
 	hashValue hash.Hash,
 	maxDepth uint16,
-	regCount uint64) *Node {
-
+	regCount uint64,
+) *Node {
 	n := &Node{
 		lChild:    lchild,
 		rChild:    rchild,
@@ -76,8 +76,8 @@ func NewNode(height int,
 // UNCHECKED requirement: payload should be deep copied if received from external sources
 func NewLeaf(path ledger.Path,
 	payload *ledger.Payload,
-	height int) *Node {
-
+	height int,
+) *Node {
 	n := &Node{
 		lChild:   nil,
 		rChild:   nil,
@@ -146,14 +146,14 @@ func NewInterimCompactifiedNode(height int, lChild, rChild *Node) *Node {
 	// an empty subtrie => in total we have one allocated register, which we represent as single leaf node
 	if rChild == nil && lChild.IsLeaf() {
 		h := hash.HashInterNode(lChild.hashValue, ledger.GetDefaultHashForHeight(lChild.height))
-		return &Node{height: height, hashValue: h, maxDepth: 0, regCount: 1}
+		return &Node{height: height, path: lChild.path, payload: lChild.payload, hashValue: h, maxDepth: 0, regCount: 1}
 	}
 	if lChild == nil && rChild.IsLeaf() {
 		h := hash.HashInterNode(ledger.GetDefaultHashForHeight(rChild.height), rChild.hashValue)
-		return &Node{height: height, hashValue: h, maxDepth: 0, regCount: 1}
+		return &Node{height: height, path: rChild.path, payload: rChild.payload, hashValue: h, maxDepth: 0, regCount: 1}
 	}
 
-	// we can't compactify; return a full interim leaf
+	// CASE (b): both children contain some allocated registers => we can't compactify; return a full interim leaf
 	return NewInterimNode(height, lChild, rChild)
 }
 
@@ -200,11 +200,7 @@ func verifyCachedHashRecursive(n *Node) bool {
 	if n == nil {
 		return true
 	}
-	if !verifyCachedHashRecursive(n.lChild) {
-		return false
-	}
-
-	if !verifyCachedHashRecursive(n.rChild) {
+	if !verifyCachedHashRecursive(n.lChild) || !verifyCachedHashRecursive(n.rChild) {
 		return false
 	}
 
