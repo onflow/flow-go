@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/dns"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -35,6 +36,7 @@ var rootBlockID = unittest.IdentifierFixture()
 
 type nodeFixtureParameters struct {
 	handlerFunc network.StreamHandler
+	unicasts    []unicast.ProtocolName
 	allowList   bool
 }
 
@@ -52,6 +54,12 @@ func withAllowListEnabled() nodeFixtureParameterOption {
 	}
 }
 
+func withPreferredUnicasts(unicasts []unicast.ProtocolName) nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.unicasts = unicasts
+	}
+}
+
 // nodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
 func nodeFixture(t *testing.T,
@@ -65,6 +73,7 @@ func nodeFixture(t *testing.T,
 	parameters := &nodeFixtureParameters{
 		handlerFunc: func(network.Stream) {},
 		allowList:   false,
+		unicasts:    nil,
 	}
 
 	for _, opt := range opts {
