@@ -304,12 +304,10 @@ func update(
 
 	// In case the parent node was a leaf, we _cannot reuse_ it, because we potentially
 	// updated registers in the sub-trie
-	n := node.NewInterimNode(nodeHeight, lChild, rChild)
 	if prune {
-		return n.Compactify()
+		return node.NewInterimCompactifiedNode(nodeHeight, lChild, rChild)
 	}
-
-	return n
+	return node.NewInterimNode(nodeHeight, lChild, rChild)
 }
 
 // UnsafeProofs provides proofs for the given paths.
