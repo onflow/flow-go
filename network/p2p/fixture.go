@@ -37,6 +37,9 @@ var rootBlockID = unittest.IdentifierFixture()
 type nodeFixtureParameters struct {
 	handlerFunc network.StreamHandler
 	unicasts    []unicast.ProtocolName
+	key         fcrypto.PrivateKey
+	address     string
+	rootBlockId flow.Identifier
 	allowList   bool
 }
 
@@ -60,25 +63,44 @@ func withPreferredUnicasts(unicasts []unicast.ProtocolName) nodeFixtureParameter
 	}
 }
 
+func withNetworkingPrivateKey(key fcrypto.PrivateKey) nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.key = key
+	}
+}
+
+func withRootBlockId(blockId flow.Identifier) nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.rootBlockId = blockId
+	}
+}
+
+func withNetworkingAddress(address string) nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.address = address
+	}
+}
+
 // nodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
-func nodeFixture(t *testing.T,
-	log zerolog.Logger,
-	key fcrypto.PrivateKey,
-	rootID flow.Identifier,
-	address string,
-	opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
-	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(key.PublicKey()), unittest.WithAddress(address))
+func nodeFixture(t *testing.T, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
+
+	logger := unittest.Logger().Level(zerolog.ErrorLevel)
 
 	parameters := &nodeFixtureParameters{
 		handlerFunc: func(network.Stream) {},
 		allowList:   false,
 		unicasts:    nil,
+		key:         generateNetworkingKey(t),
+		address:     defaultAddress,
+		rootBlockId: rootBlockID,
 	}
 
 	for _, opt := range opts {
 		opt(parameters)
 	}
+
+	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(parameters.key.PublicKey()), unittest.WithAddress(parameters.address))
 
 	pingInfoProvider, _, _, _ := mockPingInfoProvider()
 
@@ -87,18 +109,18 @@ func nodeFixture(t *testing.T,
 	unittest.RequireCloseBefore(t, resolver.Ready(), 10*time.Millisecond, "could not start resolver")
 
 	noopMetrics := metrics.NewNoopCollector()
-	connManager := NewConnManager(log, noopMetrics)
+	connManager := NewConnManager(logger, noopMetrics)
 
-	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, address, key).
-		SetRootBlockID(rootID).
+	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, parameters.address, parameters.key).
+		SetRootBlockID(parameters.rootBlockId).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
 		SetTopicValidation(false).
-		SetLogger(log)
+		SetLogger(logger)
 
 	if parameters.allowList {
-		connGater := NewConnGater(log)
+		connGater := NewConnGater(logger)
 		builder.SetConnectionGater(connGater)
 	}
 
@@ -212,12 +234,7 @@ func nodesFixture(t *testing.T, count int, opts ...nodeFixtureParameterOption) (
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
 		key := generateNetworkingKey(t)
-		node, identity := nodeFixture(t,
-			unittest.Logger().Level(zerolog.ErrorLevel),
-			key,
-			rootBlockID,
-			defaultAddress,
-			opts...)
+		node, identity := nodeFixture(t, append(opts, withNetworkingPrivateKey(key))...)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
