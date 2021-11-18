@@ -2038,7 +2038,9 @@ func TestBLSMultiSignature(t *testing.T) {
 
 					signatures := make([]cadence.Value, 0, numSigs)
 					// alter one random signature
-					sigs[numSigs/2][0] ^= 1
+					tmp := sigs[numSigs/2]
+					sigs[numSigs/2] = crypto.BLSInvalidSignature()
+
 					for _, sig := range sigs {
 						s := testutil.BytesToCadenceArray(sig)
 						signatures = append(signatures, s)
@@ -2056,7 +2058,7 @@ func TestBLSMultiSignature(t *testing.T) {
 					)
 
 					// revert the change
-					sigs[numSigs/2][0] ^= 1
+					sigs[numSigs/2] = tmp
 
 					err = vm.Run(ctx, script, view, programs)
 					assert.NoError(t, err)
@@ -2245,9 +2247,14 @@ func TestBLSMultiSignature(t *testing.T) {
 										signatureAlgorithm: SignatureAlgorithm.BLS_BLS12_381
 									))
 								}
-								let aggPk = AggregateBLSPublicKeys(pks)
-								let aggSignature = AggregateBLSSignatures(signatures)
-								return aggPk.verify(aggSignature, message, tag, KMAC128_BLS_BLS12_381)
+								let aggPk = AggregateBLSPublicKeys(pks)!
+								let aggSignature = AggregateBLSSignatures(signatures)!
+								let boo = aggPk.verify(
+									signature: aggSignature, 
+									signedData: message, 
+									domainSeparationTag: tag, 
+									hashAlgorithm: HashAlgorithm.KMAC128_BLS_BLS12_381)
+								return boo
 							}
 							`,
 					),
