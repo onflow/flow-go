@@ -68,11 +68,12 @@ func (s *ExecutionDataService) receiveBlobs(parent context.Context, br *BlobRece
 		}
 
 		if err := s.blobService.AddBlobs(ctx, batch); err != nil {
-			return nil, fmt.Errorf("failed to add blobs to blobservice: %w", err)
+			return nil, err
 		}
 
 		if recvErr != nil {
 			if recvErr != ErrClosedBlobChannel {
+				// this is an unexpected error, and should never occur
 				return nil, recvErr
 			}
 
@@ -87,28 +88,28 @@ func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}) ([]c
 	bcw, br := IncomingBlobChannel(s.maxBlobSize)
 
 	done := make(chan struct{})
-	var err error
+	var serializeErr error
 
 	go func() {
 		defer close(done)
 		defer bcw.Close()
 
-		if err = s.serializer.Serialize(bcw, v); err != nil {
+		if serializeErr = s.serializer.Serialize(bcw, v); serializeErr != nil {
 			return
 		}
 
-		err = bcw.Flush()
+		serializeErr = bcw.Flush()
 	}()
 
 	cids, recvErr := s.receiveBlobs(ctx, br)
+
+	<-done
 
 	if recvErr != nil {
 		return nil, recvErr
 	}
 
-	<-done
-
-	return cids, err
+	return cids, serializeErr
 }
 
 // Add constructs a blob tree for the given ExecutionData and adds it to the blobservice, and then returns the root CID.
@@ -149,15 +150,17 @@ func (s *ExecutionDataService) sendBlobs(parent context.Context, bs *BlobSender,
 			blob, err = s.findBlob(blobChan, c, cachedBlobs)
 
 			if err != nil {
-				_, ok := err.(*BlobNotFoundError)
+				return err
+			}
 
+			if blob == nil {
 				// the blob channel may be closed as a result of the context being canceled,
 				// in which case we should return the context error.
-				if ok && ctx.Err() != nil {
+				if ctx.Err() != nil {
 					return ctx.Err()
 				}
 
-				return err
+				return &BlobNotFoundError{c}
 			}
 		}
 
@@ -188,7 +191,7 @@ func (s *ExecutionDataService) findBlob(
 		cache[blob.Cid()] = blob
 	}
 
-	return nil, &BlobNotFoundError{target}
+	return nil, nil
 }
 
 func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
@@ -196,31 +199,33 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (in
 
 	done := make(chan struct{})
 	var v interface{}
-	var err error
+	var deserializeErr error
 
 	go func() {
 		defer close(done)
 		defer bcr.Close()
 
-		v, err = s.serializer.Deserialize(bcr)
+		v, deserializeErr = s.serializer.Deserialize(bcr)
 	}()
 
 	sendErr := s.sendBlobs(ctx, bs, cids)
 
-	if sendErr != nil && !errors.Is(sendErr, ErrClosedBlobChannel) {
+	<-done
+
+	if sendErr != nil && errors.Is(sendErr, ErrClosedBlobChannel) {
 		return nil, sendErr
 	}
 
-	<-done
-
-	if err != nil {
-		return nil, &MalformedDataError{err}
-	} else if sendErr != nil {
-		// if deserialization completed without consuming all blobs, then the data is malformed.
-		return nil, &MalformedDataError{errors.New("deserialization didn't consume all data")}
+	if deserializeErr != nil {
+		return nil, &MalformedDataError{deserializeErr}
 	}
 
-	return v, err
+	// TODO: deserialization succeeds even if the blob channel reader has still has unconsumed
+	// data, meaning that a malicious actor could fill the blob tree with lots of unnecessary
+	// data by appending it at the end of the serialized data for each level. Eventually, we
+	// will need to implement validation logic on Verification nodes to slash this behavior.
+
+	return v, nil
 }
 
 // Get gets the ExecutionData for the given root CID from the blobservice.
@@ -253,7 +258,7 @@ type MalformedDataError struct {
 }
 
 func (e *MalformedDataError) Error() string {
-	return fmt.Sprintf("blob tree contains malformed data: %v", e.err)
+	return fmt.Sprintf("malformed data: %v", e.err)
 }
 
 func (e *MalformedDataError) Unwrap() error { return e.err }
