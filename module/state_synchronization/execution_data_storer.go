@@ -1,69 +1,108 @@
 package state_synchronization
 
 import (
-	"bytes"
+	"context"
+	"errors"
 	"fmt"
-	"io"
 
-	blocks "github.com/ipfs/go-block-format"
 	"github.com/ipfs/go-cid"
-	blockstore "github.com/ipfs/go-ipfs-blockstore"
 
-	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
 )
 
-const MAX_BLOCK_SIZE = 1e6 // 1MB
+const (
+	defaultMaxBlobSize      = 1 << 20 // 1MiB
+	defaultMaxBlobTreeDepth = 2       // prevents malicious CID from causing download of unbounded amounts of data
+	defaultBlobBatchSize    = 16
+)
 
-// ExecutionData represents the execution data of a block
-type ExecutionData struct {
-	BlockID            flow.Identifier
-	Collections        []*flow.Collection
-	Events             []*flow.Event
-	TrieUpdate         []*ledger.TrieUpdate
-	TransactionResults []*flow.TransactionResult
-}
+var ErrBlobTreeDepthExceeded = errors.New("blob tree depth exceeded")
 
-// ExecutionDataStorer handles storing and loading execution data from a blockstore
+// ExecutionDataStorer handles storing and loading execution data from a blobservice
 type ExecutionDataStorer struct {
-	blockWriter *BlockWriter
 	serializer  *serializer
+	blobService network.BlobService
+	maxBlobSize int
 }
 
 func NewExecutionDataStorer(
 	codec encoding.Codec,
 	compressor network.Compressor,
-	bstore blockstore.Blockstore,
-) (*ExecutionDataStorer, error) {
-	bw := &BlockWriter{
-		maxBlockSize: MAX_BLOCK_SIZE,
-		bstore:       bstore,
-	}
-	return &ExecutionDataStorer{bw, &serializer{codec, compressor}}, nil
+	blobService network.BlobService,
+) *ExecutionDataStorer {
+	return &ExecutionDataStorer{&serializer{codec, compressor}, blobService, defaultMaxBlobSize}
 }
 
-func (s *ExecutionDataStorer) writeBlocks(v interface{}) ([]cid.Cid, error) {
-	if err := s.serializer.serialize(s.blockWriter, v); err != nil {
-		return nil, err
+func (s *ExecutionDataStorer) receiveBlobs(parent context.Context, br *BlobReceiver) ([]cid.Cid, error) {
+	defer br.Close()
+
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+
+	var blobs []network.Blob
+	var cids []cid.Cid
+
+	for {
+		blob, err := br.Receive()
+
+		if err != nil {
+			if errors.Is(err, ErrClosedBlobChannel) {
+				break
+			}
+
+			return nil, err
+		}
+
+		blobs = append(blobs, blob)
+		cids = append(cids, blob.Cid())
+
+		if len(blobs) == defaultBlobBatchSize {
+			if err := s.blobService.AddBlobs(ctx, blobs...); err != nil {
+				return nil, fmt.Errorf("failed to add blobs to blobservice: %w", err)
+			}
+
+			blobs = nil
+		}
 	}
-	if err := s.blockWriter.Flush(); err != nil {
-		return nil, err
-	}
-	cids := s.blockWriter.GetWrittenCids()
-	s.blockWriter.Reset()
+
 	return cids, nil
 }
 
-// Store stores the given ExecutionData into the blockstore and returns the root CID.
-// Since blocks are limited to MAX_BLOCK_SIZE bytes, it's possible that the data may
-// be stored in multiple blocks, and hence the returned root CID may point to a block
-// for which the data itself represents a recursive list of CIDs.
-func (s *ExecutionDataStorer) Store(sd *ExecutionData) (cid.Cid, error) {
-	cids, err := s.writeBlocks(sd)
+func (s *ExecutionDataStorer) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) {
+	bcw, br := IncomingBlobChannel(s.maxBlobSize)
+
+	done := make(chan struct{})
+	var err error
+
+	go func() {
+		defer close(done)
+		defer bcw.Close()
+
+		if err = s.serializer.Serialize(bcw, v); err != nil {
+			return
+		}
+
+		err = bcw.Flush()
+	}()
+
+	cids, recvErr := s.receiveBlobs(ctx, br)
+
+	if recvErr != nil {
+		return nil, recvErr
+	}
+
+	<-done
+
+	return cids, err
+}
+
+// Add constructs a blob tree for the given ExecutionData and adds it to the blobservice, and then returns the root CID.
+func (s *ExecutionDataStorer) Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error) {
+	cids, err := s.addBlobs(ctx, sd)
+
 	if err != nil {
-		return cid.Undef, fmt.Errorf("failed to write state diff blocks: %w", err)
+		return cid.Undef, fmt.Errorf("failed to add execution data blobs: %w", err)
 	}
 
 	for {
@@ -71,35 +110,116 @@ func (s *ExecutionDataStorer) Store(sd *ExecutionData) (cid.Cid, error) {
 			return cids[0], nil
 		}
 
-		if cids, err = s.writeBlocks(cids); err != nil {
-			return cid.Undef, fmt.Errorf("failed to write cid blocks: %w", err)
+		if cids, err = s.addBlobs(ctx, cids); err != nil {
+			return cid.Undef, fmt.Errorf("failed to add cid blobs: %w", err)
 		}
 	}
 }
 
-func (s *ExecutionDataStorer) readBlocks(cids []cid.Cid) (interface{}, error) {
-	buf := &bytes.Buffer{}
+func (s *ExecutionDataStorer) sendBlobs(parent context.Context, bs *BlobSender, cids []cid.Cid) error {
+	defer bs.Close()
+
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+
+	blobChan := s.blobService.GetBlobs(ctx, cids...)
+	cachedBlobs := make(map[cid.Cid]network.Blob)
+
 	for _, c := range cids {
-		block, err := s.blockWriter.bstore.Get(c)
-		if err != nil {
-			return nil, fmt.Errorf("failed to get block %v from blockstore: %w", c, err)
+		var err error
+		blob, ok := cachedBlobs[c]
+
+		if ok {
+			delete(cachedBlobs, c)
+		} else {
+			blob, err = s.findBlob(blobChan, c, cachedBlobs)
+
+			if err != nil {
+				_, ok := err.(*BlobNotFoundError)
+
+				// the blob channel may be closed as a result of the context being canceled,
+				// in which case we should return the context error.
+				if ok && ctx.Err() != nil {
+					return ctx.Err()
+				}
+
+				return err
+			}
 		}
-		_, _ = buf.Write(block.RawData()) // never returns error
+
+		if err = bs.Send(blob); err != nil {
+			return err
+		}
 	}
-	return s.serializer.deserialize(buf)
+
+	return nil
 }
 
-// Load loads the ExecutionData represented by the given CID from the blockstore.
-// Since blocks are limited to MAX_BLOCK_SIZE bytes, it's possible that the data was
-// stored in multiple blocks, and hence the root CID may point to a block for which
-// the data itself represents a recursive list of CIDs.
-func (s *ExecutionDataStorer) Load(c cid.Cid) (*ExecutionData, error) {
-	cids := []cid.Cid{c}
-	for {
-		v, err := s.readBlocks(cids)
-		if err != nil {
-			return nil, fmt.Errorf("could not read blocks: %w", err)
+func (s *ExecutionDataStorer) findBlob(
+	blobChan <-chan network.Blob,
+	target cid.Cid,
+	cache map[cid.Cid]network.Blob,
+) (network.Blob, error) {
+	for blob := range blobChan {
+		// check blob size
+		blobSize := len(blob.RawData())
+		if blobSize > s.maxBlobSize {
+			return nil, &BlobSizeLimitExceededError{blob.Cid()}
 		}
+
+		if blob.Cid() == target {
+			return blob, nil
+		}
+
+		cache[blob.Cid()] = blob
+	}
+
+	return nil, &BlobNotFoundError{target}
+}
+
+func (s *ExecutionDataStorer) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
+	bcr, bs := OutgoingBlobChannel()
+
+	done := make(chan struct{})
+	var v interface{}
+	var err error
+
+	go func() {
+		defer close(done)
+		defer bcr.Close()
+
+		v, err = s.serializer.Deserialize(bcr)
+	}()
+
+	sendErr := s.sendBlobs(ctx, bs, cids)
+
+	if sendErr != nil && !errors.Is(sendErr, ErrClosedBlobChannel) {
+		return nil, sendErr
+	}
+
+	<-done
+
+	if err != nil {
+		return nil, &MalformedDataError{err}
+	} else if sendErr != nil {
+		// if deserialization completed without consuming all blobs, then the data is malformed.
+		return nil, &MalformedDataError{errors.New("deserialization didn't consume all data")}
+	}
+
+	return v, err
+}
+
+// Get gets the ExecutionData for the given root CID from the blobservice.
+func (s *ExecutionDataStorer) Get(ctx context.Context, c cid.Cid) (*ExecutionData, error) {
+	cids := []cid.Cid{c}
+
+	for i := uint(0); i < defaultMaxBlobTreeDepth; i++ {
+		v, err := s.getBlobs(ctx, cids)
+
+		if err != nil {
+			return nil, fmt.Errorf("failed to get level %v of blob tree: %w", i, err)
+		}
+
 		switch v := v.(type) {
 		case *ExecutionData:
 			return v, nil
@@ -107,84 +227,35 @@ func (s *ExecutionDataStorer) Load(c cid.Cid) (*ExecutionData, error) {
 			cids = *v
 		}
 	}
+
+	return nil, ErrBlobTreeDepthExceeded
 }
 
-var _ io.Writer = (*BlockWriter)(nil)
-
-type BlockWriter struct {
-	maxBlockSize int
-	bstore       blockstore.Blockstore
-	cids         []cid.Cid
-	buf          []byte // unflushed bytes from previous write
+// MalformedDataError is returned when malformed data is found at some level of the requested
+// blob tree. It likely indicates that the tree was generated incorrectly, and hence the request
+// should not be retried.
+type MalformedDataError struct {
+	err error
 }
 
-func (bw *BlockWriter) Reset() {
-	bw.cids = nil
-	bw.buf = nil
+func (e *MalformedDataError) Error() string {
+	return fmt.Sprintf("blob tree contains malformed data: %v", e.err)
 }
 
-func (bw *BlockWriter) GetWrittenCids() []cid.Cid {
-	return bw.cids
+func (e *MalformedDataError) Unwrap() error { return e.err }
+
+type BlobSizeLimitExceededError struct {
+	cid cid.Cid
 }
 
-func (bw *BlockWriter) Flush() error {
-	if len(bw.buf) > 0 {
-		if err := bw.writeBlock(bw.buf); err != nil {
-			return err
-		}
-		bw.buf = nil
-	}
-	return nil
+func (e *BlobSizeLimitExceededError) Error() string {
+	return fmt.Sprintf("blob %v exceeds maximum blob size", e.cid.String())
 }
 
-func (bw *BlockWriter) writeBlock(data []byte) error {
-	block := blocks.NewBlock(data)
-	if err := bw.bstore.Put(block); err != nil {
-		return fmt.Errorf("failed to put block %v into blockstore: %w", block.Cid(), err)
-	}
-	bw.cids = append(bw.cids, block.Cid())
-	return nil
+type BlobNotFoundError struct {
+	cid cid.Cid
 }
 
-func (bw *BlockWriter) WriteByte(c byte) error {
-	bw.buf = append(bw.buf, c)
-	if len(bw.buf) >= bw.maxBlockSize {
-		if err := bw.writeBlock(bw.buf); err != nil {
-			return err
-		}
-		bw.buf = nil
-	}
-	return nil
-}
-
-func (bw *BlockWriter) Write(p []byte) (n int, err error) {
-	var chunk []byte
-	if leftover := len(bw.buf); leftover > 0 {
-		fill := bw.maxBlockSize - leftover
-		if fill > len(p) {
-			bw.buf = append(bw.buf, p...)
-			return len(p), nil
-		}
-		chunk, p = append(bw.buf, p[:fill]...), p[fill:]
-		if err = bw.writeBlock(chunk); err != nil {
-			return
-		} else {
-			n += fill
-		}
-		bw.buf = nil
-	}
-	for len(p) >= bw.maxBlockSize {
-		chunk, p = p[:bw.maxBlockSize], p[bw.maxBlockSize:]
-		if err = bw.writeBlock(chunk); err != nil {
-			return
-		} else {
-			n += bw.maxBlockSize
-		}
-	}
-	if len(p) > 0 {
-		bw.buf = make([]byte, 0, len(p))
-		bw.buf = append(bw.buf, p...)
-		n += len(bw.buf)
-	}
-	return
+func (e *BlobNotFoundError) Error() string {
+	return fmt.Sprintf("blob %v not found", e.cid.String())
 }

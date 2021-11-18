@@ -33,12 +33,19 @@ func (_m *BlobService) AddBlob(ctx context.Context, b blocks.Block) error {
 }
 
 // AddBlobs provides a mock function with given fields: ctx, bs
-func (_m *BlobService) AddBlobs(ctx context.Context, bs []blocks.Block) error {
-	ret := _m.Called(ctx, bs)
+func (_m *BlobService) AddBlobs(ctx context.Context, bs ...blocks.Block) error {
+	_va := make([]interface{}, len(bs))
+	for _i := range bs {
+		_va[_i] = bs[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 error
-	if rf, ok := ret.Get(0).(func(context.Context, []blocks.Block) error); ok {
-		r0 = rf(ctx, bs)
+	if rf, ok := ret.Get(0).(func(context.Context, ...blocks.Block) error); ok {
+		r0 = rf(ctx, bs...)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -98,12 +105,19 @@ func (_m *BlobService) GetBlob(ctx context.Context, c cid.Cid) (blocks.Block, er
 }
 
 // GetBlobs provides a mock function with given fields: ctx, ks
-func (_m *BlobService) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan blocks.Block {
-	ret := _m.Called(ctx, ks)
+func (_m *BlobService) GetBlobs(ctx context.Context, ks ...cid.Cid) <-chan blocks.Block {
+	_va := make([]interface{}, len(ks))
+	for _i := range ks {
+		_va[_i] = ks[_i]
+	}
+	var _ca []interface{}
+	_ca = append(_ca, ctx)
+	_ca = append(_ca, _va...)
+	ret := _m.Called(_ca...)
 
 	var r0 <-chan blocks.Block
-	if rf, ok := ret.Get(0).(func(context.Context, []cid.Cid) <-chan blocks.Block); ok {
-		r0 = rf(ctx, ks)
+	if rf, ok := ret.Get(0).(func(context.Context, ...cid.Cid) <-chan blocks.Block); ok {
+		r0 = rf(ctx, ks...)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(<-chan blocks.Block)
