@@ -19,12 +19,10 @@ func NewServer(handlers *Handlers, listenAddress string, logger zerolog.Logger) 
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
-	lm := middleware.NewLoggingMiddleware(logger)
 	// common middleware for all request
-	v1SubRouter.Use(lm.RequestStart())
+	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
-	v1SubRouter.Use(lm.RequestEnd())
 
 	for _, route := range apiRoutes(handlers) {
 		v1SubRouter.
