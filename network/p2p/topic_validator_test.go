@@ -19,15 +19,15 @@ import (
 
 // TestTopicValidator tests that a topic validator prevents an unstaked node to send messages to any staked node
 func TestTopicValidator(t *testing.T) {
-
+	sporkId := unittest.IdentifierFixture()
 	// create two staked nodes - node1 and node2
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	node1 := createNode(t, identity1.NodeID, privateKey1, sporkID)
+	node1 := createNode(t, identity1.NodeID, privateKey1, sporkId)
 
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	node2 := createNode(t, identity2.NodeID, privateKey2, sporkID)
+	node2 := createNode(t, identity2.NodeID, privateKey2, sporkId)
 
-	badTopic := engine.TopicFromChannel(engine.SyncCommittee, sporkID)
+	badTopic := engine.TopicFromChannel(engine.SyncCommittee, sporkId)
 
 	ids := flow.IdentityList{identity1, identity2}
 	translator, err := NewFixedTableIdentityTranslator(ids)
@@ -44,7 +44,7 @@ func TestTopicValidator(t *testing.T) {
 	unstakedKey := unittest.NetworkingPrivKeyFixture()
 	require.NoError(t, err)
 	// create one unstaked node
-	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, sporkID)
+	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, sporkId)
 	require.NoError(t, err)
 
 	// node1 is connected to node2, and the unstaked node is connected to node1

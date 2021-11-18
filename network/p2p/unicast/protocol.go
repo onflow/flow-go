@@ -34,16 +34,16 @@ func IsFlowProtocolStream(s libp2pnet.Stream) bool {
 	return strings.HasPrefix(p, FlowLibP2PProtocolCommonPrefix)
 }
 
-func FlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
-	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID.String())
+func FlowProtocolID(sporkId flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + sporkId.String())
 }
 
-func PingProtocolId(rootBlockID flow.Identifier) protocol.ID {
-	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID.String())
+func PingProtocolId(sporkId flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2PPingProtocolPrefix + sporkId.String())
 }
 
-func FlowGzipProtocolId(rootBlockID flow.Identifier) protocol.ID {
-	return protocol.ID(FlowLibP2PProtocolGzipCompressedOneToOne + rootBlockID.String())
+func FlowGzipProtocolId(sporkId flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2PProtocolGzipCompressedOneToOne + sporkId.String())
 }
 
 type ProtocolName string
@@ -52,8 +52,8 @@ type ProtocolFactory func(zerolog.Logger, flow.Identifier, libp2pnet.StreamHandl
 func ToProtocolFactory(name ProtocolName) (ProtocolFactory, error) {
 	switch name {
 	case GzipCompressionUnicast:
-		return func(logger zerolog.Logger, rootBlockID flow.Identifier, handler libp2pnet.StreamHandler) Protocol {
-			return NewGzipCompressedUnicast(logger, rootBlockID, handler)
+		return func(logger zerolog.Logger, sporkId flow.Identifier, handler libp2pnet.StreamHandler) Protocol {
+			return NewGzipCompressedUnicast(logger, sporkId, handler)
 		}, nil
 	default:
 		return nil, fmt.Errorf("unknown unicast protocol name: %s", name)

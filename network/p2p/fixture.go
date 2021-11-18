@@ -74,7 +74,7 @@ func withNetworkingAddress(address string) nodeFixtureParameterOption {
 
 // nodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
-func nodeFixture(t *testing.T, rootBlockId flow.Identifier, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
+func nodeFixture(t *testing.T, sporkId flow.Identifier, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
 
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
 
@@ -104,7 +104,7 @@ func nodeFixture(t *testing.T, rootBlockId flow.Identifier, opts ...nodeFixtureP
 	connManager := NewConnManager(logger, noopMetrics)
 
 	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, parameters.address, parameters.key).
-		SetRootBlockID(rootBlockId).
+		SetSporkId(sporkId).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).

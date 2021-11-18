@@ -109,13 +109,13 @@ func mockStreamHandlerForMessages(t *testing.T, ctx context.Context, msgCount in
 }
 
 func TestCreateStream_WithDefaultUnicast(t *testing.T) {
-	rootBlockId := unittest.IdentifierFixture()
-	testCreateStream(t, rootBlockId, nil, unicast.FlowProtocolID(rootBlockId))
+	sporkId := unittest.IdentifierFixture()
+	testCreateStream(t, sporkId, nil, unicast.FlowProtocolID(sporkId))
 }
 
 func TestCreateStream_WithPreferredGzipUnicast(t *testing.T) {
-	rootBlockId := unittest.IdentifierFixture()
-	testCreateStream(t, rootBlockId, []unicast.ProtocolName{unicast.GzipCompressionUnicast}, unicast.FlowGzipProtocolId(rootBlockId))
+	sporkId := unittest.IdentifierFixture()
+	testCreateStream(t, sporkId, []unicast.ProtocolName{unicast.GzipCompressionUnicast}, unicast.FlowGzipProtocolId(sporkId))
 }
 
 // testCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
@@ -131,7 +131,6 @@ func testCreateStream(t *testing.T, rootBlockId flow.Identifier, unicasts []unic
 
 	id2 := identities[1]
 
-	flowProtocolID := FlowProtocolID(sporkID)
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(t, 0, CountStream(nodes[0].host, nodes[1].host.ID(), protocolID, network.DirOutbound))
 
