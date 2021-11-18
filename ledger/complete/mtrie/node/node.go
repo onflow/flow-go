@@ -91,9 +91,9 @@ func NewLeaf(path ledger.Path,
 	return n
 }
 
-// NewInterimNode creates a new Node with the provided value and no children.
-// UNCHECKED requirement: lchild.height and rchild.height must be smaller than height
-// UNCHECKED requirement: if lchild != nil then height = lchild.height + 1, and same for rchild
+// NewInterimNode creates a new interim Node.
+// UNCHECKED requirement:
+//  * for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	var lMaxDepth, rMaxDepth uint16
 	var lRegCount, rRegCount uint64
@@ -118,90 +118,53 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	return n
 }
 
-// CopyAndPromoteLeafNode makes a copy of a node and moves it one level higher to replace
-// the parent node, this method should only be called for leaf nodes
-// depending on where this node is located to the parent the
-// hash value would be different, if isRight is set to true the original place
-// of the node n was right child of its parent so the hash value would be adjusted accordingly
-func (n *Node) copyAndPromoteLeafNode(isRight bool) *Node {
-	// note path is an arrays (not slice) so it would be coppied
-	newNode := &Node{
-		height:   n.height + 1,
-		path:     n.path,
-		payload:  n.payload,
-		maxDepth: 0,
-		regCount: 1,
+// NewInterimCompactifiedNode creates a new compactified interim Node. For compactification,
+// we only consider the immediate children. When starting with a maximally pruned trie and
+// creating only InterimCompactifiedNodes during an update, the resulting trie remains maximally
+// pruned. Details on compactification:
+//  * If _both_ immediate children represent completely unallocated sub-tries, then the sub-trie
+//    with the new interim node is also completely empty. We return nil.
+//  * If either child is a leaf (i.e. representing a single allocated register) _and_ the other
+//    child represents a completely unallocated sub-trie, the new interim node also only holds
+//    a single allocated register. In this case, we return a compactified leaf.
+// UNCHECKED requirement:
+//  * for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
+func NewInterimCompactifiedNode(height int, lChild, rChild *Node) *Node {
+	if lChild.IsDefaultNode() {
+		lChild = nil
 	}
-	if isRight {
-		newNode.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(n.height), n.hashValue)
-	} else {
-		newNode.hashValue = hash.HashInterNode(n.hashValue, ledger.GetDefaultHashForHeight(n.height))
+	if rChild.IsDefaultNode() {
+		rChild = nil
 	}
-	return newNode
+
+	// CASE (a): _both_ children do _not_ contain any allocated registers:
+	if lChild == nil && rChild == nil {
+		return nil // return nil representing as completely empty sub-trie
+	}
+
+	// CASE (b): one child is a compactified leaf (single allocated register) _and_ the other child represents
+	// an empty subtrie => in total we have one allocated register, which we represent as single leaf node
+	if rChild == nil && lChild.IsLeaf() {
+		h := hash.HashInterNode(lChild.hashValue, ledger.GetDefaultHashForHeight(lChild.height))
+		return &Node{height: height, hashValue: h, maxDepth: 0, regCount: 1}
+	}
+	if lChild == nil && rChild.IsLeaf() {
+		h := hash.HashInterNode(ledger.GetDefaultHashForHeight(rChild.height), rChild.hashValue)
+		return &Node{height: height, hashValue: h, maxDepth: 0, regCount: 1}
+	}
+
+	// we can't compactify; return a full interim leaf
+	return NewInterimNode(height, lChild, rChild)
 }
 
-// Compactify checks if the subtree represented by an interim-node can be simplified to its most concise representation by looking only at its direct children. The
-// compactified representation of a default node is `nil`. For a node that only has a
-// _single_ child that is itself a leaf, this method returns a new, fully compactified leaf.
-// Returns:
-//  * n: if the node cannot be compactified, we return the original node `n`
-//  * cn: if the node can be compactified, where cn is a newly created compactified leaf
-func (n *Node) Compactify() *Node {
-
-	// if is a default node return nil instaed
-	if n.isDefaultNode() {
-		return nil
-	}
-
-	// if is a non default leaf, return it as is (no need for deep copy)
-	if n.IsLeaf() {
-		return n
-	}
-
-	// if leaf return it as is
-	// if non leaf bubble up
-	lChildEmpty := true
-	rChildEmpty := true
-	if n.lChild != nil {
-		lChildEmpty = n.lChild.isDefaultNode()
-	}
-	if n.rChild != nil {
-		rChildEmpty = n.rChild.isDefaultNode()
-	}
-	if rChildEmpty && lChildEmpty {
-		// if both children are empty this is the same as a default leaf
-		return nil
-	}
-	// If we reach the following code, at least one child must be a non-default node
-
-	// if childNode is non-empty
-	if rChildEmpty {
-		if n.lChild.IsLeaf() {
-			return n.lChild.copyAndPromoteLeafNode(false)
-		}
-		return NewInterimNode(n.height, n.lChild, nil)
-	}
-	if lChildEmpty {
-		if n.rChild.IsLeaf() {
-			return n.rChild.copyAndPromoteLeafNode(true)
-		}
-		return NewInterimNode(n.height, nil, n.rChild)
-	}
-
-	// else no change needed
-	return n
-}
-
-// isDefaultNode returns true if either the node is nil
-// or the node's hash value is equal to the default hash value
-// for that height, in other words, it
-// does not contains any non-empty value in its sub-trie
-func (n *Node) isDefaultNode() bool {
+// IsDefaultNode returns true iff the sub-trie represented by this root node contains
+// only unallocated registers. This is the case, if the node is nil or the node's hash
+// is equal to the default hash value at the respective height.
+func (n *Node) IsDefaultNode() bool {
 	if n == nil {
 		return true
 	}
 	return n.hashValue == ledger.GetDefaultHashForHeight(n.height)
-
 }
 
 // computeHash returns the hashValue of the node
