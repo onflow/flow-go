@@ -1491,6 +1491,12 @@ func TestBlockContext_ExecuteTransaction_CreateAccount_WithMonotonicAddresses(t 
 	assert.Equal(t, flow.HexToAddress("05"), address)
 }
 
+var createMessage = func(m string) (signableMessage []byte, message cadence.Array) {
+	signableMessage = []byte(m)
+	message = testutil.BytesToCadenceArray(signableMessage)
+	return signableMessage, message
+}
+
 func TestSignatureVerification(t *testing.T) {
 
 	t.Parallel()
@@ -1594,14 +1600,6 @@ func TestSignatureVerification(t *testing.T) {
 				)
 
 				return privateKey, publicKey
-			}
-
-			createMessage := func(m string) (signableMessage []byte, message cadence.Array) {
-				signableMessage = []byte(m)
-
-				message = testutil.BytesToCadenceArray(signableMessage)
-
-				return signableMessage, message
 			}
 
 			signMessage := func(privateKey crypto.PrivateKey, m []byte) cadence.Array {
@@ -2215,10 +2213,99 @@ func TestBLSMultiSignature(t *testing.T) {
 		))
 	}
 
+	testBLSCombinedAggregations := func() {
+		t.Run("Combined Aggregations", newVMTest().run(
+			func(
+				t *testing.T,
+				vm *fvm.VirtualMachine,
+				chain flow.Chain,
+				ctx fvm.Context,
+				view state.View,
+				programs *programs.Programs,
+			) {
+
+				message, cadenceMessage := createMessage("random_message")
+				tag := "random_tag"
+
+				code := []byte(
+					fmt.Sprintf(
+						`
+							import Crypto
+
+							pub fun main(
+								publicKeys: [[UInt8]],
+								signatures: [[UInt8]],
+								message:  [UInt8],
+								tag: String,
+							): Bool {
+								let pks: [PublicKey] = []
+								for pk in publicKeys {
+									pks.append(PublicKey(
+										publicKey: pk,
+										signatureAlgorithm: SignatureAlgorithm.BLS_BLS12_381
+									))
+								}
+								let aggPk = AggregateBLSPublicKeys(pks)
+								let aggSignature = AggregateBLSSignatures(signatures)
+								return aggPk.verify(aggSignature, message, tag, KMAC128_BLS_BLS12_381)
+							}
+							`,
+					),
+				)
+
+				num := 50
+				publicKeys := make([]cadence.Value, 0, num)
+				signatures := make([]cadence.Value, 0, num)
+
+				kmac := crypto.NewBLSKMAC(string(tag))
+				for i := 0; i < num; i++ {
+					sk := randomSK(t, BLSSignatureAlgorithm)
+					pk := sk.PublicKey()
+					publicKeys = append(
+						publicKeys,
+						testutil.BytesToCadenceArray(pk.Encode()),
+					)
+					sig, err := sk.Sign(message, kmac)
+					require.NoError(t, err)
+					signatures = append(
+						signatures,
+						testutil.BytesToCadenceArray(sig),
+					)
+				}
+
+				script := fvm.Script(code).WithArguments(
+					jsoncdc.MustEncode(cadence.Array{ // keys
+						Values: publicKeys,
+						ArrayType: cadence.VariableSizedArrayType{
+							ElementType: cadence.VariableSizedArrayType{
+								ElementType: cadence.UInt8Type{},
+							},
+						},
+					}),
+					jsoncdc.MustEncode(cadence.Array{ // signatures
+						Values: signatures,
+						ArrayType: cadence.VariableSizedArrayType{
+							ElementType: cadence.VariableSizedArrayType{
+								ElementType: cadence.UInt8Type{},
+							},
+						},
+					}),
+					jsoncdc.MustEncode(cadenceMessage),
+					jsoncdc.MustEncode(cadence.String(tag)),
+				)
+
+				err := vm.Run(ctx, script, view, programs)
+				assert.NoError(t, err)
+				assert.NoError(t, script.Err)
+				assert.Equal(t, cadence.NewBool(true), script.Value)
+			},
+		))
+	}
+
 	testVerifyPoP()
 	testKeyAggregation()
 	testBLSSignatureAggregation()
-	testBLSCombinedAggrgetaions()
+	testBLSCombinedAggregations()
 }
 
 func TestHashing(t *testing.T) {
