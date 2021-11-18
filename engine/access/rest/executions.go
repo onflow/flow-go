@@ -25,6 +25,8 @@ func getExecutionResultByBlockIDs(
 		if err != nil {
 			return nil, NewBadRequestError("execution result fetching error", err)
 		}
-		results[i] = executionResultResponse(res)
+		results[i] = executionResultResponse(*res)
 	}
+
+	return results, nil
 }

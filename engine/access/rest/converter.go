@@ -332,6 +332,7 @@ func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event
 			Payload:          "", //e.Event,
 		}
 	}
+	return events
 }
 
 func executionResultResponse(exeResult flow.ExecutionResult) generated.ExecutionResult {
