@@ -37,7 +37,6 @@ type nodeFixtureParameters struct {
 	unicasts    []unicast.ProtocolName
 	key         fcrypto.PrivateKey
 	address     string
-	rootBlockId flow.Identifier
 	allowList   bool
 }
 
@@ -67,12 +66,6 @@ func withNetworkingPrivateKey(key fcrypto.PrivateKey) nodeFixtureParameterOption
 	}
 }
 
-func withRootBlockId(blockId flow.Identifier) nodeFixtureParameterOption {
-	return func(p *nodeFixtureParameters) {
-		p.rootBlockId = blockId
-	}
-}
-
 func withNetworkingAddress(address string) nodeFixtureParameterOption {
 	return func(p *nodeFixtureParameters) {
 		p.address = address
@@ -81,7 +74,7 @@ func withNetworkingAddress(address string) nodeFixtureParameterOption {
 
 // nodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
-func nodeFixture(t *testing.T, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
+func nodeFixture(t *testing.T, rootBlockId flow.Identifier, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
 
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
 
@@ -91,14 +84,15 @@ func nodeFixture(t *testing.T, opts ...nodeFixtureParameterOption) (*Node, flow.
 		unicasts:    nil,
 		key:         generateNetworkingKey(t),
 		address:     defaultAddress,
-		rootBlockId: unittest.IdentifierFixture(),
 	}
 
 	for _, opt := range opts {
 		opt(parameters)
 	}
 
-	identity := unittest.IdentityFixture(unittest.WithNetworkingKey(parameters.key.PublicKey()), unittest.WithAddress(parameters.address))
+	identity := unittest.IdentityFixture(
+		unittest.WithNetworkingKey(parameters.key.PublicKey()),
+		unittest.WithAddress(parameters.address))
 
 	pingInfoProvider, _, _, _ := mockPingInfoProvider()
 
@@ -110,7 +104,7 @@ func nodeFixture(t *testing.T, opts ...nodeFixtureParameterOption) (*Node, flow.
 	connManager := NewConnManager(logger, noopMetrics)
 
 	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, parameters.address, parameters.key).
-		SetRootBlockID(parameters.rootBlockId).
+		SetRootBlockID(rootBlockId).
 		SetConnectionManager(connManager).
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
@@ -215,7 +209,7 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 
 // nodesFixture creates a number of LibP2PNodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func nodesFixture(t *testing.T, count int, opts ...nodeFixtureParameterOption) ([]*Node, flow.IdentityList) {
+func nodesFixture(t *testing.T, rootBlockId flow.Identifier, count int, opts ...nodeFixtureParameterOption) ([]*Node, flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*Node
@@ -224,15 +218,15 @@ func nodesFixture(t *testing.T, count int, opts ...nodeFixtureParameterOption) (
 		if err != nil && nodes != nil {
 			// stops all nodes upon an error in starting even one single node
 			stopNodes(t, nodes)
+			t.Fail()
 		}
 	}()
 
 	// creating nodes
 	var identities flow.IdentityList
-	rootBlockId := unittest.IdentifierFixture()
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
-		node, identity := nodeFixture(t, append(opts, withRootBlockId(rootBlockId))...)
+		node, identity := nodeFixture(t, rootBlockId, opts...)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}

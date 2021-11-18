@@ -33,7 +33,7 @@ func TestStreamClosing(t *testing.T) {
 	handler, streamCloseWG := mockStreamHandlerForMessages(t, ctx, count, msgRegex)
 
 	// Creates nodes
-	nodes, identities := nodesFixture(t, 2, withDefaultStreamHandler(handler))
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), 2, withDefaultStreamHandler(handler))
 	defer stopNodes(t, nodes)
 	defer cancel()
 
@@ -124,9 +124,9 @@ func testCreateStream(t *testing.T, rootBlockId flow.Identifier, unicasts []unic
 
 	// Creates nodes
 	nodes, identities := nodesFixture(t,
+		rootBlockId,
 		count,
-		withPreferredUnicasts(unicasts),
-		withRootBlockId(rootBlockId))
+		withPreferredUnicasts(unicasts))
 	defer stopNodes(t, nodes)
 
 	id2 := identities[1]
@@ -222,7 +222,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	defer cancel()
 
 	// create two nodes
-	nodes, identities := nodesFixture(t, 2)
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), 2)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, 2)
 	nodeInfo1, err := PeerAddressInfo(*identities[1])
@@ -259,7 +259,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 
 	count := 2
 	// Creates nodes
-	nodes, identities := nodesFixture(t, count)
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), count)
 	node1 := nodes[0]
 	node2 := nodes[1]
 
@@ -319,7 +319,7 @@ func TestOneToOneComm(t *testing.T) {
 	}
 
 	// Creates nodes
-	nodes, identities := nodesFixture(t, count, withDefaultStreamHandler(streamHandler))
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), count, withDefaultStreamHandler(streamHandler))
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, count)
 
@@ -379,7 +379,7 @@ func TestOneToOneComm(t *testing.T) {
 func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 
 	// creates a regular node
-	nodes, identities := nodesFixture(t, 1)
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), 1)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, 1)
 
@@ -416,7 +416,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	defer cancel()
 
 	// create two regular node
-	goodNodes, goodNodeIds := nodesFixture(t, 2)
+	goodNodes, goodNodeIds := nodesFixture(t, unittest.IdentifierFixture(), 2)
 	defer stopNodes(t, goodNodes)
 	require.Len(t, goodNodeIds, 2)
 	goodNodeInfo1, err := PeerAddressInfo(*goodNodeIds[1])
@@ -461,7 +461,7 @@ func TestConnectionGating(t *testing.T) {
 	defer cancel()
 
 	// create 2 nodes
-	nodes, identities := nodesFixture(t, 2, withAllowListEnabled())
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), 2, withAllowListEnabled())
 
 	node1 := nodes[0]
 	node1Id := *identities[0]

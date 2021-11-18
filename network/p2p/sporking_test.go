@@ -45,8 +45,8 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	node1key := generateNetworkingKey(suite.T())
 	rootBlockId := unittest.IdentifierFixture()
 	node1, id1 := nodeFixture(suite.T(),
-		withNetworkingPrivateKey(node1key),
-		withRootBlockId(rootBlockId))
+		rootBlockId,
+		withNetworkingPrivateKey(node1key))
 
 	defer stopNode(suite.T(), node1)
 	suite.T().Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
@@ -55,8 +55,8 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(suite.T())
 	node2, id2 := nodeFixture(suite.T(),
-		withNetworkingPrivateKey(node2key),
-		withRootBlockId(rootBlockId))
+		rootBlockId,
+		withNetworkingPrivateKey(node2key))
 
 	peerInfo2, err := PeerAddressInfo(id2)
 	require.NoError(suite.T(), err)
@@ -73,8 +73,8 @@ func (suite *SporkingTestSuite) TestCrosstalkPreventionOnNetworkKeyChange() {
 	node2keyNew := generateNetworkingKey(suite.T())
 	assert.False(suite.T(), node2key.Equals(node2keyNew))
 	node2, id2New := nodeFixture(suite.T(),
+		rootBlockId,
 		withNetworkingPrivateKey(node2keyNew),
-		withRootBlockId(rootBlockId),
 		withNetworkingAddress(id2.Address))
 
 	defer stopNode(suite.T(), node2)
@@ -98,8 +98,8 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
 	node1, id1 := nodeFixture(suite.T(),
-		withNetworkingPrivateKey(node1key),
-		withRootBlockId(rootID1))
+		rootID1,
+		withNetworkingPrivateKey(node1key))
 
 	defer stopNode(suite.T(), node1)
 	peerInfo1, err := PeerAddressInfo(id1)
@@ -108,8 +108,8 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(suite.T())
 	node2, id2 := nodeFixture(suite.T(),
-		withNetworkingPrivateKey(node2key),
-		withRootBlockId(rootID1))
+		rootID1,
+		withNetworkingPrivateKey(node2key))
 
 	// create stream from node 2 to node 1
 	testOneToOneMessagingSucceeds(suite.T(), node2, peerInfo1)
@@ -119,13 +119,10 @@ func (suite *SporkingTestSuite) TestOneToOneCrosstalkPrevention() {
 	// stop node 2 and start it again with a different libp2p protocol id to listen for
 	stopNode(suite.T(), node2)
 
-	// update the flow root id for node 2. node1 is still listening on the old protocol
-	rootID2 := unittest.IdentifierFixture()
-
 	// start node2 with the same address and root key but different root block id
 	node2, id2New := nodeFixture(suite.T(),
+		unittest.IdentifierFixture(), // update the flow root id for node 2. node1 is still listening on the old protocol
 		withNetworkingPrivateKey(node2key),
-		withRootBlockId(rootID2),
 		withNetworkingAddress(id2.Address))
 
 	defer stopNode(suite.T(), node2)
@@ -148,16 +145,16 @@ func (suite *SporkingTestSuite) TestOneToKCrosstalkPrevention() {
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(suite.T())
 	node1, _ := nodeFixture(suite.T(),
-		withNetworkingPrivateKey(node1key),
-		withRootBlockId(rootIDBeforeSpork))
+		rootIDBeforeSpork,
+		withNetworkingPrivateKey(node1key))
 
 	defer stopNode(suite.T(), node1)
 
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2key := generateNetworkingKey(suite.T())
 	node2, id2 := nodeFixture(suite.T(),
-		withNetworkingPrivateKey(node2key),
-		withRootBlockId(rootIDBeforeSpork))
+		rootIDBeforeSpork,
+		withNetworkingPrivateKey(node2key))
 
 	pInfo2, err := PeerAddressInfo(id2)
 	defer stopNode(suite.T(), node2)

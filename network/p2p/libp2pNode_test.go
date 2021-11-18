@@ -51,6 +51,7 @@ func TestMultiAddress(t *testing.T) {
 func TestSingleNodeLifeCycle(t *testing.T) {
 	key := generateNetworkingKey(t)
 	node, _ := nodeFixture(t,
+		unittest.IdentifierFixture(),
 		withNetworkingPrivateKey(key))
 
 	done, err := node.Stop()
@@ -88,7 +89,7 @@ func TestAddPeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, count)
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), count)
 	defer stopNodes(t, nodes)
 
 	// add the remaining nodes to the first node as its set of peers
@@ -109,7 +110,7 @@ func TestRemovePeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, count)
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), count)
 	peerInfos, errs := peerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 	defer stopNodes(t, nodes)
@@ -133,7 +134,7 @@ func TestRemovePeers(t *testing.T) {
 func TestPing(t *testing.T) {
 
 	// creates two nodes
-	nodes, identities := nodesFixture(t, 2)
+	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), 2)
 	defer stopNodes(t, nodes)
 
 	node1 := nodes[0]
@@ -166,7 +167,7 @@ func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion 
 
 func TestConnectionGatingBootstrap(t *testing.T) {
 	// Create a Node with AllowList = false
-	node, identity := nodesFixture(t, 1)
+	node, identity := nodesFixture(t, unittest.IdentifierFixture(), 1)
 	node1 := node[0]
 	node1Id := identity[0]
 	defer stopNode(t, node1)
