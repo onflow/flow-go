@@ -120,6 +120,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	// verify the aggregated staking and beacon signatures next (more costly)
 
 	verifyAggregatedSignature := func(pubKeys []crypto.PublicKey, aggregatedSig crypto.Signature, hasher hash.Hasher) (bool, error) {
+		// TODO: to be replaced by module/signature.PublicKeyAggregator in V2
 		aggregatedKey, err := crypto.AggregateBLSPublicKeys(pubKeys)
 		if err != nil {
 			return false, fmt.Errorf("could not compute aggregated key: %w", err)

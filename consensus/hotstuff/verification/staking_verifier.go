@@ -17,15 +17,12 @@ import (
 // verifying operation. It's used primarily with collection cluster where hotstuff without beacon signers is used.
 type StakingVerifier struct {
 	stakingHasher hash.Hasher
-	// TODO: to be replaced by module/signature.PublicKeyAggregator in V2
-	keysAggregator *stakingKeysAggregator
 }
 
 // NewStakingVerifier creates a new single verifier with the given dependencies.
 func NewStakingVerifier() *StakingVerifier {
 	return &StakingVerifier{
-		stakingHasher:  crypto.NewBLSKMAC(encoding.CollectorVoteTag),
-		keysAggregator: newStakingKeysAggregator(),
+		stakingHasher: crypto.NewBLSKMAC(encoding.CollectorVoteTag),
 	}
 }
 
@@ -57,7 +54,13 @@ func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, bl
 	// verify the aggregated staking signature
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	aggregatedKey, err := v.keysAggregator.aggregatedStakingKey(signers)
+	pks := make([]crypto.PublicKey, 0, len(signers))
+	for _, identity := range signers {
+		pks = append(pks, identity.StakingPubKey)
+	}
+
+	// TODO: to be replaced by module/signature.PublicKeyAggregator in V2
+	aggregatedKey, err := crypto.AggregateBLSPublicKeys(pks)
 	if err != nil {
 		return false, fmt.Errorf("could not compute aggregated key: %w", err)
 	}
