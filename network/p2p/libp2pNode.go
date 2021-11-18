@@ -42,21 +42,20 @@ const (
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	sync.Mutex
-	unicastManager       *unicast.Manager
-	connGater            *ConnGater                             // used to provide white listing
-	host                 host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	pubSub               *pubsub.PubSub                         // reference to the libp2p PubSub component
-	logger               zerolog.Logger                         // used to provide logging
-	topics               map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs                 map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
-	id                   flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
-	flowLibP2PProtocolID protocol.ID                            // the unique protocol ID
-	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
-	pingService          *PingService
-	connMgr              connmgr.ConnManager
-	dht                  *dht.IpfsDHT
-	topicValidation      bool
-	pCache               *protocolPeerCache
+	unicastManager  *unicast.Manager
+	connGater       *ConnGater                             // used to provide white listing
+	host            host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	pubSub          *pubsub.PubSub                         // reference to the libp2p PubSub component
+	logger          zerolog.Logger                         // used to provide logging
+	topics          map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
+	subs            map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
+	id              flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
+	resolver        *dns.Resolver                          // dns resolver for libp2p (is nil if default)
+	pingService     *PingService
+	connMgr         connmgr.ConnManager
+	dht             *dht.IpfsDHT
+	topicValidation bool
+	pCache          *protocolPeerCache
 }
 
 // Stop terminates the libp2p node.

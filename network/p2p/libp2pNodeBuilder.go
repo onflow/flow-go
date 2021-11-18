@@ -91,7 +91,7 @@ type NodeBuilder interface {
 
 type DefaultLibP2PNodeBuilder struct {
 	id               flow.Identifier
-	sporkId          *flow.Identifier
+	sporkId          flow.Identifier
 	logger           zerolog.Logger
 	connGater        *ConnGater
 	connMngr         connmgr.ConnManager
@@ -128,7 +128,7 @@ func (builder *DefaultLibP2PNodeBuilder) SetTopicValidation(enabled bool) NodeBu
 }
 
 func (builder *DefaultLibP2PNodeBuilder) SetSporkID(sporkId flow.Identifier) NodeBuilder {
-	builder.sporkId = &sporkId
+	builder.sporkId = sporkId
 	return builder
 }
 
@@ -179,10 +179,9 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, errors.New("unable to create libp2p pubsub: factory function not provided")
 	}
 
-	if builder.sporkId == nil {
+	if builder.sporkId == flow.ZeroID {
 		return nil, errors.New("root block ID must be provided")
 	}
-	node.flowLibP2PProtocolID = unicast.FlowProtocolID(*builder.sporkId)
 
 	var opts []config.Option
 
@@ -223,7 +222,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	node.unicastManager = unicast.NewUnicastManager(
 		builder.logger,
 		unicast.NewLibP2PStreamFactory(node.host),
-		*builder.sporkId)
+		builder.sporkId)
 
 	node.pCache, err = newProtocolPeerCache(node.logger, libp2pHost)
 	if err != nil {
@@ -240,7 +239,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 
 	if builder.pingInfoProvider != nil {
-		pingLibP2PProtocolID := unicast.PingProtocolId(*builder.sporkId)
+		pingLibP2PProtocolID := unicast.PingProtocolId(builder.sporkId)
 		pingService := NewPingService(libp2pHost, pingLibP2PProtocolID, builder.pingInfoProvider, node.logger)
 		node.pingService = pingService
 	}
