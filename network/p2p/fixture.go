@@ -193,9 +193,9 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 	}
 }
 
-// nodesFixtureWithHandler creates a number of LibP2PNodes with the given callback function for stream handling.
+// nodesFixture creates a number of LibP2PNodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func nodesFixtureWithHandler(t *testing.T, count int, opts ...nodeFixtureParameterOption) ([]*Node, flow.IdentityList) {
+func nodesFixture(t *testing.T, count int, opts ...nodeFixtureParameterOption) ([]*Node, flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*Node

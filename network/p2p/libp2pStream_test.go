@@ -31,7 +31,7 @@ func TestStreamClosing(t *testing.T) {
 	handler, streamCloseWG := mockStreamHandlerForMessages(t, ctx, count, msgRegex)
 
 	// Creates nodes
-	nodes, identities := nodesFixtureWithHandler(t, 2, withDefaultStreamHandler(handler))
+	nodes, identities := nodesFixture(t, 2, withDefaultStreamHandler(handler))
 	defer stopNodes(t, nodes)
 	defer cancel()
 
@@ -111,7 +111,55 @@ func TestCreateStream(t *testing.T) {
 	count := 2
 
 	// Creates nodes
-	nodes, identities := nodesFixtureWithHandler(t, count)
+	nodes, identities := nodesFixture(t, count)
+	defer stopNodes(t, nodes)
+
+	id2 := identities[1]
+
+	flowProtocolID := unicast.FlowProtocolID(rootBlockID)
+	// Assert that there is no outbound stream to the target yet
+	require.Equal(t, 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+
+	// Now attempt to create another 100 outbound stream to the same destination by calling CreateStream
+	streamCount := 100
+	var streams []network.Stream
+	for i := 0; i < streamCount; i++ {
+		pInfo, err := PeerAddressInfo(*id2)
+		require.NoError(t, err)
+		nodes[0].host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
+		anotherStream, err := nodes[0].CreateStream(context.Background(), pInfo.ID)
+		// Assert that a stream was returned without error
+		require.NoError(t, err)
+		require.NotNil(t, anotherStream)
+		// assert that the stream count within libp2p incremented (a new stream was created)
+		require.Equal(t, i+1, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+		// assert that the same connection is reused
+		require.Len(t, nodes[0].host.Network().Conns(), 1)
+		streams = append(streams, anotherStream)
+	}
+
+	// reverse loop to close all the streams
+	for i := streamCount - 1; i >= 0; i-- {
+		s := streams[i]
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		go func() {
+			err := s.Close()
+			assert.NoError(t, err)
+			wg.Done()
+		}()
+		wg.Wait()
+		// assert that the stream count within libp2p decremented
+		require.Equal(t, i, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
+	}
+}
+
+// TestCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
+func TestCreateStream_WithPreferredUnicast(t *testing.T) {
+	count := 2
+
+	// Creates nodes
+	nodes, identities := nodesFixture(t, count)
 	defer stopNodes(t, nodes)
 
 	id2 := identities[1]
@@ -160,7 +208,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	defer cancel()
 
 	// create two nodes
-	nodes, identities := nodesFixtureWithHandler(t, 2)
+	nodes, identities := nodesFixture(t, 2)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, 2)
 	nodeInfo1, err := PeerAddressInfo(*identities[1])
@@ -197,7 +245,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 
 	count := 2
 	// Creates nodes
-	nodes, identities := nodesFixtureWithHandler(t, count)
+	nodes, identities := nodesFixture(t, count)
 	node1 := nodes[0]
 	node2 := nodes[1]
 
@@ -257,7 +305,7 @@ func TestOneToOneComm(t *testing.T) {
 	}
 
 	// Creates nodes
-	nodes, identities := nodesFixtureWithHandler(t, count, withDefaultStreamHandler(streamHandler))
+	nodes, identities := nodesFixture(t, count, withDefaultStreamHandler(streamHandler))
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, count)
 
@@ -317,7 +365,7 @@ func TestOneToOneComm(t *testing.T) {
 func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 
 	// creates a regular node
-	nodes, identities := nodesFixtureWithHandler(t, 1)
+	nodes, identities := nodesFixture(t, 1)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, 1)
 
@@ -354,7 +402,7 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	defer cancel()
 
 	// create two regular node
-	goodNodes, goodNodeIds := nodesFixtureWithHandler(t, 2)
+	goodNodes, goodNodeIds := nodesFixture(t, 2)
 	defer stopNodes(t, goodNodes)
 	require.Len(t, goodNodeIds, 2)
 	goodNodeInfo1, err := PeerAddressInfo(*goodNodeIds[1])
@@ -399,7 +447,7 @@ func TestConnectionGating(t *testing.T) {
 	defer cancel()
 
 	// create 2 nodes
-	nodes, identities := nodesFixtureWithHandler(t, 2, withAllowListEnabled())
+	nodes, identities := nodesFixture(t, 2, withAllowListEnabled())
 
 	node1 := nodes[0]
 	node1Id := *identities[0]
