@@ -101,7 +101,7 @@ func (e *Engine) checkLastSealed(finalizedID flow.Identifier) error {
 		}
 
 		// we expect the state commitments not to match so just log them gracefully
-		e.log.Info().Str("block_id", blockID.String()).Uint64("block_height", sealed.Height).Msgf("expected state commitment diff for block (%v) : sealed commit %x, our commit %x", sealedCommit, mycommit)
+		e.log.Info().Str("block_id", blockID.String()).Uint64("block_height", sealed.Height).Msgf("expected state commitment diff for block (%v) : sealed commit %x, our commit %x", blockID.String(), sealedCommit, mycommit)
 		// return fmt.Errorf("execution result is different from the sealed result, height: %v, block_id: %v, sealed_commit: %x, my_commit: %x",
 		// sealed.Height, blockID, sealedCommit, mycommit)
 	}
