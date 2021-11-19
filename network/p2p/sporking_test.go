@@ -128,30 +128,26 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	defer cancel()
 
 	// root id before spork
-	rootIDBeforeSpork := unittest.IdentifierFixture()
+	previousSporkId := unittest.IdentifierFixture()
 
 	// create and start node 1 on localhost and random port
-	node1key := generateNetworkingKey(t)
 	node1, _ := nodeFixture(t,
 		ctx,
-		rootIDBeforeSpork,
-		withNetworkingPrivateKey(node1key))
+		previousSporkId)
 
 	defer stopNode(t, node1)
 
 	// create and start node 2 on localhost and random port with the same root block ID
-	node2key := generateNetworkingKey(t)
 	node2, id2 := nodeFixture(t,
 		ctx,
-		rootIDBeforeSpork,
-		withNetworkingPrivateKey(node2key))
+		previousSporkId)
 
 	pInfo2, err := PeerAddressInfo(id2)
 	defer stopNode(t, node2)
 	require.NoError(t, err)
 
 	// spork topic is derived by suffixing the channel with the root block ID
-	topicBeforeSpork := engine.TopicFromChannel(engine.TestNetwork, rootIDBeforeSpork)
+	topicBeforeSpork := engine.TopicFromChannel(engine.TestNetwork, previousSporkId)
 
 	// both nodes are initially on the same spork and subscribed to the same topic
 	_, err = node1.Subscribe(topicBeforeSpork)
