@@ -787,10 +787,10 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
-		me, err := local.New(nil, stakingPriv)
+		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
 
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore)
 	}
 
 	for _, identity := range beaconSigners {
@@ -813,10 +813,10 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
-		me, err := local.New(nil, stakingPriv)
+		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
 
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore)
 	}
 
 	leader := stakingSigners[0]

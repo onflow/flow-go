@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -28,7 +27,6 @@ type CombinedSignerV2 struct {
 	stakingHasher  hash.Hasher
 	beaconKeyStore module.RandomBeaconKeyStore
 	beaconHasher   hash.Hasher
-	signerID       flow.Identifier
 }
 
 // NewCombinedSignerV2 creates a new combined signer with the given dependencies:
@@ -38,7 +36,6 @@ type CombinedSignerV2 struct {
 func NewCombinedSignerV2(
 	staking module.Local,
 	beaconKeyStore module.RandomBeaconKeyStore,
-	signerID flow.Identifier,
 ) *CombinedSignerV2 {
 
 	sc := &CombinedSignerV2{
@@ -46,7 +43,6 @@ func NewCombinedSignerV2(
 		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
 		beaconKeyStore: beaconKeyStore,
 		beaconHasher:   crypto.NewBLSKMAC(encoding.RandomBeaconTag),
-		signerID:       signerID,
 	}
 	return sc
 }
@@ -55,7 +51,7 @@ func NewCombinedSignerV2(
 func (c *CombinedSignerV2) CreateProposal(block *model.Block) (*model.Proposal, error) {
 
 	// check that the block is created by us
-	if block.ProposerID != c.signerID {
+	if block.ProposerID != c.staking.NodeID() {
 		return nil, fmt.Errorf("can't create proposal for someone else's block")
 	}
 
@@ -87,7 +83,7 @@ func (c *CombinedSignerV2) CreateVote(block *model.Block) (*model.Vote, error) {
 	vote := &model.Vote{
 		View:     block.View,
 		BlockID:  block.BlockID,
-		SignerID: c.signerID,
+		SignerID: c.staking.NodeID(),
 		SigData:  sigData,
 	}
 
@@ -96,8 +92,8 @@ func (c *CombinedSignerV2) CreateVote(block *model.Block) (*model.Vote, error) {
 
 // genSigData generates the signature data for our local node for the given block.
 // It returns:
-//  - (stakingSig, nil) if there is no random beacon private key  The sig is 48 bytes long
-//  - (stakingSig+randomBeaconSig, nil) if there is a random beacon private key. The sig is 96 bytes long
+//  - (stakingSig, nil) if there is no random beacon private key.
+//  - (stakingSig+randomBeaconSig, nil) if there is a random beacon private key.
 //  - (nil, error) if there is any exception
 func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 
@@ -114,10 +110,10 @@ func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
 		if errors.Is(err, module.DKGFailError) {
 			return stakingSig, nil
 		}
-		return nil, fmt.Errorf("could not get threshold signer for view %d: %w", block.View, err)
+		return nil, fmt.Errorf("could not get random beacon private key for view %d: %w", block.View, err)
 	}
 
-	// if the node is a Random Beacon participant and has completed its DKG, then using the random beacon key
+	// if the node is a Random Beacon participant and has succeeded DKG, then using the random beacon key
 	// to sign the block
 	beaconShare, err := beaconKey.Sign(msg, c.beaconHasher)
 	if err != nil {
