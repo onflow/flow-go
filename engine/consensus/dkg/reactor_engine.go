@@ -182,6 +182,7 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 	nextDKGPubKey, err := nextDKG.KeyShare(dkgPrivInfo.NodeID)
 	if err != nil {
 		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG public key for next epoch")
+		return
 	}
 
 	localPubKey := dkgPrivInfo.RandomBeaconPrivKey.PublicKey()

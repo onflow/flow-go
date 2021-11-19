@@ -202,7 +202,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 	psOpts := append(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize),
 		func(_ context.Context, h host.Host) (pubsub.Option, error) {
 			return pubsub.WithSubscriptionFilter(p2p.NewRoleBasedFilter(
-				h.ID(), builder.RootBlock.ID(), builder.IdentityProvider,
+				h.ID(), builder.IdentityProvider,
 			)), nil
 		},
 		// Note: using the WithDirectPeers option will automatically store these addresses
@@ -217,7 +217,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 			return nil, fmt.Errorf("could not convert stream factory: %w", err)
 		}
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
-			SetRootBlockID(builder.RootBlock.ID()).
+			SetSporkID(builder.SporkID).
 			SetConnectionManager(connManager).
 			// unlike the staked side of the network where currently all the node addresses are known upfront,
 			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
