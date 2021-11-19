@@ -94,6 +94,7 @@ func TestFilterSubscribe(t *testing.T) {
 	// publish a message from node 2 and check that only node1 receives
 	testPublish(&wg, node2, sub1)
 
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "timeout performing publish test")
 	wg.Wait()
 }
 
@@ -107,7 +108,7 @@ func TestCanSubscribe(t *testing.T) {
 	defer func() {
 		done, err := collectionNode.Stop()
 		require.NoError(t, err)
-		<-done
+		unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop collection node on time")
 	}()
 
 	goodTopic := engine.TopicFromChannel(engine.ProvideCollections, sporkId)
