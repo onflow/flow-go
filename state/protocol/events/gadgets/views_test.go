@@ -1,6 +1,7 @@
 package gadgets
 
 import (
+	"math/rand"
 	"sort"
 	"testing"
 
@@ -42,4 +43,23 @@ func TestViews(t *testing.T) {
 
 	// ensure map is cleared appropriately (only view 101 should remain)
 	assert.Equal(t, 1, len(views.callbacks))
+}
+
+// BenchmarkViews_BlockFinalized benchmarks the performance of BlockFinalized.
+func BenchmarkViews_BlockFinalized(b *testing.B) {
+	views := NewViews()
+
+	// DKG on mainnet has 6000 views, and 600 callbacks, this tests the upper
+	// bound of that magnitude
+	for i := 0; i < 1000; i++ {
+		views.OnView(rand.Uint64(), func(_ *flow.Header) {})
+	}
+
+	block := unittest.BlockHeaderFixture()
+	block.View = 1
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		views.BlockFinalized(&block)
+	}
 }
