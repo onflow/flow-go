@@ -26,8 +26,22 @@ func (_m *DKGKeys) InsertMyDKGPrivateInfo(epochCounter uint64, key *dkg.DKGParti
 	return r0
 }
 
+// InsertNoDKGPrivateInfo provides a mock function with given fields: epochCounter
+func (_m *DKGKeys) InsertNoDKGPrivateInfo(epochCounter uint64) error {
+	ret := _m.Called(epochCounter)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(uint64) error); ok {
+		r0 = rf(epochCounter)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // RetrieveMyDKGPrivateInfo provides a mock function with given fields: epochCounter
-func (_m *DKGKeys) RetrieveMyDKGPrivateInfo(epochCounter uint64) (*dkg.DKGParticipantPriv, error) {
+func (_m *DKGKeys) RetrieveMyDKGPrivateInfo(epochCounter uint64) (*dkg.DKGParticipantPriv, bool, error) {
 	ret := _m.Called(epochCounter)
 
 	var r0 *dkg.DKGParticipantPriv
@@ -39,12 +53,19 @@ func (_m *DKGKeys) RetrieveMyDKGPrivateInfo(epochCounter uint64) (*dkg.DKGPartic
 		}
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(uint64) bool); ok {
 		r1 = rf(epochCounter)
 	} else {
-		r1 = ret.Error(1)
+		r1 = ret.Get(1).(bool)
 	}
 
-	return r0, r1
+	var r2 error
+	if rf, ok := ret.Get(2).(func(uint64) error); ok {
+		r2 = rf(epochCounter)
+	} else {
+		r2 = ret.Error(2)
+	}
+
+	return r0, r1, r2
 }

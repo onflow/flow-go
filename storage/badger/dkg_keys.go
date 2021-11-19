@@ -66,12 +66,33 @@ func (k *DKGKeys) retrieveTx(epochCounter uint64) func(tx *badger.Txn) (*dkg.DKG
 	}
 }
 
+// InsertMyDKGPrivateInfo insert the private key to database when DKG succeeded.
+// During normal operations, no error returns are expected.
 func (k *DKGKeys) InsertMyDKGPrivateInfo(epochCounter uint64, info *dkg.DKGParticipantPriv) error {
 	return operation.RetryOnConflictTx(k.db, transaction.Update, k.storeTx(epochCounter, info))
 }
 
-func (k *DKGKeys) RetrieveMyDKGPrivateInfo(epochCounter uint64) (*dkg.DKGParticipantPriv, error) {
+// InsertNoDKGPrivateInfo insert a record in database to indicate that when DKG was completed,
+// the node failed DKG, there is no DKG key generated.
+// During normal operations, no error returns are expected.
+func (k *DKGKeys) InsertNoDKGPrivateInfo(epochCounter uint64) error {
+	return operation.RetryOnConflictTx(k.db, transaction.Update, k.storeTx(epochCounter, nil))
+}
+
+// receive the DKG key for the given Epoch, it returns:
+// - (key, true, nil) when DKG was completed, and a DKG private key was saved
+// - (nil, false, nil) when DKG was completed, but no DKG private key was saved
+// - (nil, false, storage.ErrNotFound) no DKG private key is found in database, it's unknown whether a DKG key was generated
+// - (nil, false, error) for other exceptions
+func (k *DKGKeys) RetrieveMyDKGPrivateInfo(epochCounter uint64) (*dkg.DKGParticipantPriv, bool, error) {
 	tx := k.db.NewTransaction(false)
 	defer tx.Discard()
-	return k.retrieveTx(epochCounter)(tx)
+	priv, err := k.retrieveTx(epochCounter)(tx)
+	if err != nil {
+		return nil, false, err
+	}
+	if priv == nil {
+		return nil, false, nil
+	}
+	return priv, true, nil
 }

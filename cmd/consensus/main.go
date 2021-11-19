@@ -290,10 +290,14 @@ func main() {
 					if err != nil {
 						return err
 					}
-					_, err = dkgKeyStore.RetrieveMyDKGPrivateInfo(counter)
+					_, hasRandomBeaconKey, err := dkgKeyStore.RetrieveMyDKGPrivateInfo(counter)
 					if err != nil {
 						return err
 					}
+					if !hasRandomBeaconKey {
+						return fmt.Errorf("no random beacon private key for epoch %v", counter)
+					}
+					return nil
 				}
 				return nil
 			}
