@@ -16,7 +16,7 @@ import (
 // Flow section - converting request data to flow models with validation.
 
 const maxAllowedScriptArgumentsCnt = 100
-const maxSignatureLength = 2048 // this length has been arbitrarily chosen to be 2048 just to ensure that the signature passed in is not absurdly long
+const maxSignatureLength = 64
 
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
