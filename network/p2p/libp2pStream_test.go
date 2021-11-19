@@ -216,13 +216,17 @@ func TestCreateStream_FallBack(t *testing.T) {
 		pInfo, err := PeerAddressInfo(otherId)
 		require.NoError(t, err)
 		thisNode.host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
+
+		// a new stream must be created
 		anotherStream, err := thisNode.CreateStream(ctx, pInfo.ID)
-		// Assert that a stream was returned without error
 		require.NoError(t, err)
 		require.NotNil(t, anotherStream)
-		// assert that the stream count within libp2p incremented (a new stream was created)
+
+		// number of default-protocol streams must be incremented, while preferred ones must be zero, since the other node
+		// only supports default ones.
 		require.Equal(t, i+1, CountStream(thisNode.host, otherNode.host.ID(), defaultProtocolId, network.DirOutbound))
 		require.Equal(t, 0, CountStream(thisNode.host, otherNode.host.ID(), preferredProtocolId, network.DirOutbound))
+
 		// assert that the same connection is reused
 		require.Len(t, thisNode.host.Network().Conns(), 1)
 		streams = append(streams, anotherStream)
@@ -239,7 +243,9 @@ func TestCreateStream_FallBack(t *testing.T) {
 			wg.Done()
 		}()
 		wg.Wait()
-		// assert that the stream count within libp2p decremented
+
+		// number of default-protocol streams must be decremented, while preferred ones must be zero, since the other node
+		// only supports default ones.
 		require.Equal(t, i, CountStream(thisNode.host, otherNode.host.ID(), defaultProtocolId, network.DirOutbound))
 		require.Equal(t, 0, CountStream(thisNode.host, otherNode.host.ID(), preferredProtocolId, network.DirOutbound))
 	}
