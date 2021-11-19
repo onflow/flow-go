@@ -3,7 +3,6 @@ package p2p
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -57,9 +56,7 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 		ctx,
 		unittest.IdentifierFixture())
 
-	done, err := node.Stop()
-	unittest.RequireCloseBefore(t, done, 100*time.Millisecond, "could not stop node on time")
-	assert.NoError(t, err)
+	stopNode(t, node)
 }
 
 // TestGetPeerInfo evaluates the deterministic translation between the nodes address and
