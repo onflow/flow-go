@@ -48,6 +48,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		expand:   expanded,
 		selected: selected,
 		body:     r.Body,
+		route:    h.route,
 	}
 
 	// execute handler function and check for error
@@ -131,6 +132,7 @@ type Request struct {
 	expand   []string
 	selected []string
 	body     io.ReadCloser
+	route    *mux.Route
 }
 
 func (r *Request) getParam(name string) string {
