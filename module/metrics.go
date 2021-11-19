@@ -82,6 +82,7 @@ type ComplianceMetrics interface {
 	CurrentDKGPhase1FinalView(view uint64)
 	CurrentDKGPhase2FinalView(view uint64)
 	CurrentDKGPhase3FinalView(view uint64)
+	EpochEmergencyFallbackTriggered()
 }
 
 type CleanerMetrics interface {
