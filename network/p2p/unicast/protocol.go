@@ -49,6 +49,14 @@ func FlowGzipProtocolId(sporkId flow.Identifier) protocol.ID {
 type ProtocolName string
 type ProtocolFactory func(zerolog.Logger, flow.Identifier, libp2pnet.StreamHandler) Protocol
 
+func ToProtocolNames(names []string) []ProtocolName {
+	p := make([]ProtocolName, 0)
+	for _, name := range names {
+		p = append(p, ProtocolName(name))
+	}
+	return p
+}
+
 func ToProtocolFactory(name ProtocolName) (ProtocolFactory, error) {
 	switch name {
 	case GzipCompressionUnicast:

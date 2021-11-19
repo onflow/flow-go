@@ -129,7 +129,7 @@ type BaseConfig struct {
 	guaranteesCacheSize             uint
 	receiptsCacheSize               uint
 	db                              *badger.DB
-	LibP2PStreamCompression         string
+	PreferredUnicastProtocols       *[]string
 	NetworkReceivedMessageCacheSize int
 }
 
@@ -200,7 +200,6 @@ func DefaultBaseConfig() *BaseConfig {
 		metricsEnabled:                  true,
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
-		LibP2PStreamCompression:         p2p.NoCompression,
 		NetworkReceivedMessageCacheSize: p2p.DefaultCacheSize,
 	}
 }
