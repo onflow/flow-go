@@ -23,6 +23,18 @@ const (
 // NewServer returns an HTTP server initialized with the REST API handler
 func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) *http.Server {
 
+	router := initRouter(backend, logger)
+
+	return &http.Server{
+		Addr:         listenAddress,
+		Handler:      router,
+		WriteTimeout: time.Second * 15,
+		ReadTimeout:  time.Second * 15,
+		IdleTimeout:  time.Second * 60,
+	}
+}
+
+func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
@@ -43,14 +55,7 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 			Name(r.name).
 			Handler(h)
 	}
-
-	return &http.Server{
-		Addr:         listenAddress,
-		Handler:      router,
-		WriteTimeout: time.Second * 15,
-		ReadTimeout:  time.Second * 15,
-		IdleTimeout:  time.Second * 60,
-	}
+	return router
 }
 
 type routeDefinition struct {

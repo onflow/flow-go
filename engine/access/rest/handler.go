@@ -30,9 +30,6 @@ type ApiHandlerFunc func(
 type Handler struct {
 	logger         zerolog.Logger
 	backend        access.API
-	method         string
-	pattern        string
-	name           string
 	linkGenerator  LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
 }

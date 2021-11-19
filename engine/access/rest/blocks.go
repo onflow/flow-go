@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const expandableFieldPayload = "payload"
-const expandableExecutionResult = "execution_result"
+const ExpandableFieldPayload = "payload"
+const ExpandableExecutionResult = "execution_result"
 
 // getBlocksByID gets blocks by provided ID or collection of IDs.
 func getBlocksByID(
@@ -58,32 +58,32 @@ type blockResponseFactory struct {
 
 func newBlockResponseFactory(expandFields map[string]bool, selectFields map[string]bool) *blockResponseFactory {
 	blkFactory := new(blockResponseFactory)
-	blkFactory.expandBlockPayload = expandFields[expandableFieldPayload]
-	blkFactory.expandExecutionResults = expandFields[expandableExecutionResult]
+	blkFactory.expandBlockPayload = expandFields[ExpandableFieldPayload]
+	blkFactory.expandExecutionResults = expandFields[ExpandableExecutionResult]
 	blkFactory.selectFields = selectFields
 	return blkFactory
 }
 
 func (blkRespFactory *blockResponseFactory) blockResponse(ctx context.Context, id flow.Identifier, backend access.API, linkGenerator LinkGenerator) (*generated.Block, StatusError) {
-	var responseBlock *generated.Block
+	var responseBlock = new(generated.Block)
 	if blkRespFactory.expandBlockPayload {
 		flowBlock, err := backend.GetBlockByID(ctx, id)
 		if err != nil {
-			blockLookupError(id, err)
+			return nil, blockLookupError(id, err)
 		}
 		responseBlock.Payload = blockPayloadResponse(flowBlock.Payload)
 		responseBlock.Header = blockHeaderResponse(flowBlock.Header)
 	} else {
 		flowBlockHeader, err := backend.GetBlockHeaderByID(ctx, id)
 		if err != nil {
-			blockLookupError(id, err)
+			return nil, blockLookupError(id, err)
 		}
 		responseBlock.Payload = nil
 		responseBlock.Header = blockHeaderResponse(flowBlockHeader)
 	}
-	if blkRespFactory.expandExecutionResults {
-		// lookup ER here and add to response
-	}
+	//if blkRespFactory.expandExecutionResults {
+	//	// lookup ER here and add to response
+	//}
 
 	blockLink, err := linkGenerator.BlockLink(id)
 	if err != nil {
@@ -91,12 +91,13 @@ func (blkRespFactory *blockResponseFactory) blockResponse(ctx context.Context, i
 		return nil, NewRestError(http.StatusInternalServerError, msg, err)
 	}
 
+	responseBlock.Links = new(generated.Links)
 	responseBlock.Links.Self = blockLink
 
 	return responseBlock, nil
 }
 
-func blockLookupError(id flow.Identifier, err error) error {
+func blockLookupError(id flow.Identifier, err error) StatusError {
 	msg := fmt.Sprintf("block with ID %s not found", id.String())
 	// if error has GRPC code NotFound, then return HTTP NotFound error
 	if status.Code(err) == codes.NotFound {
