@@ -152,6 +152,19 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 	}, nil
 }
 
+func toScriptArgs(script generated.ScriptsBody) ([][]byte, error) {
+	// todo(sideninja) validate
+	args := make([][]byte, len(script.Arguments))
+	for i, a := range script.Arguments {
+		args[i] = []byte(a)
+	}
+	return args, nil
+}
+
+func toScriptSource(script generated.ScriptsBody) ([]byte, error) {
+	return []byte(script.Script), nil
+}
+
 // Response section - converting flow models to response models.
 
 func proposalKeyResponse(key *flow.ProposalKey) *generated.ProposalKey {
