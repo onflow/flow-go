@@ -43,7 +43,9 @@ func (h *Handlers) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	idParam := vars["id"]
 
-	// gorilla mux retains opening and ending square brackets for ids
+	// currently, the swagger generated Go REST client is incorrectly doing a `fmt.Sprintf("%v", id)` for the id slice
+	// resulting in the client sending the ids in the format [id1 id2 id3...]. This is a temporary workaround to
+	// accommodate the client for now. Issue to to fix the client: https://github.com/onflow/flow/issues/698
 	idParam = strings.TrimSuffix(idParam, "]")
 	idParam = strings.TrimPrefix(idParam, "[")
 
