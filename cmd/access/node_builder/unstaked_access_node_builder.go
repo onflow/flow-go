@@ -343,9 +343,9 @@ func (anb *UnstakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		networkMetrics,
 		anb.RootBlock.ID(),
 		p2p.DefaultUnicastTimeout,
-		false, // no connection gating for the unstaked nodes
 		anb.IDTranslator,
 		p2p.WithMessageValidators(validators...),
+		p2p.WithConnectionGating(false),
 		// no peer manager
 		// use default identifier provider
 	)

@@ -115,7 +115,6 @@ func GenerateIDs(
 		// generate key
 		key, err := generateNetworkingKey(id.NodeID)
 		require.NoError(t, err)
-		port := "0"
 
 		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, o.connectionGating, idProvider, o.dhtOpts...)
 
