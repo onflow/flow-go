@@ -187,7 +187,7 @@ func (h *Handlers) jsonDecode(body io.ReadCloser, dst interface{}) error {
 
 	err = dec.Decode(&struct{}{})
 	if err != io.EOF {
-		msg := "Request body must only contain h single JSON object"
+		msg := "Request body must only contain a single JSON object"
 		return &badRequest{status: http.StatusBadRequest, msg: msg}
 	}
 
