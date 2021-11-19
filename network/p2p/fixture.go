@@ -38,6 +38,8 @@ type nodeFixtureParameters struct {
 	key         fcrypto.PrivateKey
 	address     string
 	allowList   bool
+	dhtEnabled  bool
+	dhtServer   bool
 }
 
 type nodeFixtureParameterOption func(*nodeFixtureParameters)
@@ -72,18 +74,28 @@ func withNetworkingAddress(address string) nodeFixtureParameterOption {
 	}
 }
 
+func withDHTNodeEnabled(asServer bool) nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.dhtEnabled = true
+		p.dhtServer = asServer
+	}
+}
+
 // nodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
 // It returns the nodes and their identities.
 func nodeFixture(t *testing.T, sporkId flow.Identifier, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
 
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
 
+	// default parameters
 	parameters := &nodeFixtureParameters{
 		handlerFunc: func(network.Stream) {},
 		allowList:   false,
 		unicasts:    nil,
 		key:         generateNetworkingKey(t),
 		address:     defaultAddress,
+		dhtServer:   false,
+		dhtEnabled:  false,
 	}
 
 	for _, opt := range opts {
@@ -114,6 +126,10 @@ func nodeFixture(t *testing.T, sporkId flow.Identifier, opts ...nodeFixtureParam
 	if parameters.allowList {
 		connGater := NewConnGater(logger)
 		builder.SetConnectionGater(connGater)
+	}
+
+	if parameters.dhtEnabled {
+		builder.SetDHTOptions(AsServer(parameters.dhtServer))
 	}
 
 	ctx := context.Background()
