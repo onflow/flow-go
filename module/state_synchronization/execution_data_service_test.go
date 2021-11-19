@@ -3,6 +3,7 @@ package state_synchronization
 import (
 	"bytes"
 	"context"
+	"math"
 	"math/rand"
 	"reflect"
 	"sync"
@@ -266,6 +267,39 @@ func TestOversizedBlob(t *testing.T) {
 	// blob of serialized execution data
 	_, data = executionData(t, eds.serializer, defaultMaxBlobSize+1)
 	test(data)
+
+	// multiple oversized blobs of serialized execution data
+	_, data = executionData(t, eds.serializer, defaultMaxBlobSize*5)
+	blobSize := int(math.Ceil(float64(len(data)) / 4))
+	var cids []cid.Cid
+	for i := 0; i < 4; i++ {
+		blob := data[i*blobSize : (i+1)*blobSize]
+		if i == 3 {
+			blob = data[i*blobSize:]
+		}
+		cid, err := putBlob(bs, blob, time.Second)
+		require.NoError(t, err)
+		cids = append(cids, cid)
+	}
+	buf := &bytes.Buffer{}
+	eds.serializer.Serialize(buf, cids)
+	test(buf.Bytes())
+
+	// multiple blobs of serialized execution data with one oversized
+	_, data = executionData(t, eds.serializer, defaultMaxBlobSize*5)
+	cids = nil
+	for i := 0; i < 5; i++ {
+		blob := data[i*defaultMaxBlobSize : (i+1)*defaultMaxBlobSize]
+		if i == 4 {
+			blob = data[i*defaultMaxBlobSize:]
+		}
+		cid, err := putBlob(bs, blob, time.Second)
+		require.NoError(t, err)
+		cids = append(cids, cid)
+	}
+	buf = &bytes.Buffer{}
+	eds.serializer.Serialize(buf, cids)
+	test(buf.Bytes())
 }
 
 func TestGetContextCanceled(t *testing.T) {
