@@ -16,6 +16,16 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// Tests in this file evaluate tests that the network layer behaves as expected after a spork.
+// All network related sporking requirements can be supported via libp2p directly,
+// without needing any additional support in Flow other than providing the new root block ID.
+// Sporking can be supported by two ways:
+// 1. Updating the network key of a node after it is moved from the old chain to the new chain
+// 2. Updating the Flow Libp2p protocol ID suffix to prevent one-to-one messaging across sporks and
+//    updating the channel suffix to prevent one-to-K messaging (PubSub) across sporks.
+// 1 and 2 both can independently ensure that nodes from the old chain cannot communicate with nodes on the new chain
+// These tests are just to reconfirm the network behaviour and provide a test bed for future tests for sporking, if needed
+
 // TestCrosstalkPreventionOnNetworkKeyChange tests that a node from the old chain cannot talk to a node in the new chain
 // if it's network key is updated while the libp2p protocol ID remains the same
 func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {

@@ -178,7 +178,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 			assert.NoError(t, err)
 			wg.Done()
 		}()
-		wg.Wait()
+		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not close streams on time")
 		// assert that the stream count within libp2p decremented
 		require.Equal(t, i, CountStream(nodes[0].host, nodes[1].host.ID(), protocolID, network.DirOutbound))
 	}
@@ -242,7 +242,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 			assert.NoError(t, err)
 			wg.Done()
 		}()
-		wg.Wait()
+		unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "could not close streams on time")
 
 		// number of default-protocol streams must be decremented, while preferred ones must be zero, since the other node
 		// only supports default ones.
