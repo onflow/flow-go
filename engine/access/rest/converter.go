@@ -45,24 +45,38 @@ func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
 	}, nil
 }
 
-func toSignature(signature *generated.TransactionSignature) (flow.TransactionSignature, error) {
-	address, err := toAddress(signature.Address)
+func toSignature(signature string) ([]byte, error) {
+	signatureBytes := []byte(signature)
+	// the maximum signature length is arbitrarily chosen to be 2048. This check is to ensure that the signature is not
+	// absurdly long
+	if len(signatureBytes) > 2048 {
+		return nil, fmt.Errorf("invalid signature")
+	}
+}
+
+func toTransactionSignature(transactionSignature *generated.TransactionSignature) (flow.TransactionSignature, error) {
+	address, err := toAddress(transactionSignature.Address)
+	if err != nil {
+		return flow.TransactionSignature{}, err
+	}
+
+	signature, err := toSignature(transactionSignature.Signature)
 	if err != nil {
 		return flow.TransactionSignature{}, err
 	}
 
 	return flow.TransactionSignature{
 		Address:     address,
-		SignerIndex: int(signature.SignerIndex),
-		KeyIndex:    uint64(signature.KeyIndex),
-		Signature:   []byte(signature.Signature),
+		SignerIndex: int(transactionSignature.SignerIndex),
+		KeyIndex:    uint64(transactionSignature.KeyIndex),
+		Signature:   signature,
 	}, nil
 }
 
-func toSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSignature, error) {
+func toTransactionSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSignature, error) {
 	signatures := make([]flow.TransactionSignature, len(sigs))
 	for _, sig := range sigs {
-		signature, err := toSignature(&sig)
+		signature, err := toTransactionSignature(&sig)
 		if err != nil {
 			return nil, err
 		}
@@ -100,12 +114,12 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		auths = append(auths, a)
 	}
 
-	payloadSigs, err := toSignatures(tx.PayloadSignatures)
+	payloadSigs, err := toTransactionSignatures(tx.PayloadSignatures)
 	if err != nil {
 		return flow.TransactionBody{}, err
 	}
 
-	envelopeSigs, err := toSignatures(tx.EnvelopeSignatures)
+	envelopeSigs, err := toTransactionSignatures(tx.EnvelopeSignatures)
 	if err != nil {
 		return flow.TransactionBody{}, err
 	}
