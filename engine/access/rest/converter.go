@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"regexp"
 
@@ -15,20 +16,25 @@ import (
 // Flow section - converting request data to flow models with validation.
 
 const maxAllowedScriptArgumentsCnt = 100
+const maxSignatureLength = 2048 // this length has been arbitrarily chosen to be 2048 just to ensure that the signature passed in is not absurdly long
 
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
 	if !valid {
-		return flow.Identifier{}, fmt.Errorf("invalid ID")
+		return flow.Identifier{}, errors.New("invalid ID")
 	}
 
-	return flow.HexStringToIdentifier(id)
+	flowID, err := flow.HexStringToIdentifier(id)
+	if err != nil {
+		return flow.Identifier{}, fmt.Errorf("invalid ID: %w", err)
+	}
+	return flowID, nil
 }
 
 func toAddress(address string) (flow.Address, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{16}$`, address)
 	if !valid {
-		return flow.Address{}, fmt.Errorf("invalid address")
+		return flow.Address{}, errors.New("invalid address")
 	}
 
 	return flow.HexToAddress(address), nil
@@ -49,9 +55,7 @@ func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
 
 func toSignature(signature string) ([]byte, error) {
 	signatureBytes := []byte(signature)
-	// the maximum signature length is arbitrarily chosen to be 2048. This check is to ensure that the signature is not
-	// absurdly long
-	if len(signatureBytes) > 2048 {
+	if len(signatureBytes) > maxSignatureLength {
 		return nil, fmt.Errorf("invalid signature")
 	}
 	return signatureBytes, nil
