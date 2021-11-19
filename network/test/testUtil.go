@@ -433,12 +433,13 @@ func MakeBlockstore(t *testing.T, name string) (blockstore.Blockstore, func()) {
 
 	opts := badger.
 		DefaultOptions(dsDir).
+		WithSyncWrites(false).
 		WithTTL(30 * time.Minute)
 
-	bs, err := badger.NewBlockstore(opts)
+	ds, err := badger.NewDatastore(opts)
 	require.NoError(t, err)
 
-	return bs, func() {
+	return blockstore.NewBlockstore(ds), func() {
 		require.NoError(t, os.RemoveAll(dsDir))
 	}
 }

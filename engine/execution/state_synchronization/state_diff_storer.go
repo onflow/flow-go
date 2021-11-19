@@ -2,6 +2,7 @@ package state_synchronization
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 
@@ -118,7 +119,7 @@ func (s *StateDiffStorer) readBlocks(cids []cid.Cid) (interface{}, error) {
 	dec := s.codec.NewDecoder(comp)
 	var code byte
 	for i, c := range cids {
-		block, err := s.blockWriter.bstore.Get(c)
+		block, err := s.blockWriter.bstore.Get(context.Background(), c)
 		if err != nil {
 			return nil, fmt.Errorf("failed to get block %v from blockstore: %w", c, err)
 		}
@@ -184,7 +185,7 @@ func (bw *BlockWriter) Flush() error {
 
 func (bw *BlockWriter) writeBlock(data []byte) error {
 	block := blocks.NewBlock(data)
-	if err := bw.bstore.Put(block); err != nil {
+	if err := bw.bstore.Put(context.Background(), block); err != nil {
 		return fmt.Errorf("failed to put block %v into blockstore: %w", block.Cid(), err)
 	}
 	bw.cids = append(bw.cids, block.Cid())

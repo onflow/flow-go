@@ -57,7 +57,7 @@ func (e *BlockExchange) GetBlocks(cids ...cid.Cid) network.BlocksPromise {
 }
 
 func (e *BlockExchange) HasBlock(block blocks.Block) error {
-	return e.bs.HasBlock(block)
+	return e.bs.HasBlock(context.Background(), block)
 }
 
 func (e *BlockExchange) GetSession(ctx context.Context) network.BlockExchangeFetcher {

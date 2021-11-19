@@ -765,7 +765,7 @@ func DefaultLibP2PHost(ctx context.Context, address string, key fcrypto.PrivateK
 	allOptions := append(defaultOptions, options...)
 
 	// create the libp2p host
-	libP2PHost, err := libp2p.New(ctx, allOptions...)
+	libP2PHost, err := libp2p.New(allOptions...)
 	if err != nil {
 		return nil, fmt.Errorf("could not create libp2p host: %w", err)
 	}
@@ -797,8 +797,9 @@ func DefaultLibP2POptions(address string, key fcrypto.PrivateKey) ([]config.Opti
 	// as the 1-k discovery process and the 1-1 messaging both sometimes attempt to open connection to the same target
 	// As of now there is no requirement of client sockets to be a well-known port, so disabling port reuse all together.
 	transport := libp2p.Transport(func(u *tptu.Upgrader) *tcp.TcpTransport {
-		tpt := tcp.NewTCPTransport(u)
-		tpt.DisableReuseport = true
+		// TODO: handle errors properly. DisableReuseport() does not return an error, so it's safe
+		// to ignore for now
+		tpt, _ := tcp.NewTCPTransport(u, tcp.DisableReuseport())
 		return tpt
 	})
 

@@ -52,7 +52,7 @@ func (suite *BlockExchangeTestSuite) SetupTest() {
 		suite.cleanupFuncs = append(suite.cleanupFuncs, cleanupFunc)
 		block := blocks.NewBlock([]byte(fmt.Sprintf("foo%v", i)))
 		suite.blockCids = append(suite.blockCids, block.Cid())
-		require.NoError(suite.T(), bstore.Put(block))
+		require.NoError(suite.T(), bstore.Put(context.Background(), block))
 		blockstores = append(blockstores, bstore)
 		bex, err := net.RegisterBlockExchange(blockExchangeChannel, blockstores[i])
 		require.NoError(suite.T(), err)
