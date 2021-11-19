@@ -17,6 +17,7 @@ import (
 
 const maxAllowedScriptArgumentsCnt = 100
 const maxSignatureLength = 64
+const maxAuthorizersCnt = 100
 
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
@@ -117,7 +118,11 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		return flow.TransactionBody{}, err
 	}
 
-	auths := make([]flow.Address, len(tx.Authorizers))
+	authorizerCnt := len(tx.Authorizers)
+	if authorizerCnt > maxAuthorizersCnt {
+		return flow.TransactionBody{}, fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizersCnt)
+	}
+	auths := make([]flow.Address, authorizerCnt)
 	for _, auth := range tx.Authorizers {
 		a, err := toAddress(auth)
 		if err != nil {
