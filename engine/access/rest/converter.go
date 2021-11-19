@@ -284,6 +284,13 @@ func blockHeaderResponse(flowHeader *flow.Header) *generated.BlockHeader {
 	}
 }
 
+func blockHeaderOnlyResponse(flowHeader *flow.Header) *generated.Block {
+	return &generated.Block{
+		Header:  blockHeaderResponse(flowHeader),
+		Payload: nil,
+	}
+}
+
 func blockPayloadResponse(flowPayload *flow.Payload) *generated.BlockPayload {
 	return &generated.BlockPayload{
 		CollectionGuarantees: collectionGuaranteesResponse(flowPayload.Guarantees),

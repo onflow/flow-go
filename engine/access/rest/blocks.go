@@ -2,9 +2,9 @@ package rest
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 	"net/http"
 
-	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -13,33 +13,39 @@ import (
 )
 
 // getBlocksByID gets blocks by provided ID or collection of IDs.
-func getBlocksByID(
-	w http.ResponseWriter,
-	r *http.Request,
-	vars map[string]string,
-	backend access.API,
-	logger zerolog.Logger,
-) (interface{}, StatusError) {
-	ids, err := toIDs(vars["id"])
+func getBlocksByID(req Request, backend access.API) (interface{}, StatusError) {
+	ids, err := toIDs(req.getParam("id"))
 	if err != nil {
 		return nil, NewBadRequestError(err.Error(), err)
 	}
 
 	blocks := make([]*generated.Block, len(ids))
 	for i, id := range ids {
-		flowBlock, err := backend.GetBlockByID(r.Context(), id)
-		if err != nil {
-			msg := fmt.Sprintf("block with ID %s not found", id.String())
-			// if error has GRPC code NotFound, then return HTTP NotFound error
-			if status.Code(err) == codes.NotFound {
-				return nil, NewNotFoundError(msg, err)
+		if req.expands(payload) {
+			flowBlock, err := backend.GetBlockByID(req.context, id)
+			if err != nil {
+				return nil, blockError(err, id)
 			}
-
-			return nil, NewRestError(http.StatusInternalServerError, msg, err)
+			blocks[i] = blockResponse(flowBlock)
+			continue
 		}
 
-		blocks[i] = blockResponse(flowBlock)
+		flowBlock, err := backend.GetBlockHeaderByID(req.context, id)
+		if err != nil {
+			return nil, blockError(err, id)
+		}
+		blocks[i] = blockHeaderOnlyResponse(flowBlock)
 	}
 
 	return blocks, nil
+}
+
+func blockError(err error, id flow.Identifier) StatusError {
+	msg := fmt.Sprintf("block with ID %s not found", id.String())
+	// if error has GRPC code NotFound, then return HTTP NotFound error
+	if status.Code(err) == codes.NotFound {
+		return NewNotFoundError(msg, err)
+	}
+
+	return NewRestError(http.StatusInternalServerError, msg, err)
 }

@@ -10,20 +10,14 @@ import (
 )
 
 // getTransactionByID gets a transaction by requested ID.
-func getTransactionByID(
-	w http.ResponseWriter,
-	r *http.Request,
-	vars map[string]string,
-	backend access.API,
-	logger zerolog.Logger,
-) (interface{}, StatusError) {
+func getTransactionByID(req Request, backend access.API) (interface{}, StatusError) {
 
-	id, err := toID(vars["id"])
+	id, err := toID(req.getParam("id"))
 	if err != nil {
 		return nil, NewBadRequestError("invalid ID", err)
 	}
 
-	tx, err := backend.GetTransaction(r.Context(), id)
+	tx, err := backend.GetTransaction(req.context, id)
 	if err != nil {
 		return nil, NewBadRequestError("transaction fetching error", err)
 	}

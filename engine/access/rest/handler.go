@@ -1,9 +1,11 @@
 package rest
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"io"
 	"net/http"
 	"strings"
@@ -26,11 +28,8 @@ type Handler struct {
 	pattern     string
 	name        string
 	handlerFunc func(
-		w http.ResponseWriter, // todo(sideninja) think about removing
-		r *http.Request, // todo(sideninja) think about removing and just exposing context
-		vars map[string]string, // todo(sideninja) think about passing as custom struct containing fields such as getParams, body, parsed expanded and link queries etc
+		req Request,
 		backend access.API,
-		logger zerolog.Logger,
 	) (interface{}, StatusError)
 }
 
@@ -38,38 +37,35 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
+	// create request dto
+	expanded, _ := middleware.GetFieldsToExpand(r)
+	selected, _ := middleware.GetFieldsToSelect(r)
+
+	request := Request{
+		r:        r,
+		context:  r.Context(),
+		params:   mux.Vars(r),
+		expand:   expanded,
+		selected: selected,
+		body:     r.Body,
+	}
+
 	// execute handler function and check for error
-	response, err := h.handlerFunc(w, r, mux.Vars(r), h.backend, errorLogger)
+	response, err := h.handlerFunc(request, h.backend)
 	if err != nil {
 		switch e := err.(type) {
-		case StatusError:
-			errorResponse(w, e.Status(), e.UserMessage(), h.logger)
+		case StatusError: // todo(sideninja) try handle not found error.Code - grpc unwrap
+			h.errorResponse(w, e.Status(), e.UserMessage(), errorLogger)
 		default:
-			errorResponse(w, http.StatusInternalServerError, e.Error(), h.logger)
+			h.errorResponse(w, http.StatusInternalServerError, e.Error(), errorLogger)
 		}
 
 		// stop going further
 		return
 	}
 
-	// serialise response to JSON and handler errors
-	encodedResponse, encErr := json.Marshal(response)
-	if encErr != nil {
-		h.logger.Error().Err(err).Msg("failed to encode response")
-		errorResponse(w, http.StatusInternalServerError, "error generating response", h.logger)
-		return
-	}
-
 	// write response to response stream
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	_, writeErr := w.Write(encodedResponse)
-	if writeErr != nil {
-		h.logger.Error().Err(err).Msg("failed to write response")
-		errorResponse(w, http.StatusInternalServerError, "error generating response", h.logger)
-		return
-	}
-
-	w.WriteHeader(http.StatusOK)
+	h.jsonResponse(w, response, selected, errorLogger)
 }
 
 // addToRouter adds handler to provided router
@@ -83,9 +79,29 @@ func (h *Handler) addToRouter(router *mux.Router) {
 	h.route = router.Get(h.name)
 }
 
+func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, selected []string, logger zerolog.Logger) {
+	// serialise response to JSON and handler errors
+	encodedResponse, err := json.Marshal(response)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("failed to encode response")
+		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	_, writeErr := w.Write(encodedResponse)
+	if writeErr != nil {
+		h.logger.Error().Err(err).Msg("failed to write response")
+		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
 // errorResponse sends an HTTP error response to the client with the given return code
 // and a model error with the given response message in the response body
-func errorResponse(
+func (h *Handler) errorResponse(
 	w http.ResponseWriter,
 	returnCode int,
 	responseMessage string,
@@ -107,6 +123,30 @@ func errorResponse(
 		logger.Error().Err(err).Msg("failed to send error response")
 	}
 }
+
+type Request struct {
+	r        *http.Request
+	context  context.Context
+	params   map[string]string
+	expand   []string
+	selected []string
+	body     io.ReadCloser
+}
+
+func (r *Request) getParam(name string) string {
+	return r.params[name] // todo(sideninja) handle missing
+}
+
+func (r *Request) expands(name string) bool {
+	for _, v := range r.expand {
+		if v == name {
+			return true
+		}
+	}
+	return false
+}
+
+const payload = "payload"
 
 // jsonDecode provides safe JSON decoding with sufficient erro handling.
 func jsonDecode(body io.ReadCloser, dst interface{}) error {
