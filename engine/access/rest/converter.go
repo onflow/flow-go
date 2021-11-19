@@ -101,7 +101,7 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		return flow.TransactionBody{}, fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArgumentsCnt)
 	}
 
-	args := make([][]byte, len(tx.Arguments))
+	args := make([][]byte, argLen)
 	for _, arg := range tx.Arguments {
 		// todo validate
 		args = append(args, []byte(arg))
