@@ -11,10 +11,11 @@ const expandQueryParam = "expand"
 const selectQueryParam = "select"
 
 // commonQueryParamMiddleware generates a Middleware function that extracts the given query parameter from the request
-// and adds it to the request context as a key value pair with the key as the query param name.
-// e.g. for queryParamName "fields", if the request url contains <some url>?fields=field1,field2,..fieldN,
-// the middleware returned by commonQueryParamMiddleware will add the key - "fields" to the request context with value
-// ["field", "fields2",..."fieldn"] when it is executed
+// and adds it to the request context as a key value pair. The key is the query param name and the value as a string slice containing
+// all comma separated values.
+// e.g. for queryParamName "field", if the request url contains <some url>?field=value1,value2,...valueN
+// the middleware returned by commonQueryParamMiddleware will add the key - "field" to the request context with value
+// []string{"value1", "value2",..."valueN"} when it is executed
 func commonQueryParamMiddleware(queryParamName string) mux.MiddlewareFunc {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
