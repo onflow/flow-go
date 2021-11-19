@@ -75,12 +75,9 @@ func (m *Manager) Register(unicast ProtocolName) error {
 	return nil
 }
 
-// CreateStream makes at most `maxAttempts` to create a stream with the peer.
-// This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
-// remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'.
-//
-// Note that in case an existing TCP connection underneath to `peerID` exists, that connection is utilized for creating a new stream.
-// The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
+// CreateStream tries establishing a libp2p stream to the remote peer id. It tries creating streams in the descending order of preference until
+// it either creates a successful stream or runs out of options. Creating stream on each protocol is tried at most `maxAttempt` one, and then falls
+// back to the less preferred one.
 func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
 	var errs error
 
@@ -99,6 +96,12 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 }
 
 // createStreamWithProtocol creates a stream on specified protocol.
+// It makes at most `maxAttempts` to create a stream with the peer.
+// This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
+// remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'.
+//
+// Note that in case an existing TCP connection underneath to `peerID` exists, that connection is utilized for creating a new stream.
+// The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
 func (m *Manager) createStreamWithProtocol(ctx context.Context,
 	protocolID protocol.ID,
 	peerID peer.ID,
