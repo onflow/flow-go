@@ -1,8 +1,6 @@
 package rest
 
 import (
-	"net/http"
-
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
@@ -11,15 +9,13 @@ import (
 
 // getTransactionByID gets a transaction by requested ID.
 func getTransactionByID(
-	w http.ResponseWriter,
-	r *http.Request,
-	vars map[string]string,
+	r *requestDecorator,
 	backend access.API,
 	generator LinkGenerator,
 	logger zerolog.Logger,
 ) (interface{}, StatusError) {
 
-	id, err := toID(vars["id"])
+	id, err := r.id()
 	if err != nil {
 		return nil, NewBadRequestError("invalid ID", err)
 	}
@@ -34,9 +30,7 @@ func getTransactionByID(
 
 // createTransaction creates a new transaction from provided payload.
 func createTransaction(
-	w http.ResponseWriter,
-	r *http.Request,
-	vars map[string]string,
+	r *requestDecorator,
 	backend access.API,
 	generator LinkGenerator,
 	logger zerolog.Logger,

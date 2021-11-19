@@ -11,7 +11,6 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
-	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -20,27 +19,20 @@ const ExpandableExecutionResult = "execution_result"
 
 // getBlocksByID gets blocks by provided ID or collection of IDs.
 func getBlocksByID(
-	w http.ResponseWriter,
-	r *http.Request,
-	vars map[string]string,
+	r *requestDecorator,
 	backend access.API,
 	linkGenerator LinkGenerator,
 	logger zerolog.Logger,
 ) (interface{}, StatusError) {
 
-	expandFields, _ := middleware.GetFieldsToExpand(r)
-	selectFields, _ := middleware.GetFieldsToSelect(r)
-
-	ids, err := toIDs(vars["id"])
+	ids, err := r.ids()
 	if err != nil {
 		return nil, NewBadRequestError(err.Error(), err)
 	}
 
-	blockFactory := newBlockResponseFactory(expandFields, selectFields)
-
 	blocks := make([]*generated.Block, len(ids))
 	for i, id := range ids {
-		block, err := blockFactory.blockResponse(r.Context(), id, backend, linkGenerator)
+		block, err := getBlockByID(r.Context(), id, r, backend, linkGenerator)
 		if err != nil {
 			return nil, err
 		}
@@ -56,17 +48,9 @@ type blockResponseFactory struct {
 	selectFields           map[string]bool
 }
 
-func newBlockResponseFactory(expandFields map[string]bool, selectFields map[string]bool) *blockResponseFactory {
-	blkFactory := new(blockResponseFactory)
-	blkFactory.expandBlockPayload = expandFields[ExpandableFieldPayload]
-	blkFactory.expandExecutionResults = expandFields[ExpandableExecutionResult]
-	blkFactory.selectFields = selectFields
-	return blkFactory
-}
-
-func (blkRespFactory *blockResponseFactory) blockResponse(ctx context.Context, id flow.Identifier, backend access.API, linkGenerator LinkGenerator) (*generated.Block, StatusError) {
+func getBlockByID(ctx context.Context, id flow.Identifier, req *requestDecorator, backend access.API, linkGenerator LinkGenerator) (*generated.Block, StatusError) {
 	var responseBlock = new(generated.Block)
-	if blkRespFactory.expandBlockPayload {
+	if req.expands(ExpandableFieldPayload) {
 		flowBlock, err := backend.GetBlockByID(ctx, id)
 		if err != nil {
 			return nil, blockLookupError(id, err)
@@ -81,7 +65,7 @@ func (blkRespFactory *blockResponseFactory) blockResponse(ctx context.Context, i
 		responseBlock.Payload = nil
 		responseBlock.Header = blockHeaderResponse(flowBlockHeader)
 	}
-	//if blkRespFactory.expandExecutionResults {
+	//if req.expands(ExpandableExecutionResult) {
 	//	// lookup ER here and add to response
 	//}
 

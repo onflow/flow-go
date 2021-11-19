@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
@@ -16,9 +15,7 @@ import (
 )
 
 type ApiHandlerFunc func(
-	w http.ResponseWriter,
-	r *http.Request,
-	vars map[string]string,
+	r *requestDecorator,
 	backend access.API,
 	generator LinkGenerator,
 	logger zerolog.Logger,
@@ -48,8 +45,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
+	decoratedRequest := newRequestDecorator(r)
+
 	// execute handler function and check for error
-	response, err := h.apiHandlerFunc(w, r, mux.Vars(r), h.backend, h.linkGenerator, errorLogger)
+	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator, errorLogger)
 	if err != nil {
 		switch e := err.(type) {
 		case StatusError:
@@ -160,9 +159,7 @@ func jsonDecode(body io.ReadCloser, dst interface{}) error {
 
 // NotImplemented handler returns an error explaining the endpoint is not yet implemented
 func NotImplemented(
-	_ http.ResponseWriter,
-	_ *http.Request,
-	_ map[string]string,
+	_ *requestDecorator,
 	_ access.API,
 	_ LinkGenerator,
 	_ zerolog.Logger,
