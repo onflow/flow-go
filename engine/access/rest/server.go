@@ -38,9 +38,9 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 	for _, r := range routeDefinitions() {
 		h := NewHandler(logger, backend, r.apiHandlerFunc, linkGenerator)
 		v1SubRouter.
-			Methods(h.method).
-			Path(h.pattern).
-			Name(h.name).
+			Methods(r.method).
+			Path(r.pattern).
+			Name(r.name).
 			Handler(h)
 	}
 
