@@ -257,12 +257,10 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	for _, msg := range msgs {
 		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
-			// CAUTION: potential slashable offense
 			b.log.Error().Err(err).Msg("bad broadcast message")
 			continue
 		}
 		if !ok {
-			// CAUTION: potential slashable offense
 			b.log.Error().Msg("invalid signature on broadcast dkg message")
 			continue
 		}
