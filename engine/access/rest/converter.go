@@ -52,6 +52,7 @@ func toSignature(signature string) ([]byte, error) {
 	if len(signatureBytes) > 2048 {
 		return nil, fmt.Errorf("invalid signature")
 	}
+	return signatureBytes, nil
 }
 
 func toTransactionSignature(transactionSignature *generated.TransactionSignature) (flow.TransactionSignature, error) {
