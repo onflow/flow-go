@@ -77,7 +77,7 @@ func TestGetPeerInfo(t *testing.T) {
 		for j := 0; j < 10; j++ {
 			rinfo, err := PeerAddressInfo(*identity)
 			require.NoError(t, err)
-			assert.True(t, rinfo.String() == info.String(), "inconsistent id generated")
+			assert.Equal(t, rinfo.String(), info.String(), "inconsistent id generated")
 		}
 	}
 }
