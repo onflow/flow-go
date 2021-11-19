@@ -89,7 +89,7 @@ func (h *Handlers) GetTransactionByID(w http.ResponseWriter, r *http.Request) {
 	idFromRequest := vars["id"]
 	id, err := toID(idFromRequest)
 	if err != nil {
-		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID: %s", idFromRequest), errorLogger)
+		h.errorResponse(w, http.StatusBadRequest, "invalid transaction ID", errorLogger)
 		return
 	}
 
