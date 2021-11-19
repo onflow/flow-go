@@ -14,6 +14,9 @@ import (
 	"github.com/ipfs/go-datastore"
 	dssync "github.com/ipfs/go-datastore/sync"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/host"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -394,4 +397,50 @@ func TestGetIncompleteData(t *testing.T) {
 
 	_, err = getExecutionData(eds, rootCid, time.Second)
 	assertErrorType(t, err, new(BlobNotFoundError))
+}
+
+func createBlobServices(ctx context.Context, t *testing.T, name string, n int) []network.BlobService {
+	var services []network.BlobService
+	var hosts []host.Host
+
+	for i := 0; i < n; i++ {
+		h, err := libp2p.New(ctx)
+		require.NoError(t, err)
+
+		cr, err := dht.New(ctx, h)
+		require.NoError(t, err)
+
+		services = append(services, network.NewBlobService(ctx, h, cr, name, dssync.MutexWrap(datastore.NewMapDatastore())))
+
+		// connect to all other hosts
+		for _, other := range hosts {
+			err := h.Connect(ctx, *host.InfoFromHost(other))
+			require.NoError(t, err)
+		}
+
+		hosts = append(hosts, h)
+	}
+
+	return services
+}
+
+func TestWithNetwork(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	blobServices := createBlobServices(ctx, t, "test-create-store-request", 2)
+
+	eds1 := executionDataService(blobServices[0])
+	eds2 := executionDataService(blobServices[1])
+
+	expected, _ := executionData(t, eds1.serializer, 10*defaultMaxBlobSize)
+	rootCid, err := addExecutionData(eds1, expected, time.Second)
+	require.NoError(t, err)
+
+	actual, err := getExecutionData(eds2, rootCid, time.Second)
+	require.NoError(t, err)
+
+	assert.Equal(t, true, reflect.DeepEqual(expected, actual))
 }
