@@ -59,7 +59,7 @@ func (h *Handlers) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 	for i, id := range ids {
 		flowID, err := toID(id)
 		if err != nil {
-			h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID %s", id), errorLogger)
+			h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID %s: %s", id, err.Error()), errorLogger)
 			return
 		}
 
