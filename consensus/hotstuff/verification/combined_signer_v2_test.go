@@ -10,11 +10,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	modulesig "github.com/onflow/flow-go/module/signature"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -58,8 +56,8 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	committee := &mocks.Committee{}
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
-	merger := modulesig.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-	verifier := NewCombinedVerifierV2(committee, merger)
+	packer := signature.NewConsensusSigDataPacker(committee)
+	verifier := NewCombinedVerifierV2(committee, packer)
 
 	// check that a created proposal can be verified by a verifier
 	proposal, err := signer.CreateProposal(block)
@@ -125,8 +123,8 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	// this failed node.
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
-	merger := modulesig.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-	verifier := NewCombinedVerifierV2(committee, merger)
+	packer := signature.NewConsensusSigDataPacker(committee)
+	verifier := NewCombinedVerifierV2(committee, packer)
 
 	proposal, err := signer.CreateProposal(block)
 	require.NoError(t, err)
