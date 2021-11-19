@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -29,7 +28,6 @@ type CombinedSignerV3 struct {
 	stakingHasher  hash.Hasher
 	beaconKeyStore module.RandomBeaconKeyStore
 	beaconHasher   hash.Hasher
-	signerID       flow.Identifier
 }
 
 // NewCombinedSignerV3 creates a new combined signer with the given dependencies:
@@ -39,7 +37,6 @@ type CombinedSignerV3 struct {
 func NewCombinedSignerV3(
 	staking module.Local,
 	beaconKeyStore module.RandomBeaconKeyStore,
-	signerID flow.Identifier,
 ) *CombinedSignerV3 {
 
 	sc := &CombinedSignerV3{
@@ -47,7 +44,6 @@ func NewCombinedSignerV3(
 		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
 		beaconKeyStore: beaconKeyStore,
 		beaconHasher:   crypto.NewBLSKMAC(encoding.RandomBeaconTag),
-		signerID:       signerID,
 	}
 	return sc
 }
@@ -56,7 +52,7 @@ func NewCombinedSignerV3(
 func (c *CombinedSignerV3) CreateProposal(block *model.Block) (*model.Proposal, error) {
 
 	// check that the block is created by us
-	if block.ProposerID != c.signerID {
+	if block.ProposerID != c.staking.NodeID() {
 		return nil, fmt.Errorf("can't create proposal for someone else's block")
 	}
 
@@ -88,7 +84,7 @@ func (c *CombinedSignerV3) CreateVote(block *model.Block) (*model.Vote, error) {
 	vote := &model.Vote{
 		View:     block.View,
 		BlockID:  block.BlockID,
-		SignerID: c.signerID,
+		SignerID: c.staking.NodeID(),
 		SigData:  sigData,
 	}
 
