@@ -343,3 +343,39 @@ func executionResultResponse(exeResult flow.ExecutionResult) generated.Execution
 		Links:   nil,
 	}
 }
+
+func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublicKey {
+	keysResponse := make([]generated.AccountPublicKey, len(keys))
+	for i, k := range keys {
+		sigAlgo := generated.SigningAlgorithm(k.SignAlgo.String())
+		hashAlgo := generated.HashingAlgorithm(k.HashAlgo.String())
+
+		keysResponse[i] = generated.AccountPublicKey{
+			Index:            int32(k.Index),
+			PublicKey:        k.PublicKey.String(),
+			SigningAlgorithm: &sigAlgo,
+			HashingAlgorithm: &hashAlgo,
+			SequenceNumber:   int32(k.SeqNumber),
+			Weight:           int32(k.Weight),
+			Revoked:          k.Revoked,
+		}
+	}
+
+	return keysResponse
+}
+
+func accountResponse(account *flow.Account) generated.Account {
+	contracts := make(map[string]string, len(account.Contracts))
+	for name, code := range account.Contracts {
+		contracts[name] = string(code)
+	}
+
+	return generated.Account{
+		Address:    account.Address.String(),
+		Balance:    int32(account.Balance),
+		Keys:       accountKeysResponse(account.Keys),
+		Contracts:  contracts,
+		Expandable: nil,
+		Links:      nil,
+	}
+}
