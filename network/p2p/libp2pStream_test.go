@@ -117,7 +117,7 @@ func TestCreateStream_WithDefaultUnicast(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
 	testCreateStream(t,
 		sporkId,
-		nil,
+		nil, // sends nil as preferred unicast so that nodes run on default plain tcp streams.
 		unicast.FlowProtocolID(sporkId))
 }
 
