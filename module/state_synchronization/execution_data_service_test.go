@@ -285,7 +285,7 @@ func TestOversizedBlob(t *testing.T) {
 		cids = append(cids, cid)
 	}
 	buf := &bytes.Buffer{}
-	eds.serializer.Serialize(buf, cids)
+	require.NoError(t, eds.serializer.Serialize(buf, cids))
 	test(buf.Bytes())
 
 	// multiple blobs of serialized execution data with one oversized
@@ -301,7 +301,7 @@ func TestOversizedBlob(t *testing.T) {
 		cids = append(cids, cid)
 	}
 	buf = &bytes.Buffer{}
-	eds.serializer.Serialize(buf, cids)
+	require.NoError(t, eds.serializer.Serialize(buf, cids))
 	test(buf.Bytes())
 }
 
