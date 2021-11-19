@@ -15,6 +15,7 @@ func getTransactionByID(
 	r *http.Request,
 	vars map[string]string,
 	backend access.API,
+	generator LinkGenerator,
 	logger zerolog.Logger,
 ) (interface{}, StatusError) {
 
@@ -37,6 +38,7 @@ func createTransaction(
 	r *http.Request,
 	vars map[string]string,
 	backend access.API,
+	generator LinkGenerator,
 	logger zerolog.Logger,
 ) (interface{}, StatusError) {
 

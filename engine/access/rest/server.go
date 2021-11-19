@@ -11,6 +11,15 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// all route names
+const (
+	getTransactionByIDRoute = "getTransactionByID"
+	createTransactionRoute  = "createTransaction"
+	getBlocksByIDRoute      = "getBlocksByID"
+	getBlocksByHeightRoute  = "getBlocksByHeightRoute"
+	getCollectionByIDRoute  = "getCollectionByIDRoute"
+)
+
 // NewServer returns an HTTP server initialized with the REST API handler
 func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) *http.Server {
 
@@ -24,14 +33,15 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 	v1SubRouter.Use(middleware.QuerySelect())
 	v1SubRouter.Use(lm.RequestEnd())
 
+	var linkGenerator LinkGenerator = NewLinkGeneratorImpl(v1SubRouter)
+
 	for _, r := range routeDefinitions() {
-		h := NewHandler(logger, backend, r.apiHandlerFunc)
-		route := v1SubRouter.
+		h := NewHandler(logger, backend, r.apiHandlerFunc, linkGenerator)
+		v1SubRouter.
 			Methods(h.method).
 			Path(h.pattern).
 			Name(h.name).
 			Handler(h)
-		h.route = route
 	}
 
 	return &http.Server{
@@ -44,9 +54,9 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 }
 
 type routeDefinition struct {
-	name        string
-	method      string
-	pattern     string
+	name           string
+	method         string
+	pattern        string
 	apiHandlerFunc ApiHandlerFunc
 }
 
@@ -54,32 +64,33 @@ func routeDefinitions() []routeDefinition {
 	return []routeDefinition{
 		// Transactions
 		{
-			method:      "GET",
-			pattern:     "/transactions/{id}",
-			name:        "getTransactionByID",
+			method:         "GET",
+			pattern:        "/transactions/{id}",
+			name:           getTransactionByIDRoute,
 			apiHandlerFunc: getTransactionByID,
 		}, {
-			method:      "POST",
-			pattern:     "/transactions",
-			name:        "createTransaction",
+			method:         "POST",
+			pattern:        "/transactions",
+			name:           createTransactionRoute,
 			apiHandlerFunc: createTransaction,
 		},
 		// Blocks
 		{
-			method:      "GET",
-			pattern:     "/blocks/{id}",
-			name:        "getBlocksByID",
+			method:         "GET",
+			pattern:        "/blocks/{id}",
+			name:           getBlocksByIDRoute,
 			apiHandlerFunc: getBlocksByID,
 		}, {
-			method:      "GET",
-			pattern:     "/blocks",
+			method:         "GET",
+			pattern:        "/blocks",
+			name:           getBlocksByHeightRoute,
 			apiHandlerFunc: NotImplemented,
 		},
 		// Collections
 		{
-			method:      "GET",
-			pattern:     "/collections/{id}",
+			method:         "GET",
+			pattern:        "/collections/{id}",
+			name:           getCollectionByIDRoute,
 			apiHandlerFunc: NotImplemented,
 		}, {}}
 }
-

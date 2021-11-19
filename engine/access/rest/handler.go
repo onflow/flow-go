@@ -20,28 +20,29 @@ type ApiHandlerFunc func(
 	r *http.Request,
 	vars map[string]string,
 	backend access.API,
+	generator LinkGenerator,
 	logger zerolog.Logger,
 ) (interface{}, StatusError)
-
 
 // Handler is custom http handler implementing custom handler function.
 // Handler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
 type Handler struct {
-	logger      zerolog.Logger
-	backend     access.API
-	method      string
-	pattern     string
-	name        string
-	route *mux.Route
+	logger         zerolog.Logger
+	backend        access.API
+	method         string
+	pattern        string
+	name           string
+	linkGenerator  LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
 }
 
-func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandlerFunc) *Handler {
+func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandlerFunc, generator LinkGenerator) *Handler {
 	return &Handler{
-		logger: logger,
-		backend: backend,
+		logger:         logger,
+		backend:        backend,
 		apiHandlerFunc: handlerFunc,
+		linkGenerator:  generator,
 	}
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -51,7 +52,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
 	// execute handler function and check for error
-	response, err := h.apiHandlerFunc(w, r, mux.Vars(r), h.backend, errorLogger)
+	response, err := h.apiHandlerFunc(w, r, mux.Vars(r), h.backend, h.linkGenerator, errorLogger)
 	if err != nil {
 		switch e := err.(type) {
 		case StatusError:
@@ -166,11 +167,8 @@ func NotImplemented(
 	_ *http.Request,
 	_ map[string]string,
 	_ access.API,
+	_ LinkGenerator,
 	_ zerolog.Logger,
 ) (interface{}, StatusError) {
 	return nil, NewRestError(http.StatusNotImplemented, "endpoint not implemented", nil)
-}
-
-func (h *Handler) linkGenerator() {
-	h.route.
 }
