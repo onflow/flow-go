@@ -209,7 +209,7 @@ func (h *Handlers) errorResponse(w http.ResponseWriter, returnCode int, response
 	}
 	encodedError, err := json.Marshal(modelError)
 	if err != nil {
-		logger.Error().Str("response_message", responseMessage).Msg("failed to json encode error message")
+		logger.Error().Err(err).Str("response_message", responseMessage).Msg("failed to json encode error message")
 		return
 	}
 	_, err = w.Write(encodedError)
