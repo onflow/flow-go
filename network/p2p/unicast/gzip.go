@@ -12,8 +12,8 @@ import (
 
 const GzipCompressionUnicast = ProtocolName("gzip-compression")
 
-func gzipCompressedProtocolId(rootBlockID flow.Identifier) protocol.ID {
-	return protocol.ID(FlowLibP2PProtocolGzipCompressedOneToOne + rootBlockID.String())
+func FlowGzipProtocolId(sporkId flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2PProtocolGzipCompressedOneToOne + sporkId.String())
 }
 
 // GzipStream is a stream compression creates and returns a gzip-compressed stream out of input stream.
@@ -23,9 +23,9 @@ type GzipStream struct {
 	logger         zerolog.Logger
 }
 
-func NewGzipCompressedUnicast(logger zerolog.Logger, rootBlockID flow.Identifier, defaultHandler libp2pnet.StreamHandler) *GzipStream {
+func NewGzipCompressedUnicast(logger zerolog.Logger, sporkId flow.Identifier, defaultHandler libp2pnet.StreamHandler) *GzipStream {
 	return &GzipStream{
-		protocolId:     gzipCompressedProtocolId(rootBlockID),
+		protocolId:     FlowGzipProtocolId(sporkId),
 		defaultHandler: defaultHandler,
 		logger:         logger.With().Str("subsystem", "gzip-unicast").Logger(),
 	}

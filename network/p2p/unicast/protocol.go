@@ -42,10 +42,6 @@ func PingProtocolId(sporkId flow.Identifier) protocol.ID {
 	return protocol.ID(FlowLibP2PPingProtocolPrefix + sporkId.String())
 }
 
-func FlowGzipProtocolId(sporkId flow.Identifier) protocol.ID {
-	return protocol.ID(FlowLibP2PProtocolGzipCompressedOneToOne + sporkId.String())
-}
-
 type ProtocolName string
 type ProtocolFactory func(zerolog.Logger, flow.Identifier, libp2pnet.StreamHandler) Protocol
 
@@ -68,6 +64,7 @@ func ToProtocolFactory(name ProtocolName) (ProtocolFactory, error) {
 	}
 }
 
+// Protocol represents a unicast protocol.
 type Protocol interface {
 	NewStream(s libp2pnet.Stream) (libp2pnet.Stream, error)
 	Handler() libp2pnet.StreamHandler

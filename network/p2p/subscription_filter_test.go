@@ -95,7 +95,6 @@ func TestFilterSubscribe(t *testing.T) {
 	testPublish(&wg, node2, sub1)
 
 	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "timeout performing publish test")
-	wg.Wait()
 }
 
 // TestCanSubscribe tests that the subscription filter blocks a node from subscribing
