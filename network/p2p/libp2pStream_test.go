@@ -112,17 +112,27 @@ func mockStreamHandlerForMessages(t *testing.T, ctx context.Context, msgCount in
 	return h, streamCloseWG
 }
 
+// TestCreateStream_WithDefaultUnicast evaluates correctness of creating default (tcp) unicast streams between two libp2p nodes.
 func TestCreateStream_WithDefaultUnicast(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
-	testCreateStream(t, sporkId, nil, unicast.FlowProtocolID(sporkId))
+	testCreateStream(t,
+		sporkId,
+		nil,
+		unicast.FlowProtocolID(sporkId))
 }
 
+// TestCreateStream_WithPreferredGzipUnicast evaluates correctness of creating gzip-compressed tcp unicast streams between two libp2p nodes.
 func TestCreateStream_WithPreferredGzipUnicast(t *testing.T) {
 	sporkId := unittest.IdentifierFixture()
-	testCreateStream(t, sporkId, []unicast.ProtocolName{unicast.GzipCompressionUnicast}, unicast.FlowGzipProtocolId(sporkId))
+	testCreateStream(t,
+		sporkId,
+		[]unicast.ProtocolName{unicast.GzipCompressionUnicast},
+		unicast.FlowGzipProtocolId(sporkId))
 }
 
-// testCreateStreams checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
+// testCreateStreams checks if a new streams of "preferred" type is created each time when CreateStream is called and an existing stream is not
+// reused. The "preferred" stream type is the one with the largest index in `unicasts` list.
+// To check that the streams are of "preferred" type, it evaluates the protocol id of established stream against the input `protocolID`.
 func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.ProtocolName, protocolID core.ProtocolID) {
 	count := 2
 	ctx, cancel := context.WithCancel(context.Background())
@@ -175,7 +185,11 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 	}
 }
 
-// TestCreateStream_FallBack checks if a new streams is created each time when CreateStream is called and an existing stream is not reused
+// TestCreateStream_FallBack checks two libp2p nodes with conflicting supported unicast protocols fall back
+// to default (tcp) unicast protocol during their negotiation.
+// To do this, a node with preferred gzip-compressed tcp unicast tries creating stream to another node that only
+// supports default plain tcp unicast. The test evaluates that the unicast stream established between two nodes
+// are of type default plain tcp.
 func TestCreateStream_FallBack(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
