@@ -22,25 +22,32 @@ import (
 // MaxConnectAttemptSleepDuration is the maximum number of milliseconds to wait between attempts for a 1-1 direct connection
 const MaxConnectAttemptSleepDuration = 5
 
+// Manager manages libp2p stream negotiation and creation, which is utilized for unicast dispatches.
 type Manager struct {
 	logger         zerolog.Logger
 	streamFactory  StreamFactory
 	unicasts       []Protocol
 	defaultHandler libp2pnet.StreamHandler
-	rootBlockId    flow.Identifier
+	sporkId        flow.Identifier
 }
 
-func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, rootBlockId flow.Identifier) *Manager {
+func NewUnicastManager(logger zerolog.Logger, streamFactory StreamFactory, sporkId flow.Identifier) *Manager {
 	return &Manager{
 		logger:        logger,
 		streamFactory: streamFactory,
-		rootBlockId:   rootBlockId,
+		sporkId:       sporkId,
 	}
 }
 
+// WithDefaultHandler sets the default stream handler for this unicast manager. The default handler is utilized
+// as the core handler for other unicast protocols, e.g., compressions.
 func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
-	defaultProtocolID := FlowProtocolID(m.rootBlockId)
+	defaultProtocolID := FlowProtocolID(m.sporkId)
 	m.defaultHandler = defaultHandler
+
+	if len(m.unicasts) > 0 {
+		panic("default handler must be set only once before any unicast registration")
+	}
 
 	m.unicasts = []Protocol{
 		&PlainStream{
@@ -52,13 +59,15 @@ func (m *Manager) WithDefaultHandler(defaultHandler libp2pnet.StreamHandler) {
 	m.streamFactory.SetStreamHandler(defaultProtocolID, defaultHandler)
 }
 
+// Register registers given protocol name as preferred unicast. Each invocation of register prioritizes the current protocol
+// over previously registered ones.
 func (m *Manager) Register(unicast ProtocolName) error {
 	factory, err := ToProtocolFactory(unicast)
 	if err != nil {
 		return fmt.Errorf("could not translate protocol name into factory: %w", err)
 	}
 
-	u := factory(m.logger, m.rootBlockId, m.defaultHandler)
+	u := factory(m.logger, m.sporkId, m.defaultHandler)
 
 	m.unicasts = append(m.unicasts, u)
 	m.streamFactory.SetStreamHandler(u.ProtocolId(), u.Handler())
@@ -89,6 +98,7 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 	return nil, nil, fmt.Errorf("could not create stream on any available unicast protocol: %w", errs)
 }
 
+// createStreamWithProtocol creates a stream on specified protocol.
 func (m *Manager) createStreamWithProtocol(ctx context.Context,
 	protocolID protocol.ID,
 	peerID peer.ID,
