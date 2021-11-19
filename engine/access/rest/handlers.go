@@ -48,7 +48,7 @@ func (h *Handlers) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 	idParam = strings.TrimSuffix(idParam, "]")
 	idParam = strings.TrimPrefix(idParam, "[")
 
-	ids := strings.Fields(idParam)
+	ids := strings.Split(idParam, ",")
 
 	blocks := make([]*generated.Block, len(ids))
 
