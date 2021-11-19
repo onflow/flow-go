@@ -22,11 +22,10 @@ import (
 // a signature from a random beacon signer, which verifies either the signature share or
 // the reconstructed threshold signature.
 type CombinedVerifierV2 struct {
-	committee      hotstuff.Committee
-	stakingHasher  hash.Hasher
-	beaconHasher   hash.Hasher
-	keysAggregator *stakingKeysAggregator
-	packer         hotstuff.Packer
+	committee     hotstuff.Committee
+	stakingHasher hash.Hasher
+	beaconHasher  hash.Hasher
+	packer        hotstuff.Packer
 }
 
 // NewCombinedVerifierV2 creates a new combined verifier with the given dependencies.
@@ -35,11 +34,10 @@ type CombinedVerifierV2 struct {
 // - the packer is used to unpack QC for verification;
 func NewCombinedVerifierV2(committee hotstuff.Committee, packer hotstuff.Packer) *CombinedVerifierV2 {
 	return &CombinedVerifierV2{
-		committee:      committee,
-		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
-		beaconHasher:   crypto.NewBLSKMAC(encoding.RandomBeaconTag),
-		keysAggregator: newStakingKeysAggregator(),
-		packer:         packer,
+		committee:     committee,
+		stakingHasher: crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+		beaconHasher:  crypto.NewBLSKMAC(encoding.RandomBeaconTag),
+		packer:        packer,
 	}
 }
 
@@ -122,9 +120,14 @@ func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte,
 		return false, nil
 	}
 
+	pks := make([]crypto.PublicKey, 0, len(signers))
+	for _, identity := range signers {
+		pks = append(pks, identity.StakingPubKey)
+	}
+
 	// verify the aggregated staking signature next (more costly)
 	// TODO: update to use module/signature.PublicKeyAggregator
-	aggregatedKey, err := c.keysAggregator.aggregatedStakingKey(signers)
+	aggregatedKey, err := crypto.AggregateBLSPublicKeys(pks)
 	if err != nil {
 		return false, fmt.Errorf("could not compute aggregated key: %w", err)
 	}

@@ -75,13 +75,18 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(block *model.Block) (hotstuf
 		beaconKeys = append(beaconKeys, pk)
 	}
 
-	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, encoding.ConsensusVoteTag)
+	rbSigAggtor, err := signature.NewWeightedSignatureAggregator(allParticipants, beaconKeys, msg, encoding.RandomBeaconTag)
 	if err != nil {
 		return nil, fmt.Errorf("could not create aggregator for thershold signatures: %w", err)
 	}
 
-	rbRector := &signature.RandomBeaconReconstructor{} // TODO: initialize properly when ready
+	threshold := msig.RandomBeaconThreshold(int(dkg.Size()))
+	randomBeaconInspector, err := signature.NewRandomBeaconInspector(dkg.GroupKey(), beaconKeys, threshold, msg)
+	if err != nil {
+		return nil, fmt.Errorf("could not create random beacon inspector: %w", err)
+	}
 
+	rbRector := signature.NewRandomBeaconReconstructor(dkg, randomBeaconInspector)
 	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
 
 	return &CombinedVoteProcessorV3{

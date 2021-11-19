@@ -1,52 +1,65 @@
 package signature
 
 import (
+	"fmt"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 // RandomBeaconReconstructor implements hotstuff.RandomBeaconReconstructor.
-// The implementation wraps the thresholdSigner and translates the signer identity into signer index.
+// The implementation wraps the hotstuff.RandomBeaconInspector and translates the signer identity into signer index.
+// It has knowledge about DKG to be able to map signerID to signerIndex
 type RandomBeaconReconstructor struct {
-	dkg                   hotstuff.DKG                   // to lookup signer index by signer ID
-	randomBeaconInspector hotstuff.RandomBeaconInspector // a stateful object for this block. It's used for both storing all sig shares and producing the node's own share by signing the block
+	hotstuff.RandomBeaconInspector              // a stateful object for this epoch. It's used for both verifying all sig shares and reconstructing the threshold signature.
+	dkg                            hotstuff.DKG // to lookup signer index by signer ID
 }
 
 var _ hotstuff.RandomBeaconReconstructor = &RandomBeaconReconstructor{}
 
-func NewRandomBeaconReconstructur(dkg hotstuff.DKG, randomBeaconInspector hotstuff.RandomBeaconInspector) *RandomBeaconReconstructor {
+func NewRandomBeaconReconstructor(dkg hotstuff.DKG, randomBeaconInspector hotstuff.RandomBeaconInspector) *RandomBeaconReconstructor {
 	return &RandomBeaconReconstructor{
+		RandomBeaconInspector: randomBeaconInspector,
 		dkg:                   dkg,
-		randomBeaconInspector: randomBeaconInspector,
 	}
 }
 
-// Verify returns true if and only if the signature is valid.
-// It expects that correct type of signature is passed. Only SigTypeRandomBeacon is supported
+// Verify verifies the signature share under the signer's public key and the message agreed upon.
+// The function is thread-safe and wait-free (i.e. allowing arbitrary many routines to
+// execute the business logic, without interfering with each other).
+// It allows concurrent verification of the given signature.
+// Returns :
+//  - engine.InvalidInputError if signerIndex is invalid
+//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
+//  - other error if there is an unexpected exception.
 func (r *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.Signature) error {
-	panic("to be implemented")
+	signerIndex, err := r.dkg.Index(signerID)
+	if err != nil {
+		return fmt.Errorf("could not map signerID %v to signerIndex: %w", signerID, err)
+	}
+	return r.RandomBeaconInspector.Verify(int(signerIndex), sig)
 }
 
-// TrustedAdd adds the signature share to the reconstructors internal
-// state. Validity of signature is not checked. It is up to the
-// implementation, whether it still adds a signature or not, when the
-// minimal number of required sig shares has already been reached,
-// because the reconstructed group signature is the same.
-// Returns: true if and only if enough signature shares were collected
+// TrustedAdd adds a share to the internal signature shares store.
+// There is no pre-check of the signature's validity _before_ adding it.
+// It is the caller's responsibility to make sure the signature was previously verified.
+// Nevertheless, the implementation guarantees safety (only correct threshold signatures
+// are returned) through a post-check (verifying the threshold signature
+// _after_ reconstruction before returning it).
+// The function is thread-safe but locks its internal state, thereby permitting only
+// one routine at a time to add a signature.
+// Returns:
+//  - (true, nil) if the signature has been added, and enough shares have been collected.
+//  - (false, nil) if the signature has been added, but not enough shares were collected.
+//  - (false, error) if there is any exception adding the signature share.
+//      - engine.InvalidInputError if signerIndex is invalid
+//  	- engine.DuplicatedEntryError if the signer has been already added
+//      - other error if there is an unexpected exception.
 func (r *RandomBeaconReconstructor) TrustedAdd(signerID flow.Identifier, sig crypto.Signature) (bool, error) {
-	panic("to be implemented")
-}
-
-// EnoughShares returns true if and only if reconstructor
-// has collected a sufficient number of signature shares.
-func (r *RandomBeaconReconstructor) EnoughShares() bool {
-	panic("to be implemented")
-}
-
-// Reconstruct reconstructs the group signature from the provided
-// signature shares. Errors if the the number of shares is insufficient
-// or some of the added signatures shares were invalid.
-func (r *RandomBeaconReconstructor) Reconstruct() (crypto.Signature, error) {
-	panic("to be implemented")
+	signerIndex, err := r.dkg.Index(signerID)
+	if err != nil {
+		return false, fmt.Errorf("could not map signerID %v to signerIndex: %w", signerID, err)
+	}
+	return r.RandomBeaconInspector.TrustedAdd(int(signerIndex), sig)
 }

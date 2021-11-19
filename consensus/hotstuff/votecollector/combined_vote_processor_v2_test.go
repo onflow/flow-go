@@ -13,6 +13,7 @@ import (
 	"go.uber.org/atomic"
 	"pgregory.net/rapid"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
@@ -22,10 +23,13 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	msig "github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -746,16 +750,34 @@ func TestCombinedVoteProcessorV2_PropertyCreatingQCLiveness(testifyT *testing.T)
 // We start with leader proposing a block, then new leader collects votes and builds a QC.
 // Need to verify that QC that was produced is valid and can be embedded in new proposal.
 func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
-	t.Skip("This test is skipped due to missing RandomBeaconReconstructor impl")
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
 	view := uint64(20)
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
+	// all committee members run DKG
+	dkgData, err := run.RunFastKG(11, unittest.RandomBytes(32))
+	require.NoError(t, err)
+
 	// signers hold objects that are created with private key and can sign votes and proposals
 	signers := make(map[flow.Identifier]*verification.CombinedSignerV2)
+
 	// prepare staking signers, each signer has it's own private/public key pair
-	stakingSigners := unittest.IdentityListFixture(3, func(identity *flow.Identity) {
+	// stakingSigners sign only with staking key, meaning they have failed DKG
+	stakingSigners := unittest.IdentityListFixture(3)
+	beaconSigners := unittest.IdentityListFixture(8)
+	allIdentities := append(stakingSigners, beaconSigners...)
+	require.Equal(t, len(dkgData.PubKeyShares), len(allIdentities))
+	dkgParticipants := make(map[flow.Identifier]flow.DKGParticipant)
+	// fill dkg participants data
+	for index, identity := range allIdentities {
+		dkgParticipants[identity.NodeID] = flow.DKGParticipant{
+			Index:    uint(index),
+			KeyShare: dkgData.PubKeyShares[index],
+		}
+	}
+
+	for _, identity := range stakingSigners {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
@@ -765,17 +787,25 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
-		me, err := local.New(nil, stakingPriv)
+		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore)
-	})
-	beaconSigners := unittest.IdentityListFixture(8, func(identity *flow.Identity) {
+	}
+
+	for _, identity := range beaconSigners {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
-		dkgKey := unittest.DKGParticipantPriv()
-		identity.NodeID = dkgKey.NodeID
+		participantData := dkgParticipants[identity.NodeID]
+
+		dkgKey := &dkg.DKGParticipantPriv{
+			NodeID: identity.NodeID,
+			RandomBeaconPrivKey: encodable.RandomBeaconPrivKey{
+				PrivateKey: dkgData.PrivKeyShares[participantData.Index],
+			},
+			GroupIndex: int(participantData.Index),
+		}
 
 		keys := &storagemock.DKGKeys{}
 		// there is DKG key for this epoch
@@ -783,21 +813,28 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
-		me, err := local.New(nil, stakingPriv)
+		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
 
 		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore)
-	})
+	}
 
 	leader := stakingSigners[0]
 
 	block := helper.MakeBlock(helper.WithBlockView(view),
 		helper.WithBlockProposer(leader.NodeID))
 
-	allIdentities := append(stakingSigners, beaconSigners...)
+	inmemDKG, err := inmem.DKGFromEncodable(inmem.EncodableDKG{
+		GroupKey: encodable.RandomBeaconPubKey{
+			PublicKey: dkgData.PubGroupKey,
+		},
+		Participants: dkgParticipants,
+	})
+	require.NoError(t, err)
 
 	committee := &mockhotstuff.Committee{}
 	committee.On("Identities", block.BlockID, mock.Anything).Return(allIdentities, nil)
+	committee.On("DKG", block.BlockID).Return(inmemDKG, nil)
 
 	votes := make([]*model.Vote, 0, len(allIdentities))
 
