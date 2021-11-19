@@ -81,8 +81,8 @@ func withDHTNodeEnabled(asServer bool) nodeFixtureParameterOption {
 	}
 }
 
-// nodeFixture creates a single LibP2PNodes with the given key, root block id, and callback function for stream handling.
-// It returns the nodes and their identities.
+// nodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
+// It returns the node and its identity.
 func nodeFixture(t *testing.T, sporkId flow.Identifier, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
 
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
@@ -223,7 +223,7 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 	}
 }
 
-// nodesFixture creates a number of LibP2PNodes with the given callback function for stream handling.
+// nodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
 func nodesFixture(t *testing.T, rootBlockId flow.Identifier, count int, opts ...nodeFixtureParameterOption) ([]*Node, flow.IdentityList) {
 	// keeps track of errors on creating a node
