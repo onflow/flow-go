@@ -11,6 +11,8 @@ import (
 	"github.com/multiformats/go-multiaddr"
 )
 
+// StreamFactory is a wrapper around libp2p host.Host to provide abstraction and encapsulation for unicast stream manager so that
+// it can create libp2p streams with finer granularity.
 type StreamFactory interface {
 	SetStreamHandler(protocol.ID, network.StreamHandler)
 	DialAddress(peer.ID) []multiaddr.Multiaddr
