@@ -19,23 +19,17 @@ func LoggingMiddleware(logger zerolog.Logger) mux.MiddlewareFunc {
 			respWriter := newResponseWriter(w)
 			// continue to the next handler
 			inner.ServeHTTP(respWriter, req)
-			if respWriter.statusCode == http.StatusOK {
-				logger.Info().Str("method", req.Method).
-					Str("uri", req.RequestURI).
-					Str("client_ip", req.RemoteAddr).
-					Str("user_agent", req.UserAgent()).
-					Dur("duration", time.Since(start)).
-					Int("response_code", respWriter.statusCode).
-					Msg("api")
-			} else {
-				logger.Error().Str("method", req.Method).
-					Str("uri", req.RequestURI).
-					Str("client_ip", req.RemoteAddr).
-					Str("user_agent", req.UserAgent()).
-					Dur("duration", time.Since(start)).
-					Int("response_code", respWriter.statusCode).
-					Msg("api")
+			log := logger.Info()
+			if respWriter.statusCode != http.StatusOK {
+				log = logger.Error()
 			}
+			log.Str("method", req.Method).
+				Str("uri", req.RequestURI).
+				Str("client_ip", req.RemoteAddr).
+				Str("user_agent", req.UserAgent()).
+				Dur("duration", time.Since(start)).
+				Int("response_code", respWriter.statusCode).
+				Msg("api")
 		})
 	}
 }
