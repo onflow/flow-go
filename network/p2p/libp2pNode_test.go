@@ -50,10 +50,12 @@ func TestMultiAddress(t *testing.T) {
 
 // TestSingleNodeLifeCycle evaluates correct lifecycle translation from start to stop the node
 func TestSingleNodeLifeCycle(t *testing.T) {
-	key := generateNetworkingKey(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	node, _ := nodeFixture(t,
-		unittest.IdentifierFixture(),
-		withNetworkingPrivateKey(key))
+		ctx,
+		unittest.IdentifierFixture())
 
 	done, err := node.Stop()
 	unittest.RequireCloseBefore(t, done, 100*time.Millisecond, "could not stop node on time")
@@ -90,7 +92,7 @@ func TestAddPeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), count)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), count)
 	defer stopNodes(t, nodes)
 
 	// add the remaining nodes to the first node as its set of peers
@@ -111,7 +113,7 @@ func TestRemovePeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), count)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), count)
 	peerInfos, errs := peerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 	defer stopNodes(t, nodes)
@@ -133,9 +135,11 @@ func TestRemovePeers(t *testing.T) {
 
 // TestPing tests that a node can ping another node
 func TestPing(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// creates two nodes
-	nodes, identities := nodesFixture(t, unittest.IdentifierFixture(), 2)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), 2)
 	defer stopNodes(t, nodes)
 
 	node1 := nodes[0]
@@ -153,12 +157,13 @@ func TestPing(t *testing.T) {
 }
 
 func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion string, expectedHeight uint64, expectedView uint64) {
-	pctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
 	pInfo, err := PeerAddressInfo(target)
 	assert.NoError(t, err)
 	source.host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-	resp, rtt, err := source.Ping(pctx, pInfo.ID)
+	resp, rtt, err := source.Ping(ctx, pInfo.ID)
 	assert.NoError(t, err)
 	assert.NotZero(t, rtt)
 	assert.Equal(t, expectedVersion, resp.Version)
@@ -167,8 +172,10 @@ func testPing(t *testing.T, source *Node, target flow.Identity, expectedVersion 
 }
 
 func TestConnectionGatingBootstrap(t *testing.T) {
-	// Create a Node with AllowList = false
-	node, identity := nodesFixture(t, unittest.IdentifierFixture(), 1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	node, identity := nodesFixture(t, ctx, unittest.IdentifierFixture(), 1)
 	node1 := node[0]
 	node1Id := identity[0]
 	defer stopNode(t, node1)

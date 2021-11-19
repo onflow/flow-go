@@ -19,11 +19,15 @@ import (
 // TestCrosstalkPreventionOnNetworkKeyChange tests that a node from the old chain cannot talk to a node in the new chain
 // if it's network key is updated while the libp2p protocol ID remains the same
 func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(t)
 	sporkId := unittest.IdentifierFixture()
 
 	node1, id1 := nodeFixture(t,
+		ctx,
 		sporkId,
 		withNetworkingPrivateKey(node1key))
 	defer stopNode(t, node1)
@@ -33,6 +37,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	// create and start node 2 on localhost and random port
 	node2key := generateNetworkingKey(t)
 	node2, id2 := nodeFixture(t,
+		ctx,
 		sporkId,
 		withNetworkingPrivateKey(node2key))
 	peerInfo2, err := PeerAddressInfo(id2)
@@ -50,6 +55,7 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	node2keyNew := generateNetworkingKey(t)
 	assert.False(t, node2key.Equals(node2keyNew))
 	node2, id2New := nodeFixture(t,
+		ctx,
 		sporkId,
 		withNetworkingPrivateKey(node2keyNew),
 		withNetworkingAddress(id2.Address))
@@ -67,38 +73,32 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 // TestOneToOneCrosstalkPrevention tests that a node from the old chain cannot talk directly to a node in the new chain
 // if the Flow libp2p protocol ID is updated while the network keys are kept the same.
 func TestOneToOneCrosstalkPrevention(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// root id before spork
-	rootID1 := unittest.IdentifierFixture()
+	sporkId1 := unittest.IdentifierFixture()
 
 	// create and start node 1 on localhost and random port
-	node1key := generateNetworkingKey(t)
-	node1, id1 := nodeFixture(t,
-		rootID1,
-		withNetworkingPrivateKey(node1key))
+	node1, id1 := nodeFixture(t, ctx, sporkId1)
 
 	defer stopNode(t, node1)
 	peerInfo1, err := PeerAddressInfo(id1)
 	require.NoError(t, err)
 
 	// create and start node 2 on localhost and random port
-	node2key := generateNetworkingKey(t)
-	node2, id2 := nodeFixture(t,
-		rootID1,
-		withNetworkingPrivateKey(node2key))
+	node2, id2 := nodeFixture(t, ctx, sporkId1)
 
 	// create stream from node 2 to node 1
 	testOneToOneMessagingSucceeds(t, node2, peerInfo1)
 
 	// Simulate a hard-spoon: node1 is on the old chain, but node2 is moved from the old chain to the new chain
-
 	// stop node 2 and start it again with a different libp2p protocol id to listen for
 	stopNode(t, node2)
 
 	// start node2 with the same address and root key but different root block id
 	node2, id2New := nodeFixture(t,
+		ctx,
 		unittest.IdentifierFixture(), // update the flow root id for node 2. node1 is still listening on the old protocol
-		withNetworkingPrivateKey(node2key),
 		withNetworkingAddress(id2.Address))
 
 	defer stopNode(t, node2)
@@ -114,6 +114,8 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 // TestOneToKCrosstalkPrevention tests that a node from the old chain cannot talk to a node in the new chain via PubSub
 // if the channel is updated while the network keys are kept the same.
 func TestOneToKCrosstalkPrevention(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	// root id before spork
 	rootIDBeforeSpork := unittest.IdentifierFixture()
@@ -121,6 +123,7 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	// create and start node 1 on localhost and random port
 	node1key := generateNetworkingKey(t)
 	node1, _ := nodeFixture(t,
+		ctx,
 		rootIDBeforeSpork,
 		withNetworkingPrivateKey(node1key))
 
@@ -129,15 +132,13 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2key := generateNetworkingKey(t)
 	node2, id2 := nodeFixture(t,
+		ctx,
 		rootIDBeforeSpork,
 		withNetworkingPrivateKey(node2key))
 
 	pInfo2, err := PeerAddressInfo(id2)
 	defer stopNode(t, node2)
 	require.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	// spork topic is derived by suffixing the channel with the root block ID
 	topicBeforeSpork := engine.TopicFromChannel(engine.TestNetwork, rootIDBeforeSpork)

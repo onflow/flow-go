@@ -83,8 +83,7 @@ func withDHTNodeEnabled(asServer bool) nodeFixtureParameterOption {
 
 // nodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
 // It returns the node and its identity.
-func nodeFixture(t *testing.T, sporkId flow.Identifier, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
-
+func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
 
 	// default parameters
@@ -132,7 +131,6 @@ func nodeFixture(t *testing.T, sporkId flow.Identifier, opts ...nodeFixtureParam
 		builder.SetDHTOptions(AsServer(parameters.dhtServer))
 	}
 
-	ctx := context.Background()
 	n, err := builder.Build(ctx)
 	require.NoError(t, err)
 
@@ -225,7 +223,8 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 
 // nodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func nodesFixture(t *testing.T, rootBlockId flow.Identifier, count int, opts ...nodeFixtureParameterOption) ([]*Node, flow.IdentityList) {
+func nodesFixture(t *testing.T, ctx context.Context, rootBlockId flow.Identifier, count int, opts ...nodeFixtureParameterOption) ([]*Node,
+	flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
 	var nodes []*Node
@@ -242,7 +241,7 @@ func nodesFixture(t *testing.T, rootBlockId flow.Identifier, count int, opts ...
 	var identities flow.IdentityList
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
-		node, identity := nodeFixture(t, rootBlockId, opts...)
+		node, identity := nodeFixture(t, ctx, rootBlockId, opts...)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
