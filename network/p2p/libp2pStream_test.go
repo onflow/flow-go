@@ -50,7 +50,7 @@ func TestStreamClosing(t *testing.T) {
 		go func(i int) {
 			// Create stream from node 1 to node 2 (reuse if one already exists)
 			nodes[0].host.Peerstore().AddAddrs(nodeInfo1.ID, nodeInfo1.Addrs, peerstore.AddressTTL)
-			s, err := nodes[0].CreateStream(context.Background(), nodeInfo1.ID)
+			s, err := nodes[0].CreateStream(ctx, nodeInfo1.ID)
 			assert.NoError(t, err)
 			w := bufio.NewWriter(s)
 
@@ -138,7 +138,6 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Creates nodes
 	nodes, identities := nodesFixture(t,
 		ctx,
 		sporkId,
@@ -158,7 +157,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 		pInfo, err := PeerAddressInfo(*id2)
 		require.NoError(t, err)
 		nodes[0].host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-		anotherStream, err := nodes[0].CreateStream(context.Background(), pInfo.ID)
+		anotherStream, err := nodes[0].CreateStream(ctx, pInfo.ID)
 		// Assert that a stream was returned without error
 		require.NoError(t, err)
 		require.NotNil(t, anotherStream)
@@ -196,7 +195,10 @@ func TestCreateStream_FallBack(t *testing.T) {
 
 	// Creates two nodes: one with preferred gzip, and other one with default protocol
 	sporkId := unittest.IdentifierFixture()
-	thisNode, _ := nodeFixture(t, ctx, sporkId, withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
+	thisNode, _ := nodeFixture(t,
+		ctx,
+		sporkId,
+		withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
 	otherNode, otherId := nodeFixture(t, ctx, sporkId)
 
 	defer stopNodes(t, []*Node{thisNode, otherNode})
@@ -214,7 +216,7 @@ func TestCreateStream_FallBack(t *testing.T) {
 		pInfo, err := PeerAddressInfo(otherId)
 		require.NoError(t, err)
 		thisNode.host.Peerstore().AddAddrs(pInfo.ID, pInfo.Addrs, peerstore.AddressTTL)
-		anotherStream, err := thisNode.CreateStream(context.Background(), pInfo.ID)
+		anotherStream, err := thisNode.CreateStream(ctx, pInfo.ID)
 		// Assert that a stream was returned without error
 		require.NoError(t, err)
 		require.NotNil(t, anotherStream)
@@ -326,7 +328,7 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	for i := 0; i < 2; i++ {
 
 		// limit the maximum amount of time to wait for a connection to be established by using a context that times out
-		ctx, cancel := context.WithTimeout(context.Background(), maxTimeToWait)
+		ctx, cancel := context.WithTimeout(ctx, maxTimeToWait)
 
 		unittest.RequireReturnsBefore(t, func() {
 			_, err = node1.CreateStream(ctx, pInfo.ID)
@@ -371,7 +373,7 @@ func TestOneToOneComm(t *testing.T) {
 
 	// Create stream from node 1 to node 2
 	nodes[0].host.Peerstore().AddAddrs(pInfo2.ID, pInfo2.Addrs, peerstore.AddressTTL)
-	s1, err := nodes[0].CreateStream(context.Background(), pInfo2.ID)
+	s1, err := nodes[0].CreateStream(ctx, pInfo2.ID)
 	assert.NoError(t, err)
 	rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
 
@@ -393,7 +395,7 @@ func TestOneToOneComm(t *testing.T) {
 
 	// Create stream from node 2 to node 1
 	nodes[1].host.Peerstore().AddAddrs(pInfo1.ID, pInfo1.Addrs, peerstore.AddressTTL)
-	s2, err := nodes[1].CreateStream(context.Background(), pInfo1.ID)
+	s2, err := nodes[1].CreateStream(ctx, pInfo1.ID)
 	assert.NoError(t, err)
 	rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
 
@@ -437,7 +439,7 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	require.NoError(t, err)
 
 	timeout := 1 * time.Second
-	tctx, tcancel := context.WithTimeout(context.Background(), timeout)
+	tctx, tcancel := context.WithTimeout(ctx, timeout)
 	defer tcancel()
 
 	// attempt to create a stream from node 1 to node 2 and assert that it fails after timeout
