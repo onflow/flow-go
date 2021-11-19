@@ -14,6 +14,8 @@ import (
 
 // Flow section - converting request data to flow models with validation.
 
+const maxAllowedScriptArgumentsCnt = 100
+
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
 	if !valid {
@@ -89,6 +91,12 @@ func toTransactionSignatures(sigs []generated.TransactionSignature) ([]flow.Tran
 }
 
 func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error) {
+
+	argLen := len(tx.Arguments)
+	if argLen > maxAllowedScriptArgumentsCnt {
+		return flow.TransactionBody{}, fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArgumentsCnt)
+	}
+
 	args := make([][]byte, len(tx.Arguments))
 	for _, arg := range tx.Arguments {
 		// todo validate

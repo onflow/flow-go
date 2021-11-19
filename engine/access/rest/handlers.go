@@ -15,7 +15,6 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 const BlockIDCntLimit = 50
@@ -50,15 +49,15 @@ func (h *Handlers) BlocksIdGet(w http.ResponseWriter, r *http.Request) {
 
 	ids := strings.Split(idParam, ",")
 
-	blocks := make([]*generated.Block, len(ids))
-
 	if len(ids) > MaxAllowedBlockIDsCnt {
 		h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", MaxAllowedBlockIDsCnt), errorLogger)
 		return
 	}
 
+	blocks := make([]*generated.Block, len(ids))
+
 	for i, id := range ids {
-		flowID, err := flow.HexStringToIdentifier(id)
+		flowID, err := toID(id)
 		if err != nil {
 			h.errorResponse(w, http.StatusBadRequest, fmt.Sprintf("invalid ID %s", id), errorLogger)
 			return
