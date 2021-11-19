@@ -118,7 +118,7 @@ func GenerateIDs(
 
 		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, o.connectionGating, idProvider, o.dhtOpts...)
 
-		_, port, err = libP2PNodes[i].GetIPPort()
+		_, port, err := libP2PNodes[i].GetIPPort()
 		require.NoError(t, err)
 
 		identities[i].Address = fmt.Sprintf("0.0.0.0:%s", port)
