@@ -768,7 +768,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore)
 	})
 	beaconSigners := unittest.IdentityListFixture(8, func(identity *flow.Identity) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
@@ -786,7 +786,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		me, err := local.New(nil, stakingPriv)
 		require.NoError(t, err)
 
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore, identity.NodeID)
+		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore)
 	})
 
 	leader := stakingSigners[0]
