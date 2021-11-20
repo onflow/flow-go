@@ -38,12 +38,10 @@ func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
-	lm := middleware.NewLoggingMiddleware(logger)
 	// common middleware for all request
-	v1SubRouter.Use(lm.RequestStart())
+	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
-	v1SubRouter.Use(lm.RequestEnd())
 
 	var linkGenerator LinkGenerator = NewLinkGeneratorImpl(v1SubRouter)
 

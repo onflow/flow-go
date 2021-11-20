@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 
@@ -32,7 +31,7 @@ func getBlocksByID(
 
 	blocks := make([]*generated.Block, len(ids))
 	for i, id := range ids {
-		block, err := getBlockByID(r.Context(), id, r, backend, linkGenerator)
+		block, err := getBlockByID(id, r, backend, linkGenerator)
 		if err != nil {
 			return nil, err
 		}
@@ -48,17 +47,17 @@ type blockResponseFactory struct {
 	selectFields           map[string]bool
 }
 
-func getBlockByID(ctx context.Context, id flow.Identifier, req *requestDecorator, backend access.API, linkGenerator LinkGenerator) (*generated.Block, StatusError) {
+func getBlockByID(id flow.Identifier, req *requestDecorator, backend access.API, linkGenerator LinkGenerator) (*generated.Block, StatusError) {
 	var responseBlock = new(generated.Block)
 	if req.expands(ExpandableFieldPayload) {
-		flowBlock, err := backend.GetBlockByID(ctx, id)
+		flowBlock, err := backend.GetBlockByID(req.Context(), id)
 		if err != nil {
 			return nil, blockLookupError(id, err)
 		}
 		responseBlock.Payload = blockPayloadResponse(flowBlock.Payload)
 		responseBlock.Header = blockHeaderResponse(flowBlock.Header)
 	} else {
-		flowBlockHeader, err := backend.GetBlockHeaderByID(ctx, id)
+		flowBlockHeader, err := backend.GetBlockHeaderByID(req.Context(), id)
 		if err != nil {
 			return nil, blockLookupError(id, err)
 		}

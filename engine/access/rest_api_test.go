@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -148,7 +149,11 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 			suite.blocks.On("ByID", id).Return(block, nil).Once()
 		}
 
-		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, expandPayloadOption())
+		// the swagger generated Go client code has bug where it generates a space delimited list of ids instead of a
+		// comma delimited one. hence, explicitly setting the ids as a csv here
+		blockIDSlice := []string{strings.Join(blockIDs, ",")}
+
+		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandPayloadOption())
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), blocks, rest.MaxAllowedBlockIDs)
@@ -193,8 +198,8 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		for i := range blockIDs {
 			blockIDs[i] = unittest.IdentifierFixture().String()
 		}
-
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, expandPayloadOption())
+		blockIDSlice := []string{strings.Join(blockIDs, ",")}
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandPayloadOption())
 		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", rest.MaxAllowedBlockIDs))
 	})
 
@@ -221,8 +226,8 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 			)
 			suite.blocks.On("ByID", id).Return(block, nil).Once()
 		}
-
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, expandPayloadOption())
+		blockIDSlice := []string{strings.Join(blockIDs, ",")}
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandPayloadOption())
 		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", blockIDs[invalidBlockIndex]))
 	})
 
