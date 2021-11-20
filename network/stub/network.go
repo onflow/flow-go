@@ -10,8 +10,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
@@ -29,7 +29,7 @@ type Network struct {
 	engines      map[network.Channel]network.Engine // used to keep track of attached engines of the node.
 	seenEventIDs sync.Map                           // used to keep track of event IDs seen by attached engines.
 	qCD          chan struct{}                      // used to stop continuous delivery mode of the Network.
-	*component.NoopComponent
+	mocknetwork.Network
 }
 
 // NewNetwork create a mocked Network.

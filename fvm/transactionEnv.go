@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/onflow/cadence/runtime/sema"
 	"github.com/opentracing/opentracing-go"
 	traceLog "github.com/opentracing/opentracing-go/log"
 
@@ -33,25 +32,25 @@ var _ runtime.Interface = &TransactionEnv{}
 
 // TransactionEnv is a read-write environment used for executing flow transactions.
 type TransactionEnv struct {
-	vm               *VirtualMachine
-	ctx              Context
-	sth              *state.StateHolder
-	programs         *handler.ProgramsHandler
-	accounts         state.Accounts
-	uuidGenerator    *state.UUIDGenerator
-	contracts        *handler.ContractHandler
-	accountKeys      *handler.AccountKeyHandler
-	metrics          *handler.MetricsHandler
-	eventHandler     *handler.EventHandler
-	addressGenerator flow.AddressGenerator
-	rng              *rand.Rand
-	logs             []string
-	totalGasUsed     uint64
-	tx               *flow.TransactionBody
-	txIndex          uint32
-	txID             flow.Identifier
-	traceSpan        opentracing.Span
-	authorizers      []runtime.Address
+	vm                 *VirtualMachine
+	ctx                Context
+	sth                *state.StateHolder
+	programs           *handler.ProgramsHandler
+	accounts           state.Accounts
+	uuidGenerator      *state.UUIDGenerator
+	contracts          *handler.ContractHandler
+	accountKeys        *handler.AccountKeyHandler
+	metrics            *handler.MetricsHandler
+	computationHandler handler.ComputationMeteringHandler
+	eventHandler       *handler.EventHandler
+	addressGenerator   flow.AddressGenerator
+	rng                *rand.Rand
+	logs               []string
+	tx                 *flow.TransactionBody
+	txIndex            uint32
+	txID               flow.Identifier
+	traceSpan          opentracing.Span
+	authorizers        []runtime.Address
 }
 
 func NewTransactionEnvironment(
@@ -76,22 +75,24 @@ func NewTransactionEnvironment(
 	)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
+	computationHandler := handler.NewComputationMeteringHandler(computationLimit(ctx, tx))
 
 	env := &TransactionEnv{
-		vm:               vm,
-		ctx:              ctx,
-		sth:              sth,
-		metrics:          metrics,
-		programs:         programsHandler,
-		accounts:         accounts,
-		accountKeys:      accountKeys,
-		addressGenerator: generator,
-		uuidGenerator:    uuidGenerator,
-		eventHandler:     eventHandler,
-		tx:               tx,
-		txIndex:          txIndex,
-		txID:             tx.ID(),
-		traceSpan:        traceSpan,
+		vm:                 vm,
+		ctx:                ctx,
+		sth:                sth,
+		metrics:            metrics,
+		programs:           programsHandler,
+		accounts:           accounts,
+		accountKeys:        accountKeys,
+		addressGenerator:   generator,
+		uuidGenerator:      uuidGenerator,
+		eventHandler:       eventHandler,
+		computationHandler: computationHandler,
+		tx:                 tx,
+		txIndex:            txIndex,
+		txID:               tx.ID(),
+		traceSpan:          traceSpan,
 	}
 
 	env.contracts = handler.NewContractHandler(accounts,
@@ -104,6 +105,18 @@ func NewTransactionEnvironment(
 	}
 
 	return env
+}
+
+func computationLimit(ctx Context, tx *flow.TransactionBody) uint64 {
+	// if gas limit is set to zero fallback to the gas limit set by the context
+	if tx.GasLimit == 0 {
+		// if context gasLimit is also zero, fallback to the default gas limit
+		if ctx.GasLimit == 0 {
+			return DefaultGasLimit
+		}
+		return ctx.GasLimit
+	}
+	return tx.GasLimit
 }
 
 func (e *TransactionEnv) TxIndex() uint32 {
@@ -267,33 +280,26 @@ func (e *TransactionEnv) GetStorageCapacity(address common.Address) (value uint6
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetStorageCapacityScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
+	result, invokeErr := accountStorageCapacity(address)
 
-	// TODO (ramtin) this shouldn't be this way, it should call the invokeMeta
-	// and we handle the errors and still compute the state interactions
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	var capacity uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
 	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
 	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
 	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-	if script.Err == nil {
-		// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
-		// divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
-		capacity = script.Value.ToGoValue().(uint64) / 100
+	if invokeErr != nil {
+		return 0, nil
 	}
 
-	return capacity, nil
+	return storageMBUFixToBytesUInt(result), nil
+}
+
+// storageMBUFixToBytesUInt converts the return type of storage capacity which is a UFix64 with the unit of megabytes to
+// UInt with the unit of bytes
+func storageMBUFixToBytesUInt(result cadence.Value) uint64 {
+	// Divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
+	return result.ToGoValue().(uint64) / 100
 }
 
 func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
@@ -302,26 +308,14 @@ func (e *TransactionEnv) GetAccountBalance(address common.Address) (value uint64
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenBalanceScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
+	result, invokeErr := accountBalance(address)
 
-	// TODO similar to the one above
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	var balance uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
-	if script.Err == nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if invokeErr != nil {
+		return 0, nil
 	}
-
-	return balance, nil
+	return result.ToGoValue().(uint64), nil
 }
 
 func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
@@ -330,28 +324,16 @@ func (e *TransactionEnv) GetAccountAvailableBalance(address common.Address) (val
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenAvailableBalanceScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
+	result, invokeErr := accountAvailableBalance(address)
 
-	// TODO similar to the one above
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	var balance uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
 	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-	if script.Err == nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if invokeErr != nil {
+		return 0, nil
 	}
-
-	return balance, nil
+	return result.ToGoValue().(uint64), nil
 }
 
 func (e *TransactionEnv) ResolveLocation(
@@ -553,24 +535,15 @@ func (e *TransactionEnv) GenerateUUID() (uint64, error) {
 }
 
 func (e *TransactionEnv) GetComputationLimit() uint64 {
-	// if gas limit is set to zero fallback to the gas limit set by the context
-	if e.tx.GasLimit == 0 {
-		// if context gasLimit is also zero, fallback to the default gas limit
-		if e.ctx.GasLimit == 0 {
-			return DefaultGasLimit
-		}
-		return e.ctx.GasLimit
-	}
-	return e.tx.GasLimit
+	return e.computationHandler.Limit()
 }
 
 func (e *TransactionEnv) SetComputationUsed(used uint64) error {
-	e.totalGasUsed = used
-	return nil
+	return e.computationHandler.AddUsed(used)
 }
 
 func (e *TransactionEnv) GetComputationUsed() uint64 {
-	return e.totalGasUsed
+	return e.computationHandler.Used()
 }
 
 func (e *TransactionEnv) SetAccountFrozen(address common.Address, frozen bool) error {
@@ -730,22 +703,8 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 
 	if e.ctx.ServiceAccountEnabled {
-		// uses `FlowServiceAccount.setupNewAccount` from https://github.com/onflow/flow-core-contracts/blob/master/contracts/FlowServiceAccount.cdc
-		invoker := NewTransactionContractFunctionInvocator(
-			common.AddressLocation{Address: common.Address(e.ctx.Chain.ServiceAddress()), Name: flowServiceAccountContract},
-			"setupNewAccount",
-			[]interpreter.Value{
-				interpreter.NewAddressValue(common.Address(flowAddress)),
-				interpreter.NewAddressValue(payer),
-			},
-			[]sema.Type{
-				sema.AuthAccountType,
-				sema.AuthAccountType,
-			},
-			e.ctx.Logger,
-		)
-
-		_, invokeErr := invoker.Invoke(e, e.traceSpan)
+		setupNewAccount := SetupNewAccountInvocation(e, e.traceSpan)
+		_, invokeErr := setupNewAccount(flowAddress, payer)
 
 		if invokeErr != nil {
 			return address, errors.HandleRuntimeError(invokeErr)

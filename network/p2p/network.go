@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/rs/zerolog"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
@@ -40,24 +40,43 @@ var NotEjectedFilter = filter.Not(filter.Ejected)
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	identityProvider id.IdentityProvider
-	logger           zerolog.Logger
-	codec            network.Codec
-	me               module.Local
-	mw               network.Middleware
-	top              network.Topology // used to determine fanout connections
-	metrics          module.NetworkMetrics
-	rcache           *RcvCache // used to deduplicate incoming messages
-	queue            network.MessageQueue
-	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
-	lifecycleManager *lifecycle.LifecycleManager // used to manage the network's start-stop lifecycle
-	registerRequests chan *registerRequest
+	identityProvider              id.IdentityProvider
+	logger                        zerolog.Logger
+	codec                         network.Codec
+	me                            module.Local
+	mw                            network.Middleware
+	top                           network.Topology // used to determine fanout connections
+	metrics                       module.NetworkMetrics
+	rcache                        *RcvCache // used to deduplicate incoming messages
+	queue                         network.MessageQueue
+	subMngr                       network.SubscriptionManager // used to keep track of subscribed channels
+	registerEngineRequests        chan *registerEngineRequest
+	registerBlockExchangeRequests chan *registerBlockExchangeRequest
 	*component.ComponentManager
 }
 
-type registerRequest struct {
+var _ network.Network = (*Network)(nil)
+
+type registerEngineRequest struct {
 	channel  network.Channel
-	respChan chan *Conduit
+	engine   network.Engine
+	respChan chan *registerEngineResp
+}
+
+type registerEngineResp struct {
+	conduit network.Conduit
+	err     error
+}
+
+type registerBlockExchangeRequest struct {
+	channel  network.Channel
+	bstore   blockstore.Blockstore
+	respChan chan *registerBlockExchangeResp
+}
+
+type registerBlockExchangeResp struct {
+	blockExchange network.BlockExchange
+	err           error
 }
 
 var ErrNetworkShutdown = errors.New("network has already shutdown")
@@ -89,81 +108,94 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		logger:           log,
-		codec:            codec,
-		me:               me,
-		mw:               mw,
-		rcache:           rcache,
-		top:              top,
-		metrics:          metrics,
-		subMngr:          sm,
-		lifecycleManager: lifecycle.NewLifecycleManager(),
-		identityProvider: identityProvider,
-		registerRequests: make(chan *registerRequest),
+		logger:                        log,
+		codec:                         codec,
+		me:                            me,
+		mw:                            mw,
+		rcache:                        rcache,
+		top:                           top,
+		metrics:                       metrics,
+		subMngr:                       sm,
+		identityProvider:              identityProvider,
+		registerEngineRequests:        make(chan *registerEngineRequest),
+		registerBlockExchangeRequests: make(chan *registerBlockExchangeRequest),
 	}
 
 	o.mw.SetOverlay(o)
 
 	o.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			// setup the message queue
-			// create priority queue
-			o.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, metrics)
-
-			// create workers to read from the queue and call queueSubmitFunc
-			queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, o.queue, o.queueSubmitFunc)
-
-			o.mw.Start(ctx)
-			<-o.mw.Ready()
-
-			ready()
-		}).
-		AddWorker(func(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-
-			for {
-				select {
-				case req := <-o.registerRequests:
-					// TODO: remove ctx field from Conduit
-
-					// create a cancellable child context
-					ctx, cancel := context.WithCancel(parent)
-
-					// create the conduit
-					conduit := &Conduit{
-						ctx:       ctx,
-						cancel:    cancel,
-						channel:   req.channel,
-						publish:   o.publish,
-						unicast:   o.unicast,
-						multicast: o.multicast,
-						close:     o.unregister,
-					}
-
-					select {
-					case <-ctx.Done():
-						return
-					case req.respChan <- conduit:
-					}
-				case <-parent.Done():
-					return
-				}
-			}
-		}).Build()
+		AddWorker(o.runMiddleware).
+		AddWorker(o.processRegisterEngineRequests).
+		AddWorker(o.processRegisterBlockExchangeRequests).Build()
 
 	return o, nil
 }
 
-// Register will register the given engine with the given unique engine engineID,
-// returning a conduit to directly submit messages to the message bus of the
-// engine.
-func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
-	select {
-	case <-n.ComponentManager.ShutdownSignal():
-		return nil, ErrNetworkShutdown
-	default:
-	}
+func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	<-n.mw.Ready()
+	ready()
 
+	for {
+		select {
+		case req := <-n.registerEngineRequests:
+			conduit, err := n.handleRegisterEngineRequest(parent, req.channel, req.engine)
+			resp := &registerEngineResp{
+				conduit: conduit,
+				err:     err,
+			}
+
+			select {
+			case <-parent.Done():
+				return
+			case req.respChan <- resp:
+			}
+		case <-parent.Done():
+			return
+		}
+	}
+}
+
+func (n *Network) processRegisterBlockExchangeRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	<-n.mw.Ready()
+	ready()
+
+	for {
+		select {
+		case req := <-n.registerBlockExchangeRequests:
+			blockExchange, err := n.handleRegisterBlockExchangeRequest(parent, req.channel, req.bstore)
+			resp := &registerBlockExchangeResp{
+				blockExchange: blockExchange,
+				err:           err,
+			}
+
+			select {
+			case <-parent.Done():
+				return
+			case req.respChan <- resp:
+			}
+		case <-parent.Done():
+			return
+		}
+	}
+}
+
+func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+	// setup the message queue
+	// create priority queue
+	n.queue = queue.NewMessageQueue(ctx, queue.GetEventPriority, n.metrics)
+
+	// create workers to read from the queue and call queueSubmitFunc
+	queue.CreateQueueWorkers(ctx, queue.DefaultNumWorkers, n.queue, n.queueSubmitFunc)
+
+	n.mw.Start(ctx)
+	<-n.mw.Ready()
+
+	ready()
+
+	<-n.mw.Done()
+}
+
+func (n *Network) handleRegisterEngineRequest(parent irrecoverable.SignalerContext, channel network.Channel, engine network.Engine) (network.Conduit, error) {
 	if !channels.Exists(channel) {
 		return nil, fmt.Errorf("unknown channel: %s, should be registered in topic map", channel)
 	}
@@ -177,22 +209,79 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 		Str("channel_id", channel.String()).
 		Msg("channel successfully registered")
 
-	respChan := make(chan *Conduit)
+	// TODO: remove ctx field from Conduit
+	// create a cancellable child context
+	ctx, cancel := context.WithCancel(parent)
 
-	select {
-	case <-n.ComponentManager.ShutdownSignal():
-		return nil, ErrNetworkShutdown
-	case n.registerRequests <- &registerRequest{
-		channel:  channel,
-		respChan: respChan,
-	}:
+	// create the conduit
+	conduit := &Conduit{
+		ctx:       ctx,
+		cancel:    cancel,
+		channel:   channel,
+		publish:   n.publish,
+		unicast:   n.unicast,
+		multicast: n.multicast,
+		close:     n.unregister,
 	}
 
+	return conduit, nil
+}
+
+func (n *Network) handleRegisterBlockExchangeRequest(parent irrecoverable.SignalerContext, channel network.Channel, bstore blockstore.Blockstore) (network.BlockExchange, error) {
+	// TODO: this is a hack, we should not rely on knowing the underlying implementation
+	mw, ok := n.mw.(*Middleware)
+	if !ok {
+		return nil, errors.New("middleware was of unexpected type")
+	}
+	if mw.libP2PNode.dht == nil {
+		return nil, errors.New("block exchange is disabled because content routing is not configured")
+	}
+
+	return NewBlockExchange(parent, mw.libP2PNode.host, mw.libP2PNode.dht, channel.String(), bstore), nil
+}
+
+// Register will register the given engine with the given unique engine engineID,
+// returning a conduit to directly submit messages to the message bus of the
+// engine.
+func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
+	respChan := make(chan *registerEngineResp)
+
 	select {
 	case <-n.ComponentManager.ShutdownSignal():
 		return nil, ErrNetworkShutdown
-	case conduit := <-respChan:
-		return conduit, nil
+	case n.registerEngineRequests <- &registerEngineRequest{
+		channel:  channel,
+		engine:   engine,
+		respChan: respChan,
+	}:
+		select {
+		case <-n.ComponentManager.ShutdownSignal():
+			return nil, ErrNetworkShutdown
+		case resp := <-respChan:
+			return resp.conduit, resp.err
+		}
+	}
+}
+
+// RegisterBlockExchange registers a BlockExchange network on the given channel.
+// The returned BlockExchange can be used to request blocks from the network.
+func (n *Network) RegisterBlockExchange(channel network.Channel, bstore blockstore.Blockstore) (network.BlockExchange, error) {
+	respChan := make(chan *registerBlockExchangeResp)
+
+	select {
+	case <-n.ComponentManager.ShutdownSignal():
+		return nil, ErrNetworkShutdown
+	case n.registerBlockExchangeRequests <- &registerBlockExchangeRequest{
+		channel:  channel,
+		bstore:   bstore,
+		respChan: respChan,
+	}:
+		select {
+		case <-n.ComponentManager.ShutdownSignal():
+			return nil, ErrNetworkShutdown
+		case resp := <-respChan:
+			return resp.blockExchange, resp.err
+		}
 	}
 }
 

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
@@ -51,7 +51,7 @@ func (e Event) Checksum() Identifier {
 // Encode returns the canonical encoding of this event, containing only the fields necessary to uniquely identify it.
 func (e Event) Encode() []byte {
 	w := wrapEventID(e)
-	return encoding.DefaultEncoder.MustEncode(w)
+	return json.NewMarshaler().MustMarshal(w)
 }
 
 func (e Event) Fingerprint() []byte {
