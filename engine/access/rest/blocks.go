@@ -41,12 +41,6 @@ func getBlocksByID(
 	return blocks, nil
 }
 
-type blockResponseFactory struct {
-	expandBlockPayload     bool
-	expandExecutionResults bool
-	selectFields           map[string]bool
-}
-
 func getBlockByID(id flow.Identifier, req *requestDecorator, backend access.API, linkGenerator LinkGenerator) (*generated.Block, StatusError) {
 	var responseBlock = new(generated.Block)
 	if req.expands(ExpandableFieldPayload) {
