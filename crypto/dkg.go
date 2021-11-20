@@ -26,38 +26,38 @@ type DKGState interface {
 	Size() int
 	// Threshold returns the threshold value t
 	Threshold() int
-	// Start starts running a DKG in the current participant
+	// Start starts running a DKG in the current node
 	Start(seed []byte) error
-	// HandleBroadcastMsg processes a new broadcasted message received by the current participant.
+	// HandleBroadcastMsg processes a new broadcasted message received by the current node.
 	// orig is the message origin index
 	HandleBroadcastMsg(orig int, msg []byte) error
-	// HandlePrivateMsg processes a new private message received by the current participant.
+	// HandlePrivateMsg processes a new private message received by the current node.
 	// orig is the message origin index
 	HandlePrivateMsg(orig int, msg []byte) error
-	// End ends a DKG protocol in the current participant.
-	// It returns the finalized public data and participant private key share.
+	// End ends a DKG protocol in the current node.
+	// It returns the finalized public data and node private key share.
 	// - the group public key corresponding to the group secret key
-	// - all the public key shares corresponding to the participants private
+	// - all the public key shares corresponding to the nodes private
 	// key shares
-	// - the finalized private key which is the current participant's own private key share
+	// - the finalized private key which is the current node's own private key share
 	End() (PrivateKey, PublicKey, []PublicKey, error)
 	// NextTimeout set the next timeout of the protocol if any timeout applies.
 	// Some protocols could require more than one timeout
 	NextTimeout() error
 	// Running returns the running state of the DKG protocol
 	Running() bool
-	// ForceDisqualify forces a participant to get disqualified
+	// ForceDisqualify forces a node to get disqualified
 	// for a reason outside of the DKG protocol.
-	// The caller should make sure all honest participants call this function,
+	// The caller should make sure all honest nodes call this function,
 	// otherwise, the protocol can be broken.
-	ForceDisqualify(participant int) error
+	ForceDisqualify(node int) error
 }
 
-// index is the participant index type used as participants ID
+// index is the node index type used as participants ID
 type index byte
 
 // newDKGCommon initializes the common structure of DKG protocols
-func newDKGCommon(size int, threshold int, myIndex int,
+func newDKGCommon(size int, threshold int, currentIndex int,
 	processor DKGProcessor, leaderIndex int) (*dkgCommon, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
 		return nil, invalidInputsErrorf(
@@ -66,11 +66,11 @@ func newDKGCommon(size int, threshold int, myIndex int,
 			DKGMaxSize)
 	}
 
-	if myIndex >= size || leaderIndex >= size || myIndex < 0 || leaderIndex < 0 {
+	if currentIndex >= size || leaderIndex >= size || currentIndex < 0 || leaderIndex < 0 {
 		return nil, invalidInputsErrorf(
-			"indices of current and leader participants must be between 0 and %d, got %d",
+			"indices of current and leader nodes must be between 0 and %d, got %d",
 			size-1,
-			myIndex)
+			currentIndex)
 	}
 
 	if threshold >= size || threshold < MinimumThreshold {
@@ -82,18 +82,18 @@ func newDKGCommon(size int, threshold int, myIndex int,
 	}
 
 	return &dkgCommon{
-		size:      size,
-		threshold: threshold,
-		myIndex:   index(myIndex),
-		processor: processor,
+		size:         size,
+		threshold:    threshold,
+		currentIndex: index(currentIndex),
+		processor:    processor,
 	}, nil
 }
 
 // dkgCommon holds the common data of all DKG protocols
 type dkgCommon struct {
-	size      int
-	threshold int
-	myIndex   index
+	size         int
+	threshold    int
+	currentIndex index
 	// running is true when the DKG protocol is running, is false otherwise
 	running bool
 	// processes the action of the DKG interface outputs
@@ -134,7 +134,7 @@ const (
 
 // DKGProcessor is an interface that implements the DKG output actions.
 //
-// An instance of a DKGProcessor is needed for each participant in order to
+// An instance of a DKGProcessor is needed for each node in order to
 // particpate in a DKG protocol
 type DKGProcessor interface {
 	// PrivateSend sends a message to a destination over
@@ -146,7 +146,7 @@ type DKGProcessor interface {
 	// messages by a unique instance ID.
 	PrivateSend(dest int, data []byte)
 	// Broadcast broadcasts a message to all participants.
-	// This function assumes all participants have received the same message,
+	// This function assumes all nodes have received the same message,
 	// failing to do so, the protocol can be broken.
 	// The broadcasted message is public and not confidential.
 	// The broadcasting channel should authenticate the sender.
@@ -154,18 +154,18 @@ type DKGProcessor interface {
 	// protocol instance. This can be achieved by prepending all
 	// messages by a unique instance ID.
 	Broadcast(data []byte)
-	// Disqualify flags that a participant is misbehaving and that it got
+	// Disqualify flags that a node is misbehaving and that it got
 	// disqualified from the protocol. Such behavior deserves
-	// disqualifying as it is flagged to all honest participants in
+	// disqualifying as it is flagged to all honest nodes in
 	// the protocol.
 	// log describes the disqualification reason.
-	Disqualify(participant int, log string)
-	// FlagMisbehavior warns that a participant is misbehaving.
-	// Such behavior is not necessarily flagged to all participants and therefore
-	// the participant is not disqualified from the protocol. Other mechanisms
+	Disqualify(node int, log string)
+	// FlagMisbehavior warns that a node is misbehaving.
+	// Such behavior is not necessarily flagged to all nodes and therefore
+	// the node is not disqualified from the protocol. Other mechanisms
 	// outside DKG could be implemented to synchronize slashing the misbehaving
-	// participant by all participating participants, using the api `ForceDisqualify`. Failing to
+	// node by all participating nodes, using the api `ForceDisqualify`. Failing to
 	// do so, the protocol can be broken.
 	// log describes the misbehavior.
-	FlagMisbehavior(participant int, log string)
+	FlagMisbehavior(node int, log string)
 }

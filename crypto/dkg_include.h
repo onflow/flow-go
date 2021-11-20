@@ -5,7 +5,7 @@
 
 #include "bls12381_utils.h"
 
-// the highest index of a DKG participant
+// the highest index of a DKG node
 #define MAX_IND         255
 #define MAX_IND_BITS    8
 

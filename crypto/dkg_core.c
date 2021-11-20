@@ -73,8 +73,8 @@ static void G2_polynomialImage(ep2_t y, const ep2_st* A, const int len_A,
     bn_free(bn_x);
 }
 
-// compute the participants public keys from the verification vector
-// y[i] = Q(i+1) for all participants i, with:
+// compute the nodes public keys from the verification vector
+// y[i] = Q(i+1) for all nodes i, with:
 // Q(x) = A_0 + A_1*x + ... +  A_n*x^n  in G2
 void G2_polynomialImages(ep2_st *y, const int len_y, const ep2_st* A, const int len_A) {
     // order r

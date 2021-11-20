@@ -86,7 +86,7 @@ func SignatureFormatCheck(algo SigningAlgorithm, s Signature) (bool, error) {
 func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, fmt.Errorf("key generation failed: %w", err)
+		return nil, invalidInputsErrorf("key generation failed: %s", err)
 	}
 	return signer.generatePrivateKey(seed)
 }
@@ -95,7 +95,7 @@ func GeneratePrivateKey(algo SigningAlgorithm, seed []byte) (PrivateKey, error) 
 func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, fmt.Errorf("decode private key failed: %w", err)
+		return nil, invalidInputsErrorf("decode private key failed: %s", err)
 	}
 	return signer.decodePrivateKey(data)
 }
@@ -104,7 +104,7 @@ func DecodePrivateKey(algo SigningAlgorithm, data []byte) (PrivateKey, error) {
 func DecodePublicKey(algo SigningAlgorithm, data []byte) (PublicKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, fmt.Errorf("decode public key failed: %w", err)
+		return nil, invalidInputsErrorf("decode public key failed: %s", err)
 	}
 	return signer.decodePublicKey(data)
 }
@@ -113,7 +113,7 @@ func DecodePublicKey(algo SigningAlgorithm, data []byte) (PublicKey, error) {
 func DecodePublicKeyCompressed(algo SigningAlgorithm, data []byte) (PublicKey, error) {
 	signer, err := newSigner(algo)
 	if err != nil {
-		return nil, fmt.Errorf("decode public key failed: %w", err)
+		return nil, invalidInputsErrorf("decode public key failed: %s", err)
 	}
 	return signer.decodePublicKeyCompressed(data)
 }

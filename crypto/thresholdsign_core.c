@@ -1,6 +1,6 @@
 // +build relic
 
-#include "bls_thresholdsign_include.h"
+#include "thresholdsign_include.h"
 
 // Computes the Lagrange coefficient L(i+1) at 0 with regards to the range [signers(0)+1..signers(t)+1]
 // and stores it in res, where t is the degree of the polynomial P

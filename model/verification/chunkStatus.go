@@ -8,23 +8,16 @@ import (
 // ChunkStatus is a data struct represents the current status of fetching chunk data pack for the chunk.
 type ChunkStatus struct {
 	ChunkIndex      uint64
-	ExecutionResult *flow.ExecutionResult
 	BlockHeight     uint64
+	ExecutionResult *flow.ExecutionResult
 }
 
-func (s ChunkStatus) ID() flow.Identifier {
-	return s.ExecutionResult.Chunks[s.ChunkIndex].ID()
-}
-
-func (s ChunkStatus) Checksum() flow.Identifier {
-	return s.ExecutionResult.Chunks[s.ChunkIndex].ID()
+func (s ChunkStatus) Chunk() *flow.Chunk {
+	return s.ExecutionResult.Chunks[s.ChunkIndex]
 }
 
 func (s ChunkStatus) ChunkLocatorID() flow.Identifier {
-	return chunks.Locator{
-		ResultID: s.ExecutionResult.ID(),
-		Index:    s.ChunkIndex,
-	}.ID()
+	return chunks.ChunkLocatorID(s.ExecutionResult.ID(), s.ChunkIndex)
 }
 
 type ChunkStatusList []*ChunkStatus

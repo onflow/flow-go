@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/node"
@@ -133,6 +134,125 @@ func Test_VerifyCachedHash(t *testing.T) {
 	n4 := node.NewInterimNode(1, n1, n2)
 	n5 := node.NewInterimNode(1, n4, n3)
 	require.True(t, n5.VerifyCachedHash())
+}
+
+func Test_Compactify(t *testing.T) {
+	// Paths are not acurate in this case which causes the compact value be wrong
+	path0 := utils.PathByUint16(0)             // 0000...
+	path1 := utils.PathByUint16(1<<14 + 1<<13) // 01100...
+	path2 := utils.PathByUint16(1 << 15)       // 1000...
+	payload1 := utils.LightPayload(2, 2)
+	payload2 := utils.LightPayload(2, 4)
+	emptyPayload := &ledger.Payload{}
+
+	t.Run("non-leaf non-empty on right and leaf empty on left", func(t *testing.T) {
+		//          n5
+		//       /     \
+		//      n3      n4(-)
+		//   /    \
+		//  n1(p1) n2(p2)
+		//
+		// n4 would be replaced with nil, but n5 won't be prunned
+		n1 := node.NewLeaf(path0, payload1, 254)
+		n2 := node.NewLeaf(path1, payload2, 254)
+		n3 := node.NewInterimNode(255, n1, n2)
+		n4 := node.NewLeaf(path2, emptyPayload, 255)
+		n5 := node.NewInterimNode(256, n3, n4)
+
+		nn5 := n5.Compactify()
+		require.Equal(t, n5.MaxDepth(), nn5.MaxDepth())
+		require.True(t, nn5.VerifyCachedHash())
+		require.True(t, nn5.VerifyCachedHash())
+		require.Nil(t, nn5.RightChild())
+		require.Equal(t, nn5, n5)
+	})
+
+	t.Run("lowest level right leaf be empty", func(t *testing.T) {
+		//          n5
+		//       /     \
+		//      n3      n4(p2)
+		//   /    \
+		//  n1(p1) n2(-)
+		//
+		// n2 represents an unallocated/empty register
+		// pruning n3 should result in
+		//
+		//          nn5
+		//       /     \
+		//     nn3(p1)  n4(p2)
+		// and nn5 pruning should result in no change
+		n1 := node.NewLeaf(path0, payload1, 254)
+		n2 := node.NewLeaf(path1, emptyPayload, 254)
+		n3 := node.NewInterimNode(255, n1, n2)
+		n4 := node.NewLeaf(path2, payload2, 255)
+		n5 := node.NewInterimNode(256, n3, n4)
+
+		nn3 := n3.Compactify()
+		require.True(t, nn3.VerifyCachedHash())
+		require.Equal(t, n3.Hash(), nn3.Hash())
+		require.Equal(t, payload1, nn3.Payload())
+		require.True(t, nn3.IsLeaf())
+
+		nn5 := n5.Compactify()
+		require.Equal(t, nn5, n5)
+	})
+
+	t.Run("lowest level left leaf be empty", func(t *testing.T) {
+		//          n5
+		//       /     \
+		//      n3      n4(p2)
+		//   /    \
+		//  n1(-) n2(p1)
+		//
+		// n1 represents an unallocated/empty register
+		// pruning should result in
+		//          nn5
+		//       /     \
+		//     nn3(p1)  n4(p2)
+		n1 := node.NewLeaf(path0, emptyPayload, 254)
+		n2 := node.NewLeaf(path1, payload1, 254)
+		n3 := node.NewInterimNode(255, n1, n2)
+		n4 := node.NewLeaf(path2, payload2, 255)
+		n5 := node.NewInterimNode(256, n3, n4)
+		require.True(t, n2.VerifyCachedHash())
+
+		nn3 := n3.Compactify()
+		require.True(t, nn3.VerifyCachedHash())
+		require.Equal(t, nn3.Hash(), n3.Hash())
+		require.Equal(t, nn3.Payload(), payload1)
+		require.True(t, nn3.IsLeaf())
+
+		nn5 := n5.Compactify()
+		require.Equal(t, nn5, n5)
+	})
+
+	t.Run("lowest level left and right leaves be empty", func(t *testing.T) {
+		//          n5
+		//       /     \
+		//      n3      n4(p1)
+		//   /    \
+		//  n1(-) n2(-)
+		//
+		// n1 and n2 represent unallocated/empty registers
+		// pruning should result in
+		//          nn5 (p1)
+		n1 := node.NewLeaf(path0, emptyPayload, 254)
+		n2 := node.NewLeaf(path1, emptyPayload, 254)
+		n3 := node.NewInterimNode(255, n1, n2)
+		n4 := node.NewLeaf(path2, payload1, 255)
+		n5 := node.NewInterimNode(256, n3, n4)
+		require.True(t, n2.VerifyCachedHash())
+
+		nn3 := n3.Compactify()
+		require.Nil(t, nn3)
+
+		nn5 := n5.Compactify()
+		require.True(t, nn5.VerifyCachedHash())
+		require.Equal(t, nn5.Hash(), n5.Hash())
+		require.Equal(t, nn5.Payload(), payload1)
+		require.True(t, nn5.IsLeaf())
+	})
+
 }
 
 func hashToString(hash hash.Hash) string {
