@@ -20,12 +20,32 @@ func getTransactionByID(
 		return nil, NewBadRequestError("invalid ID", err)
 	}
 
-	tx, err := backend.GetTransaction(r.Context(), id)
+	txr, err := backend.GetTransactionResult(r.Context(), id)
 	if err != nil {
-		return nil, NewBadRequestError("transaction fetching error", err)
+		return nil, NewBadRequestError("transaction result fetching error", err)
 	}
 
-	return transactionResponse(tx), nil
+	return transactionResultResponse(txr), nil
+}
+
+func getTransactionResultByID(
+	r *requestDecorator,
+	backend access.API,
+	generator LinkGenerator,
+	logger zerolog.Logger,
+) (interface{}, StatusError) {
+
+	id, err := r.id()
+	if err != nil {
+		return nil, NewBadRequestError("invalid ID", err)
+	}
+
+	txr, err := backend.GetTransactionResult(r.Context(), id)
+	if err != nil {
+		return nil, NewBadRequestError("transaction result fetching error", err)
+	}
+
+	return transactionResultResponse(txr), nil
 }
 
 // createTransaction creates a new transaction from provided payload.

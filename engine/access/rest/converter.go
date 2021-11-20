@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/onflow/flow-go/access"
+
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -151,6 +153,19 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 	}, nil
 }
 
+func toScriptArgs(script generated.ScriptsBody) ([][]byte, error) {
+	// todo(sideninja) validate
+	args := make([][]byte, len(script.Arguments))
+	for i, a := range script.Arguments {
+		args[i] = []byte(a)
+	}
+	return args, nil
+}
+
+func toScriptSource(script generated.ScriptsBody) ([]byte, error) {
+	return []byte(script.Script), nil
+}
+
 // Response section - converting flow models to response models.
 
 func proposalKeyResponse(key *flow.ProposalKey) *generated.ProposalKey {
@@ -203,6 +218,56 @@ func transactionResponse(tx *flow.TransactionBody) *generated.Transaction {
 	}
 }
 
+func eventResponse(event flow.Event) generated.Event {
+	return generated.Event{
+		Type_:            string(event.Type),
+		TransactionId:    event.TransactionID.String(),
+		TransactionIndex: int32(event.TransactionIndex),
+		EventIndex:       int32(event.EventIndex),
+		Payload:          string(event.Payload),
+	}
+}
+
+func eventsResponse(events []flow.Event) []generated.Event {
+	eventsRes := make([]generated.Event, len(events))
+	for i, e := range events {
+		eventsRes[i] = eventResponse(e)
+	}
+
+	return eventsRes
+}
+
+func statusResponse(status flow.TransactionStatus) generated.TransactionStatus {
+	switch status {
+	case flow.TransactionStatusExpired:
+		return generated.EXPIRED
+	case flow.TransactionStatusExecuted:
+		return generated.EXECUTED
+	case flow.TransactionStatusFinalized:
+		return generated.FINALIZED
+	case flow.TransactionStatusSealed:
+		return generated.SEALED
+	case flow.TransactionStatusPending:
+		return generated.PENDING
+	default:
+		return ""
+	}
+}
+
+func transactionResultResponse(txr *access.TransactionResult) *generated.TransactionResult {
+	status := statusResponse(txr.Status)
+
+	return &generated.TransactionResult{
+		BlockId:         txr.BlockID.String(),
+		Status:          &status,
+		ErrorMessage:    txr.ErrorMessage,
+		ComputationUsed: int32(0),
+		Events:          eventsResponse(txr.Events),
+		Expandable:      nil,
+		Links:           nil,
+	}
+}
+
 func blockResponse(flowBlock *flow.Block) *generated.Block {
 	return &generated.Block{
 		Header:  blockHeaderResponse(flowBlock.Header),
@@ -217,6 +282,13 @@ func blockHeaderResponse(flowHeader *flow.Header) *generated.BlockHeader {
 		Height:               int32(flowHeader.Height),
 		Timestamp:            flowHeader.Timestamp,
 		ParentVoterSignature: fmt.Sprint(flowHeader.ParentVoterSigData),
+	}
+}
+
+func blockHeaderOnlyResponse(flowHeader *flow.Header) *generated.Block {
+	return &generated.Block{
+		Header:  blockHeaderResponse(flowHeader),
+		Payload: nil,
 	}
 }
 
@@ -259,5 +331,72 @@ func blockSealResponse(flowSeal *flow.Seal) generated.BlockSeal {
 	return generated.BlockSeal{
 		BlockId:  flowSeal.BlockID.String(),
 		ResultId: flowSeal.ResultID.String(),
+	}
+}
+
+func collectionResponse(flowCollection *flow.LightCollection) generated.Collection {
+	return generated.Collection{
+		Id:           flowCollection.ID().String(),
+		Transactions: nil, // todo(sideninja) we receive light collection with only transaction ids, should we fetch txs by default?
+		Links:        nil,
+	}
+}
+
+func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event {
+	events := make([]generated.Event, len(eventList))
+	for i, e := range eventList {
+		events[i] = generated.Event{
+			Type_:            e.Type,
+			TransactionId:    "",
+			TransactionIndex: 0,
+			EventIndex:       0,
+			Payload:          "", //e.Event,
+		}
+	}
+	return events
+}
+
+func executionResultResponse(exeResult flow.ExecutionResult) generated.ExecutionResult {
+	return generated.ExecutionResult{
+		Id:      exeResult.ID().String(),
+		BlockId: exeResult.BlockID.String(),
+		Events:  serviceEventListResponse(exeResult.ServiceEvents),
+		Links:   nil,
+	}
+}
+
+func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublicKey {
+	keysResponse := make([]generated.AccountPublicKey, len(keys))
+	for i, k := range keys {
+		sigAlgo := generated.SigningAlgorithm(k.SignAlgo.String())
+		hashAlgo := generated.HashingAlgorithm(k.HashAlgo.String())
+
+		keysResponse[i] = generated.AccountPublicKey{
+			Index:            int32(k.Index),
+			PublicKey:        k.PublicKey.String(),
+			SigningAlgorithm: &sigAlgo,
+			HashingAlgorithm: &hashAlgo,
+			SequenceNumber:   int32(k.SeqNumber),
+			Weight:           int32(k.Weight),
+			Revoked:          k.Revoked,
+		}
+	}
+
+	return keysResponse
+}
+
+func accountResponse(account *flow.Account) generated.Account {
+	contracts := make(map[string]string, len(account.Contracts))
+	for name, code := range account.Contracts {
+		contracts[name] = string(code)
+	}
+
+	return generated.Account{
+		Address:    account.Address.String(),
+		Balance:    int32(account.Balance),
+		Keys:       accountKeysResponse(account.Keys),
+		Contracts:  contracts,
+		Expandable: nil,
+		Links:      nil,
 	}
 }
