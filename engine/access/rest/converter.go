@@ -57,7 +57,7 @@ func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
 func toSignature(signature string) ([]byte, error) {
 	signatureBytes := []byte(signature)
 	if len(signatureBytes) > maxSignatureLength {
-		return nil, fmt.Errorf("invalid signature")
+		return nil, errors.New("signature length invalid")
 	}
 	return signatureBytes, nil
 }
