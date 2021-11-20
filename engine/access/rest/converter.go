@@ -381,8 +381,8 @@ func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event
 	return events
 }
 
-func executionResultResponse(exeResult flow.ExecutionResult) generated.ExecutionResult {
-	return generated.ExecutionResult{
+func executionResultResponse(exeResult *flow.ExecutionResult) *generated.ExecutionResult {
+	return &generated.ExecutionResult{
 		Id:      exeResult.ID().String(),
 		BlockId: exeResult.BlockID.String(),
 		Events:  serviceEventListResponse(exeResult.ServiceEvents),

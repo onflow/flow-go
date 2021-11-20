@@ -13,11 +13,13 @@ import (
 
 // all route names
 const (
-	getTransactionByIDRoute = "getTransactionByID"
-	createTransactionRoute  = "createTransaction"
-	getBlocksByIDRoute      = "getBlocksByID"
-	getBlocksByHeightRoute  = "getBlocksByHeightRoute"
-	getCollectionByIDRoute  = "getCollectionByIDRoute"
+	getTransactionByIDRoute     = "getTransactionByID"
+	createTransactionRoute      = "createTransaction"
+	getBlocksByIDRoute          = "getBlocksByID"
+	getBlocksByHeightRoute      = "getBlocksByHeightRoute"
+	getCollectionByIDRoute      = "getCollectionByIDRoute"
+	getBlockPayloadByIDRoute    = "getBlockPayloadByID"
+	getExecutionResultByIDRoute = "getExecutionResultByID"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -88,6 +90,20 @@ func routeDefinitions() []routeDefinition {
 			pattern:        "/blocks",
 			name:           getBlocksByHeightRoute,
 			apiHandlerFunc: NotImplemented,
+		},
+		// Block Payload
+		{
+			method:         "GET",
+			pattern:        "/blocks/{id}/payload",
+			name:           getBlockPayloadByIDRoute,
+			apiHandlerFunc: getBlockPayloadByID,
+		},
+		// Execution Result
+		{
+			method:         "GET",
+			pattern:        "/execution_results/{id}",
+			name:           getExecutionResultByIDRoute,
+			apiHandlerFunc: getExecutionResultByID,
 		},
 		// Collections
 		{

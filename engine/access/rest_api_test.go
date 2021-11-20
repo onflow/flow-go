@@ -2,6 +2,7 @@ package access
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -160,7 +161,11 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		for i, b := range blocks {
 			assert.Equal(suite.T(), b.ID().String(), actualBlocks[i].Header.Id)
 		}
-	})
+
+		jsonBytes, err := json.MarshalIndent(actualBlocks, "", "\t")
+		require.NoError(suite.T(), err)
+		fmt.Println(string(jsonBytes))
+ 	})
 
 	suite.Run("GetBlockByID with a non-existing block ID", func() {
 
