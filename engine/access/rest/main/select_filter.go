@@ -58,16 +58,23 @@ func filterStructx(astruct interface{}, structType reflect.Type, fields ...strin
 	return out
 
 }
-func filterStruct(rv reflect.Value, rt reflect.Type, fields ...string) interface{} {
+func filterStruct(rv reflect.Value, fields ...string) interface{} {
 
+	//fmt.Println(reflect.TypeOf(rv).String())
+	//fmt.Println(reflect.TypeOf(rv).String()=="reflect.Value")
 	fs := fieldSet(fields...)
+	rt := rv.Type()
 
 	out := make(map[string]interface{}, rt.NumField())
 	for i := 0; i < rt.NumField(); i++ {
 		field := rt.Field(i)
-		fmt.Println(field)
+		fmt.Println(field.Type.Kind())
+		switch field.Type.Kind() {
+		case reflect.Slice: return SelectFields(field, fields...)
+		case reflect.Struct: return SelectFields(field, fields...)
+		}
 		jsonKey := field.Tag.Get("json")
-		fmt.Println(jsonKey)
+		//fmt.Println(jsonKey)
 		if fs[jsonKey] {
 			fmt.Println(rv.Field(i))
 			out[jsonKey] = rv.Field(i).Interface()
@@ -82,48 +89,70 @@ func SelectFields(obj interface{}, fields ...string) interface{} {
 	switch reflect.TypeOf(obj).Kind() {
 	case reflect.Slice:
 		s := reflect.ValueOf(obj)
-		t := reflect.TypeOf(obj).Elem()
 		out := make([]interface{}, s.Len())
 		for i := 0; i < s.Len(); i++ {
 			element := s.Index(i)
-			fmt.Println(element.Type())
-			converted := element.Convert(t)
-			fmt.Println(converted.Type())
-			out[i] = filterStruct(converted, element.Type(), fields...)
+			out[i] = filterStruct(element, fields...)
 		}
 		return out
 	case reflect.Struct:
 		v := reflect.ValueOf(obj)
-		t := reflect.TypeOf(obj)
-		return filterStruct(v, t, fields...)
+		//t := reflect.TypeOf(obj)
+		return filterStruct(v, fields...)
+
+	case reflect.Ptr:
+		v := reflect.ValueOf(obj)
+		//t := reflect.TypeOf(obj)
+		return filterStruct(v, fields...)
+
 	default:
 		panic("unexpected")
 	}
 }
 
 func main() {
-	result := SearchResult{
-		Date:     "to be honest you should probably use a time.Time field here, just sayin",
-		Industry: "rocketships",
-		IdCity:   "interface{} is kinda inspecific, but this is the idcity field",
-		City:     "New York Fuckin' City",
-	}
+	//result := SearchResult{
+	//	Date:     "to be honest you should probably use a time.Time field here, just sayin",
+	//	Industry: "rocketships",
+	//	IdCity:   "interface{} is kinda inspecific, but this is the idcity field",
+	//	City:     "New York Fuckin' City",
+	//}
 
-	b1, err := json.MarshalIndent(SelectFields(result, "date"), "", "  ")
+	//m, err := objx.FromJSON(json)
+	//
+	//
+	marshalled, err := json.MarshalIndent(generateBlock(), "", "\t")
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Println("---------")
-	fmt.Print(string(b1))
-	fmt.Println("---------")
 
-	blk := []SearchResult{result}
-
-	b, err := json.MarshalIndent(SelectFields(blk, "date"), "", "  ")
+	var outputMap = new(map[string]interface{})
+	err = json.Unmarshal(marshalled, outputMap)
 	if err != nil {
 		panic(err.Error())
 	}
-	fmt.Print(string(b))
+	for k, v := range *outputMap {
+		fmt.Println(k)
+		fmt.Println(reflect.TypeOf(v))
+	}
+
+
+	//
+	//b1, err := json.MarshalIndent(SelectFields(generateBlock(), "date"), "", "  ")
+	//if err != nil {
+	//	panic(err.Error())
+	//}
+	//fmt.Println("---------")
+	//fmt.Print(string(b1))
+	//fmt.Println("---------")
+
+	//blk := []generated.Block{generateBlock(), generateBlock()}
+	//
+	//b, err := json.MarshalIndent(SelectFields(blk, "date"), "", "  ")
+	//if err != nil {
+	//	panic(err.Error())
+	//}
+	//fmt.Print(string(b))
 }
 
 func generateBlock() generated.Block {
