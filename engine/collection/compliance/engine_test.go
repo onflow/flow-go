@@ -136,6 +136,7 @@ func (cs *ComplianceSuite) SetupTest() {
 		return channel
 	}()
 
+	cs.hotstuff.On("Start", mock.Anything)
 	cs.hotstuff.On("Ready", mock.Anything).Return(ready)
 	<-cs.engine.Ready()
 }
