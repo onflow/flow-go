@@ -27,7 +27,7 @@ const rootSnapshotBucketURL = "https://storage.googleapis.com/flow-genesis-boots
 // transaction used when resetting the FlowEpoch smart contract during the sporking process.
 //
 // When we perform a spork, the network is instantiated with a new protocol state which
-// in generate is inconsistent with the state in the FlowEpoch smart contract. The resetEpoch
+// in general is inconsistent with the state in the FlowEpoch smart contract. The resetEpoch
 // transaction is the mechanism for re-synchronizing these two states.
 //
 var resetCmd = &cobra.Command{
