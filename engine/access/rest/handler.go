@@ -10,49 +10,49 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gorilla/mux"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
+type ApiHandlerFunc func(
+	r *requestDecorator,
+	backend access.API,
+	generator LinkGenerator,
+	logger zerolog.Logger,
+) (interface{}, StatusError)
+
 // Handler is custom http handler implementing custom handler function.
 // Handler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
 type Handler struct {
-	logger      zerolog.Logger
-	backend     access.API
 	route       *mux.Route
 	method      string
 	pattern     string
 	name        string
-	handlerFunc func(
-		req Request,
-		backend access.API,
-	) (interface{}, StatusError)
+	logger         zerolog.Logger
+	backend        access.API
+	linkGenerator  LinkGenerator
+	apiHandlerFunc ApiHandlerFunc
 }
 
+func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandlerFunc, generator LinkGenerator) *Handler {
+	return &Handler{
+		logger:         logger,
+		backend:        backend,
+		apiHandlerFunc: handlerFunc,
+		linkGenerator:  generator,
+	}
+}
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
-	// create request dto
-	expanded, _ := middleware.GetFieldsToExpand(r)
-	selected, _ := middleware.GetFieldsToSelect(r)
-
-	request := Request{
-		r:        r,
-		context:  r.Context(),
-		params:   mux.Vars(r),
-		expand:   expanded,
-		selected: selected,
-		body:     r.Body,
-		route:    h.route,
-	}
+	decoratedRequest := newRequestDecorator(r)
 
 	// execute handler function and check for error
-	response, err := h.handlerFunc(request, h.backend)
+	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator, errorLogger)
 	if err != nil {
 		switch e := err.(type) {
 		case StatusError: // todo(sideninja) try handle not found error.Code - grpc unwrap
@@ -85,7 +85,7 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, sele
 	encodedResponse, err := json.Marshal(response)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to encode response")
-		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
+		errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
 		return
 	}
 
@@ -93,7 +93,7 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, sele
 	_, writeErr := w.Write(encodedResponse)
 	if writeErr != nil {
 		h.logger.Error().Err(err).Msg("failed to write response")
-		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
+		errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
 		return
 	}
 
@@ -204,10 +204,9 @@ func jsonDecode(body io.ReadCloser, dst interface{}) error {
 
 // NotImplemented handler returns an error explaining the endpoint is not yet implemented
 func NotImplemented(
-	_ http.ResponseWriter,
-	_ *http.Request,
-	_ map[string]string,
+	_ *requestDecorator,
 	_ access.API,
+	_ LinkGenerator,
 	_ zerolog.Logger,
 ) (interface{}, StatusError) {
 	return nil, NewRestError(http.StatusNotImplemented, "endpoint not implemented", nil)

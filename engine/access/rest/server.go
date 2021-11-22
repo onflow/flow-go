@@ -11,22 +11,19 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// all route names
+const (
+	getTransactionByIDRoute = "getTransactionByID"
+	createTransactionRoute  = "createTransaction"
+	getBlocksByIDRoute      = "getBlocksByID"
+	getBlocksByHeightRoute  = "getBlocksByHeightRoute"
+	getCollectionByIDRoute  = "getCollectionByIDRoute"
+)
+
 // NewServer returns an HTTP server initialized with the REST API handler
 func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) *http.Server {
 
-	router := mux.NewRouter().StrictSlash(true)
-	v1SubRouter := router.PathPrefix("/v1").Subrouter()
-
-	lm := middleware.NewLoggingMiddleware(logger)
-	// common middleware for all request
-	v1SubRouter.Use(lm.RequestStart())
-	v1SubRouter.Use(middleware.QueryExpandable())
-	v1SubRouter.Use(middleware.QuerySelect())
-	v1SubRouter.Use(lm.RequestEnd())
-
-	for _, h := range apiHandlers(logger, backend) {
-		h.addToRouter(v1SubRouter)
-	}
+	router := initRouter(backend, logger)
 
 	return &http.Server{
 		Addr:         listenAddress,
@@ -37,45 +34,68 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 	}
 }
 
-func apiHandlers(logger zerolog.Logger, backend access.API) []*Handler {
-	return []*Handler{
+func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
+	router := mux.NewRouter().StrictSlash(true)
+	v1SubRouter := router.PathPrefix("/v1").Subrouter()
+
+	lm := middleware.NewLoggingMiddleware(logger)
+	// common middleware for all request
+	v1SubRouter.Use(lm.RequestStart())
+	v1SubRouter.Use(middleware.QueryExpandable())
+	v1SubRouter.Use(middleware.QuerySelect())
+	v1SubRouter.Use(lm.RequestEnd())
+
+	var linkGenerator LinkGenerator = NewLinkGeneratorImpl(v1SubRouter)
+
+	for _, r := range routeDefinitions() {
+		h := NewHandler(logger, backend, r.apiHandlerFunc, linkGenerator)
+		v1SubRouter.
+			Methods(r.method).
+			Path(r.pattern).
+			Name(r.name).
+			Handler(h)
+	}
+	return router
+}
+
+type routeDefinition struct {
+	name           string
+	method         string
+	pattern        string
+	apiHandlerFunc ApiHandlerFunc
+}
+
+func routeDefinitions() []routeDefinition {
+	return []routeDefinition{
 		// Transactions
 		{
-			logger:      logger,
-			backend:     backend,
-			method:      "GET",
-			pattern:     "/transactions/{id}",
-			name:        "getTransactionByID",
-			handlerFunc: getTransactionByID,
+			method:         "GET",
+			pattern:        "/transactions/{id}",
+			name:           getTransactionByIDRoute,
+			apiHandlerFunc: getTransactionByID,
 		}, {
-			logger:      logger,
-			backend:     backend,
-			method:      "POST",
-			pattern:     "/transactions",
-			name:        "createTransaction",
-			handlerFunc: createTransaction,
+			method:         "POST",
+			pattern:        "/transactions",
+			name:           createTransactionRoute,
+			apiHandlerFunc: createTransaction,
 		},
 		// Blocks
 		{
-			logger:      logger,
-			backend:     backend,
-			method:      "GET",
-			pattern:     "/blocks/{id}",
-			name:        "getBlocksByID",
-			handlerFunc: getBlocksByID,
+			method:         "GET",
+			pattern:        "/blocks/{id}",
+			name:           getBlocksByIDRoute,
+			apiHandlerFunc: getBlocksByID,
 		}, {
-			logger:      logger,
-			backend:     backend,
-			method:      "GET",
-			pattern:     "/blocks",
-			handlerFunc: NotImplemented,
+			method:         "GET",
+			pattern:        "/blocks",
+			name:           getBlocksByHeightRoute,
+			apiHandlerFunc: NotImplemented,
 		},
 		// Collections
 		{
-			logger:      logger,
-			backend:     backend,
-			method:      "GET",
-			pattern:     "/collections/{id}",
-			handlerFunc: NotImplemented,
+			method:         "GET",
+			pattern:        "/collections/{id}",
+			name:           getCollectionByIDRoute,
+			apiHandlerFunc: NotImplemented,
 		}, {}}
 }
