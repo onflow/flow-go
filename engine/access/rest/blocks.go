@@ -36,6 +36,67 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 	return blocks, nil
 }
 
+func getBlocksByHeights(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+	height := r.getParam("height")
+	startHeight := r.getParam("start_height")
+	endHeight := r.getParam("end_height")
+
+	if height != "" && (startHeight != "" || endHeight != "") {
+		err := fmt.Errorf("can only provide either heights or start and end height range")
+		return nil, NewBadRequestError(err.Error(), err)
+	}
+	if height == "" && (startHeight == "" || endHeight == "") {
+		err := fmt.Errorf("must provide either heights or start and end height range")
+		return nil, NewBadRequestError(err.Error(), err)
+	}
+
+	blocks := make([]*generated.Block, len(height))
+
+	if height != "" {
+		heights, err := toHeights(height)
+		if err != nil {
+			return nil, NewBadRequestError(err.Error(), err)
+		}
+
+		for i, h := range heights {
+			block, err := getBlockByHeight(r.Context(), h, r, backend, link)
+			if err != nil {
+				return nil, err
+			}
+			blocks[i] = block
+		}
+	}
+
+}
+
+func getBlockByHeight(
+	ctx context.Context,
+	height uint64,
+	req *requestDecorator,
+	backend access.API,
+	link LinkGenerator,
+) (*generated.Block, StatusError) {
+	var responseBlock = new(generated.Block)
+	if req.expands(ExpandableFieldPayload) {
+		flowBlock, err := backend.GetBlockByHeight(ctx, height)
+		if err != nil {
+			return nil, blockLookupError(string(height), err)
+		}
+		responseBlock = blockResponse(flowBlock, link)
+
+		return responseBlock, nil
+	}
+
+	flowBlockHeader, err := backend.GetBlockHeaderByHeight(ctx, height)
+	if err != nil {
+		return nil, blockLookupError(string(height), err)
+	}
+	responseBlock.Header = blockHeaderResponse(flowBlockHeader)
+	responseBlock.Links = blockLink(flowBlockHeader.ID(), link)
+
+	return responseBlock, nil
+}
+
 func getBlockByID(
 	ctx context.Context,
 	id flow.Identifier,
@@ -48,7 +109,7 @@ func getBlockByID(
 	if req.expands(ExpandableFieldPayload) {
 		flowBlock, err := backend.GetBlockByID(ctx, id)
 		if err != nil {
-			return nil, blockLookupError(id, err)
+			return nil, blockLookupError(id.String(), err)
 		}
 		responseBlock = blockResponse(flowBlock, link)
 
@@ -57,7 +118,7 @@ func getBlockByID(
 
 	flowBlockHeader, err := backend.GetBlockHeaderByID(ctx, id)
 	if err != nil {
-		return nil, blockLookupError(id, err)
+		return nil, blockLookupError(id.String(), err)
 	}
 	responseBlock.Header = blockHeaderResponse(flowBlockHeader)
 	responseBlock.Links = blockLink(id, link)
@@ -69,8 +130,8 @@ func getBlockByID(
 	//}
 }
 
-func blockLookupError(id flow.Identifier, err error) StatusError {
-	msg := fmt.Sprintf("block with ID %s not found", id.String())
+func blockLookupError(id string, err error) StatusError {
+	msg := fmt.Sprintf("block %s not found")
 	// if error has GRPC code NotFound, then return HTTP NotFound error
 	if status.Code(err) == codes.NotFound {
 		return NewNotFoundError(msg, err)

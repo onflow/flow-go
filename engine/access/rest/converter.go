@@ -16,6 +16,8 @@ import (
 // open api spec and flow models.
 
 const MaxAllowedIDs = 50 // todo(sideninja) discuss if we should restrict maximum on all IDs collection or is anywhere required more thant this
+const MaxAllowedHeights = 50
+
 var MaxAllowedBlockIDs = MaxAllowedIDs
 
 // Flow section - converting request data to flow models with validation.
@@ -55,6 +57,27 @@ func toIDs(ids string) ([]flow.Identifier, error) {
 
 func toHeight(height string) (uint64, error) {
 	return strconv.ParseUint(height, 0, 64)
+}
+
+func toHeights(height string) ([]uint64, error) {
+	height = strings.TrimSuffix(height, "]")
+	height = strings.TrimPrefix(height, "[")
+	rawHeights := strings.Fields(height)
+
+	if len(rawHeights) > MaxAllowedHeights {
+		return nil, fmt.Errorf("at most %d heights can be requested at a time", MaxAllowedHeights)
+	}
+
+	heights := make([]uint64, len(rawHeights))
+	for i, h := range rawHeights {
+		conv, err := toHeight(h)
+		if err != nil {
+			return nil, fmt.Errorf("invalid height %s", h)
+		}
+		heights[i] = conv
+	}
+
+	return heights, nil
 }
 
 func toAddress(address string) (flow.Address, error) {
