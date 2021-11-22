@@ -1,6 +1,8 @@
 package eventloop
 
 import (
+	"context"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"io/ioutil"
 	"sync"
 	"testing"
@@ -27,7 +29,8 @@ func TestEventLoopV2(t *testing.T) {
 type EventLoopV2TestSuite struct {
 	suite.Suite
 
-	eh *mocks.EventHandlerV2
+	eh     *mocks.EventHandlerV2
+	cancel context.CancelFunc
 
 	eventLoop *EventLoopV2
 }
@@ -43,10 +46,17 @@ func (s *EventLoopV2TestSuite) SetupTest() {
 	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), s.eh)
 	require.NoError(s.T(), err)
 	s.eventLoop = eventLoop
-	<-eventLoop.Ready()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	s.eventLoop.Start(signalerCtx)
+	<-s.eventLoop.Ready()
 }
 
 func (s *EventLoopV2TestSuite) TearDownTest() {
+	s.cancel()
 	<-s.eventLoop.Done()
 }
 
@@ -55,6 +65,7 @@ func (s *EventLoopV2TestSuite) TestReadyDone() {
 	time.Sleep(1 * time.Second)
 	done := atomic.NewBool(false)
 	go func() {
+		s.cancel()
 		<-s.eventLoop.Done()
 		done.Store(true)
 	}()
@@ -104,6 +115,10 @@ func TestEventLoopV2_Timeout(t *testing.T) {
 	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), eh)
 	require.NoError(t, err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	eventLoop.Start(signalerCtx)
+
 	<-eventLoop.Ready()
 
 	time.Sleep(10 * time.Millisecond)
@@ -130,5 +145,7 @@ func TestEventLoopV2_Timeout(t *testing.T) {
 
 	require.Eventually(t, processed.Load, time.Millisecond*200, time.Millisecond*10)
 	wg.Wait()
+
+	cancel()
 	<-eventLoop.Done()
 }

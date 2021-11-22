@@ -1,33 +1,33 @@
 package eventloop
 
 import (
+	"context"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"time"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 )
 
 // EventLoopV2 buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
 type EventLoopV2 struct {
+	*component.ComponentManager
 	log                zerolog.Logger
 	eventHandler       hotstuff.EventHandlerV2
 	metrics            module.HotstuffMetrics
 	proposals          chan *model.Proposal
 	quorumCertificates chan *flow.QuorumCertificate
-
-	lm   *lifecycle.LifecycleManager
-	unit *engine.Unit // lock for preventing concurrent state transitions
 }
 
 var _ hotstuff.EventLoopV2 = &EventLoopV2{}
 var _ module.ReadyDoneAware = &EventLoopV2{}
+var _ module.Startable = &EventLoopV2{}
 
 // NewEventLoopV2 creates an instance of EventLoopV2.
 func NewEventLoopV2(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandlerV2) (*EventLoopV2, error) {
@@ -36,18 +36,23 @@ func NewEventLoopV2(log zerolog.Logger, metrics module.HotstuffMetrics, eventHan
 
 	el := &EventLoopV2{
 		log:                log,
-		lm:                 lifecycle.NewLifecycleManager(),
 		eventHandler:       eventHandler,
 		metrics:            metrics,
 		proposals:          proposals,
 		quorumCertificates: quorumCertificates,
-		unit:               engine.NewUnit(),
 	}
+
+	componentBuilder := component.NewComponentManagerBuilder()
+	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+		el.loop(ctx)
+	})
+	el.ComponentManager = componentBuilder.Build()
 
 	return el, nil
 }
 
-func (el *EventLoopV2) loop() {
+func (el *EventLoopV2) loop(ctx context.Context) {
 
 	err := el.eventHandler.Start()
 	if err != nil {
@@ -61,7 +66,7 @@ func (el *EventLoopV2) loop() {
 	// if hotstuff hits any unknown error, it will exit the loop
 
 	for {
-		quitted := el.unit.Quit()
+		quitted := ctx.Done()
 
 		// Giving timeout events the priority to be processed first
 		// This is to prevent attacks from malicious nodes that attempt
@@ -171,7 +176,7 @@ func (el *EventLoopV2) SubmitProposal(proposalHeader *flow.Header, parentView ui
 
 	select {
 	case el.proposals <- proposal:
-	case <-el.unit.Quit():
+	case <-el.ComponentManager.ShutdownSignal():
 		return
 	}
 
@@ -186,31 +191,11 @@ func (el *EventLoopV2) SubmitTrustedQC(qc *flow.QuorumCertificate) {
 
 	select {
 	case el.quorumCertificates <- qc:
-	case <-el.unit.Quit():
+	case <-el.ComponentManager.ShutdownSignal():
 		return
 	}
 
 	// the wait duration is measured as how long it takes from a qc being
 	// received to event handler commencing the processing of the qc
 	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnQc)
-}
-
-// Ready implements interface module.ReadyDoneAware
-// Method call will starts the EventLoopV2's internal processing loop.
-// Multiple calls are handled gracefully and the event loop will only start
-// once.
-func (el *EventLoopV2) Ready() <-chan struct{} {
-	el.lm.OnStart(func() {
-		el.unit.Launch(el.loop)
-	})
-	return el.lm.Started()
-}
-
-// Done implements interface module.ReadyDoneAware
-func (el *EventLoopV2) Done() <-chan struct{} {
-	el.lm.OnStop(func() {
-		// wait for event loop to exit
-		<-el.unit.Done()
-	})
-	return el.lm.Stopped()
 }
