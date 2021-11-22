@@ -8,14 +8,19 @@ import (
 )
 
 // getTransactionByID gets a transaction by requested ID.
-func getTransactionByID(req Request, backend access.API) (interface{}, StatusError) {
+func getTransactionByID(
+	r *requestDecorator,
+	backend access.API,
+	generator LinkGenerator,
+	logger zerolog.Logger,
+) (interface{}, StatusError) {
 
-	id, err := toID(req.getParam("id"))
+	id, err := r.id()
 	if err != nil {
 		return nil, NewBadRequestError("invalid ID", err)
 	}
 
-	tx, err := backend.GetTransaction(req.context, id)
+	tx, err := backend.GetTransaction(r.Context(), id)
 	if err != nil {
 		return nil, NewBadRequestError("transaction fetching error", err)
 	}

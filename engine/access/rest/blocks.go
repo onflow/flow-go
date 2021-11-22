@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/rs/zerolog"
 	"net/http"
 
 	"google.golang.org/grpc/codes"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 const ExpandableFieldPayload = "payload"

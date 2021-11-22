@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/middleware"
+	"github.com/gorilla/mux"
 	"io"
 	"net/http"
 	"strings"
@@ -16,6 +16,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
+// ApiHandlerFunc is a function that contains endpoint handling logic,
+// it fetches necessary resources and returns an error or response model.
 type ApiHandlerFunc func(
 	r *requestDecorator,
 	backend access.API,
@@ -27,10 +29,10 @@ type ApiHandlerFunc func(
 // Handler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
 type Handler struct {
-	route       *mux.Route
-	method      string
-	pattern     string
-	name        string
+	route          *mux.Route
+	method         string
+	pattern        string
+	name           string
 	logger         zerolog.Logger
 	backend        access.API
 	linkGenerator  LinkGenerator
@@ -66,7 +68,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// write response to response stream
-	h.jsonResponse(w, response, selected, errorLogger)
+	h.jsonResponse(w, response, errorLogger)
 }
 
 // addToRouter adds handler to provided router
@@ -80,12 +82,12 @@ func (h *Handler) addToRouter(router *mux.Router) {
 	h.route = router.Get(h.name)
 }
 
-func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, selected []string, logger zerolog.Logger) {
+func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logger zerolog.Logger) {
 	// serialise response to JSON and handler errors
 	encodedResponse, err := json.Marshal(response)
 	if err != nil {
 		h.logger.Error().Err(err).Msg("failed to encode response")
-		errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
+		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
 		return
 	}
 
@@ -93,7 +95,7 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, sele
 	_, writeErr := w.Write(encodedResponse)
 	if writeErr != nil {
 		h.logger.Error().Err(err).Msg("failed to write response")
-		errorResponse(w, http.StatusInternalServerError, "error generating response", errorLogger)
+		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
 		return
 	}
 
