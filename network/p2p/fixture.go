@@ -25,7 +25,7 @@ import (
 )
 
 // Workaround for https://github.com/stretchr/testify/pull/808
-const tickForAssertEventually = 100 * time.Millisecond
+const ticksForAssertEventually = 100 * time.Millisecond
 
 // Creating a node fixture with defaultAddress lets libp2p runs it on an
 // allocated port by OS. So after fixture created, its address would be
@@ -140,7 +140,7 @@ func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opt
 	require.Eventuallyf(t, func() bool {
 		ip, p, err := n.GetIPPort()
 		return err == nil && ip != "" && p != ""
-	}, 3*time.Second, tickForAssertEventually, fmt.Sprintf("could not start node %s", identity.NodeID.String()))
+	}, 3*time.Second, ticksForAssertEventually, fmt.Sprintf("could not start node %s", identity.NodeID.String()))
 
 	// get the actual IP and port that have been assigned by the subsystem
 	ip, port, err := n.GetIPPort()

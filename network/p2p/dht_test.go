@@ -54,7 +54,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 			}
 		}
 		return true
-	}, time.Second*5, tickForAssertEventually, "nodes failed to connect")
+	}, time.Second*5, ticksForAssertEventually, "nodes failed to connect")
 
 	// connect the two DHT servers to each other
 	err := dhtServerNodes[0].host.Connect(ctx, getDhtServerAddr(1))
@@ -63,7 +63,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 	// wait for the first server to connect to the second and update its routing table
 	require.Eventually(t, func() bool {
 		return dhtServerNodes[0].dht.RoutingTable().Find(getDhtServerAddr(1).ID) != ""
-	}, time.Second*5, tickForAssertEventually, "dht servers failed to connect")
+	}, time.Second*5, ticksForAssertEventually, "dht servers failed to connect")
 
 	// check that all even numbered clients can create streams with all odd numbered clients
 	for i := 0; i < len(dhtClientNodes); i += 2 {
@@ -165,7 +165,7 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 		return true
 	}
 	// assert that the graph is fully connected
-	require.Eventually(t, fullyConnectedGraph, time.Second*5, tickForAssertEventually, "nodes failed to discover each other")
+	require.Eventually(t, fullyConnectedGraph, time.Second*5, ticksForAssertEventually, "nodes failed to discover each other")
 
 	// Step 4: publish a message to the topic
 	require.NoError(t, dhtServerNode.Publish(ctx, topic, []byte("hello")))
