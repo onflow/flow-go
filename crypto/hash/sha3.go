@@ -10,6 +10,8 @@ func NewSHA3_256() Hasher {
 	return &sha3State{
 		rate:      rateSha3_256,
 		outputLen: HashLenSha3_256,
+		bufIndex:  bufNilValue,
+		bufSize:   bufNilValue,
 	}
 }
 
@@ -18,6 +20,8 @@ func NewSHA3_384() Hasher {
 	return &sha3State{
 		rate:      rateSha3_384,
 		outputLen: HashLenSha3_384,
+		bufIndex:  bufNilValue,
+		bufSize:   bufNilValue,
 	}
 }
 
@@ -59,6 +63,24 @@ func (s *sha3State) SumHash() Hash {
 func (d *sha3State) Write(p []byte) (int, error) {
 	d.write(p)
 	return len(p), nil
+}
+
+// ComputeSHA3_256 computes the SHA3-256 digest of data
+// and copies the result to the result buffer.
+//
+// The function is not part of the Hasher API. It is a light API
+// that allows a simple computation of a hash and minimizes
+// heap allocations.
+func ComputeSHA3_256(result *[HashLenSha3_256]byte, data []byte) {
+	state := &sha3State{
+		rate:      rateSha3_256,
+		outputLen: HashLenSha3_256,
+		bufIndex:  bufNilValue,
+		bufSize:   bufNilValue,
+	}
+	state.write(data)
+	state.padAndPermute()
+	copyOut(result[:], state)
 }
 
 // The functions below were copied and modified from golang.org/x/crypto/sha3.
@@ -110,11 +132,41 @@ const (
 )
 
 type sha3State struct {
-	a         [25]uint64 // main state of the hash
-	buf       []byte     // points into storage
-	storage   storageBuf
+	a       [25]uint64 // main state of the hash
+	storage storageBuf // constant size array
+	// `buf` is a sub-slice that points into `storage` using `bufIndex` and `bufSize`:
+	// - `bufIndex` is the index of the first element of buf
+	// - `bufSize` is the size of buf
+	bufIndex  int
+	bufSize   int
 	rate      int // the number of bytes of state to use
 	outputLen int // the default output size in bytes
+}
+
+// returns the current buf
+func (d *sha3State) buf() []byte {
+	return d.storage.asBytes()[d.bufIndex : d.bufIndex+d.bufSize]
+}
+
+// setBuf assigns `buf` (sub-slice of `storage`) to a sub-slice of `storage`
+// defined by a starting index and size.
+func (d *sha3State) setBuf(start, size int) {
+	d.bufIndex = start
+	d.bufSize = size
+}
+
+const bufNilValue = -1
+
+// checks if `buf` is nil (not yet set)
+func (d *sha3State) bufIsNil() bool {
+	return d.bufSize == bufNilValue
+}
+
+// appendBuf appends a slice to `buf` (sub-slice of `storage`)
+// The function assumes the appended buffer still fits into `storage`.
+func (d *sha3State) appendBuf(slice []byte) {
+	copy(d.storage.asBytes()[d.bufIndex+d.bufSize:], slice)
+	d.bufSize += len(slice)
 }
 
 // Reset clears the internal state.
@@ -123,39 +175,39 @@ func (d *sha3State) Reset() {
 	for i := range d.a {
 		d.a[i] = 0
 	}
-	d.buf = d.storage.asBytes()[:0]
+	d.setBuf(0, 0)
 }
 
 // permute applies the KeccakF-1600 permutation.
 func (d *sha3State) permute() {
 	// xor the input into the state before applying the permutation.
-	xorIn(d, d.buf)
-	d.buf = d.storage.asBytes()[:0]
+	xorIn(d, d.buf())
+	d.setBuf(0, 0)
 	keccakF1600(&d.a)
 }
 
 func (d *sha3State) write(p []byte) {
-	if d.buf == nil {
-		d.buf = d.storage.asBytes()[:0]
+	if d.bufIsNil() {
+		d.setBuf(0, 0)
 	}
 
 	for len(p) > 0 {
-		if len(d.buf) == 0 && len(p) >= d.rate {
+		if d.bufSize == 0 && len(p) >= d.rate {
 			// The fast path; absorb a full "rate" bytes of input and apply the permutation.
 			xorIn(d, p[:d.rate])
 			p = p[d.rate:]
 			keccakF1600(&d.a)
 		} else {
 			// The slow path; buffer the input until we can fill the sponge, and then xor it in.
-			todo := d.rate - len(d.buf)
+			todo := d.rate - d.bufSize
 			if todo > len(p) {
 				todo = len(p)
 			}
-			d.buf = append(d.buf, p[:todo]...)
+			d.appendBuf(p[:todo])
 			p = p[todo:]
 
 			// If the sponge is full, apply the permutation.
-			if len(d.buf) == d.rate {
+			if d.bufSize == d.rate {
 				d.permute()
 			}
 		}
@@ -165,26 +217,27 @@ func (d *sha3State) write(p []byte) {
 // pads appends the domain separation bits in dsbyte, applies
 // the multi-bitrate 10..1 padding rule, and permutes the state.
 func (d *sha3State) padAndPermute() {
-	if d.buf == nil {
-		d.buf = d.storage.asBytes()[:0]
+	if d.bufIsNil() {
+		d.setBuf(0, 0)
 	}
 	// Pad with this instance with dsbyte. We know that there's
 	// at least one byte of space in d.buf because, if it were full,
 	// permute would have been called to empty it. dsbyte also contains the
 	// first one bit for the padding. See the comment in the state struct.
-	d.buf = append(d.buf, dsbyte)
-	zerosStart := len(d.buf)
-	d.buf = d.storage.asBytes()[:d.rate]
+	d.appendBuf([]byte{dsbyte})
+	zerosStart := d.bufSize
+	d.setBuf(0, d.rate)
+	buf := d.buf()
 	for i := zerosStart; i < d.rate; i++ {
-		d.buf[i] = 0
+		buf[i] = 0
 	}
 	// This adds the final one bit for the padding. Because of the way that
 	// bits are numbered from the LSB upwards, the final bit is the MSB of
 	// the last byte.
-	d.buf[d.rate-1] ^= 0x80
+	buf[d.rate-1] ^= 0x80
 	// Apply the permutation
 	d.permute()
-	d.buf = d.storage.asBytes()[:d.rate]
+	d.setBuf(0, d.rate)
 }
 
 // Sum applies padding to the hash state and then squeezes out the desired

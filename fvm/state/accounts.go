@@ -48,7 +48,7 @@ type Accounts interface {
 	GetValue(address flow.Address, key string) (flow.RegisterValue, error)
 	CheckAccountNotFrozen(address flow.Address) error
 	GetStorageUsed(address flow.Address) (uint64, error)
-	SetValue(address flow.Address, key string, value []byte) error
+	SetValue(address flow.Address, key string, value flow.RegisterValue) error
 	AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error)
 	SetAccountFrozen(address flow.Address, frozen bool) error
 }

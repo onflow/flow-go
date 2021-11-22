@@ -1,6 +1,8 @@
 package flow
 
 import (
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 
 	"github.com/onflow/flow-go/ledger/common/hash"
@@ -96,4 +98,44 @@ func ToStateCommitment(stateBytes []byte) (StateCommitment, error) {
 	}
 	copy(state[:], stateBytes)
 	return state, nil
+}
+
+func (s StateCommitment) MarshalJSON() ([]byte, error) {
+	return json.Marshal(hex.EncodeToString(s[:]))
+}
+
+func (s *StateCommitment) UnmarshalJSON(data []byte) error {
+	// first, attempt to unmarshal assuming data is a hex string representation
+	err := s.unmarshalJSONHexString(data)
+	if err == nil {
+		return nil
+	}
+	// fallback to unmarshalling as [32]byte
+	return s.unmarshalJSONByteArr(data)
+}
+
+func (s *StateCommitment) unmarshalJSONHexString(data []byte) error {
+	var stateCommitmentHex string
+	if err := json.Unmarshal(data, &stateCommitmentHex); err != nil {
+		return err
+	}
+	b, err := hex.DecodeString(stateCommitmentHex)
+	if err != nil {
+		return err
+	}
+	h, err := hash.ToHash(b)
+	if err != nil {
+		return err
+	}
+	*s = StateCommitment(h)
+	return nil
+}
+
+func (s *StateCommitment) unmarshalJSONByteArr(data []byte) error {
+	var stateCommitment [32]byte
+	if err := json.Unmarshal(data, &stateCommitment); err != nil {
+		return err
+	}
+	*s = stateCommitment
+	return nil
 }

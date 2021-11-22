@@ -22,6 +22,8 @@ require (
 	github.com/golang/protobuf v1.5.2
 	github.com/google/go-cmp v0.5.6
 	github.com/google/uuid v1.3.0
+	github.com/gopherjs/gopherjs v0.0.0-20190430165422-3e4dfb77656c // indirect
+	github.com/gorilla/mux v1.7.3
 	github.com/grpc-ecosystem/go-grpc-middleware/providers/zerolog/v2 v2.0.0-rc.2
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-20200501113911-9a95f0fdbfea
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
@@ -29,7 +31,14 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/improbable-eng/grpc-web v0.12.0
+	github.com/ipfs/go-bitswap v0.4.0
+	github.com/ipfs/go-block-format v0.0.3
+	github.com/ipfs/go-cid v0.0.7
+	github.com/ipfs/go-datastore v0.4.5
+	github.com/ipfs/go-ipfs-blockstore v0.1.6
+	github.com/ipfs/go-ipfs-exchange-interface v0.0.1
 	github.com/ipfs/go-log v1.0.5
+	github.com/ipld/go-ipld-prime v0.12.0 // indirect
 	github.com/jrick/bitset v1.0.0
 	github.com/kr/text v0.2.0 // indirect
 	github.com/libp2p/go-addr-util v0.1.0
@@ -47,7 +56,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/atree v0.1.0-beta1.0.20211027184039-559ee654ece9
 	github.com/onflow/cadence v0.20.0-beta10
-	github.com/onflow/cadence/v19 v19.0.0-00010101000000-000000000000
+	github.com/onflow/flow v0.2.3-0.20211103155021-9254a66368d5
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.7
 	github.com/onflow/flow-emulator v0.20.3
@@ -56,12 +65,13 @@ require (
 	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pelletier/go-toml v1.9.4 // indirect
+	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/rs/zerolog v1.19.0
-	github.com/schollz/progressbar/v3 v3.8.3
 	github.com/sethvargo/go-retry v0.1.0
+	github.com/smartystreets/assertions v1.0.0 // indirect
 	github.com/spf13/cast v1.4.1 // indirect
 	github.com/spf13/cobra v1.2.1
 	github.com/spf13/pflag v1.0.5
@@ -91,7 +101,3 @@ require (
 replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
 replace github.com/onflow/flow-go/crypto => ./crypto
-
-replace github.com/onflow/cadence/v19 => github.com/onflow/cadence v0.19.0
-
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.20.0-beta10-patch.1

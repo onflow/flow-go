@@ -26,12 +26,12 @@ var _ component.Component = (*CommandRunner)(nil)
 
 const CommandRunnerShutdownTimeout = 5 * time.Second
 
-type CommandHandler func(ctx context.Context, request *CommandRequest) error
+type CommandHandler func(ctx context.Context, request *CommandRequest) (interface{}, error)
 type CommandValidator func(request *CommandRequest) error
 type CommandRunnerOption func(*CommandRunner)
 
 type CommandRequest struct {
-	Data          map[string]interface{}
+	Data          interface{}
 	ValidatorData interface{}
 }
 
@@ -239,30 +239,34 @@ func (r *CommandRunner) runAdminServer(ctx irrecoverable.SignalerContext) error 
 	return nil
 }
 
-func (r *CommandRunner) runCommand(ctx context.Context, command string, data map[string]interface{}) error {
+func (r *CommandRunner) runCommand(ctx context.Context, command string, data interface{}) (interface{}, error) {
 	r.logger.Info().Str("command", command).Msg("received new command")
 
 	req := &CommandRequest{Data: data}
+
 	if validator := r.getValidator(command); validator != nil {
 		if validationErr := validator(req); validationErr != nil {
-			return status.Error(codes.InvalidArgument, validationErr.Error())
+			return nil, status.Error(codes.InvalidArgument, validationErr.Error())
 		}
 	}
 
+	var handleResult interface{}
+	var handleErr error
+
 	if handler := r.getHandler(command); handler != nil {
-		if handleErr := handler(ctx, req); handleErr != nil {
+		if handleResult, handleErr = handler(ctx, req); handleErr != nil {
 			if errors.Is(handleErr, context.Canceled) {
-				return status.Error(codes.Canceled, "client canceled")
+				return nil, status.Error(codes.Canceled, "client canceled")
 			} else if errors.Is(handleErr, context.DeadlineExceeded) {
-				return status.Error(codes.DeadlineExceeded, "request timed out")
+				return nil, status.Error(codes.DeadlineExceeded, "request timed out")
 			} else {
 				s, _ := status.FromError(handleErr)
-				return s.Err()
+				return nil, s.Err()
 			}
 		}
 	} else {
-		return status.Error(codes.Unimplemented, "invalid command")
+		return nil, status.Error(codes.Unimplemented, "invalid command")
 	}
 
-	return nil
+	return handleResult, nil
 }
