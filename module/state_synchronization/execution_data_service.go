@@ -4,10 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ipfs/go-cid"
 
 	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -24,14 +26,16 @@ type ExecutionDataService struct {
 	serializer  *serializer
 	blobService network.BlobService
 	maxBlobSize int
+	metrics     module.ExecutionDataServiceMetrics
 }
 
 func NewExecutionDataService(
 	codec encoding.Codec,
 	compressor network.Compressor,
 	blobService network.BlobService,
+	metrics module.ExecutionDataServiceMetrics,
 ) *ExecutionDataService {
-	return &ExecutionDataService{&serializer{codec, compressor}, blobService, defaultMaxBlobSize}
+	return &ExecutionDataService{&serializer{codec, compressor}, blobService, defaultMaxBlobSize, metrics}
 }
 
 func (s *ExecutionDataService) storeBatch(ctx context.Context, br *BlobReceiver) ([]network.Blob, error) {
@@ -114,18 +118,31 @@ func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}) ([]c
 
 // Add constructs a blob tree for the given ExecutionData and adds it to the blobservice, and then returns the root CID.
 func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error) {
+	s.metrics.ExecutionDataAddStarted()
+
+	start := time.Now()
 	cids, err := s.addBlobs(ctx, sd)
 
 	if err != nil {
+		s.metrics.ExecutionDataAddFinished(time.Since(start), false, 0)
+
 		return cid.Undef, fmt.Errorf("failed to add execution data blobs: %w", err)
 	}
 
+	var blobTreeNodes int
+
 	for {
+		blobTreeNodes += len(cids)
+
 		if len(cids) == 1 {
+			s.metrics.ExecutionDataAddFinished(time.Since(start), true, blobTreeNodes)
+
 			return cids[0], nil
 		}
 
 		if cids, err = s.addBlobs(ctx, cids); err != nil {
+			s.metrics.ExecutionDataAddFinished(time.Since(start), false, blobTreeNodes)
+
 			return cid.Undef, fmt.Errorf("failed to add cid blobs: %w", err)
 		}
 	}
@@ -230,17 +247,28 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (in
 
 // Get gets the ExecutionData for the given root CID from the blobservice.
 func (s *ExecutionDataService) Get(ctx context.Context, c cid.Cid) (*ExecutionData, error) {
+	s.metrics.ExecutionDataGetStarted()
+
+	start := time.Now()
 	cids := []cid.Cid{c}
+
+	var blobTreeNodes int
 
 	for i := uint(0); i < defaultMaxBlobTreeDepth; i++ {
 		v, err := s.getBlobs(ctx, cids)
 
 		if err != nil {
+			s.metrics.ExecutionDataGetFinished(time.Since(start), false, blobTreeNodes)
+
 			return nil, fmt.Errorf("failed to get level %v of blob tree: %w", i, err)
 		}
 
+		blobTreeNodes += len(cids)
+
 		switch v := v.(type) {
 		case *ExecutionData:
+			s.metrics.ExecutionDataGetFinished(time.Since(start), true, blobTreeNodes)
+
 			return v, nil
 		case *[]cid.Cid:
 			cids = *v
