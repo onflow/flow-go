@@ -1,0 +1,106 @@
+{
+  "result_files": [
+    {"file": "test-result-crypto-hash-1-count-fail.json"}
+  ],
+  "tests": [
+    {
+      "test": "TestSanitySha3_256",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "passed": 0,
+      "failed": 1,
+      "no result": 0,
+      "no_result_files": [
+      ],
+      "flaky_rate": 100,
+      "average_duration": 0
+    },
+    {
+      "test": "TestSanitySha3_384",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "passed": 1,
+      "failed": 0,
+      "no result": 0,
+      "no_result_files": [
+      ],
+      "flaky_rate": 0,
+      "average_duration": 0
+    },
+    {
+      "test": "TestSanitySha2_256",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "passed": 1,
+      "failed": 0,
+      "no result": 0,
+      "no_result_files": [
+      ],
+      "flaky_rate": 0,
+      "average_duration": 0
+    },
+    {
+      "test": "TestSanitySha2_384",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "passed": 1,
+      "failed": 0,
+      "no result": 0,
+      "no_result_files": [
+      ],
+      "flaky_rate": 0,
+      "average_duration": 0
+    },
+    {
+      "test": "TestSanityKmac128",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "passed": 1,
+      "failed": 0,
+      "no result": 0,
+      "no_result_files": [
+      ],
+      "flaky_rate": 0,
+      "average_duration": 0
+    },
+    {
+      "test": "TestHashersAPI",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "passed": 1,
+      "failed": 0,
+      "no result": 0,
+      "no_result_files": [
+      ],
+      "flaky_rate": 0,
+      "average_duration": 0
+    },
+    {
+      "test": "TestSha3",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "passed": 1,
+      "failed": 0,
+      "no result": 0,
+      "no_result_files": [
+      ],
+      "flaky_rate": 0,
+      "average_duration": 0.23
+    },
+    {
+      "test": "TestSha3/SHA3_256",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "passed": 1,
+      "failed": 0,
+      "no result": 0,
+      "no_result_files": [
+      ],
+      "flaky_rate": 0,
+      "average_duration": 0.11
+    },
+    {
+      "test": "TestSha3/SHA3_384",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "passed": 1,
+      "failed": 0,
+      "no result": 0,
+      "no_result_files": [
+      ],
+      "flaky_rate": 0,
+      "average_duration": 0.12
+    }
+  ]
+}

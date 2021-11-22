@@ -19,7 +19,7 @@ type RawTestStep struct {
 	Elapsed float32   `json:"Elapsed"`
 }
 
-// models full summary of a test run from "go test -json"
+// models full level 1 summary of a test run from "go test -json"
 type TestRun struct {
 	CommitSha      string          `json:"commit_sha"`
 	CommitDate     time.Time       `json:"commit_date"`
