@@ -4,6 +4,8 @@ package mock
 
 import (
 	flow "github.com/onflow/flow-go/model/flow"
+	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+
 	mock "github.com/stretchr/testify/mock"
 )
 
@@ -44,12 +46,12 @@ func (_m *HotStuff) Ready() <-chan struct{} {
 	return r0
 }
 
+// Start provides a mock function with given fields: _a0
+func (_m *HotStuff) Start(_a0 irrecoverable.SignalerContext) {
+	_m.Called(_a0)
+}
+
 // SubmitProposal provides a mock function with given fields: proposal, parentView
 func (_m *HotStuff) SubmitProposal(proposal *flow.Header, parentView uint64) {
 	_m.Called(proposal, parentView)
-}
-
-// SubmitVote provides a mock function with given fields: originID, blockID, view, sigData
-func (_m *HotStuff) SubmitVote(originID flow.Identifier, blockID flow.Identifier, view uint64, sigData []byte) {
-	_m.Called(originID, blockID, view, sigData)
 }
