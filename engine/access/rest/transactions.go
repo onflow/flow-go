@@ -39,7 +39,7 @@ func getTransactionResultByID(r *requestDecorator, backend access.API, link Link
 func createTransaction(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
 
 	var txBody generated.TransactionsBody
-	err := jsonDecode(r.Body, &txBody)
+	err := r.bodyAs(&txBody)
 	if err != nil {
 		return nil, NewBadRequestError("invalid transaction request", err)
 	}

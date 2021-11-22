@@ -8,7 +8,7 @@ import (
 func executeScript(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
 	blockID := r.getParam("block_id")
 	var scriptBody generated.ScriptsBody
-	err := jsonDecode(r.Body, &scriptBody)
+	err := r.bodyAs(&scriptBody)
 	if err != nil {
 		return nil, NewBadRequestError("invalid script execution request", err)
 	}
