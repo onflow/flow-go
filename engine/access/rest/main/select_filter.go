@@ -110,7 +110,40 @@ func SelectFields(obj interface{}, fields ...string) interface{} {
 	}
 }
 
+func jsonPath(prefix string, key string) string {
+	if prefix == "" {
+		return key
+	}
+	return fmt.Sprintf("%s.%s", prefix, key)
+}
+
+func filter(json interface{}, prefix string, filterMap map[string]bool)  {
+	switch t := json.(type) {
+	case []interface{}:
+		for _, item := range t {
+			filter(item, prefix, filterMap)
+		}
+	case map[string]interface{}:
+		for k,v := range t{
+			key := jsonPath(prefix, k)
+			switch value := v.(type) {
+			case []interface{}:
+				filter(value, key, filterMap)
+			case map[string]interface{}:
+				filter(value, key, filterMap)
+			default:
+				if filterMap[key] {
+					delete(t, k)
+					return
+				}
+			}
+		}
+	}
+}
+
 func main() {
+
+
 	//result := SearchResult{
 	//	Date:     "to be honest you should probably use a time.Time field here, just sayin",
 	//	Industry: "rocketships",
@@ -126,15 +159,30 @@ func main() {
 		panic(err.Error())
 	}
 
+	//fmt.Println(string(marshalled))
+
 	var outputMap = new(map[string]interface{})
 	err = json.Unmarshal(marshalled, outputMap)
 	if err != nil {
 		panic(err.Error())
 	}
-	for k, v := range *outputMap {
-		fmt.Println(k)
-		fmt.Println(reflect.TypeOf(v))
+
+	filterMap := map[string]bool{}
+	filterMap["header.id"] = true
+	filterMap["payload.collection_guarantees.signature"] = true
+	filterMap["payload.collection_guarantees.signer_ids"] = true
+
+	filter(*outputMap, "", filterMap)
+
+	marshalled, err = json.MarshalIndent(outputMap, "", "\t")
+	if err != nil {
+		panic(err.Error())
 	}
+	fmt.Println(string(marshalled))
+	//for k, v := range *outputMap {
+	//	fmt.Println(k)
+	//	fmt.Println(reflect.TypeOf(v))
+	//}
 
 
 	//
