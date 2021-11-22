@@ -2,8 +2,6 @@ package eventloop
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -12,6 +10,8 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 )
 
@@ -23,6 +23,7 @@ type EventLoopV2 struct {
 	metrics            module.HotstuffMetrics
 	proposals          chan *model.Proposal
 	quorumCertificates chan *flow.QuorumCertificate
+	startTime          time.Time
 }
 
 var _ hotstuff.EventLoopV2 = &EventLoopV2{}
@@ -30,7 +31,7 @@ var _ module.ReadyDoneAware = &EventLoopV2{}
 var _ module.Startable = &EventLoopV2{}
 
 // NewEventLoopV2 creates an instance of EventLoopV2.
-func NewEventLoopV2(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandlerV2) (*EventLoopV2, error) {
+func NewEventLoopV2(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandlerV2, startTime time.Time) (*EventLoopV2, error) {
 	proposals := make(chan *model.Proposal)
 	quorumCertificates := make(chan *flow.QuorumCertificate)
 
@@ -40,12 +41,21 @@ func NewEventLoopV2(log zerolog.Logger, metrics module.HotstuffMetrics, eventHan
 		metrics:            metrics,
 		proposals:          proposals,
 		quorumCertificates: quorumCertificates,
+		startTime:          startTime,
 	}
 
 	componentBuilder := component.NewComponentManagerBuilder()
 	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		ready()
-		el.loop(ctx)
+
+		// launch when scheduled by el.startTime
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(time.Until(startTime)):
+			el.loop(ctx)
+		}
+
 	})
 	el.ComponentManager = componentBuilder.Build()
 

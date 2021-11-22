@@ -2,7 +2,6 @@ package eventloop
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"io/ioutil"
 	"sync"
 	"testing"
@@ -16,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -43,7 +43,7 @@ func (s *EventLoopV2TestSuite) SetupTest() {
 
 	log := zerolog.New(ioutil.Discard)
 
-	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), s.eh)
+	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), s.eh, time.Time{})
 	require.NoError(s.T(), err)
 	s.eventLoop = eventLoop
 
@@ -112,7 +112,7 @@ func TestEventLoopV2_Timeout(t *testing.T) {
 
 	log := zerolog.New(ioutil.Discard)
 
-	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), eh)
+	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), eh, time.Time{})
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -146,6 +146,43 @@ func TestEventLoopV2_Timeout(t *testing.T) {
 	require.Eventually(t, processed.Load, time.Millisecond*200, time.Millisecond*10)
 	wg.Wait()
 
+	cancel()
+	<-eventLoop.Done()
+}
+
+// TestReadyDoneWithStartTime tests that event loop correctly starts and schedules start of processing
+// when startTime argument is used
+func TestReadyDoneWithStartTime(t *testing.T) {
+	eh := &mocks.EventHandlerV2{}
+	eh.On("Start").Return(nil)
+	eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C)
+	eh.On("OnLocalTimeout").Return(nil)
+
+	metrics := metrics.NewNoopCollector()
+
+	log := zerolog.New(ioutil.Discard)
+
+	startTime := time.Now().Add(2 * time.Second)
+	eventLoop, err := NewEventLoopV2(log, metrics, eh, startTime)
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	eh.On("OnReceiveProposal", mock.AnythingOfType("*model.Proposal")).Run(func(args mock.Arguments) {
+		require.True(t, time.Now().After(startTime))
+		close(done)
+	}).Return(nil).Once()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	eventLoop.Start(signalerCtx)
+
+	<-eventLoop.Ready()
+
+	parentBlock := unittest.BlockHeaderFixture()
+	block := unittest.BlockHeaderWithParentFixture(&parentBlock)
+	eventLoop.SubmitProposal(&block, parentBlock.View)
+
+	<-done
 	cancel()
 	<-eventLoop.Done()
 }
