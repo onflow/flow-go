@@ -32,7 +32,7 @@ func executeScript(r *requestDecorator, backend access.API, link LinkGenerator) 
 
 		return result, nil
 	}
-
+	// todo(sideninja) implement block height support
 	id, err := toID(blockID)
 	if err != nil {
 		return nil, NewBadRequestError(err.Error(), err)
