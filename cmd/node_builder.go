@@ -129,7 +129,7 @@ type BaseConfig struct {
 	guaranteesCacheSize             uint
 	receiptsCacheSize               uint
 	db                              *badger.DB
-	PreferredUnicastProtocols       *[]string
+	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize int
 }
 
