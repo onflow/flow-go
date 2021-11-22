@@ -229,7 +229,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
 		mwOpts = append(mwOpts,
 			p2p.WithPeerManager(peerManagerFactory),
-			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(*fnb.PreferredUnicastProtocols)))
+			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)))
 
 		fnb.Middleware = p2p.NewMiddleware(
 			fnb.Logger,
