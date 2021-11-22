@@ -1,7 +1,11 @@
 package voteaggregator
 
 import (
+	"context"
 	"fmt"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 
 	"github.com/rs/zerolog"
 
@@ -10,7 +14,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
-	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/mempool"
 )
 
@@ -24,8 +27,7 @@ const defaultVoteQueueCapacity = 1000
 // VoteAggregator is designed in a way that it can aggregate votes for collection & consensus clusters
 // that is why implementation relies on dependency injection.
 type VoteAggregatorV2 struct {
-	unit                *engine.Unit
-	lm                  *lifecycle.LifecycleManager
+	*component.ComponentManager
 	log                 zerolog.Logger
 	notifier            hotstuff.Consumer
 	highestPrunedView   counters.StrictMonotonousCounter
@@ -35,6 +37,8 @@ type VoteAggregatorV2 struct {
 }
 
 var _ hotstuff.VoteAggregatorV2 = &VoteAggregatorV2{}
+var _ module.ReadyDoneAware = &VoteAggregatorV2{}
+var _ module.Startable = &VoteAggregatorV2{}
 
 // NewVoteAggregatorV2 creates an instance of vote aggregator
 // Note: verifyingProcessorFactory is injected. Thereby, the code is agnostic to the
@@ -53,8 +57,6 @@ func NewVoteAggregatorV2(
 	}
 
 	aggregator := &VoteAggregatorV2{
-		unit:                engine.NewUnit(),
-		lm:                  lifecycle.NewLifecycleManager(),
 		log:                 log,
 		notifier:            notifier,
 		highestPrunedView:   counters.NewMonotonousCounter(highestPrunedView),
@@ -63,48 +65,43 @@ func NewVoteAggregatorV2(
 		queuedVotesNotifier: engine.NewNotifier(),
 	}
 
+	componentBuilder := component.NewComponentManagerBuilder()
+
+	// launch as many workers as we need
+	for i := 0; i < defaultVoteAggregatorWorkers; i++ {
+		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			err := aggregator.queuedVotesProcessingLoop(ctx)
+			if err != nil {
+				ctx.Throw(err)
+			}
+		})
+	}
+
+	aggregator.ComponentManager = componentBuilder.Build()
+
 	return aggregator, nil
 }
 
-// Ready returns a ready channel that is closed once the engine has fully
-// started. For the propagation engine, we consider the engine up and running
-// upon initialization.
-func (va *VoteAggregatorV2) Ready() <-chan struct{} {
-	va.lm.OnStart(func() {
-		// launch as many workers as we need
-		for i := 0; i < defaultVoteAggregatorWorkers; i++ {
-			va.unit.Launch(va.queuedVotesProcessingLoop)
-		}
-	})
-	return va.lm.Started()
-}
-
-func (va *VoteAggregatorV2) Done() <-chan struct{} {
-	va.lm.OnStop(func() {
-		<-va.unit.Done()
-	})
-	return va.lm.Stopped()
-}
-
-func (va *VoteAggregatorV2) queuedVotesProcessingLoop() {
+func (va *VoteAggregatorV2) queuedVotesProcessingLoop(ctx context.Context) error {
 	notifier := va.queuedVotesNotifier.Channel()
 	for {
 		select {
-		case <-va.unit.Quit():
-			return
+		case <-ctx.Done():
+			return nil
 		case <-notifier:
-			err := va.processQueuedVoteEvents()
+			err := va.processQueuedVoteEvents(ctx)
 			if err != nil {
-				va.log.Fatal().Err(err).Msg("internal error processing queued vote events")
+				return fmt.Errorf("internal error processing queued vote events: %w", err)
 			}
 		}
 	}
 }
 
-func (va *VoteAggregatorV2) processQueuedVoteEvents() error {
+func (va *VoteAggregatorV2) processQueuedVoteEvents(ctx context.Context) error {
 	for {
 		select {
-		case <-va.unit.Quit():
+		case <-ctx.Done():
 			return nil
 		default:
 		}

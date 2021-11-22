@@ -1,7 +1,9 @@
 package voteaggregator
 
 import (
+	"context"
 	"errors"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"testing"
 	"time"
 
@@ -39,6 +41,8 @@ type VoteAggregatorV2TestSuite struct {
 	signer     *mocks.SignerVerifier
 	notifier   *mocks.Consumer
 	collectors *mocks.VoteCollectors
+	cancel     context.CancelFunc
+
 	aggregator *VoteAggregatorV2
 }
 
@@ -67,11 +71,17 @@ func (s *VoteAggregatorV2TestSuite) SetupTest() {
 	s.aggregator, err = NewVoteAggregatorV2(unittest.Logger(), s.notifier, 0, s.collectors)
 	require.NoError(s.T(), err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
 	// startup aggregator
+	s.aggregator.Start(signalerCtx)
 	<-s.aggregator.Ready()
 }
 
 func (s *VoteAggregatorV2TestSuite) TearDownTest() {
+	s.cancel()
 	<-s.aggregator.Done()
 }
 
