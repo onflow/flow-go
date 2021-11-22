@@ -94,7 +94,7 @@ func routeDefinitions() []routeDefinition {
 			method:         "GET",
 			pattern:        "/blocks",
 			name:           getBlocksByHeightRoute,
-			apiHandlerFunc: NotImplemented,
+			apiHandlerFunc: getBlocksByHeights,
 		},
 		// Collections
 		{
