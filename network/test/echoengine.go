@@ -10,7 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/module/component"
+	mockcomponent "github.com/onflow/flow-go/module/component/mock"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -29,7 +29,7 @@ type EchoEngine struct {
 	seen     map[string]int         // used to track the seen events
 	echo     bool                   // used to enable or disable echoing back the recvd message
 	send     ConduitSendWrapperFunc // used to provide play and plug wrapper around its conduit
-	component.NoopComponent
+	mockcomponent.Component
 }
 
 func NewEchoEngine(t *testing.T, net network.Network, cap int, channel network.Channel, echo bool, send ConduitSendWrapperFunc) *EchoEngine {

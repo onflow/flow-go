@@ -1,6 +1,7 @@
 package signature
 
 import (
+	"bytes"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
@@ -15,7 +16,7 @@ import (
 // The encoding method is RLP.
 type ConsensusSigDataPacker struct {
 	committees hotstuff.Committee
-	encoder    *rlp.Encoder // rlp encoder is used in order to ensure deterministic encoding
+	codec      *rlp.Codec // rlp encoder is used in order to ensure deterministic encoding
 }
 
 var _ hotstuff.Packer = &ConsensusSigDataPacker{}
@@ -23,7 +24,7 @@ var _ hotstuff.Packer = &ConsensusSigDataPacker{}
 func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataPacker {
 	return &ConsensusSigDataPacker{
 		committees: committees,
-		encoder:    rlp.NewEncoder(),
+		codec:      &rlp.Codec{},
 	}
 }
 
@@ -93,7 +94,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	}
 
 	// encode the structured data into raw bytes
-	encoded, err := p.encoder.Encode(data)
+	encoded, err := p.encode(&data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not encode data %v, %w", data, err)
 	}
@@ -109,8 +110,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 //  - (nil, signature.ErrInvalidFormat) if failed to unpack the signature data
 func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
-	var data signatureData
-	err := p.encoder.Decode(sigData, &data)
+	data, err := p.decode(sigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode sig data %s: %w", err, signature.ErrInvalidFormat)
 	}
@@ -160,6 +160,21 @@ func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flo
 		AggregatedRandomBeaconSig:    data.AggregatedRandomBeaconSig,
 		ReconstructedRandomBeaconSig: data.ReconstructedRandomBeaconSig,
 	}, nil
+}
+
+func (p *ConsensusSigDataPacker) encode(sigData *signatureData) ([]byte, error) {
+	var buf bytes.Buffer
+	encoder := p.codec.NewEncoder(&buf)
+	err := encoder.Encode(sigData)
+	return buf.Bytes(), err
+}
+
+func (p *ConsensusSigDataPacker) decode(data []byte) (*signatureData, error) {
+	bs := bytes.NewReader(data)
+	decoder := p.codec.NewDecoder(bs)
+	var sigData signatureData
+	err := decoder.Decode(&sigData)
+	return &sigData, err
 }
 
 // the total number of bytes required to fit the `count` number of bits

@@ -165,7 +165,7 @@ func readPointG2(a *pointG2, src []byte) error {
 	case invalid:
 		return invalidInputsErrorf("input is not a G2 point")
 	default:
-		return errors.New("reading a G2 point has failed")
+		return errors.New("reading a G2 point failed")
 	}
 }
 
@@ -181,7 +181,7 @@ func readPointG1(a *pointG1, src []byte) error {
 	case invalid:
 		return invalidInputsErrorf("input is not a G1 point")
 	default:
-		return errors.New("reading a G1 point has failed")
+		return errors.New("reading a G1 point failed")
 	}
 }
 

@@ -199,13 +199,12 @@ func TestInvalidSigType(t *testing.T) {
 	signerIDs, sig, err := packer.Pack(blockID, blockSigData)
 	require.NoError(t, err)
 
-	var data signatureData
-	err = packer.encoder.Decode(sig, &data)
+	data, err := packer.decode(sig)
 	require.NoError(t, err)
 
 	data.SigType = []byte{1}
 
-	encoded, err := packer.encoder.Encode(data)
+	encoded, err := packer.encode(data)
 	require.NoError(t, err)
 
 	_, err = packer.Unpack(blockID, signerIDs, encoded)
