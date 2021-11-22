@@ -1,9 +1,11 @@
 package rest
 
 import (
-	"github.com/onflow/flow-go/access"
-	"github.com/rs/zerolog"
 	"net/http"
+
+	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/access"
 )
 
 func getAccount(

@@ -3,13 +3,18 @@ package rest
 import (
 	"github.com/gorilla/mux"
 
+	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"github.com/onflow/flow-go/model/flow"
 )
+
+type LinkFun func(id flow.Identifier) (string, error)
 
 type LinkGenerator interface {
 	BlockLink(id flow.Identifier) (string, error)
 	TransactionLink(id flow.Identifier) (string, error)
 	TransactionResultLink(id flow.Identifier) (string, error)
+	PayloadLink(id flow.Identifier) (string, error)
+	ExecutionResultLink(id flow.Identifier) (string, error)
 }
 
 type LinkGeneratorImpl struct {
@@ -22,11 +27,23 @@ func NewLinkGeneratorImpl(router *mux.Router) *LinkGeneratorImpl {
 	}
 }
 
+func (generator *LinkGeneratorImpl) BlockLink(id flow.Identifier) (string, error) {
+	return generator.link(getBlocksByIDRoute, id)
+}
+func (generator *LinkGeneratorImpl) PayloadLink(id flow.Identifier) (string, error) {
+	return generator.link(getBlocksByIDRoute, id)
+}
+func (generator *LinkGeneratorImpl) ExecutionResultLink(id flow.Identifier) (string, error) {
+	return generator.link(getExecutionResultByIDRoute, id)
+}
+
+
 func linkFromRoute(route *mux.Route, id flow.Identifier) (string, error) {
 	url, err := route.URLPath("id", id.String())
 	if err != nil {
 		return "", err
 	}
+	// TODO: remove the leading '/v1' from the generated link
 	return url.String(), nil
 }
 
@@ -40,4 +57,14 @@ func (generator *LinkGeneratorImpl) TransactionLink(id flow.Identifier) (string,
 
 func (generator *LinkGeneratorImpl) TransactionResultLink(id flow.Identifier) (string, error) {
 	return linkFromRoute(generator.router.Get(getTransactionResultByIDRoute), id)
+}
+
+func selfLink(id flow.Identifier, linkFun LinkFun) (*generated.Links, error) {
+	url, err := linkFun(id)
+	if err != nil {
+		return nil, err
+	}
+	return &generated.Links{
+		Self: url,
+	}, nil
 }

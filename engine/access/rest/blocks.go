@@ -3,9 +3,9 @@ package rest
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"net/http"
 
+	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -131,6 +131,9 @@ func getBlockByID(
 ) (*generated.Block, StatusError) {
 
 	var responseBlock = new(generated.Block)
+	responseBlock.Expandable = new(generated.BlockExpandable)
+
+	// if payload is to be expanded then lookup full block which contains both header and payload
 	if req.expands(ExpandableFieldPayload) {
 		flowBlock, err := backend.GetBlockByID(ctx, id)
 		if err != nil {
@@ -161,6 +164,5 @@ func blockLookupError(id string, err error) StatusError {
 	if status.Code(err) == codes.NotFound {
 		return NewNotFoundError(msg, err)
 	}
-
 	return NewRestError(http.StatusInternalServerError, msg, err)
 }

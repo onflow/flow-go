@@ -2,12 +2,13 @@ package rest
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/access"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -15,28 +16,37 @@ import (
 // Converter provides functionality to convert from request models generated using
 // open api spec and flow models.
 
+// Flow section - converting request data to flow models with validation.
+
+const maxAllowedScriptArgumentsCnt = 100
+const maxSignatureLength = 64
+const maxAuthorizersCnt = 100
 const MaxAllowedIDs = 50 // todo(sideninja) discuss if we should restrict maximum on all IDs collection or is anywhere required more thant this
 const MaxAllowedHeights = 50
 
 var MaxAllowedBlockIDs = MaxAllowedIDs
 
-// Flow section - converting request data to flow models with validation.
-
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
 	if !valid {
-		return flow.Identifier{}, fmt.Errorf("invalid ID")
+		return flow.Identifier{}, errors.New("invalid ID")
 	}
 
-	return flow.HexStringToIdentifier(id)
+	flowID, err := flow.HexStringToIdentifier(id)
+	if err != nil {
+		return flow.Identifier{}, fmt.Errorf("invalid ID: %w", err)
+	}
+	return flowID, nil
 }
 
 func toIDs(ids string) ([]flow.Identifier, error) {
-	// gorilla mux retains opening and ending square brackets for ids
+	// currently, the swagger generated Go REST client is incorrectly doing a `fmt.Sprintf("%v", id)` for the id slice
+	// resulting in the client sending the ids in the format [id1 id2 id3...]. This is a temporary workaround to
+	// accommodate the client for now. Issue to to fix the client: https://github.com/onflow/flow/issues/698
 	ids = strings.TrimSuffix(ids, "]")
 	ids = strings.TrimPrefix(ids, "[")
 
-	reqIDs := strings.Fields(ids)
+	reqIDs := strings.Split(ids, ",")
 
 	if len(reqIDs) > MaxAllowedBlockIDs {
 		return nil, fmt.Errorf("at most %d Block IDs can be requested at a time", MaxAllowedBlockIDs)
@@ -83,7 +93,7 @@ func toHeights(height string) ([]uint64, error) {
 func toAddress(address string) (flow.Address, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{16}$`, address)
 	if !valid {
-		return flow.Address{}, fmt.Errorf("invalid address")
+		return flow.Address{}, errors.New("invalid address")
 	}
 
 	return flow.HexToAddress(address), nil
@@ -102,24 +112,37 @@ func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
 	}, nil
 }
 
-func toSignature(signature *generated.TransactionSignature) (flow.TransactionSignature, error) {
-	address, err := toAddress(signature.Address)
+func toSignature(signature string) ([]byte, error) {
+	signatureBytes := []byte(signature)
+	if len(signatureBytes) > maxSignatureLength {
+		return nil, errors.New("signature length invalid")
+	}
+	return signatureBytes, nil
+}
+
+func toTransactionSignature(transactionSignature *generated.TransactionSignature) (flow.TransactionSignature, error) {
+	address, err := toAddress(transactionSignature.Address)
+	if err != nil {
+		return flow.TransactionSignature{}, err
+	}
+
+	signature, err := toSignature(transactionSignature.Signature)
 	if err != nil {
 		return flow.TransactionSignature{}, err
 	}
 
 	return flow.TransactionSignature{
 		Address:     address,
-		SignerIndex: int(signature.SignerIndex),
-		KeyIndex:    uint64(signature.KeyIndex),
-		Signature:   []byte(signature.Signature),
+		SignerIndex: int(transactionSignature.SignerIndex),
+		KeyIndex:    uint64(transactionSignature.KeyIndex),
+		Signature:   signature,
 	}, nil
 }
 
-func toSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSignature, error) {
+func toTransactionSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSignature, error) {
 	signatures := make([]flow.TransactionSignature, len(sigs))
 	for _, sig := range sigs {
-		signature, err := toSignature(&sig)
+		signature, err := toTransactionSignature(&sig)
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +154,13 @@ func toSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSign
 }
 
 func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error) {
-	args := make([][]byte, len(tx.Arguments))
+
+	argLen := len(tx.Arguments)
+	if argLen > maxAllowedScriptArgumentsCnt {
+		return flow.TransactionBody{}, fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArgumentsCnt)
+	}
+
+	args := make([][]byte, argLen)
 	for _, arg := range tx.Arguments {
 		// todo validate
 		args = append(args, []byte(arg))
@@ -147,7 +176,11 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		return flow.TransactionBody{}, err
 	}
 
-	auths := make([]flow.Address, len(tx.Authorizers))
+	authorizerCnt := len(tx.Authorizers)
+	if authorizerCnt > maxAuthorizersCnt {
+		return flow.TransactionBody{}, fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizersCnt)
+	}
+	auths := make([]flow.Address, authorizerCnt)
 	for _, auth := range tx.Authorizers {
 		a, err := toAddress(auth)
 		if err != nil {
@@ -157,12 +190,12 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		auths = append(auths, a)
 	}
 
-	payloadSigs, err := toSignatures(tx.PayloadSignatures)
+	payloadSigs, err := toTransactionSignatures(tx.PayloadSignatures)
 	if err != nil {
 		return flow.TransactionBody{}, err
 	}
 
-	envelopeSigs, err := toSignatures(tx.EnvelopeSignatures)
+	envelopeSigs, err := toTransactionSignatures(tx.EnvelopeSignatures)
 	if err != nil {
 		return flow.TransactionBody{}, err
 	}
@@ -336,13 +369,6 @@ func blockHeaderResponse(flowHeader *flow.Header) *generated.BlockHeader {
 	}
 }
 
-func blockHeaderOnlyResponse(flowHeader *flow.Header) *generated.Block {
-	return &generated.Block{
-		Header:  blockHeaderResponse(flowHeader),
-		Payload: nil,
-	}
-}
-
 func blockPayloadResponse(flowPayload *flow.Payload) *generated.BlockPayload {
 	return &generated.BlockPayload{
 		CollectionGuarantees: collectionGuaranteesResponse(flowPayload.Guarantees),
@@ -407,8 +433,8 @@ func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event
 	return events
 }
 
-func executionResultResponse(exeResult flow.ExecutionResult) generated.ExecutionResult {
-	return generated.ExecutionResult{
+func executionResultResponse(exeResult *flow.ExecutionResult) *generated.ExecutionResult {
+	return &generated.ExecutionResult{
 		Id:      exeResult.ID().String(),
 		BlockId: exeResult.BlockID.String(),
 		Events:  serviceEventListResponse(exeResult.ServiceEvents),

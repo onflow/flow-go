@@ -42,6 +42,8 @@ func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandle
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
 	decoratedRequest := newRequestDecorator(r)
@@ -77,14 +79,15 @@ func (h *Handler) addToRouter(router *mux.Router) {
 
 func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logger zerolog.Logger) {
 	// serialise response to JSON and handler errors
-	encodedResponse, err := json.Marshal(response)
-	if err != nil {
+	encodedResponse, encErr := json.Marshal(response)
+	if encErr != nil {
 		h.logger.Error().Err(err).Msg("failed to encode response")
 		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	// write response to response stream
+
 	_, writeErr := w.Write(encodedResponse)
 	if writeErr != nil {
 		h.logger.Error().Err(err).Msg("failed to write response")

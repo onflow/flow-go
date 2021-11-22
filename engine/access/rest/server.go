@@ -20,6 +20,8 @@ const (
 	getBlocksByHeightRoute        = "getBlocksByHeight"
 	getCollectionByIDRoute        = "getCollectionByID"
 	executeScriptRoute            = "executeScript"
+	getBlockPayloadByIDRoute    = "getBlockPayloadByID"
+	getExecutionResultByIDRoute = "getExecutionResultByID"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -40,12 +42,10 @@ func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
-	lm := middleware.NewLoggingMiddleware(logger)
 	// common middleware for all request
-	v1SubRouter.Use(lm.RequestStart())
+	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
-	v1SubRouter.Use(lm.RequestEnd())
 
 	var linkGenerator LinkGenerator = NewLinkGeneratorImpl(v1SubRouter)
 
@@ -95,6 +95,20 @@ func routeDefinitions() []routeDefinition {
 			pattern:        "/blocks",
 			name:           getBlocksByHeightRoute,
 			apiHandlerFunc: getBlocksByHeights,
+		},
+		// Block Payload
+		{
+			method:         "GET",
+			pattern:        "/blocks/{id}/payload",
+			name:           getBlockPayloadByIDRoute,
+			apiHandlerFunc: getBlockPayloadByID,
+		},
+		// Execution Result
+		{
+			method:         "GET",
+			pattern:        "/execution_results/{id}",
+			name:           getExecutionResultByIDRoute,
+			apiHandlerFunc: getExecutionResultByID,
 		},
 		// Collections
 		{
