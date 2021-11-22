@@ -25,6 +25,10 @@ type ApiHandlerFunc func(
 // Handler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
 type Handler struct {
+  route       *mux.Route
+	method      string
+	pattern     string
+	name        string
 	logger         zerolog.Logger
 	backend        access.API
 	linkGenerator  LinkGenerator
@@ -40,8 +44,6 @@ func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandle
 	}
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
@@ -70,6 +72,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// write response to response stream
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 	_, writeErr := w.Write(encodedResponse)
 	if writeErr != nil {
 		h.logger.Error().Err(err).Msg("failed to write response")
@@ -78,6 +81,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusOK)
+}
+
+// addToRouter adds handler to provided router
+func (h *Handler) addToRouter(router *mux.Router) {
+	router.
+		Methods(h.method).
+		Path(h.pattern).
+		Name(h.name).
+		Handler(h)
+
+	h.route = router.Get(h.name)
 }
 
 // errorResponse sends an HTTP error response to the client with the given return code
