@@ -332,8 +332,8 @@ func (e *Engine) serveREST() {
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
-	restAPIHandler := rest.NewRestAPIHandler(e.backend, e.log)
-	e.restServer = rest.NewRestAPIServer(restAPIHandler, e.config.RESTListenAddr, e.log)
+	restAPIHandler := rest.NewHandlers(e.backend, e.log)
+	e.restServer = rest.NewServer(restAPIHandler, e.config.RESTListenAddr, e.log)
 
 	l, err := net.Listen("tcp", e.config.RESTListenAddr)
 	if err != nil {
