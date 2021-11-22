@@ -13,11 +13,12 @@ import (
 
 // all route names
 const (
-	getTransactionByIDRoute = "getTransactionByID"
-	createTransactionRoute  = "createTransaction"
-	getBlocksByIDRoute      = "getBlocksByID"
-	getBlocksByHeightRoute  = "getBlocksByHeightRoute"
-	getCollectionByIDRoute  = "getCollectionByIDRoute"
+	getTransactionByIDRoute       = "getTransactionByID"
+	getTransactionResultByIDRoute = "getTransactionResultByID"
+	createTransactionRoute        = "createTransaction"
+	getBlocksByIDRoute            = "getBlocksByID"
+	getBlocksByHeightRoute        = "getBlocksByHeight"
+	getCollectionByIDRoute        = "getCollectionByID"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -74,6 +75,13 @@ func routeDefinitions() []routeDefinition {
 			pattern:        "/transactions",
 			name:           createTransactionRoute,
 			apiHandlerFunc: createTransaction,
+		},
+		// Transaction Results
+		{
+			method:         "GET",
+			pattern:        "/transaction_results/{id}",
+			name:           getTransactionResultByIDRoute,
+			apiHandlerFunc: getTransactionResultByID,
 		},
 		// Blocks
 		{
