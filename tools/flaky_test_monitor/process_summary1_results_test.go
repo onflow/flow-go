@@ -53,8 +53,8 @@ func TestProcessTestRun(t *testing.T) {
 // HELPERS - UTILITIES
 
 func runProcessTestRun(t *testing.T, jsonExpectedActualFile string) {
-	const expectedJsonFilePath = "./testdata/expected/"
-	const rawJsonFilePath = "./testdata/raw/"
+	const expectedJsonFilePath = "./testdata/summary1/expected/"
+	const rawJsonFilePath = "./testdata/summary1/raw/"
 
 	var expectedTestRun TestRun
 	// read in expected JSON from file
@@ -124,14 +124,13 @@ func checkTestRuns(t *testing.T, expectedTestRun TestRun, actualTestRun TestRun)
 			require.Equal(t, expectedPackageResults.Output[packageOutputIndex], actualPackageResults.Output[packageOutputIndex])
 		}
 
-		// check all regular and nil tests results of each package
+		// check tests results of each package
 		checkTestResults(t, expectedPackageResults.Tests, actualPackageResults.Tests)
 	}
 	// finally, compare the entire actual test run against what's expected - if there were any discrepancies they should have been caught by now
 	require.Equal(t, expectedTestRun, actualTestRun)
 }
 
-// checks regular and nil test results
 func checkTestResults(t *testing.T, expectedTestResults []TestResult, actualTestResults []TestResult) {
 	require.Equal(t, len(expectedTestResults), len(actualTestResults))
 	for testResultIndex := range expectedTestResults {
