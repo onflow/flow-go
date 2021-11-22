@@ -88,7 +88,8 @@ const (
 	codeIndexResultApprovalByChunk   = 204
 
 	// internal failure information that should be preserved across restarts
-	codeExecutionFork = 254
+	codeExecutionFork                   = 254
+	codeEpochEmergencyFallbackTriggered = 255
 )
 
 func makePrefix(code byte, keys ...interface{}) []byte {
