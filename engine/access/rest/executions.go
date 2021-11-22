@@ -1,22 +1,12 @@
 package rest
 
 import (
-	"net/http"
-
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
-func getExecutionResultByBlockIDs(
-	w http.ResponseWriter,
-	r *http.Request,
-	vars map[string]string,
-	backend access.API,
-	logger zerolog.Logger,
-) (interface{}, StatusError) {
-	blockIds, err := toIDs(vars["block_id"])
+func getExecutionResultByBlockIDs(r *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, StatusError) {
+	blockIds, err := toIDs(r.getParam("block_id"))
 	if err != nil {
 		return nil, NewBadRequestError("invalid IDs", err)
 	}

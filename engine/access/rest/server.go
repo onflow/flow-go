@@ -20,8 +20,8 @@ const (
 	getBlocksByHeightRoute        = "getBlocksByHeight"
 	getCollectionByIDRoute        = "getCollectionByID"
 	executeScriptRoute            = "executeScript"
-	getBlockPayloadByIDRoute    = "getBlockPayloadByID"
-	getExecutionResultByIDRoute = "getExecutionResultByID"
+	getBlockPayloadByIDRoute      = "getBlockPayloadByID"
+	getExecutionResultByIDRoute   = "getExecutionResultByID"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -108,7 +108,7 @@ func routeDefinitions() []routeDefinition {
 			method:         "GET",
 			pattern:        "/execution_results/{id}",
 			name:           getExecutionResultByIDRoute,
-			apiHandlerFunc: getExecutionResultByID,
+			apiHandlerFunc: getExecutionResultByBlockIDs,
 		},
 		// Collections
 		{

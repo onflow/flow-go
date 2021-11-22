@@ -3,9 +3,9 @@ package rest
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 	"net/http"
 
-	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -16,7 +16,7 @@ import (
 const ExpandableFieldPayload = "payload"
 const ExpandableExecutionResult = "execution_result"
 
-// getBlocksByIDs gets blocks by provided ID or collection of IDs.
+// getBlocksByID gets blocks by provided ID or collection of IDs.
 func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
 
 	ids, err := r.ids()
@@ -26,7 +26,7 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 
 	blocks := make([]*generated.Block, len(ids))
 	for i, id := range ids {
-		block, err := getBlockByID(r.Context(), id, r, backend, link)
+		block, err := getBlockByID(id, r, backend, link)
 		if err != nil {
 			return nil, err
 		}
@@ -36,6 +36,66 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 	return blocks, nil
 }
 
+func getBlockByID(id flow.Identifier, req *requestDecorator, backend access.API, link LinkGenerator) (*generated.Block, StatusError) {
+	var responseBlock = new(generated.Block)
+	responseBlock.Expandable = new(generated.BlockExpandable)
+
+	// if payload is to be expanded then lookup full block which contains both header and payload
+	if req.expands(ExpandableFieldPayload) {
+		header, payload, statusError := blockLookup(req.Context(), id, backend)
+		if statusError != nil {
+			return nil, statusError
+		}
+		responseBlock.Header = header
+		responseBlock.Payload = payload
+	} else {
+
+		// else only lookup header and add expandable link for payload
+		header, statusError := headerLookup(req.Context(), id, backend)
+		if statusError != nil {
+			return nil, statusError
+		}
+		responseBlock.Header = header
+		responseBlock.Payload = nil
+
+		var err error
+		responseBlock.Expandable.Payload, err = link.PayloadLink(id)
+		if err != nil {
+			msg := fmt.Sprintf("failed to generate response for block ID %s", id.String())
+			return nil, NewRestError(http.StatusInternalServerError, msg, err)
+		}
+	}
+
+	// if execution result is to be expanded, then lookup execution result else add expandable link for execution result
+	if req.expands(ExpandableExecutionResult) {
+		executionResult, err := executionResultLookup(req.Context(), id, backend, link)
+		if err != nil {
+			msg := fmt.Sprintf("failed to generate response for block ID %s", id.String())
+			return nil, NewRestError(http.StatusInternalServerError, msg, err)
+		}
+		responseBlock.ExecutionResult = executionResult
+	} else {
+		var err error
+		responseBlock.Expandable.ExecutionResult, err = link.ExecutionResultLink(id)
+		if err != nil {
+			msg := fmt.Sprintf("failed to generate response for block ID %s", id.String())
+			return nil, NewRestError(http.StatusInternalServerError, msg, err)
+		}
+	}
+
+	// add self link
+	selfLink, err := selfLink(id, link.BlockLink)
+	if err != nil {
+		msg := fmt.Sprintf("failed to generate response for block ID %s", id.String())
+		return nil, NewRestError(http.StatusInternalServerError, msg, err)
+	}
+	responseBlock.Links = selfLink
+
+	// ship it
+	return responseBlock, nil
+}
+
+// todo(sideninja) use functions from block lookup to support expanding etc
 func getBlocksByHeights(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
 	height := r.getParam("height")
 	startHeight := r.getParam("start_height")
@@ -105,7 +165,7 @@ func getBlockByHeight(
 	if req.expands(ExpandableFieldPayload) {
 		flowBlock, err := backend.GetBlockByHeight(ctx, height)
 		if err != nil {
-			return nil, blockLookupError(string(height), err)
+			return nil, blockHeightLookupError(height, err)
 		}
 		responseBlock = blockResponse(flowBlock, link)
 
@@ -114,7 +174,7 @@ func getBlockByHeight(
 
 	flowBlockHeader, err := backend.GetBlockHeaderByHeight(ctx, height)
 	if err != nil {
-		return nil, blockLookupError(string(height), err)
+		return nil, blockHeightLookupError(height, err)
 	}
 	responseBlock.Header = blockHeaderResponse(flowBlockHeader)
 	responseBlock.Links = blockLink(flowBlockHeader.ID(), link)
@@ -122,44 +182,81 @@ func getBlockByHeight(
 	return responseBlock, nil
 }
 
-func getBlockByID(
-	ctx context.Context,
-	id flow.Identifier,
-	req *requestDecorator,
-	backend access.API,
-	link LinkGenerator,
-) (*generated.Block, StatusError) {
+// getExecutionResultByID gets Execution Result payload by ID
+func getExecutionResultByID(req *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
 
-	var responseBlock = new(generated.Block)
-	responseBlock.Expandable = new(generated.BlockExpandable)
-
-	// if payload is to be expanded then lookup full block which contains both header and payload
-	if req.expands(ExpandableFieldPayload) {
-		flowBlock, err := backend.GetBlockByID(ctx, id)
-		if err != nil {
-			return nil, blockLookupError(id.String(), err)
-		}
-		responseBlock = blockResponse(flowBlock, link)
-
-		return responseBlock, nil
-	}
-
-	flowBlockHeader, err := backend.GetBlockHeaderByID(ctx, id)
+	id, err := req.id()
 	if err != nil {
-		return nil, blockLookupError(id.String(), err)
+		return nil, NewBadRequestError(err.Error(), err)
 	}
-	responseBlock.Header = blockHeaderResponse(flowBlockHeader)
-	responseBlock.Links = blockLink(id, link)
 
-	return responseBlock, nil
-
-	//if req.expands(ExpandableExecutionResult) {
-	//	// lookup ER here and add to response
-	//}
+	executionResult, err := executionResultLookup(req.Context(), id, backend, link)
+	if err != nil {
+		msg := fmt.Sprintf("failed to generate response for execution result ID %s", id.String())
+		return nil, NewRestError(http.StatusInternalServerError, msg, err)
+	}
+	return executionResult, nil
 }
 
-func blockLookupError(id string, err error) StatusError {
-	msg := fmt.Sprintf("block %s not found")
+// getBlockPayloadByID gets block payload by ID
+func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, StatusError) {
+
+	id, err := req.id()
+	if err != nil {
+		return nil, NewBadRequestError(err.Error(), err)
+	}
+
+	_, payload, statusErr := blockLookup(req.Context(), id, backend)
+	if err != nil {
+		return nil, statusErr
+	}
+
+	return payload, nil
+}
+
+func blockLookup(ctx context.Context, id flow.Identifier, backend access.API) (*generated.BlockHeader, *generated.BlockPayload, StatusError) {
+	flowBlock, err := backend.GetBlockByID(ctx, id)
+	if err != nil {
+		return nil, nil, idLookupError(id, "block", err)
+	}
+	return blockHeaderResponse(flowBlock.Header), blockPayloadResponse(flowBlock.Payload), nil
+}
+
+func headerLookup(ctx context.Context, id flow.Identifier, backend access.API) (*generated.BlockHeader, StatusError) {
+	flowBlockHeader, err := backend.GetBlockHeaderByID(ctx, id)
+	if err != nil {
+		return nil, idLookupError(id, "block header", err)
+	}
+	return blockHeaderResponse(flowBlockHeader), nil
+}
+
+func executionResultLookup(ctx context.Context, id flow.Identifier, backend access.API, linkGenerator LinkGenerator) (*generated.ExecutionResult, StatusError) {
+	executionResult, err := backend.GetExecutionResultForBlockID(ctx, id)
+	if err != nil {
+		return nil, idLookupError(id, "execution result", err)
+	}
+
+	executionResultResp := executionResultResponse(executionResult)
+	executionResultResp.Links, err = selfLink(executionResult.ID(), linkGenerator.ExecutionResultLink)
+	if err != nil {
+		msg := fmt.Sprintf("failed to generate response for execution result ID %s", id.String())
+		return nil, NewRestError(http.StatusInternalServerError, msg, err)
+	}
+	return executionResultResp, nil
+}
+
+func idLookupError(id flow.Identifier, entityType string, err error) StatusError {
+	msg := fmt.Sprintf("%s with ID %s not found", entityType, id.String())
+	// if error has GRPC code NotFound, then return HTTP NotFound error
+	if status.Code(err) == codes.NotFound {
+		return NewNotFoundError(msg, err)
+	}
+	return NewRestError(http.StatusInternalServerError, msg, err)
+}
+
+// todo(sideninja) refactor and merge
+func blockHeightLookupError(height uint64, err error) StatusError {
+	msg := fmt.Sprintf("block with height %d not found", height)
 	// if error has GRPC code NotFound, then return HTTP NotFound error
 	if status.Code(err) == codes.NotFound {
 		return NewNotFoundError(msg, err)
