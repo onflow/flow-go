@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
 	"net/http"
 
 	"google.golang.org/grpc/codes"
@@ -22,7 +21,6 @@ func getBlocksByID(
 	r *requestDecorator,
 	backend access.API,
 	linkGenerator LinkGenerator,
-	logger zerolog.Logger,
 ) (interface{}, StatusError) {
 
 	ids, err := r.ids()
@@ -42,7 +40,14 @@ func getBlocksByID(
 	return blocks, nil
 }
 
-func getBlockByID(ctx context.Context, id flow.Identifier, req *requestDecorator, backend access.API, linkGenerator LinkGenerator) (*generated.Block, StatusError) {
+func getBlockByID(
+	ctx context.Context,
+	id flow.Identifier,
+	req *requestDecorator,
+	backend access.API,
+	linkGenerator LinkGenerator,
+) (*generated.Block, StatusError) {
+
 	var responseBlock = new(generated.Block)
 	if req.expands(ExpandableFieldPayload) {
 		flowBlock, err := backend.GetBlockByID(ctx, id)

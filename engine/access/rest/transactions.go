@@ -1,8 +1,6 @@
 package rest
 
 import (
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
@@ -12,7 +10,6 @@ func getTransactionByID(
 	r *requestDecorator,
 	backend access.API,
 	generator LinkGenerator,
-	logger zerolog.Logger,
 ) (interface{}, StatusError) {
 
 	id, err := r.id()
@@ -32,7 +29,6 @@ func getTransactionResultByID(
 	r *requestDecorator,
 	backend access.API,
 	generator LinkGenerator,
-	logger zerolog.Logger,
 ) (interface{}, StatusError) {
 	id, err := r.id()
 	if err != nil {
@@ -52,7 +48,6 @@ func createTransaction(
 	r *requestDecorator,
 	backend access.API,
 	generator LinkGenerator,
-	logger zerolog.Logger,
 ) (interface{}, StatusError) {
 
 	var txBody generated.TransactionsBody

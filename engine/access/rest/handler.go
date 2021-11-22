@@ -22,7 +22,6 @@ type ApiHandlerFunc func(
 	r *requestDecorator,
 	backend access.API,
 	generator LinkGenerator,
-	logger zerolog.Logger,
 ) (interface{}, StatusError)
 
 // Handler is custom http handler implementing custom handler function.
@@ -54,7 +53,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	decoratedRequest := newRequestDecorator(r)
 
 	// execute handler function and check for error
-	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator, errorLogger)
+	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
 	if err != nil {
 		switch e := err.(type) {
 		case StatusError: // todo(sideninja) try handle not found error.Code - grpc unwrap
@@ -209,7 +208,6 @@ func NotImplemented(
 	_ *requestDecorator,
 	_ access.API,
 	_ LinkGenerator,
-	_ zerolog.Logger,
 ) (interface{}, StatusError) {
 	return nil, NewRestError(http.StatusNotImplemented, "endpoint not implemented", nil)
 }
