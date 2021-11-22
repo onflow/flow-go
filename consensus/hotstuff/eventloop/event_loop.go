@@ -15,8 +15,8 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 )
 
-// EventLoopV2 buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
-type EventLoopV2 struct {
+// EventLoop buffers all incoming events to the hotstuff EventHandler, and feeds EventHandler one event at a time.
+type EventLoop struct {
 	*component.ComponentManager
 	log                zerolog.Logger
 	eventHandler       hotstuff.EventHandlerV2
@@ -26,16 +26,16 @@ type EventLoopV2 struct {
 	startTime          time.Time
 }
 
-var _ hotstuff.EventLoopV2 = &EventLoopV2{}
-var _ module.ReadyDoneAware = &EventLoopV2{}
-var _ module.Startable = &EventLoopV2{}
+var _ hotstuff.EventLoop = &EventLoop{}
+var _ module.ReadyDoneAware = &EventLoop{}
+var _ module.Startable = &EventLoop{}
 
-// NewEventLoopV2 creates an instance of EventLoopV2.
-func NewEventLoopV2(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandlerV2, startTime time.Time) (*EventLoopV2, error) {
+// NewEventLoop creates an instance of EventLoop.
+func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandlerV2, startTime time.Time) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
 	quorumCertificates := make(chan *flow.QuorumCertificate)
 
-	el := &EventLoopV2{
+	el := &EventLoop{
 		log:                log,
 		eventHandler:       eventHandler,
 		metrics:            metrics,
@@ -62,7 +62,7 @@ func NewEventLoopV2(log zerolog.Logger, metrics module.HotstuffMetrics, eventHan
 	return el, nil
 }
 
-func (el *EventLoopV2) loop(ctx context.Context) {
+func (el *EventLoop) loop(ctx context.Context) {
 
 	err := el.eventHandler.Start()
 	if err != nil {
@@ -179,7 +179,7 @@ func (el *EventLoopV2) loop(ctx context.Context) {
 }
 
 // SubmitProposal pushes the received block to the blockheader channel
-func (el *EventLoopV2) SubmitProposal(proposalHeader *flow.Header, parentView uint64) {
+func (el *EventLoop) SubmitProposal(proposalHeader *flow.Header, parentView uint64) {
 	received := time.Now()
 
 	proposal := model.ProposalFromFlow(proposalHeader, parentView)
@@ -196,7 +196,7 @@ func (el *EventLoopV2) SubmitProposal(proposalHeader *flow.Header, parentView ui
 }
 
 // SubmitTrustedQC pushes the received QC to the quorumCertificates channel
-func (el *EventLoopV2) SubmitTrustedQC(qc *flow.QuorumCertificate) {
+func (el *EventLoop) SubmitTrustedQC(qc *flow.QuorumCertificate) {
 	received := time.Now()
 
 	select {

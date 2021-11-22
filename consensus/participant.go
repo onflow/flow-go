@@ -2,6 +2,7 @@ package consensus
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/consensus/hotstuff/eventloop"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -129,7 +130,8 @@ func NewParticipant(
 	}
 
 	// initialize and return the event loop
-	loop, err := hotstuff.NewEventLoop(log, metrics, handler, cfg.StartupTime)
+	// TODO: add proper event handler when it's replaced
+	loop, err := eventloop.NewEventLoop(log, metrics, nil, cfg.StartupTime)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event loop: %w", err)
 	}
