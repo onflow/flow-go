@@ -288,7 +288,8 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlock
 		Uint64("view", vote.View).
 		Msg("received vote")
 
-	c.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
+	// TODO: replace this with submitting logic to vote aggregator in V2
+	//c.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
 	return nil
 }
 

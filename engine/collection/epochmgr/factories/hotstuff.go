@@ -66,7 +66,7 @@ func (f *HotStuffFactory) Create(
 	builder module.Builder,
 	updater module.Finalizer,
 	communicator hotstuff.Communicator,
-) (*hotstuff.EventLoop, error) {
+) (module.HotStuff, error) {
 
 	// setup metrics/logging with the new chain ID
 	metrics := f.createMetrics(cluster.ChainID())
