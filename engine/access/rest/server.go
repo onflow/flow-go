@@ -49,11 +49,7 @@ func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
 
 	for _, r := range routeDefinitions() {
 		h := NewHandler(logger, backend, r.apiHandlerFunc, linkGenerator)
-		v1SubRouter.
-			Methods(r.method).
-			Path(r.pattern).
-			Name(r.name).
-			Handler(h)
+		h.addToRouter(v1SubRouter)
 	}
 	return router
 }
