@@ -16,8 +16,8 @@ import (
 const ExpandableFieldPayload = "payload"
 const ExpandableExecutionResult = "execution_result"
 
-// getBlocksByID gets blocks by provided ID or collection of IDs.
-func getBlocksByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+// getBlocksByIDs gets blocks by provided ID or collection of IDs.
+func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
 
 	ids, err := r.ids()
 	if err != nil {

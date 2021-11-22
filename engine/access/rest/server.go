@@ -16,7 +16,7 @@ const (
 	getTransactionByIDRoute       = "getTransactionByID"
 	getTransactionResultByIDRoute = "getTransactionResultByID"
 	createTransactionRoute        = "createTransaction"
-	getBlocksByIDRoute            = "getBlocksByID"
+	getBlocksByIDRoute            = "getBlocksByIDs"
 	getBlocksByHeightRoute        = "getBlocksByHeight"
 	getCollectionByIDRoute        = "getCollectionByID"
 	executeScriptRoute            = "executeScript"
@@ -89,7 +89,7 @@ func routeDefinitions() []routeDefinition {
 			method:         "GET",
 			pattern:        "/blocks/{id}",
 			name:           getBlocksByIDRoute,
-			apiHandlerFunc: getBlocksByID,
+			apiHandlerFunc: getBlocksByIDs,
 		}, {
 			method:         "GET",
 			pattern:        "/blocks",
