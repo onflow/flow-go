@@ -67,6 +67,31 @@ func getBlocksByHeights(r *requestDecorator, backend access.API, link LinkGenera
 		}
 	}
 
+	if startHeight != "" && endHeight != "" {
+		start, err := toHeight(startHeight)
+		if err != nil {
+			return nil, NewBadRequestError(err.Error(), err)
+		}
+		end, err := toHeight(endHeight)
+		if err != nil {
+			return nil, NewBadRequestError(err.Error(), err)
+		}
+
+		if start > end {
+			err := fmt.Errorf("start height must be lower than end height")
+			return nil, NewBadRequestError(err.Error(), err)
+		}
+
+		for i := start; i < end; i++ {
+			block, err := getBlockByHeight(r.Context(), i, r, backend, link)
+			if err != nil {
+				return nil, err
+			}
+			blocks[i] = block
+		}
+	}
+
+	return blocks, nil
 }
 
 func getBlockByHeight(
