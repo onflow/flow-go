@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/antihax/optional"
 	restclient "github.com/onflow/flow/openapi/go-client-generated"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -121,7 +122,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		blocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, nil)
+		blocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, expandPayloadOption())
 		require.NoError(suite.T(), err)
 		require.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		require.Len(suite.T(), blocks, 1)
@@ -147,7 +148,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 			suite.blocks.On("ByID", id).Return(block, nil).Once()
 		}
 
-		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, nil)
+		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, expandPayloadOption())
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), blocks, rest.MaxAllowedBlockIDs)
@@ -165,7 +166,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{nonExistingBlockID.String()}, nil)
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{nonExistingBlockID.String()}, expandPayloadOption())
 		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", nonExistingBlockID.String()))
 	})
 
@@ -176,7 +177,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		defer cancel()
 
 		const invalidBlockID = "invalid_block_id"
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{invalidBlockID}, nil)
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{invalidBlockID}, expandPayloadOption())
 		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("invalid ID %s", invalidBlockID))
 	})
 
@@ -193,7 +194,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 			blockIDs[i] = unittest.IdentifierFixture().String()
 		}
 
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, nil)
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, expandPayloadOption())
 		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", rest.MaxAllowedBlockIDs))
 	})
 
@@ -221,7 +222,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 			suite.blocks.On("ByID", id).Return(block, nil).Once()
 		}
 
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, nil)
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDs, expandPayloadOption())
 		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", blockIDs[invalidBlockIndex]))
 	})
 
@@ -249,4 +250,11 @@ func assertError(t *testing.T, resp *http.Response, err error, expectedCode int,
 	modelError := swaggerError.Model().(restclient.ModelError)
 	require.EqualValues(t, expectedCode, modelError.Code)
 	require.Contains(t, modelError.Message, expectedMsgSubstr)
+}
+
+func expandPayloadOption() *restclient.BlocksApiBlocksIdGetOpts {
+	return &restclient.BlocksApiBlocksIdGetOpts{
+		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Select_: optional.EmptyInterface(),
+	}
 }

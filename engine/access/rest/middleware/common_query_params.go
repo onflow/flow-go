@@ -20,8 +20,12 @@ func commonQueryParamMiddleware(queryParamName string) mux.MiddlewareFunc {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			if values, ok := req.URL.Query()[queryParamName]; ok {
 				values := strings.Split(values[0], ",")
+				valueMap := make(map[string]bool, len(values))
+				for _, v := range values {
+					valueMap[v] = true
+				}
 				// save the query param value in the request context
-				req = addRequestAttribute(req, queryParamName, values)
+				req = addRequestAttribute(req, queryParamName, valueMap)
 			}
 			handler.ServeHTTP(w, req)
 		})
@@ -38,19 +42,19 @@ func QuerySelect() mux.MiddlewareFunc {
 	return commonQueryParamMiddleware(selectQueryParam)
 }
 
-func getField(req *http.Request, key string) ([]string, bool) {
+func getField(req *http.Request, key string) (map[string]bool, bool) {
 	value, found := getRequestAttribute(req, key)
 	if !found {
 		return nil, false
 	}
-	valueAsStringSlice, ok := value.([]string)
+	valueAsStringSlice, ok := value.(map[string]bool)
 	return valueAsStringSlice, ok
 }
 
-func GetFieldsToExpand(req *http.Request) ([]string, bool) {
+func GetFieldsToExpand(req *http.Request) (map[string]bool, bool) {
 	return getField(req, expandQueryParam)
 }
 
-func GetFieldsToSelect(req *http.Request) ([]string, bool) {
+func GetFieldsToSelect(req *http.Request) (map[string]bool, bool) {
 	return getField(req, selectQueryParam)
 }
