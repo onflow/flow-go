@@ -115,7 +115,7 @@ func TestCreateStream(t *testing.T) {
 
 	id2 := identities[1]
 
-	flowProtocolID := FlowProtocolID(rootBlockID)
+	flowProtocolID := FlowProtocolID(sporkID)
 	// Assert that there is no outbound stream to the target yet
 	require.Equal(t, 0, CountStream(nodes[0].host, nodes[1].host.ID(), flowProtocolID, network.DirOutbound))
 

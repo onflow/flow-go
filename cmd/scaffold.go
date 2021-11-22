@@ -213,7 +213,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
-			fnb.RootBlock.ID(),
+			fnb.SporkID,
 			fnb.IdentityProvider,
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
@@ -611,7 +611,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msg("failed to read root sealed result")
 	sealingSegment, err := rootSnapshot.SealingSegment()
 	fnb.MustNot(err).Msg("failed to read root sealing segment")
-	fnb.RootBlock = sealingSegment[len(sealingSegment)-1]
+	fnb.RootBlock = sealingSegment.Highest()
 	fnb.RootQC, err = rootSnapshot.QuorumCertificate()
 	fnb.MustNot(err).Msg("failed to read root qc")
 	// set the chain ID based on the root header
@@ -620,6 +620,8 @@ func (fnb *FlowNodeBuilder) initState() {
 	// state as final authority on what the chain ID is
 	// => https://github.com/dapperlabs/flow-go/issues/4167
 	fnb.RootChainID = fnb.RootBlock.Header.ChainID
+	fnb.SporkID, err = rootSnapshot.Params().SporkID()
+	fnb.MustNot(err)
 
 	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
 	fnb.MustNot(err).Msg("failed to determine whether database contains bootstrapped state")
@@ -640,9 +642,10 @@ func (fnb *FlowNodeBuilder) initState() {
 
 		// Verify root block in protocol state is consistent with bootstrap information stored on-disk.
 		// Inconsistencies can happen when the bootstrap root block is updated (because of new spork),
-		// but the protocol state is not updated, so they don't match
-		// when this happens during a spork, we could try deleting the protocol state database.
-		// TODO: revisit this check when implementing Epoch
+		// but the protocol state is not updated, so they don't match.
+		//
+		// When this happens during a spork, we could try deleting the protocol state database.
+		//
 		rootBlockFromState, err := state.Params().Root()
 		fnb.MustNot(err).Msg("could not load root block from protocol state")
 		if fnb.RootBlock.ID() != rootBlockFromState.ID() {
