@@ -14,7 +14,7 @@ const selectQueryParam = "select"
 // and adds it to the request context as a key value pair with the key as the query param name.
 // e.g. for queryParamName "fields", if the request url contains <some url>?fields=field1,field2,..fieldN,
 // the middleware returned by commonQueryParamMiddleware will add the key - "fields" to the request context with value
-// ["field", "fields2",..."fieldn"] when it is executed
+// as a map containing each of the field as key and value true ["field"]->true, ["fields2"] -> true etc when it is executed
 func commonQueryParamMiddleware(queryParamName string) mux.MiddlewareFunc {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

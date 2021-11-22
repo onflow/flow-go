@@ -9,13 +9,6 @@ type StatusError interface {
 	UserMessage() string // the error message to return to the client
 }
 
-// RestError is implementation of status error.
-type RestError struct {
-	status      int
-	userMessage string
-	err         error
-}
-
 // NewRestError creates an error returned to user with provided status
 // user displayed message and internal error
 func NewRestError(status int, msg string, err error) *RestError {
@@ -24,10 +17,6 @@ func NewRestError(status int, msg string, err error) *RestError {
 		userMessage: msg,
 		err:         err,
 	}
-}
-
-func (restError *RestError) UserMessage() string {
-	return restError.userMessage
 }
 
 // NewNotFoundError creates a new not found rest error.
@@ -46,6 +35,17 @@ func NewBadRequestError(msg string, err error) *RestError {
 		userMessage: msg,
 		err:         err,
 	}
+}
+
+// RestError is implementation of status error.
+type RestError struct {
+	status      int
+	userMessage string
+	err         error
+}
+
+func (e *RestError) UserMessage() string {
+	return e.userMessage
 }
 
 // Status returns error http status code.

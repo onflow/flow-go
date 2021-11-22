@@ -2,10 +2,12 @@ package rest
 
 import (
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
+	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -13,26 +15,35 @@ import (
 // Converter provides functionality to convert from request models generated using
 // open api spec and flow models.
 
+// Flow section - converting request data to flow models with validation.
+
+const maxAllowedScriptArgumentsCnt = 100
+const maxSignatureLength = 64
+const maxAuthorizersCnt = 100
 const MaxAllowedIDs = 50 // todo(sideninja) discuss if we should restrict maximum on all IDs collection or is anywhere required more thant this
 var MaxAllowedBlockIDs = MaxAllowedIDs
-
-// Flow section - converting request data to flow models with validation.
 
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
 	if !valid {
-		return flow.Identifier{}, fmt.Errorf("invalid ID")
+		return flow.Identifier{}, errors.New("invalid ID")
 	}
 
-	return flow.HexStringToIdentifier(id)
+	flowID, err := flow.HexStringToIdentifier(id)
+	if err != nil {
+		return flow.Identifier{}, fmt.Errorf("invalid ID: %w", err)
+	}
+	return flowID, nil
 }
 
 func toIDs(ids string) ([]flow.Identifier, error) {
-	// gorilla mux retains opening and ending square brackets for ids
+	// currently, the swagger generated Go REST client is incorrectly doing a `fmt.Sprintf("%v", id)` for the id slice
+	// resulting in the client sending the ids in the format [id1 id2 id3...]. This is a temporary workaround to
+	// accommodate the client for now. Issue to to fix the client: https://github.com/onflow/flow/issues/698
 	ids = strings.TrimSuffix(ids, "]")
 	ids = strings.TrimPrefix(ids, "[")
 
-	reqIDs := strings.Fields(ids)
+	reqIDs := strings.Split(ids, ",")
 
 	if len(reqIDs) > MaxAllowedBlockIDs {
 		return nil, fmt.Errorf("at most %d Block IDs can be requested at a time", MaxAllowedBlockIDs)
@@ -54,7 +65,7 @@ func toIDs(ids string) ([]flow.Identifier, error) {
 func toAddress(address string) (flow.Address, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{16}$`, address)
 	if !valid {
-		return flow.Address{}, fmt.Errorf("invalid address")
+		return flow.Address{}, errors.New("invalid address")
 	}
 
 	return flow.HexToAddress(address), nil
@@ -73,24 +84,37 @@ func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
 	}, nil
 }
 
-func toSignature(signature *generated.TransactionSignature) (flow.TransactionSignature, error) {
-	address, err := toAddress(signature.Address)
+func toSignature(signature string) ([]byte, error) {
+	signatureBytes := []byte(signature)
+	if len(signatureBytes) > maxSignatureLength {
+		return nil, errors.New("signature length invalid")
+	}
+	return signatureBytes, nil
+}
+
+func toTransactionSignature(transactionSignature *generated.TransactionSignature) (flow.TransactionSignature, error) {
+	address, err := toAddress(transactionSignature.Address)
+	if err != nil {
+		return flow.TransactionSignature{}, err
+	}
+
+	signature, err := toSignature(transactionSignature.Signature)
 	if err != nil {
 		return flow.TransactionSignature{}, err
 	}
 
 	return flow.TransactionSignature{
 		Address:     address,
-		SignerIndex: int(signature.SignerIndex),
-		KeyIndex:    uint64(signature.KeyIndex),
-		Signature:   []byte(signature.Signature),
+		SignerIndex: int(transactionSignature.SignerIndex),
+		KeyIndex:    uint64(transactionSignature.KeyIndex),
+		Signature:   signature,
 	}, nil
 }
 
-func toSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSignature, error) {
+func toTransactionSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSignature, error) {
 	signatures := make([]flow.TransactionSignature, len(sigs))
 	for _, sig := range sigs {
-		signature, err := toSignature(&sig)
+		signature, err := toTransactionSignature(&sig)
 		if err != nil {
 			return nil, err
 		}
@@ -102,7 +126,13 @@ func toSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSign
 }
 
 func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error) {
-	args := make([][]byte, len(tx.Arguments))
+
+	argLen := len(tx.Arguments)
+	if argLen > maxAllowedScriptArgumentsCnt {
+		return flow.TransactionBody{}, fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArgumentsCnt)
+	}
+
+	args := make([][]byte, argLen)
 	for _, arg := range tx.Arguments {
 		// todo validate
 		args = append(args, []byte(arg))
@@ -118,7 +148,11 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		return flow.TransactionBody{}, err
 	}
 
-	auths := make([]flow.Address, len(tx.Authorizers))
+	authorizerCnt := len(tx.Authorizers)
+	if authorizerCnt > maxAuthorizersCnt {
+		return flow.TransactionBody{}, fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizersCnt)
+	}
+	auths := make([]flow.Address, authorizerCnt)
 	for _, auth := range tx.Authorizers {
 		a, err := toAddress(auth)
 		if err != nil {
@@ -128,12 +162,12 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		auths = append(auths, a)
 	}
 
-	payloadSigs, err := toSignatures(tx.PayloadSignatures)
+	payloadSigs, err := toTransactionSignatures(tx.PayloadSignatures)
 	if err != nil {
 		return flow.TransactionBody{}, err
 	}
 
-	envelopeSigs, err := toSignatures(tx.EnvelopeSignatures)
+	envelopeSigs, err := toTransactionSignatures(tx.EnvelopeSignatures)
 	if err != nil {
 		return flow.TransactionBody{}, err
 	}
@@ -149,6 +183,19 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		PayloadSignatures:  payloadSigs,
 		EnvelopeSignatures: envelopeSigs,
 	}, nil
+}
+
+func toScriptArgs(script generated.ScriptsBody) ([][]byte, error) {
+	// todo(sideninja) validate
+	args := make([][]byte, len(script.Arguments))
+	for i, a := range script.Arguments {
+		args[i] = []byte(a)
+	}
+	return args, nil
+}
+
+func toScriptSource(script generated.ScriptsBody) ([]byte, error) {
+	return []byte(script.Script), nil
 }
 
 // Response section - converting flow models to response models.
@@ -200,6 +247,56 @@ func transactionResponse(tx *flow.TransactionBody) *generated.Transaction {
 		PayloadSignatures:  transactionSignatureResponse(tx.PayloadSignatures),
 		EnvelopeSignatures: transactionSignatureResponse(tx.EnvelopeSignatures),
 		Result:             nil, // todo(sideninja) should we provide result, maybe have a wait for result http long pulling system would be super helpful (with reasonable timeout) but careful about resources and dos
+	}
+}
+
+func eventResponse(event flow.Event) generated.Event {
+	return generated.Event{
+		Type_:            string(event.Type),
+		TransactionId:    event.TransactionID.String(),
+		TransactionIndex: int32(event.TransactionIndex),
+		EventIndex:       int32(event.EventIndex),
+		Payload:          string(event.Payload),
+	}
+}
+
+func eventsResponse(events []flow.Event) []generated.Event {
+	eventsRes := make([]generated.Event, len(events))
+	for i, e := range events {
+		eventsRes[i] = eventResponse(e)
+	}
+
+	return eventsRes
+}
+
+func statusResponse(status flow.TransactionStatus) generated.TransactionStatus {
+	switch status {
+	case flow.TransactionStatusExpired:
+		return generated.EXPIRED
+	case flow.TransactionStatusExecuted:
+		return generated.EXECUTED
+	case flow.TransactionStatusFinalized:
+		return generated.FINALIZED
+	case flow.TransactionStatusSealed:
+		return generated.SEALED
+	case flow.TransactionStatusPending:
+		return generated.PENDING
+	default:
+		return ""
+	}
+}
+
+func transactionResultResponse(txr *access.TransactionResult) *generated.TransactionResult {
+	status := statusResponse(txr.Status)
+
+	return &generated.TransactionResult{
+		BlockId:         txr.BlockID.String(),
+		Status:          &status,
+		ErrorMessage:    txr.ErrorMessage,
+		ComputationUsed: int32(0),
+		Events:          eventsResponse(txr.Events),
+		Expandable:      nil,
+		Links:           nil,
 	}
 }
 
@@ -259,5 +356,72 @@ func blockSealResponse(flowSeal *flow.Seal) generated.BlockSeal {
 	return generated.BlockSeal{
 		BlockId:  flowSeal.BlockID.String(),
 		ResultId: flowSeal.ResultID.String(),
+	}
+}
+
+func collectionResponse(flowCollection *flow.LightCollection) generated.Collection {
+	return generated.Collection{
+		Id:           flowCollection.ID().String(),
+		Transactions: nil, // todo(sideninja) we receive light collection with only transaction ids, should we fetch txs by default?
+		Links:        nil,
+	}
+}
+
+func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event {
+	events := make([]generated.Event, len(eventList))
+	for i, e := range eventList {
+		events[i] = generated.Event{
+			Type_:            e.Type,
+			TransactionId:    "",
+			TransactionIndex: 0,
+			EventIndex:       0,
+			Payload:          "", //e.Event,
+		}
+	}
+	return events
+}
+
+func executionResultResponse(exeResult *flow.ExecutionResult) *generated.ExecutionResult {
+	return &generated.ExecutionResult{
+		Id:      exeResult.ID().String(),
+		BlockId: exeResult.BlockID.String(),
+		Events:  serviceEventListResponse(exeResult.ServiceEvents),
+		Links:   nil,
+	}
+}
+
+func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublicKey {
+	keysResponse := make([]generated.AccountPublicKey, len(keys))
+	for i, k := range keys {
+		sigAlgo := generated.SigningAlgorithm(k.SignAlgo.String())
+		hashAlgo := generated.HashingAlgorithm(k.HashAlgo.String())
+
+		keysResponse[i] = generated.AccountPublicKey{
+			Index:            int32(k.Index),
+			PublicKey:        k.PublicKey.String(),
+			SigningAlgorithm: &sigAlgo,
+			HashingAlgorithm: &hashAlgo,
+			SequenceNumber:   int32(k.SeqNumber),
+			Weight:           int32(k.Weight),
+			Revoked:          k.Revoked,
+		}
+	}
+
+	return keysResponse
+}
+
+func accountResponse(account *flow.Account) generated.Account {
+	contracts := make(map[string]string, len(account.Contracts))
+	for name, code := range account.Contracts {
+		contracts[name] = string(code)
+	}
+
+	return generated.Account{
+		Address:    account.Address.String(),
+		Balance:    int32(account.Balance),
+		Keys:       accountKeysResponse(account.Keys),
+		Contracts:  contracts,
+		Expandable: nil,
+		Links:      nil,
 	}
 }

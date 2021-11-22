@@ -43,6 +43,7 @@ func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandle
 		linkGenerator:  generator,
 	}
 }
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
@@ -53,7 +54,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator, errorLogger)
 	if err != nil {
 		switch e := err.(type) {
-		case StatusError:
+		case StatusError: // todo(sideninja) try handle not found error.Code - grpc unwrap
 			errorResponse(w, e.Status(), e.UserMessage(), errorLogger)
 		default:
 			errorResponse(w, http.StatusInternalServerError, e.Error(), errorLogger)
@@ -73,6 +74,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// write response to response stream
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+
 	_, writeErr := w.Write(encodedResponse)
 	if writeErr != nil {
 		h.logger.Error().Err(err).Msg("failed to write response")
