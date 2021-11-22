@@ -34,7 +34,7 @@ func NewExecutionDataService(
 	return &ExecutionDataService{&serializer{codec, compressor}, blobService, defaultMaxBlobSize}
 }
 
-func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *BlobReceiver) ([]network.Blob, error) {
+func (s *ExecutionDataService) storeBatch(ctx context.Context, br *BlobReceiver) ([]network.Blob, error) {
 	var blobs []network.Blob
 	var err error
 
@@ -52,7 +52,7 @@ func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *BlobReceive
 	return blobs, err
 }
 
-func (s *ExecutionDataService) receiveBlobs(parent context.Context, br *BlobReceiver) ([]cid.Cid, error) {
+func (s *ExecutionDataService) storeBlobs(parent context.Context, br *BlobReceiver) ([]cid.Cid, error) {
 	defer br.Close()
 
 	ctx, cancel := context.WithCancel(parent)
@@ -61,7 +61,7 @@ func (s *ExecutionDataService) receiveBlobs(parent context.Context, br *BlobRece
 	var cids []cid.Cid
 
 	for {
-		batch, recvErr := s.receiveBatch(ctx, br)
+		batch, recvErr := s.storeBatch(ctx, br)
 
 		for _, blob := range batch {
 			cids = append(cids, blob.Cid())
@@ -101,7 +101,7 @@ func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}) ([]c
 		serializeErr = bcw.Flush()
 	}()
 
-	cids, recvErr := s.receiveBlobs(ctx, br)
+	cids, recvErr := s.storeBlobs(ctx, br)
 
 	<-done
 
@@ -131,7 +131,7 @@ func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.
 	}
 }
 
-func (s *ExecutionDataService) sendBlobs(parent context.Context, bs *BlobSender, cids []cid.Cid) error {
+func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *BlobSender, cids []cid.Cid) error {
 	defer bs.Close()
 
 	ctx, cancel := context.WithCancel(parent)
@@ -208,7 +208,7 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (in
 		v, deserializeErr = s.serializer.Deserialize(bcr)
 	}()
 
-	sendErr := s.sendBlobs(ctx, bs, cids)
+	sendErr := s.retrieveBlobs(ctx, bs, cids)
 
 	<-done
 
