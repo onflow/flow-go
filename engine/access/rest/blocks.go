@@ -41,7 +41,7 @@ func getBlockByID(
 	id flow.Identifier,
 	req *requestDecorator,
 	backend access.API,
-	linkGenerator LinkGenerator,
+	link LinkGenerator,
 ) (*generated.Block, StatusError) {
 
 	var responseBlock = new(generated.Block)
@@ -50,30 +50,22 @@ func getBlockByID(
 		if err != nil {
 			return nil, blockLookupError(id, err)
 		}
-		responseBlock.Payload = blockPayloadResponse(flowBlock.Payload)
-		responseBlock.Header = blockHeaderResponse(flowBlock.Header)
-	} else {
-		flowBlockHeader, err := backend.GetBlockHeaderByID(ctx, id)
-		if err != nil {
-			return nil, blockLookupError(id, err)
-		}
-		responseBlock.Payload = nil
-		responseBlock.Header = blockHeaderResponse(flowBlockHeader)
+		responseBlock = blockResponse(flowBlock, link)
+		return responseBlock, nil
 	}
+
+	flowBlockHeader, err := backend.GetBlockHeaderByID(ctx, id)
+	if err != nil {
+		return nil, blockLookupError(id, err)
+	}
+	responseBlock.Header = blockHeaderResponse(flowBlockHeader)
+	responseBlock.Links = blockLink(id, link)
+
+	return responseBlock, nil
+
 	//if req.expands(ExpandableExecutionResult) {
 	//	// lookup ER here and add to response
 	//}
-
-	blockLink, err := linkGenerator.BlockLink(id)
-	if err != nil {
-		msg := fmt.Sprintf("failed to generate respose for block ID %s", id.String())
-		return nil, NewRestError(http.StatusInternalServerError, msg, err)
-	}
-
-	responseBlock.Links = new(generated.Links)
-	responseBlock.Links.Self = blockLink
-
-	return responseBlock, nil
 }
 
 func blockLookupError(id flow.Identifier, err error) StatusError {

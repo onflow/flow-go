@@ -278,16 +278,23 @@ func transactionResultResponse(txr *access.TransactionResult, txID flow.Identifi
 
 func transactionResultLink(txID flow.Identifier, link LinkGenerator) *generated.Links {
 	self, _ := link.TransactionResultLink(txID)
-
 	return &generated.Links{
 		Self: self,
 	}
 }
 
-func blockResponse(flowBlock *flow.Block) *generated.Block {
+func blockLink(id flow.Identifier, link LinkGenerator) *generated.Links {
+	self, _ := link.BlockLink(id)
+	return &generated.Links{
+		Self: self,
+	}
+}
+
+func blockResponse(flowBlock *flow.Block, link LinkGenerator) *generated.Block {
 	return &generated.Block{
 		Header:  blockHeaderResponse(flowBlock.Header),
 		Payload: blockPayloadResponse(flowBlock.Payload),
+		Links:   blockLink(flowBlock.ID(), link),
 	}
 }
 
