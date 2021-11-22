@@ -91,7 +91,7 @@ func (stdinResultReader StdinResultReader) getResultsFileName() string {
 	return os.Args[1]
 }
 
-func processTestRun(resultReader ResultReader) TestRun {
+func processSummary1TestRun(resultReader ResultReader) TestRun {
 	reader := resultReader.getReader()
 	scanner := bufio.NewScanner(reader)
 
@@ -271,7 +271,7 @@ func finalizeTestRun(packageResultMap map[string]*PackageResult) TestRun {
 func main() {
 	resultReader := StdinResultReader{}
 
-	testRun := processTestRun(resultReader)
+	testRun := processSummary1TestRun(resultReader)
 
 	testRun.save(resultReader.getResultsFileName())
 }

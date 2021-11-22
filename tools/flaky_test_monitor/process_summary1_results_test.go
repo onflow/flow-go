@@ -15,7 +15,7 @@ import (
 )
 
 // data driven table test
-func TestProcessTestRun(t *testing.T) {
+func TestProcessSummary1TestRun(t *testing.T) {
 	testDataMap := map[string]string{
 		"1 count all pass":                "test-result-crypto-hash-1-count-pass.json",
 		"1 count 1 fail the rest pass":    "test-result-crypto-hash-1-count-fail.json",
@@ -45,14 +45,14 @@ func TestProcessTestRun(t *testing.T) {
 
 	for k, testJsonData := range testDataMap {
 		t.Run(k, func(t *testing.T) {
-			runProcessTestRun(t, testJsonData)
+			runProcessSummary1TestRun(t, testJsonData)
 		})
 	}
 }
 
 // HELPERS - UTILITIES
 
-func runProcessTestRun(t *testing.T, jsonExpectedActualFile string) {
+func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
 	const expectedJsonFilePath = "./testdata/summary1/expected/"
 	const rawJsonFilePath = "./testdata/summary1/raw/"
 
@@ -96,7 +96,7 @@ func runProcessTestRun(t *testing.T, jsonExpectedActualFile string) {
 	resultReader := FileResultReader{
 		rawJsonFile: rawJsonFilePath + jsonExpectedActualFile,
 	}
-	actualTestRun := processTestRun(&resultReader)
+	actualTestRun := processSummary1TestRun(&resultReader)
 
 	checkTestRuns(t, expectedTestRun, actualTestRun)
 }
