@@ -3,18 +3,10 @@ package rest
 import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
-	"github.com/rs/zerolog"
-	"net/http"
 )
 
-func executeScript(
-	w http.ResponseWriter,
-	r *http.Request,
-	vars map[string]string,
-	backend access.API,
-	logger zerolog.Logger,
-) (interface{}, StatusError) {
-	blockID := vars["block_id"]
+func executeScript(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+	blockID := r.getParam("block_id")
 	var scriptBody generated.ScriptsBody
 	err := jsonDecode(r.Body, &scriptBody)
 	if err != nil {

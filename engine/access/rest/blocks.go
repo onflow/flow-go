@@ -17,11 +17,7 @@ const ExpandableFieldPayload = "payload"
 const ExpandableExecutionResult = "execution_result"
 
 // getBlocksByID gets blocks by provided ID or collection of IDs.
-func getBlocksByID(
-	r *requestDecorator,
-	backend access.API,
-	linkGenerator LinkGenerator,
-) (interface{}, StatusError) {
+func getBlocksByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
 
 	ids, err := r.ids()
 	if err != nil {
@@ -30,7 +26,7 @@ func getBlocksByID(
 
 	blocks := make([]*generated.Block, len(ids))
 	for i, id := range ids {
-		block, err := getBlockByID(r.Context(), id, r, backend, linkGenerator)
+		block, err := getBlockByID(r.Context(), id, r, backend, link)
 		if err != nil {
 			return nil, err
 		}

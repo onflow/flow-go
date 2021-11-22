@@ -34,6 +34,11 @@ func (rd *requestDecorator) selects(field string) bool {
 	return rd.selectFields[field]
 }
 
+func (rd *requestDecorator) getParam(name string) string {
+	vars := mux.Vars(rd.Request)
+	return vars[name] // todo(sideninja) check if exists
+}
+
 func (rd *requestDecorator) ids() ([]flow.Identifier, error) {
 	vars := mux.Vars(rd.Request)
 	return toIDs(vars["id"])
