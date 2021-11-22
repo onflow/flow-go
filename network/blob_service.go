@@ -2,8 +2,9 @@ package network
 
 import (
 	"context"
-	"io"
+	"time"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-bitswap"
 	bsnet "github.com/ipfs/go-bitswap/network"
 	blocks "github.com/ipfs/go-block-format"
@@ -11,9 +12,14 @@ import (
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
+	provider "github.com/ipfs/go-ipfs-provider"
+	"github.com/ipfs/go-ipfs-provider/simple"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
+	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 type Blob = blocks.Block
@@ -40,7 +46,7 @@ type BlobGetter interface {
 // datastore and may retrieve data from a remote Exchange.
 // It uses an internal `datastore.Datastore` instance to store values.
 type BlobService interface {
-	io.Closer
+	component.Component
 	BlobGetter
 
 	// AddBlob puts a given blob to the underlying datastore
@@ -55,27 +61,84 @@ type BlobService interface {
 
 	// GetSession creates a new session that allows for controlled exchange of wantlists to decrease the bandwidth overhead.
 	GetSession(ctx context.Context) BlobGetter
+
+	TriggerReprovide(ctx context.Context) error
 }
 
 type blobService struct {
+	*component.ComponentManager
 	blockService blockservice.BlockService
+	reprovider   provider.Reprovider
 }
 
 var _ BlobService = (*blobService)(nil)
+var _ module.Startable = (*blobService)(nil)
+
+type BlobServiceConfig struct {
+	ReprovideInterval time.Duration
+}
+
+type BlobServiceOption func(*BlobServiceConfig)
+
+func WithReprovideInterval(d time.Duration) BlobServiceOption {
+	return func(config *BlobServiceConfig) {
+		config.ReprovideInterval = d
+	}
+}
 
 func NewBlobService(
-	parent context.Context,
 	host host.Host,
 	r routing.ContentRouting,
 	prefix string,
 	ds datastore.Batching,
+	opts ...BlobServiceOption,
 ) BlobService {
-	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
+	bs := &blobService{}
 	bstore := blockstore.NewBlockstore(ds)
-
-	return &blobService{
-		blockService: blockservice.New(bstore, bitswap.New(parent, bsNetwork, bstore)),
+	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
+	config := &BlobServiceConfig{
+		ReprovideInterval: 12 * time.Hour,
 	}
+
+	for _, opt := range opts {
+		opt(config)
+	}
+
+	bs.ComponentManager = component.NewComponentManagerBuilder().
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			bs.blockService = blockservice.New(bstore, bitswap.New(ctx, bsNetwork, bstore))
+
+			ready()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			bs.reprovider = simple.NewReprovider(ctx, config.ReprovideInterval, r, simple.NewBlockstoreProvider(bstore))
+
+			ready()
+
+			bs.reprovider.Run()
+		}).
+		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+
+			<-bs.Ready()
+			<-ctx.Done()
+
+			var err *multierror.Error
+
+			err = multierror.Append(err, bs.reprovider.Close())
+			err = multierror.Append(err, bs.blockService.Close())
+
+			if err.ErrorOrNil() != nil {
+				ctx.Throw(err)
+			}
+		}).
+		Build()
+
+	return bs
+}
+
+func (bs *blobService) TriggerReprovide(ctx context.Context) error {
+	return bs.reprovider.Trigger(ctx)
 }
 
 func (bs *blobService) GetBlob(ctx context.Context, c cid.Cid) (Blob, error) {
@@ -96,10 +159,6 @@ func (bs *blobService) AddBlobs(ctx context.Context, blobs []Blob) error {
 
 func (bs *blobService) DeleteBlob(ctx context.Context, c cid.Cid) error {
 	return bs.blockService.DeleteBlock(ctx, c)
-}
-
-func (bs *blobService) Close() error {
-	return bs.blockService.Close()
 }
 
 func (bs *blobService) GetSession(ctx context.Context) BlobGetter {

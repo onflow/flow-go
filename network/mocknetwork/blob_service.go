@@ -8,6 +8,8 @@ import (
 
 	context "context"
 
+	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
+
 	mock "github.com/stretchr/testify/mock"
 
 	network "github.com/onflow/flow-go/network"
@@ -46,20 +48,6 @@ func (_m *BlobService) AddBlobs(ctx context.Context, bs []blocks.Block) error {
 	return r0
 }
 
-// Close provides a mock function with given fields:
-func (_m *BlobService) Close() error {
-	ret := _m.Called()
-
-	var r0 error
-	if rf, ok := ret.Get(0).(func() error); ok {
-		r0 = rf()
-	} else {
-		r0 = ret.Error(0)
-	}
-
-	return r0
-}
-
 // DeleteBlob provides a mock function with given fields: ctx, c
 func (_m *BlobService) DeleteBlob(ctx context.Context, c cid.Cid) error {
 	ret := _m.Called(ctx, c)
@@ -69,6 +57,22 @@ func (_m *BlobService) DeleteBlob(ctx context.Context, c cid.Cid) error {
 		r0 = rf(ctx, c)
 	} else {
 		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
+// Done provides a mock function with given fields:
+func (_m *BlobService) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
 	}
 
 	return r0
@@ -124,6 +128,41 @@ func (_m *BlobService) GetSession(ctx context.Context) network.BlobGetter {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(network.BlobGetter)
 		}
+	}
+
+	return r0
+}
+
+// Ready provides a mock function with given fields:
+func (_m *BlobService) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
+	}
+
+	return r0
+}
+
+// Start provides a mock function with given fields: _a0
+func (_m *BlobService) Start(_a0 irrecoverable.SignalerContext) {
+	_m.Called(_a0)
+}
+
+// TriggerReprovide provides a mock function with given fields: ctx
+func (_m *BlobService) TriggerReprovide(ctx context.Context) error {
+	ret := _m.Called(ctx)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(context.Context) error); ok {
+		r0 = rf(ctx)
+	} else {
+		r0 = ret.Error(0)
 	}
 
 	return r0

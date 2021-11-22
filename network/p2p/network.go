@@ -237,7 +237,11 @@ func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.Signaler
 		return nil, errors.New("blob exchange is disabled because content routing is not configured")
 	}
 
-	return network.NewBlobService(parent, mw.libP2PNode.host, mw.libP2PNode.dht, channel.String(), ds), nil
+	bs := network.NewBlobService(mw.libP2PNode.host, mw.libP2PNode.dht, channel.String(), ds)
+	bs.Start(parent)
+	<-bs.Ready()
+
+	return bs, nil
 }
 
 // Register will register the given engine with the given unique engine engineID,

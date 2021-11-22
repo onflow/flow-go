@@ -34,9 +34,10 @@ require (
 	github.com/ipfs/go-bitswap v0.5.0
 	github.com/ipfs/go-block-format v0.0.3
 	github.com/ipfs/go-blockservice v0.2.0
-	github.com/ipfs/go-cid v0.0.7
+	github.com/ipfs/go-cid v0.1.0
 	github.com/ipfs/go-datastore v0.5.0
 	github.com/ipfs/go-ipfs-blockstore v0.2.0
+	github.com/ipfs/go-ipfs-provider v0.7.0
 	github.com/ipfs/go-log v1.0.5
 	github.com/ipld/go-ipld-prime v0.12.0 // indirect
 	github.com/jrick/bitset v1.0.0
@@ -82,10 +83,9 @@ require (
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.7.0
 	go.uber.org/multierr v1.7.0
-	golang.org/x/crypto v0.0.0-20210513164829-c07d793c2f9a
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/sys v0.0.0-20210910150752-751e447fb3d0 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.49.0

@@ -16,6 +16,7 @@ import (
 	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -23,6 +24,8 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -399,47 +402,132 @@ func TestGetIncompleteData(t *testing.T) {
 	assertErrorType(t, err, new(BlobNotFoundError))
 }
 
-func createBlobServices(ctx context.Context, t *testing.T, name string, n int) []network.BlobService {
-	var services []network.BlobService
-	var hosts []host.Host
+func createBlobService(ctx irrecoverable.SignalerContext, t *testing.T, ds datastore.Batching, name string, dhtOpts ...dht.Option) (network.BlobService, host.Host) {
+	h, err := libp2p.New(ctx)
+	require.NoError(t, err)
 
-	for i := 0; i < n; i++ {
-		h, err := libp2p.New(ctx)
-		require.NoError(t, err)
+	cr, err := dht.New(ctx, h, dhtOpts...)
+	require.NoError(t, err)
 
-		cr, err := dht.New(ctx, h)
-		require.NoError(t, err)
+	service := network.NewBlobService(h, cr, name, ds)
+	service.Start(ctx)
+	<-service.Ready()
 
-		services = append(services, network.NewBlobService(ctx, h, cr, name, dssync.MutexWrap(datastore.NewMapDatastore())))
-
-		// connect to all other hosts
-		for _, other := range hosts {
-			err := h.Connect(ctx, *host.InfoFromHost(other))
-			require.NoError(t, err)
-		}
-
-		hosts = append(hosts, h)
-	}
-
-	return services
+	return service, h
 }
 
 func TestWithNetwork(t *testing.T) {
 	t.Parallel()
 
-	ctx, cancel := context.WithCancel(context.Background())
+	parent, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	blobServices := createBlobServices(ctx, t, "test-create-store-request", 2)
+	ctx, errChan := irrecoverable.WithSignaler(parent)
 
-	eds1 := executionDataService(blobServices[0])
-	eds2 := executionDataService(blobServices[1])
+	service1, h1 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-create-store-request")
+	service2, h2 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-create-store-request")
+
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		select {
+		case err := <-errChan:
+			t.Errorf("unexpected error: %v", err)
+		case <-util.AllDone(service1, service2):
+			select {
+			case err := <-errChan:
+				t.Errorf("unexpected error: %v", err)
+			default:
+			}
+		}
+	}()
+
+	defer func() {
+		cancel()
+		<-done
+	}()
+
+	require.NoError(t, h1.Connect(ctx, *host.InfoFromHost(h2)))
+
+	eds1 := executionDataService(service1)
+	eds2 := executionDataService(service2)
 
 	expected, _ := executionData(t, eds1.serializer, 10*defaultMaxBlobSize)
 	rootCid, err := addExecutionData(eds1, expected, time.Second)
 	require.NoError(t, err)
 
 	actual, err := getExecutionData(eds2, rootCid, time.Second)
+	require.NoError(t, err)
+
+	assert.Equal(t, true, reflect.DeepEqual(expected, actual))
+}
+
+func TestReprovider(t *testing.T) {
+	t.Parallel()
+
+	parent, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	ctx, errChan := irrecoverable.WithSignaler(parent)
+
+	ds := dssync.MutexWrap(datastore.NewMapDatastore())
+	mockBs := mockBlobService(blockstore.NewBlockstore(ds))
+	mockEds := executionDataService(mockBs)
+	expected, _ := executionData(t, mockEds.serializer, 10*defaultMaxBlobSize)
+	rootCid, err := addExecutionData(mockEds, expected, time.Second)
+	require.NoError(t, err)
+
+	h1, err := libp2p.New(ctx)
+	require.NoError(t, err)
+	cr1, err := dht.New(ctx, h1, dht.Mode(dht.ModeServer))
+	require.NoError(t, err)
+
+	dhtOpts := []dht.Option{
+		dht.RoutingTableFilter(func(dht interface{}, p peer.ID) bool {
+			return p == h1.ID()
+		}),
+		dht.Mode(dht.ModeServer),
+		dht.DisableAutoRefresh(),
+	}
+
+	service2, h2 := createBlobService(ctx, t, ds, "test-reprovider", dhtOpts...)
+	service3, h3 := createBlobService(ctx, t, dssync.MutexWrap(datastore.NewMapDatastore()), "test-reprovider", dhtOpts...)
+
+	require.NoError(t, h2.Connect(ctx, *host.InfoFromHost(h1)))
+	require.NoError(t, h3.Connect(ctx, *host.InfoFromHost(h1)))
+
+	done := make(chan struct{})
+
+	go func() {
+		defer close(done)
+
+		select {
+		case err := <-errChan:
+			t.Errorf("unexpected error: %v", err)
+		case <-util.AllDone(service2, service3):
+			select {
+			case err := <-errChan:
+				t.Errorf("unexpected error: %v", err)
+			default:
+			}
+		}
+	}()
+
+	defer func() {
+		cancel()
+		assert.NoError(t, cr1.Close())
+		<-done
+	}()
+
+	reprovideCtx, reprovideCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer reprovideCancel()
+	require.NoError(t, service2.TriggerReprovide(reprovideCtx))
+
+	eds := executionDataService(service3)
+
+	actual, err := getExecutionData(eds, rootCid, time.Second)
 	require.NoError(t, err)
 
 	assert.Equal(t, true, reflect.DeepEqual(expected, actual))
