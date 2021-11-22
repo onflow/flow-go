@@ -51,6 +51,7 @@ func getBlockByID(
 			return nil, blockLookupError(id, err)
 		}
 		responseBlock = blockResponse(flowBlock, link)
+
 		return responseBlock, nil
 	}
 

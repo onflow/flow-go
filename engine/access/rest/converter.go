@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/onflow/flow-go/access"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/onflow/flow-go/engine/access/rest/generated"
@@ -50,6 +51,10 @@ func toIDs(ids string) ([]flow.Identifier, error) {
 	}
 
 	return resIDs, nil
+}
+
+func toHeight(height string) (uint64, error) {
+	return strconv.ParseUint(height, 0, 64)
 }
 
 func toAddress(address string) (flow.Address, error) {

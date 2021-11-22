@@ -19,6 +19,7 @@ const (
 	getBlocksByIDRoute            = "getBlocksByID"
 	getBlocksByHeightRoute        = "getBlocksByHeight"
 	getCollectionByIDRoute        = "getCollectionByID"
+	executeScriptRoute            = "executeScript"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -100,6 +101,13 @@ func routeDefinitions() []routeDefinition {
 			method:         "GET",
 			pattern:        "/collections/{id}",
 			name:           getCollectionByIDRoute,
-			apiHandlerFunc: NotImplemented,
-		}, {}}
+			apiHandlerFunc: getCollectionByID,
+		},
+		// Scripts
+		{
+			method:         "POST",
+			pattern:        "/scripts",
+			name:           executeScriptRoute,
+			apiHandlerFunc: executeScript,
+		}}
 }
