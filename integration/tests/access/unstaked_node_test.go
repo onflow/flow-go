@@ -88,6 +88,7 @@ func (suite *UnstakedAccessSuite) TestReceiveBlocks() {
 	})
 
 	suite.Run("consensus follower sync up with the chain", func() {
+		// this test seems flaky
 		// kick off the second follower
 		suite.followerMgr2.startFollower(ctx)
 
