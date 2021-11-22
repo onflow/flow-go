@@ -3,7 +3,6 @@ package voteaggregator
 import (
 	"context"
 	"errors"
-	"github.com/onflow/flow-go/module/irrecoverable"
 	"testing"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
