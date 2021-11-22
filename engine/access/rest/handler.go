@@ -149,8 +149,6 @@ func (r *Request) expands(name string) bool {
 	return false
 }
 
-const payload = "payload"
-
 // jsonDecode provides safe JSON decoding with sufficient erro handling.
 func jsonDecode(body io.ReadCloser, dst interface{}) error {
 	// validate size
