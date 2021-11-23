@@ -43,7 +43,7 @@ func bitsToBytes(bits int) int {
 func (sk *PrKeyECDSA) signHash(h hash.Hash) (Signature, error) {
 	r, s, err := goecdsa.Sign(rand.Reader, sk.goPrKey, h)
 	if err != nil {
-		return nil, fmt.Errorf("ECDSA Sign has failed: %w", err)
+		return nil, fmt.Errorf("ECDSA Sign failed: %w", err)
 	}
 	rBytes := r.Bytes()
 	sBytes := s.Bytes()
@@ -65,7 +65,7 @@ func (sk *PrKeyECDSA) Sign(data []byte, alg hash.Hasher) (Signature, error) {
 	// no need to check the hasher output size as all supported hash algos
 	// have at least 32 bytes output
 	if alg == nil {
-		return nil, invalidInputsErrorf("Sign requires a Hasher")
+		return nil, invalidInputsErrorf("hasher is nil")
 	}
 	h := alg.ComputeHash(data)
 	return sk.signHash(h)
@@ -97,7 +97,7 @@ func (pk *PubKeyECDSA) Verify(sig Signature, data []byte, alg hash.Hasher) (bool
 	// no need to check the hasher output size as all supported hash algos
 	// have at lease 32 bytes output
 	if alg == nil {
-		return false, invalidInputsErrorf("Verify requires a Hasher")
+		return false, invalidInputsErrorf("hasher is nil")
 	}
 
 	h := alg.ComputeHash(data)

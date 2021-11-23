@@ -68,7 +68,7 @@ func newDKGCommon(size int, threshold int, myIndex int,
 
 	if myIndex >= size || leaderIndex >= size || myIndex < 0 || leaderIndex < 0 {
 		return nil, invalidInputsErrorf(
-			"indices of current and leader participants must be between 0 and %d, got %d",
+			"indices of current and leader nodes must be between 0 and %d, got %d",
 			size-1,
 			myIndex)
 	}

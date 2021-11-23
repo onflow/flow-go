@@ -156,7 +156,7 @@ func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 	dkgParticipantPrivInfo := unittest.DKGParticipantPriv()
 
 	keyStorage := new(storage.DKGKeys)
-	keyStorage.On("RetrieveMyDKGPrivateInfo", currentCounter+1).Return(dkgParticipantPrivInfo, nil)
+	keyStorage.On("RetrieveMyDKGPrivateInfo", currentCounter+1).Return(dkgParticipantPrivInfo, true, nil)
 	factory := new(module.DKGControllerFactory)
 
 	nextDKG := new(protocol.DKG)

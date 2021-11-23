@@ -9,14 +9,13 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/onflow/flow-go/cmd/util/cmd/common"
-
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
 
 	"github.com/onflow/flow-go/cmd"
+	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
@@ -290,10 +289,14 @@ func main() {
 					if err != nil {
 						return err
 					}
-					_, err = dkgKeyStore.RetrieveMyDKGPrivateInfo(counter)
+					_, hasRandomBeaconKey, err := dkgKeyStore.RetrieveMyDKGPrivateInfo(counter)
 					if err != nil {
 						return err
 					}
+					if !hasRandomBeaconKey {
+						return fmt.Errorf("no random beacon private key for epoch %v", counter)
+					}
+					return nil
 				}
 				return nil
 			}

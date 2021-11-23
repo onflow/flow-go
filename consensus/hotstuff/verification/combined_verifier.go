@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
+// TODO: to be replaced by CombinedVerifierV2
 // CombinedVerifier is a verifier capable of verifying two signatures for each
 // verifying operation. The first type is a signature from an aggregating signer,
 // which verifies either the single or the aggregated signature. The second type is

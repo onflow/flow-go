@@ -173,15 +173,21 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 		return
 	}
 
-	dkgPrivInfo, err := e.keyStorage.RetrieveMyDKGPrivateInfo(currentEpochCounter + 1)
+	dkgPrivInfo, hasDKGKey, err := e.keyStorage.RetrieveMyDKGPrivateInfo(currentEpochCounter + 1)
 	if err != nil {
-		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG private info for next epoch")
+		e.log.Err(err).Msgf("checking DKG key consistency: could not retrieve DKG private info for next epoch: %v", currentEpochCounter+1)
+		return
+	}
+
+	if !hasDKGKey {
+		e.log.Err(err).Msgf("checking DKG key consistency: no DKG private info for next epoch: %v", currentEpochCounter+1)
 		return
 	}
 
 	nextDKGPubKey, err := nextDKG.KeyShare(dkgPrivInfo.NodeID)
 	if err != nil {
 		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG public key for next epoch")
+		return
 	}
 
 	localPubKey := dkgPrivInfo.RandomBeaconPrivKey.PublicKey()

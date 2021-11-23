@@ -1,11 +1,12 @@
 package dkg
 
 import (
-	"github.com/onflow/flow-go/module"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/module"
 
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
@@ -278,8 +279,9 @@ func TestWithWhiteboard(t *testing.T) {
 	signatures := []crypto.Signature{}
 	indices := []uint{}
 	for i, n := range nodes {
-		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(nextEpochSetup.Counter)
+		priv, hasDKGKey, err := n.keyStorage.RetrieveMyDKGPrivateInfo(nextEpochSetup.Counter)
 		require.NoError(t, err)
+		require.True(t, hasDKGKey)
 
 		signer := signature.NewThresholdProvider("TAG", priv.RandomBeaconPrivKey.PrivateKey)
 		signers = append(signers, signer)

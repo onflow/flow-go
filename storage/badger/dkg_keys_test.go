@@ -36,7 +36,7 @@ func TestDKGKeysInsertAndRetrieve(t *testing.T) {
 		epochCounter := rand.Uint64()
 
 		// attempt to get a non-existent key
-		_, err = store.RetrieveMyDKGPrivateInfo(epochCounter)
+		_, _, err = store.RetrieveMyDKGPrivateInfo(epochCounter)
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 
 		// store a key in db
@@ -45,12 +45,33 @@ func TestDKGKeysInsertAndRetrieve(t *testing.T) {
 		require.NoError(t, err)
 
 		// retrieve the key by epoch counter
-		actual, err := store.RetrieveMyDKGPrivateInfo(epochCounter)
+		actual, hasDKGKey, err := store.RetrieveMyDKGPrivateInfo(epochCounter)
 		require.NoError(t, err)
+		require.True(t, hasDKGKey)
 		assert.Equal(t, expected, actual)
 
 		// test storing same key
 		err = store.InsertMyDKGPrivateInfo(epochCounter, expected)
 		require.True(t, errors.Is(err, storage.ErrAlreadyExists))
+	})
+}
+
+func TestDKGKeysInsertAndRetrieveNoDKGKey(t *testing.T) {
+	unittest.RunWithTypedBadgerDB(t, bstorage.InitSecret, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store, err := bstorage.NewDKGKeys(metrics, db)
+		require.NoError(t, err)
+
+		rand.Seed(time.Now().UnixNano())
+		epochCounter := rand.Uint64()
+
+		// store a key in db
+		err = store.InsertNoDKGPrivateInfo(epochCounter)
+		require.NoError(t, err)
+
+		// retrieve the key by epoch counter
+		_, hasDKGKey, err := store.RetrieveMyDKGPrivateInfo(epochCounter)
+		require.NoError(t, err)
+		require.False(t, hasDKGKey)
 	})
 }

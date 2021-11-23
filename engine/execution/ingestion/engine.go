@@ -249,7 +249,7 @@ func (e *Engine) finalizedUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.
 }
 
 func (e *Engine) pendingUnexecutedBlocks(finalized protocol.Snapshot) ([]flow.Identifier, error) {
-	pendings, err := finalized.Descendants()
+	pendings, err := finalized.ValidDescendants()
 	if err != nil {
 		return nil, fmt.Errorf("could not get pending blocks: %w", err)
 	}
@@ -1037,6 +1037,23 @@ func (e *Engine) ExecuteScriptAtBlockID(ctx context.Context, script []byte, argu
 			Msg("extensive log: executed script content")
 	}
 	return e.computationManager.ExecuteScript(script, arguments, block, blockView)
+}
+
+func (e *Engine) GetRegisterAtBlockID(ctx context.Context, owner, controller, key []byte, blockID flow.Identifier) ([]byte, error) {
+
+	stateCommit, err := e.execState.StateCommitmentByBlockID(ctx, blockID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get state commitment for block (%s): %w", blockID, err)
+	}
+
+	blockView := e.execState.NewView(stateCommit)
+
+	data, err := blockView.Get(string(owner), string(controller), string(key))
+	if err != nil {
+		return nil, fmt.Errorf("failed to get the register (owner : %s, controller: %s, key: %s): %w", hex.EncodeToString(owner), hex.EncodeToString(owner), string(key), err)
+	}
+
+	return data, nil
 }
 
 func (e *Engine) GetAccount(ctx context.Context, addr flow.Address, blockID flow.Identifier) (*flow.Account, error) {

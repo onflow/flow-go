@@ -121,6 +121,7 @@ func createValidators(participantData *ParticipantData, identities flow.Identity
 		}
 
 		// create signer
+		// TODO: to be replaced with NewCombinedVerifierV2
 		merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 		stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
 		beaconVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)

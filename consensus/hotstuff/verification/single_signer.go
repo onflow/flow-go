@@ -47,7 +47,9 @@ func (s *SingleSigner) CreateProposal(block *model.Block) (*model.Proposal, erro
 
 	// check that the block is created by us
 	if block.ProposerID != s.signerID {
-		return nil, fmt.Errorf("can't create proposal for someone else's block")
+		return nil, fmt.Errorf("expect the proposal is from me (%v), but actually from someone else (%v)",
+			s.signerID,
+			block.ProposerID)
 	}
 
 	// create the message to be signed and generate signature

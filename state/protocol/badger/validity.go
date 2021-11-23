@@ -6,9 +6,46 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
+	"github.com/onflow/flow-go/state"
 	"github.com/onflow/flow-go/state/protocol"
 )
 
+// isValidExtendingEpochSetup checks whether an epoch setup service being
+// added to the state is valid. In addition to intrinsic validitym, we also
+// check that it is valid w.r.t. the previous epoch setup event, and the
+// current epoch status.
+func isValidExtendingEpochSetup(extendingSetup *flow.EpochSetup, activeSetup *flow.EpochSetup, status *flow.EpochStatus) error {
+
+	// We should only have a single epoch setup event per epoch.
+	if status.NextEpoch.SetupID != flow.ZeroID {
+		// true iff EpochSetup event for NEXT epoch was already included before
+		return protocol.NewInvalidServiceEventError("duplicate epoch setup service event: %x", status.NextEpoch.SetupID)
+	}
+
+	// The setup event should have the counter increased by one.
+	if extendingSetup.Counter != activeSetup.Counter+1 {
+		return protocol.NewInvalidServiceEventError("next epoch setup has invalid counter (%d => %d)", activeSetup.Counter, extendingSetup.Counter)
+	}
+
+	// The first view needs to be exactly one greater than the current epoch final view
+	if extendingSetup.FirstView != activeSetup.FinalView+1 {
+		return protocol.NewInvalidServiceEventError(
+			"next epoch first view must be exactly 1 more than current epoch final view (%d != %d+1)",
+			extendingSetup.FirstView,
+			activeSetup.FinalView,
+		)
+	}
+
+	// Finally, the epoch setup event must contain all necessary information.
+	err := isValidEpochSetup(extendingSetup)
+	if err != nil {
+		return protocol.NewInvalidServiceEventError("invalid epoch setup: %w", err)
+	}
+
+	return nil
+}
+
+// isValidEpochSetup checks whether an epoch setup service event is intrinsically valid
 func isValidEpochSetup(setup *flow.EpochSetup) error {
 	return verifyEpochSetup(setup, true)
 }
@@ -99,6 +136,37 @@ func verifyEpochSetup(setup *flow.EpochSetup, verifyNetworkAddress bool) error {
 	return nil
 }
 
+// isValidExtendingEpochCommit checks whether an epoch commit service being
+// added to the state is valid. In addition to intrinsic validity, we also
+// check that it is valid w.r.t. the previous epoch setup event, and the
+// current epoch status.
+func isValidExtendingEpochCommit(extendingCommit *flow.EpochCommit, extendingSetup *flow.EpochSetup, activeSetup *flow.EpochSetup, status *flow.EpochStatus) error {
+
+	// We should only have a single epoch commit event per epoch.
+	if status.NextEpoch.CommitID != flow.ZeroID {
+		// true iff EpochCommit event for NEXT epoch was already included before
+		return protocol.NewInvalidServiceEventError("duplicate epoch commit service event: %x", status.NextEpoch.CommitID)
+	}
+
+	// The epoch setup event needs to happen before the commit.
+	if status.NextEpoch.SetupID == flow.ZeroID {
+		return protocol.NewInvalidServiceEventError("missing epoch setup for epoch commit")
+	}
+
+	// The commit event should have the counter increased by one.
+	if extendingCommit.Counter != activeSetup.Counter+1 {
+		return protocol.NewInvalidServiceEventError("next epoch commit has invalid counter (%d => %d)", activeSetup.Counter, extendingCommit.Counter)
+	}
+
+	err := isValidEpochCommit(extendingCommit, extendingSetup)
+	if err != nil {
+		return state.NewInvalidExtensionErrorf("invalid epoch commit: %s", err)
+	}
+
+	return nil
+}
+
+// isValidEpochCommit checks whether an epoch commit service event is intrinsically valid.
 func isValidEpochCommit(commit *flow.EpochCommit, setup *flow.EpochSetup) error {
 
 	if len(setup.Assignments) != len(commit.ClusterQCs) {
@@ -135,21 +203,21 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("could not latest sealed result: %w", err)
 	}
 
-	if len(segment) == 0 {
+	if len(segment.Blocks) == 0 {
 		return fmt.Errorf("invalid empty sealing segment")
 	}
-	// TAIL <- ... <- HEAD
-	head := segment[len(segment)-1] // reference block of the snapshot
-	tail := segment[0]              // last sealed block
-	headID := head.ID()
-	tailID := tail.ID()
 
-	if result.BlockID != tailID {
-		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, tail.ID())
+	highest := segment.Highest() // reference block of the snapshot
+	lowest := segment.Lowest()   // last sealed block
+	highestID := highest.ID()
+	lowestID := lowest.ID()
+
+	if result.BlockID != lowestID {
+		return fmt.Errorf("root execution result for wrong block (%x != %x)", result.BlockID, lowest.ID())
 	}
 
-	if seal.BlockID != tailID {
-		return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, tail.ID())
+	if seal.BlockID != lowestID {
+		return fmt.Errorf("root block seal for wrong block (%x != %x)", seal.BlockID, lowest.ID())
 	}
 
 	if verifyResultID {
@@ -172,8 +240,8 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	if err != nil {
 		return fmt.Errorf("could not get qc for root snapshot: %w", err)
 	}
-	if qc.BlockID != headID {
-		return fmt.Errorf("qc is for wrong block (got: %x, expected: %x)", qc.BlockID, headID)
+	if qc.BlockID != highestID {
+		return fmt.Errorf("qc is for wrong block (got: %x, expected: %x)", qc.BlockID, highestID)
 	}
 
 	firstView, err := snap.Epochs().Current().FirstView()
@@ -186,10 +254,10 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 	}
 
 	// the segment must be fully within the current epoch
-	if firstView > tail.Header.View {
-		return fmt.Errorf("tail block of sealing segment has lower view than first view of epoch")
+	if firstView > lowest.Header.View {
+		return fmt.Errorf("lowest block of sealing segment has lower view than first view of epoch")
 	}
-	if head.Header.View >= finalView {
+	if highest.Header.View >= finalView {
 		return fmt.Errorf("final view of epoch less than first block view")
 	}
 
