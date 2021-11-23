@@ -18,6 +18,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -168,7 +169,7 @@ func allKeys(t *testing.T, bs blockstore.Blockstore, timeout time.Duration) []ci
 func executionDataService(bs network.BlobService) *ExecutionDataService {
 	codec := new(cbor.Codec)
 	compressor := compressor.NewLz4Compressor()
-	return NewExecutionDataService(codec, compressor, bs, metrics.NewNoopCollector())
+	return NewExecutionDataService(codec, compressor, bs, metrics.NewNoopCollector(), zerolog.Nop())
 }
 
 func assertErrorType(t *testing.T, err error, target interface{}) {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/ipfs/go-cid"
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module"
@@ -35,6 +36,7 @@ func NewExecutionDataService(
 	compressor network.Compressor,
 	blobService network.BlobService,
 	metrics module.ExecutionDataServiceMetrics,
+	logger zerolog.Logger,
 ) *ExecutionDataService {
 	return &ExecutionDataService{&serializer{codec, compressor}, blobService, defaultMaxBlobSize, metrics}
 }
@@ -240,7 +242,7 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (in
 
 	<-done
 
-	if retrieveErr != nil && errors.Is(retrieveErr, blobs.ErrClosedBlobChannel) {
+	if retrieveErr != nil && !errors.Is(retrieveErr, blobs.ErrClosedBlobChannel) {
 		return nil, retrieveErr
 	}
 
