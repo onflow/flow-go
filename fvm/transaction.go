@@ -2,9 +2,10 @@ package fvm
 
 import (
 	"fmt"
-	"github.com/opentracing/opentracing-go"
 	"runtime/debug"
 	"strings"
+
+	"github.com/opentracing/opentracing-go"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
