@@ -339,7 +339,7 @@ func (c *Controller) start() error {
 	// before starting the DKG, sleep for a random delay to avoid synchronizing
 	// this expensive operation across all consensus nodes
 	delay := c.preStartDelay()
-	c.log.Debug().Msgf("sleeping for %s before processing phase 1 broadcast message", delay)
+	c.log.Debug().Msgf("sleeping for %s before starting DKG", delay)
 	time.Sleep(delay)
 
 	c.dkgLock.Lock()
