@@ -1,7 +1,6 @@
 package eventhandler
 
 import (
-	"errors"
 	"fmt"
 	"time"
 
@@ -10,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
 )
 
 // EventHandlerV2 is the main handler for individual events that trigger state transition.
@@ -124,7 +124,7 @@ func (e *EventHandlerV2) OnReceiveProposal(proposal *model.Proposal) error {
 			log.Warn().Err(err).Msg("invalid block proposal")
 			return nil
 		}
-		if errors.Is(err, model.ErrUnverifiableBlock) {
+		if mempool.IsDecreasingPruningHeightError(err) {
 			log.Warn().Err(err).Msg("unverifiable block proposal")
 
 			// even if the block is unverifiable because the QC has been
@@ -140,10 +140,12 @@ func (e *EventHandlerV2) OnReceiveProposal(proposal *model.Proposal) error {
 	// votes for it.
 	err := e.voteAggregator.AddBlock(proposal)
 	if err != nil {
-		return fmt.Errorf("could not add block (%v) to vote aggregator: %w", block.BlockID, err)
+		if !mempool.IsDecreasingPruningHeightError(err) {
+			return fmt.Errorf("could not add block (%v) to vote aggregator: %w", block.BlockID, err)
+		}
 	}
 
-	// store the block. the block will also be validated there
+	// store the block.
 	err = e.forks.AddBlock(block)
 	if err != nil {
 		return fmt.Errorf("cannot add block to fork (%x): %w", block.BlockID, err)
