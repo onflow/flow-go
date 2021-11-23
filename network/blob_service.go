@@ -16,6 +16,7 @@ import (
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
+
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
