@@ -78,30 +78,11 @@ func TestIdentityList_Exists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		sort.Slice(il1, func(p, q int) bool {
-			num1 := il1[p].NodeID[:]
-			num2 := il1[q].NodeID[:]
-			lenID := len(num1)
-
-			// assume the length is a multiple of 4, for performance.  it's 32 bytes
-			for i := 0; i < lenID; i += 8 {
-				chunk1 := binary.BigEndian.Uint64(num1[i:])
-				chunk2 := binary.BigEndian.Uint64(num2[i:])
-
-				if chunk1 < chunk2 {
-					return true
-				} else if chunk1 == chunk2 {
-					continue
-				} else {
-					return false
-				}
-			}
-			// equality
-			return true
-		})
-		element := il1[8]
-
-		assert.True(t, il1.Exists(element))
+		il1.Sort()
+		
+		for i := 0; i < 10; i++ {
+			assert.True(t, il1.Exists(il1[i]))
+		}
 		assert.False(t, il1.Exists(il2[0]))
 	})
 }
@@ -112,30 +93,11 @@ func TestIdentityList_IdentifierExists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		sort.Slice(il1, func(p, q int) bool {
-			num1 := il1[p].NodeID[:]
-			num2 := il1[q].NodeID[:]
-			lenID := len(num1)
-
-			// assume the length is a multiple of 4, for performance.  it's 32 bytes
-			for i := 0; i < lenID; i += 8 {
-				chunk1 := binary.BigEndian.Uint64(num1[i:])
-				chunk2 := binary.BigEndian.Uint64(num2[i:])
-
-				if chunk1 < chunk2 {
-					return true
-				} else if chunk1 == chunk2 {
-					continue
-				} else {
-					return false
-				}
-			}
-			// equality
-			return true
-		})
-		element := il1[8]
-
-		assert.True(t, il1.IdentifierExists(element.NodeID))
+		il1.Sort()
+		
+		for i := 0; i < 10; i++ {
+			assert.True(t, il1.IdentifierExists(il1[i].NodeID))
+		}
 		assert.False(t, il1.IdentifierExists(il2[0].NodeID))
 	})
 }
