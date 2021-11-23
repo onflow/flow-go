@@ -147,8 +147,9 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	signatures := []crypto.Signature{}
 	indices := []uint{}
 	for i, n := range nodes {
-		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(nextEpochSetup.Counter)
+		priv, hasDKGKey, err := n.keyStorage.RetrieveMyDKGPrivateInfo(nextEpochSetup.Counter)
 		require.NoError(s.T(), err)
+		require.True(s.T(), hasDKGKey)
 
 		signer := signature.NewThresholdProvider("TAG", priv.RandomBeaconPrivKey.PrivateKey)
 		signers = append(signers, signer)
@@ -201,5 +202,6 @@ func (s *DKGSuite) TestNodesDown() {
 // between consensus node and access node, as well as connection issues between
 // access node and execution node, or the execution node being down).
 func (s *DKGSuite) TestEmulatorProblems() {
+	s.T().Skip("flaky test - quarantined")
 	s.runTest(numberOfNodes, true)
 }

@@ -53,7 +53,7 @@ func TestConnectionManagerProtection(t *testing.T) {
 		// single stream created on a connection
 		{protect, isProtected, unprotect, isNotProtected},
 		// two streams created on a connection at the same time
-		{protect, protect, unprotect, isProtected, unprotect, isNotProtected},
+		{protect, protect, unprotect, isNotProtected, unprotect, isNotProtected},
 		// two streams created on a connection one after another
 		{protect, unprotect, isNotProtected, protect, unprotect, isNotProtected},
 	}
@@ -68,9 +68,9 @@ func testSequence(t *testing.T, sequence []fun, connMgr *ConnManager) {
 	for _, s := range sequence {
 		switch s.funName {
 		case protectF:
-			connMgr.ProtectPeer(pID)
+			connMgr.Protect(pID, "global")
 		case unprotectF:
-			connMgr.UnprotectPeer(pID)
+			connMgr.Unprotect(pID, "global")
 		case isProtectedF:
 			require.Equal(t, connMgr.IsProtected(pID, ""), s.expectation, fmt.Sprintf("failed sequence: %v", sequence))
 		}

@@ -96,8 +96,10 @@ func (suite *DHTTestSuite) TestFindPeerWithDHT() {
 
 			// Try to create a stream from client i to client j. This should resort to a DHT
 			// lookup since client i does not know client j's address.
-			_, err = dhtClientNodes[i].CreateStream(suite.ctx, dhtClientNodes[j].host.ID())
-			require.NoError(suite.T(), err)
+			unittest.RequireReturnsBefore(suite.T(), func() {
+				_, err = dhtClientNodes[i].CreateStream(suite.ctx, dhtClientNodes[j].host.ID())
+				require.NoError(suite.T(), err)
+			}, 1*time.Second, "could not create stream on time")
 		}
 	}
 }
@@ -214,7 +216,6 @@ func (suite *DHTTestSuite) TestPubSubWithDHTDiscovery() {
 // CreateNode creates the given number of libp2pnodes
 // if dhtServer is true, the DHTServer is used as for Discovery else DHTClient
 func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node) {
-
 	// keeps track of errors on creating a node
 	var err error
 	logger := log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
@@ -239,13 +240,14 @@ func (suite *DHTTestSuite) CreateNodes(count int, dhtServer bool) (nodes []*Node
 		resolver := dns.NewResolver(noopMetrics)
 
 		n, err := NewDefaultLibP2PNodeBuilder(flow.Identifier{}, "0.0.0.0:0", key).
-			SetRootBlockID(rootBlockID).
+			SetSporkID(sporkID).
 			SetConnectionManager(connManager).
 			SetDHTOptions(AsServer(dhtServer)).
 			SetPingInfoProvider(pingInfoProvider).
 			SetResolver(resolver).
 			SetLogger(logger).
 			SetTopicValidation(false).
+			SetStreamCompressor(WithGzipCompression).
 			Build(suite.ctx)
 		require.NoError(suite.T(), err)
 

@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
+// TODO: to be replaced with EpochAwareRandomBeaconKeyStore
 // EpochAwareSignerStore implements the SignerStore interface. It is epoch
 // aware, and provides the appropriate threshold signers on a per-view basis,
 // using the database to retrieve the relevant DKG keys.
@@ -40,11 +41,13 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 		return signer, nil
 	}
 
-	privDKGData, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
+	privDKGData, hasBeaconKey, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
 	if errors.Is(err, storage.ErrNotFound) {
 		signer = NewThresholdProvider(encoding.RandomBeaconTag, nil)
 	} else if err != nil {
 		return nil, fmt.Errorf("could not retrieve DKG private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
+	} else if !hasBeaconKey {
+		return nil, fmt.Errorf("no random beacon private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
 	} else {
 		signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData.RandomBeaconPrivKey)
 	}

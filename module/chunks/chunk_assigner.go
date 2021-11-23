@@ -6,7 +6,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/crypto/random"
 	chunkmodels "github.com/onflow/flow-go/model/chunks"
-	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/encoding/json"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/indices"
@@ -167,8 +167,8 @@ func chunkAssignment(ids flow.IdentifierList, chunks flow.ChunkList, rng random.
 func fingerPrint(blockID flow.Identifier, resultID flow.Identifier, alpha int) (hash.Hash, error) {
 	hasher := hash.NewSHA3_256()
 
-	// encodes alpha parameteer
-	encAlpha, err := encoding.DefaultEncoder.Encode(alpha)
+	// encodes alpha parameter
+	encAlpha, err := json.NewMarshaler().Marshal(alpha)
 	if err != nil {
 		return nil, fmt.Errorf("could not encode alpha: %w", err)
 	}
