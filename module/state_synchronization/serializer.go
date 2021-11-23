@@ -44,6 +44,7 @@ type serializer struct {
 	compressor network.Compressor
 }
 
+// writePrototype writes the header code for the given value to the given writer
 func (s *serializer) writePrototype(w io.Writer, v interface{}) error {
 	var code byte
 	var err error
@@ -65,6 +66,7 @@ func (s *serializer) writePrototype(w io.Writer, v interface{}) error {
 	return nil
 }
 
+// Serialize encodes and compresses the given value to the given writer
 func (s *serializer) Serialize(w io.Writer, v interface{}) error {
 	if err := s.writePrototype(w, v); err != nil {
 		return fmt.Errorf("failed to write prototype: %w", err)
@@ -82,6 +84,7 @@ func (s *serializer) Serialize(w io.Writer, v interface{}) error {
 		return fmt.Errorf("failed to encode data: %w", err)
 	}
 
+	// flush data out to the underlying writer
 	if err := comp.Close(); err != nil {
 		return fmt.Errorf("failed to close compressor: %w", err)
 	}
@@ -89,6 +92,7 @@ func (s *serializer) Serialize(w io.Writer, v interface{}) error {
 	return nil
 }
 
+// readPrototype reads a header code from the given reader and returns a prototype value
 func (s *serializer) readPrototype(r io.Reader) (interface{}, error) {
 	var code byte
 	var err error
@@ -108,6 +112,7 @@ func (s *serializer) readPrototype(r io.Reader) (interface{}, error) {
 	return getPrototype(code)
 }
 
+// Deserialize decompresses and decodes the data from the given reader
 func (s *serializer) Deserialize(r io.Reader) (interface{}, error) {
 	v, err := s.readPrototype(r)
 

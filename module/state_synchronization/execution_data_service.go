@@ -294,10 +294,11 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid, log
 		return nil, &MalformedDataError{deserializeErr}
 	}
 
-	// TODO: deserialization succeeds even if the blob channel reader has still has unconsumed
-	// data, meaning that a malicious actor could fill the blob tree with lots of unnecessary
-	// data by appending it at the end of the serialized data for each level. Eventually, we
-	// will need to implement validation logic on Verification nodes to slash this behavior.
+	// TODO: deserialization succeeds even if the blob channel reader has still has unconsumed data, meaning that a malicious actor
+	// could fill the blob tree with lots of unnecessary data by appending it at the end of the serialized data for each level.
+	// It's possible that we could detect this and fail deserialization using something like the following:
+	// https://github.com/onflow/flow-go/blob/bd5320719266b045ae2cac954f6a56e1e79560eb/engine/access/rest/handlers.go#L189-L193
+	// Eventually, we will need to implement validation logic on Verification nodes to slash this behavior.
 
 	return v, nil
 }
