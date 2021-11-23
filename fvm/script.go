@@ -65,13 +65,13 @@ func (proc *ScriptProcedure) Run(vm *VirtualMachine, ctx Context, sth *state.Sta
 	return nil
 }
 
-type ScriptInvocator struct{}
+type ScriptInvoker struct{}
 
-func NewScriptInvocator() ScriptInvocator {
-	return ScriptInvocator{}
+func NewScriptInvoker() ScriptInvoker {
+	return ScriptInvoker{}
 }
 
-func (i ScriptInvocator) Process(
+func (i ScriptInvoker) Process(
 	vm *VirtualMachine,
 	ctx Context,
 	proc *ScriptProcedure,

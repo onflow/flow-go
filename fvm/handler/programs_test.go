@@ -133,7 +133,7 @@ func Test_Programs(t *testing.T) {
 
 	fmt.Printf("Account created\n")
 
-	context := fvm.NewContext(zerolog.Nop(), fvm.WithRestrictedDeployment(false), fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())), fvm.WithCadenceLogging(true))
+	context := fvm.NewContext(zerolog.Nop(), fvm.WithRestrictedDeployment(false), fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())), fvm.WithCadenceLogging(true))
 
 	var contractAView *delta.View = nil
 	var contractBView *delta.View = nil

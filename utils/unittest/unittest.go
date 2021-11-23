@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -29,7 +31,7 @@ func ExpectPanic(expectedMsg string, t *testing.T) {
 
 // AssertReturnsBefore asserts that the given function returns before the
 // duration expires.
-func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
+func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration, msgAndArgs ...interface{}) {
 	done := make(chan struct{})
 
 	go func() {
@@ -40,7 +42,7 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 	select {
 	case <-time.After(duration):
 		t.Log("function did not return in time")
-		t.Fail()
+		assert.Fail(t, "function did not close in time", msgAndArgs...)
 	case <-done:
 		return
 	}
@@ -264,4 +266,9 @@ func Concurrently(n int, f func(int)) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+// AssertEqualBlocksLenAndOrder asserts that both a segment of blocks have the same len and blocks are in the same order
+func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlocks []*flow.Block) {
+	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
 }
