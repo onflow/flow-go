@@ -934,7 +934,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 			fvm.WithTransactionProcessors(
 				fvm.NewTransactionAccountFrozenChecker(),
 				fvm.NewTransactionAccountFrozenEnabler(),
-				fvm.NewTransactionInvocator(zerolog.Nop()),
+				fvm.NewTransactionInvoker(zerolog.Nop()),
 			),
 		).
 		run(
