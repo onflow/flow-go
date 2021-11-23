@@ -345,6 +345,11 @@ func (c *Core) checkBlockOutdated(blockID flow.Identifier) error {
 // * exception in case of unexpected error
 // * nil - successfully processed result approval
 func (c *Core) ProcessApproval(approval *flow.ResultApproval) error {
+	c.log.Debug().
+		Str("result_id", approval.Body.ExecutionResultID.String()).
+		Str("verifier_id", approval.Body.ApproverID.String()).
+		Msg("processing result approval")
+
 	span, _, isSampled := c.tracer.StartBlockSpan(context.Background(), approval.Body.BlockID, trace.CONSealingProcessApproval)
 	if isSampled {
 		span.LogFields(log.String("approverId", approval.Body.ApproverID.String()))
@@ -405,6 +410,10 @@ func (c *Core) processApproval(approval *flow.ResultApproval) error {
 			return fmt.Errorf("could not process assignment: %w", err)
 		}
 	} else {
+		c.log.Debug().
+			Str("result_id", approval.Body.ExecutionResultID.String()).
+			Msg("haven't yet received execution result, caching for later")
+
 		// in case we haven't received execution result, cache it and process later.
 		c.approvalsCache.Put(approval)
 	}

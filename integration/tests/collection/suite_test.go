@@ -40,6 +40,8 @@ type CollectorSuite struct {
 	net       *testnet.FlowNetwork
 	nClusters uint
 
+	serviceAccountIdx uint64
+
 	// account info
 	acct struct {
 		key    *sdk.AccountKey
@@ -62,14 +64,22 @@ func TestCollectorSuite(t *testing.T) {
 // NOTE: This must be called explicitly by each test, since nodes/clusters vary
 //       between test cases.
 func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
-
-	// default set of non-collector nodes
 	var (
 		conNode = testnet.NewNodeConfig(flow.RoleConsensus, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
-		exeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
-		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.ErrorLevel), testnet.AsGhost())
+		exeNode = testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
+		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 	)
-	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection, testnet.WithAdditionalFlag("--block-rate-delay=1ms"))
+	nodes := []testnet.NodeConfig{
+		conNode,
+		exeNode,
+		verNode,
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+	}
+	colNodes := testnet.NewNodeConfigSet(nNodes, flow.RoleCollection,
+		testnet.WithLogLevel(zerolog.WarnLevel),
+		testnet.WithAdditionalFlag("--block-rate-delay=1ms"),
+	)
 
 	suite.nClusters = nClusters
 
@@ -77,8 +87,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 	suite.ghostID = conNode.Identifier
 
 	// instantiate the network
-	nodes := append(colNodes, conNode, exeNode, verNode)
-	nodes = append(nodes, testnet.NewNodeConfig(flow.RoleAccess), testnet.NewNodeConfig(flow.RoleAccess))
+	nodes = append(nodes, colNodes...)
 	conf := testnet.NewNetworkConfig(name, nodes, testnet.WithClusters(nClusters))
 	suite.net = testnet.PrepareFlowNetwork(suite.T(), conf)
 
@@ -88,6 +97,7 @@ func (suite *CollectorSuite) SetupTest(name string, nNodes, nClusters uint) {
 
 	// create an account to use for sending transactions
 	suite.acct.addr, suite.acct.key, suite.acct.signer = common.GetAccount(suite.net.Root().Header.ChainID.Chain())
+	suite.serviceAccountIdx = 2
 
 	// subscribe to the ghost
 	for attempts := 0; ; attempts++ {
@@ -162,8 +172,11 @@ func (suite *CollectorSuite) TxForCluster(target flow.IdentityList) *sdk.Transac
 
 	// hash-grind the script until the transaction will be routed to target cluster
 	for {
+		serviceAccountAddr, err := suite.net.Root().Header.ChainID.Chain().AddressAtIndex(suite.serviceAccountIdx)
+		suite.Require().NoError(err)
+		suite.serviceAccountIdx++
 		tx.SetScript(append(tx.Script, '/', '/'))
-		err := tx.SignEnvelope(sdk.ServiceAddress(sdk.Testnet), acct.key.Index, acct.signer)
+		err = tx.SignEnvelope(sdk.Address(serviceAccountAddr), acct.key.Index, acct.signer)
 		require.Nil(suite.T(), err)
 		routed, ok := clusters.ByTxID(convert.IDFromSDK(tx.ID()))
 		require.True(suite.T(), ok)
@@ -226,7 +239,7 @@ func (suite *CollectorSuite) AwaitTransactionsIncluded(txIDs ...flow.Identifier)
 
 	suite.T().Logf("awaiting %d transactions included", len(txIDs))
 
-	waitFor := defaultTimeout + time.Duration(len(lookup))*100*time.Millisecond
+	waitFor := defaultTimeout + time.Duration(len(lookup))*200*time.Millisecond
 	deadline := time.Now().Add(waitFor)
 	for time.Now().Before(deadline) {
 
@@ -318,7 +331,7 @@ func (suite *CollectorSuite) ClusterStateFor(id flow.Identifier) *clusterstateim
 
 	clusterStateRoot, err := clusterstateimpl.NewStateRoot(rootBlock)
 	suite.NoError(err)
-	clusterState, err := clusterstateimpl.Bootstrap(db, clusterStateRoot)
+	clusterState, err := clusterstateimpl.OpenState(db, nil, nil, nil, clusterStateRoot.ClusterID())
 	require.NoError(suite.T(), err, "could not get cluster state")
 
 	return clusterState

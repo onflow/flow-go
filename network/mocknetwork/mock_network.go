@@ -6,6 +6,7 @@ package mocknetwork
 
 import (
 	gomock "github.com/golang/mock/gomock"
+	go_ipfs_blockstore "github.com/ipfs/go-ipfs-blockstore"
 	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	network "github.com/onflow/flow-go/network"
 	reflect "reflect"
@@ -75,6 +76,21 @@ func (m *MockNetwork) Register(arg0 network.Channel, arg1 network.Engine) (netwo
 func (mr *MockNetworkMockRecorder) Register(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Register", reflect.TypeOf((*MockNetwork)(nil).Register), arg0, arg1)
+}
+
+// RegisterBlockExchange mocks base method
+func (m *MockNetwork) RegisterBlockExchange(arg0 network.Channel, arg1 go_ipfs_blockstore.Blockstore) (network.BlockExchange, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RegisterBlockExchange", arg0, arg1)
+	ret0, _ := ret[0].(network.BlockExchange)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RegisterBlockExchange indicates an expected call of RegisterBlockExchange
+func (mr *MockNetworkMockRecorder) RegisterBlockExchange(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RegisterBlockExchange", reflect.TypeOf((*MockNetwork)(nil).RegisterBlockExchange), arg0, arg1)
 }
 
 // Start mocks base method

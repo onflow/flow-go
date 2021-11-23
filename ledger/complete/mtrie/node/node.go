@@ -57,18 +57,13 @@ func NewNode(height int,
 	maxDepth uint16,
 	regCount uint64) *Node {
 
-	var pl *ledger.Payload
-	if payload != nil {
-		pl = payload.DeepCopy()
-	}
-
 	n := &Node{
 		lChild:    lchild,
 		rChild:    rchild,
 		height:    height,
 		path:      path,
 		hashValue: hashValue,
-		payload:   pl,
+		payload:   payload,
 		maxDepth:  maxDepth,
 		regCount:  regCount,
 	}
@@ -78,6 +73,7 @@ func NewNode(height int,
 // NewLeaf creates a compact leaf Node.
 // UNCHECKED requirement: height must be non-negative
 // UNCHECKED requirement: payload is non nil
+// UNCHECKED requirement: payload should be deep copied if received from external sources
 func NewLeaf(path ledger.Path,
 	payload *ledger.Payload,
 	height int) *Node {
@@ -87,7 +83,7 @@ func NewLeaf(path ledger.Path,
 		rChild:   nil,
 		height:   height,
 		path:     path,
-		payload:  payload.DeepCopy(),
+		payload:  payload,
 		maxDepth: 0,
 		regCount: uint64(1),
 	}
@@ -122,10 +118,97 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	return n
 }
 
+// CopyAndPromoteLeafNode makes a copy of a node and moves it one level higher to replace
+// the parent node, this method should only be called for leaf nodes
+// depending on where this node is located to the parent the
+// hash value would be different, if isRight is set to true the original place
+// of the node n was right child of its parent so the hash value would be adjusted accordingly
+func (n *Node) copyAndPromoteLeafNode(isRight bool) *Node {
+	// note path is an arrays (not slice) so it would be coppied
+	newNode := &Node{
+		height:   n.height + 1,
+		path:     n.path,
+		payload:  n.payload,
+		maxDepth: n.maxDepth,
+		regCount: n.regCount,
+	}
+	if isRight {
+		newNode.hashValue = hash.HashInterNode(ledger.GetDefaultHashForHeight(n.height), n.hashValue)
+	} else {
+		newNode.hashValue = hash.HashInterNode(n.hashValue, ledger.GetDefaultHashForHeight(n.height))
+	}
+	return newNode
+}
+
 // computeAndStoreHash computes the node's hash value and
 // stores the result in the nodes internal `hashValue` field
 func (n *Node) computeAndStoreHash() {
 	n.hashValue = n.computeHash()
+}
+
+// Compactify checks if the subtree represented by an interim-node can be simplified to its most concise representation by looking only at its direct children. The
+// compactified representation of a default node is `nil`. For a node that only has a
+// _single_ child that is itself a leaf, this method returns a new, fully compactified leaf.
+// Returns:
+//  * n: if the node cannot be compactified, we return the original node `n`
+//  * cn: if the node can be compactified, where cn is a newly created compactified leaf
+func (n *Node) Compactify() *Node {
+
+	// if is a default node return nil instaed
+	if n.isDefaultNode() {
+		return nil
+	}
+
+	// if is a non default leaf, return it as is (no need for deep copy)
+	if n.IsLeaf() {
+		return n
+	}
+
+	// if leaf return it as is
+	// if non leaf bubble up
+	lChildEmpty := true
+	rChildEmpty := true
+	if n.lChild != nil {
+		lChildEmpty = n.lChild.isDefaultNode()
+	}
+	if n.rChild != nil {
+		rChildEmpty = n.rChild.isDefaultNode()
+	}
+	if rChildEmpty && lChildEmpty {
+		// if both children are empty this is the same as as a default leafs
+		return nil
+	}
+
+	// if childNode is non empty
+	if rChildEmpty {
+		if !lChildEmpty && n.lChild.IsLeaf() {
+			return n.lChild.copyAndPromoteLeafNode(false)
+		}
+		// this would replace empty nodes with nil
+		n.rChild = nil
+	}
+	if lChildEmpty {
+		if !rChildEmpty && n.rChild.IsLeaf() {
+			return n.rChild.copyAndPromoteLeafNode(true)
+		}
+		// this would replace empty nodes with nil
+		n.lChild = nil
+	}
+
+	// else no change needed
+	return n
+}
+
+// isDefaultNode returns true if either the node is nil
+// or the node's hash value is equal to the default hash value
+// for that height, in other words, it
+// does not contains any non-empty value in its sub-trie
+func (n *Node) isDefaultNode() bool {
+	if n == nil {
+		return true
+	}
+	return n.hashValue == ledger.GetDefaultHashForHeight(n.height)
+
 }
 
 // computeHash returns the hashValue of the node
