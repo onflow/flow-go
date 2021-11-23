@@ -13,6 +13,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/libp2p/go-libp2p"
+	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -98,14 +99,15 @@ func DefaultLibP2PNodeFactory(
 	me flow.Identifier,
 	address string,
 	flowKey fcrypto.PrivateKey,
-	rootBlockID flow.Identifier,
+	sporkID flow.Identifier,
 	idProvider id.IdentityProvider,
 	maxPubSubMsgSize int,
 	metrics module.NetworkMetrics,
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
 	role string,
-	streamFactory LibP2PStreamCompressorWrapperFunc) (LibP2PFactoryFunc, error) {
+	streamFactory LibP2PStreamCompressorWrapperFunc,
+) (LibP2PFactoryFunc, error) {
 
 	connManager := NewConnManager(log, metrics)
 
@@ -117,15 +119,13 @@ func DefaultLibP2PNodeFactory(
 
 	if role != "ghost" {
 		psOpts = append(psOpts, func(_ context.Context, h host.Host) (pubsub.Option, error) {
-			return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(
-				h.ID(), rootBlockID, idProvider,
-			)), nil
+			return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(h.ID(), idProvider)), nil
 		})
 	}
 
 	return func(ctx context.Context) (*Node, error) {
 		return NewDefaultLibP2PNodeBuilder(me, address, flowKey).
-			SetRootBlockID(rootBlockID).
+			SetSporkID(sporkID).
 			SetConnectionGater(connGater).
 			SetConnectionManager(connManager).
 			SetPubsubOptions(psOpts...).
@@ -138,8 +138,8 @@ func DefaultLibP2PNodeFactory(
 }
 
 type NodeBuilder interface {
-	SetRootBlockID(flow.Identifier) NodeBuilder
-	SetConnectionManager(TagLessConnManager) NodeBuilder
+	SetSporkID(flow.Identifier) NodeBuilder
+	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetConnectionGater(*ConnGater) NodeBuilder
 	SetPubsubOptions(...PubsubOption) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
@@ -153,10 +153,10 @@ type NodeBuilder interface {
 
 type DefaultLibP2PNodeBuilder struct {
 	id               flow.Identifier
-	rootBlockID      *flow.Identifier
+	sporkID          flow.Identifier
 	logger           zerolog.Logger
 	connGater        *ConnGater
-	connMngr         TagLessConnManager
+	connMngr         connmgr.ConnManager
 	pingInfoProvider PingInfoProvider
 	resolver         *dns.Resolver
 	streamFactory    LibP2PStreamCompressorWrapperFunc
@@ -190,12 +190,12 @@ func (builder *DefaultLibP2PNodeBuilder) SetTopicValidation(enabled bool) NodeBu
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetRootBlockID(rootBlockId flow.Identifier) NodeBuilder {
-	builder.rootBlockID = &rootBlockId
+func (builder *DefaultLibP2PNodeBuilder) SetSporkID(sporkID flow.Identifier) NodeBuilder {
+	builder.sporkID = sporkID
 	return builder
 }
 
-func (builder *DefaultLibP2PNodeBuilder) SetConnectionManager(connMngr TagLessConnManager) NodeBuilder {
+func (builder *DefaultLibP2PNodeBuilder) SetConnectionManager(connMngr connmgr.ConnManager) NodeBuilder {
 	builder.connMngr = connMngr
 	return builder
 }
@@ -248,10 +248,10 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 		return nil, errors.New("unable to create libp2p pubsub: factory function not provided")
 	}
 
-	if builder.rootBlockID == nil {
-		return nil, errors.New("root block ID must be provided")
+	if builder.sporkID == flow.ZeroID {
+		return nil, errors.New("spork ID must be provided")
 	}
-	node.flowLibP2PProtocolID = generateFlowProtocolID(*builder.rootBlockID)
+	node.flowLibP2PProtocolID = FlowProtocolID(builder.sporkID)
 
 	var opts []config.Option
 
@@ -294,6 +294,11 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 	node.host = libp2pHost
 
+	node.pCache, err = newProtocolPeerCache(node.logger, libp2pHost)
+	if err != nil {
+		return nil, err
+	}
+
 	if len(builder.dhtOpts) != 0 {
 		kdht, err := NewDHT(ctx, node.host, builder.dhtOpts...)
 		if err != nil {
@@ -304,7 +309,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 
 	if builder.pingInfoProvider != nil {
-		pingLibP2PProtocolID := generatePingProtcolID(*builder.rootBlockID)
+		pingLibP2PProtocolID := generatePingProtocolID(builder.sporkID)
 		pingService := NewPingService(libp2pHost, pingLibP2PProtocolID, builder.pingInfoProvider, node.logger)
 		node.pingService = pingService
 	}
@@ -352,9 +357,10 @@ type Node struct {
 	resolver             *dns.Resolver                          // dns resolver for libp2p (is nil if default)
 	compressedStream     LibP2PStreamCompressorWrapperFunc
 	pingService          *PingService
-	connMgr              TagLessConnManager
+	connMgr              connmgr.ConnManager
 	dht                  *dht.IpfsDHT
 	topicValidation      bool
+	pCache               *protocolPeerCache
 }
 
 // Stop terminates the libp2p node.
@@ -425,12 +431,7 @@ func (n *Node) Stop() (chan struct{}, error) {
 
 // AddPeer adds a peer to this node by adding it to this node's peerstore and connecting to it
 func (n *Node) AddPeer(ctx context.Context, peerInfo peer.AddrInfo) error {
-	err := n.host.Connect(ctx, peerInfo)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return n.host.Connect(ctx, peerInfo)
 }
 
 // RemovePeer closes the connection with the peer.
@@ -440,6 +441,15 @@ func (n *Node) RemovePeer(ctx context.Context, peerID peer.ID) error {
 		return fmt.Errorf("failed to remove peer %s: %w", peerID, err)
 	}
 	return nil
+}
+
+func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
+	pMap := n.pCache.getPeers(pid)
+	peers := make(peer.IDSlice, 0, len(pMap))
+	for p := range pMap {
+		peers = append(peers, p)
+	}
+	return peers
 }
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
@@ -483,11 +493,6 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 // Note that in case an existing TCP connection underneath to `peerID` exists, that connection is utilized for creating a new stream.
 // The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
 func (n *Node) tryCreateNewStream(ctx context.Context, peerID peer.ID, maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {
-	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
-	// connection creation is being attempted, and remove it from protected list once stream created.
-	n.connMgr.ProtectPeer(peerID)
-	defer n.connMgr.UnprotectPeer(peerID)
-
 	var errs error
 	var s libp2pnet.Stream
 	var retries = 0
@@ -681,8 +686,8 @@ func (n *Node) Ping(ctx context.Context, peerID peer.ID) (message.PingResponse, 
 
 	targetInfo := peer.AddrInfo{ID: peerID}
 
-	n.connMgr.ProtectPeer(targetInfo.ID)
-	defer n.connMgr.UnprotectPeer(targetInfo.ID)
+	n.connMgr.Protect(targetInfo.ID, "ping")
+	defer n.connMgr.Unprotect(targetInfo.ID, "ping")
 
 	// connect to the target node
 	err := n.host.Connect(ctx, targetInfo)
@@ -819,19 +824,20 @@ func DefaultPubSub(ctx context.Context, host host.Host, psOption ...pubsub.Optio
 // PubsubOption generates a libp2p pubsub.Option from the given context and host
 type PubsubOption func(ctx context.Context, host host.Host) (pubsub.Option, error)
 
-func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
-	pubSubOptionFunc := func(option pubsub.Option) PubsubOption {
-		return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
-			return option, nil
-		}
+func PubSubOptionWrapper(option pubsub.Option) PubsubOption {
+	return func(_ context.Context, _ host.Host) (pubsub.Option, error) {
+		return option, nil
 	}
+}
+
+func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 	return []PubsubOption{
 		// skip message signing
-		pubSubOptionFunc(pubsub.WithMessageSigning(true)),
+		PubSubOptionWrapper(pubsub.WithMessageSigning(true)),
 		// skip message signature
-		pubSubOptionFunc(pubsub.WithStrictSignatureVerification(true)),
+		PubSubOptionWrapper(pubsub.WithStrictSignatureVerification(true)),
 		// set max message size limit for 1-k PubSub messaging
-		pubSubOptionFunc(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
+		PubSubOptionWrapper(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
 		// no discovery
 	}
 }

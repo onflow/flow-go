@@ -1,6 +1,8 @@
 package network
 
 import (
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
+
 	"github.com/onflow/flow-go/module/component"
 )
 
@@ -15,4 +17,8 @@ type Network interface {
 	// The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
 	// On a single node, only one engine can be subscribed to a channel at any given time.
 	Register(channel Channel, engine Engine) (Conduit, error)
+
+	// RegisterBlockExchange registers a BlockExchange network on the given channel.
+	// The returned BlockExchange can be used to request blocks from the network.
+	RegisterBlockExchange(channel Channel, store blockstore.Blockstore) (BlockExchange, error)
 }

@@ -22,6 +22,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/admin"
+	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/admin/commands/common"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
@@ -116,6 +117,7 @@ type FlowNodeBuilder struct {
 	lm                       *lifecycle.LifecycleManager
 	extraFlagCheck           func() error
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
+	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
@@ -150,6 +152,8 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
 	fnb.flags.StringVar(&fnb.BaseConfig.LibP2PStreamCompression, "stream-compression", p2p.NoCompression,
 		"networking stream compression mechanism")
+	fnb.flags.IntVar(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultCacheSize,
+		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
 }
@@ -209,7 +213,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
-			fnb.RootBlock.ID(),
+			fnb.SporkID,
 			fnb.IdentityProvider,
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
@@ -222,9 +226,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
 
-		mwOpts := []p2p.MiddlewareOption{
-			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
-		}
+		var mwOpts []p2p.MiddlewareOption
 		if len(fnb.MsgValidators) > 0 {
 			mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 		}
@@ -234,7 +236,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		mwOpts = append(mwOpts, p2p.WithPeerManager(peerManagerFactory))
 
 		fnb.Middleware = p2p.NewMiddleware(
-			fnb.Logger.Level(zerolog.ErrorLevel),
+			fnb.Logger,
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
@@ -262,7 +264,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			codec,
 			fnb.Me,
 			func() (network.Middleware, error) { return fnb.Middleware, nil },
-			p2p.DefaultCacheSize,
+			fnb.NetworkReceivedMessageCacheSize,
 			topologyCache,
 			subscriptionManager,
 			fnb.Metrics.Network,
@@ -388,7 +390,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	log := fnb.Logger.With().
 		Timestamp().
 		Str("node_role", fnb.BaseConfig.NodeRole).
-		Str("node_id", fnb.BaseConfig.nodeIDHex).
+		Str("node_id", fnb.NodeID.String()).
 		Logger()
 
 	log.Info().Msgf("flow %s node starting up", fnb.BaseConfig.NodeRole)
@@ -432,10 +434,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 		fnb.Metrics = Metrics{
-			Network:        metrics.NewNetworkCollector(),
-			Engine:         metrics.NewEngineCollector(),
-			Compliance:     metrics.NewComplianceCollector(),
-			Cache:          metrics.NewCacheCollector(fnb.RootChainID),
+			Network:    metrics.NewNetworkCollector(),
+			Engine:     metrics.NewEngineCollector(),
+			Compliance: metrics.NewComplianceCollector(),
+			// CacheControl metrics has been causing memory abuse, disable for now
+			// Cache:          metrics.NewCacheCollector(fnb.RootChainID),
+			Cache:          metrics.NewNoopCollector(),
 			CleanCollector: metrics.NewCleanerCollector(),
 			Mempool:        mempools,
 		}
@@ -584,8 +588,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		node.IdentityProvider = idCache
 		node.IDTranslator = idCache
-		node.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
-		node.SyncEngineIdentifierProvider = id.NewFilteredIdentifierProvider(
+		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
@@ -608,7 +611,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msg("failed to read root sealed result")
 	sealingSegment, err := rootSnapshot.SealingSegment()
 	fnb.MustNot(err).Msg("failed to read root sealing segment")
-	fnb.RootBlock = sealingSegment[len(sealingSegment)-1]
+	fnb.RootBlock = sealingSegment.Highest()
 	fnb.RootQC, err = rootSnapshot.QuorumCertificate()
 	fnb.MustNot(err).Msg("failed to read root qc")
 	// set the chain ID based on the root header
@@ -617,6 +620,8 @@ func (fnb *FlowNodeBuilder) initState() {
 	// state as final authority on what the chain ID is
 	// => https://github.com/dapperlabs/flow-go/issues/4167
 	fnb.RootChainID = fnb.RootBlock.Header.ChainID
+	fnb.SporkID, err = rootSnapshot.Params().SporkID()
+	fnb.MustNot(err)
 
 	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
 	fnb.MustNot(err).Msg("failed to determine whether database contains bootstrapped state")
@@ -637,9 +642,10 @@ func (fnb *FlowNodeBuilder) initState() {
 
 		// Verify root block in protocol state is consistent with bootstrap information stored on-disk.
 		// Inconsistencies can happen when the bootstrap root block is updated (because of new spork),
-		// but the protocol state is not updated, so they don't match
-		// when this happens during a spork, we could try deleting the protocol state database.
-		// TODO: revisit this check when implementing Epoch
+		// but the protocol state is not updated, so they don't match.
+		//
+		// When this happens during a spork, we could try deleting the protocol state database.
+		//
 		rootBlockFromState, err := state.Params().Root()
 		fnb.MustNot(err).Msg("could not load root block from protocol state")
 		if fnb.RootBlock.ID() != rootBlockFromState.ID() {
@@ -820,10 +826,8 @@ func (fnb *FlowNodeBuilder) Module(name string, f func(builder NodeBuilder, node
 	return fnb
 }
 
-// AdminCommand registers a new admin command with the admin server
-func (fnb *FlowNodeBuilder) AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder {
-	fnb.adminCommandBootstrapper.RegisterHandler(command, handler)
-	fnb.adminCommandBootstrapper.RegisterValidator(command, validator)
+func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder {
+	fnb.adminCommands[command] = f
 	return fnb
 }
 
@@ -927,6 +931,7 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 		flags:                    pflag.CommandLine,
 		lm:                       lifecycle.NewLifecycleManager(),
 		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
+		adminCommands:            make(map[string]func(*NodeConfig) commands.AdminCommand),
 	}
 	return builder
 }
@@ -962,7 +967,11 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 }
 
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
-	fnb.AdminCommand("set-log-level", common.SetLogLevelCommand.Handler, common.SetLogLevelCommand.Validator)
+	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
+		return &common.SetLogLevelCommand{}
+	}).AdminCommand("read-protocol-state-blocks", func(config *NodeConfig) commands.AdminCommand {
+		return common.NewReadProtocolStateBlocksCommand(config.State, config.Storage.Blocks)
+	})
 }
 
 // Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
@@ -1031,6 +1040,13 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 
 		for _, f := range fnb.postInitFns {
 			fnb.handlePostInit(f)
+		}
+
+		// set up all admin commands
+		for commandName, commandFunc := range fnb.adminCommands {
+			command := commandFunc(fnb.NodeConfig)
+			fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
+			fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
 		}
 
 		// set up all modules

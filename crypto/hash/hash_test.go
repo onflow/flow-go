@@ -163,9 +163,15 @@ func TestSha3(t *testing.T) {
 			rand.Read(value)
 			expected := sha3.Sum256(value)
 
+			// test hash computation using the hasher
 			hasher := NewSHA3_256()
 			h := hasher.ComputeHash(value)
 			assert.Equal(t, expected[:], []byte(h))
+
+			// test hash computation using the light api
+			var res [HashLenSha3_256]byte
+			ComputeSHA3_256(&res, value)
+			assert.Equal(t, expected[:], res[:])
 		}
 	})
 
@@ -189,36 +195,45 @@ func BenchmarkComputeHash(b *testing.B) {
 	rand.Read(m)
 
 	b.Run("SHA2_256", func(b *testing.B) {
-		alg := NewSHA2_256()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
+			alg := NewSHA2_256()
 			_ = alg.ComputeHash(m)
 		}
 		b.StopTimer()
 	})
 
 	b.Run("SHA2_384", func(b *testing.B) {
-		alg := NewSHA2_384()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
+			alg := NewSHA2_384()
 			_ = alg.ComputeHash(m)
 		}
 		b.StopTimer()
 	})
 
 	b.Run("SHA3_256", func(b *testing.B) {
-		alg := NewSHA3_256()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
+			alg := NewSHA3_256()
 			alg.ComputeHash(m)
 		}
 		b.StopTimer()
 	})
 
-	b.Run("SHA3_384", func(b *testing.B) {
-		alg := NewSHA3_384()
+	b.Run("SHA3_256_light", func(b *testing.B) {
+		var h [HashLenSha3_256]byte
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
+			ComputeSHA3_256(&h, m)
+		}
+		b.StopTimer()
+	})
+
+	b.Run("SHA3_384", func(b *testing.B) {
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			alg := NewSHA3_384()
 			_ = alg.ComputeHash(m)
 		}
 		b.StopTimer()

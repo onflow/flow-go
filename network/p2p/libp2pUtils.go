@@ -162,12 +162,16 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-func generateFlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
-	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID.String())
+// FlowProtocolID creates a libp2p protocol ID namespaced to a particular
+// spork. This prevents cross-talk between nodes from different sporks.
+func FlowProtocolID(sporkID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + sporkID.String())
 }
 
-func generatePingProtcolID(rootBlockID flow.Identifier) protocol.ID {
-	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID.String())
+// generatePingProtocolID creates a libp2p protocol ID namespaced to a particular
+// spork. This prevents cross-talk between nodes from different sporks.
+func generatePingProtocolID(sporkID flow.Identifier) protocol.ID {
+	return protocol.ID(FlowLibP2PPingProtocolPrefix + sporkID.String())
 }
 
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.

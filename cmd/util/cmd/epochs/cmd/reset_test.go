@@ -1,15 +1,14 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,148 +17,163 @@ import (
 
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/onflow/flow-go/utils/io"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-const happyPathLogs = `^read in root-protocol-snapshot.json` +
-	`extracted resetEpoch transaction arguments from snapshot` +
-	`wrote resetEpoch transaction arguments`
+// TestReset_LocalSnapshot tests the command with a local snapshot file.
+func TestReset_LocalSnapshot(t *testing.T) {
 
-var happyPathRegex = regexp.MustCompile(happyPathLogs)
+	// tests that given the root snapshot file and no payout, the command
+	// writes the expected arguments to stdout.
+	t.Run("happy path", func(t *testing.T) {
 
-// TestResetHappyPathWithoutPayout tests that given the root snapshot file and no payout, the command
-// writes file containing the correct argument values
-func TestResetHappyPathWithoutPayout(t *testing.T) {
+		unittest.RunWithTempDir(t, func(bootDir string) {
 
-	unittest.RunWithTempDir(t, func(bootDir string) {
+			// create a root snapshot
+			rootSnapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10))
 
-		nodesPerCluster := 5
-
-		// to match regex
-		hook := zeroLoggerHook{logs: &strings.Builder{}}
-		log = log.Hook(hook)
-
-		// path to args file (if created)
-		path, err := os.Getwd()
-		require.NoError(t, err)
-		argsPath := filepath.Join(path, resetArgsFileName)
-
-		// remove args file once test finishes
-		defer func() {
-			err := os.Remove(argsPath)
+			// write snapshot to correct path in bootDir
+			err := writeRootSnapshot(bootDir, rootSnapshot)
 			require.NoError(t, err)
-		}()
 
-		// create a root snapshot
-		rootSnapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(nodesPerCluster))
+			// set initial flag values
+			flagBootDir = bootDir
+			flagPayout = ""
 
-		// write snapshot to correct path in bootDir
-		err = writeRootSnapshot(bootDir, rootSnapshot)
-		require.NoError(t, err)
+			// run command with overwritten stdout
+			stdout := bytes.NewBuffer(nil)
+			resetCmd.SetOut(stdout)
+			resetRun(resetCmd, nil)
 
-		// set initial flag values
-		flagBootDir = bootDir
-		flagPayout = ""
+			// read output from stdout
+			var outputTxArgs []interface{}
+			err = json.NewDecoder(stdout).Decode(&outputTxArgs)
+			require.NoError(t, err)
 
-		// run command
-		resetRun(nil, nil)
-		assert.Regexp(t, happyPathRegex, hook.logs.String())
+			// compare to expected values
+			expectedArgs := extractResetEpochArgs(rootSnapshot)
+			verifyArguments(t, expectedArgs, outputTxArgs)
+		})
+	})
 
-		// check if args file was created
-		assert.FileExists(t, argsPath)
+	// tests that given the root snapshot file and payout, the command
+	// writes the expected arguments to stdout.
+	t.Run("with payout flag set", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(bootDir string) {
 
-		// read file and make sure values are exactly as expected
-		var actualArgs []interface{}
-		err = readJSON(argsPath, &actualArgs)
-		require.NoError(t, err)
+			// create a root snapshot
+			rootSnapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(10))
 
-		// extract args
-		expectedArgs := extractResetEpochArgs(rootSnapshot)
-		verifyArguments(t, expectedArgs, actualArgs)
+			// write snapshot to correct path in bootDir
+			err := writeRootSnapshot(bootDir, rootSnapshot)
+			require.NoError(t, err)
+
+			// set initial flag values
+			flagBootDir = bootDir
+			flagPayout = "10.0"
+
+			// run command with overwritten stdout
+			stdout := bytes.NewBuffer(nil)
+			resetCmd.SetOut(stdout)
+			resetRun(resetCmd, nil)
+
+			// read output from stdout
+			var outputTxArgs []interface{}
+			err = json.NewDecoder(stdout).Decode(&outputTxArgs)
+			require.NoError(t, err)
+
+			// compare to expected values
+			expectedArgs := extractResetEpochArgs(rootSnapshot)
+			verifyArguments(t, expectedArgs, outputTxArgs)
+		})
+	})
+
+	// tests that without the root snapshot file in the bootstrap
+	// dir, the command exits and does not output a args json file
+	t.Run("missing snapshot file", func(t *testing.T) {
+		unittest.RunWithTempDir(t, func(bootDir string) {
+
+			var hook unittest.LoggerHook
+			log, hook = unittest.HookedLogger()
+
+			// set initial flag values
+			flagBootDir = bootDir
+			flagPayout = ""
+
+			// run command
+			resetRun(resetCmd, nil)
+
+			assert.Regexp(t, "failed to retrieve root snapshot from local bootstrap directory", hook.Logs())
+		})
 	})
 }
 
-// TestResetHappyPathWithPayout tests that given the root snapshot file and payout, the command
-// writes file containing the correct argument values
-func TestResetHappyPathWithPayout(t *testing.T) {
+// TestReset_BucketSnapshot tests generating resetEpoch arguments using a
+// root snapshot downloaded from GCP.
+func TestReset_BucketSnapshot(t *testing.T) {
+	// this test is skipped, as it requires an internet connection
+	t.SkipNow()
 
-	unittest.RunWithTempDir(t, func(bootDir string) {
-
-		nodesPerCluster := 5
-
-		// to match regex
-		hook := zeroLoggerHook{logs: &strings.Builder{}}
-		log = log.Hook(hook)
-
-		// path to args file (if created)
-		path, err := os.Getwd()
-		require.NoError(t, err)
-		argsPath := filepath.Join(path, resetArgsFileName)
-
-		// remove args file once test finishes
-		defer func() {
-			err := os.Remove(argsPath)
-			require.NoError(t, err)
-		}()
-
-		// create a root snapshot
-		rootSnapshot := unittest.RootSnapshotFixture(unittest.IdentityListFixture(nodesPerCluster))
-
-		// write snapshot to correct path in bootDir
-		err = writeRootSnapshot(bootDir, rootSnapshot)
-		require.NoError(t, err)
-
+	// should output tx arguments to stdout
+	t.Run("happy path", func(t *testing.T) {
 		// set initial flag values
-		flagBootDir = bootDir
-		flagPayout = "10000.0254"
+		flagBucketNetworkName = "mainnet-13"
+		flagPayout = ""
 
-		// run command
-		resetRun(nil, nil)
-		assert.Regexp(t, happyPathRegex, hook.logs.String())
+		// run command with overwritten stdout
+		stdout := bytes.NewBuffer(nil)
+		resetCmd.SetOut(stdout)
+		resetRun(resetCmd, nil)
 
-		// check if args file was created
-		assert.FileExists(t, argsPath)
-
-		// read file and make sure values are exactly as expected
-		var actualArgs []interface{}
-		err = readJSON(argsPath, &actualArgs)
+		// read output from stdout
+		var outputTxArgs []interface{}
+		err := json.NewDecoder(stdout).Decode(&outputTxArgs)
 		require.NoError(t, err)
 
-		// extract args
+		// compare to expected values
+		rootSnapshot, err := getSnapshotFromBucket(fmt.Sprintf(rootSnapshotBucketURL, flagBucketNetworkName))
+		require.NoError(t, err)
 		expectedArgs := extractResetEpochArgs(rootSnapshot)
-		verifyArguments(t, expectedArgs, actualArgs)
+		verifyArguments(t, expectedArgs, outputTxArgs)
 	})
-}
 
-// TestResetNoSnapshot tests that without the root snapshot file in the bootstrap
-// dir, the command exits and does not output a args json file
-func TestResetNoSnapshot(t *testing.T) {
+	// should output arguments to stdout, including specified payout
+	t.Run("happy path - with payout", func(t *testing.T) {
+		// set initial flag values
+		flagBucketNetworkName = "mainnet-13"
+		flagPayout = "10.0"
 
-	unittest.RunWithTempDir(t, func(bootDir string) {
+		// run command with overwritten stdout
+		stdout := bytes.NewBuffer(nil)
+		resetCmd.SetOut(stdout)
+		resetRun(resetCmd, nil)
 
-		var noSnapshotRegex = regexp.MustCompile(`^root-protocol-snapshot.json file does not exists in the --boot-dir given`)
-
-		// to match regex
-		hook := zeroLoggerHook{logs: &strings.Builder{}}
-		log = log.Hook(hook)
-
-		// path to args file (if created)
-		path, err := os.Getwd()
+		// read output from stdout
+		var outputTxArgs []interface{}
+		err := json.NewDecoder(stdout).Decode(&outputTxArgs)
 		require.NoError(t, err)
-		argsPath := filepath.Join(path, resetArgsFileName)
+
+		// compare to expected values
+		rootSnapshot, err := getSnapshotFromBucket(fmt.Sprintf(rootSnapshotBucketURL, flagBucketNetworkName))
+		require.NoError(t, err)
+		expectedArgs := extractResetEpochArgs(rootSnapshot)
+		verifyArguments(t, expectedArgs, outputTxArgs)
+	})
+
+	// with a missing snapshot, should log an error
+	t.Run("missing snapshot", func(t *testing.T) {
+
+		var hook unittest.LoggerHook
+		log, hook = unittest.HookedLogger()
 
 		// set initial flag values
-		// root snapshot json file does not exist within this dir
-		flagBootDir = bootDir
+		flagBucketNetworkName = "not-a-real-network-name"
 		flagPayout = ""
 
 		// run command
-		resetRun(nil, nil)
-		assert.Regexp(t, noSnapshotRegex, hook.logs.String())
+		resetRun(resetCmd, nil)
 
-		// check if args file was created
-		assert.NoFileExists(t, argsPath)
+		assert.Regexp(t, "failed to retrieve root snapshot from bucket", hook.Logs())
 	})
 }
 
@@ -203,29 +217,4 @@ func writeJSON(path string, data interface{}) error {
 	}
 
 	return nil
-}
-
-// TODO: move this to common module
-func readJSON(path string, target interface{}) error {
-
-	dat, err := io.ReadFile(path)
-	if err != nil {
-		return err
-	}
-
-	err = json.Unmarshal(dat, target)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// TODO: move this to common module
-type zeroLoggerHook struct {
-	logs *strings.Builder
-}
-
-func (h zeroLoggerHook) Run(_ *zerolog.Event, _ zerolog.Level, msg string) {
-	h.logs.WriteString(msg)
 }
