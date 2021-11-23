@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/onflow/flow-go/engine"
@@ -40,7 +39,6 @@ const (
 // be used in conjuction with the DKG MessagingEngine for private messages, and
 // with the DKG smart-contract for broadcast messages.
 type Broker struct {
-	sync.Mutex
 	log                       zerolog.Logger
 	unit                      *engine.Unit
 	dkgInstanceID             string                     // unique identifier of the current dkg run (prevent replay attacks)
@@ -199,8 +197,6 @@ func (b *Broker) GetBroadcastMsgCh() <-chan messages.DKGMessage {
 // block whose seal is finalized. The function doesn't return until the received
 // messages are processed by the consumer because b.msgCh is not buffered.
 func (b *Broker) Poll(referenceBlock flow.Identifier) error {
-	b.Lock()
-	defer b.Unlock()
 	expRetry, err := retry.NewExponential(retryMilliseconds)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
@@ -233,6 +229,8 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 		return nil
 	}
 
+	b.unit.Lock()
+	defer b.unit.Unlock()
 	for _, msg := range msgs {
 		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
