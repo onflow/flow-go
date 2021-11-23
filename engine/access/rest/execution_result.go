@@ -29,7 +29,7 @@ func getExecutionResultByID(req *requestDecorator, backend access.API, link Link
 func executionResultLookup(ctx context.Context, id flow.Identifier, backend access.API, linkGenerator LinkGenerator) (*generated.ExecutionResult, StatusError) {
 	executionResult, err := backend.GetExecutionResultForBlockID(ctx, id)
 	if err != nil {
-		return nil, idLookupError(id, "execution result", err)
+		return nil, idLookupError(&id, "execution result", err)
 	}
 
 	executionResultResp := executionResultResponse(executionResult)

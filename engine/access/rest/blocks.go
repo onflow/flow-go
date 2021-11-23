@@ -27,7 +27,8 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 
 	blocks := make([]*generated.Block, len(ids))
 	for i, id := range ids {
-		block, err := getBlockByID(id, r, backend, link)
+		blkProvider := NewBlockProvider(backend, withID(&id))
+		block, err := getBlock(blkProvider, r, backend, link)
 		if err != nil {
 			return nil, err
 		}
@@ -37,34 +38,117 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 	return blocks, nil
 }
 
-func getBlockByID(id flow.Identifier, req *requestDecorator, backend access.API, link LinkGenerator) (*generated.Block, StatusError) {
+func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+	height := r.getParam("height")
+	startHeight := r.getParam("start_height")
+	endHeight := r.getParam("end_height")
+
+	// if both height and one or both of start and end height are provided
+	if height != "" && (startHeight != "" || endHeight != "") {
+		err := fmt.Errorf("can only provide either heights or start and end height range")
+		return nil, NewBadRequestError(err.Error(), err)
+	}
+
+	// if neither height nor start and end height are provided
+	if height == "" && (startHeight == "" || endHeight == "") {
+		err := fmt.Errorf("must provide either heights or start and end height range")
+		return nil, NewBadRequestError(err.Error(), err)
+	}
+
+	blocks := make([]*generated.Block, len(height))
+
+	if height != "" {
+		heights, err := toHeights(height)
+		if err != nil {
+			return nil, NewBadRequestError(err.Error(), err)
+		}
+
+		for i, h := range heights {
+			blkProvider := NewBlockProvider(backend, withHeight(h))
+			block, err := getBlock(blkProvider, r, backend, link)
+			if err != nil {
+				return nil, err
+			}
+			blocks[i] = block
+		}
+		return blocks, nil
+	}
+
+	if startHeight != "" && endHeight != "" {
+		start, err := toHeight(startHeight)
+		if err != nil {
+			return nil, NewBadRequestError(err.Error(), err)
+		}
+		end, err := toHeight(endHeight)
+		if err != nil {
+			return nil, NewBadRequestError(err.Error(), err)
+		}
+
+		if start > end {
+			err := fmt.Errorf("start height must be lower than end height")
+			return nil, NewBadRequestError(err.Error(), err)
+		}
+
+		for i := start; i < end; i++ {
+			blkProvider := NewBlockProvider(backend, withHeight(i))
+			block, err := getBlock(blkProvider, r, backend, link)
+			if err != nil {
+				return nil, err
+			}
+			blocks[i] = block
+		}
+	}
+
+	return blocks, nil
+}
+
+// getBlockPayloadByID gets block payload by ID
+func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, StatusError) {
+
+	id, err := req.id()
+	if err != nil {
+		return nil, NewBadRequestError(err.Error(), err)
+	}
+
+	blkProvider := NewBlockProvider(backend, withID(&id))
+	blk, statusErr := blkProvider.getBlock(req.Context())
+	if statusErr != nil {
+		return nil, statusErr
+	}
+	payload := blockPayloadResponse(blk.Payload)
+	return payload, nil
+}
+
+func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.API, link LinkGenerator) (*generated.Block, StatusError) {
 	var responseBlock = new(generated.Block)
 	responseBlock.Expandable = new(generated.BlockExpandable)
 
+	var id flow.Identifier
 	// if payload is to be expanded then lookup full block which contains both header and payload
 	if req.expands(ExpandableFieldPayload) {
-		header, payload, statusError := blockLookup(req.Context(), id, backend)
-		if statusError != nil {
-			return nil, statusError
+		blk, err := blkProvider.getBlock(req.Context())
+		if err != nil {
+			return nil, err
 		}
-		responseBlock.Header = header
-		responseBlock.Payload = payload
+		responseBlock.Header, responseBlock.Payload = blockHeaderResponse(blk.Header), blockPayloadResponse(blk.Payload)
+		id = blk.ID()
 	} else {
 
 		// else only lookup header and add expandable link for payload
-		header, statusError := headerLookup(req.Context(), id, backend)
-		if statusError != nil {
-			return nil, statusError
+		header, statusErr := blkProvider.getHeader(req.Context())
+		if statusErr != nil {
+			return nil, statusErr
 		}
-		responseBlock.Header = header
+		responseBlock.Header = blockHeaderResponse(header)
 		responseBlock.Payload = nil
+		id = header.ID()
 
-		var err error
-		responseBlock.Expandable.Payload, err = link.PayloadLink(id)
+		payload, err := link.PayloadLink(id)
 		if err != nil {
 			msg := fmt.Sprintf("failed to generate response for block ID %s", id.String())
 			return nil, NewRestError(http.StatusInternalServerError, msg, err)
 		}
+		responseBlock.Expandable.Payload = payload
 	}
 
 	// if execution result is to be expanded, then lookup execution result else add expandable link for execution result
@@ -96,129 +180,7 @@ func getBlockByID(id flow.Identifier, req *requestDecorator, backend access.API,
 	return responseBlock, nil
 }
 
-// todo(sideninja) use functions from block lookup to support expanding etc
-func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
-	height := r.getParam("height")
-	startHeight := r.getParam("start_height")
-	endHeight := r.getParam("end_height")
-
-	// if both height and one or both of start and end height are provided
-	if height != "" && (startHeight != "" || endHeight != "") {
-		err := fmt.Errorf("can only provide either heights or start and end height range")
-		return nil, NewBadRequestError(err.Error(), err)
-	}
-
-	// if neither height nor start and end height are provided
-	if height == "" && (startHeight == "" || endHeight == "") {
-		err := fmt.Errorf("must provide either heights or start and end height range")
-		return nil, NewBadRequestError(err.Error(), err)
-	}
-
-	blocks := make([]*generated.Block, len(height))
-
-	if height != "" {
-		heights, err := toHeights(height)
-		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
-		}
-
-		for i, h := range heights {
-			block, err := getBlockByHeight(r.Context(), h, r, backend, link)
-			if err != nil {
-				return nil, err
-			}
-			blocks[i] = block
-		}
-	}
-
-	if startHeight != "" && endHeight != "" {
-		start, err := toHeight(startHeight)
-		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
-		}
-		end, err := toHeight(endHeight)
-		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
-		}
-
-		if start > end {
-			err := fmt.Errorf("start height must be lower than end height")
-			return nil, NewBadRequestError(err.Error(), err)
-		}
-
-		for i := start; i < end; i++ {
-			block, err := getBlockByHeight(r.Context(), i, r, backend, link)
-			if err != nil {
-				return nil, err
-			}
-			blocks[i] = block
-		}
-	}
-
-	return blocks, nil
-}
-
-func getBlockByHeight(
-	ctx context.Context,
-	height uint64,
-	req *requestDecorator,
-	backend access.API,
-	link LinkGenerator,
-) (*generated.Block, StatusError) {
-	var responseBlock = new(generated.Block)
-	if req.expands(ExpandableFieldPayload) {
-		flowBlock, err := backend.GetBlockByHeight(ctx, height)
-		if err != nil {
-			return nil, blockHeightLookupError(height, err)
-		}
-		responseBlock = blockResponse(flowBlock, link)
-
-		return responseBlock, nil
-	}
-
-	flowBlockHeader, err := backend.GetBlockHeaderByHeight(ctx, height)
-	if err != nil {
-		return nil, blockHeightLookupError(height, err)
-	}
-	responseBlock.Header = blockHeaderResponse(flowBlockHeader)
-	responseBlock.Links = blockLink(flowBlockHeader.ID(), link)
-
-	return responseBlock, nil
-}
-
-// getBlockPayloadByID gets block payload by ID
-func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, StatusError) {
-
-	id, err := req.id()
-	if err != nil {
-		return nil, NewBadRequestError(err.Error(), err)
-	}
-
-	_, payload, statusErr := blockLookup(req.Context(), id, backend)
-	if err != nil {
-		return nil, statusErr
-	}
-
-	return payload, nil
-}
-
-func blockLookup(ctx context.Context, id flow.Identifier, backend access.API) (*generated.BlockHeader, *generated.BlockPayload, StatusError) {
-	flowBlock, err := backend.GetBlockByID(ctx, id)
-	if err != nil {
-		return nil, nil, idLookupError(id, "block", err)
-	}
-	return blockHeaderResponse(flowBlock.Header), blockPayloadResponse(flowBlock.Payload), nil
-}
-
-func headerLookup(ctx context.Context, id flow.Identifier, backend access.API) (*generated.BlockHeader, StatusError) {
-	flowBlockHeader, err := backend.GetBlockHeaderByID(ctx, id)
-	if err != nil {
-		return nil, idLookupError(id, "block header", err)
-	}
-	return blockHeaderResponse(flowBlockHeader), nil
-}
-
-func idLookupError(id flow.Identifier, entityType string, err error) StatusError {
+func idLookupError(id *flow.Identifier, entityType string, err error) StatusError {
 	msg := fmt.Sprintf("%s with ID %s not found", entityType, id.String())
 	// if error has GRPC code NotFound, then return HTTP NotFound error
 	if status.Code(err) == codes.NotFound {
@@ -228,11 +190,73 @@ func idLookupError(id flow.Identifier, entityType string, err error) StatusError
 }
 
 // todo(sideninja) refactor and merge
-func blockHeightLookupError(height uint64, err error) StatusError {
-	msg := fmt.Sprintf("block with height %d not found", height)
+func heightLookupError(height uint64, entityType string, err error) StatusError {
+	msg := fmt.Sprintf("%s at height %d not found", entityType, height)
 	// if error has GRPC code NotFound, then return HTTP NotFound error
 	if status.Code(err) == codes.NotFound {
 		return NewNotFoundError(msg, err)
 	}
 	return NewRestError(http.StatusInternalServerError, msg, err)
+}
+
+// blockProvider is a layer of abstraction on top of the backend access.API and provides a uniform way to
+// lookup a block or a block header either by ID or by height
+type blockProvider struct {
+	id      *flow.Identifier
+	height  uint64
+	backend access.API
+}
+
+type blockProviderOption func(blkProvider *blockProvider)
+
+func withID(id *flow.Identifier) blockProviderOption {
+	return func(blkProvider *blockProvider) {
+		blkProvider.id = id
+	}
+}
+func withHeight(height uint64) blockProviderOption {
+	return func(blkProvider *blockProvider) {
+		blkProvider.height = height
+	}
+}
+
+func NewBlockProvider(backend access.API, options ...blockProviderOption) *blockProvider {
+	blkProvider := &blockProvider{
+		backend: backend,
+	}
+
+	for _, o := range options {
+		o(blkProvider)
+	}
+	return blkProvider
+}
+
+func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, StatusError) {
+	if blkProvider.id != nil {
+		blk, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
+		if err != nil {
+			return nil, idLookupError(blkProvider.id, "block", err)
+		}
+		return blk, nil
+	}
+	blk, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
+	if err != nil {
+		return nil, heightLookupError(blkProvider.height, "block", err)
+	}
+	return blk, nil
+}
+
+func (blkProvider *blockProvider) getHeader(ctx context.Context) (*flow.Header, StatusError) {
+	if blkProvider.id != nil {
+		header, err := blkProvider.backend.GetBlockHeaderByID(ctx, *blkProvider.id)
+		if err != nil {
+			return nil, idLookupError(blkProvider.id, "block", err)
+		}
+		return header, nil
+	}
+	header, err := blkProvider.backend.GetBlockHeaderByHeight(ctx, blkProvider.height)
+	if err != nil {
+		return nil, heightLookupError(blkProvider.height, "block", err)
+	}
+	return header, nil
 }
