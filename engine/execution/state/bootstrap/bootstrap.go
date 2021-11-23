@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
-const ledgerIntractionLimitNeeded = 50_000_000
+const ledgerIntractionLimitNeeded = 1_000_000_000
 
 type Bootstrapper struct {
 	logger zerolog.Logger
