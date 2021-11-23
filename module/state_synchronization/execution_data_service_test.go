@@ -26,6 +26,7 @@ import (
 	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/compressor"
@@ -167,7 +168,7 @@ func allKeys(t *testing.T, bs blockstore.Blockstore, timeout time.Duration) []ci
 func executionDataService(bs network.BlobService) *ExecutionDataService {
 	codec := new(cbor.Codec)
 	compressor := compressor.NewLz4Compressor()
-	return NewExecutionDataService(codec, compressor, bs)
+	return NewExecutionDataService(codec, compressor, bs, metrics.NewNoopCollector())
 }
 
 func assertErrorType(t *testing.T, err error, target interface{}) {
