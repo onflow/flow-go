@@ -29,6 +29,7 @@ type ExecutionDataService struct {
 	blobService network.BlobService
 	maxBlobSize int
 	metrics     module.ExecutionDataServiceMetrics
+	logger      zerolog.Logger
 }
 
 func NewExecutionDataService(
@@ -38,7 +39,13 @@ func NewExecutionDataService(
 	metrics module.ExecutionDataServiceMetrics,
 	logger zerolog.Logger,
 ) *ExecutionDataService {
-	return &ExecutionDataService{&serializer{codec, compressor}, blobService, defaultMaxBlobSize, metrics}
+	return &ExecutionDataService{
+		&serializer{codec, compressor},
+		blobService,
+		defaultMaxBlobSize,
+		metrics,
+		logger.With().Str("component", "execution_data_service").Logger(),
+	}
 }
 
 func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *blobs.BlobReceiver) ([]blobs.Blob, error) {
@@ -60,7 +67,7 @@ func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *blobs.BlobR
 	return batch, err
 }
 
-func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.BlobReceiver) ([]cid.Cid, error) {
+func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.BlobReceiver, logger zerolog.Logger) ([]cid.Cid, error) {
 	defer br.Close()
 
 	ctx, cancel := context.WithCancel(parent)
@@ -70,14 +77,22 @@ func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.Blob
 
 	for {
 		batch, recvErr := s.receiveBatch(ctx, br)
+		batchCids := zerolog.Arr()
 
 		for _, blob := range batch {
 			cids = append(cids, blob.Cid())
+			batchCids.Str(blob.Cid().String())
 		}
 
+		batchLogger := logger.With().Array("cids", batchCids).Logger()
+
 		if err := s.blobService.AddBlobs(ctx, batch); err != nil {
+			batchLogger.Debug().Err(err).Msg("failed to add batch to blobservice")
+
 			return nil, err
 		}
+
+		batchLogger.Debug().Msg("added batch to blobservice")
 
 		if recvErr != nil {
 			if recvErr != blobs.ErrClosedBlobChannel {
@@ -92,7 +107,7 @@ func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.Blob
 	return cids, nil
 }
 
-func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) {
+func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}, logger zerolog.Logger) ([]cid.Cid, error) {
 	bcw, br := blobs.IncomingBlobChannel(s.maxBlobSize)
 
 	done := make(chan struct{})
@@ -103,13 +118,19 @@ func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}) ([]c
 		defer bcw.Close()
 
 		if serializeErr = s.serializer.Serialize(bcw, v); serializeErr != nil {
+			logger.Debug().Err(serializeErr).Msg("failed to serialize execution data")
+
 			return
 		}
 
 		serializeErr = bcw.Flush()
+
+		if serializeErr != nil {
+			logger.Debug().Err(serializeErr).Msg("flushed execution data")
+		}
 	}()
 
-	cids, storeErr := s.storeBlobs(ctx, br)
+	cids, storeErr := s.storeBlobs(ctx, br, logger)
 
 	<-done
 
@@ -122,10 +143,13 @@ func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}) ([]c
 
 // Add constructs a blob tree for the given ExecutionData and adds it to the blobservice, and then returns the root CID.
 func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error) {
+	logger := s.logger.With().Str("block_id", sd.BlockID.String()).Logger()
+	logger.Debug().Msg("adding execution data")
+
 	s.metrics.ExecutionDataAddStarted()
 
 	start := time.Now()
-	cids, err := s.addBlobs(ctx, sd)
+	cids, err := s.addBlobs(ctx, sd, logger)
 
 	if err != nil {
 		s.metrics.ExecutionDataAddFinished(time.Since(start), false, 0)
@@ -144,7 +168,7 @@ func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.
 			return cids[0], nil
 		}
 
-		if cids, err = s.addBlobs(ctx, cids); err != nil {
+		if cids, err = s.addBlobs(ctx, cids, logger); err != nil {
 			s.metrics.ExecutionDataAddFinished(time.Since(start), false, blobTreeNodes)
 
 			return cid.Undef, fmt.Errorf("failed to add cid blobs: %w", err)
@@ -152,7 +176,7 @@ func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.
 	}
 }
 
-func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *blobs.BlobSender, cids []cid.Cid) error {
+func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *blobs.BlobSender, cids []cid.Cid, logger zerolog.Logger) error {
 	defer bs.Close()
 
 	ctx, cancel := context.WithCancel(parent)
@@ -172,7 +196,7 @@ func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *blobs.B
 		if !ok {
 			var err error
 
-			blob, err = s.findBlob(blobChan, c, cachedBlobs)
+			blob, err = s.findBlob(blobChan, c, cachedBlobs, logger)
 
 			if err != nil {
 				_, ok := err.(*BlobNotFoundError)
@@ -205,8 +229,14 @@ func (s *ExecutionDataService) findBlob(
 	blobChan <-chan blobs.Blob,
 	target cid.Cid,
 	cache map[cid.Cid]blobs.Blob,
+	logger zerolog.Logger,
 ) (blobs.Blob, error) {
+	targetLogger := logger.With().Str("target_cid", target.String()).Logger()
+	targetLogger.Debug().Msg("finding blob")
+
 	for blob := range blobChan {
+		targetLogger.Debug().Str("cid", blob.Cid().String()).Msg("received blob")
+
 		// check blob size
 		blobSize := len(blob.RawData())
 
@@ -221,10 +251,12 @@ func (s *ExecutionDataService) findBlob(
 		}
 	}
 
+	targetLogger.Debug().Msg("blob not found")
+
 	return nil, &BlobNotFoundError{target}
 }
 
-func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
+func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid, logger zerolog.Logger) (interface{}, error) {
 	bcr, bs := blobs.OutgoingBlobChannel()
 
 	done := make(chan struct{})
@@ -235,10 +267,12 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (in
 		defer close(done)
 		defer bcr.Close()
 
-		v, deserializeErr = s.serializer.Deserialize(bcr)
+		if v, deserializeErr = s.serializer.Deserialize(bcr); deserializeErr != nil {
+			logger.Debug().Err(deserializeErr).Msg("failed to deserialize execution data")
+		}
 	}()
 
-	retrieveErr := s.retrieveBlobs(ctx, bs, cids)
+	retrieveErr := s.retrieveBlobs(ctx, bs, cids, logger)
 
 	<-done
 
@@ -260,6 +294,9 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (in
 
 // Get gets the ExecutionData for the given root CID from the blobservice.
 func (s *ExecutionDataService) Get(ctx context.Context, c cid.Cid) (*ExecutionData, error) {
+	logger := s.logger.With().Str("cid", c.String()).Logger()
+	logger.Debug().Msg("getting execution data")
+
 	s.metrics.ExecutionDataGetStarted()
 
 	start := time.Now()
@@ -268,7 +305,7 @@ func (s *ExecutionDataService) Get(ctx context.Context, c cid.Cid) (*ExecutionDa
 	var blobTreeNodes int
 
 	for i := uint(0); i < defaultMaxBlobTreeDepth; i++ {
-		v, err := s.getBlobs(ctx, cids)
+		v, err := s.getBlobs(ctx, cids, logger)
 
 		if err != nil {
 			s.metrics.ExecutionDataGetFinished(time.Since(start), false, blobTreeNodes)
