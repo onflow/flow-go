@@ -23,17 +23,17 @@ func Test_Programs(t *testing.T) {
 	addressC := flow.HexToAddress("0c")
 
 	contractALocation := common.AddressLocation{
-		Address: common.BytesToAddress(addressA.Bytes()),
+		Address: common.Address(addressA),
 		Name:    "A",
 	}
 
 	contractBLocation := common.AddressLocation{
-		Address: common.BytesToAddress(addressB.Bytes()),
+		Address: common.Address(addressB),
 		Name:    "B",
 	}
 
 	contractCLocation := common.AddressLocation{
-		Address: common.BytesToAddress(addressC.Bytes()),
+		Address: common.Address(addressC),
 		Name:    "C",
 	}
 

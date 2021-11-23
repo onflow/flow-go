@@ -168,7 +168,7 @@ func (e *ScriptEnv) ValueExists(owner, key []byte) (exists bool, err error) {
 }
 
 func (e *ScriptEnv) AccountExists(address common.Address) (exists bool, err error) {
-	return e.accounts.Exists(flow.BytesToAddress(address.Bytes()))
+	return e.accounts.Exists(flow.Address(address))
 }
 
 func (e *ScriptEnv) GetStorageUsed(address common.Address) (value uint64, err error) {
@@ -177,7 +177,7 @@ func (e *ScriptEnv) GetStorageUsed(address common.Address) (value uint64, err er
 		defer sp.Finish()
 	}
 
-	value, err = e.accounts.GetStorageUsed(flow.BytesToAddress(address.Bytes()))
+	value, err = e.accounts.GetStorageUsed(flow.Address(address))
 	if err != nil {
 		return value, fmt.Errorf("getting storage used failed: %w", err)
 	}
@@ -317,7 +317,7 @@ func (e *ScriptEnv) GetAccountContractNames(address runtime.Address) ([]string, 
 		defer sp.Finish()
 	}
 
-	a := flow.BytesToAddress(address.Bytes())
+	a := flow.Address(address)
 
 	freezeError := e.accounts.CheckAccountNotFrozen(a)
 	if freezeError != nil {
@@ -338,7 +338,7 @@ func (e *ScriptEnv) GetCode(location runtime.Location) ([]byte, error) {
 		return nil, errors.NewInvalidLocationErrorf(location, "expecting an AddressLocation, but other location types are passed")
 	}
 
-	address := flow.BytesToAddress(contractLocation.Address.Bytes())
+	address := flow.Address(contractLocation.Address)
 
 	err := e.accounts.CheckAccountNotFrozen(address)
 	if err != nil {
@@ -360,7 +360,7 @@ func (e *ScriptEnv) GetProgram(location common.Location) (*interpreter.Program, 
 	}
 
 	if addressLocation, ok := location.(common.AddressLocation); ok {
-		address := flow.BytesToAddress(addressLocation.Address.Bytes())
+		address := flow.Address(addressLocation.Address)
 
 		freezeError := e.accounts.CheckAccountNotFrozen(address)
 		if freezeError != nil {
