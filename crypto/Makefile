@@ -19,7 +19,7 @@ endif
 
 .PHONY: docker-build
 docker-build:
-	docker build --ssh default -t gcr.io/dl-flow/golang-cmake:latest -t gcr.io/dl-flow/golang-cmake:$(IMAGE_TAG) .
+	docker build -t gcr.io/dl-flow/golang-cmake:latest -t gcr.io/dl-flow/golang-cmake:$(IMAGE_TAG) .
 
 .PHONY: docker-push
 docker-push:
