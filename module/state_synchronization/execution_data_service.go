@@ -48,6 +48,7 @@ func NewExecutionDataService(
 	}
 }
 
+// receiveBatch receives a batch of blobs from the given BlobReceiver, and returns them as a slice
 func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *blobs.BlobReceiver) ([]blobs.Blob, error) {
 	var batch []blobs.Blob
 	var err error
@@ -67,6 +68,7 @@ func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *blobs.BlobR
 	return batch, err
 }
 
+// storeBlobs receives blobs from the given BlobReceiver, and stores them to the blobservice
 func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.BlobReceiver, logger zerolog.Logger) ([]cid.Cid, error) {
 	defer br.Close()
 
@@ -76,7 +78,7 @@ func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.Blob
 	var cids []cid.Cid
 
 	for {
-		batch, recvErr := s.receiveBatch(ctx, br)
+		batch, recvErr := s.receiveBatch(ctx, br) // retrieve one batch at a time
 		batchCids := zerolog.Arr()
 
 		for _, blob := range batch {
@@ -100,6 +102,7 @@ func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.Blob
 				return nil, recvErr
 			}
 
+			// the blob channel was closed, meaning that all blobs have been received
 			break
 		}
 	}
@@ -107,12 +110,14 @@ func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.Blob
 	return cids, nil
 }
 
+// addBlobs serializes the given object, splits the serialized data into blobs, and adds them to the blobservice
 func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}, logger zerolog.Logger) ([]cid.Cid, error) {
 	bcw, br := blobs.IncomingBlobChannel(s.maxBlobSize)
 
 	done := make(chan struct{})
 	var serializeErr error
 
+	// start serialization goroutine
 	go func() {
 		defer close(done)
 		defer bcw.Close()
@@ -176,15 +181,16 @@ func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.
 	}
 }
 
+// retrieveBlobs retrieves the blobs for the given CIDs from the blobservice, and sends them to the given BlobSender
 func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *blobs.BlobSender, cids []cid.Cid, logger zerolog.Logger) error {
 	defer bs.Close()
 
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 
-	blobChan := s.blobService.GetBlobs(ctx, cids)
+	blobChan := s.blobService.GetBlobs(ctx, cids) // initiate a batch request for the given CIDs
 	cachedBlobs := make(map[cid.Cid]blobs.Blob)
-	cidCounts := make(map[cid.Cid]int)
+	cidCounts := make(map[cid.Cid]int) // used to account for duplicate CIDs
 
 	for _, c := range cids {
 		cidCounts[c] += 1
@@ -225,6 +231,8 @@ func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *blobs.B
 	return nil
 }
 
+// findBlob retrieves blobs from the given channel, caching them along the way, until it either
+// finds the target blob or exhausts the channel.
 func (s *ExecutionDataService) findBlob(
 	blobChan <-chan blobs.Blob,
 	target cid.Cid,
@@ -256,6 +264,7 @@ func (s *ExecutionDataService) findBlob(
 	return nil, &BlobNotFoundError{target}
 }
 
+// getBlobs gets the given CIDs from the blobservice, reassembles the blobs, and deserializes the reassembled data into an object.
 func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid, logger zerolog.Logger) (interface{}, error) {
 	bcr, bs := blobs.OutgoingBlobChannel()
 
@@ -263,6 +272,7 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid, log
 	var v interface{}
 	var deserializeErr error
 
+	// start deserialization goroutine
 	go func() {
 		defer close(done)
 		defer bcr.Close()
@@ -341,6 +351,7 @@ func (e *MalformedDataError) Error() string {
 
 func (e *MalformedDataError) Unwrap() error { return e.err }
 
+// BlobSizeLimitExceededError is returned when a blob exceeds the maximum size allowed.
 type BlobSizeLimitExceededError struct {
 	cid cid.Cid
 }
@@ -349,6 +360,7 @@ func (e *BlobSizeLimitExceededError) Error() string {
 	return fmt.Sprintf("blob %v exceeds maximum blob size", e.cid.String())
 }
 
+// BlobNotFoundError is returned when the blobservice failed to find a blob.
 type BlobNotFoundError struct {
 	cid cid.Cid
 }
