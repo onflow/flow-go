@@ -30,21 +30,14 @@ type TestRun struct {
 // save TestRun to local JSON file
 func (testRun *TestRun) save(fileName string) {
 	testRunBytes, err := json.MarshalIndent(testRun, "", "  ")
-
-	if err != nil {
-		panic("error marshalling json" + err.Error())
-	}
+	assertErrNil(err, "error marshalling json: ")
 
 	file, err := os.Create(fileName)
-	if err != nil {
-		panic("error creating filename: " + err.Error())
-	}
+	assertErrNil(err, "error creating filename: ")
 	defer file.Close()
 
 	_, err = file.Write(testRunBytes)
-	if err != nil {
-		panic("error saving test run to file: " + err.Error())
-	}
+	assertErrNil(err, "error saving test run to file: ")
 }
 
 // models test result of an entire package which can have multiple tests
@@ -100,9 +93,7 @@ func processSummary1TestRun(resultReader ResultReader) TestRun {
 	packageResultMap := processTestRunLineByLine(scanner)
 
 	err := scanner.Err()
-	if err != nil {
-		panic("error returning EOF for scanner: " + err.Error())
-	}
+	assertErrNil(err, "error returning EOF for scanner: ")
 
 	postProcessTestRun(packageResultMap)
 
@@ -124,9 +115,7 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*PackageResult 
 	for scanner.Scan() {
 		var rawTestStep RawTestStep
 		err := json.Unmarshal(scanner.Bytes(), &rawTestStep)
-		if err != nil {
-			panic("error unmarshalling raw test step: " + err.Error())
-		}
+		assertErrNil(err, "error unmarshalling raw test step: ")
 
 		// check if package result exists to hold test results
 		packageResult, packageResultExists := packageResultMap[rawTestStep.Package]
@@ -241,14 +230,10 @@ func finalizeTestRun(packageResultMap map[string]*PackageResult) TestRun {
 	}
 
 	commitDate, err := time.Parse(time.RFC3339, os.Getenv("COMMIT_DATE"))
-	if err != nil {
-		panic("error parsing COMMIT_DATE: " + err.Error())
-	}
+	assertErrNil(err, "error parsing COMMIT_DATE: ")
 
 	jobStarted, err := time.Parse(time.RFC3339, os.Getenv("JOB_STARTED"))
-	if err != nil {
-		panic("error parsing JOB_STARTED: " + err.Error())
-	}
+	assertErrNil(err, "error parsing JOB_STARTED: ")
 
 	var testRun TestRun
 	testRun.CommitDate = commitDate.UTC()
