@@ -51,7 +51,11 @@ func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
 
 	for _, r := range routeDefinitions() {
 		h := NewHandler(logger, backend, r.apiHandlerFunc, linkGenerator)
-		h.addToRouter(v1SubRouter)
+		v1SubRouter.
+			Methods(r.method).
+			Path(r.pattern).
+			Name(r.name).
+			Handler(h)
 	}
 	return router
 }
@@ -94,7 +98,7 @@ func routeDefinitions() []routeDefinition {
 			method:         "GET",
 			pattern:        "/blocks",
 			name:           getBlocksByHeightRoute,
-			apiHandlerFunc: getBlocksByHeights,
+			apiHandlerFunc: getBlocksByHeight,
 		},
 		// Block Payload
 		{
@@ -108,7 +112,7 @@ func routeDefinitions() []routeDefinition {
 			method:         "GET",
 			pattern:        "/execution_results/{id}",
 			name:           getExecutionResultByIDRoute,
-			apiHandlerFunc: getExecutionResultByBlockIDs,
+			apiHandlerFunc: getExecutionResultByID,
 		},
 		// Collections
 		{

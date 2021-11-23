@@ -2,6 +2,7 @@ package rest
 
 import (
 	"fmt"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )

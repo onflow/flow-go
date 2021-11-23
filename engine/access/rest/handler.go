@@ -2,9 +2,9 @@ package rest
 
 import (
 	"encoding/json"
-	"github.com/gorilla/mux"
-	"github.com/rs/zerolog"
 	"net/http"
+
+	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
@@ -22,10 +22,6 @@ type ApiHandlerFunc func(
 // Handler function allows easier handling of errors and responses as it
 // wraps functionality for handling error and responses outside of endpoint handling.
 type Handler struct {
-	route          *mux.Route
-	method         string
-	pattern        string
-	name           string
 	logger         zerolog.Logger
 	backend        access.API
 	linkGenerator  LinkGenerator
@@ -61,17 +57,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	// write response to response stream
 	h.jsonResponse(w, response, errorLogger)
-}
-
-// addToRouter adds handler to provided router
-func (h *Handler) addToRouter(router *mux.Router) {
-	router.
-		Methods(h.method).
-		Path(h.pattern).
-		Name(h.name).
-		Handler(h)
-
-	h.route = router.Get(h.name)
 }
 
 func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logger zerolog.Logger) {

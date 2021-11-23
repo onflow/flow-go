@@ -3,8 +3,9 @@ package rest
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
 	"net/http"
+
+	"github.com/onflow/flow-go/model/flow"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -96,15 +97,18 @@ func getBlockByID(id flow.Identifier, req *requestDecorator, backend access.API,
 }
 
 // todo(sideninja) use functions from block lookup to support expanding etc
-func getBlocksByHeights(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
 	height := r.getParam("height")
 	startHeight := r.getParam("start_height")
 	endHeight := r.getParam("end_height")
 
+	// if both height and one or both of start and end height are provided
 	if height != "" && (startHeight != "" || endHeight != "") {
 		err := fmt.Errorf("can only provide either heights or start and end height range")
 		return nil, NewBadRequestError(err.Error(), err)
 	}
+
+	// if neither height nor start and end height are provided
 	if height == "" && (startHeight == "" || endHeight == "") {
 		err := fmt.Errorf("must provide either heights or start and end height range")
 		return nil, NewBadRequestError(err.Error(), err)
@@ -182,22 +186,6 @@ func getBlockByHeight(
 	return responseBlock, nil
 }
 
-// getExecutionResultByID gets Execution Result payload by ID
-func getExecutionResultByID(req *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
-
-	id, err := req.id()
-	if err != nil {
-		return nil, NewBadRequestError(err.Error(), err)
-	}
-
-	executionResult, err := executionResultLookup(req.Context(), id, backend, link)
-	if err != nil {
-		msg := fmt.Sprintf("failed to generate response for execution result ID %s", id.String())
-		return nil, NewRestError(http.StatusInternalServerError, msg, err)
-	}
-	return executionResult, nil
-}
-
 // getBlockPayloadByID gets block payload by ID
 func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, StatusError) {
 
@@ -228,21 +216,6 @@ func headerLookup(ctx context.Context, id flow.Identifier, backend access.API) (
 		return nil, idLookupError(id, "block header", err)
 	}
 	return blockHeaderResponse(flowBlockHeader), nil
-}
-
-func executionResultLookup(ctx context.Context, id flow.Identifier, backend access.API, linkGenerator LinkGenerator) (*generated.ExecutionResult, StatusError) {
-	executionResult, err := backend.GetExecutionResultForBlockID(ctx, id)
-	if err != nil {
-		return nil, idLookupError(id, "execution result", err)
-	}
-
-	executionResultResp := executionResultResponse(executionResult)
-	executionResultResp.Links, err = selfLink(executionResult.ID(), linkGenerator.ExecutionResultLink)
-	if err != nil {
-		msg := fmt.Sprintf("failed to generate response for execution result ID %s", id.String())
-		return nil, NewRestError(http.StatusInternalServerError, msg, err)
-	}
-	return executionResultResp, nil
 }
 
 func idLookupError(id flow.Identifier, entityType string, err error) StatusError {

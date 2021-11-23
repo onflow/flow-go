@@ -165,7 +165,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		jsonBytes, err := json.MarshalIndent(actualBlocks, "", "\t")
 		require.NoError(suite.T(), err)
 		fmt.Println(string(jsonBytes))
- 	})
+	})
 
 	suite.Run("GetBlockByID with a non-existing block ID", func() {
 
