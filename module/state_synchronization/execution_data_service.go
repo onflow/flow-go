@@ -38,7 +38,7 @@ func NewExecutionDataService(
 	return &ExecutionDataService{&serializer{codec, compressor}, blobService, defaultMaxBlobSize, metrics}
 }
 
-func (s *ExecutionDataService) storeBatch(ctx context.Context, br *BlobReceiver) ([]network.Blob, error) {
+func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *BlobReceiver) ([]network.Blob, error) {
 	var blobs []network.Blob
 	var err error
 
@@ -65,7 +65,7 @@ func (s *ExecutionDataService) storeBlobs(parent context.Context, br *BlobReceiv
 	var cids []cid.Cid
 
 	for {
-		batch, recvErr := s.storeBatch(ctx, br)
+		batch, recvErr := s.receiveBatch(ctx, br)
 
 		for _, blob := range batch {
 			cids = append(cids, blob.Cid())
@@ -156,32 +156,40 @@ func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *BlobSen
 
 	blobChan := s.blobService.GetBlobs(ctx, cids)
 	cachedBlobs := make(map[cid.Cid]network.Blob)
+	cidCounts := make(map[cid.Cid]int)
 
 	for _, c := range cids {
-		var err error
+		cidCounts[c] += 1
+	}
+
+	for _, c := range cids {
 		blob, ok := cachedBlobs[c]
 
-		if ok {
-			delete(cachedBlobs, c)
-		} else {
+		if !ok {
+			var err error
+
 			blob, err = s.findBlob(blobChan, c, cachedBlobs)
 
 			if err != nil {
-				return err
-			}
+				_, ok := err.(*BlobNotFoundError)
 
-			if blob == nil {
 				// the blob channel may be closed as a result of the context being canceled,
 				// in which case we should return the context error.
-				if ctx.Err() != nil {
+				if ok && ctx.Err() != nil {
 					return ctx.Err()
 				}
 
-				return &BlobNotFoundError{c}
+				return err
 			}
 		}
 
-		if err = bs.Send(blob); err != nil {
+		cidCounts[c] -= 1
+
+		if cidCounts[c] == 0 {
+			delete(cachedBlobs, c)
+		}
+
+		if err := bs.Send(blob); err != nil {
 			return err
 		}
 	}
@@ -197,18 +205,19 @@ func (s *ExecutionDataService) findBlob(
 	for blob := range blobChan {
 		// check blob size
 		blobSize := len(blob.RawData())
+
 		if blobSize > s.maxBlobSize {
 			return nil, &BlobSizeLimitExceededError{blob.Cid()}
 		}
 
+		cache[blob.Cid()] = blob
+
 		if blob.Cid() == target {
 			return blob, nil
 		}
-
-		cache[blob.Cid()] = blob
 	}
 
-	return nil, nil
+	return nil, &BlobNotFoundError{target}
 }
 
 func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
