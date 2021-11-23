@@ -44,6 +44,7 @@ func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *BlobReceive
 
 	for i := 0; i < defaultBlobBatchSize; i++ {
 		var blob network.Blob
+
 		blob, err = br.Receive()
 
 		if err != nil {
@@ -105,12 +106,12 @@ func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}) ([]c
 		serializeErr = bcw.Flush()
 	}()
 
-	cids, recvErr := s.storeBlobs(ctx, br)
+	cids, storeErr := s.storeBlobs(ctx, br)
 
 	<-done
 
-	if recvErr != nil {
-		return nil, recvErr
+	if storeErr != nil {
+		return nil, storeErr
 	}
 
 	return cids, serializeErr
@@ -190,7 +191,7 @@ func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *BlobSen
 		}
 
 		if err := bs.Send(blob); err != nil {
-			return err
+			return fmt.Errorf("failed to send blob %v to blob channel: %w", blob.Cid(), err)
 		}
 	}
 
@@ -234,12 +235,12 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (in
 		v, deserializeErr = s.serializer.Deserialize(bcr)
 	}()
 
-	sendErr := s.retrieveBlobs(ctx, bs, cids)
+	retrieveErr := s.retrieveBlobs(ctx, bs, cids)
 
 	<-done
 
-	if sendErr != nil && errors.Is(sendErr, ErrClosedBlobChannel) {
-		return nil, sendErr
+	if retrieveErr != nil && errors.Is(retrieveErr, ErrClosedBlobChannel) {
+		return nil, retrieveErr
 	}
 
 	if deserializeErr != nil {
