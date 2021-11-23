@@ -1,4 +1,4 @@
-package state_synchronization
+package blobs
 
 import (
 	"io"
@@ -18,7 +18,7 @@ func TestEmptyRead(t *testing.T) {
 }
 
 func TestEmptyWrite(t *testing.T) {
-	bcw, br := IncomingBlobChannel(defaultMaxBlobSize)
+	bcw, br := IncomingBlobChannel(1024)
 	require.NoError(t, bcw.Close())
 	_, err := br.Receive()
 	assert.ErrorIs(t, err, ErrClosedBlobChannel)

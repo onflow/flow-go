@@ -24,6 +24,7 @@ import (
 
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/encoding/cbor"
+	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
@@ -36,8 +37,8 @@ func mockBlobService(bs blockstore.Blockstore) network.BlobService {
 	bex := new(mocknetwork.BlobService)
 
 	bex.On("GetBlobs", mock.Anything, mock.AnythingOfType("[]cid.Cid")).
-		Return(func(ctx context.Context, cids []cid.Cid) <-chan network.Blob {
-			ch := make(chan network.Blob)
+		Return(func(ctx context.Context, cids []cid.Cid) <-chan blobs.Blob {
+			ch := make(chan blobs.Blob)
 
 			var wg sync.WaitGroup
 			wg.Add(len(cids))
@@ -128,7 +129,7 @@ func putBlob(bs blockstore.Blockstore, data []byte, timeout time.Duration) (cid.
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	blob := network.NewBlob(data)
+	blob := blobs.NewBlob(data)
 
 	return blob.Cid(), bs.Put(ctx, blob)
 }
@@ -183,24 +184,24 @@ func writeBlobTree(t *testing.T, s *serializer, data []byte, bs blockstore.Block
 			numBlobs++
 		}
 
-		blobs := make([]network.Blob, numBlobs)
+		batch := make([]blobs.Blob, numBlobs)
 		for i := 0; i < numBlobs; i++ {
 			end := (i + 1) * defaultMaxBlobSize
 			if end > len(data) {
 				end = len(data)
 			}
 
-			blobs[i] = network.NewBlob(data[i*defaultMaxBlobSize : end])
+			batch[i] = blobs.NewBlob(data[i*defaultMaxBlobSize : end])
 		}
 
-		require.NoError(t, bs.PutMany(ctx, blobs))
+		require.NoError(t, bs.PutMany(ctx, batch))
 
 		if numBlobs <= 1 {
-			return blobs[0].Cid()
+			return batch[0].Cid()
 		}
 
 		cids := make([]cid.Cid, numBlobs)
-		for i, b := range blobs {
+		for i, b := range batch {
 			cids[i] = b.Cid()
 		}
 
@@ -345,7 +346,7 @@ func TestAddContextCanceled(t *testing.T) {
 
 	bex.ExpectedCalls = bex.ExpectedCalls[:len(bex.ExpectedCalls)-1]
 	bex.On("AddBlobs", mock.Anything, mock.AnythingOfType("[]blocks.Block")).
-		Return(func(ctx context.Context, blobs []network.Blob) error {
+		Return(func(ctx context.Context, blobs []blobs.Blob) error {
 			for _, b := range blobs {
 				if b.Cid() == blockingCid {
 					<-ctx.Done()
@@ -378,8 +379,8 @@ func TestGetIncompleteData(t *testing.T) {
 
 	bex.ExpectedCalls = bex.ExpectedCalls[1:]
 	bex.On("GetBlobs", mock.Anything, mock.AnythingOfType("[]cid.Cid")).
-		Return(func(ctx context.Context, cids []cid.Cid) <-chan network.Blob {
-			ch := make(chan network.Blob)
+		Return(func(ctx context.Context, cids []cid.Cid) <-chan blobs.Blob {
+			ch := make(chan blobs.Blob)
 
 			go func() {
 				defer close(ch)

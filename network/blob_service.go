@@ -7,7 +7,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/ipfs/go-bitswap"
 	bsnet "github.com/ipfs/go-bitswap/network"
-	blocks "github.com/ipfs/go-block-format"
 	blockservice "github.com/ipfs/go-blockservice"
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-datastore"
@@ -18,19 +17,16 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 )
-
-type Blob = blocks.Block
-
-var NewBlob = blocks.NewBlock
 
 // BlobGetter is the common interface shared between blobservice sessions and
 // the blobservice.
 type BlobGetter interface {
 	// GetBlob gets the requested blob.
-	GetBlob(ctx context.Context, c cid.Cid) (Blob, error)
+	GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob, error)
 
 	// GetBlobs does a batch request for the given cids, returning blobs as
 	// they are found, in no particular order.
@@ -39,7 +35,7 @@ type BlobGetter interface {
 	// be canceled). In that case, it will close the channel early. It is up
 	// to the consumer to detect this situation and keep track which blobs
 	// it has received and which it hasn't.
-	GetBlobs(ctx context.Context, ks []cid.Cid) <-chan Blob
+	GetBlobs(ctx context.Context, ks []cid.Cid) <-chan blobs.Blob
 }
 
 // BlobService is a hybrid blob datastore. It stores data in a local
@@ -50,11 +46,11 @@ type BlobService interface {
 	BlobGetter
 
 	// AddBlob puts a given blob to the underlying datastore
-	AddBlob(ctx context.Context, b Blob) error
+	AddBlob(ctx context.Context, b blobs.Blob) error
 
 	// AddBlobs adds a slice of blobs at the same time using batching
 	// capabilities of the underlying datastore whenever possible.
-	AddBlobs(ctx context.Context, bs []Blob) error
+	AddBlobs(ctx context.Context, bs []blobs.Blob) error
 
 	// DeleteBlob deletes the given blob from the blobservice.
 	DeleteBlob(ctx context.Context, c cid.Cid) error
@@ -141,19 +137,19 @@ func (bs *blobService) TriggerReprovide(ctx context.Context) error {
 	return bs.reprovider.Trigger(ctx)
 }
 
-func (bs *blobService) GetBlob(ctx context.Context, c cid.Cid) (Blob, error) {
+func (bs *blobService) GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob, error) {
 	return bs.blockService.GetBlock(ctx, c)
 }
 
-func (bs *blobService) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan Blob {
+func (bs *blobService) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan blobs.Blob {
 	return bs.blockService.GetBlocks(ctx, ks)
 }
 
-func (bs *blobService) AddBlob(ctx context.Context, b Blob) error {
+func (bs *blobService) AddBlob(ctx context.Context, b blobs.Blob) error {
 	return bs.blockService.AddBlock(ctx, b)
 }
 
-func (bs *blobService) AddBlobs(ctx context.Context, blobs []Blob) error {
+func (bs *blobService) AddBlobs(ctx context.Context, blobs []blobs.Blob) error {
 	return bs.blockService.AddBlocks(ctx, blobs)
 }
 
@@ -171,10 +167,10 @@ type blobServiceSession struct {
 
 var _ BlobGetter = (*blobServiceSession)(nil)
 
-func (s *blobServiceSession) GetBlob(ctx context.Context, c cid.Cid) (Blob, error) {
+func (s *blobServiceSession) GetBlob(ctx context.Context, c cid.Cid) (blobs.Blob, error) {
 	return s.session.GetBlock(ctx, c)
 }
 
-func (s *blobServiceSession) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan Blob {
+func (s *blobServiceSession) GetBlobs(ctx context.Context, ks []cid.Cid) <-chan blobs.Blob {
 	return s.session.GetBlocks(ctx, ks)
 }

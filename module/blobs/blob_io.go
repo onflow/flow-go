@@ -1,22 +1,20 @@
-package state_synchronization
+package blobs
 
 import (
 	"errors"
 	"io"
 	"sync"
-
-	"github.com/onflow/flow-go/network"
 )
 
 var ErrClosedBlobChannel = errors.New("send/receive on closed blob channel")
 
 type blobChannel struct {
-	blobs chan network.Blob
+	blobs chan Blob
 	once  sync.Once
 	done  chan struct{}
 }
 
-func (bc *blobChannel) Send(blob network.Blob) error {
+func (bc *blobChannel) Send(blob Blob) error {
 	select {
 	case <-bc.done:
 		return ErrClosedBlobChannel
@@ -31,7 +29,7 @@ func (bc *blobChannel) Send(blob network.Blob) error {
 	}
 }
 
-func (bc *blobChannel) Receive() (network.Blob, error) {
+func (bc *blobChannel) Receive() (Blob, error) {
 	select {
 	case <-bc.done:
 		return nil, ErrClosedBlobChannel
@@ -89,7 +87,7 @@ func (bw *BlobChannelWriter) write(p []byte) (int, error) {
 }
 
 func (bw *BlobChannelWriter) sendNewBlob() error {
-	blob := network.NewBlob(bw.buf)
+	blob := NewBlob(bw.buf)
 
 	if err := bw.blobs.Send(blob); err != nil {
 		return err
@@ -141,7 +139,7 @@ type BlobReceiver struct {
 
 var _ io.Closer = (*BlobReceiver)(nil)
 
-func (br *BlobReceiver) Receive() (network.Blob, error) {
+func (br *BlobReceiver) Receive() (Blob, error) {
 	return br.blobs.Receive()
 }
 
@@ -153,7 +151,7 @@ const defaultInitialBufCapacity = 1 << 17 // 128 KiB
 
 func IncomingBlobChannel(maxBlobSize int) (*BlobChannelWriter, *BlobReceiver) {
 	blobChan := &blobChannel{
-		blobs: make(chan network.Blob),
+		blobs: make(chan Blob),
 		done:  make(chan struct{}),
 	}
 	return &BlobChannelWriter{
@@ -253,7 +251,7 @@ type BlobSender struct {
 
 var _ io.Closer = (*BlobSender)(nil)
 
-func (bs *BlobSender) Send(blob network.Blob) error {
+func (bs *BlobSender) Send(blob Blob) error {
 	return bs.blobs.Send(blob)
 }
 
@@ -263,7 +261,7 @@ func (bs *BlobSender) Close() error {
 
 func OutgoingBlobChannel() (*BlobChannelReader, *BlobSender) {
 	blobChan := &blobChannel{
-		blobs: make(chan network.Blob),
+		blobs: make(chan Blob),
 		done:  make(chan struct{}),
 	}
 	return &BlobChannelReader{blobs: blobChan}, &BlobSender{blobChan}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/network"
 )
 
@@ -38,12 +39,12 @@ func NewExecutionDataService(
 	return &ExecutionDataService{&serializer{codec, compressor}, blobService, defaultMaxBlobSize, metrics}
 }
 
-func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *BlobReceiver) ([]network.Blob, error) {
-	var blobs []network.Blob
+func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *blobs.BlobReceiver) ([]blobs.Blob, error) {
+	var batch []blobs.Blob
 	var err error
 
 	for i := 0; i < defaultBlobBatchSize; i++ {
-		var blob network.Blob
+		var blob blobs.Blob
 
 		blob, err = br.Receive()
 
@@ -51,13 +52,13 @@ func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *BlobReceive
 			break
 		}
 
-		blobs = append(blobs, blob)
+		batch = append(batch, blob)
 	}
 
-	return blobs, err
+	return batch, err
 }
 
-func (s *ExecutionDataService) storeBlobs(parent context.Context, br *BlobReceiver) ([]cid.Cid, error) {
+func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.BlobReceiver) ([]cid.Cid, error) {
 	defer br.Close()
 
 	ctx, cancel := context.WithCancel(parent)
@@ -77,7 +78,7 @@ func (s *ExecutionDataService) storeBlobs(parent context.Context, br *BlobReceiv
 		}
 
 		if recvErr != nil {
-			if recvErr != ErrClosedBlobChannel {
+			if recvErr != blobs.ErrClosedBlobChannel {
 				// this is an unexpected error, and should never occur
 				return nil, recvErr
 			}
@@ -90,7 +91,7 @@ func (s *ExecutionDataService) storeBlobs(parent context.Context, br *BlobReceiv
 }
 
 func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}) ([]cid.Cid, error) {
-	bcw, br := IncomingBlobChannel(s.maxBlobSize)
+	bcw, br := blobs.IncomingBlobChannel(s.maxBlobSize)
 
 	done := make(chan struct{})
 	var serializeErr error
@@ -149,14 +150,14 @@ func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.
 	}
 }
 
-func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *BlobSender, cids []cid.Cid) error {
+func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *blobs.BlobSender, cids []cid.Cid) error {
 	defer bs.Close()
 
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 
 	blobChan := s.blobService.GetBlobs(ctx, cids)
-	cachedBlobs := make(map[cid.Cid]network.Blob)
+	cachedBlobs := make(map[cid.Cid]blobs.Blob)
 	cidCounts := make(map[cid.Cid]int)
 
 	for _, c := range cids {
@@ -199,10 +200,10 @@ func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *BlobSen
 }
 
 func (s *ExecutionDataService) findBlob(
-	blobChan <-chan network.Blob,
+	blobChan <-chan blobs.Blob,
 	target cid.Cid,
-	cache map[cid.Cid]network.Blob,
-) (network.Blob, error) {
+	cache map[cid.Cid]blobs.Blob,
+) (blobs.Blob, error) {
 	for blob := range blobChan {
 		// check blob size
 		blobSize := len(blob.RawData())
@@ -222,7 +223,7 @@ func (s *ExecutionDataService) findBlob(
 }
 
 func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (interface{}, error) {
-	bcr, bs := OutgoingBlobChannel()
+	bcr, bs := blobs.OutgoingBlobChannel()
 
 	done := make(chan struct{})
 	var v interface{}
@@ -239,7 +240,7 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid) (in
 
 	<-done
 
-	if retrieveErr != nil && errors.Is(retrieveErr, ErrClosedBlobChannel) {
+	if retrieveErr != nil && errors.Is(retrieveErr, blobs.ErrClosedBlobChannel) {
 		return nil, retrieveErr
 	}
 

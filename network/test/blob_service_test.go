@@ -16,6 +16,7 @@ import (
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
@@ -54,7 +55,7 @@ func TestBlobExchange(t *testing.T) {
 	suite.Run(t, new(BlobServiceTestSuite))
 }
 
-func (suite *BlobServiceTestSuite) putBlob(ds datastore.Batching, blob network.Blob) {
+func (suite *BlobServiceTestSuite) putBlob(ds datastore.Batching, blob blobs.Blob) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	suite.Require().NoError(blockstore.NewBlockstore(ds).Put(ctx, blob))
@@ -86,7 +87,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 	for i, net := range networks {
 		ds := sync.MutexWrap(datastore.NewMapDatastore())
 		suite.datastores = append(suite.datastores, ds)
-		blob := network.NewBlob([]byte(fmt.Sprintf("foo%v", i)))
+		blob := blobs.NewBlob([]byte(fmt.Sprintf("foo%v", i)))
 		suite.blobCids = append(suite.blobCids, blob.Cid())
 		suite.putBlob(ds, blob)
 		blobService, err := net.RegisterBlobService(blobExchangeChannel, ds)
@@ -169,7 +170,7 @@ func (suite *BlobServiceTestSuite) TestHas() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	var blobChans []<-chan network.Blob
+	var blobChans []<-chan blobs.Blob
 	unreceivedBlobs := make([]map[cid.Cid]struct{}, len(suite.blobServices))
 	for i, bex := range suite.blobServices {
 		unreceivedBlobs[i] = make(map[cid.Cid]struct{})
@@ -177,7 +178,7 @@ func (suite *BlobServiceTestSuite) TestHas() {
 		var blobsToGet []cid.Cid
 		for j := 0; j < suite.numNodes; j++ {
 			if j != i {
-				blob := network.NewBlob([]byte(fmt.Sprintf("bar%v", i)))
+				blob := blobs.NewBlob([]byte(fmt.Sprintf("bar%v", i)))
 				blobsToGet = append(blobsToGet, blob.Cid())
 				unreceivedBlobs[i][blob.Cid()] = struct{}{}
 			}
@@ -199,7 +200,7 @@ func (suite *BlobServiceTestSuite) TestHas() {
 	}, time.Second, 100*time.Millisecond)
 
 	for i, bex := range suite.blobServices {
-		err := bex.AddBlob(ctx, network.NewBlob([]byte(fmt.Sprintf("bar%v", i))))
+		err := bex.AddBlob(ctx, blobs.NewBlob([]byte(fmt.Sprintf("bar%v", i))))
 		suite.Require().NoError(err)
 	}
 
