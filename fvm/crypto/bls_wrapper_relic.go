@@ -16,8 +16,11 @@ func NewBLSKMAC(tag string) hash.Hasher {
 func VerifyPOP(pk *runtime.PublicKey, s crypto.Signature) (bool, error) {
 	key, err := crypto.DecodePublicKey(crypto.BLSBLS12381, pk.PublicKey)
 	if err != nil {
+		// at this stage, thge public key is valid and there are no possible user value errors
+		// TODO: should we panic if error?
 		return false, err
 	}
+	// TODO: should we panic if error?
 	return crypto.BLSVerifyPOP(key, s)
 }
 
@@ -27,6 +30,9 @@ func AggregateSignatures(sigs [][]byte) (crypto.Signature, error) {
 	for _, sig := range sigs {
 		s = append(s, sig)
 	}
+
+	// TODO: check for user errors
+	// TODO: panic for other errors?
 	return crypto.AggregateBLSSignatures(s)
 }
 
@@ -34,13 +40,17 @@ func AggregateSignatures(sigs [][]byte) (crypto.Signature, error) {
 func AggregatePublicKeys(keys []*runtime.PublicKey) (*runtime.PublicKey, error) {
 	pks := make([]crypto.PublicKey, 0, len(keys))
 	for _, key := range keys {
-                // TODO: avoid validating the public keys again since Cadence makes sure runtime keys have been validated. This requires exporting an unsafe function in the crypto package. 
+		// TODO: avoid validating the public keys again since Cadence makes sure runtime keys have been validated.
+		// This requires exporting an unsafe function in the crypto package.
+		// TODO: panic if error?
 		pk, err := crypto.DecodePublicKey(crypto.BLSBLS12381, key.PublicKey)
 		if err != nil {
 			return nil, err
 		}
 		pks = append(pks, pk)
 	}
+	// TODO: chech for user errors
+	// TODO: panic if error?
 	pk, err := crypto.AggregateBLSPublicKeys(pks)
 	if err != nil {
 		return nil, err
