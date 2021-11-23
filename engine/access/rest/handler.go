@@ -55,15 +55,21 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	decoratedResponse, resErr := newResponseDecorator(decoratedRequest, response, h.linkGenerator)
+	if resErr != nil {
+		h.errorResponse(w, http.StatusInternalServerError, resErr.Error(), errorLogger)
+		return
+	}
+
 	// write response to response stream
-	h.jsonResponse(w, response, errorLogger)
+	h.jsonResponse(w, decoratedResponse, errorLogger)
 }
 
-func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logger zerolog.Logger) {
+func (h *Handler) jsonResponse(w http.ResponseWriter, response *responseDecorator, logger zerolog.Logger) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	// serialise response to JSON and handler errors
-	encodedResponse, encErr := json.Marshal(response)
+	encodedResponse, encErr := response.JSON()
 	if encErr != nil {
 		h.logger.Error().Err(encErr).Msg("failed to encode response")
 		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)

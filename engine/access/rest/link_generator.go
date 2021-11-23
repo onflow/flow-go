@@ -15,6 +15,9 @@ type LinkGenerator interface {
 	TransactionResultLink(id flow.Identifier) (string, error)
 	PayloadLink(id flow.Identifier) (string, error)
 	ExecutionResultLink(id flow.Identifier) (string, error)
+	AccountLink(address string) (string, error)
+	AccountContractLink(address string) (string, error)
+	AccountKeysLink(address string) (string, error)
 }
 
 type LinkGeneratorImpl struct {
@@ -45,6 +48,18 @@ func (generator *LinkGeneratorImpl) TransactionResultLink(id flow.Identifier) (s
 	return generator.link(getTransactionResultByIDRoute, id)
 }
 
+func (generator *LinkGeneratorImpl) AccountLink(address string) (string, error) {
+	return generator.linkAddress(getAccountRoute, address)
+}
+
+func (generator *LinkGeneratorImpl) AccountContractLink(address string) (string, error) {
+	return generator.linkAddress(getAccountContractsRoute, address)
+}
+
+func (generator *LinkGeneratorImpl) AccountKeysLink(address string) (string, error) {
+	return generator.linkAddress(getAccountKeysRoute, address)
+}
+
 func selfLink(id flow.Identifier, linkFun LinkFun) (*generated.Links, error) {
 	url, err := linkFun(id)
 	if err != nil {
@@ -61,5 +76,13 @@ func (generator *LinkGeneratorImpl) link(route string, id flow.Identifier) (stri
 		return "", err
 	}
 	// TODO: remove the leading '/v1' from the generated link
+	return url.String(), nil
+}
+
+func (generator *LinkGeneratorImpl) linkAddress(route string, address string) (string, error) {
+	url, err := generator.router.Get(route).URLPath("address", address)
+	if err != nil {
+		return "", err
+	}
 	return url.String(), nil
 }

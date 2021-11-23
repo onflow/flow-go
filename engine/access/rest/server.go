@@ -22,6 +22,9 @@ const (
 	executeScriptRoute            = "executeScript"
 	getBlockPayloadByIDRoute      = "getBlockPayloadByID"
 	getExecutionResultByIDRoute   = "getExecutionResultByID"
+	getAccountRoute               = "getAccount"
+	getAccountContractsRoute      = "getAccountContracts"
+	getAccountKeysRoute           = "getAccountKeys"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler

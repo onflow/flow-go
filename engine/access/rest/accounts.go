@@ -1,21 +1,14 @@
 package rest
 
 import (
-	"net/http"
-
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/access"
 )
 
-func getAccount(
-	w http.ResponseWriter,
-	r *http.Request,
-	vars map[string]string,
-	backend access.API,
-	logger zerolog.Logger,
-) (interface{}, StatusError) {
-	address, err := toAddress(vars["address"])
+const ExpandableFieldContracts = "contracts"
+const ExpandableFieldKeys = "keys"
+
+func getAccount(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+	address, err := toAddress(r.getParam("address"))
 	if err != nil {
 		return nil, NewBadRequestError("invalid address", err)
 	}

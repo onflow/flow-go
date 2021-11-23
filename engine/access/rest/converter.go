@@ -463,7 +463,7 @@ func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublic
 }
 
 func accountResponse(account *flow.Account) generated.Account {
-	contracts := make(map[string]string, len(account.Contracts))
+	contracts := make(map[string]string)
 	for name, code := range account.Contracts {
 		contracts[name] = string(code)
 	}
@@ -475,5 +475,11 @@ func accountResponse(account *flow.Account) generated.Account {
 		Contracts:  contracts,
 		Expandable: nil,
 		Links:      nil,
+	}
+}
+
+func LinkResponse(link string) *generated.Links {
+	return &generated.Links{
+		Self: link,
 	}
 }
