@@ -199,7 +199,7 @@ func heightLookupError(height uint64, entityType string, err error) StatusError 
 	return NewRestError(http.StatusInternalServerError, msg, err)
 }
 
-// blockProvider provides is layer of abstraction on top of the backend access.API to provide a uniform way to
+// blockProvider is a layer of abstraction on top of the backend access.API and provides a uniform way to
 // lookup a block or a block header either by ID or by height
 type blockProvider struct {
 	id      *flow.Identifier
