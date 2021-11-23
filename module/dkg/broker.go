@@ -201,7 +201,6 @@ func (b *Broker) GetBroadcastMsgCh() <-chan messages.DKGMessage {
 func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 	b.Lock()
 	defer b.Unlock()
-
 	expRetry, err := retry.NewExponential(retryMilliseconds)
 	if err != nil {
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
@@ -295,6 +294,8 @@ func (b *Broker) Shutdown() {
 // updateContractClient will return the last successful client index by default for all initial operations or else
 // it will return the appropriate client index with respect to last successful and number of client.
 func (b *Broker) updateContractClient(clientIndex int) (int, module.DKGContractClient) {
+	b.unit.Lock()
+	defer b.unit.Unlock()
 	if clientIndex == b.lastSuccessfulClientIndex {
 		if clientIndex == len(b.dkgContractClients)-1 {
 			clientIndex = 0
@@ -310,14 +311,17 @@ func (b *Broker) updateContractClient(clientIndex int) (int, module.DKGContractC
 
 // getInitialContractClient will return the last successful contract client or the initial
 func (b *Broker) getInitialContractClient() (int, module.DKGContractClient) {
+	b.unit.Lock()
+	defer b.unit.Unlock()
 	return b.lastSuccessfulClientIndex, b.dkgContractClients[b.lastSuccessfulClientIndex]
 }
 
 // updateLastSuccessfulClient set lastSuccessfulClientIndex in concurrency safe way
 func (b *Broker) updateLastSuccessfulClient(clientIndex int) {
 	b.unit.Lock()
+	defer b.unit.Unlock()
+
 	b.lastSuccessfulClientIndex = clientIndex
-	b.unit.Unlock()
 }
 
 // listen is a blocking call that processes incoming messages from the network

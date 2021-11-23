@@ -3,9 +3,8 @@ package epochs
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
-
-	"github.com/onflow/flow-go/engine"
 
 	"github.com/onflow/flow-go/module/retrymiddleware"
 
@@ -42,7 +41,7 @@ type RootQCVoter struct {
 	qcContractClients         []module.QCContractClient // priority ordered array of client to the QC aggregator smart contract
 	lastSuccessfulClientIndex int                       // index of the contract client that was last successful during retries
 	wait                      time.Duration             // how long to sleep in between vote attempts
-	unit                      *engine.Unit
+	mu                        sync.Mutex
 }
 
 // NewRootQCVoter returns a new root QC voter, configured for a particular epoch.
@@ -61,7 +60,7 @@ func NewRootQCVoter(
 		state:             state,
 		qcContractClients: contractClients,
 		wait:              time.Second * 10,
-		unit:              engine.NewUnit(),
+		mu:                sync.Mutex{},
 	}
 	return voter
 }
@@ -160,6 +159,8 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 // updateContractClient will return the last successful client index by default for all initial operations or else
 // it will return the appropriate client index with respect to last successful and number of client.
 func (voter *RootQCVoter) updateContractClient(clientIndex int) (int, module.QCContractClient) {
+	voter.mu.Lock()
+	defer voter.mu.Unlock()
 	if clientIndex == voter.lastSuccessfulClientIndex {
 		if clientIndex == len(voter.qcContractClients)-1 {
 			clientIndex = 0
@@ -175,12 +176,15 @@ func (voter *RootQCVoter) updateContractClient(clientIndex int) (int, module.QCC
 
 // getInitialContractClient will return the last successful contract client or the initial
 func (voter *RootQCVoter) getInitialContractClient() (int, module.QCContractClient) {
+	voter.mu.Lock()
+	defer voter.mu.Unlock()
 	return voter.lastSuccessfulClientIndex, voter.qcContractClients[voter.lastSuccessfulClientIndex]
 }
 
 // updateLastSuccessfulClient set lastSuccessfulClientIndex in concurrency safe way
 func (voter *RootQCVoter) updateLastSuccessfulClient(clientIndex int) {
-	voter.unit.Lock()
+	voter.mu.Lock()
+	defer voter.mu.Unlock()
+
 	voter.lastSuccessfulClientIndex = clientIndex
-	voter.unit.Unlock()
 }
