@@ -40,9 +40,9 @@ func New(
 // In order to ensure that only a safe node will be voted, Voter will ask Forks whether a vote is a safe node or not.
 // The curView is taken as input to ensure Voter will only vote for proposals at current view and prevent double voting.
 // Returns:
-//  * vote, nil: The very first time it encounters a safe block of the current view to vote for.
+//  * (vote, nil): On the _first_ block for the current view that is safe to vote for.
 //    Subsequently, voter does _not_ vote for any other block with the same (or lower) view.
-//  * nil, model.NoVoteError: If the voter decides that it does not want to vote for the given block.
+//  * (nil, model.NoVoteError): If the voter decides that it does not want to vote for the given block.
 //    This is a sentinel error and _expected_ during normal operation.
 // All other errors are unexpected and potential symptoms of uncovered edge cases or corrupted internal state (fatal).
 func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model.Vote, error) {
@@ -55,8 +55,8 @@ func (v *Voter) ProduceVoteIfVotable(block *model.Block, curView uint64) (*model
 	}
 
 	// Do not produce a vote for blocks where we are not a valid committee member.
-	// HotStuff will ask for a vote for the first block of the next epoch, even if we are unstaked in
-	// the next epoch. These votes can't be used to produce valid QCs.
+	// HotStuff will ask for a vote for the first block of the next epoch, even if we
+	// have zero weight in the next epoch. Such vote can't be used to produce valid QCs.
 	_, err := v.committee.Identity(block.BlockID, v.committee.Self())
 	if errors.Is(model.ErrInvalidSigner, err) {
 		return nil, model.NoVoteError{Msg: "not voting committee member for block"}
