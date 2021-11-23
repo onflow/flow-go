@@ -1,9 +1,7 @@
 package flow_test
 
 import (
-	"encoding/binary"
 	"math/rand"
-	"sort"
 	"testing"
 	"time"
 
@@ -78,8 +76,8 @@ func TestIdentityList_Exists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		il1.Sort()
-		
+		il1 = il1.Sort(order.Canonical)
+
 		for i := 0; i < 10; i++ {
 			assert.True(t, il1.Exists(il1[i]))
 		}
@@ -93,8 +91,8 @@ func TestIdentityList_IdentifierExists(t *testing.T) {
 		il2 := unittest.IdentityListFixture(1)
 
 		// sort the first list
-		il1.Sort()
-		
+		il1 = il1.Sort(order.Canonical)
+
 		for i := 0; i < 10; i++ {
 			assert.True(t, il1.IdentifierExists(il1[i].NodeID))
 		}
