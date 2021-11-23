@@ -214,6 +214,7 @@ func (e *Engine) Ready() <-chan struct{} {
 func (e *Engine) Done() <-chan struct{} {
 	e.lm.OnStop(func() {
 		e.log.Debug().Msg("shutting down hotstuff eventloop")
+		e.stopHotstuff()
 		<-e.core.hotstuff.Done()
 		e.log.Debug().Msg("all components have been shut down")
 		<-e.unit.Done()
