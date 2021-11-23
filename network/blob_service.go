@@ -17,7 +17,6 @@ import (
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
@@ -69,7 +68,7 @@ type blobService struct {
 }
 
 var _ BlobService = (*blobService)(nil)
-var _ module.Startable = (*blobService)(nil)
+var _ component.Component = (*blobService)(nil)
 
 type BlobServiceConfig struct {
 	ReprovideInterval time.Duration
