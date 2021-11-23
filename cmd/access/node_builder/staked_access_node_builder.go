@@ -195,7 +195,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier
 	psOpts := append(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize),
 		func(_ context.Context, h host.Host) (pubsub.Option, error) {
 			return pubsub.WithSubscriptionFilter(p2p.NewRoleBasedFilter(
-				h.ID(), builder.RootBlock.ID(), builder.IdentityProvider,
+				h.ID(), builder.IdentityProvider,
 			)), nil
 		})
 
@@ -214,7 +214,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier
 			return nil, fmt.Errorf("could not convert stream factory: %w", err)
 		}
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
-			SetRootBlockID(builder.RootBlock.ID()).
+			SetSporkID(builder.SporkID).
 			// no connection gater
 			SetConnectionManager(connManager).
 			// act as a DHT server
