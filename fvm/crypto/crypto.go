@@ -124,12 +124,12 @@ func VerifySignatureFromRuntime(
 
 	sigAlgo := RuntimeToCryptoSigningAlgorithm(signatureAlgorithm)
 	if sigAlgo == crypto.UnknownSigningAlgorithm {
-		return false, errors.NewValueErrorf(signatureAlgorithm.String(), "signature algorithm type not found")
+		return false, errors.NewValueErrorf(signatureAlgorithm.Name(), "signature algorithm type not found")
 	}
 
 	hashAlgo := RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	if hashAlgo == hash.UnknownHashingAlgorithm {
-		return false, errors.NewValueErrorf(hashAlgorithm.String(), "hashing algorithm type not found")
+		return false, errors.NewValueErrorf(hashAlgorithm.Name(), "hashing algorithm type not found")
 	}
 
 	// check ECDSA compatibilites
