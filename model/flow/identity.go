@@ -566,54 +566,14 @@ func (il IdentityList) EqualTo(other IdentityList) bool {
 // Exists takes a previously sorted Identity list and searches it for the target value
 // This code is optimized, so the coding style will be different
 // target:  value to search for
+// CAUTION:  The identity list MUST be sorted prior to calling this method
 func (il IdentityList) Exists(target *Identity) bool {
-	left := 0
-	lenList := len(il)
-	right := lenList - 1
-	mid := int(uint(right) >> 1)
-	num2 := target.NodeID[:]
-
-	// pre-calculate these 4 values for comparisons later
-	var tgt [4]uint64
-	tgt[0] = binary.BigEndian.Uint64(num2[:])
-	tgt[1] = binary.BigEndian.Uint64(num2[8:])
-	tgt[2] = binary.BigEndian.Uint64(num2[16:])
-	tgt[3] = binary.BigEndian.Uint64(num2[24:])
-
-	for {
-		num1 := il[mid].NodeID[:]
-		lenID := len(num1)
-		i := 0
-
-		// assume the length is a multiple of 8, for performance.  it's 32 bytes
-		for {
-			chunk1 := binary.BigEndian.Uint64(num1[i:])
-			chunk2 := tgt[i/8]
-
-			if chunk1 < chunk2 {
-				left = mid + 1
-				break
-			} else if chunk1 > chunk2 {
-				right = mid - 1
-				break
-			} else if i >= lenID-8 {
-				// we're on the last chunk of 8 bytes, and
-				// so return true if equal -- it exists
-				return true
-			}
-
-			// these 8 bytes were equal, so increment index by 8 bytes
-			i += 8
-		}
-		if left > right {
-			return false
-		}
-		mid = int(uint(left+right) >> 1)
-	}
+	return Exists(target.NodeID)
 }
 
 // Exists takes a previously sorted Identity list and searches it for the target value
 // target:  value to search for
+// CAUTION:  The identity list MUST be sorted prior to calling this method
 func (il IdentityList) IdentifierExists(target Identifier) bool {
 	left := 0
 	lenList := len(il)
