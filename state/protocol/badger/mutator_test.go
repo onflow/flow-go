@@ -983,7 +983,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), qcBlock)
-			require.Error(t, err)
+			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, db)
 		})
 
