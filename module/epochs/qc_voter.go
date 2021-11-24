@@ -27,7 +27,7 @@ const (
 
 	// update qc contract client after 2 consecutive failures
 	retryMaxConsecutiveFailures = 2
-  
+
 	// retryDurationMax is the maximum duration to wait between two consecutive requests
 	retryDurationMax = 10 * time.Minute
 

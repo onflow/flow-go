@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/onflow/flow-go/engine"
@@ -28,9 +29,6 @@ const (
 	// retryMaxRead is the max number of times the broker will attempt to read messages
 	retryMaxRead = 3
 
-	// retryMilliseconds is the number of milliseconds to wait between retries
-	retryMilliseconds = 1000 * time.Millisecond
-
 	// retryMaxConsecutiveFailures is the number of consecutive failures allowed before we attempt with fallback client
 	retryMaxConsecutiveFailures = 2
 	// retryDuration is the initial duration to wait between retries for all retryable
@@ -46,19 +44,19 @@ const (
 // be used in conjunction with the DKG MessagingEngine for private messages, and
 // with the DKG smart-contract for broadcast messages.
 type Broker struct {
-	log                     zerolog.Logger
-	unit                    *engine.Unit
-	dkgInstanceID           string                     // unique identifier of the current dkg run (prevent replay attacks)
-	committee               flow.IdentityList          // IDs of DKG members
-	me                      module.Local               // used for signing bcast messages
-	myIndex                 int                        // index of this instance in the committee
-	dkgContractClients      []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
-	activeDKGContractClient int                        // index of the dkg contract client that is currently in use
-	tunnel                  *BrokerTunnel              // channels through which the broker communicates with the network engine
-	privateMsgCh            chan messages.DKGMessage   // channel to forward incoming private messages to consumers
-	broadcastMsgCh          chan messages.DKGMessage   // channel to forward incoming broadcast messages to consumers
-	messageOffset           uint                       // offset for next broadcast messages to fetch
-	shutdownCh              chan struct{}              // channel to stop the broker from listening
+	log                       zerolog.Logger
+	unit                      *engine.Unit
+	dkgInstanceID             string                     // unique identifier of the current dkg run (prevent replay attacks)
+	committee                 flow.IdentityList          // IDs of DKG members
+	me                        module.Local               // used for signing bcast messages
+	myIndex                   int                        // index of this instance in the committee
+	dkgContractClients        []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
+	lastSuccessfulClientIndex int                        // index of the contract client that was last successful during retries
+	tunnel                    *BrokerTunnel              // channels through which the broker communicates with the network engine
+	privateMsgCh              chan messages.DKGMessage   // channel to forward incoming private messages to consumers
+	broadcastMsgCh            chan messages.DKGMessage   // channel to forward incoming broadcast messages to consumers
+	messageOffset             uint                       // offset for next broadcast messages to fetch
+	shutdownCh                chan struct{}              // channel to stop the broker from listening
 
 	broadcasts    uint       // broadcasts counts the number of successful broadcasts
 	broadcastLock sync.Mutex // protects access to broadcasts count variable
