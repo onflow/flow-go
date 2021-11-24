@@ -2,6 +2,7 @@ package eventloop
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -49,11 +50,16 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 		ready()
 
 		// launch when scheduled by el.startTime
+		el.log.Info().Msgf("event loop will start at: %v", startTime)
 		select {
 		case <-ctx.Done():
 			return
 		case <-time.After(time.Until(startTime)):
-			el.loop(ctx)
+			el.log.Info().Msgf("starting event loop")
+			err := el.loop(ctx)
+			if err != nil {
+				ctx.Throw(err)
+			}
 		}
 
 	})
@@ -62,11 +68,11 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 	return el, nil
 }
 
-func (el *EventLoop) loop(ctx context.Context) {
+func (el *EventLoop) loop(ctx context.Context) error {
 
 	err := el.eventHandler.Start()
 	if err != nil {
-		el.log.Fatal().Err(err).Msg("could not start event handler")
+		return fmt.Errorf("could not start event handler: %w", err)
 	}
 
 	// hotstuff will run in an event loop to process all events synchronously. And this is what will happen when hitting errors:
@@ -75,9 +81,8 @@ func (el *EventLoop) loop(ctx context.Context) {
 	// if hotstuff hits a known error that is safe to be ignored, it will not exit the loop (for instance, invalid proposal)
 	// if hotstuff hits any unknown error, it will exit the loop
 
+	shutdownSignaled := ctx.Done()
 	for {
-		quitted := ctx.Done()
-
 		// Giving timeout events the priority to be processed first
 		// This is to prevent attacks from malicious nodes that attempt
 		// to block honest nodes' pacemaker from progressing by sending
@@ -88,8 +93,8 @@ func (el *EventLoop) loop(ctx context.Context) {
 		select {
 
 		// if we receive the shutdown signal, exit the loop
-		case <-quitted:
-			return
+		case <-shutdownSignaled:
+			return nil
 
 		// if we receive a time out, process it and log errors
 		case <-timeoutChannel:
@@ -102,7 +107,7 @@ func (el *EventLoop) loop(ctx context.Context) {
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
 
 			if err != nil {
-				el.log.Fatal().Err(err).Msg("could not process timeout")
+				return fmt.Errorf("could not process timeout: %w", err)
 			}
 
 			// At this point, we have received and processed an event from the timeout channel.
@@ -121,8 +126,8 @@ func (el *EventLoop) loop(ctx context.Context) {
 		select {
 
 		// same as before
-		case <-quitted:
-			return
+		case <-shutdownSignaled:
+			return nil
 
 		// same as before
 		case <-timeoutChannel:
@@ -138,7 +143,7 @@ func (el *EventLoop) loop(ctx context.Context) {
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeTimeout)
 
 			if err != nil {
-				el.log.Fatal().Err(err).Msg("could not process timeout")
+				return fmt.Errorf("could not process timeout: %w", err)
 			}
 
 		// if we have a new proposal, process it
@@ -155,7 +160,7 @@ func (el *EventLoop) loop(ctx context.Context) {
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnProposal)
 
 			if err != nil {
-				el.log.Fatal().Err(err).Msg("could not process proposal")
+				return fmt.Errorf("could not process proposal: %w", err)
 			}
 
 		// if we have a new QC, process it
@@ -172,7 +177,7 @@ func (el *EventLoop) loop(ctx context.Context) {
 			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnQc)
 
 			if err != nil {
-				el.log.Fatal().Err(err).Msg("could not process QC")
+				return fmt.Errorf("could not process QC: %w", err)
 			}
 		}
 	}

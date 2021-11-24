@@ -1,6 +1,7 @@
 package voteaggregator
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -39,6 +41,8 @@ type VoteAggregatorV2TestSuite struct {
 	signer     *mocks.SignerVerifier
 	notifier   *mocks.Consumer
 	collectors *mocks.VoteCollectors
+	cancel     context.CancelFunc
+
 	aggregator *VoteAggregatorV2
 }
 
@@ -67,12 +71,19 @@ func (s *VoteAggregatorV2TestSuite) SetupTest() {
 	s.aggregator, err = NewVoteAggregatorV2(unittest.Logger(), s.notifier, 0, s.collectors)
 	require.NoError(s.T(), err)
 
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
 	// startup aggregator
-	<-s.aggregator.Ready()
+	s.aggregator.Start(signalerCtx)
+
+	unittest.RequireCloseBefore(s.T(), s.aggregator.Ready(), 100*time.Millisecond, "aggregator not started")
 }
 
 func (s *VoteAggregatorV2TestSuite) TearDownTest() {
-	<-s.aggregator.Done()
+	s.cancel()
+	unittest.RequireCloseBefore(s.T(), s.aggregator.Done(), 100*time.Millisecond, "aggregator not stopped")
 }
 
 // prepareMockedCollector prepares a mocked collector and stores it in map, later it will be used
