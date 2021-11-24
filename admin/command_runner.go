@@ -60,9 +60,24 @@ func NewCommandRunnerBootstrapper() *CommandRunnerBootstrapper {
 }
 
 func (r *CommandRunnerBootstrapper) Bootstrap(logger zerolog.Logger, bindAddress string, opts ...CommandRunnerOption) *CommandRunner {
+	handlers := make(map[string]CommandHandler)
+	commands := make([]interface{}, 0, len(r.handlers))
+	r.RegisterHandler("list-commands", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+		return commands, nil
+	})
+	for command, handler := range r.handlers {
+		handlers[command] = handler
+		commands = append(commands, command)
+	}
+
+	validators := make(map[string]CommandValidator)
+	for command, validator := range r.validators {
+		validators[command] = validator
+	}
+
 	commandRunner := &CommandRunner{
-		handlers:         r.handlers,
-		validators:       r.validators,
+		handlers:         handlers,
+		validators:       validators,
 		grpcAddress:      fmt.Sprintf("%s/flow-node-admin.sock", os.TempDir()),
 		httpAddress:      bindAddress,
 		logger:           logger.With().Str("admin", "command_runner").Logger(),

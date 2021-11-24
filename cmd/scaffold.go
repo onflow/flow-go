@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/admin/commands/common"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
@@ -64,22 +65,7 @@ type Metrics struct {
 	CleanCollector module.CleanerMetrics
 }
 
-type Storage struct {
-	Headers      storage.Headers
-	Index        storage.Index
-	Identities   storage.Identities
-	Guarantees   storage.Guarantees
-	Receipts     *bstorage.ExecutionReceipts
-	Results      storage.ExecutionResults
-	Seals        storage.Seals
-	Payloads     storage.Payloads
-	Blocks       storage.Blocks
-	Transactions storage.Transactions
-	Collections  storage.Collections
-	Setups       storage.EpochSetups
-	Commits      storage.EpochCommits
-	Statuses     storage.EpochStatuses
-}
+type Storage = storage.All
 
 type namedModuleFunc struct {
 	fn   func(builder NodeBuilder, nodeConfig *NodeConfig) error
@@ -574,7 +560,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Transactions: transactions,
 		Collections:  collections,
 		Setups:       setups,
-		Commits:      commits,
+		EpochCommits: commits,
 		Statuses:     statuses,
 	}
 }
@@ -634,7 +620,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Results,
 			fnb.Storage.Blocks,
 			fnb.Storage.Setups,
-			fnb.Storage.Commits,
+			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
 		)
 		fnb.MustNot(err).Msg("could not open flow state")
@@ -672,7 +658,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Results,
 			fnb.Storage.Blocks,
 			fnb.Storage.Setups,
-			fnb.Storage.Commits,
+			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
 			rootSnapshot,
 			options...,
@@ -969,8 +955,12 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetLogLevelCommand{}
-	}).AdminCommand("read-protocol-state-blocks", func(config *NodeConfig) commands.AdminCommand {
-		return common.NewReadProtocolStateBlocksCommand(config.State, config.Storage.Blocks)
+	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
+	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadResultsCommand(config.State, config.Storage.Results)
+	}).AdminCommand("read-seals", func(config *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
 	})
 }
 
