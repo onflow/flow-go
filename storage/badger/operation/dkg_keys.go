@@ -7,9 +7,9 @@ import (
 )
 
 func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
-	return insert(makePrefix(codeDKGPrivateInfo, epochCounter), info)
+	return insert(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
 
 func RetrieveMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeDKGPrivateInfo, epochCounter), info)
+	return retrieve(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }

@@ -848,7 +848,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
 		encodableSk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
-		privParticipant := dkgmod.DKGParticipantPriv{
+		privParticipant := dkgmod.RandomBeaconPriv{
 			NodeID:              nodeID,
 			RandomBeaconPrivKey: encodableSk,
 			GroupIndex:          i,

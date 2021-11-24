@@ -40,7 +40,7 @@ func TestDKGKeysInsertAndRetrieve(t *testing.T) {
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 
 		// store a key in db
-		expected := unittest.DKGParticipantPriv()
+		expected := unittest.RandomBeaconPriv()
 		err = store.InsertMyBeaconPrivateKey(epochCounter, expected)
 		require.NoError(t, err)
 

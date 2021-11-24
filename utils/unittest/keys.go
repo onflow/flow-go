@@ -30,7 +30,7 @@ func StakingKeys(n int) []crypto.PrivateKey {
 	return keys
 }
 
-func DKGParticipantPriv() *encodable.RandomBeaconPrivKey {
+func RandomBeaconPriv() *encodable.RandomBeaconPrivKey {
 	privKey := StakingPrivKeyFixture()
 	return &encodable.RandomBeaconPrivKey{
 		PrivateKey: privKey,
