@@ -5,99 +5,135 @@
       {
       "test": "TestSanitySha3_256",
       "package": "github.com/onflow/flow-go/crypto/hash",
+      "runs": 1,
       "passed": 0,
       "failed": 1,
       "no_result": 0,
-      "flaky_rate": 100,
-      "average_duration": 0
+      "failure_rate": 100,
+      "average_duration": 0,
+      "durations": [
+        0
+      ]
       },
 
       "github.com/onflow/flow-go/crypto/hash/TestSanitySha3_384":
       {
         "test": "TestSanitySha3_384",
         "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 1,
         "passed": 1,
         "failed": 0,
         "no_result": 0,
-        "flaky_rate": 0,
-        "average_duration": 0
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0
+        ]
       },
 
       "github.com/onflow/flow-go/crypto/hash/TestSanitySha2_256":
       {
         "test": "TestSanitySha2_256",
         "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 1,
         "passed": 1,
         "failed": 0,
         "no_result": 0,
-        "flaky_rate": 0,
-        "average_duration": 0
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0
+        ]
       },
 
       "github.com/onflow/flow-go/crypto/hash/TestSanitySha2_384":
       {
         "test": "TestSanitySha2_384",
         "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 1,
         "passed": 1,
         "failed": 0,
         "no_result": 0,
-        "flaky_rate": 0,
-        "average_duration": 0
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0
+        ]
       },
 
       "github.com/onflow/flow-go/crypto/hash/TestSanityKmac128":
       {
         "test": "TestSanityKmac128",
         "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 1,
         "passed": 1,
         "failed": 0,
         "no_result": 0,
-        "flaky_rate": 0,
-        "average_duration": 0
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0
+        ]
       },
 
       "github.com/onflow/flow-go/crypto/hash/TestHashersAPI":
       {
         "test": "TestHashersAPI",
         "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 1,
         "passed": 1,
         "failed": 0,
         "no_result": 0,
-        "flaky_rate": 0,
-        "average_duration": 0
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0
+        ]
       },
 
       "github.com/onflow/flow-go/crypto/hash/TestSha3":
       {
         "test": "TestSha3",
         "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 1,
         "passed": 1,
         "failed": 0,
         "no_result": 0,
-        "flaky_rate": 0,
-        "average_duration": 0.23
+        "failure_rate": 0,
+        "average_duration": 0.23,
+        "durations": [
+          0.23
+        ]
       },
 
       "github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_256":
       {
         "test": "TestSha3/SHA3_256",
         "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 1,
         "passed": 1,
         "failed": 0,
         "no_result": 0,
-        "flaky_rate": 0,
-        "average_duration": 0.11
+        "failure_rate": 0,
+        "average_duration": 0.11,
+        "durations": [
+          0.11
+        ]
       },
 
       "github.com/onflow/flow-go/crypto/hash/TestSha3/SHA3_384":
       {
         "test": "TestSha3/SHA3_384",
         "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 1,
         "passed": 1,
         "failed": 0,
         "no_result": 0,
-        "flaky_rate": 0,
-        "average_duration": 0.12
+        "failure_rate": 0,
+        "average_duration": 0.12,
+        "durations": [
+          0.12
+        ]
       }
     } 
 }

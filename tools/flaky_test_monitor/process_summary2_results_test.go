@@ -52,12 +52,23 @@ func runProcessSummary2TestRun(t *testing.T, testDir string) {
 		require.True(t, isFoundExpected)
 		require.True(t, isFoundActual)
 
-		require.Equal(t, expectedTestSummary.AverageDuration, actualTestSummary.AverageDuration)
-		require.Equal(t, expectedTestSummary.Failed, actualTestSummary.Failed)
-		require.Equal(t, expectedTestSummary.FlakyRate, actualTestSummary.FlakyRate)
-		require.Equal(t, expectedTestSummary.NoResult, actualTestSummary.NoResult)
 		require.Equal(t, expectedTestSummary.Package, actualTestSummary.Package)
 		require.Equal(t, expectedTestSummary.Test, actualTestSummary.Test)
+
+		require.Equal(t, expectedTestSummary.Runs, actualTestSummary.Runs)
+		require.Equal(t, expectedTestSummary.Passed, actualTestSummary.Passed)
+		require.Equal(t, expectedTestSummary.Failed, actualTestSummary.Failed)
+		require.Equal(t, expectedTestSummary.NoResult, actualTestSummary.NoResult)
+
+		require.Equal(t, expectedTestSummary.FailureRate, actualTestSummary.FailureRate)
+
+		// check all durations
+		require.Equal(t, len(expectedTestSummary.Durations), len(actualTestSummary.Durations))
+		for i := range expectedTestSummary.Durations {
+			require.Equal(t, expectedTestSummary.Durations[i], actualTestSummary.Durations[i])
+		}
+		require.Equal(t, expectedTestSummary.AverageDuration, actualTestSummary.AverageDuration)
+
 	}
 
 	//make sure calculated summary level 2 is what we expected
@@ -71,7 +82,7 @@ func runProcessSummary2TestRun(t *testing.T, testDir string) {
 			//a sub-directory of the test name will hold all test failure messages
 			failureEntries, err := os.ReadDir(expectedFailureMessagesPath + actualTestSummary.Test)
 			require.Nil(t, err)
-			require.Equal(t, actualTestSummary.Failed, len(failureEntries)+1)
+			require.Equal(t, actualTestSummary.Failed, len(failureEntries))
 		}
 	}
 }
