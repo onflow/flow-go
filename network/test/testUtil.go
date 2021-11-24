@@ -3,6 +3,8 @@ package test
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"reflect"
 	"runtime"
 	"strings"
@@ -10,7 +12,10 @@ import (
 	"testing"
 	"time"
 
+	datastore "github.com/ipfs/go-datastore/examples"
+	blockstore "github.com/ipfs/go-ipfs-blockstore"
 	"github.com/libp2p/go-libp2p-core/peer"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 
@@ -36,7 +41,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-var rootBlockID = unittest.IdentifierFixture()
+var sporkID = unittest.IdentifierFixture()
 
 const DryRun = true
 
@@ -95,11 +100,18 @@ func NewTagWatchingConnManager(log zerolog.Logger, idProvider id.IdentityProvide
 // GenerateIDs is a test helper that generate flow identities with a valid port and libp2p nodes.
 // If `dryRunMode` is set to true, it returns an empty slice instead of libp2p nodes, assuming that slice is never going
 // to get used.
-func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode, connGating bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Node, []observable.Observable) {
+func GenerateIDs(
+	t *testing.T,
+	logger zerolog.Logger,
+	n int,
+	dryRunMode, connGating bool,
+	idOpts []func(*flow.Identity),
+	dhtOpts []dht.Option,
+) (flow.IdentityList, []*p2p.Node, []observable.Observable) {
 	libP2PNodes := make([]*p2p.Node, n)
 	tagObservables := make([]observable.Observable, n)
 
-	identities := unittest.IdentityListFixture(n, opts...)
+	identities := unittest.IdentityListFixture(n, idOpts...)
 
 	idProvider := id.NewFixedIdentityProvider(identities)
 
@@ -111,7 +123,7 @@ func GenerateIDs(t *testing.T, logger zerolog.Logger, n int, dryRunMode, connGat
 		port := "0"
 
 		if !dryRunMode {
-			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, connGating, idProvider)
+			libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, connGating, idProvider, dhtOpts...)
 
 			_, port, err = libP2PNodes[i].GetIPPort()
 			require.NoError(t, err)
@@ -148,7 +160,7 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 			factory,
 			id.NodeID,
 			metrics,
-			rootBlockID,
+			sporkID,
 			p2p.DefaultUnicastTimeout,
 			enablePeerManagementAndConnectionGating,
 			p2p.NewIdentityProviderIDTranslator(idProviders[i]),
@@ -237,9 +249,12 @@ func GenerateNetworks(t *testing.T,
 func GenerateIDsAndMiddlewares(t *testing.T,
 	n int,
 	dryRunMode bool,
-	logger zerolog.Logger, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []observable.Observable, []*UpdatableIDProvider) {
+	logger zerolog.Logger,
+	idOpts []func(*flow.Identity),
+	dhtOpts []dht.Option,
+) (flow.IdentityList, []*p2p.Middleware, []observable.Observable, []*UpdatableIDProvider) {
 
-	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, dryRunMode, true, opts...)
+	ids, libP2PNodes, protectObservables := GenerateIDs(t, logger, n, dryRunMode, true, idOpts, dhtOpts)
 	mws, providers := GenerateMiddlewares(t, logger, ids, libP2PNodes, true)
 	return ids, mws, protectObservables, providers
 }
@@ -249,9 +264,12 @@ func GenerateIDsMiddlewaresNetworks(t *testing.T,
 	log zerolog.Logger,
 	csize int,
 	tops []network.Topology,
-	dryRun bool, opts ...func(*flow.Identity)) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network, []observable.Observable, context.CancelFunc) {
+	dryRun bool,
+	idOpts []func(*flow.Identity),
+	dhtOpts []dht.Option,
+) (flow.IdentityList, []*p2p.Middleware, []*p2p.Network, []observable.Observable, context.CancelFunc) {
 
-	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, dryRun, log, opts...)
+	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, dryRun, log, idOpts, dhtOpts)
 	sms := GenerateSubscriptionManagers(t, mws)
 	networks, netCancel := GenerateNetworks(t, log, ids, mws, csize, tops, sms, dryRun)
 	return ids, mws, networks, observables, netCancel
@@ -275,6 +293,7 @@ func generateLibP2PNode(t *testing.T,
 	key crypto.PrivateKey,
 	connGating bool,
 	idProvider id.IdentityProvider,
+	dhtOpts ...dht.Option,
 ) (*p2p.Node, observable.Observable) {
 
 	noopMetrics := metrics.NewNoopCollector()
@@ -294,16 +313,20 @@ func generateLibP2PNode(t *testing.T,
 	// dns resolver
 	resolver := dns.NewResolver(noopMetrics)
 
-	libP2PNode, err := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
-		SetRootBlockID(rootBlockID).
+	builder := p2p.NewDefaultLibP2PNodeBuilder(id.NodeID, "0.0.0.0:0", key).
+		SetSporkID(sporkID).
 		SetConnectionGater(connGater).
 		SetConnectionManager(connManager).
 		SetPubsubOptions(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize)...).
 		SetPingInfoProvider(pingInfoProvider).
 		SetResolver(resolver).
-		SetLogger(logger).
-		SetStreamCompressor(p2p.WithGzipCompression).
-		Build(ctx)
+		SetLogger(logger)
+
+	if len(dhtOpts) > 0 {
+		builder.SetDHTOptions(dhtOpts...)
+	}
+
+	libP2PNode, err := builder.Build(ctx)
 	require.NoError(t, err)
 
 	return libP2PNode, connManager
@@ -400,4 +423,18 @@ func networkPayloadFixture(t *testing.T, size uint) []byte {
 	require.InDelta(t, len(encodedEvent), int(size), float64(overhead))
 
 	return payload
+}
+
+func MakeBlockstore(t *testing.T, name string) (blockstore.Blockstore, func()) {
+	dsDir := filepath.Join(os.TempDir(), name)
+	require.NoError(t, os.RemoveAll(dsDir))
+	err := os.Mkdir(dsDir, os.ModeDir)
+	require.NoError(t, err)
+
+	ds, err := datastore.NewDatastore(dsDir)
+	require.NoError(t, err)
+
+	return blockstore.NewBlockstore(ds.(*datastore.Datastore)), func() {
+		require.NoError(t, os.RemoveAll(dsDir))
+	}
 }

@@ -19,4 +19,5 @@ type All struct {
 	TransactionResults TransactionResults
 	Collections        Collections
 	Events             Events
+	Identities         Identities
 }

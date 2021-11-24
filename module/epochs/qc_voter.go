@@ -18,11 +18,15 @@ import (
 )
 
 const (
-	// retryMilliseconds is the number of milliseconds to wait between retries
-	retryMilliseconds = 1000 * time.Millisecond
+	// retryDuration is the initial duration to wait between retries for all retryable
+	// requests - increases exponentially for subsequent retries
+	retryDuration = time.Second
 
-	// percentage of jitter to add to QC contract requests
-	retryJitter = 10
+	// retryDurationMax is the maximum duration to wait between two consecutive requests
+	retryDurationMax = 10 * time.Minute
+
+	// retryJitterPercent is the percentage jitter to introduce to each retry interval
+	retryJitterPercent = 25 // 25%
 )
 
 // RootQCVoter is responsible for generating and submitting votes for the
@@ -96,13 +100,17 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		return fmt.Errorf("could not create vote for cluster root qc: %w", err)
 	}
 
-	expRetry, err := retry.NewExponential(retryMilliseconds)
+	// this backoff configuration will never terminate on its own, but the
+	// request logic will exit when we exit the EpochSetup phase
+	expRetry, err := retry.NewExponential(retryDuration)
 	if err != nil {
 		log.Fatal().Err(err).Msg("create retry mechanism")
 	}
+	maxedRetry := retry.WithCappedDuration(retryDurationMax, expRetry)
+	backoff := retry.WithJitterPercent(retryJitterPercent, maxedRetry)
 
 	attempts := 0
-	err = retry.Do(ctx, retry.WithJitterPercent(retryJitter, expRetry), func(ctx context.Context) error {
+	err = retry.Do(ctx, backoff, func(ctx context.Context) error {
 		attempts++
 
 		// retry with next fallback client after 2 failed attempts

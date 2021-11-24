@@ -23,22 +23,17 @@ import (
 	"github.com/onflow/flow-go/module/trace"
 )
 
-const (
-	flowServiceAccountContract = "FlowServiceAccount"
-	deductFeesContractFunction = "deductTransactionFee"
-)
-
-type TransactionInvocator struct {
+type TransactionInvoker struct {
 	logger zerolog.Logger
 }
 
-func NewTransactionInvocator(logger zerolog.Logger) *TransactionInvocator {
-	return &TransactionInvocator{
+func NewTransactionInvoker(logger zerolog.Logger) *TransactionInvoker {
+	return &TransactionInvoker{
 		logger: logger,
 	}
 }
 
-func (i *TransactionInvocator) Process(
+func (i *TransactionInvoker) Process(
 	vm *VirtualMachine,
 	ctx *Context,
 	proc *TransactionProcedure,
@@ -88,11 +83,11 @@ func (i *TransactionInvocator) Process(
 			proc.Events = make([]flow.Event, 0)
 			proc.ServiceEvents = make([]flow.Event, 0)
 		}
-		if mergeError := parentState.MergeState(childState, sth.EnforceLimit); mergeError != nil {
+		if mergeError := parentState.MergeState(childState, sth.EnforceInteractionLimits()); mergeError != nil {
 			processErr = fmt.Errorf("transaction invocation failed: %w", mergeError)
 		}
 		sth.SetActiveState(parentState)
-		sth.EnforceLimit = true
+		sth.EnableLimitEnforcement()
 	}()
 
 	for numberOfRetries = 0; numberOfRetries < int(ctx.MaxNumOfTxRetries); numberOfRetries++ {
@@ -154,14 +149,17 @@ func (i *TransactionInvocator) Process(
 	// 	panic(err)
 	// }
 
+	// disable the limit checks on states
+	sth.DisableLimitEnforcement()
+
 	// try to deduct fees even if there is an error.
 	// disable the limit checks on states
-	sth.EnforceLimit = false
 	feesError := i.deductTransactionFees(env, proc)
 	if feesError != nil {
 		txError = feesError
 	}
-	sth.EnforceLimit = true
+	sth.EnableLimitEnforcement()
+
 	// applying contract changes
 	// this writes back the contract contents to accounts
 	// if any error occurs we fail the tx
@@ -178,7 +176,7 @@ func (i *TransactionInvocator) Process(
 
 	// it there was any transaction error clear changes and try to deduct fees again
 	if txError != nil {
-		sth.EnforceLimit = false
+		sth.DisableLimitEnforcement()
 		// drop delta since transaction failed
 		childState.View().DropDelta()
 		// if tx fails just do clean up
@@ -240,26 +238,30 @@ func (i *TransactionInvocator) Process(
 	return txError
 }
 
-func (i *TransactionInvocator) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) error {
+func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) (err error) {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
 	}
 
-	invocator := NewTransactionContractFunctionInvocator(
-		common.AddressLocation{
-			Address: common.BytesToAddress(env.ctx.Chain.ServiceAddress().Bytes()),
-			Name:    flowServiceAccountContract,
-		},
-		deductFeesContractFunction,
-		[]interpreter.Value{
-			interpreter.NewAddressValue(common.BytesToAddress(proc.Transaction.Payer.Bytes())),
-		},
-		[]sema.Type{
-			sema.AuthAccountType,
-		},
-		env.ctx.Logger,
-	)
-	_, err := invocator.Invoke(env, proc.TraceSpan)
+	// start a new computation meter for deducting transaction fees.
+	subMeter := env.computationHandler.StartSubMeter(DefaultGasLimit)
+	defer func() {
+		merr := subMeter.Discard()
+		if merr == nil {
+			return
+		}
+		if err != nil {
+			// The error merr (from discarding the subMeter) will be hidden by err (transaction fee deduction error)
+			// as it has priority. So log merr.
+			i.logger.Error().Err(merr).
+				Msg("error discarding computation meter in deductTransactionFees (while also handling a deductTransactionFees error)")
+			return
+		}
+		err = merr
+	}()
+
+	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
+	_, err = deductTxFees(proc.Transaction.Payer)
 
 	if err != nil {
 		// TODO: Fee value is currently a constant. this should be changed when it is not
@@ -291,7 +293,7 @@ var setAccountFrozenFunctionType = &sema.FunctionType{
 	},
 }
 
-func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclaration {
+func valueDeclarations(ctx *Context, env Environment) []runtime.ValueDeclaration {
 	var predeclaredValues []runtime.ValueDeclaration
 
 	if ctx.AccountFreezeAvailable {
@@ -316,7 +318,13 @@ func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclara
 						panic(errors.NewValueErrorf(invocation.Arguments[0].String(),
 							"second argument of setAccountFrozen must be a boolean"))
 					}
-					err := env.SetAccountFrozen(common.Address(address), bool(frozen))
+
+					var err error
+					if env, isTXEnv := env.(*TransactionEnv); isTXEnv {
+						err = env.SetAccountFrozen(common.Address(address), bool(frozen))
+					} else {
+						err = errors.NewOperationNotSupportedError("SetAccountFrozen")
+					}
 					if err != nil {
 						panic(err)
 					}
@@ -334,7 +342,7 @@ func valueDeclarations(ctx *Context, env *TransactionEnv) []runtime.ValueDeclara
 
 // requiresRetry returns true for transactions that has to be rerun
 // this is an additional check which was introduced
-func (i *TransactionInvocator) requiresRetry(err error, proc *TransactionProcedure) bool {
+func (i *TransactionInvoker) requiresRetry(err error, proc *TransactionProcedure) bool {
 	// if no error no retry
 	if err == nil {
 		return false
@@ -386,7 +394,7 @@ func (i *TransactionInvocator) requiresRetry(err error, proc *TransactionProcedu
 
 // logRuntimeError logs run time errors into a file
 // This is a temporary measure.
-func (i *TransactionInvocator) dumpRuntimeError(runtimeErr *runtime.Error, procedure *TransactionProcedure) {
+func (i *TransactionInvoker) dumpRuntimeError(runtimeErr *runtime.Error, procedure *TransactionProcedure) {
 
 	codesJSON, err := json.Marshal(runtimeErr.Codes)
 	if err != nil {

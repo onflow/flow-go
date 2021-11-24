@@ -928,6 +928,48 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
 			}))
+
+	t.Run("Using to much interaction fails but does not panic", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
+		withContextOptions(
+			fvm.WithTransactionProcessors(
+				fvm.NewTransactionAccountFrozenChecker(),
+				fvm.NewTransactionAccountFrozenEnabler(),
+				fvm.NewTransactionInvoker(zerolog.Nop()),
+			),
+		).
+		run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				ctx.MaxStateInteractionSize = 500_000
+				//ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				require.NoError(t, err)
+
+				_, txBody := testutil.CreateMultiAccountCreationTransaction(t, chain, 100)
+
+				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+				txBody.SetPayer(chain.ServiceAddress())
+
+				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				require.Error(t, tx.Err)
+
+				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
+			}))
 }
 
 var createAccountScript = []byte(`
@@ -2032,7 +2074,7 @@ func TestWithServiceAccount(t *testing.T) {
 		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvoker(zerolog.Nop()),
 		),
 	)
 
@@ -2077,7 +2119,7 @@ func TestEventLimits(t *testing.T) {
 		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvoker(zerolog.Nop()),
 		),
 	)
 
@@ -2115,7 +2157,7 @@ func TestEventLimits(t *testing.T) {
 		fvm.WithChain(chain),
 		fvm.WithEventCollectionSizeLimit(2),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvoker(zerolog.Nop()),
 		),
 	)
 
@@ -2414,6 +2456,7 @@ func TestTransactionFeeDeduction(t *testing.T) {
 		name          string
 		fundWith      uint64
 		tryToTransfer uint64
+		gasLimit      uint64
 		checkResult   func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure)
 	}
 
@@ -2497,6 +2540,30 @@ func TestTransactionFeeDeduction(t *testing.T) {
 			name:          "If tx fails, fee deduction events are emitted",
 			fundWith:      fundingAmount,
 			tryToTransfer: 2 * fundingAmount,
+			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
+				require.Error(t, tx.Err)
+
+				var deposits []flow.Event
+				var withdraws []flow.Event
+
+				for _, e := range tx.Events {
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensDeposited", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+						deposits = append(deposits, e)
+					}
+					if string(e.Type) == fmt.Sprintf("A.%s.FlowToken.TokensWithdrawn", fvm.FlowTokenAddress(flow.Testnet.Chain())) {
+						withdraws = append(withdraws, e)
+					}
+				}
+
+				require.Len(t, deposits, 1)
+				require.Len(t, withdraws, 1)
+			},
+		},
+		{
+			name:          "If tx fails because of gas limit reached, fee deduction events are emitted",
+			fundWith:      fundingAmount,
+			tryToTransfer: 2 * fundingAmount,
+			gasLimit:      uint64(10),
 			checkResult: func(t *testing.T, balanceBefore uint64, balanceAfter uint64, tx *fvm.TransactionProcedure) {
 				require.Error(t, tx.Err)
 
@@ -2686,6 +2753,12 @@ func TestTransactionFeeDeduction(t *testing.T) {
 
 			txBody.SetProposalKey(address, 0, 0)
 			txBody.SetPayer(address)
+
+			if tc.gasLimit == 0 {
+				txBody.SetGasLimit(fvm.DefaultGasLimit)
+			} else {
+				txBody.SetGasLimit(tc.gasLimit)
+			}
 
 			err = testutil.SignEnvelope(
 				txBody,
