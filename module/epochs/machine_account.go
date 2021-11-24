@@ -113,7 +113,7 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 	}
 	backoff := retry.WithJitterPercent(
 		5, // 5% jitter
-		retry.WithMaxDuration(checkMachineAccountRetryMax, expRetry),
+		retry.WithCappedDuration(checkMachineAccountRetryMax, expRetry),
 	)
 
 	err = retry.Do(ctx, backoff, func(ctx context.Context) error {

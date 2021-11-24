@@ -1,0 +1,84 @@
+name: Benchstat
+on:
+  pull_request:
+    branches:
+      - master
+      - "auto-cadence-upgrade/**"
+      - "feature/**"
+      - "v[0-9]+.[0-9]+"
+    paths:
+      - "fvm/**"
+      - "go.sum"
+
+jobs:
+  benchstat:
+    name: Performance regression check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set benchmark repetitions
+        # reducing repetition will speed up execution,
+        # but will be more inaccurate at detecting change
+        run: echo "::set-output name=benchmark_repetitions::7"
+        id: settings
+
+      - name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Setup go
+        uses: actions/setup-go@v2
+        with:
+          # 1.17 to get shuffle on bench tests
+          go-version: "^1.17"
+
+      - name: Build relic
+        run: make crypto/relic/build
+
+      - name: Run benchmark on current branch
+        run: |
+          go test ./fvm --bench . --tags relic -shuffle=on -count ${{ steps.settings.outputs.benchmark_repetitions }} | tee new.txt
+
+      - name: Checkout base branch
+        run: git checkout ${{ github.event.pull_request.base.sha }}
+
+      - name: Run benchmark on base branch
+        run: |
+          go test ./fvm --bench . --tags relic -shuffle=on  -count ${{ steps.settings.outputs.benchmark_repetitions }} | tee old.txt
+
+      # see https://trstringer.com/github-actions-multiline-strings/ to see why this part is complex
+      - name: Use benchstat for comparison
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          GO111MODULE=off go get golang.org/x/perf/cmd/benchstat
+          echo "BENCHSTAT<<EOF" >> $GITHUB_ENV
+          echo "$(benchstat -html -sort delta old.txt new.txt | sed  '/<title/,/<\/style>/d' | sed 's/<!doctype html>//g')" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+      - name: Find existing comment on PR
+        uses: peter-evans/find-comment@v1
+        id: fc
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: "github-actions[bot]"
+          body-includes: "## FVM [Benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) comparison"
+
+      - name: Create or update comment
+        uses: peter-evans/create-or-update-comment@v1
+        with:
+          comment-id: ${{ steps.fc.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            ## FVM [Benchstat](https://pkg.go.dev/golang.org/x/perf/cmd/benchstat) comparison
+
+            This branch with compared with the base branch ${{  github.event.pull_request.base.label }} commit ${{ github.event.pull_request.base.sha }}
+
+            The command `go test ./fvm --bench . --tags relic -shuffle=on -count N` was used.
+
+            Bench tests were run a total of ${{ steps.settings.outputs.benchmark_repetitions }} times on each branch.
+
+            ## Results
+
+            ${{ env.BENCHSTAT }}
+            
+          edit-mode: replace

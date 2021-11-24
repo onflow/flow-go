@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
@@ -41,22 +42,23 @@ func (suite *AccessSuite) TearDownTest() {
 
 func (suite *AccessSuite) SetupTest() {
 	nodeConfigs := []testnet.NodeConfig{
-		testnet.NewNodeConfig(flow.RoleAccess),
-		testnet.NewNodeConfig(flow.RoleAccess),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 	}
 
 	// need one dummy execution node (unused ghost)
-	exeConfig := testnet.NewNodeConfig(flow.RoleExecution)
+	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel))
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
 	// need one dummy verification node (unused ghost)
-	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.AsGhost())
+	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, verConfig)
 
 	// need three consensus nodes (unused ghost)
 	for n := 0; n < 3; n++ {
 		conID := unittest.IdentifierFixture()
 		nodeConfig := testnet.NewNodeConfig(flow.RoleConsensus,
+			testnet.WithLogLevel(zerolog.FatalLevel),
 			testnet.WithID(conID),
 			testnet.AsGhost())
 		nodeConfigs = append(nodeConfigs, nodeConfig)
@@ -64,7 +66,7 @@ func (suite *AccessSuite) SetupTest() {
 
 	// need one controllable collection node (used ghost)
 	collID := unittest.IdentifierFixture()
-	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithID(collID))
+	collConfig := testnet.NewNodeConfig(flow.RoleCollection, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(collID))
 	nodeConfigs = append(nodeConfigs, collConfig)
 
 	conf := testnet.NewNetworkConfig("access_api_test", nodeConfigs)

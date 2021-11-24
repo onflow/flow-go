@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
@@ -38,7 +39,7 @@ func (s *Suite) SetupTest() {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -46,28 +47,28 @@ func (s *Suite) SetupTest() {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
 	// a ghost node masquerading as a consensus node
 	s.ghostID = unittest.IdentifierFixture()
 	ghostConNode := testnet.NewNodeConfig(
 		flow.RoleAccess,
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.WithID(s.ghostID),
 		testnet.AsGhost())
 
 	confs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
-		testnet.NewNodeConfig(flow.RoleAccess),
-		testnet.NewNodeConfig(flow.RoleAccess),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		ghostConNode,
 	}
 
@@ -348,6 +349,48 @@ pub fun main(nodeID: String): FlowIDTableStaking.NodeInfo {
 
 func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
 	v, err := s.client.ExecuteScriptBytes(ctx, []byte(getNodeInfo), []cadence.Value{cadence.String(nodeID.String())})
+	require.NoError(s.T(), err)
+
+	return v
+}
+
+// SetApprovedNodesScript adds a node the the approved node list, this must be done when a node joins the protocol during the epoch staking phase
+func (s *Suite) SetApprovedNodesScript(ctx context.Context, env templates.Environment, identities ...flow.Identifier) *sdk.TransactionResult {
+	ids := make([]cadence.Value, 0)
+	for _, id := range identities {
+		idCDC, err := cadence.NewString(id.String())
+		require.NoError(s.T(), err)
+
+		ids = append(ids, idCDC)
+	}
+
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
+
+	idTableAddress := sdk.HexToAddress(env.IDTableAddress)
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateSetApprovedNodesScript(env)).
+		SetGasLimit(9999).
+		SetReferenceBlockID(sdk.Identifier(latestBlockID)).
+		SetProposalKey(s.client.SDKServiceAddress(), 0, s.client.Account().Keys[0].SequenceNumber).
+		SetPayer(s.client.SDKServiceAddress()).
+		AddAuthorizer(idTableAddress)
+
+	err = tx.AddArgument(cadence.NewArray(ids))
+	require.NoError(s.T(), err)
+
+	err = s.client.SignAndSendTransaction(ctx, tx)
+	require.NoError(s.T(), err)
+
+	result, err := s.client.WaitForSealed(ctx, tx.ID())
+	require.NoError(s.T(), err)
+
+	return result
+}
+
+// ExecuteReadApprovedNodesScript executes the return proposal table script and returns a list of approved nodes
+func (s *Suite) ExecuteReadApprovedNodesScript(ctx context.Context, env templates.Environment) cadence.Value {
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 
 	return v

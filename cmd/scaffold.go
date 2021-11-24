@@ -42,7 +42,6 @@ import (
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
-	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -136,10 +135,13 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminKey, "admin-key", defaultConfig.AdminKey, "admin key file (for TLS)")
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminClientCAs, "admin-client-certs", defaultConfig.AdminClientCAs, "admin client certs (for mutual TLS)")
 
-	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", dns.DefaultTimeToLive, "time-to-live for dns cache")
+	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
+	fnb.flags.StringVar(&fnb.BaseConfig.LibP2PStreamCompression, "stream-compression", p2p.NoCompression,
+		"networking stream compression mechanism")
+	fnb.flags.IntVar(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultCacheSize,
+		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
 	fnb.flags.UintVar(&fnb.BaseConfig.receiptsCacheSize, "receipts-cache-size", bstorage.DefaultCacheSize, "receipts cache size")
-
 }
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
@@ -164,6 +166,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 				}
 				return head.Height, nil
 			},
+			HotstuffViewFun: nil, // set in next code block, depending on role
 		}
 
 		// only consensus roles will need to report hotstuff view
@@ -179,29 +182,37 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 				return curView, nil
 			}
+		} else {
+			// non-consensus will not report any hotstuff view
+			pingProvider.HotstuffViewFun = func() (uint64, error) {
+				return 0, fmt.Errorf("non-consensus nodes do not report hotstuff view in ping")
+			}
+		}
+
+		streamFactory, err := p2p.LibP2PStreamCompressorFactoryFunc(fnb.BaseConfig.LibP2PStreamCompression)
+		if err != nil {
+			return nil, fmt.Errorf("could not convert stream factory: %w", err)
 		}
 
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
-			fnb.Logger.Level(zerolog.ErrorLevel),
+			fnb.Logger,
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
-			fnb.RootBlock.ID(),
-			fnb.RootChainID,
+			fnb.SporkID,
 			fnb.IdentityProvider,
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
 			pingProvider,
 			fnb.BaseConfig.DNSCacheTTL,
-			fnb.BaseConfig.NodeRole)
+			fnb.BaseConfig.NodeRole,
+			streamFactory)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
 		}
 
-		mwOpts := []p2p.MiddlewareOption{
-			p2p.WithIdentifierProvider(fnb.NetworkingIdentifierProvider),
-		}
+		var mwOpts []p2p.MiddlewareOption
 		if len(fnb.MsgValidators) > 0 {
 			mwOpts = append(mwOpts, p2p.WithMessageValidators(fnb.MsgValidators...))
 		}
@@ -211,7 +222,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		mwOpts = append(mwOpts, p2p.WithPeerManager(peerManagerFactory))
 
 		fnb.Middleware = p2p.NewMiddleware(
-			fnb.Logger.Level(zerolog.ErrorLevel),
+			fnb.Logger,
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
@@ -239,7 +250,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			codec,
 			fnb.Me,
 			func() (network.Middleware, error) { return fnb.Middleware, nil },
-			p2p.DefaultCacheSize,
+			fnb.NetworkReceivedMessageCacheSize,
 			topologyCache,
 			subscriptionManager,
 			fnb.Metrics.Network,
@@ -365,7 +376,7 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	log := fnb.Logger.With().
 		Timestamp().
 		Str("node_role", fnb.BaseConfig.NodeRole).
-		Str("node_id", fnb.BaseConfig.nodeIDHex).
+		Str("node_id", fnb.NodeID.String()).
 		Logger()
 
 	log.Info().Msgf("flow %s node starting up", fnb.BaseConfig.NodeRole)
@@ -409,10 +420,12 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 		mempools := metrics.NewMempoolCollector(5 * time.Second)
 
 		fnb.Metrics = Metrics{
-			Network:        metrics.NewNetworkCollector(),
-			Engine:         metrics.NewEngineCollector(),
-			Compliance:     metrics.NewComplianceCollector(),
-			Cache:          metrics.NewCacheCollector(fnb.RootChainID),
+			Network:    metrics.NewNetworkCollector(),
+			Engine:     metrics.NewEngineCollector(),
+			Compliance: metrics.NewComplianceCollector(),
+			// CacheControl metrics has been causing memory abuse, disable for now
+			// Cache:          metrics.NewCacheCollector(fnb.RootChainID),
+			Cache:          metrics.NewNoopCollector(),
 			CleanCollector: metrics.NewCleanerCollector(),
 			Mempool:        mempools,
 		}
@@ -561,8 +574,7 @@ func (fnb *FlowNodeBuilder) InitIDProviders() {
 
 		node.IdentityProvider = idCache
 		node.IDTranslator = idCache
-		node.NetworkingIdentifierProvider = id.NewFilteredIdentifierProvider(p2p.NotEjectedFilter, idCache)
-		node.SyncEngineIdentifierProvider = id.NewFilteredIdentifierProvider(
+		node.SyncEngineIdentifierProvider = id.NewIdentityFilterIdentifierProvider(
 			filter.And(
 				filter.HasRole(flow.RoleConsensus),
 				filter.Not(filter.HasNodeID(node.Me.NodeID())),
@@ -585,7 +597,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msg("failed to read root sealed result")
 	sealingSegment, err := rootSnapshot.SealingSegment()
 	fnb.MustNot(err).Msg("failed to read root sealing segment")
-	fnb.RootBlock = sealingSegment[len(sealingSegment)-1]
+	fnb.RootBlock = sealingSegment.Highest()
 	fnb.RootQC, err = rootSnapshot.QuorumCertificate()
 	fnb.MustNot(err).Msg("failed to read root qc")
 	// set the chain ID based on the root header
@@ -594,6 +606,8 @@ func (fnb *FlowNodeBuilder) initState() {
 	// state as final authority on what the chain ID is
 	// => https://github.com/dapperlabs/flow-go/issues/4167
 	fnb.RootChainID = fnb.RootBlock.Header.ChainID
+	fnb.SporkID, err = rootSnapshot.Params().SporkID()
+	fnb.MustNot(err)
 
 	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
 	fnb.MustNot(err).Msg("failed to determine whether database contains bootstrapped state")
@@ -614,9 +628,10 @@ func (fnb *FlowNodeBuilder) initState() {
 
 		// Verify root block in protocol state is consistent with bootstrap information stored on-disk.
 		// Inconsistencies can happen when the bootstrap root block is updated (because of new spork),
-		// but the protocol state is not updated, so they don't match
-		// when this happens during a spork, we could try deleting the protocol state database.
-		// TODO: revisit this check when implementing Epoch
+		// but the protocol state is not updated, so they don't match.
+		//
+		// When this happens during a spork, we could try deleting the protocol state database.
+		//
 		rootBlockFromState, err := state.Params().Root()
 		fnb.MustNot(err).Msg("could not load root block from protocol state")
 		if fnb.RootBlock.ID() != rootBlockFromState.ID() {
@@ -719,7 +734,9 @@ func (fnb *FlowNodeBuilder) initFvmOptions() {
 		fvm.WithAccountStorageLimit(true),
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary || fnb.RootChainID == flow.Mainnet {
-		fvm.WithTransactionFeesEnabled(true)
+		vmOpts = append(vmOpts,
+			fvm.WithTransactionFeesEnabled(true),
+		)
 	}
 	if fnb.RootChainID == flow.Testnet || fnb.RootChainID == flow.Canary {
 		vmOpts = append(vmOpts,

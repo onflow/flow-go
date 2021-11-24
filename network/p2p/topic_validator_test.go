@@ -22,12 +22,12 @@ func TestTopicValidator(t *testing.T) {
 
 	// create two staked nodes - node1 and node2
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	node1 := createNode(t, identity1.NodeID, privateKey1, rootBlockID)
+	node1 := createNode(t, identity1.NodeID, privateKey1, sporkID)
 
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
-	node2 := createNode(t, identity2.NodeID, privateKey2, rootBlockID)
+	node2 := createNode(t, identity2.NodeID, privateKey2, sporkID)
 
-	badTopic := engine.TopicFromChannel(engine.SyncCommittee, rootBlockID)
+	badTopic := engine.TopicFromChannel(engine.SyncCommittee, sporkID)
 
 	ids := flow.IdentityList{identity1, identity2}
 	translator, err := NewFixedTableIdentityTranslator(ids)
@@ -44,7 +44,7 @@ func TestTopicValidator(t *testing.T) {
 	unstakedKey := unittest.NetworkingPrivKeyFixture()
 	require.NoError(t, err)
 	// create one unstaked node
-	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, rootBlockID)
+	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, sporkID)
 	require.NoError(t, err)
 
 	// node1 is connected to node2, and the unstaked node is connected to node1

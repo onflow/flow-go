@@ -1,4 +1,4 @@
-package vertestutils
+package verificationtest
 
 import (
 	"context"
