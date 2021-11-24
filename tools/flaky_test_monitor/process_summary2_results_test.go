@@ -15,18 +15,35 @@ func TestProcessSummary2TestRun(t *testing.T) {
 
 	for k, testDir := range testDataMap {
 		t.Run(k, func(t *testing.T) {
+			setUp(t)
 			runProcessSummary2TestRun(t, testDir)
+			tearDown(t)
 		})
 	}
 }
 
+func setUp(t *testing.T) {
+	deleteFailuresDir(t)
+}
+
+func tearDown(t *testing.T) {
+	deleteFailuresDir(t)
+}
+
 // HELPERS - UTILITIES
+
+const actualFailureTestDataPath = "./failures/"
+
+func deleteFailuresDir(t *testing.T) {
+	// delete failure test dir that stores failure messages
+	err := os.RemoveAll(actualFailureTestDataPath)
+	require.Nil(t, err)
+}
 
 func runProcessSummary2TestRun(t *testing.T, testDir string) {
 	inputTestDataPath := "./testdata/summary2/" + testDir + "/input/"
 	expectedOutputTestDataPath := "./testdata/summary2/" + testDir + "/expected-output/" + testDir + ".json"
 	expectedFailureMessagesPath := "./testdata/summary2/" + testDir + "/expected-output/failures/"
-	actualFailureTestDataPath := "./failures/"
 
 	// **************************************************************
 	actualTestSummary2 := processSummary2TestRun(inputTestDataPath)
