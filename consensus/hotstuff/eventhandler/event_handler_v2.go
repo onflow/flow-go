@@ -1,6 +1,7 @@
 package eventhandler
 
 import (
+	"errors"
 	"fmt"
 	"time"
 
@@ -119,12 +120,22 @@ func (e *EventHandlerV2) OnReceiveProposal(proposal *model.Proposal) error {
 		// validate the block. exit if the proposal is invalid
 		err := e.validator.ValidateProposal(proposal)
 		if model.IsInvalidBlockError(err) {
-			_ = e.voteAggregator.InvalidBlock(proposal)
+			perr := e.voteAggregator.InvalidBlock(proposal)
+			if mempool.IsDecreasingPruningHeightError(perr) {
+				log.Warn().Err(err).Msgf("invalid block proposal, but vote aggregator has pruned this height: %v", perr)
+				return nil
+			}
+
+			if perr != nil {
+				return fmt.Errorf("vote aggregator could not process invalid block proposal %v, err %v: %w",
+					block.BlockID, err, perr)
+			}
 
 			log.Warn().Err(err).Msg("invalid block proposal")
 			return nil
 		}
-		if mempool.IsDecreasingPruningHeightError(err) {
+
+		if errors.Is(err, model.ErrUnverifiableBlock) {
 			log.Warn().Err(err).Msg("unverifiable block proposal")
 
 			// even if the block is unverifiable because the QC has been
