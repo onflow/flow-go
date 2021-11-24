@@ -121,14 +121,20 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		suite.blocks.On("ByID", block.ID()).Return(block, nil).Once()
 
 		client := suite.restAPIClient()
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5000)
 		defer cancel()
 
-		blocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, expandPayloadOption())
+		blocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, expandAndSelectOptions())
 		require.NoError(suite.T(), err)
 		require.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		require.Len(suite.T(), blocks, 1)
 		assert.Equal(suite.T(), block.ID().String(), blocks[0].Header.Id)
+
+		fmt.Println(blocks[0])
+		require.Nil(suite.T(), blocks[0].ExecutionResult)
+		jsonBytes, err := json.MarshalIndent(blocks[0], "", "\t")
+		require.NoError(suite.T(), err)
+		fmt.Println(string(jsonBytes))
 	})
 
 	suite.Run("GetBlockByID for multiple IDs - happy path", func() {
@@ -154,7 +160,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		// comma delimited one. hence, explicitly setting the ids as a csv here
 		blockIDSlice := []string{strings.Join(blockIDs, ",")}
 
-		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandPayloadOption())
+		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandAndSelectOptions())
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
 		assert.Len(suite.T(), blocks, rest.MaxAllowedBlockIDs)
@@ -176,7 +182,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{nonExistingBlockID.String()}, expandPayloadOption())
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{nonExistingBlockID.String()}, expandAndSelectOptions())
 		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", nonExistingBlockID.String()))
 	})
 
@@ -187,7 +193,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		defer cancel()
 
 		const invalidBlockID = "invalid_block_id"
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{invalidBlockID}, expandPayloadOption())
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{invalidBlockID}, expandAndSelectOptions())
 		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("invalid ID %s", invalidBlockID))
 	})
 
@@ -204,7 +210,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 			blockIDs[i] = unittest.IdentifierFixture().String()
 		}
 		blockIDSlice := []string{strings.Join(blockIDs, ",")}
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandPayloadOption())
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandAndSelectOptions())
 		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", rest.MaxAllowedBlockIDs))
 	})
 
@@ -232,7 +238,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 			suite.blocks.On("ByID", id).Return(block, nil).Once()
 		}
 		blockIDSlice := []string{strings.Join(blockIDs, ",")}
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandPayloadOption())
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandAndSelectOptions())
 		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", blockIDs[invalidBlockIndex]))
 	})
 
@@ -262,9 +268,9 @@ func assertError(t *testing.T, resp *http.Response, err error, expectedCode int,
 	require.Contains(t, modelError.Message, expectedMsgSubstr)
 }
 
-func expandPayloadOption() *restclient.BlocksApiBlocksIdGetOpts {
+func expandAndSelectOptions() *restclient.BlocksApiBlocksIdGetOpts {
 	return &restclient.BlocksApiBlocksIdGetOpts{
 		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
-		Select_: optional.EmptyInterface(),
+		Select_: optional.NewInterface([]string{"header.id"}),
 	}
 }

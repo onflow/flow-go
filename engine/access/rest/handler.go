@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/rs/zerolog"
@@ -55,6 +56,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// apply the select filter if any select fields have been specified
+	selectFields := decoratedRequest.selects()
+	if len(selectFields) > 0 {
+		var err error
+		response, err = SelectFilter(response, selectFields)
+		if err != nil {
+			h.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
+		}
+	}
+
 	// write response to response stream
 	h.jsonResponse(w, response, errorLogger)
 }
@@ -69,6 +80,7 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logg
 		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
 		return
 	}
+	fmt.Println(string(encodedResponse))
 
 	// write response to response stream
 	_, writeErr := w.Write(encodedResponse)

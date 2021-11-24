@@ -10,21 +10,25 @@ import (
 
 func ExampleSelectFilter() {
 
-	block, err := generateBlock()
-	if err != nil {
-		fmt.Println(err)
-		return
+	blocks := make([]generated.Block, 2)
+	for i := range blocks {
+		block, err := generateBlock()
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		blocks[i] = block
 	}
 
 	selectKeys := []string{
 		"header.id",
 		"payload.collection_guarantees.signature",
-		"payload.block_seal.aggregated_approval_signatures.signer_ids",
+		"payload.block_seals.aggregated_approval_signatures.signer_ids",
 		"payload.collection_guarantees.signer_ids",
 		"execution_result.events.event_index",
 	}
 
-	filteredBlock, err := SelectFilter(block, selectKeys)
+	filteredBlock, err := SelectFilter(blocks, selectKeys)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -36,44 +40,84 @@ func ExampleSelectFilter() {
 	}
 	fmt.Println(string(marshalled))
 	// Output:
-	//{
-	//	"execution_result": {
-	//		"events": [
-	//			{
-	//				"event_index": 2
-	//			},
-	//			{
-	//				"event_index": 3
-	//			}
-	//		]
+	//[
+	//	{
+	//		"execution_result": {
+	//			"events": [
+	//				{
+	//					"event_index": 2
+	//				},
+	//				{
+	//					"event_index": 3
+	//				}
+	//			]
+	//		},
+	//		"header": {
+	//			"id": "abcd"
+	//		},
+	//		"payload": {
+	//			"block_seals": [
+	//				{
+	//					"aggregated_approval_signatures": [
+	//						{
+	//							"signer_ids": [
+	//								"abcdef0123456789",
+	//								"abcdef0123456789"
+	//							]
+	//						}
+	//					]
+	//				}
+	//			],
+	//			"collection_guarantees": [
+	//				{
+	//					"signature": "abcdef0123456789",
+	//					"signer_ids": [
+	//						"abcdef0123456789",
+	//						"abcdef0123456789"
+	//					]
+	//				}
+	//			]
+	//		}
 	//	},
-	//	"header": {
-	//		"id": "abcd"
-	//	},
-	//	"payload": {
-	//		"block_seals": [
-	//			{
-	//				"aggregated_approval_signatures": [
-	//					{
-	//						"signer_ids": [
-	//							"abcdef0123456789",
-	//							"abcdef0123456789"
-	//						]
-	//					}
-	//				]
-	//			}
-	//		],
-	//		"collection_guarantees": [
-	//			{
-	//				"signature": "abcdef0123456789",
-	//				"signer_ids": [
-	//					"abcdef0123456789",
-	//					"abcdef0123456789"
-	//				]
-	//			}
-	//		]
+	//	{
+	//		"execution_result": {
+	//			"events": [
+	//				{
+	//					"event_index": 2
+	//				},
+	//				{
+	//					"event_index": 3
+	//				}
+	//			]
+	//		},
+	//		"header": {
+	//			"id": "abcd"
+	//		},
+	//		"payload": {
+	//			"block_seals": [
+	//				{
+	//					"aggregated_approval_signatures": [
+	//						{
+	//							"signer_ids": [
+	//								"abcdef0123456789",
+	//								"abcdef0123456789"
+	//							]
+	//						}
+	//					]
+	//				}
+	//			],
+	//			"collection_guarantees": [
+	//				{
+	//					"signature": "abcdef0123456789",
+	//					"signer_ids": [
+	//						"abcdef0123456789",
+	//						"abcdef0123456789"
+	//					]
+	//				}
+	//			]
+	//		}
 	//	}
-	//}
+	//]
 }
 
 func generateBlock() (generated.Block, error) {

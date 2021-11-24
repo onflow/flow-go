@@ -20,7 +20,6 @@ func filterObject(jsonStruct map[string]interface{}, prefix string, filterMap ma
 			if simpleSlice {
 				if !filterMap[newPrefix] {
 					delete(jsonStruct, key)
-					return
 				}
 			}
 			// if after calling filterSlice the list is empty, then delete the key-value pair from the map
@@ -36,7 +35,7 @@ func filterObject(jsonStruct map[string]interface{}, prefix string, filterMap ma
 			}
 		default:
 			// if the value is a non-list,non-struct type then filter it out if the key is not present
-			// // e.g. { a : 1}
+			// e.g. { a : 1}
 			if !filterMap[newPrefix] {
 				delete(jsonStruct, key)
 			}
@@ -53,11 +52,12 @@ func filterSlice(jsonSlice []interface{}, prefix string, filterMap map[string]bo
 		case []interface{}:
 			// if the slice has other slice as elements, recurse
 			// e.g [[{b:1}, {b:2}...]]
-			itemAsType, _ = filterSlice(itemAsType, prefix, filterMap)
+			var sliceType bool
+			itemAsType, sliceType = filterSlice(itemAsType, prefix, filterMap)
 			if len(itemAsType) == 0 {
 				// since all elements of the slice are the same, if one sub-slice has been filtered out, we can safely
 				// remove all sub-slices and return (instead of iterating all slice elements)
-				return nil, false
+				return nil, sliceType
 			}
 		case map[string]interface{}:
 			// if the slice has structs as elements, call filterObject
@@ -78,34 +78,32 @@ func filterSlice(jsonSlice []interface{}, prefix string, filterMap map[string]bo
 	return jsonSlice, false
 }
 
-// filterMap converts the keys to a map[string]bool for ease of use in the filter functions
-func filterMap(selectKeys []string) map[string]bool {
-	var filter = make(map[string]bool, len(selectKeys))
-	for _, k := range selectKeys {
-		filter[k] = true
-	}
-	return filter
-}
-
 // SelectFilter selects the specified keys from the given object. The keys are in the json dot notation and must refer
 // to leaf elements e.g. payload.collection_guarantees.signer_ids
-func SelectFilter(object interface{}, selectKeys []string) (map[string]interface{}, error) {
+func SelectFilter(object interface{}, selectKeys []string) (interface{}, error) {
 
 	marshalled, err := json.Marshal(object)
 	if err != nil {
 		return nil, err
 	}
 
-	var outputMap = new(map[string]interface{})
+	var outputMap = new(interface{})
 	err = json.Unmarshal(marshalled, outputMap)
 	if err != nil {
 		return nil, err
 	}
 
-	filter := filterMap(selectKeys)
+	filter := sliceToMap(selectKeys)
 
-	filterObject(*outputMap, "", filter)
-
+	switch itemAsType := (*outputMap).(type) {
+	case []interface{}:
+		filterSlice(itemAsType, "", filter)
+	case map[string]interface{}:
+		filterObject(itemAsType, "", filter)
+		if err != nil {
+			return nil, err
+		}
+	}
 	return *outputMap, nil
 }
 

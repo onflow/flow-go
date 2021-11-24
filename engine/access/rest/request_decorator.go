@@ -18,24 +18,39 @@ import (
 type requestDecorator struct {
 	*http.Request
 	expandFields map[string]bool
-	selectFields map[string]bool
+	selectFields []string
 }
 
 func newRequestDecorator(r *http.Request) *requestDecorator {
 	decoratedReq := &requestDecorator{
 		Request: r,
 	}
-	decoratedReq.expandFields, _ = middleware.GetFieldsToExpand(r)
-	decoratedReq.selectFields, _ = middleware.GetFieldsToSelect(r)
+
+	if expandFields, found := middleware.GetFieldsToExpand(r); found {
+		decoratedReq.expandFields = sliceToMap(expandFields)
+	}
+
+	if selectFields, found := middleware.GetFieldsToSelect(r); found {
+		decoratedReq.selectFields = selectFields
+	}
+
 	return decoratedReq
+}
+
+func sliceToMap(values []string) map[string]bool {
+	valueMap := make(map[string]bool, len(values))
+	for _, v := range values {
+		valueMap[v] = true
+	}
+	return valueMap
 }
 
 func (rd *requestDecorator) expands(field string) bool {
 	return rd.expandFields[field]
 }
 
-func (rd *requestDecorator) selects(field string) bool {
-	return rd.selectFields[field]
+func (rd *requestDecorator) selects() []string {
+	return rd.selectFields
 }
 
 func (rd *requestDecorator) getParam(name string) string {
