@@ -59,28 +59,16 @@ func extractExecutionState(
 
 	var migrations []ledger.Migration
 	var rs []ledger.Reporter
-	var validators []ledger.Validator
 
 	if migrate {
-		//storageFormatV6Migration := mgr.StorageFormatV6Migration{
-		//	Log:       log,
-		//	OutputDir: outputDir,
-		//}
-
 		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
 			Log:       log,
 			OutputDir: outputDir,
 		}
 
 		migrations = []ledger.Migration{
-			//storageFormatV6Migration.Migrate,
 			storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration,
-		}
-
-		// only add validators if migration is on
-		validators = []ledger.Validator{
-			// vlds.NewAccountBalanceValidator(log, chain),
 		}
 
 	}
@@ -104,7 +92,6 @@ func extractExecutionState(
 		ledger.State(targetHash),
 		migrations,
 		rs,
-		validators,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,
