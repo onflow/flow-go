@@ -74,7 +74,7 @@ func (e *EventHandlerV2) OnQCConstructed(qc *flow.QuorumCertificate) error {
 		Hex("qc_block_id", qc.BlockID[:]).
 		Logger()
 
-	e.notifier.OnQcConstructedFromVotes(qc)
+	e.notifier.OnQcConstructedFromVotes(curView, qc)
 	defer e.notifier.OnEventProcessed()
 
 	log.Debug().Msg("received constructed QC")

@@ -85,11 +85,11 @@ func (p *Distributor) OnVoting(vote *model.Vote) {
 	}
 }
 
-func (p *Distributor) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
+func (p *Distributor) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	p.lock.RLock()
 	defer p.lock.RUnlock()
 	for _, subscriber := range p.subscribers {
-		subscriber.OnQcConstructedFromVotes(qc)
+		subscriber.OnQcConstructedFromVotes(curView, qc)
 	}
 }
 

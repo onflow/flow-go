@@ -89,8 +89,9 @@ func (lc *LogConsumer) OnVoting(vote *model.Vote) {
 		Msg("voting for block")
 }
 
-func (lc *LogConsumer) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
+func (lc *LogConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
 	lc.log.Debug().
+		Uint64("cur_view", curView).
 		Uint64("qc_view", qc.View).
 		Hex("qc_id", qc.BlockID[:]).
 		Msg("QC constructed from votes")

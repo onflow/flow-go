@@ -36,13 +36,15 @@ func NewTelemetryConsumer(log zerolog.Logger, chain flow.ChainID) *TelemetryCons
 	}
 }
 
-func (t *TelemetryConsumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
-	t.pathHandler.StartNextPath(currentView)
-	t.pathHandler.NextStep().
-		Uint64("voted_block_view", vote.View).
-		Hex("voted_block_id", vote.BlockID[:]).
-		Hex("voter_id", vote.SignerID[:]).
-		Msg("OnReceiveVote")
+func (t *TelemetryConsumer) OnReceiveVote(vote *model.Vote) {
+	// TODO: update
+	//       As of Consensus Voting V2, receiving a vote is not an event within the HotStuff state machine anymore.
+	//t.pathHandler.StartNextPath(currentView)
+	// t.pathHandler.NextStep().
+	// 	Uint64("voted_block_view", vote.View).
+	// 	Hex("voted_block_id", vote.BlockID[:]).
+	// 	Hex("voter_id", vote.SignerID[:]).
+	// 	Msg("OnReceiveVote")
 }
 
 func (t *TelemetryConsumer) OnReceiveProposal(currentView uint64, proposal *model.Proposal) {
@@ -151,8 +153,10 @@ func (t *TelemetryConsumer) OnForkChoiceGenerated(current_view uint64, qc *flow.
 	// proposed block, whose details (including the qc) are captured by telemetry
 }
 
-func (t *TelemetryConsumer) OnQcConstructedFromVotes(qc *flow.QuorumCertificate) {
+func (t *TelemetryConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
+	t.pathHandler.StartNextPath(curView)
 	t.pathHandler.NextStep().
+		Uint64("curView", curView).
 		Uint64("qc_block_view", qc.View).
 		Hex("qc_block_id", qc.BlockID[:]).
 		Msg("OnQcConstructedFromVotes")

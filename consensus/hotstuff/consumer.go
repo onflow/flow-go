@@ -101,7 +101,7 @@ type Consumer interface {
 	// Prerequisites:
 	// Implementation must be concurrency safe; Non-blocking;
 	// and must handle repetition of the same events (with some processing overhead).
-	OnQcConstructedFromVotes(*flow.QuorumCertificate)
+	OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate)
 
 	// OnStartingTimeout notifications are produced by PaceMaker. Such a notification indicates that the
 	// PaceMaker is now waiting for the system to (receive and) process blocks or votes.

@@ -91,7 +91,8 @@ func (p *FinalizationDistributor) OnProposingBlock(*model.Proposal) {}
 
 func (p *FinalizationDistributor) OnVoting(*model.Vote) {}
 
-func (p *FinalizationDistributor) OnQcConstructedFromVotes(*flow.QuorumCertificate) {}
+func (p *FinalizationDistributor) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
+}
 
 func (p *FinalizationDistributor) OnStartingTimeout(*model.TimerInfo) {}
 
