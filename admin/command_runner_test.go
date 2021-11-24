@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -279,6 +280,36 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 
 	suite.True(called)
 	suite.Equal("200 OK", resp.Status)
+}
+
+func (suite *CommandRunnerSuite) TestListCommands() {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+		return nil, nil
+	})
+	suite.bootstrapper.RegisterHandler("bar", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+		return nil, nil
+	})
+	suite.bootstrapper.RegisterHandler("baz", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+		return nil, nil
+	})
+
+	suite.SetupCommandRunner()
+
+	url := fmt.Sprintf("http://%s/admin/run_command", suite.httpAddress)
+	reqBody := bytes.NewBuffer([]byte(`{"commandName": "list-commands"}`))
+	resp, err := http.Post(url, "application/json", reqBody)
+	require.NoError(suite.T(), err)
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	suite.Equal("200 OK", resp.Status)
+
+	var response map[string][]string
+	require.NoError(suite.T(), json.NewDecoder(resp.Body).Decode(&response))
+	suite.Subset(response["output"], []string{"foo", "bar", "baz"})
 }
 
 func generateCerts(t *testing.T) (tls.Certificate, *x509.CertPool, tls.Certificate, *x509.CertPool) {
