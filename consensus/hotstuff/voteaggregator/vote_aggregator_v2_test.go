@@ -77,12 +77,13 @@ func (s *VoteAggregatorV2TestSuite) SetupTest() {
 
 	// startup aggregator
 	s.aggregator.Start(signalerCtx)
-	<-s.aggregator.Ready()
+
+	unittest.RequireCloseBefore(s.T(), s.aggregator.Ready(), 100*time.Millisecond, "aggregator not started")
 }
 
 func (s *VoteAggregatorV2TestSuite) TearDownTest() {
 	s.cancel()
-	<-s.aggregator.Done()
+	unittest.RequireCloseBefore(s.T(), s.aggregator.Done(), 100*time.Millisecond, "aggregator not stopped")
 }
 
 // prepareMockedCollector prepares a mocked collector and stores it in map, later it will be used

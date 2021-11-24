@@ -69,13 +69,7 @@ func NewVoteAggregatorV2(
 
 	// launch as many workers as we need
 	for i := 0; i < defaultVoteAggregatorWorkers; i++ {
-		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			ready()
-			err := aggregator.queuedVotesProcessingLoop(ctx)
-			if err != nil {
-				ctx.Throw(err)
-			}
-		})
+		componentBuilder.AddWorker(aggregator.queuedVotesProcessingLoop)
 	}
 
 	aggregator.ComponentManager = componentBuilder.Build()
@@ -83,16 +77,18 @@ func NewVoteAggregatorV2(
 	return aggregator, nil
 }
 
-func (va *VoteAggregatorV2) queuedVotesProcessingLoop(ctx context.Context) error {
+func (va *VoteAggregatorV2) queuedVotesProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 	notifier := va.queuedVotesNotifier.Channel()
+	ready() // signal that this worker is ready
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 		case <-notifier:
 			err := va.processQueuedVoteEvents(ctx)
 			if err != nil {
-				return fmt.Errorf("internal error processing queued vote events: %w", err)
+				ctx.Throw(fmt.Errorf("internal error processing queued vote events: %w", err))
+				return
 			}
 		}
 	}
