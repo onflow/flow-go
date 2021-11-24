@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
-	dkgmodel "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -179,13 +178,13 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 		return
 	}
 
-	nextDKGPubKey, err := nextDKG.KeyShare(dkgPrivInfo.NodeID)
+	nextDKGPubKey, err := nextDKG.KeyShare(e.me.NodeID())
 	if err != nil {
 		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG public key for next epoch")
 		return
 	}
 
-	localPubKey := dkgPrivInfo.RandomBeaconPrivKey.PublicKey()
+	localPubKey := dkgPrivInfo.PublicKey()
 
 	if !nextDKGPubKey.Equals(localPubKey) {
 		e.log.Warn().Msg("checking DKG key consistency: locally computed dkg public key does not match dkg public key for next epoch")
@@ -280,12 +279,8 @@ func (e *ReactorEngine) end(epochCounter uint64) func() error {
 
 		privateShare, _, _ := e.controller.GetArtifacts()
 
-		privKeyInfo := dkgmodel.DKGParticipantPriv{
-			NodeID: e.me.NodeID(),
-			RandomBeaconPrivKey: encodable.RandomBeaconPrivKey{
-				PrivateKey: privateShare,
-			},
-			GroupIndex: e.controller.GetIndex(),
+		privKeyInfo := encodable.RandomBeaconPrivKey{
+			PrivateKey: privateShare,
 		}
 		err = e.keyStorage.InsertMyDKGPrivateInfo(epochCounter, &privKeyInfo)
 		if err != nil {

@@ -3,7 +3,6 @@ package dkg
 import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 // DKGData represents all the output data from the DKG process, including private information.
@@ -15,8 +14,4 @@ type DKGData struct {
 }
 
 // bootstrap.DKGParticipantPriv is the canonical structure for encoding private node DKG information.
-type DKGParticipantPriv struct {
-	NodeID              flow.Identifier
-	RandomBeaconPrivKey encodable.RandomBeaconPrivKey
-	GroupIndex          int
-}
+type DKGParticipantPriv = encodable.RandomBeaconPrivKey

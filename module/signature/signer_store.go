@@ -46,7 +46,7 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 	} else if err != nil {
 		return nil, fmt.Errorf("could not retrieve DKG private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
 	} else {
-		signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData.RandomBeaconPrivKey)
+		signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData)
 	}
 	s.signers[epoch] = signer
 
