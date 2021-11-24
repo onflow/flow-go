@@ -146,7 +146,6 @@ func TestExtractExecutionState(t *testing.T) {
 					err := Cmd.Execute()
 					require.NoError(t, err)
 
-					// require.FileExists(t, path.Join(outdir, bootstrap.FilenameWALRootCheckpoint)) //make sure we have root checkpoint file
 
 					diskWal, err := wal.NewDiskWAL(zerolog.Nop(), nil, metrics.NewNoopCollector(), outdir, size, pathfinder.PathByteSize, wal.SegmentSize)
 					require.NoError(t, err)
