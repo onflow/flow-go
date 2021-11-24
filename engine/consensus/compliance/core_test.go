@@ -367,6 +367,8 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 }
 
 func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
+	cs.T().Skip("this test needs to be updated in V2 since vote processing will be part of" +
+		"vote aggregator")
 
 	// create a vote
 	originID := unittest.IdentifierFixture()

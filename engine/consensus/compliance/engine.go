@@ -1,6 +1,7 @@
 package compliance
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
@@ -47,6 +49,7 @@ type Engine struct {
 	pendingVotes   engine.MessageStore
 	messageHandler *engine.MessageHandler
 	con            network.Conduit
+	stopHotstuff   context.CancelFunc
 }
 
 func NewEngine(
@@ -168,7 +171,13 @@ func (e *Engine) Ready() <-chan struct{} {
 	}
 	e.lm.OnStart(func() {
 		e.unit.Launch(e.loop)
+
+		ctx, cancel := context.WithCancel(context.Background())
+		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+		e.stopHotstuff = cancel
+		e.core.hotstuff.Start(signalerCtx)
 		// wait for request handler to startup
+
 		<-e.core.hotstuff.Ready()
 	})
 	return e.lm.Started()
@@ -178,9 +187,10 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	e.lm.OnStop(func() {
-		e.log.Debug().Msg("shutting down hotstuff eventloop")
+		e.log.Info().Msg("shutting down hotstuff eventloop")
+		e.stopHotstuff()
 		<-e.core.hotstuff.Done()
-		e.log.Debug().Msg("all components have been shut down")
+		e.log.Info().Msg("all components have been shut down")
 		<-e.unit.Done()
 	})
 	return e.lm.Stopped()

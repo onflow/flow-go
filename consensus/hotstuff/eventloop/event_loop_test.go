@@ -32,7 +32,7 @@ type EventLoopV2TestSuite struct {
 	eh     *mocks.EventHandlerV2
 	cancel context.CancelFunc
 
-	eventLoop *EventLoopV2
+	eventLoop *EventLoop
 }
 
 func (s *EventLoopV2TestSuite) SetupTest() {
@@ -43,7 +43,7 @@ func (s *EventLoopV2TestSuite) SetupTest() {
 
 	log := zerolog.New(ioutil.Discard)
 
-	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), s.eh, time.Time{})
+	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), s.eh, time.Time{})
 	require.NoError(s.T(), err)
 	s.eventLoop = eventLoop
 
@@ -109,7 +109,7 @@ func TestEventLoopV2_Timeout(t *testing.T) {
 
 	log := zerolog.New(ioutil.Discard)
 
-	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), eh, time.Time{})
+	eventLoop, err := NewEventLoop(log, metrics.NewNoopCollector(), eh, time.Time{})
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -161,7 +161,7 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 
 	startTimeDuration := 2 * time.Second
 	startTime := time.Now().Add(startTimeDuration)
-	eventLoop, err := NewEventLoopV2(log, metrics, eh, startTime)
+	eventLoop, err := NewEventLoop(log, metrics, eh, startTime)
 	require.NoError(t, err)
 
 	done := make(chan struct{})
