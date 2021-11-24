@@ -97,8 +97,10 @@ func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.Sto
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("failed to store empty value for newly allocated storage index: %w", err)
 	}
-	a.setStorageUsed(address, oldSize+uint64(RegisterSize(address, false, key, []byte{})))
-
+	err = a.setStorageUsed(address, oldSize+uint64(RegisterSize(address, false, key, []byte{})))
+	if err != nil {
+		return atree.StorageIndex{}, fmt.Errorf("failed update storage used for newly allocated storage index: %w", err)
+	}
 	// update the storageIndex bytes
 	err = a.setValue(address, false, KeyStorageIndex, newIndexBytes[:])
 	if err != nil {
