@@ -6,8 +6,6 @@ import (
 	"strings"
 
 	"github.com/onflow/cadence/runtime"
-	"github.com/onflow/cadence/runtime/interpreter"
-
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -219,30 +217,4 @@ func (e *OperationNotSupportedError) Error() string {
 // Code returns the error code for this error
 func (e *OperationNotSupportedError) Code() ErrorCode {
 	return ErrCodeOperationNotSupportedError
-}
-
-// EncodingUnsupportedValueError indicates that Cadence attempted
-// to encode a value that is not supported.
-type EncodingUnsupportedValueError struct {
-	value interpreter.Value
-	path  []string
-}
-
-// NewEncodingUnsupportedValueError construct a new EncodingUnsupportedValueError
-func NewEncodingUnsupportedValueError(value interpreter.Value, path []string) *EncodingUnsupportedValueError {
-	return &EncodingUnsupportedValueError{value: value, path: path}
-}
-
-func (e *EncodingUnsupportedValueError) Error() string {
-	return fmt.Sprintf(
-		"%s encoding unsupported value to path [%s]: %[1]T, %[1]v",
-		e.Code().String(),
-		strings.Join(e.path, ","),
-		e.value,
-	)
-}
-
-// Code returns the error code for this error
-func (e *EncodingUnsupportedValueError) Code() ErrorCode {
-	return ErrCodeEncodingUnsupportedValue
 }
