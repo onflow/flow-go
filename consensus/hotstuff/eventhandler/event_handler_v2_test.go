@@ -126,11 +126,17 @@ func (es *EventHandlerV2Suite) TestQCBuiltFutureViewChanged() {
 	// voting block exists
 	curView := es.paceMaker.CurView()
 
+	// b1 is for current view
+	// b2 and b3 is for future view, but branched out from the same parent as b1
 	b1 := createBlockWithQC(curView, curView-1)
-	b2 := createBlockWithQC(curView+1, curView)
-	b3 := createBlockWithQC(curView+2, curView+1)
+	b2 := createBlockWithQC(curView+1, curView-1)
+	b3 := createBlockWithQC(curView+2, curView-1)
 
 	// a qc is built
+	// qc3 is for future view
+	// qc2 is an older than qc3
+	// since vote aggregator can concurrently process votes and build qcs,
+	// we prepare qcs at different view to be processed, and verify the view change.
 	qc1 := createQC(b1)
 	qc2 := createQC(b2)
 	qc3 := createQC(b3)
@@ -140,10 +146,17 @@ func (es *EventHandlerV2Suite) TestQCBuiltFutureViewChanged() {
 	es.forks.blocks[b2.BlockID] = b2
 	es.forks.blocks[b3.BlockID] = b3
 
+	// test that qc for future view should trigger view change
 	err := es.eventhandler.OnQCConstructed(qc3)
 	endView := b3.View + 1 // next view
 	require.NoError(es.T(), err, "if a vote can trigger a QC to be built,"+
 		"and the QC triggered a view change, then start new view")
+	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
+
+	// the same qc would not trigger view change
+	err := es.eventhandler.OnQCConstructed(qc3)
+	endView := b3.View + 1 // next view
+	require.NoError(es.T(), err, "same qc should not trigger view change")
 	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
 
 	// old QCs won't trigger view change
