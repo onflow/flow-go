@@ -173,7 +173,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 		// create a proposal that directly descends from the latest finalized header
 		originID := cs.participants[1].NodeID
 		block := unittest.BlockWithParentFixture(cs.head)
-		proposal := unittest.ProposalFromBlock(&block)
+		proposal := unittest.ProposalFromBlock(block)
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head
@@ -188,4 +188,17 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 
 	// check the submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
+}
+
+// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
+// was submitted from network layer.
+func (cs *ComplianceSuite) TestProcessUnsupportedMessageType() {
+	invalidEvent := uint64(42)
+	err := cs.engine.Process("ch", unittest.IdentifierFixture(), invalidEvent)
+	// shouldn't result in error since byzantine inputs are expected
+	require.NoError(cs.T(), err)
+	// in case of local processing error cannot be consumed since all inputs are trusted
+	err = cs.engine.ProcessLocal(invalidEvent)
+	require.Error(cs.T(), err)
+	require.True(cs.T(), engine.IsIncompatibleInputTypeError(err))
 }

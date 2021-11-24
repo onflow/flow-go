@@ -149,7 +149,13 @@ func (h Header) MarshalJSON() ([]byte, error) {
 	// we use an alias to avoid endless recursion; the alias will not have the
 	// marshal function and encode like a raw header
 	type Encodable Header
-	return json.Marshal(Encodable(h))
+	return json.Marshal(struct {
+		Encodable
+		ID string
+	}{
+		Encodable: Encodable(h),
+		ID:        h.ID().String(),
+	})
 }
 
 // UnmarshalJSON makes sure the timestamp is decoded in UTC.

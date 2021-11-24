@@ -173,7 +173,7 @@ func CreateAccountsWithSimpleAddresses(
 		zerolog.Nop(),
 		fvm.WithChain(chain),
 		fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()),
+			fvm.NewTransactionInvoker(zerolog.Nop()),
 		),
 	)
 
@@ -283,6 +283,38 @@ func CreateAccountCreationTransaction(t *testing.T, chain flow.Chain) (flow.Acco
 		  }
 		}
 	`, hex.EncodeToString(keyBytes))
+
+	// create the transaction to create the account
+	tx := flow.NewTransactionBody().
+		SetScript([]byte(script)).
+		AddAuthorizer(chain.ServiceAddress())
+
+	return accountKey, tx
+}
+
+// CreateMultiAccountCreationTransaction creates a transaction which will create many (n) new account.
+//
+// This function returns a randomly generated private key and the transaction.
+func CreateMultiAccountCreationTransaction(t *testing.T, chain flow.Chain, n int) (flow.AccountPrivateKey, *flow.TransactionBody) {
+	accountKey, err := GenerateAccountPrivateKey()
+	require.NoError(t, err)
+
+	keyBytes, err := flow.EncodeRuntimeAccountPublicKey(accountKey.PublicKey(1000))
+	require.NoError(t, err)
+
+	// define the cadence script
+	script := fmt.Sprintf(`
+      transaction {
+		prepare(signer: AuthAccount) {
+		  var i = 0
+		  while i < %d {
+			let account = AuthAccount(payer: signer)
+			account.addPublicKey("%s".decodeHex())
+			i = i + 1
+		  }
+		}
+	  }
+	`, n, hex.EncodeToString(keyBytes))
 
 	// create the transaction to create the account
 	tx := flow.NewTransactionBody().

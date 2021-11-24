@@ -2,6 +2,8 @@
 
 package flow
 
+import "encoding/json"
+
 // A Seal is produced when an Execution Result (referenced by `ResultID`) for
 // particular block (referenced by `BlockID`) is committed into the chain.
 // A Seal for a block B can be included in the payload B's descendants. Only
@@ -69,4 +71,15 @@ func (s Seal) ID() Identifier {
 
 func (s Seal) Checksum() Identifier {
 	return MakeID(s)
+}
+
+func (s Seal) MarshalJSON() ([]byte, error) {
+	type Alias Seal
+	return json.Marshal(struct {
+		Alias
+		ID string
+	}{
+		Alias: Alias(s),
+		ID:    s.ID().String(),
+	})
 }

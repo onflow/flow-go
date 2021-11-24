@@ -21,14 +21,18 @@ import (
 )
 
 const (
-	// retryMilliseconds is the number of milliseconds to wait between retries
-	retryMilliseconds = 1000 * time.Millisecond
-
-	// percentage of jitter to add to QC contract requests
-	retryJitter = 10
+	// retryDuration is the initial duration to wait between retries for all retryable
+	// requests - increases exponentially for subsequent retries
+	retryDuration = time.Second
 
 	// update qc contract client after 2 consecutive failures
 	retryMaxConsecutiveFailures = 2
+  
+	// retryDurationMax is the maximum duration to wait between two consecutive requests
+	retryDurationMax = 10 * time.Minute
+
+	// retryJitterPercent is the percentage jitter to introduce to each retry interval
+	retryJitterPercent = 25 // 25%
 )
 
 // RootQCVoter is responsible for generating and submitting votes for the
@@ -103,17 +107,21 @@ func (voter *RootQCVoter) Vote(ctx context.Context, epoch protocol.Epoch) error 
 		return fmt.Errorf("could not create vote for cluster root qc: %w", err)
 	}
 
-	expRetry, err := retry.NewExponential(retryMilliseconds)
+	// this backoff configuration will never terminate on its own, but the
+	// request logic will exit when we exit the EpochSetup phase
+	expRetry, err := retry.NewExponential(retryDuration)
 	if err != nil {
 		log.Fatal().Err(err).Msg("create retry mechanism")
 	}
+	maxedRetry := retry.WithCappedDuration(retryDurationMax, expRetry)
+	withJitter := retry.WithJitterPercent(retryJitterPercent, maxedRetry)
 
 	clientIndex, qcContractClient := voter.getInitialContractClient()
 	onMaxConsecutiveRetries := func(totalAttempts int) {
 		voter.updateContractClient(clientIndex)
 		log.Warn().Msgf("retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
 	}
-	afterConsecutiveRetries := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, retry.WithJitterPercent(retryJitter, expRetry), onMaxConsecutiveRetries)
+	afterConsecutiveRetries := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
 
 	err = retry.Do(ctx, afterConsecutiveRetries, func(ctx context.Context) error {
 		// check that we're still in the setup phase, if we're not we can't

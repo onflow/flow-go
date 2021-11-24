@@ -47,7 +47,11 @@ func NewApprovalCollector(
 		return nil, fmt.Errorf("instantiation of AggregatedSignatures failed: %w", err)
 	}
 	collector := ApprovalCollector{
-		log:                  log,
+		log: log.With().
+			Str("component", "approval_collector").
+			Str("incorporated_block", incorporatedBlock.ID().String()).
+			Str("executed_block", executedBlock.ID().String()).
+			Logger(),
 		incorporatedResult:   result,
 		incorporatedBlock:    incorporatedBlock,
 		executedBlock:        executedBlock,
@@ -139,6 +143,11 @@ func (c *ApprovalCollector) SealResult() error {
 // - exception in case of any other error, usually this is not expected
 // - nil on success
 func (c *ApprovalCollector) ProcessApproval(approval *flow.ResultApproval) error {
+	c.log.Debug().
+		Str("result_id", approval.Body.ExecutionResultID.String()).
+		Str("verifier_id", approval.Body.ApproverID.String()).
+		Msg("processing result approval")
+
 	chunkIndex := approval.Body.ChunkIndex
 	if chunkIndex >= uint64(len(c.chunkCollectors)) {
 		return engine.NewInvalidInputErrorf("approval collector chunk index out of range: %v", chunkIndex)

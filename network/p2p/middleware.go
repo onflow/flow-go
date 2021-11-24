@@ -449,6 +449,13 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 
 // processMessage processes a message and eventually passes it to the overlay
 func (m *Middleware) processMessage(msg *message.Message) {
+	originID := flow.HashToID(msg.OriginID)
+
+	m.log.Debug().
+		Str("channel", msg.ChannelID).
+		Str("type", msg.Type).
+		Str("origin_id", originID.String()).
+		Msg("processing new message")
 
 	// run through all the message validators
 	for _, v := range m.validators {
@@ -459,7 +466,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 	}
 
 	// if validation passed, send the message to the overlay
-	err := m.ov.Receive(flow.HashToID(msg.OriginID), msg)
+	err := m.ov.Receive(originID, msg)
 	if err != nil {
 		m.log.Error().Err(err).Msg("could not deliver payload")
 	}

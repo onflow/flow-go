@@ -23,7 +23,7 @@ import (
 func createAccount(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) flow.Address {
 	ctx = fvm.NewContextFromParent(
 		ctx,
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 	)
 
 	txBody := flow.NewTransactionBody().
@@ -337,7 +337,7 @@ func newAccountKey(
 func TestCreateAccount(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 	}
 
 	t.Run("Single account",
@@ -410,7 +410,7 @@ func TestCreateAccount(t *testing.T) {
 func TestCreateAccount_WithRestrictedAccountCreation(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 	}
 
 	t.Run("Unauthorized account payer",
@@ -519,7 +519,7 @@ func TestUpdateAccountCode(t *testing.T) {
 func TestAddAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 	}
 
 	type addKeyTest struct {
@@ -783,7 +783,7 @@ func TestAddAccountKey(t *testing.T) {
 func TestRemoveAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 	}
 
 	type removeKeyTest struct {
@@ -1014,7 +1014,7 @@ func TestGetAccountKey(t *testing.T) {
 
 	t.Skip()
 	options := []fvm.Option{
-		fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 		fvm.WithCadenceLogging(true),
 	}
 
@@ -1199,8 +1199,8 @@ func TestGetAccountKey(t *testing.T) {
 							"weight: 1000.00000000, "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 							"isRevoked: false, "+
-							"keyIndex: %d)"+
-							byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
+							"keyIndex: %d)",
+						byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
 						i,
 					)
 
@@ -1223,7 +1223,7 @@ func byteSliceToCadenceArrayLiteral(bytes []byte) string {
 func TestAccountBalanceFields(t *testing.T) {
 	t.Run("Get balance works",
 		newVMTest().withContextOptions(
-			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 		).
 			run(func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
@@ -1256,7 +1256,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 	t.Run("Get available balance works",
 		newVMTest().withContextOptions(
-			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 			fvm.WithAccountStorageLimit(false),
 		).withBootstrapProcedureOptions(
@@ -1286,13 +1286,13 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
-				assert.Equal(t, cadence.UFix64(9999_5070), script.Value)
+				assert.Equal(t, cadence.UFix64(9999_3930), script.Value)
 			}),
 	)
 
 	t.Run("Get available balance works with minimum balance",
 		newVMTest().withContextOptions(
-			fvm.WithTransactionProcessors(fvm.NewTransactionInvocator(zerolog.Nop())),
+			fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 			fvm.WithCadenceLogging(true),
 			fvm.WithAccountStorageLimit(false),
 		).withBootstrapProcedureOptions(

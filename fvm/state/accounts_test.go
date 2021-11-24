@@ -3,6 +3,7 @@ package state_test
 import (
 	"testing"
 
+	"github.com/onflow/atree"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -416,15 +417,15 @@ func TestAccounts_AllocateStorageIndex(t *testing.T) {
 	// no register set case
 	i, err := accounts.AllocateStorageIndex(address)
 	require.NoError(t, err)
-	require.Equal(t, i, uint64(1))
+	require.Equal(t, i, atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 1}))
 
 	// register already set case
 	i, err = accounts.AllocateStorageIndex(address)
 	require.NoError(t, err)
-	require.Equal(t, i, uint64(2))
+	require.Equal(t, i, atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 2}))
 
 	// register update successful
 	i, err = accounts.AllocateStorageIndex(address)
 	require.NoError(t, err)
-	require.Equal(t, i, uint64(3))
+	require.Equal(t, i, atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 3}))
 }

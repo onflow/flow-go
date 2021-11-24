@@ -22,7 +22,9 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/admin"
+	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/admin/commands/common"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
@@ -63,22 +65,7 @@ type Metrics struct {
 	CleanCollector module.CleanerMetrics
 }
 
-type Storage struct {
-	Headers      storage.Headers
-	Index        storage.Index
-	Identities   storage.Identities
-	Guarantees   storage.Guarantees
-	Receipts     *bstorage.ExecutionReceipts
-	Results      storage.ExecutionResults
-	Seals        storage.Seals
-	Payloads     storage.Payloads
-	Blocks       storage.Blocks
-	Transactions storage.Transactions
-	Collections  storage.Collections
-	Setups       storage.EpochSetups
-	Commits      storage.EpochCommits
-	Statuses     storage.EpochStatuses
-}
+type Storage = storage.All
 
 type namedModuleFunc struct {
 	fn   func(builder NodeBuilder, nodeConfig *NodeConfig) error
@@ -116,6 +103,7 @@ type FlowNodeBuilder struct {
 	lm                       *lifecycle.LifecycleManager
 	extraFlagCheck           func() error
 	adminCommandBootstrapper *admin.CommandRunnerBootstrapper
+	adminCommands            map[string]func(config *NodeConfig) commands.AdminCommand
 }
 
 func (fnb *FlowNodeBuilder) BaseFlags() {
@@ -211,7 +199,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
-			fnb.RootBlock.ID(),
+			fnb.SporkID,
 			fnb.IdentityProvider,
 			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
@@ -572,7 +560,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Transactions: transactions,
 		Collections:  collections,
 		Setups:       setups,
-		Commits:      commits,
+		EpochCommits: commits,
 		Statuses:     statuses,
 	}
 }
@@ -609,7 +597,7 @@ func (fnb *FlowNodeBuilder) initState() {
 	fnb.MustNot(err).Msg("failed to read root sealed result")
 	sealingSegment, err := rootSnapshot.SealingSegment()
 	fnb.MustNot(err).Msg("failed to read root sealing segment")
-	fnb.RootBlock = sealingSegment[len(sealingSegment)-1]
+	fnb.RootBlock = sealingSegment.Highest()
 	fnb.RootQC, err = rootSnapshot.QuorumCertificate()
 	fnb.MustNot(err).Msg("failed to read root qc")
 	// set the chain ID based on the root header
@@ -618,6 +606,8 @@ func (fnb *FlowNodeBuilder) initState() {
 	// state as final authority on what the chain ID is
 	// => https://github.com/dapperlabs/flow-go/issues/4167
 	fnb.RootChainID = fnb.RootBlock.Header.ChainID
+	fnb.SporkID, err = rootSnapshot.Params().SporkID()
+	fnb.MustNot(err)
 
 	isBootStrapped, err := badgerState.IsBootstrapped(fnb.DB)
 	fnb.MustNot(err).Msg("failed to determine whether database contains bootstrapped state")
@@ -630,7 +620,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Results,
 			fnb.Storage.Blocks,
 			fnb.Storage.Setups,
-			fnb.Storage.Commits,
+			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
 		)
 		fnb.MustNot(err).Msg("could not open flow state")
@@ -638,9 +628,10 @@ func (fnb *FlowNodeBuilder) initState() {
 
 		// Verify root block in protocol state is consistent with bootstrap information stored on-disk.
 		// Inconsistencies can happen when the bootstrap root block is updated (because of new spork),
-		// but the protocol state is not updated, so they don't match
-		// when this happens during a spork, we could try deleting the protocol state database.
-		// TODO: revisit this check when implementing Epoch
+		// but the protocol state is not updated, so they don't match.
+		//
+		// When this happens during a spork, we could try deleting the protocol state database.
+		//
 		rootBlockFromState, err := state.Params().Root()
 		fnb.MustNot(err).Msg("could not load root block from protocol state")
 		if fnb.RootBlock.ID() != rootBlockFromState.ID() {
@@ -667,7 +658,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Results,
 			fnb.Storage.Blocks,
 			fnb.Storage.Setups,
-			fnb.Storage.Commits,
+			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
 			rootSnapshot,
 			options...,
@@ -821,10 +812,8 @@ func (fnb *FlowNodeBuilder) Module(name string, f func(builder NodeBuilder, node
 	return fnb
 }
 
-// AdminCommand registers a new admin command with the admin server
-func (fnb *FlowNodeBuilder) AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder {
-	fnb.adminCommandBootstrapper.RegisterHandler(command, handler)
-	fnb.adminCommandBootstrapper.RegisterValidator(command, validator)
+func (fnb *FlowNodeBuilder) AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder {
+	fnb.adminCommands[command] = f
 	return fnb
 }
 
@@ -928,6 +917,7 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 		flags:                    pflag.CommandLine,
 		lm:                       lifecycle.NewLifecycleManager(),
 		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
+		adminCommands:            make(map[string]func(*NodeConfig) commands.AdminCommand),
 	}
 	return builder
 }
@@ -963,7 +953,15 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 }
 
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
-	fnb.AdminCommand("set-log-level", common.SetLogLevelCommand.Handler, common.SetLogLevelCommand.Validator)
+	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
+		return &common.SetLogLevelCommand{}
+	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
+	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadResultsCommand(config.State, config.Storage.Results)
+	}).AdminCommand("read-seals", func(config *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
+	})
 }
 
 // Run calls Ready() to start all the node modules and components. It also sets up a channel to gracefully shut
@@ -1032,6 +1030,13 @@ func (fnb *FlowNodeBuilder) Ready() <-chan struct{} {
 
 		for _, f := range fnb.postInitFns {
 			fnb.handlePostInit(f)
+		}
+
+		// set up all admin commands
+		for commandName, commandFunc := range fnb.adminCommands {
+			command := commandFunc(fnb.NodeConfig)
+			fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
+			fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
 		}
 
 		// set up all modules
