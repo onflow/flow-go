@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/eventhandler"
+	"github.com/onflow/flow-go/consensus/hotstuff/eventloop"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/forkchoice"
@@ -41,7 +42,7 @@ func NewParticipant(
 	finalized *flow.Header,
 	pending []*flow.Header,
 	options ...Option,
-) (*hotstuff.EventLoop, error) {
+) (module.HotStuff, error) {
 
 	// initialize the default configuration
 	defTimeout := timeout.DefaultConfig
@@ -123,13 +124,14 @@ func NewParticipant(
 	voter := voter.New(signer, forks, persist, committee, voted)
 
 	// initialize the event handler
-	handler, err := eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
+	_, err = eventhandler.New(log, pacemaker, producer, forks, persist, communicator, committee, aggregator, voter, validator, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event handler: %w", err)
 	}
 
 	// initialize and return the event loop
-	loop, err := hotstuff.NewEventLoop(log, metrics, handler, cfg.StartupTime)
+	// TODO: add proper event handler when it's replaced
+	loop, err := eventloop.NewEventLoop(log, metrics, nil, cfg.StartupTime)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event loop: %w", err)
 	}

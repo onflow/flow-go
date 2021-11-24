@@ -341,7 +341,8 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 	log.Info().Msg("forwarding block vote to hotstuff") // to keep logging consistent with proposals
 
 	// forward the vote to hotstuff for processing
-	c.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
+	// TODO: replace vote submitting directly with vote aggregator in V2
+	//c.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
 
 	return nil
 }

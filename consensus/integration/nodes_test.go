@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus"
-	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
@@ -21,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
 	builder "github.com/onflow/flow-go/module/builder/consensus"
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
@@ -53,7 +53,7 @@ type Node struct {
 	id         *flow.Identity
 	compliance *compliance.Engine
 	sync       *synceng.Engine
-	hot        *hotstuff.EventLoop
+	hot        module.HotStuff
 	state      *bprotocol.MutableState
 	headers    *storage.Headers
 	net        *Network

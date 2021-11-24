@@ -38,6 +38,7 @@ func (cs *ComplianceSuite) SetupTest() {
 		return channel
 	}()
 
+	cs.hotstuff.On("Start", mock.Anything)
 	cs.hotstuff.On("Ready", mock.Anything).Return(ready)
 	<-cs.engine.Ready()
 }
@@ -149,6 +150,8 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 // TestSubmittingMultipleVotes tests that we can send multiple votes and they
 // are queued and processed in expected way
 func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
+	cs.T().Skip("this test needs to be updated in V2 since vote processing will be part of" +
+		"vote aggregator")
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
