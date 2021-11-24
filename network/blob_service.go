@@ -58,6 +58,7 @@ type BlobService interface {
 	// GetSession creates a new session that allows for controlled exchange of wantlists to decrease the bandwidth overhead.
 	GetSession(ctx context.Context) BlobGetter
 
+	// TriggerReprovide updates the BlobService's provider entries in the DHT
 	TriggerReprovide(ctx context.Context) error
 }
 
@@ -71,17 +72,19 @@ var _ BlobService = (*blobService)(nil)
 var _ component.Component = (*blobService)(nil)
 
 type BlobServiceConfig struct {
-	ReprovideInterval time.Duration
+	ReprovideInterval time.Duration // the interval at which the DHT provider entries are refreshed
 }
 
 type BlobServiceOption func(*BlobServiceConfig)
 
+// WithReprovideInterval sets the interval at which DHT provider entries are refreshed
 func WithReprovideInterval(d time.Duration) BlobServiceOption {
 	return func(config *BlobServiceConfig) {
 		config.ReprovideInterval = d
 	}
 }
 
+// NewBlobService creates a new BlobService.
 func NewBlobService(
 	host host.Host,
 	r routing.ContentRouting,
@@ -116,7 +119,7 @@ func NewBlobService(
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			ready()
 
-			<-bs.Ready()
+			<-bs.Ready() // wait for variables to be initialized
 			<-ctx.Done()
 
 			var err *multierror.Error
