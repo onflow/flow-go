@@ -262,7 +262,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidParent() {
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, &block)
+	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
@@ -288,7 +288,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalValidAncestor() {
 	require.NoError(cs.T(), err, "valid block proposal should pass")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, &block)
+	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
 
 	// we should submit the proposal to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
@@ -321,7 +321,7 @@ func (cs *ComplianceCoreSuite) TestOnBlockProposalInvalidExtension() {
 	require.Error(cs.T(), err, "proposal with invalid extension should fail")
 
 	// we should extend the state with the header
-	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, &block)
+	cs.state.AssertCalled(cs.T(), "Extend", mock.Anything, block)
 
 	// we should not submit the proposal to hotstuff
 	cs.hotstuff.AssertExpectations(cs.T())
