@@ -8,6 +8,6 @@ type EventLoop interface {
 	SubmitProposal(proposalHeader *flow.Header, parentView uint64)
 
 	// SubmitTrustedQC accepts QC for processing. QC will be dispatched on worker thread.
-	// CAUTION: QC is trusted (_not_ validated again)
+	// CAUTION: QC is trusted (_not_ validated again), as it's built by ourselves.
 	SubmitTrustedQC(qc *flow.QuorumCertificate)
 }

@@ -27,9 +27,9 @@ type EventLoop struct {
 	startTime          time.Time
 }
 
-var _ hotstuff.EventLoop = &EventLoop{}
-var _ module.ReadyDoneAware = &EventLoop{}
-var _ module.Startable = &EventLoop{}
+var _ hotstuff.EventLoop = (*EventLoop)(nil)
+var _ module.ReadyDoneAware = (*EventLoop)(nil)
+var _ module.Startable = (*EventLoop)(nil)
 
 // NewEventLoop creates an instance of EventLoop.
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandlerV2, startTime time.Time) (*EventLoop, error) {

@@ -213,10 +213,10 @@ func (e *Engine) Ready() <-chan struct{} {
 // For the consensus engine, we wait for hotstuff to finish.
 func (e *Engine) Done() <-chan struct{} {
 	e.lm.OnStop(func() {
-		e.log.Debug().Msg("shutting down hotstuff eventloop")
+		e.log.Info().Msg("shutting down hotstuff eventloop")
 		e.stopHotstuff()
 		<-e.core.hotstuff.Done()
-		e.log.Debug().Msg("all components have been shut down")
+		e.log.Info().Msg("all components have been shut down")
 		<-e.unit.Done()
 	})
 	return e.lm.Stopped()
