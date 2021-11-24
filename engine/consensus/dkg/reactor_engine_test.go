@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/engine/consensus/dkg"
-	dkgmodel "github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	module "github.com/onflow/flow-go/module/mock"
@@ -85,11 +85,11 @@ func TestEpochSetup(t *testing.T) {
 	// ensure that an attempt is made to insert the expected dkg private share
 	// for the next epoch.
 	keyStorage := new(storage.DKGKeys)
-	keyStorage.On("InsertMyDKGPrivateInfo", mock.Anything, mock.Anything).Run(
+	keyStorage.On("InsertMyBeaconPrivateKey", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			epochCounter := args.Get(0).(uint64)
 			require.Equal(t, nextCounter, epochCounter)
-			dkgPriv := args.Get(1).(*dkgmodel.DKGParticipantPriv)
+			dkgPriv := args.Get(1).(*encodable.RandomBeaconPrivKey)
 			require.Equal(t, expectedPrivKey, dkgPriv.PrivateKey)
 		}).
 		Return(nil).
@@ -153,7 +153,7 @@ func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 	dkgParticipantPrivInfo := unittest.DKGParticipantPriv()
 
 	keyStorage := new(storage.DKGKeys)
-	keyStorage.On("RetrieveMyDKGPrivateInfo", currentCounter+1).Return(dkgParticipantPrivInfo, nil)
+	keyStorage.On("RetrieveMyBeaconPrivateKey", currentCounter+1).Return(dkgParticipantPrivInfo, nil)
 	factory := new(module.DKGControllerFactory)
 
 	nextDKG := new(protocol.DKG)

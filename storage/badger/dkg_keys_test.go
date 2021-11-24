@@ -36,21 +36,21 @@ func TestDKGKeysInsertAndRetrieve(t *testing.T) {
 		epochCounter := rand.Uint64()
 
 		// attempt to get a non-existent key
-		_, err = store.RetrieveMyDKGPrivateInfo(epochCounter)
+		_, err = store.RetrieveMyBeaconPrivateKey(epochCounter)
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 
 		// store a key in db
 		expected := unittest.DKGParticipantPriv()
-		err = store.InsertMyDKGPrivateInfo(epochCounter, expected)
+		err = store.InsertMyBeaconPrivateKey(epochCounter, expected)
 		require.NoError(t, err)
 
 		// retrieve the key by epoch counter
-		actual, err := store.RetrieveMyDKGPrivateInfo(epochCounter)
+		actual, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
 
 		// test storing same key
-		err = store.InsertMyDKGPrivateInfo(epochCounter, expected)
+		err = store.InsertMyBeaconPrivateKey(epochCounter, expected)
 		require.True(t, errors.Is(err, storage.ErrAlreadyExists))
 	})
 }

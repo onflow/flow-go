@@ -55,7 +55,7 @@ func generateVote(c *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not read DKG private key file")
 	}
 
-	var randomBeaconPrivKey dkg.DKGParticipantPriv
+	var randomBeaconPrivKey encodable.RandomBeaconPrivKey
 	err = json.Unmarshal(data, &randomBeaconPrivKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not unmarshal DKG private key data")

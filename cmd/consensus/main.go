@@ -37,7 +37,6 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/dkg"
 	dkgmodel "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
@@ -271,7 +270,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			err = dkgKeyStore.InsertMyDKGPrivateInfo(epochCounter, privateDKGData)
+			err = dkgKeyStore.InsertMyBeaconPrivateKey(epochCounter, privateDKGData)
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}
@@ -289,7 +288,7 @@ func main() {
 					if err != nil {
 						return err
 					}
-					_, err = dkgKeyStore.RetrieveMyDKGPrivateInfo(counter)
+					_, err = dkgKeyStore.RetrieveMyBeaconPrivateKey(counter)
 					if err != nil {
 						return err
 					}
@@ -765,14 +764,14 @@ func main() {
 		Run()
 }
 
-func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPriv, error) {
+func loadDKGPrivateData(dir string, myID flow.Identifier) (*encodable.RandomBeaconPrivKey, error) {
 	path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, myID)
 	data, err := io.ReadFile(filepath.Join(dir, path))
 	if err != nil {
 		return nil, err
 	}
 
-	var priv dkg.DKGParticipantPriv
+	var priv encodable.RandomBeaconPrivKey
 	err = json.Unmarshal(data, &priv)
 	if err != nil {
 		return nil, err

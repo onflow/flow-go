@@ -12,8 +12,8 @@ type DKGKeys struct {
 	mock.Mock
 }
 
-// InsertMyDKGPrivateInfo provides a mock function with given fields: epochCounter, key
-func (_m *DKGKeys) InsertMyDKGPrivateInfo(epochCounter uint64, key *encodable.RandomBeaconPrivKey) error {
+// InsertMyBeaconPrivateKey provides a mock function with given fields: epochCounter, key
+func (_m *DKGKeys) InsertMyBeaconPrivateKey(epochCounter uint64, key *encodable.RandomBeaconPrivKey) error {
 	ret := _m.Called(epochCounter, key)
 
 	var r0 error
@@ -26,8 +26,8 @@ func (_m *DKGKeys) InsertMyDKGPrivateInfo(epochCounter uint64, key *encodable.Ra
 	return r0
 }
 
-// RetrieveMyDKGPrivateInfo provides a mock function with given fields: epochCounter
-func (_m *DKGKeys) RetrieveMyDKGPrivateInfo(epochCounter uint64) (*encodable.RandomBeaconPrivKey, error) {
+// RetrieveMyBeaconPrivateKey provides a mock function with given fields: epochCounter
+func (_m *DKGKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64) (*encodable.RandomBeaconPrivKey, error) {
 	ret := _m.Called(epochCounter)
 
 	var r0 *encodable.RandomBeaconPrivKey

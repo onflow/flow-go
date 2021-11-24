@@ -40,7 +40,7 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 		return signer, nil
 	}
 
-	privDKGData, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
+	privDKGData, err := s.keys.RetrieveMyBeaconPrivateKey(epoch)
 	if errors.Is(err, storage.ErrNotFound) {
 		signer = NewThresholdProvider(encoding.RandomBeaconTag, nil)
 	} else if err != nil {

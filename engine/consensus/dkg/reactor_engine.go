@@ -172,7 +172,7 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 		return
 	}
 
-	dkgPrivInfo, err := e.keyStorage.RetrieveMyDKGPrivateInfo(currentEpochCounter + 1)
+	dkgPrivInfo, err := e.keyStorage.RetrieveMyBeaconPrivateKey(currentEpochCounter + 1)
 	if err != nil {
 		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG private info for next epoch")
 		return
@@ -282,7 +282,7 @@ func (e *ReactorEngine) end(epochCounter uint64) func() error {
 		privKeyInfo := encodable.RandomBeaconPrivKey{
 			PrivateKey: privateShare,
 		}
-		err = e.keyStorage.InsertMyDKGPrivateInfo(epochCounter, &privKeyInfo)
+		err = e.keyStorage.InsertMyBeaconPrivateKey(epochCounter, &privKeyInfo)
 		if err != nil {
 			return fmt.Errorf("couldn't save DKG private key in db: %w", err)
 		}
