@@ -135,7 +135,7 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, _
 }
 
 // startDKGForEpoch starts the DKG instance for the given epoch, only if we have
-// never started the DKG for the given epoch. This allows consensus nodes which
+// never started the DKG during setup phase for the given epoch. This allows consensus nodes which
 // boot from a state snapshot within the EpochSetup phase to run the DKG.
 //
 // It starts a new controller for the epoch and registers the triggers to regularly
