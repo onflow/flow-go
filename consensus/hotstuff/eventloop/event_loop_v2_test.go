@@ -52,25 +52,22 @@ func (s *EventLoopV2TestSuite) SetupTest() {
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
 	s.eventLoop.Start(signalerCtx)
-	<-s.eventLoop.Ready()
+	unittest.RequireCloseBefore(s.T(), s.eventLoop.Ready(), 100*time.Millisecond, "event loop not started")
 }
 
 func (s *EventLoopV2TestSuite) TearDownTest() {
 	s.cancel()
-	<-s.eventLoop.Done()
+	unittest.RequireCloseBefore(s.T(), s.eventLoop.Done(), 100*time.Millisecond, "event loop not stopped")
 }
 
 // TestReadyDone tests if event loop stops internal worker thread
 func (s *EventLoopV2TestSuite) TestReadyDone() {
 	time.Sleep(1 * time.Second)
-	done := atomic.NewBool(false)
 	go func() {
 		s.cancel()
-		<-s.eventLoop.Done()
-		done.Store(true)
 	}()
 
-	require.Eventually(s.T(), done.Load, time.Millisecond*100, time.Millisecond*10)
+	unittest.RequireCloseBefore(s.T(), s.eventLoop.Done(), 100*time.Millisecond, "event loop not stopped")
 }
 
 // Test_SubmitQC tests that submitted proposal is eventually sent to event handler for processing
@@ -119,7 +116,7 @@ func TestEventLoopV2_Timeout(t *testing.T) {
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 	eventLoop.Start(signalerCtx)
 
-	<-eventLoop.Ready()
+	unittest.RequireCloseBefore(t, eventLoop.Ready(), 100*time.Millisecond, "event loop not stopped")
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -147,7 +144,7 @@ func TestEventLoopV2_Timeout(t *testing.T) {
 	wg.Wait()
 
 	cancel()
-	<-eventLoop.Done()
+	unittest.RequireCloseBefore(t, eventLoop.Done(), 100*time.Millisecond, "event loop not stopped")
 }
 
 // TestReadyDoneWithStartTime tests that event loop correctly starts and schedules start of processing
@@ -162,7 +159,8 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 
 	log := zerolog.New(ioutil.Discard)
 
-	startTime := time.Now().Add(2 * time.Second)
+	startTimeDuration := 2 * time.Second
+	startTime := time.Now().Add(startTimeDuration)
 	eventLoop, err := NewEventLoopV2(log, metrics, eh, startTime)
 	require.NoError(t, err)
 
@@ -176,13 +174,13 @@ func TestReadyDoneWithStartTime(t *testing.T) {
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 	eventLoop.Start(signalerCtx)
 
-	<-eventLoop.Ready()
+	unittest.RequireCloseBefore(t, eventLoop.Ready(), 100*time.Millisecond, "event loop not started")
 
 	parentBlock := unittest.BlockHeaderFixture()
 	block := unittest.BlockHeaderWithParentFixture(&parentBlock)
 	eventLoop.SubmitProposal(&block, parentBlock.View)
 
-	<-done
+	unittest.RequireCloseBefore(t, done, startTimeDuration+100*time.Millisecond, "proposal wasn't received")
 	cancel()
-	<-eventLoop.Done()
+	unittest.RequireCloseBefore(t, eventLoop.Done(), 100*time.Millisecond, "event loop not stopped")
 }
