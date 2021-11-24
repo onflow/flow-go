@@ -53,7 +53,7 @@ func (r *ReadBlocksCommand) Handler(ctx context.Context, req *admin.CommandReque
 func (r *ReadBlocksCommand) Validator(req *admin.CommandRequest) error {
 	input, ok := req.Data.(map[string]interface{})
 	if !ok {
-		return errors.New("wrong input format: expected JSON")
+		return ErrValidatorReqDataFormat
 	}
 
 	block, ok := input["block"]

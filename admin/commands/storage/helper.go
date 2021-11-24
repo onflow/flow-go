@@ -2,6 +2,7 @@ package storage
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -18,6 +19,13 @@ const (
 	blocksRequestFinal
 	blocksRequestSealed
 )
+
+const (
+	FINAL  = "final"
+	SEALED = "sealed"
+)
+
+var ErrValidatorReqDataFormat error = errors.New("wrong input format: expected JSON")
 
 type blocksRequest struct {
 	requestType blocksRequestType
@@ -39,15 +47,15 @@ func parseN(m interface{}) (uint64, error) {
 }
 
 func parseBlocksRequest(block interface{}) (*blocksRequest, error) {
-	errInvalidBlockValue := fmt.Errorf("invalid value for \"block\": expected \"final\", \"sealed\", block ID, or block height, but got: %v", block)
+	errInvalidBlockValue := fmt.Errorf("invalid value for \"block\": expected %q, %q, block ID, or block height, but got: %v", FINAL, SEALED, block)
 	req := &blocksRequest{}
 
 	switch block := block.(type) {
 	case string:
 		block = strings.ToLower(strings.TrimSpace(block))
-		if block == "final" {
+		if block == FINAL {
 			req.requestType = blocksRequestFinal
-		} else if block == "sealed" {
+		} else if block == SEALED {
 			req.requestType = blocksRequestSealed
 		} else if id, err := flow.HexStringToIdentifier(block); err == nil {
 			req.requestType = blocksRequestByID

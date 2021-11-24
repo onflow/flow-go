@@ -126,7 +126,7 @@ func (suite *ReadProtocolStateBlocksSuite) TestValidateInvalidFormat() {
 	}))
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
 		Data: map[string]interface{}{
-			"glock": 123,
+			"blah": 123,
 		},
 	}))
 }
