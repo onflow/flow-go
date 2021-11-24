@@ -1,6 +1,7 @@
 package eventloop
 
 import (
+	"context"
 	"io/ioutil"
 	"sync"
 	"testing"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -27,7 +29,8 @@ func TestEventLoopV2(t *testing.T) {
 type EventLoopV2TestSuite struct {
 	suite.Suite
 
-	eh *mocks.EventHandlerV2
+	eh     *mocks.EventHandlerV2
+	cancel context.CancelFunc
 
 	eventLoop *EventLoopV2
 }
@@ -40,26 +43,31 @@ func (s *EventLoopV2TestSuite) SetupTest() {
 
 	log := zerolog.New(ioutil.Discard)
 
-	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), s.eh)
+	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), s.eh, time.Time{})
 	require.NoError(s.T(), err)
 	s.eventLoop = eventLoop
-	<-eventLoop.Ready()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	s.cancel = cancel
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	s.eventLoop.Start(signalerCtx)
+	unittest.RequireCloseBefore(s.T(), s.eventLoop.Ready(), 100*time.Millisecond, "event loop not started")
 }
 
 func (s *EventLoopV2TestSuite) TearDownTest() {
-	<-s.eventLoop.Done()
+	s.cancel()
+	unittest.RequireCloseBefore(s.T(), s.eventLoop.Done(), 100*time.Millisecond, "event loop not stopped")
 }
 
 // TestReadyDone tests if event loop stops internal worker thread
 func (s *EventLoopV2TestSuite) TestReadyDone() {
 	time.Sleep(1 * time.Second)
-	done := atomic.NewBool(false)
 	go func() {
-		<-s.eventLoop.Done()
-		done.Store(true)
+		s.cancel()
 	}()
 
-	require.Eventually(s.T(), done.Load, time.Millisecond*100, time.Millisecond*10)
+	unittest.RequireCloseBefore(s.T(), s.eventLoop.Done(), 100*time.Millisecond, "event loop not stopped")
 }
 
 // Test_SubmitQC tests that submitted proposal is eventually sent to event handler for processing
@@ -101,10 +109,14 @@ func TestEventLoopV2_Timeout(t *testing.T) {
 
 	log := zerolog.New(ioutil.Discard)
 
-	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), eh)
+	eventLoop, err := NewEventLoopV2(log, metrics.NewNoopCollector(), eh, time.Time{})
 	require.NoError(t, err)
 
-	<-eventLoop.Ready()
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	eventLoop.Start(signalerCtx)
+
+	unittest.RequireCloseBefore(t, eventLoop.Ready(), 100*time.Millisecond, "event loop not stopped")
 
 	time.Sleep(10 * time.Millisecond)
 
@@ -130,5 +142,45 @@ func TestEventLoopV2_Timeout(t *testing.T) {
 
 	require.Eventually(t, processed.Load, time.Millisecond*200, time.Millisecond*10)
 	wg.Wait()
-	<-eventLoop.Done()
+
+	cancel()
+	unittest.RequireCloseBefore(t, eventLoop.Done(), 100*time.Millisecond, "event loop not stopped")
+}
+
+// TestReadyDoneWithStartTime tests that event loop correctly starts and schedules start of processing
+// when startTime argument is used
+func TestReadyDoneWithStartTime(t *testing.T) {
+	eh := &mocks.EventHandlerV2{}
+	eh.On("Start").Return(nil)
+	eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C)
+	eh.On("OnLocalTimeout").Return(nil)
+
+	metrics := metrics.NewNoopCollector()
+
+	log := zerolog.New(ioutil.Discard)
+
+	startTimeDuration := 2 * time.Second
+	startTime := time.Now().Add(startTimeDuration)
+	eventLoop, err := NewEventLoopV2(log, metrics, eh, startTime)
+	require.NoError(t, err)
+
+	done := make(chan struct{})
+	eh.On("OnReceiveProposal", mock.AnythingOfType("*model.Proposal")).Run(func(args mock.Arguments) {
+		require.True(t, time.Now().After(startTime))
+		close(done)
+	}).Return(nil).Once()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	eventLoop.Start(signalerCtx)
+
+	unittest.RequireCloseBefore(t, eventLoop.Ready(), 100*time.Millisecond, "event loop not started")
+
+	parentBlock := unittest.BlockHeaderFixture()
+	block := unittest.BlockHeaderWithParentFixture(&parentBlock)
+	eventLoop.SubmitProposal(&block, parentBlock.View)
+
+	unittest.RequireCloseBefore(t, done, startTimeDuration+100*time.Millisecond, "proposal wasn't received")
+	cancel()
+	unittest.RequireCloseBefore(t, eventLoop.Done(), 100*time.Millisecond, "event loop not stopped")
 }
