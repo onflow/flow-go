@@ -1,9 +1,8 @@
-package common
+package storage
 
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"testing"
 
@@ -22,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-type ReadProtocolStateBlocksSuite struct {
+type ReadBlocksSuite struct {
 	suite.Suite
 
 	command commands.AdminCommand
@@ -34,8 +33,9 @@ type ReadProtocolStateBlocksSuite struct {
 	allBlocks []*flow.Block
 }
 
-func TestReadProtocolStateBlocks(t *testing.T) {
-	suite.Run(t, new(ReadProtocolStateBlocksSuite))
+func TestReadBlocks(t *testing.T) {
+	t.Parallel()
+	suite.Run(t, new(ReadBlocksSuite))
 }
 
 func createSnapshot(head *flow.Header) protocol.Snapshot {
@@ -49,7 +49,7 @@ func createSnapshot(head *flow.Header) protocol.Snapshot {
 	return snapshot
 }
 
-func (suite *ReadProtocolStateBlocksSuite) SetupTest() {
+func (suite *ReadBlocksSuite) SetupTest() {
 	suite.state = new(protocolmock.State)
 	suite.blocks = new(storagemock.Blocks)
 
@@ -107,14 +107,14 @@ func (suite *ReadProtocolStateBlocksSuite) SetupTest() {
 					return nil
 				}
 			}
-			return errors.New("block not found")
+			return fmt.Errorf("block %#v not found", blockID)
 		},
 	)
 
-	suite.command = NewReadProtocolStateBlocksCommand(suite.state, suite.blocks)
+	suite.command = NewReadBlocksCommand(suite.state, suite.blocks)
 }
 
-func (suite *ReadProtocolStateBlocksSuite) TestValidateInvalidFormat() {
+func (suite *ReadBlocksSuite) TestValidateInvalidFormat() {
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
 		Data: true,
 	}))
@@ -131,7 +131,7 @@ func (suite *ReadProtocolStateBlocksSuite) TestValidateInvalidFormat() {
 	}))
 }
 
-func (suite *ReadProtocolStateBlocksSuite) TestValidateInvalidBlock() {
+func (suite *ReadBlocksSuite) TestValidateInvalidBlock() {
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
 		Data: map[string]interface{}{
 			"block": true,
@@ -154,7 +154,7 @@ func (suite *ReadProtocolStateBlocksSuite) TestValidateInvalidBlock() {
 	}))
 }
 
-func (suite *ReadProtocolStateBlocksSuite) TestValidateInvalidBlockHeight() {
+func (suite *ReadBlocksSuite) TestValidateInvalidBlockHeight() {
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
 		Data: map[string]interface{}{
 			"block": float64(-1),
@@ -167,7 +167,7 @@ func (suite *ReadProtocolStateBlocksSuite) TestValidateInvalidBlockHeight() {
 	}))
 }
 
-func (suite *ReadProtocolStateBlocksSuite) TestValidateInvalidN() {
+func (suite *ReadBlocksSuite) TestValidateInvalidN() {
 	assert.Error(suite.T(), suite.command.Validator(&admin.CommandRequest{
 		Data: map[string]interface{}{
 			"block": 1,
@@ -188,7 +188,7 @@ func (suite *ReadProtocolStateBlocksSuite) TestValidateInvalidN() {
 	}))
 }
 
-func (suite *ReadProtocolStateBlocksSuite) getBlocks(reqData map[string]interface{}) []*flow.Block {
+func (suite *ReadBlocksSuite) getBlocks(reqData map[string]interface{}) []*flow.Block {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -207,7 +207,7 @@ func (suite *ReadProtocolStateBlocksSuite) getBlocks(reqData map[string]interfac
 	return blocks
 }
 
-func (suite *ReadProtocolStateBlocksSuite) TestHandleFinal() {
+func (suite *ReadBlocksSuite) TestHandleFinal() {
 	blocks := suite.getBlocks(map[string]interface{}{
 		"block": "final",
 	})
@@ -215,7 +215,7 @@ func (suite *ReadProtocolStateBlocksSuite) TestHandleFinal() {
 	require.EqualValues(suite.T(), blocks[0], suite.final)
 }
 
-func (suite *ReadProtocolStateBlocksSuite) TestHandleSealed() {
+func (suite *ReadBlocksSuite) TestHandleSealed() {
 	blocks := suite.getBlocks(map[string]interface{}{
 		"block": "sealed",
 	})
@@ -223,7 +223,7 @@ func (suite *ReadProtocolStateBlocksSuite) TestHandleSealed() {
 	require.EqualValues(suite.T(), blocks[0], suite.sealed)
 }
 
-func (suite *ReadProtocolStateBlocksSuite) TestHandleHeight() {
+func (suite *ReadBlocksSuite) TestHandleHeight() {
 	for i, block := range suite.allBlocks {
 		responseBlocks := suite.getBlocks(map[string]interface{}{
 			"block": float64(i),
@@ -233,7 +233,7 @@ func (suite *ReadProtocolStateBlocksSuite) TestHandleHeight() {
 	}
 }
 
-func (suite *ReadProtocolStateBlocksSuite) TestHandleID() {
+func (suite *ReadBlocksSuite) TestHandleID() {
 	for _, block := range suite.allBlocks {
 		responseBlocks := suite.getBlocks(map[string]interface{}{
 			"block": block.ID().String(),
@@ -243,7 +243,7 @@ func (suite *ReadProtocolStateBlocksSuite) TestHandleID() {
 	}
 }
 
-func (suite *ReadProtocolStateBlocksSuite) TestHandleNExceedsRootBlock() {
+func (suite *ReadBlocksSuite) TestHandleNExceedsRootBlock() {
 	responseBlocks := suite.getBlocks(map[string]interface{}{
 		"block": "final",
 		"n":     float64(len(suite.allBlocks) + 1),
