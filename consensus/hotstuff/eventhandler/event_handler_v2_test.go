@@ -154,8 +154,8 @@ func (es *EventHandlerV2Suite) TestQCBuiltFutureViewChanged() {
 	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
 
 	// the same qc would not trigger view change
-	err := es.eventhandler.OnQCConstructed(qc3)
-	endView := b3.View + 1 // next view
+	err = es.eventhandler.OnQCConstructed(qc3)
+	endView = b3.View + 1 // next view
 	require.NoError(es.T(), err, "same qc should not trigger view change")
 	require.Equal(es.T(), endView, es.paceMaker.CurView(), "incorrect view change")
 
