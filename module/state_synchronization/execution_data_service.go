@@ -111,6 +111,9 @@ func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.Blob
 }
 
 // addBlobs serializes the given object, splits the serialized data into blobs, and adds them to the blobservice
+//
+// blobs are added in a batched streaming fashion, using a separate goroutine to serialize the object and send the
+// blobs of serialized data over a blob channel to the main routine, which adds them in batches to the blobservice.
 func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}, logger zerolog.Logger) ([]cid.Cid, error) {
 	bcw, br := blobs.IncomingBlobChannel(s.maxBlobSize)
 
@@ -265,6 +268,9 @@ func (s *ExecutionDataService) findBlob(
 }
 
 // getBlobs gets the given CIDs from the blobservice, reassembles the blobs, and deserializes the reassembled data into an object.
+//
+// blobs are fetched from the blobservice and sent over a blob channel as they arrive, to a separate goroutine, which performs the
+// deserialization in a streaming fashion.
 func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid, logger zerolog.Logger) (interface{}, error) {
 	bcr, bs := blobs.OutgoingBlobChannel()
 
