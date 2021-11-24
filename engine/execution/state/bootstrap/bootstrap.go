@@ -43,7 +43,7 @@ func (b *Bootstrapper) BootstrapLedger(
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)
 
-	ctx := fvm.NewContext(b.logger, fvm.WithMaxStateInteractionSize(ledgerIntractionLimitNeeded), fvm.WithChain(chain))
+	ctx := fvm.NewContext(b.logger, fvm.WithMaxStateInteractionSize(ledgerIntractionLimitNeededForBootstrapping), fvm.WithChain(chain))
 
 	bootstrap := fvm.Bootstrap(
 		servicePublicKey,
