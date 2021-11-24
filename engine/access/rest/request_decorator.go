@@ -17,25 +17,40 @@ import (
 // a convenience wrapper around the http request to make it easy to read request params
 type requestDecorator struct {
 	*http.Request
-	expandFields map[string]bool // todo(sideninja) discuss removing bool and replacing with string array
-	selectFields map[string]bool // todo(sideninja) discuss removing bool and replacing with string array
+	expandFields map[string]bool
+	selectFields []string
 }
 
 func newRequestDecorator(r *http.Request) *requestDecorator {
 	decoratedReq := &requestDecorator{
 		Request: r,
 	}
-	decoratedReq.expandFields, _ = middleware.GetFieldsToExpand(r) // todo(sideninja) discuss moving to here or in general out of middlewares since it's not a middleware anymore
-	decoratedReq.selectFields, _ = middleware.GetFieldsToSelect(r) // todo(sideninja) discuss moving to here or in general out of middlewares since it's not a middleware anymore
+
+	if expandFields, found := middleware.GetFieldsToExpand(r); found {
+		decoratedReq.expandFields = sliceToMap(expandFields)
+	}
+
+	if selectFields, found := middleware.GetFieldsToSelect(r); found {
+		decoratedReq.selectFields = selectFields
+	}
+
 	return decoratedReq
+}
+
+func sliceToMap(values []string) map[string]bool {
+	valueMap := make(map[string]bool, len(values))
+	for _, v := range values {
+		valueMap[v] = true
+	}
+	return valueMap
 }
 
 func (rd *requestDecorator) expands(field string) bool {
 	return rd.expandFields[field]
 }
 
-func (rd *requestDecorator) selects(field string) bool {
-	return rd.selectFields[field]
+func (rd *requestDecorator) selects() []string {
+	return rd.selectFields
 }
 
 func (rd *requestDecorator) getParam(name string) string {
