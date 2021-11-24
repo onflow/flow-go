@@ -17,16 +17,16 @@ import (
 // a convenience wrapper around the http request to make it easy to read request params
 type requestDecorator struct {
 	*http.Request
-	expandFields map[string]bool
-	selectFields map[string]bool
+	expandFields map[string]bool // todo(sideninja) discuss removing bool and replacing with string array
+	selectFields map[string]bool // todo(sideninja) discuss removing bool and replacing with string array
 }
 
 func newRequestDecorator(r *http.Request) *requestDecorator {
 	decoratedReq := &requestDecorator{
 		Request: r,
 	}
-	decoratedReq.expandFields, _ = middleware.GetFieldsToExpand(r)
-	decoratedReq.selectFields, _ = middleware.GetFieldsToSelect(r)
+	decoratedReq.expandFields, _ = middleware.GetFieldsToExpand(r) // todo(sideninja) discuss moving to here or in general out of middlewares since it's not a middleware anymore
+	decoratedReq.selectFields, _ = middleware.GetFieldsToSelect(r) // todo(sideninja) discuss moving to here or in general out of middlewares since it's not a middleware anymore
 	return decoratedReq
 }
 

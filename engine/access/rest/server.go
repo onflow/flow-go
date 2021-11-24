@@ -22,6 +22,7 @@ const (
 	executeScriptRoute            = "executeScript"
 	getBlockPayloadByIDRoute      = "getBlockPayloadByID"
 	getExecutionResultByIDRoute   = "getExecutionResultByID"
+	getAccountRoute               = "getAccount"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -127,5 +128,12 @@ func routeDefinitions() []routeDefinition {
 			pattern:        "/scripts",
 			name:           executeScriptRoute,
 			apiHandlerFunc: executeScript,
+		},
+		// Accounts
+		{
+			method:         "GET",
+			pattern:        "/accounts/{address}",
+			name:           getAccountRoute,
+			apiHandlerFunc: getAccount,
 		}}
 }
