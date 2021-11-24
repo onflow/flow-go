@@ -281,7 +281,7 @@ func TestWithWhiteboard(t *testing.T) {
 		priv, err := n.keyStorage.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(t, err)
 
-		signer := signature.NewThresholdProvider("TAG", priv.RandomBeaconPrivKey.PrivateKey)
+		signer := signature.NewThresholdProvider("TAG", priv)
 		signers = append(signers, signer)
 
 		signature, err := signer.Sign(sigData)

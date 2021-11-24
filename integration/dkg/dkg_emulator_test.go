@@ -150,7 +150,7 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		priv, err := n.keyStorage.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(s.T(), err)
 
-		signer := signature.NewThresholdProvider("TAG", priv.RandomBeaconPrivKey.PrivateKey)
+		signer := signature.NewThresholdProvider("TAG", priv)
 		signers = append(signers, signer)
 
 		signature, err := signer.Sign(sigData)
