@@ -308,7 +308,7 @@ func (e *EventHandlerV2) startNewView() error {
 	// when there are multiple block proposals, we will just pick the first one.
 	// forks is responsible for slashing double proposal behavior, and
 	// event handler is aware of double proposals, but picking any should work and
-	// won't hurt safeness
+	// won't hurt safety
 	block := blocks[0]
 
 	log.Debug().
@@ -345,11 +345,9 @@ func (e *EventHandlerV2) processBlockForCurrentView(block *model.Block) error {
 		return fmt.Errorf("unexpected error in voting logic: %w", err)
 	}
 
-	// Inform PaceMaker that we've processed a block for the current view. We expect a view change
-	// if an only if we are _not_ the next leader
-	// Depending on whether
-	// we are the leader for the next view, the PaceMaker should trigger a view change. We
-	// perform a sanity check here, because a wrong view change can have disastrous consequences.
+	// Inform PaceMaker that we've processed a block for the current view. We expect
+	// a view change if an only if we are _not_ the next leader. We perform a sanity
+	// check here, because a wrong view change can have disastrous consequences.
 	isSelfNextLeader := e.committee.Self() == nextLeader
 	_, viewChanged := e.paceMaker.UpdateCurViewWithBlock(block, isSelfNextLeader)
 	if viewChanged == isSelfNextLeader {
