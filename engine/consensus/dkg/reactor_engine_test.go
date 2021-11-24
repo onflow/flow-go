@@ -2,9 +2,11 @@ package dkg_test
 
 import (
 	"math/rand"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
@@ -102,7 +104,6 @@ func TestEpochSetup(t *testing.T) {
 	controller.On("End").Return(nil).Once()
 	controller.On("Poll", mock.Anything).Return(nil).Times(15)
 	controller.On("GetArtifacts").Return(expectedPrivKey, nil, nil).Once()
-	controller.On("GetIndex").Return(myIndex).Once()
 	controller.On("SubmitResult").Return(nil).Once()
 
 	factory := new(module.DKGControllerFactory)
@@ -137,7 +138,7 @@ func TestEpochSetup(t *testing.T) {
 // TestReactorEngine_EpochCommittedPhaseStarted ensures that we are logging
 // a warning message whenever we have a mismatch between the locally produced DKG keys
 // and the keys produced by the DKG smart contract.
-/*func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
+func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 	rand.Seed(time.Now().UnixNano())
 	currentCounter := rand.Uint64()
 	nextCounter := currentCounter + 1
@@ -201,4 +202,4 @@ func TestEpochSetup(t *testing.T) {
 	engine.EpochCommittedPhaseStarted(currentCounter, &firstBlock)
 
 	require.Equal(t, 1, hookCalls)
-}*/
+}
