@@ -62,6 +62,7 @@ func TestExtractExecutionState(t *testing.T) {
 				unittest.StateCommitmentFixture(),
 				outdir,
 				zerolog.Nop(),
+				flow.Emulator.Chain(),
 				false,
 				false,
 			)
@@ -133,7 +134,14 @@ func TestExtractExecutionState(t *testing.T) {
 				//we need fresh output dir to prevent contamination
 				unittest.RunWithTempDir(t, func(outdir string) {
 
-					Cmd.SetArgs([]string{"--execution-state-dir", execdir, "--output-dir", outdir, "--state-commitment", stateCommitment.String(), "--datadir", datadir, "--no-migration", "--no-report"})
+					Cmd.SetArgs([]string{
+						"--execution-state-dir", execdir,
+						"--output-dir", outdir,
+						"--state-commitment", stateCommitment.String(),
+						"--datadir", datadir,
+						"--no-migration",
+						"--no-report",
+						"--chain", flow.Emulator.Chain().String()})
 
 					err := Cmd.Execute()
 					require.NoError(t, err)
