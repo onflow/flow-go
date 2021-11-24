@@ -18,7 +18,7 @@ var (
 )
 
 // VerifyingVoteProcessorFactory generates hotstuff.VerifyingVoteCollector instances
-type VerifyingVoteProcessorFactory = func(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error)
+type VerifyingVoteProcessorFactory = func(log zerolog.Logger, proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error)
 
 // VoteCollector implements a state machine for transition between different states of vote collector
 type VoteCollector struct {
@@ -154,7 +154,7 @@ func (m *VoteCollector) ProcessBlock(proposal *model.Proposal) error {
 		case hotstuff.VoteCollectorStatusCaching:
 			// TODO: implement logic for validating block proposal, converting it to vote and further processing
 
-			err := m.caching2Verifying(proposal.Block)
+			err := m.caching2Verifying(proposal)
 			if errors.Is(err, ErrDifferentCollectorState) {
 				continue // concurrent state update by other thread => restart our logic
 			}
@@ -203,11 +203,12 @@ func (m *VoteCollector) RegisterVoteConsumer(consumer hotstuff.VoteConsumer) {
 // Error returns:
 // * ErrDifferentCollectorState if the VoteCollector's state is _not_ `CachingVotes`
 // * all other errors are unexpected and potential symptoms of internal bugs or state corruption (fatal)
-func (m *VoteCollector) caching2Verifying(block *model.Block) error {
-	log := m.log.With().Hex("BlockID", block.BlockID[:]).Logger()
-	newProc, err := m.createVerifyingProcessor(log, block)
+func (m *VoteCollector) caching2Verifying(proposal *model.Proposal) error {
+	blockID := proposal.Block.BlockID
+	log := m.log.With().Hex("BlockID", blockID[:]).Logger()
+	newProc, err := m.createVerifyingProcessor(log, proposal)
 	if err != nil {
-		return fmt.Errorf("failed to create VerifyingVoteProcessor for block %v: %w", block.BlockID, err)
+		return fmt.Errorf("failed to create VerifyingVoteProcessor for proposal %v: %w", blockID, err)
 	}
 	newProcWrapper := &atomicValueWrapper{processor: newProc}
 
