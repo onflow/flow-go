@@ -34,7 +34,7 @@ func (p Payload) MarshalJSON() ([]byte, error) {
 	}
 
 	type payloadAlias Payload
-	return json.Marshal(struct {payloadAlias} {
+	return json.Marshal(struct{ payloadAlias }{
 		payloadAlias: payloadAlias(p),
 	})
 }
