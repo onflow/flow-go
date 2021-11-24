@@ -245,6 +245,7 @@ func (s *ExecutionDataService) findBlob(
 	targetLogger := logger.With().Str("target_cid", target.String()).Logger()
 	targetLogger.Debug().Msg("finding blob")
 
+	// Note: blobs are returned as they are found, in no particular order
 	for blob := range blobChan {
 		targetLogger.Debug().Str("cid", blob.Cid().String()).Msg("received blob")
 
