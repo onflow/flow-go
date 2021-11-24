@@ -218,8 +218,8 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	}
 
 	p.log.Info().
-		Hex("block_id", qc.BlockID).
-		Hex("view", qc.View).
+		Hex("block_id", qc.BlockID[:]).
+		Uint64("view", qc.View).
 		Int("num_signers", len(qc.SignerIDs)).
 		Msg("new qc has been created")
 
