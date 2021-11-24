@@ -49,7 +49,7 @@ func NewExecutionDataService(
 }
 
 // receiveBatch receives a batch of blobs from the given BlobReceiver, and returns them as a slice
-func (s *ExecutionDataService) receiveBatch(ctx context.Context, br *blobs.BlobReceiver) ([]blobs.Blob, error) {
+func (s *ExecutionDataService) receiveBatch(br *blobs.BlobReceiver) ([]blobs.Blob, error) {
 	var batch []blobs.Blob
 	var err error
 
@@ -78,7 +78,7 @@ func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.Blob
 	var cids []cid.Cid
 
 	for {
-		batch, recvErr := s.receiveBatch(ctx, br) // retrieve one batch at a time
+		batch, recvErr := s.receiveBatch(br) // retrieve one batch at a time
 		batchCids := zerolog.Arr()
 
 		for _, blob := range batch {

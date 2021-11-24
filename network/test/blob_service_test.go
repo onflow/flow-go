@@ -92,6 +92,7 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		suite.putBlob(ds, blob)
 		blobService, err := net.RegisterBlobService(blobExchangeChannel, ds)
 		suite.Require().NoError(err)
+		<-blobService.Ready()
 		suite.blobServices = append(suite.blobServices, blobService)
 	}
 

@@ -238,8 +238,9 @@ func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.Signaler
 	}
 
 	bs := network.NewBlobService(mw.libP2PNode.host, mw.libP2PNode.dht, channel.String(), ds)
+
+	// start the blob service using the network's context
 	bs.Start(parent)
-	<-bs.Ready()
 
 	return bs, nil
 }
