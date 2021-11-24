@@ -1,7 +1,7 @@
 package reporters_test
 
 import (
-	"os"
+	"io/ioutil"
 	"path"
 	"sync"
 	"testing"
@@ -19,7 +19,7 @@ func TestReportFileWriter(t *testing.T) {
 	log := zerolog.Logger{}
 
 	requireFileContains := func(t *testing.T, expected string) {
-		dat, err := os.ReadFile(filename)
+		dat, err := ioutil.ReadFile(filename)
 		require.NoError(t, err)
 
 		require.Equal(t, []byte(expected), dat)
