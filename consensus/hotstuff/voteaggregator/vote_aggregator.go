@@ -36,7 +36,7 @@ type VoteAggregator struct {
 	queuedVotes         *fifoqueue.FifoQueue
 }
 
-var _ hotstuff.VoteAggregatorV2 = (*VoteAggregator)(nil)
+var _ hotstuff.VoteAggregator = (*VoteAggregator)(nil)
 var _ module.ReadyDoneAware = (*VoteAggregator)(nil)
 var _ module.Startable = (*VoteAggregator)(nil)
 
