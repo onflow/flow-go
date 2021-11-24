@@ -192,8 +192,10 @@ func (suite *BlobServiceTestSuite) TestHas() {
 	suite.Require().Never(func() bool {
 		for _, blobChan := range blobChans {
 			select {
-			case <-blobChan:
-				return true
+			case _, ok := <-blobChan:
+				if ok {
+					return true
+				}
 			default:
 			}
 		}
