@@ -4,8 +4,10 @@ import (
 	"context"
 	"fmt"
 	"github.com/onflow/cadence"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/stretchr/testify/suite"
 	"testing"
@@ -166,16 +168,15 @@ func (s *Suite) TestEpochJoin() {
 
 		currentPhase, err := snapshot.Phase()
 		require.NoError(s.T(), err)
-		fmt.Printf("\n\nPHASE: %s\n\n", currentPhase)
-
-		// uncomment to check if identity inside
-		//_, err = snapshot.Identity(info.NodeID)
-		if currentPhase == flow.EpochPhaseCommitted {
+		if currentPhase == flow.EpochPhaseSetup {
 			break
 		}
 
 		time.Sleep(time.Second)
 	}
+
+	segment, err := snapshot.SealingSegment()
+	require.NoError(s.T(), err)
 
 	//add our container to the network
 	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
@@ -183,6 +184,33 @@ func (s *Suite) TestEpochJoin() {
 	//start our test container
 	testContainer := s.net.ContainerByID(info.NodeID)
 	testContainer.WriteRootSnapshot(snapshot)
+
 	testContainer.Container.Start(ctx)
+	s.WaitForEpochs(ctx, 2)
+
+	// get client configured to send request directly to our new access node
+	clientAddr := fmt.Sprintf(":%s", s.net.AccessPortsByContainerName[info.ContainerName])
+	client, err := testnet.NewClient(clientAddr, s.net.Root().Header.ChainID.Chain())
+	require.NoError(s.T(), err)
+
+	snapshot, err = client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+
+	segment2, err := snapshot.SealingSegment()
+	require.NoError(s.T(), err)
+
+	// most recent segment should have higher highest that the segment we bootstrapped with
+	require.True(s.T(), segment2.Highest().Header.Height > segment.Highest().Header.Height)
+
+	// sanity check: ensure id is in snapshot identities
+	ids, err := snapshot.Identities(filter.HasNodeID(info.NodeID))
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), ids[0].NodeID, info.NodeID)
+
+	// check that we can execute script on our newly staked and joined access node
+	proposedTable, err = client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
+	require.NoError(s.T(), err)
+	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()))
+
 	s.net.StopContainers()
 }

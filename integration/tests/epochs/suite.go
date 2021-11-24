@@ -10,6 +10,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/state/protocol"
 	"github.com/rs/zerolog"
 	"strings"
 
@@ -22,10 +23,6 @@ import (
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-)
-
-const (
-	defaultPort = "3569"
 )
 
 type Suite struct {
@@ -171,7 +168,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		require.NoError(s.T(), err)
 	}
 
-	containerName := fmt.Sprintf("epochs-test-join-%s-%s", role, nodeID)
+	containerName := fmt.Sprintf("%s_test", role)
 
 	// register node using staking collection
 	result, err = s.registerNode(
@@ -181,19 +178,18 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		stakingAccount,
 		nodeID,
 		role,
-		s.getNodeAddress(containerName),
+		testnet.GetPrivateNodeInfoAddress(containerName),
 		strings.TrimPrefix(networkingKey.PublicKey().String(), "0x"),
 		strings.TrimPrefix(stakingKey.PublicKey().String(), "0x"),
 		fmt.Sprintf("%f", stakeAmount),
 		hex.EncodeToString(encMachinePubKey),
 	)
-	fmt.Printf("REGISTER NODE DONE \n\n")
+
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
 	result = s.SetApprovedNodesScript(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
 	require.NoError(s.T(), result.Error)
-	fmt.Printf("SetApprovedNodesScript DONE: \n\n")
 
 	return &StakedNodeOperationInfo{
 		NodeID:                  nodeID,
@@ -207,10 +203,6 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		MachineAccountPublicKey: machineAccountPubKey,
 		ContainerName:           containerName,
 	}
-}
-
-func (s *Suite) getNodeAddress(name string) string {
-	return fmt.Sprintf("%s:%s", name, defaultPort)
 }
 
 // transfers tokens to receiver from service account
@@ -394,4 +386,19 @@ func (s *Suite) ExecuteReadApprovedNodesScript(ctx context.Context, env template
 	require.NoError(s.T(), err)
 
 	return v
+}
+
+func (s *Suite) WaitForEpochs(ctx context.Context, numOfEpochs int)  {
+	var epoch protocol.Epoch
+	var epochCounter uint64
+	for counter := 0; counter < numOfEpochs; counter++ {
+		// wait until the access node reaches the desired epoch
+		for epoch == nil || epochCounter != uint64(counter) {
+			snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+			require.NoError(s.T(), err)
+			epoch = snapshot.Epochs().Current()
+			epochCounter, err = epoch.Counter()
+			require.NoError(s.T(), err)
+		}
+	}
 }

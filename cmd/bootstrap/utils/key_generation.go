@@ -4,9 +4,10 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"fmt"
-	"github.com/onflow/flow-go/model/encodable"
 	gohash "hash"
 	"io"
+
+	"github.com/onflow/flow-go/model/encodable"
 
 	"golang.org/x/crypto/hkdf"
 

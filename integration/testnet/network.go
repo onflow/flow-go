@@ -97,18 +97,19 @@ func init() {
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
-	t                  *testing.T
-	suite              *testingdock.Suite
-	config             NetworkConfig
-	cli                *dockerclient.Client
-	network            *testingdock.Network
-	Containers         map[string]*Container
-	ConsensusFollowers map[flow.Identifier]consensus_follower.ConsensusFollower
-	AccessPorts        map[string]string
-	root               *flow.Block
-	result             *flow.ExecutionResult
-	seal               *flow.Seal
-	BootstrapDir       string
+	t                          *testing.T
+	suite                      *testingdock.Suite
+	config                     NetworkConfig
+	cli                        *dockerclient.Client
+	network                    *testingdock.Network
+	Containers                 map[string]*Container
+	ConsensusFollowers         map[flow.Identifier]consensus_follower.ConsensusFollower
+	AccessPorts                map[string]string
+	AccessPortsByContainerName map[string]string
+	root                       *flow.Block
+	result                     *flow.ExecutionResult
+	seal                       *flow.Seal
+	BootstrapDir               string
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -481,18 +482,19 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
-		t:                  t,
-		cli:                dockerClient,
-		config:             networkConf,
-		suite:              suite,
-		network:            network,
-		Containers:         make(map[string]*Container, nNodes),
-		ConsensusFollowers: make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
-		AccessPorts:        make(map[string]string),
-		root:               root,
-		seal:               seal,
-		result:             result,
-		BootstrapDir:       bootstrapDir,
+		t:                          t,
+		cli:                        dockerClient,
+		config:                     networkConf,
+		suite:                      suite,
+		network:                    network,
+		Containers:                 make(map[string]*Container, nNodes),
+		ConsensusFollowers:         make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
+		AccessPorts:                make(map[string]string),
+		AccessPortsByContainerName: make(map[string]string),
+		root:                       root,
+		seal:                       seal,
+		result:                     result,
+		BootstrapDir:               bootstrapDir,
 	}
 
 	// check that at-least 2 full access nodes must be configure in your test suite
@@ -725,6 +727,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
 			nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 			net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
+			net.AccessPortsByContainerName[nodeContainer.Name()] = hostGRPCPort
 			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 
 			if nodeConf.SupportsUnstakedNodes {

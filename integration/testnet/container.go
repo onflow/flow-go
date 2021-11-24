@@ -80,15 +80,16 @@ func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID
 
 	return nil
 }
+// GetPrivateNodeInfoAddress returns the node's address <name>:<port>
+func GetPrivateNodeInfoAddress(nodeName string) string {
+	return fmt.Sprintf("%s:%d", nodeName, DefaultFlowPort)
+}
 
 func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey crypto.PrivateKey) ContainerConfig {
-	// define the node's address <name>:<port>
-	addr := fmt.Sprintf("%s:%d", nodeName, DefaultFlowPort)
-
 	info := bootstrap.NewPrivateNodeInfo(
 		conf.Identifier,
 		conf.Role,
-		addr,
+		GetPrivateNodeInfoAddress(nodeName),
 		conf.Stake,
 		networkKey,
 		stakingKey,
