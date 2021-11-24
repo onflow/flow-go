@@ -304,14 +304,14 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid, log
 }
 
 // Get gets the ExecutionData for the given root CID from the blobservice.
-func (s *ExecutionDataService) Get(ctx context.Context, c cid.Cid) (*ExecutionData, error) {
-	logger := s.logger.With().Str("cid", c.String()).Logger()
+func (s *ExecutionDataService) Get(ctx context.Context, rootCid cid.Cid) (*ExecutionData, error) {
+	logger := s.logger.With().Str("cid", rootCid.String()).Logger()
 	logger.Debug().Msg("getting execution data")
 
 	s.metrics.ExecutionDataGetStarted()
 
 	start := time.Now()
-	cids := []cid.Cid{c}
+	cids := []cid.Cid{rootCid}
 
 	var blobTreeNodes int
 
