@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -24,21 +23,20 @@ func TestProcessSummary2TestRun(t *testing.T) {
 // HELPERS - UTILITIES
 
 func runProcessSummary2TestRun(t *testing.T, testDir string) {
-	//const inputTestDataPath = "./testdata/summary2/test1-1package-1failure/input/"
 	inputTestDataPath := "./testdata/summary2/" + testDir + "/input/"
 	expectedOutputTestDataPath := "./testdata/summary2/" + testDir + "/expected-output/" + testDir + ".json"
-	expectedFailureMessagesPath := "./testdata/summary2/" + testDir + "/expected-output/" + "failures/"
+	expectedFailureMessagesPath := "./testdata/summary2/" + testDir + "/expected-output/failures/"
+	actualFailureTestDataPath := "./failures/"
 
+	// **************************************************************
 	actualTestSummary2 := processSummary2TestRun(inputTestDataPath)
+	// **************************************************************
 
-	//read in expected summary level 2
-
+	// read in expected summary level 2
 	var expectedTestSummary2 TestSummary2
-	// read in expected JSON from file
-	expectedTestSummary2JsonBytes, err := ioutil.ReadFile(expectedOutputTestDataPath)
+	expectedTestSummary2JsonBytes, err := os.ReadFile(expectedOutputTestDataPath)
 	require.Nil(t, err)
 	require.NotEmpty(t, expectedTestSummary2JsonBytes)
-
 	err = json.Unmarshal(expectedTestSummary2JsonBytes, &expectedTestSummary2)
 	require.Nil(t, err)
 
@@ -68,21 +66,57 @@ func runProcessSummary2TestRun(t *testing.T, testDir string) {
 			require.Equal(t, expectedTestSummary.Durations[i], actualTestSummary.Durations[i])
 		}
 		require.Equal(t, expectedTestSummary.AverageDuration, actualTestSummary.AverageDuration)
-
 	}
 
-	//make sure calculated summary level 2 is what we expected
+	// make sure calculated summary level 2 is what we expected
 	require.Equal(t, expectedTestSummary2, actualTestSummary2)
 
-	//check failure messages created
-	for _, actualTestSummary := range actualTestSummary2.TestResults {
-		//if test has failures, there should be directory of failure messages text files
-		if actualTestSummary.Failed > 0 {
-			//for every test that has failures, there should be 1 text file per failure
-			//a sub-directory of the test name will hold all test failure messages
-			failureEntries, err := os.ReadDir(expectedFailureMessagesPath + actualTestSummary.Test)
+	// check failure messages created
+
+	// count expected failure directories (1 directory/test)
+	expectedFailureDirEntries, err := os.ReadDir(expectedFailureMessagesPath)
+	require.Nil(t, err)
+
+	// count actual failure directories
+	actualFailureDirEntries, err := os.ReadDir(actualFailureTestDataPath)
+	require.Nil(t, err)
+
+	require.Equal(t, len(expectedFailureDirEntries), len(actualFailureDirEntries))
+
+	// compare expected vs actual failure messages
+
+	for dirEntryIndex, expectedDirEntry := range expectedFailureDirEntries {
+		// sub-directory names should be the same - each sub directory corresponds to a failed test name
+		require.Equal(t, expectedDirEntry.Name(), actualFailureDirEntries[dirEntryIndex].Name())
+
+		// under each sub-directory, there should be 1 or more text files (failure1.txt, failure2.txt, etc)
+		// that holds the raw failure message for that test
+		expectedTestFailuresDirEntries, err := os.ReadDir(expectedFailureMessagesPath + expectedDirEntry.Name())
+		require.Nil(t, err)
+
+		actualTestFailuresDirEntries, err := os.ReadDir(actualFailureTestDataPath + actualFailureDirEntries[dirEntryIndex].Name())
+		require.Nil(t, err)
+
+		// make sure there are the expected number of failed text files
+		require.Equal(t, len(expectedTestFailuresDirEntries), len(actualTestFailuresDirEntries))
+
+		// check contents of each text file for expected failure message
+		// for every test that has failures, there should be 1 text file per failure
+
+		// if test has failures, there should be directory of failure messages text files
+		// a sub-directory of the test name will hold all test failure messages
+
+		for expectedFailureFileIndex, expectedFailureFileDirEntry := range expectedTestFailuresDirEntries {
+			expectedFailureFilePath := expectedFailureMessagesPath + expectedDirEntry.Name() + "/" + expectedFailureFileDirEntry.Name()
+			expectedFailureFileBytes, err := os.ReadFile(expectedFailureFilePath)
 			require.Nil(t, err)
-			require.Equal(t, actualTestSummary.Failed, len(failureEntries))
+
+			actualFailureFilePath := actualFailureTestDataPath + actualFailureDirEntries[dirEntryIndex].Name() + "/" + actualTestFailuresDirEntries[expectedFailureFileIndex].Name()
+			actualFailureFileBytes, err := os.ReadFile(actualFailureFilePath)
+			require.Nil(t, err)
+
+			// read expected and actual text files as bytes and compare them all at once
+			require.Equal(t, expectedFailureFileBytes, actualFailureFileBytes)
 		}
 	}
 }

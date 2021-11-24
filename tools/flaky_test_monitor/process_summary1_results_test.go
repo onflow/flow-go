@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"sort"
@@ -58,7 +57,7 @@ func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
 
 	var expectedTestRun TestRun
 	// read in expected JSON from file
-	expectedJsonBytes, err := ioutil.ReadFile(expectedJsonFilePath + jsonExpectedActualFile)
+	expectedJsonBytes, err := os.ReadFile(expectedJsonFilePath + jsonExpectedActualFile)
 	require.Nil(t, err)
 	require.NotEmpty(t, expectedJsonBytes)
 

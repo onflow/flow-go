@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 )
 
@@ -25,10 +24,13 @@ type TestResultSummary struct {
 	Durations       []float32 `json:"durations"`
 }
 
-func processSummary2TestRun(level1Directory string) TestSummary2 {
+const failuresDir = "./failures/"
 
+// process level 1 summary files in a single directory and output level 2 summary
+func processSummary2TestRun(level1Directory string) TestSummary2 {
 	dirEntries, err := os.ReadDir(level1Directory)
-	assertErrNil(err, "error reading level 1 directory: ")
+	os.Mkdir(failuresDir, 0755)
+	assertErrNil(err, "error reading level 1 directory")
 
 	testSummary2 := TestSummary2{}
 	testSummary2.TestResults = make(map[string]*TestResultSummary)
@@ -38,11 +40,11 @@ func processSummary2TestRun(level1Directory string) TestSummary2 {
 		// read in each level 1 summary
 		var level1TestRun TestRun
 
-		level1JsonBytes, err := ioutil.ReadFile(level1Directory + dirEntries[i].Name())
-		assertErrNil(err, "error reading level 1 json: ")
+		level1JsonBytes, err := os.ReadFile(level1Directory + dirEntries[i].Name())
+		assertErrNil(err, "error reading level 1 json")
 
 		err = json.Unmarshal(level1JsonBytes, &level1TestRun)
-		assertErrNil(err, "error unmarshalling level 1 test run: ")
+		assertErrNil(err, "error unmarshalling level 1 test run")
 
 		// go through each level 1 summary and update level 2 summary
 		for _, packageResult := range level1TestRun.PackageResults {
@@ -67,6 +69,7 @@ func processSummary2TestRun(level1Directory string) TestSummary2 {
 					testResultSummary.Passed++
 				case "fail":
 					testResultSummary.Failed++
+					saveFailureMessage(testResult)
 				case "":
 					testResultSummary.NoResult++
 				default:
@@ -84,6 +87,32 @@ func processSummary2TestRun(level1Directory string) TestSummary2 {
 	// calculate averages and other calculations that can only be completed after all test runs have been read
 	postProcessTestSummary2(testSummary2)
 	return testSummary2
+}
+
+func saveFailureMessage(testResult TestResult) {
+	if testResult.Result != "fail" {
+		panic(fmt.Sprintf("unexpected test result: " + testResult.Result))
+	}
+
+	// sub-directory names should be the same - each sub directory corresponds to a failed test name
+	err := os.Mkdir(failuresDir+testResult.Test, 0755)
+	assertErrNil(err, "error creating sub-dir under failuresDir")
+
+	// under each sub-directory, there should be 1 or more text files (failure1.txt, failure2.txt, etc)
+	// that holds the raw failure message for that test
+
+	dirEntries, err := os.ReadDir(failuresDir + testResult.Test)
+	assertErrNil(err, "error reading sub-dir entries under failuresDir")
+
+	// failure text files will be named "failure1.txt", "failure2.txt", etc so we want to know how
+	// many failure files already exist in the sub-directory before creating the next one
+	failureFile, err := os.Create(failuresDir + testResult.Test + "/" + fmt.Sprintf("failure%d.txt", len(dirEntries)+1))
+	assertErrNil(err, "error creating failure file")
+
+	for _, output := range testResult.Output {
+		_, err = failureFile.WriteString(output)
+		assertErrNil(err, "error writing to failure file")
+	}
 }
 
 func postProcessTestSummary2(testSummary2 TestSummary2) {

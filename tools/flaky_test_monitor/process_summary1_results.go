@@ -30,14 +30,14 @@ type TestRun struct {
 // save TestRun to local JSON file
 func (testRun *TestRun) save(fileName string) {
 	testRunBytes, err := json.MarshalIndent(testRun, "", "  ")
-	assertErrNil(err, "error marshalling json: ")
+	assertErrNil(err, "error marshalling json")
 
 	file, err := os.Create(fileName)
-	assertErrNil(err, "error creating filename: ")
+	assertErrNil(err, "error creating filename")
 	defer file.Close()
 
 	_, err = file.Write(testRunBytes)
-	assertErrNil(err, "error saving test run to file: ")
+	assertErrNil(err, "error saving test run to file")
 }
 
 // models test result of an entire package which can have multiple tests
@@ -93,7 +93,7 @@ func processSummary1TestRun(resultReader ResultReader) TestRun {
 	packageResultMap := processTestRunLineByLine(scanner)
 
 	err := scanner.Err()
-	assertErrNil(err, "error returning EOF for scanner: ")
+	assertErrNil(err, "error returning EOF for scanner")
 
 	postProcessTestRun(packageResultMap)
 
@@ -115,7 +115,7 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*PackageResult 
 	for scanner.Scan() {
 		var rawTestStep RawTestStep
 		err := json.Unmarshal(scanner.Bytes(), &rawTestStep)
-		assertErrNil(err, "error unmarshalling raw test step: ")
+		assertErrNil(err, "error unmarshalling raw test step")
 
 		// check if package result exists to hold test results
 		packageResult, packageResultExists := packageResultMap[rawTestStep.Package]
@@ -230,10 +230,10 @@ func finalizeTestRun(packageResultMap map[string]*PackageResult) TestRun {
 	}
 
 	commitDate, err := time.Parse(time.RFC3339, os.Getenv("COMMIT_DATE"))
-	assertErrNil(err, "error parsing COMMIT_DATE: ")
+	assertErrNil(err, "error parsing COMMIT_DATE")
 
 	jobStarted, err := time.Parse(time.RFC3339, os.Getenv("JOB_STARTED"))
-	assertErrNil(err, "error parsing JOB_STARTED: ")
+	assertErrNil(err, "error parsing JOB_STARTED")
 
 	var testRun TestRun
 	testRun.CommitDate = commitDate.UTC()
