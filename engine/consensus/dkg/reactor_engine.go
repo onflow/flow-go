@@ -158,7 +158,7 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 		log.Fatal().Err(err).Msg("could not check whether DKG is started")
 	}
 	if started {
-		log.Warn().Msg("DKG already started, skipping starting the DKG for this epoch")
+		log.Warn().Msg("DKG started before, skipping starting the DKG for this epoch")
 		return
 	}
 
