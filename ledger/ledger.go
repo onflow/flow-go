@@ -303,12 +303,3 @@ type Reporter interface {
 	// Report accepts slice ledger payloads and reports the state of the ledger
 	Report(payloads []Payload) error
 }
-
-// Validator validates the payloads after migration, the setup phase would receive
-// payloads before the migration starts and the validate phase would receive the post migration
-// payloads, since data migrations are subjective to the input data, these validators helps
-// to prevent accidental data loss. A migration code might implement validator interface as well.
-type Validator interface {
-	Setup(oldPayloads []Payload) error
-	Validate(newPayloads []Payload) (isValid bool, err error)
-}
