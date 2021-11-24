@@ -371,7 +371,7 @@ func TestExtendReceiptsInvalid(t *testing.T) {
 		})
 
 		// force the receipt validator to refuse this payload
-		validator.On("ValidatePayload", &block3).Return(engine.NewInvalidInputError("")).Once()
+		validator.On("ValidatePayload", block3).Return(engine.NewInvalidInputError("")).Once()
 
 		err = state.Extend(context.Background(), block3)
 		require.Error(t, err)
@@ -997,7 +997,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), qcBlock)
-			require.Error(t, err)
+			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, db)
 		})
 
@@ -1011,7 +1011,7 @@ func TestExtendEpochSetupInvalid(t *testing.T) {
 
 			qcBlock := unittest.BlockWithParentFixture(sealingBlock)
 			err = state.Extend(context.Background(), qcBlock)
-			require.Error(t, err)
+			require.NoError(t, err)
 			assertEpochEmergencyFallbackTriggered(t, db)
 		})
 	})
