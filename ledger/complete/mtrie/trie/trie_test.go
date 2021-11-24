@@ -2,6 +2,7 @@ package trie_test
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"math"
 	"math/rand"
@@ -66,9 +67,9 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hashToString(rightPopulatedTrie.RootHash()))
 }
 
-// // Test_TrieWithMiddleRegister tests the root hash of trie holding only a single
-// // allocated register somewhere in the middle.
-// // The expected value is coming from a reference implementation in python and is hard-coded here.
+// Test_TrieWithMiddleRegister tests the root hash of trie holding only a single
+// allocated register somewhere in the middle.
+// The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithMiddleRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()
@@ -176,7 +177,7 @@ func Test_UpdateTrie(t *testing.T) {
 }
 
 // Test_UnallocateRegisters tests whether unallocating registers matches the formal specification.
-// Unallocating here means, to set the stored register value to an empty byte slice
+// Unallocating here means, to set the stored register value to an empty byte slice.
 // The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_UnallocateRegisters(t *testing.T) {
 	rng := &LinearCongruentialGenerator{seed: 0}
@@ -220,12 +221,45 @@ func (rng *LinearCongruentialGenerator) next() uint16 {
 // sampleRandomRegisterWrites generates path-payload tuples for `number` randomly selected registers;
 // caution: registers might repeat
 func sampleRandomRegisterWrites(rng *LinearCongruentialGenerator, number int) ([]ledger.Path, []ledger.Payload) {
-
 	paths := make([]ledger.Path, 0, number)
 	payloads := make([]ledger.Payload, 0, number)
 	for i := 0; i < number; i++ {
 		path := utils.PathByUint16LeftPadded(rng.next())
 		paths = append(paths, path)
+		t := rng.next()
+		payload := utils.LightPayload(t, t)
+		payloads = append(payloads, *payload)
+	}
+	return paths, payloads
+}
+
+// sampleRandomRegisterWrites generates path-payload tuples for `number` randomly selected registers;
+// each path is starting with the specified `prefix` and is filled to the full length with random bytes
+// caution: register paths might repeat
+func sampleRandomRegisterWritesWithPrefix(rng *LinearCongruentialGenerator, number int, prefix []byte) ([]ledger.Path, []ledger.Payload) {
+	prefixLen := len(prefix)
+	if prefixLen >= hash.HashLen {
+		panic("prefix must be shorter than full path length, so there is some space left for random path segment")
+	}
+
+	paths := make([]ledger.Path, 0, number)
+	payloads := make([]ledger.Payload, 0, number)
+	nextRandomBytes := make([]byte, 2)
+	nextRandomByteIndex := 2 // index of next unused byte in nextRandomBytes; if value is >= 2, we need to generate new random bytes
+	for i := 0; i < number; i++ {
+		var p ledger.Path
+		copy(p[:prefixLen], prefix)
+		for b := prefixLen; b < hash.HashLen; b++ {
+			if nextRandomByteIndex >= 2 {
+				// pre-generate next 2 bytes
+				binary.BigEndian.PutUint16(nextRandomBytes, rng.next())
+				nextRandomByteIndex = 0
+			}
+			p[b] = nextRandomBytes[nextRandomByteIndex]
+			nextRandomByteIndex += 1
+		}
+		paths = append(paths, p)
+
 		t := rng.next()
 		payload := utils.LightPayload(t, t)
 		payloads = append(payloads, *payload)
@@ -298,6 +332,71 @@ func TestSplitByPath(t *testing.T) {
 	for i := index; i < len(paths); i++ {
 		assert.Equal(t, paths[i], sortedPaths[i])
 	}
+}
+
+// Test_DifferentiateEmptyVsLeaf tests correct behaviour for a very specific edge case for pruning:
+//  * By convention, a node in the trie is a leaf iff both children are nil.
+//  * Therefore, we consider a completely unallocated subtrie also as a potential leaf.
+// An edge case can now arise when unallocating a previously allocated leaf (see vertex '■' in the illustration below):
+//  * Before the update, both children of the leaf are nil (because it is a leaf)
+//  * After the update-algorithm updated the sub-Trie with root ■, both children of the updated vertex are
+//    also nil. But the sub-trie has now changed: the register previously represented by ■ is now gone.
+//    This case must be explicitly handled by the update algorithm:
+//    (i)  If the vertex is an interim node, i.e. it had at least one child, it is legal to re-use the vertex if neither
+//         of its child-subtries were affected by the update.
+//    (ii) If the vertex is a leaf, only checking that neither child-subtries were affected by the update is insufficient.
+//         This is because the register the leaf represents might itself be affected by the update.
+//    Condition (ii) is particularly subtle, if there are register updates in the subtrie of the leaf:
+//     * From an API perspective, it is a legal operation to set an unallocated register to nil (essentially a no-op).
+//     * Though, the Trie-update algorithm only realizes that the register is already unallocated, once it traverses
+//       into the respective sub-trie. When bubbling up from the recursion, nothing has changed in the children of ■
+//       but the vertex ■ itself has changed from an allocated leaf register to an unallocated register.
+func Test_DifferentiateEmptyVsLeaf(t *testing.T) {
+	//           ⋮  commonPrefix29bytes 101 ....
+	//           o
+	//          / \
+	//        /    \
+	//       /      \
+	//      ■        o
+	//    Left      / \
+	//  SubTrie     ⋮  ⋮
+	//             Right
+	//            SubTrie
+	// Left Sub-Trie (■) is a single compactified leaf
+	// Right Sub-Trie contains multiple (18) allocated registers
+
+	commonPrefix29bytes := "a0115ce6d49ffe0c9c3d8382826bbec896a9555e4c7720c45b558e7a9e"
+	leftSubTriePrefix, _ := hex.DecodeString(commonPrefix29bytes + "0")  // in total 30 bytes
+	rightSubTriePrefix, _ := hex.DecodeString(commonPrefix29bytes + "1") // in total 30 bytes
+
+	rng := &LinearCongruentialGenerator{seed: 0}
+	leftSubTriePath, leftSubTriePayload := sampleRandomRegisterWritesWithPrefix(rng, 1, leftSubTriePrefix)
+	rightSubTriePath, rightSubTriePayload := deduplicateWrites(sampleRandomRegisterWritesWithPrefix(rng, 18, rightSubTriePrefix))
+
+	// initialize Trie to the depicted state
+	paths := append(leftSubTriePath, rightSubTriePath...)
+	payloads := append(leftSubTriePayload, rightSubTriePayload...)
+	startTrie, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), paths, payloads, true)
+	require.NoError(t, err)
+	expectedRootHashHex := "8cf6659db0af7626ab0991e2a49019353d549aa4a8c4be1b33e8953d1a9b7fdd"
+	require.Equal(t, expectedRootHashHex, hashToString(startTrie.RootHash()))
+
+	// Register update:
+	//  * de-allocate the compactified leaf (■), i.e. set its payload to nil.
+	//  * also set a previously already unallocated register to nil as well
+	unallocatedRegister := leftSubTriePath[0]            // copy path to leaf and modify it (next line)
+	unallocatedRegister[len(unallocatedRegister)-1] ^= 1 // path differs only in the last byte, i.e. register is also in the left Sub-Trie
+	updatedPaths := append(leftSubTriePath, unallocatedRegister)
+	updatedPayloads := []ledger.Payload{*ledger.EmptyPayload(), *ledger.EmptyPayload()}
+	updatedTrie, err := trie.NewTrieWithUpdatedRegisters(startTrie, updatedPaths, updatedPayloads, true)
+	require.NoError(t, err)
+
+	// The updated trie should equal to a trie containing only the right sub-Trie
+	expectedUpdatedRootHashHex := "576e12a7ef5c760d5cc808ce50e9297919b21b87656b0cc0d9fe8a1a589cf42c"
+	require.Equal(t, expectedUpdatedRootHashHex, hashToString(updatedTrie.RootHash()))
+	referenceTrie, err := trie.NewTrieWithUpdatedRegisters(trie.NewEmptyMTrie(), rightSubTriePath, rightSubTriePayload, true)
+	require.NoError(t, err)
+	require.Equal(t, expectedUpdatedRootHashHex, hashToString(referenceTrie.RootHash()))
 }
 
 func Test_Pruning(t *testing.T) {

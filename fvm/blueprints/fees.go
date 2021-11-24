@@ -46,30 +46,6 @@ func DeployStorageFeesContractTransaction(service flow.Address, contract []byte)
 		AddAuthorizer(service)
 }
 
-const getFlowTokenAvailableBalanceScriptTemplate = `
-import FlowStorageFees from 0x%s
-
-pub fun main(): UFix64 {
-  return FlowStorageFees.defaultTokenAvailableBalance(0x%s)
-}
-`
-
-func GetFlowTokenAvailableBalanceScript(accountAddress, serviceAddress flow.Address) []byte {
-	return []byte(fmt.Sprintf(getFlowTokenAvailableBalanceScriptTemplate, serviceAddress, accountAddress))
-}
-
-const getStorageCapacityScriptTemplate = `
-import FlowStorageFees from 0x%s
-
-pub fun main(): UFix64 {
-	return FlowStorageFees.calculateAccountCapacity(0x%s)
-}
-`
-
-func GetStorageCapacityScript(accountAddress, serviceAddress flow.Address) []byte {
-	return []byte(fmt.Sprintf(getStorageCapacityScriptTemplate, serviceAddress, accountAddress))
-}
-
 const setupFeesTransactionTemplate = `
 import FlowStorageFees, FlowServiceAccount from 0x%s
 

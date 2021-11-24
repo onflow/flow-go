@@ -12,17 +12,15 @@ import (
 
 // RoleBasedFilter implements a subscription filter that filters subscriptions based on a node's role.
 type RoleBasedFilter struct {
-	idProvider  id.IdentityProvider
-	myPeerID    peer.ID
-	myRole      *flow.Role
-	rootBlockID flow.Identifier
+	idProvider id.IdentityProvider
+	myPeerID   peer.ID
+	myRole     *flow.Role
 }
 
-func NewRoleBasedFilter(pid peer.ID, rootBlockID flow.Identifier, idProvider id.IdentityProvider) *RoleBasedFilter {
+func NewRoleBasedFilter(pid peer.ID, idProvider id.IdentityProvider) *RoleBasedFilter {
 	filter := &RoleBasedFilter{
-		idProvider:  idProvider,
-		myPeerID:    pid,
-		rootBlockID: rootBlockID,
+		idProvider: idProvider,
+		myPeerID:   pid,
 	}
 	filter.myRole = filter.getRole(pid)
 
