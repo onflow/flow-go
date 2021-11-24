@@ -6,6 +6,7 @@ import (
 
 	"github.com/onflow/flow-go/utils/logging"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -30,13 +31,15 @@ type TelemetryConsumer struct {
 	pathHandler *PathHandler
 }
 
+var _ hotstuff.Consumer = (*TelemetryConsumer)(nil)
+
 func NewTelemetryConsumer(log zerolog.Logger, chain flow.ChainID) *TelemetryConsumer {
 	return &TelemetryConsumer{
 		pathHandler: NewPathHandler(log, chain),
 	}
 }
 
-func (t *TelemetryConsumer) OnReceiveVote(vote *model.Vote) {
+func (t *TelemetryConsumer) OnReceiveVote(currentView uint64, vote *model.Vote) {
 	// TODO: update
 	//       As of Consensus Voting V2, receiving a vote is not an event within the HotStuff state machine anymore.
 	//t.pathHandler.StartNextPath(currentView)
