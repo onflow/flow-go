@@ -58,17 +58,17 @@ func (suite *ReadProtocolStateBlocksSuite) SetupTest() {
 	genesis := unittest.GenesisFixture()
 	blocks = append(blocks, genesis)
 	sealed := unittest.BlockWithParentFixture(genesis.Header)
-	blocks = append(blocks, &sealed)
+	blocks = append(blocks, sealed)
 	final := unittest.BlockWithParentFixture(sealed.Header)
-	blocks = append(blocks, &final)
+	blocks = append(blocks, final)
 	final = unittest.BlockWithParentFixture(final.Header)
-	blocks = append(blocks, &final)
+	blocks = append(blocks, final)
 	final = unittest.BlockWithParentFixture(final.Header)
-	blocks = append(blocks, &final)
+	blocks = append(blocks, final)
 
 	suite.allBlocks = blocks
-	suite.sealed = &sealed
-	suite.final = &final
+	suite.sealed = sealed
+	suite.final = final
 
 	suite.state.On("Final").Return(createSnapshot(final.Header))
 	suite.state.On("Sealed").Return(createSnapshot(sealed.Header))

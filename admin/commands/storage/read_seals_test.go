@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"gotest.tools/assert"
+
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/model/flow"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"gotest.tools/assert"
 )
 
 func TestReadSealsByID(t *testing.T) {

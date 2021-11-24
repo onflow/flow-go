@@ -1362,7 +1362,7 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 			// add a block for the first seal to reference
 			block1 := unittest.BlockWithParentFixture(head)
 			block1.SetPayload(flow.EmptyPayload())
-			err = state.Extend(context.Background(), &block1)
+			err = state.Extend(context.Background(), block1)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block1.ID())
 			require.NoError(t, err)
@@ -1383,7 +1383,7 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 				unittest.WithFirstView(epoch1FinalView+10), // invalid first view
 			)
 
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			receipt1.ExecutionResult.ServiceEvents = []flow.ServiceEvent{epoch2Setup.ServiceEvent()}
 
 			// incorporating the service event should trigger EECC
@@ -1392,7 +1392,7 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 			// add a block containing a receipt for block 1
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
-			err = state.Extend(context.Background(), &block2)
+			err = state.Extend(context.Background(), block2)
 			require.NoError(t, err)
 			err = state.Finalize(context.Background(), block2.ID())
 			require.NoError(t, err)
@@ -1402,14 +1402,14 @@ func TestEmergencyEpochChainContinuation(t *testing.T) {
 			block3.SetPayload(flow.Payload{
 				Seals: []*flow.Seal{seal1},
 			})
-			err = state.Extend(context.Background(), &block3)
+			err = state.Extend(context.Background(), block3)
 			require.NoError(t, err)
 
 			// block 4 will be the first block for epoch 2
 			block4 := unittest.BlockWithParentFixture(block3.Header)
 			block4.Header.View = epoch1Setup.FinalView + 1
 
-			err = state.Extend(context.Background(), &block4)
+			err = state.Extend(context.Background(), block4)
 			require.NoError(t, err)
 
 			assertEpochEmergencyFallbackTriggered(t, db)
