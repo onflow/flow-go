@@ -108,12 +108,6 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		}
 	}
 
-	// before ending the test and awaiting successful completion, ensure we leave
-	// the dkg client in an enabled state
-	for _, node := range nodes {
-		node.dkgContractClient.Enable()
-	}
-
 	for _, n := range nodes {
 		n.Done()
 	}

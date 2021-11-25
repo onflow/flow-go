@@ -5,13 +5,19 @@ import (
 	"encoding/hex"
 
 	"github.com/onflow/flow-go/crypto"
-
 	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 )
 
 func NetworkingKey() (crypto.PrivateKey, error) {
-	return ECDSAKey()
+	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
+	n, err := rand.Read(seed)
+	if err != nil || n != crypto.KeyGenSeedMinLenECDSAP256 {
+		return nil, err
+	}
+
+	sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
+	return sk, err
 }
 
 func NetworkingKeys(n int) ([]crypto.PrivateKey, error) {
@@ -26,17 +32,6 @@ func NetworkingKeys(n int) ([]crypto.PrivateKey, error) {
 	}
 
 	return keys, nil
-}
-
-func ECDSAKey() (crypto.PrivateKey, error) {
-	seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
-	n, err := rand.Read(seed)
-	if err != nil || n != crypto.KeyGenSeedMinLenECDSAP256 {
-		return nil, err
-	}
-
-	sk, err := crypto.GeneratePrivateKey(crypto.ECDSAP256, seed)
-	return sk, err
 }
 
 func StakingKey() (crypto.PrivateKey, error) {
