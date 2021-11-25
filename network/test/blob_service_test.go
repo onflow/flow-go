@@ -168,9 +168,6 @@ func (suite *BlobServiceTestSuite) TestGetBlobsWithSession() {
 }
 
 func (suite *BlobServiceTestSuite) TestHas() {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
 	var blobChans []<-chan blobs.Blob
 	unreceivedBlobs := make([]map[cid.Cid]struct{}, len(suite.blobServices))
 	for i, bex := range suite.blobServices {
@@ -184,6 +181,10 @@ func (suite *BlobServiceTestSuite) TestHas() {
 				unreceivedBlobs[i][blob.Cid()] = struct{}{}
 			}
 		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
 		blobs := bex.GetBlobs(ctx, blobsToGet)
 		blobChans = append(blobChans, blobs)
 	}
@@ -203,6 +204,9 @@ func (suite *BlobServiceTestSuite) TestHas() {
 	}, time.Second, 100*time.Millisecond)
 
 	for i, bex := range suite.blobServices {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
 		err := bex.AddBlob(ctx, blobs.NewBlob([]byte(fmt.Sprintf("bar%v", i))))
 		suite.Require().NoError(err)
 	}
@@ -212,7 +216,7 @@ func (suite *BlobServiceTestSuite) TestHas() {
 			delete(unreceivedBlobs[i], blob.Cid())
 		}
 		for c := range unreceivedBlobs[i] {
-			suite.Assert().Fail("blob %v not received by node %v", c, i)
+			suite.T().Errorf("blob %v not received by node %v", c, i)
 		}
 	}
 }
