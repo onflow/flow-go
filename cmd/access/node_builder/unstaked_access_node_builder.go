@@ -212,10 +212,6 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 	)
 
 	return func(ctx context.Context) (*p2p.Node, error) {
-		streamFactory, err := p2p.LibP2PStreamCompressorFactoryFunc(builder.BaseConfig.LibP2PStreamCompression)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert stream factory: %w", err)
-		}
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
 			SetRootBlockID(builder.RootBlock.ID()).
 			SetConnectionManager(connManager).
@@ -225,7 +221,6 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
 			SetPubsubOptions(psOpts...).
-			SetStreamCompressor(streamFactory).
 			Build(ctx)
 		if err != nil {
 			return nil, err
