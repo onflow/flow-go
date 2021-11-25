@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
 
+	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 )
@@ -90,7 +91,11 @@ func (h *ProgramsHandler) Get(location common.Location) (*interpreter.Program, b
 		if view != nil { // handle view not set (ie. for non-address locations
 			err := h.mergeState(view)
 			if err != nil {
-				panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
+				// ignore LedgerIntractionLimitExceededError errors
+				var interactionLimiExceededErr *errors.LedgerIntractionLimitExceededError
+				if !errors.As(err, &interactionLimiExceededErr) {
+					panic(fmt.Sprintf("merge error while getting program, panic: %s", err))
+				}
 			}
 		}
 		return program, true
