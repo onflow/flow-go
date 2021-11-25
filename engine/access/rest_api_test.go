@@ -88,7 +88,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.chainID = flow.Testnet
 	suite.metrics = metrics.NewNoopCollector()
 
-	const anyPort = "0.0.0.0:0" // :0 to let the OS pick a free port
+	const anyPort = ":0" // :0 to let the OS pick a free port
 	config := rpc.Config{
 		UnsecureGRPCListenAddr: anyPort,
 		SecureGRPCListenAddr:   anyPort,
@@ -121,7 +121,7 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		suite.blocks.On("ByID", block.ID()).Return(block, nil).Once()
 
 		client := suite.restAPIClient()
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5000)
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
 		blocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, expandAndSelectOptions())
