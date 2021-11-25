@@ -3,8 +3,10 @@
 package mock
 
 import (
-	cadence "github.com/onflow/cadence"
+	atree "github.com/onflow/atree"
 	ast "github.com/onflow/cadence/runtime/ast"
+
+	cadence "github.com/onflow/cadence"
 
 	common "github.com/onflow/cadence/runtime/common"
 
@@ -59,6 +61,29 @@ func (_m *Environment) AddEncodedAccountKey(address common.Address, publicKey []
 	}
 
 	return r0
+}
+
+// AllocateStorageIndex provides a mock function with given fields: owner
+func (_m *Environment) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	ret := _m.Called(owner)
+
+	var r0 atree.StorageIndex
+	if rf, ok := ret.Get(0).(func([]byte) atree.StorageIndex); ok {
+		r0 = rf(owner)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(atree.StorageIndex)
+		}
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func([]byte) error); ok {
+		r1 = rf(owner)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
 }
 
 // Context provides a mock function with given fields:
