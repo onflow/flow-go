@@ -208,11 +208,11 @@ func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *blobs.B
 			blob, err = s.findBlob(blobChan, c, cachedBlobs, logger)
 
 			if err != nil {
-				_, ok := err.(*BlobNotFoundError)
+				var blobNotFound *BlobNotFoundError
 
 				// the blob channel may be closed as a result of the context being canceled,
 				// in which case we should return the context error.
-				if ok && ctx.Err() != nil {
+				if errors.As(err, &blobNotFound) && ctx.Err() != nil {
 					return ctx.Err()
 				}
 
