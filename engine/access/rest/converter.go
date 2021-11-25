@@ -26,6 +26,10 @@ const MaxAllowedHeights = 50
 
 var MaxAllowedBlockIDs = MaxAllowedIDs
 
+func toBase64(byteValue []byte) string {
+	return base64.StdEncoding.EncodeToString(byteValue)
+}
+
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
 	if !valid {
@@ -365,7 +369,7 @@ func blockHeaderResponse(flowHeader *flow.Header) *generated.BlockHeader {
 		ParentId:             flowHeader.ParentID.String(),
 		Height:               int32(flowHeader.Height),
 		Timestamp:            flowHeader.Timestamp,
-		ParentVoterSignature: fmt.Sprint(flowHeader.ParentVoterSigData),
+		ParentVoterSignature: toBase64(flowHeader.ParentVoterSigData),
 	}
 }
 
@@ -392,7 +396,7 @@ func collectionGuaranteeResponse(flowCollGuarantee *flow.CollectionGuarantee) ge
 	return generated.CollectionGuarantee{
 		CollectionId: flowCollGuarantee.CollectionID.String(),
 		SignerIds:    signerIDs,
-		Signature:    base64.StdEncoding.EncodeToString(flowCollGuarantee.Signature.Bytes()),
+		Signature:    toBase64(flowCollGuarantee.Signature.Bytes()),
 	}
 }
 
@@ -405,9 +409,39 @@ func blockSealsResponse(flowSeals []*flow.Seal) []generated.BlockSeal {
 }
 
 func blockSealResponse(flowSeal *flow.Seal) generated.BlockSeal {
+
+	var aggregatedApprovalSignatures []generated.AggregatedSignature
+	for _, signature := range flowSeal.AggregatedApprovalSigs {
+
+		var verifierSignatures []string
+		for _, verifierSignature := range signature.VerifierSignatures {
+			verifierSignatures = append(verifierSignatures, toBase64(verifierSignature.Bytes()))
+		}
+		var signerIDs []string
+		for _, signerID := range signature.SignerIDs {
+			signerIDs = append(signerIDs, signerID.String())
+		}
+
+		aggregatedApprovalSignature := generated.AggregatedSignature{
+			VerifierSignatures: verifierSignatures,
+			SignerIds:          signerIDs,
+		}
+		aggregatedApprovalSignatures = append(aggregatedApprovalSignatures, aggregatedApprovalSignature)
+	}
+
+	finalState := ""
+	if len(flowSeal.FinalState) > 0 {
+		finalStateBytes, err := flowSeal.FinalState.MarshalJSON()
+		if err == nil {
+			finalState = string(finalStateBytes)
+		}
+	}
+
 	return generated.BlockSeal{
-		BlockId:  flowSeal.BlockID.String(),
-		ResultId: flowSeal.ResultID.String(),
+		BlockId:                      flowSeal.BlockID.String(),
+		ResultId:                     flowSeal.ResultID.String(),
+		FinalState:                   finalState,
+		AggregatedApprovalSignatures: aggregatedApprovalSignatures,
 	}
 }
 
