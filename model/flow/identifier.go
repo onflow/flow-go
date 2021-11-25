@@ -146,12 +146,15 @@ func MerkleRoot(ids ...Identifier) Identifier {
 	var root Identifier
 	tree := merkle.NewTree()
 	for i, id := range ids {
+		val := make([]byte, 8)
+		binary.BigEndian.PutUint64(val, uint64(i))
+
 		// NOTE: the id[:] passed in here will be the address of byte array
 		// that is used by Go in the loop, so it MUST be copied to a different
 		// slice if the intention is to store it's value. Otherwise,
 		// all the value will be the last item of the ids slice.
 		// This is not a problem for i, due to it being a primative (int)
-		tree.Put(id[:], i)
+		tree.Put(id[:], val)
 	}
 	hash := tree.Hash()
 	copy(root[:], hash)
