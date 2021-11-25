@@ -24,7 +24,7 @@ require (
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
 	github.com/onflow/flow-go-sdk v0.24.0
-	github.com/onflow/flow-go/crypto v0.21.3 // replaced by version on-disk
+	github.com/onflow/flow-go/crypto v0.21.4-0.20211125190211-7b31c986316e // replaced by version on-disk
 	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/plus3it/gorecurcopy v0.0.1
 	github.com/prometheus/common v0.20.0 // indirect
@@ -41,5 +41,3 @@ require (
 //replace golang.org/x/sys => golang.org/x/sys v0.0.0-20200826173525-f9321e4c35a6
 
 replace github.com/onflow/flow-go => ../
-
-replace github.com/onflow/flow-go/crypto => ../crypto
