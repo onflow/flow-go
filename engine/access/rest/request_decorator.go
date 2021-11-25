@@ -40,7 +40,11 @@ func (rd *requestDecorator) selects(field string) bool {
 
 func (rd *requestDecorator) getParam(name string) string {
 	vars := mux.Vars(rd.Request)
-	return vars[name] // todo(sideninja) check if exists
+	return vars[name] // todo(sideninja) consider returning err if non-existing
+}
+
+func (rd *requestDecorator) getQuery(name string) string {
+	return rd.Request.URL.Query().Get(name) // todo(sideninja) consider returning err if non-existing
 }
 
 func (rd *requestDecorator) bodyAs(dst interface{}) error {
