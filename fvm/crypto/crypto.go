@@ -136,20 +136,20 @@ func VerifySignatureFromRuntime(
 	if sigAlgo == crypto.ECDSAP256 || sigAlgo == crypto.ECDSASecp256k1 {
 		// hashing compatibility
 		if hashAlgo != hash.SHA2_256 && hashAlgo != hash.SHA3_256 {
-			return false, errors.NewValueErrorf("cannot use hashing algorithm type %s with signature signature algorithm type %s",
-				hashAlgo.String(), sigAlgo.String())
+			return false, errors.NewValueErrorf(sigAlgo.String(), "cannot use hashing algorithm type %s with signature signature algorithm type %s",
+				hashAlgo, sigAlgo)
 		}
 
 		// tag compatibility
 		if !tagECDSACheck(tag) {
-			return false, errors.NewValueErrorf("tag %s is not supported", tag)
+			return false, errors.NewValueErrorf(sigAlgo.String(), "tag %s is not supported", tag)
 		}
 
 		// check BLS compatibilites
 	} else if sigAlgo == crypto.BLSBLS12381 && hashAlgo != hash.KMAC128 {
 		// hashing compatibility
-		return false, errors.NewValueErrorf("cannot use hashing algorithm type %s with signature signature algorithm type %s",
-			hashAlgo.String(), sigAlgo.String())
+		return false, errors.NewValueErrorf(sigAlgo.String(), "cannot use hashing algorithm type %s with signature signature algorithm type %s",
+			hashAlgo, sigAlgo)
 		// there are no tag constraints
 	}
 
@@ -229,7 +229,7 @@ func (DefaultSignatureVerifier) Verify(
 	case hash.KMAC128:
 		hasher = NewBLSKMAC(tag)
 	default:
-		return false, errors.NewValueErrorf(hashAlgo.String(), "hashing algorithm type not found")
+		return false, errors.NewValueErrorf(fmt.Sprint(hashAlgo), "hashing algorithm type not found")
 	}
 
 	valid, err := publicKey.Verify(signature, message, hasher)
