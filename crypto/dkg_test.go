@@ -350,7 +350,9 @@ func dkgCommonTest(t *testing.T, dkg int, n int, threshold int, test testCase) {
 		t.Logf("dkg failed, there are %d disqualified nodes\n", r1)
 		// DKG failed, check for final errors
 		for i := r1; i < n; i++ {
-			assert.Error(t, processors[i].finalError)
+			err := processors[i].finalError
+			assert.Error(t, err)
+			assert.True(t, IsDKGFailureError(err))
 		}
 	} else {
 		t.Logf("dkg succeeded, there are %d disqualified nodes\n", r1)
