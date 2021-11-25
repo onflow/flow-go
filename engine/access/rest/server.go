@@ -44,16 +44,18 @@ func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
 	// common middleware for all request
+	v1SubRouter.Use(mux.CORSMethodMiddleware(v1SubRouter)) // sets the Access-Control-Allow-Methods CORS header
 	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
+
 
 	var linkGenerator LinkGenerator = NewLinkGeneratorImpl(v1SubRouter)
 
 	for _, r := range routeDefinitions() {
 		h := NewHandler(logger, backend, r.apiHandlerFunc, linkGenerator)
 		v1SubRouter.
-			Methods(r.method).
+			Methods(r.method, http.MethodOptions).
 			Path(r.pattern).
 			Name(r.name).
 			Handler(h)
