@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/queue"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
@@ -14,7 +15,7 @@ type Queues struct {
 
 // QueuesBackdata is mempool map for ingestion.Queues (head Node ID -> Queues)
 type QueuesBackdata struct {
-	*Backdata
+	mempool.Backdata
 }
 
 func NewQueues() *Queues {

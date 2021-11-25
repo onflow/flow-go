@@ -4,6 +4,7 @@ package stdmap
 
 import (
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool"
 	"github.com/onflow/flow-go/module/mempool/entity"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
@@ -19,7 +20,7 @@ type BlockByCollections struct {
 // for each collection it stores the blocks that contains the collection.
 // the Backdata is essentially map<collectionID>map<blockID>*ExecutableBlock
 type BlockByCollectionBackdata struct {
-	*Backdata
+	mempool.Backdata
 }
 
 func NewBlockByCollections() *BlockByCollections {
