@@ -20,7 +20,7 @@ type BlockByCollections struct {
 // for each collection it stores the blocks that contains the collection.
 // the Backdata is essentially map<collectionID>map<blockID>*ExecutableBlock
 type BlockByCollectionBackdata struct {
-	mempool.Backdata
+	mempool.BackData
 }
 
 func NewBlockByCollections() *BlockByCollections {
@@ -53,7 +53,7 @@ func (b *BlockByCollections) Run(f func(backdata *BlockByCollectionBackdata) err
 }
 
 func (b *BlockByCollectionBackdata) ByID(id flow.Identifier) (*entity.BlocksByCollection, bool) {
-	e, exists := b.Backdata.ByID(id)
+	e, exists := b.BackData.ByID(id)
 	if !exists {
 		return nil, false
 	}

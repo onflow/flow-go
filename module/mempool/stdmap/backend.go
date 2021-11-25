@@ -14,7 +14,7 @@ import (
 // Backend provides synchronized access to a backdata
 type Backend struct {
 	sync.RWMutex
-	backData           mempool.Backdata
+	backData           mempool.BackData
 	guaranteedCapacity uint
 	batchEject         BatchEjectFunc
 	eject              EjectFunc

@@ -15,7 +15,7 @@ type Queues struct {
 
 // QueuesBackdata is mempool map for ingestion.Queues (head Node ID -> Queues)
 type QueuesBackdata struct {
-	mempool.Backdata
+	mempool.BackData
 }
 
 func NewQueues() *Queues {
@@ -23,7 +23,7 @@ func NewQueues() *Queues {
 }
 
 func (b *QueuesBackdata) ByID(queueID flow.Identifier) (*queue.Queue, bool) {
-	entity, exists := b.Backdata.ByID(queueID)
+	entity, exists := b.BackData.ByID(queueID)
 	if !exists {
 		return nil, false
 	}
@@ -32,7 +32,7 @@ func (b *QueuesBackdata) ByID(queueID flow.Identifier) (*queue.Queue, bool) {
 }
 
 func (b *QueuesBackdata) All() []*queue.Queue {
-	entities := b.Backdata.All()
+	entities := b.BackData.All()
 
 	queues := make([]*queue.Queue, len(entities))
 	for i, entity := range entities {

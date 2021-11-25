@@ -4,7 +4,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type Backdata interface {
+type BackData interface {
 	// Has checks if we already contain the item with the given hash.
 	Has(entityID flow.Identifier) bool
 
