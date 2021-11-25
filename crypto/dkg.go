@@ -53,6 +53,31 @@ type DKGState interface {
 	ForceDisqualify(node int) error
 }
 
+// dkgFailureError is an error returned when a participant
+// detects a failure in the protocol and is not able to compute output keys.
+// Such a failure can be local and only depends on the participant's view to what
+// happened in the protocol.
+type dkgFailureError struct {
+	err error
+}
+
+// dkgFailureErrorf constructs a new dkgFailureError
+func dkgFailureErrorf(msg string, args ...interface{}) error {
+	return &dkgFailureError{
+		err: fmt.Errorf(msg, args...),
+	}
+}
+
+func (e dkgFailureError) Error() string {
+	return e.err.Error()
+}
+
+// IsInvalidInputsError checks if the input error is of a dkgFailureError type
+func IsDKGFailureError(err error) bool {
+	var target *dkgFailureError
+	return errors.As(err, &target)
+}
+
 // index is the node index type used as participants ID
 type index byte
 
