@@ -73,6 +73,10 @@ func (d *RemoteDebugger) RunTransactionAtBlockID(txBody *flow.TransactionBody, b
 	if err != nil {
 		return nil, err
 	}
+	err = view.Cache.Persist()
+	if err != nil {
+		return nil, err
+	}
 	return tx.Err, nil
 }
 
