@@ -85,10 +85,8 @@ func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.Sto
 	// store nil so that the setValue for new allocated slabs would be faster
 	// and won't do ledger getValue for every new slabs (currently happening to compute storage size changes)
 	// this way the getValue would load this value from deltas
-	// TODO: update this code to use atree.SlabIndexToLedgerKey method when the new version of atree is used
-	key := atree.LedgerBaseStorageSlabPrefix + string(index[:])
-
-	err = a.stateHolder.State().Set(string(address.Bytes()), "", key, []byte{}, false)
+	key := atree.SlabIndexToLedgerKey(index)
+	err = a.stateHolder.State().Set(string(address.Bytes()), "", string(key), []byte{}, false)
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("failed to store empty value for newly allocated storage index: %w", err)
 	}
