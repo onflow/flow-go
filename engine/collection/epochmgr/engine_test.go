@@ -11,7 +11,8 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/suite"
 
-	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	epochmgr "github.com/onflow/flow-go/engine/collection/epochmgr/mock"
 	"github.com/onflow/flow-go/model/flow"
 	realmodule "github.com/onflow/flow-go/module"
@@ -32,23 +33,29 @@ import (
 
 // mockComponents is a container for the mocked version of epoch components.
 type mockComponents struct {
-	state    *cluster.State
-	prop     *mocknetwork.Engine
-	sync     *mocknetwork.Engine
-	hotstuff *module.HotStuff
+	state      *cluster.State
+	prop       *mocknetwork.Engine
+	sync       *mocknetwork.Engine
+	hotstuff   *module.HotStuff
+	aggregator *mockhotstuff.VoteAggregator
 }
 
 func newMockComponents() *mockComponents {
 
 	components := &mockComponents{
-		state:    new(cluster.State),
-		prop:     new(mocknetwork.Engine),
-		sync:     new(mocknetwork.Engine),
-		hotstuff: new(module.HotStuff),
+		state:      new(cluster.State),
+		prop:       new(mocknetwork.Engine),
+		sync:       new(mocknetwork.Engine),
+		hotstuff:   new(module.HotStuff),
+		aggregator: new(mockhotstuff.VoteAggregator),
 	}
 	unittest.ReadyDoneify(components.prop)
 	unittest.ReadyDoneify(components.sync)
 	unittest.ReadyDoneify(components.hotstuff)
+	unittest.ReadyDoneify(components.aggregator)
+
+	// for now only aggregator supports Startable, mock only it
+	components.aggregator.On("Start", mock.Anything)
 
 	return components
 }
@@ -64,7 +71,7 @@ type Suite struct {
 	pools *epochs.TransactionPools
 
 	// qc voter dependencies
-	signer  *hotstuff.Signer
+	signer  *mockhotstuff.Signer
 	client  *module.QCContractClient
 	voter   *module.ClusterRootQCVoter
 	factory *epochmgr.EpochComponentsFactory
@@ -88,7 +95,7 @@ func (suite *Suite) SetupTest() {
 	suite.epochs = make(map[uint64]*protocol.Epoch)
 	suite.components = make(map[uint64]*mockComponents)
 
-	suite.signer = new(hotstuff.Signer)
+	suite.signer = new(mockhotstuff.Signer)
 	suite.client = new(module.QCContractClient)
 	suite.voter = new(module.ClusterRootQCVoter)
 	suite.factory = new(epochmgr.EpochComponentsFactory)
@@ -108,6 +115,9 @@ func (suite *Suite) SetupTest() {
 			func(epoch realprotocol.Epoch) network.Engine { return suite.ComponentsForEpoch(epoch).prop },
 			func(epoch realprotocol.Epoch) network.Engine { return suite.ComponentsForEpoch(epoch).sync },
 			func(epoch realprotocol.Epoch) realmodule.HotStuff { return suite.ComponentsForEpoch(epoch).hotstuff },
+			func(epoch realprotocol.Epoch) hotstuff.VoteAggregator {
+				return suite.ComponentsForEpoch(epoch).aggregator
+			},
 			func(epoch realprotocol.Epoch) error { return nil },
 		)
 
@@ -152,6 +162,8 @@ func (suite *Suite) AssertEpochStarted(counter uint64) {
 	components.hotstuff.AssertCalled(suite.T(), "Ready")
 	components.prop.AssertCalled(suite.T(), "Ready")
 	components.sync.AssertCalled(suite.T(), "Ready")
+	components.aggregator.AssertCalled(suite.T(), "Ready")
+	components.aggregator.AssertCalled(suite.T(), "Start", mock.Anything)
 }
 
 // AssertEpochStopped asserts that the components for the given epoch have been stopped.
@@ -178,7 +190,7 @@ func (suite *Suite) MockAsUnstakedNode() {
 	suite.factory = new(epochmgr.EpochComponentsFactory)
 	suite.factory.
 		On("Create", mock.Anything).
-		Return(nil, nil, nil, nil, ErrUnstakedForEpoch)
+		Return(nil, nil, nil, nil, nil, ErrUnstakedForEpoch)
 
 	var err error
 	suite.engine, err = New(suite.log, suite.me, suite.state, suite.pools, suite.voter, suite.factory, suite.heights)
@@ -257,6 +269,12 @@ func (suite *Suite) TestRespondToPhaseChange() {
 }
 
 func (suite *Suite) TestRespondToEpochTransition() {
+
+	// we are in committed phase
+	suite.snap.On("Phase").Return(flow.EpochPhaseCommitted, nil)
+
+	// start the engine
+	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
 
 	first := unittest.BlockHeaderFixture()
 

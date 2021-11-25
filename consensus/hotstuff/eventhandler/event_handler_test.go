@@ -302,9 +302,9 @@ func (v *BlacklistValidator) ValidateProposal(proposal *model.Proposal) error {
 	return nil
 }
 
-func TestEventHandler(t *testing.T) {
-	suite.Run(t, new(EventHandlerSuite))
-}
+//func TestEventHandler(t *testing.T) {
+//	suite.Run(t, new(EventHandlerSuite))
+//}
 
 type EventHandlerSuite struct {
 	suite.Suite

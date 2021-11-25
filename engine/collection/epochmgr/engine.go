@@ -71,6 +71,20 @@ func NewEpochComponents(
 	return components
 }
 
+type StartableEpochComponents struct {
+	*EpochComponents
+	signalerCtx irrecoverable.SignalerContext // used to start the component
+	cancel      context.CancelFunc            // used to stop the epoch components
+}
+
+func NewStartableEpochComponents(components *EpochComponents, signalerCtx irrecoverable.SignalerContext, cancel context.CancelFunc) *StartableEpochComponents {
+	return &StartableEpochComponents{
+		EpochComponents: components,
+		signalerCtx:     signalerCtx,
+		cancel:          cancel,
+	}
+}
+
 // Engine is the epoch manager, which coordinates the lifecycle of other modules
 // and processes that are epoch-dependent. The manager is responsible for
 // spinning up engines when a new epoch is about to start and spinning down
@@ -86,11 +100,11 @@ type Engine struct {
 	factory          EpochComponentsFactory        // consolidates creating epoch for an epoch
 	voter            module.ClusterRootQCVoter     // manages process of voting for next epoch's QC
 	heightEvents     events.Heights                // allows subscribing to particular heights
-	irrecoverableCtx irrecoverable.SignalerContext // used to start epoch components
-	stopComponents   context.CancelFunc            // used to stop epoch components
+	irrecoverableCtx irrecoverable.SignalerContext // parent context for canceling all started epochs
+	stopComponents   context.CancelFunc            // used to stop all components
 
-	epochs         map[uint64]*EpochComponents // epoch-scoped components per epoch
-	startupTimeout time.Duration               // how long we wait for epoch components to start up
+	epochs         map[uint64]*StartableEpochComponents // epoch-scoped components per epoch
+	startupTimeout time.Duration                        // how long we wait for epoch components to start up
 }
 
 func New(
@@ -102,8 +116,7 @@ func New(
 	factory EpochComponentsFactory,
 	heightEvents events.Heights,
 ) (*Engine, error) {
-
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, stopComponents := context.WithCancel(context.Background())
 	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 
 	e := &Engine{
@@ -115,10 +128,10 @@ func New(
 		voter:            voter,
 		factory:          factory,
 		heightEvents:     heightEvents,
-		epochs:           make(map[uint64]*EpochComponents),
+		epochs:           make(map[uint64]*StartableEpochComponents),
 		startupTimeout:   DefaultStartupTimeout,
 		irrecoverableCtx: signalerCtx,
-		stopComponents:   cancel,
+		stopComponents:   stopComponents,
 	}
 
 	// set up epoch-scoped epoch managed by this engine for the current epoch
@@ -137,7 +150,10 @@ func New(
 		return nil, fmt.Errorf("could not create epoch components for current epoch: %w", err)
 	}
 
-	e.epochs[counter] = components
+	ctx, cancel := context.WithCancel(e.irrecoverableCtx)
+	signalerCtx, _ = irrecoverable.WithSignaler(ctx)
+
+	e.epochs[counter] = NewStartableEpochComponents(components, signalerCtx, cancel)
 
 	return e, nil
 }
@@ -152,7 +168,7 @@ func (e *Engine) Ready() <-chan struct{} {
 		epochs := make([]module.ReadyDoneAware, 0, len(e.epochs))
 		for _, epoch := range e.epochs {
 			epochs = append(epochs, epoch)
-			epoch.Start(e.irrecoverableCtx) // start every component using parent ctx
+			epoch.Start(epoch.signalerCtx) // start every component using it's own context
 		}
 		// wait for all engines to start
 		<-util.AllReady(epochs...)
@@ -179,7 +195,7 @@ func (e *Engine) Done() <-chan struct{} {
 		for _, epoch := range e.epochs {
 			epochs = append(epochs, epoch)
 		}
-		e.stopComponents()
+		e.stopComponents() // stop all components using parent context
 		<-util.AllDone(epochs...)
 	})
 }
@@ -335,14 +351,19 @@ func (e *Engine) onEpochSetupPhaseStarted() {
 //
 // CAUTION: the caller MUST acquire the engine lock.
 func (e *Engine) startEpochComponents(counter uint64, components *EpochComponents) error {
-	// start component using parent context
-	components.Start(e.irrecoverableCtx)
+
+	ctx, cancel := context.WithCancel(e.irrecoverableCtx)
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	// start component using its own context
+	components.Start(signalerCtx)
 
 	select {
 	case <-components.Ready():
-		e.epochs[counter] = components
+		e.epochs[counter] = NewStartableEpochComponents(components, signalerCtx, cancel)
 		return nil
 	case <-time.After(e.startupTimeout):
+		cancel() // cancel current context if we didn't start in time
 		return fmt.Errorf("could not start epoch %d components after %s", counter, e.startupTimeout)
 	}
 }
@@ -357,6 +378,9 @@ func (e *Engine) stopEpochComponents(counter uint64) error {
 	if !exists {
 		return fmt.Errorf("can not stop non-existent epoch %d", counter)
 	}
+
+	// stop individual component
+	components.cancel()
 
 	select {
 	case <-components.Done():
