@@ -84,7 +84,7 @@ func TestEpochSetup(t *testing.T) {
 
 	// ensure that an attempt is made to insert the expected dkg private share
 	// for the next epoch.
-	keyStorage := new(storage.DKGKeys)
+	keyStorage := new(storage.BeaconPrivateKeys)
 	keyStorage.On("InsertMyBeaconPrivateKey", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			epochCounter := args.Get(0).(uint64)
@@ -155,7 +155,7 @@ func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 	// to be logged.
 	priv := unittest.RandomBeaconPriv()
 
-	keyStorage := new(storage.DKGKeys)
+	keyStorage := new(storage.BeaconPrivateKeys)
 	keyStorage.On("RetrieveMyBeaconPrivateKey", currentCounter+1).Return(priv, nil)
 	factory := new(module.DKGControllerFactory)
 

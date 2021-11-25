@@ -115,7 +115,7 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
-		dkgKeyStore             *bstorage.DKGKeys
+		dkgKeyStore             *bstorage.BeaconPrivateKeys
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -170,7 +170,7 @@ func main() {
 			return nil
 		}).
 		Module("dkg key storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			dkgKeyStore, err = bstorage.NewDKGKeys(node.Metrics.Cache, node.SecretsDB)
+			dkgKeyStore, err = bstorage.NewBeaconPrivateKeys(node.Metrics.Cache, node.SecretsDB)
 			return err
 		}).
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
