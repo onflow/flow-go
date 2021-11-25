@@ -36,11 +36,6 @@ type VoteProcessorFactory struct {
 
 var _ hotstuff.VoteProcessorFactory = &VoteProcessorFactory{}
 
-type CreateVoteProcessorFactory = func(
-	committee hotstuff.Committee,
-	created hotstuff.OnQCCreated,
-) *VoteProcessorFactory
-
 // Create instantiates a VerifyingVoteProcessor for the given block proposal.
 // A VerifyingVoteProcessor are only created for proposals with valid proposer votes.
 // Expected error returns during normal operations:

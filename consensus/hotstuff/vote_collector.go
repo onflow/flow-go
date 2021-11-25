@@ -3,6 +3,7 @@ package hotstuff
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/rs/zerolog"
 )
 
