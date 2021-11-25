@@ -115,7 +115,11 @@ func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenera
 	if statusErr != nil {
 		return nil, statusErr
 	}
-	payload := blockPayloadResponse(blk.Payload)
+	payload, err := blockPayloadResponse(blk.Payload)
+	if err != nil {
+		msg := fmt.Sprintf("failed to generate response for block payload for ID %s", id.String())
+		return nil, NewRestError(http.StatusInternalServerError, msg, err)
+	}
 	return payload, nil
 }
 
@@ -126,11 +130,17 @@ func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.
 	var id flow.Identifier
 	// if payload is to be expanded then lookup full block which contains both header and payload
 	if req.expands(ExpandableFieldPayload) {
-		blk, err := blkProvider.getBlock(req.Context())
-		if err != nil {
-			return nil, err
+		blk, statusErr := blkProvider.getBlock(req.Context())
+		if statusErr != nil {
+			return nil, statusErr
 		}
-		responseBlock.Header, responseBlock.Payload = blockHeaderResponse(blk.Header), blockPayloadResponse(blk.Payload)
+		headerResponse := blockHeaderResponse(blk.Header)
+		payloadResponse, err := blockPayloadResponse(blk.Payload)
+		if err != nil {
+			msg := fmt.Sprintf("failed to generate response for block ID %s", id.String())
+			return nil, NewRestError(http.StatusInternalServerError, msg, err)
+		}
+		responseBlock.Header, responseBlock.Payload = headerResponse, payloadResponse
 		id = blk.ID()
 	} else {
 
