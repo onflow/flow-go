@@ -17,7 +17,7 @@ import (
 
 const (
 	defaultMaxBlobSize      = 1 << 20 // 1MiB
-	defaultMaxBlobTreeDepth = 2       // prevents malicious CID from causing download of unbounded amounts of data
+	defaultMaxBlobTreeDepth = 1       // prevents malicious CID from causing download of unbounded amounts of data
 	defaultBlobBatchSize    = 16
 )
 
@@ -322,13 +322,13 @@ func (s *ExecutionDataService) Get(ctx context.Context, rootCid cid.Cid) (*Execu
 
 	var blobTreeNodes int
 
-	for i := uint(0); i < defaultMaxBlobTreeDepth; i++ {
+	for i := uint(0); i <= defaultMaxBlobTreeDepth; i++ {
 		v, err := s.getBlobs(ctx, cids, logger)
 
 		if err != nil {
 			s.metrics.ExecutionDataGetFinished(time.Since(start), false, blobTreeNodes)
 
-			return nil, fmt.Errorf("failed to get level %v of blob tree: %w", i, err)
+			return nil, fmt.Errorf("failed to get level %d of blob tree: %w", i, err)
 		}
 
 		blobTreeNodes += len(cids)
