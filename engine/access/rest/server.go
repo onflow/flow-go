@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/rs/cors"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 
@@ -30,9 +32,21 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 
 	router := initRouter(backend, logger)
 
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedHeaders: []string{"*"},
+		AllowedMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodOptions,
+			http.MethodHead},
+	})
+
 	return &http.Server{
 		Addr:         listenAddress,
-		Handler:      router,
+		Handler:      c.Handler(router),
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
@@ -44,18 +58,16 @@ func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
 	// common middleware for all request
-	v1SubRouter.Use(mux.CORSMethodMiddleware(v1SubRouter)) // sets the Access-Control-Allow-Methods CORS header
 	v1SubRouter.Use(middleware.LoggingMiddleware(logger))
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
-
 
 	var linkGenerator LinkGenerator = NewLinkGeneratorImpl(v1SubRouter)
 
 	for _, r := range routeDefinitions() {
 		h := NewHandler(logger, backend, r.apiHandlerFunc, linkGenerator)
 		v1SubRouter.
-			Methods(r.method, http.MethodOptions).
+			Methods(r.method).
 			Path(r.pattern).
 			Name(r.name).
 			Handler(h)

@@ -114,9 +114,6 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 
 	suite.Run("GetBlockByID for a single ID - happy path", func() {
 
-
-		fmt.Println(suite.rpcEng.RestApiAddress())
-		time.Sleep(time.Hour)
 		collections := unittest.CollectionListFixture(1)
 		block := unittest.BlockWithGuaranteesFixture(
 			unittest.CollectionGuaranteesWithCollectionIDFixture(collections),

@@ -38,12 +38,6 @@ func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandle
 }
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
-	w.Header().Set("Access-Control-Allow-Origin", "*")
-	w.Header().Set("Access-Control-Allow-Headers", "*")
-	if r.Method == http.MethodOptions {
-		return
-	}
-
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 	decoratedRequest := newRequestDecorator(r)
 
