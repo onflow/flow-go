@@ -1,6 +1,7 @@
 package epochmgr
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/state/cluster"
@@ -22,6 +23,7 @@ type EpochComponentsFactory interface {
 		proposal network.Engine,
 		sync network.Engine,
 		hotstuff module.HotStuff,
+		voteAggregator hotstuff.VoteAggregator,
 		err error,
 	)
 }

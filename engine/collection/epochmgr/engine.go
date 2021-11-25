@@ -8,9 +8,12 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
@@ -30,20 +33,42 @@ var ErrUnstakedForEpoch = fmt.Errorf("we are not a staked node in the epoch")
 
 // EpochComponents represents all dependencies for running an epoch.
 type EpochComponents struct {
-	state    cluster.State
-	prop     network.Engine
-	sync     network.Engine
-	hotstuff module.HotStuff
+	*component.ComponentManager
+	state      cluster.State
+	prop       network.Engine
+	sync       network.Engine
+	hotstuff   module.HotStuff
+	aggregator hotstuff.VoteAggregator
 }
 
-// Ready starts all epoch components.
-func (ec *EpochComponents) Ready() <-chan struct{} {
-	return util.AllReady(ec.prop, ec.sync, ec.hotstuff)
-}
+var _ module.Startable = (*EpochComponents)(nil)
+var _ module.ReadyDoneAware = (*EpochComponents)(nil)
 
-// Done stops all epoch components.
-func (ec *EpochComponents) Done() <-chan struct{} {
-	return util.AllDone(ec.prop, ec.sync, ec.hotstuff)
+func NewEpochComponents(
+	state cluster.State,
+	prop network.Engine,
+	sync network.Engine,
+	hotstuff module.HotStuff,
+	aggregator hotstuff.VoteAggregator,
+) *EpochComponents {
+	components := &EpochComponents{
+		state:      state,
+		prop:       prop,
+		sync:       sync,
+		hotstuff:   hotstuff,
+		aggregator: aggregator,
+	}
+
+	builder := component.NewComponentManagerBuilder()
+	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		aggregator.Start(ctx)
+		<-util.AllReady(components.prop, components.sync, components.hotstuff, components.aggregator)
+		ready()
+		<-util.AllDone(components.prop, components.sync, components.hotstuff, components.aggregator)
+	})
+	components.ComponentManager = builder.Build()
+
+	return components
 }
 
 // Engine is the epoch manager, which coordinates the lifecycle of other modules
@@ -53,14 +78,16 @@ func (ec *EpochComponents) Done() <-chan struct{} {
 type Engine struct {
 	events.Noop // satisfy protocol events consumer interface
 
-	unit         *engine.Unit
-	log          zerolog.Logger
-	me           module.Local
-	state        protocol.State
-	pools        *epochs.TransactionPools  // epoch-scoped transaction pools
-	factory      EpochComponentsFactory    // consolidates creating epoch for an epoch
-	voter        module.ClusterRootQCVoter // manages process of voting for next epoch's QC
-	heightEvents events.Heights            // allows subscribing to particular heights
+	unit             *engine.Unit
+	log              zerolog.Logger
+	me               module.Local
+	state            protocol.State
+	pools            *epochs.TransactionPools      // epoch-scoped transaction pools
+	factory          EpochComponentsFactory        // consolidates creating epoch for an epoch
+	voter            module.ClusterRootQCVoter     // manages process of voting for next epoch's QC
+	heightEvents     events.Heights                // allows subscribing to particular heights
+	irrecoverableCtx irrecoverable.SignalerContext // used to start epoch components
+	stopComponents   context.CancelFunc            // used to stop epoch components
 
 	epochs         map[uint64]*EpochComponents // epoch-scoped components per epoch
 	startupTimeout time.Duration               // how long we wait for epoch components to start up
@@ -76,17 +103,22 @@ func New(
 	heightEvents events.Heights,
 ) (*Engine, error) {
 
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
 	e := &Engine{
-		unit:           engine.NewUnit(),
-		log:            log.With().Str("engine", "epochmgr").Logger(),
-		me:             me,
-		state:          state,
-		pools:          pools,
-		voter:          voter,
-		factory:        factory,
-		heightEvents:   heightEvents,
-		epochs:         make(map[uint64]*EpochComponents),
-		startupTimeout: DefaultStartupTimeout,
+		unit:             engine.NewUnit(),
+		log:              log.With().Str("engine", "epochmgr").Logger(),
+		me:               me,
+		state:            state,
+		pools:            pools,
+		voter:            voter,
+		factory:          factory,
+		heightEvents:     heightEvents,
+		epochs:           make(map[uint64]*EpochComponents),
+		startupTimeout:   DefaultStartupTimeout,
+		irrecoverableCtx: signalerCtx,
+		stopComponents:   cancel,
 	}
 
 	// set up epoch-scoped epoch managed by this engine for the current epoch
@@ -120,7 +152,9 @@ func (e *Engine) Ready() <-chan struct{} {
 		epochs := make([]module.ReadyDoneAware, 0, len(e.epochs))
 		for _, epoch := range e.epochs {
 			epochs = append(epochs, epoch)
+			epoch.Start(e.irrecoverableCtx) // start every component using parent ctx
 		}
+		// wait for all engines to start
 		<-util.AllReady(epochs...)
 	}, func() {
 		// check the current phase on startup, in case we are in setup phase
@@ -145,6 +179,7 @@ func (e *Engine) Done() <-chan struct{} {
 		for _, epoch := range e.epochs {
 			epochs = append(epochs, epoch)
 		}
+		e.stopComponents()
 		<-util.AllDone(epochs...)
 	})
 }
@@ -155,17 +190,12 @@ func (e *Engine) Done() <-chan struct{} {
 // Returns ErrUnstakedForEpoch if this node is not staked in the epoch.
 func (e *Engine) createEpochComponents(epoch protocol.Epoch) (*EpochComponents, error) {
 
-	state, prop, sync, hot, err := e.factory.Create(epoch)
+	state, prop, sync, hot, aggregator, err := e.factory.Create(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not setup requirements for epoch (%d): %w", epoch, err)
 	}
 
-	components := &EpochComponents{
-		state:    state,
-		prop:     prop,
-		sync:     sync,
-		hotstuff: hot,
-	}
+	components := NewEpochComponents(state, prop, sync, hot, aggregator)
 	return components, err
 }
 
@@ -305,6 +335,8 @@ func (e *Engine) onEpochSetupPhaseStarted() {
 //
 // CAUTION: the caller MUST acquire the engine lock.
 func (e *Engine) startEpochComponents(counter uint64, components *EpochComponents) error {
+	// start component using parent context
+	components.Start(e.irrecoverableCtx)
 
 	select {
 	case <-components.Ready():
