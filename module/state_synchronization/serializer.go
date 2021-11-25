@@ -12,7 +12,7 @@ import (
 
 // header codes to distinguish between different types of data
 const (
-	CodeRecursiveCIDs = iota
+	CodeRecursiveCIDs = iota + 1
 	CodeExecutionData
 )
 
