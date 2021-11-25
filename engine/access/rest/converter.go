@@ -29,7 +29,7 @@ var MaxAllowedBlockIDs = MaxAllowedIDs
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
 	if !valid {
-		return flow.Identifier{}, errors.New("invalid ID")
+		return flow.Identifier{}, errors.New("invalid ID format")
 	}
 
 	flowID, err := flow.HexStringToIdentifier(id)
@@ -411,10 +411,19 @@ func blockSealResponse(flowSeal *flow.Seal) generated.BlockSeal {
 	}
 }
 
+func idsResponse(ids []flow.Identifier) []string {
+	res := make([]string, len(ids))
+	for x, i := range ids {
+		res[x] = i.String()
+	}
+
+	return res
+}
+
 func collectionResponse(flowCollection *flow.LightCollection) generated.Collection {
 	return generated.Collection{
 		Id:           flowCollection.ID().String(),
-		Transactions: nil, // todo(sideninja) we receive light collection with only transaction ids, should we fetch txs by default?
+		Transactions: idsResponse(flowCollection.Transactions),
 		Links:        nil,
 	}
 }
