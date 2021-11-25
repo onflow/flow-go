@@ -8,16 +8,11 @@ import (
 )
 
 func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, error) {
-	blockID := r.getParam("block_id")
-	blockHeight := r.getParam("block_height")
+	blockID := r.getQuery("block_id")
+	blockHeight := r.getQuery("block_height")
 
 	if blockID != "" && blockHeight != "" {
 		err := fmt.Errorf("can not provide both block ID and block height")
-		return nil, NewBadRequestError(err.Error(), err)
-	}
-
-	if blockID == "" && blockHeight == "" {
-		err := fmt.Errorf("either block ID or block height must be provided")
 		return nil, NewBadRequestError(err.Error(), err)
 	}
 
@@ -37,12 +32,12 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 		return nil, NewBadRequestError(err.Error(), err)
 	}
 
-	var result []byte
 	if blockID == "latest" || blockHeight == "latest" {
-		result, err = backend.ExecuteScriptAtLatestBlock(r.Context(), code, args)
+		result, err := backend.ExecuteScriptAtLatestBlock(r.Context(), code, args)
 		if err != nil {
 			return nil, NewBadRequestError(err.Error(), err)
 		}
+		return result, nil
 	}
 
 	if blockID != "" {
@@ -51,10 +46,12 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 			return nil, NewBadRequestError(err.Error(), err)
 		}
 
-		result, err = backend.ExecuteScriptAtBlockID(r.Context(), id, code, args)
+		result, err := backend.ExecuteScriptAtBlockID(r.Context(), id, code, args)
 		if err != nil {
 			return nil, NewBadRequestError(err.Error(), err)
 		}
+
+		return result, nil
 	}
 
 	if blockHeight != "" {
@@ -63,11 +60,16 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 			return nil, NewBadRequestError(err.Error(), err)
 		}
 
-		result, err = backend.ExecuteScriptAtBlockHeight(r.Context(), height, code, args)
+		result, err := backend.ExecuteScriptAtBlockHeight(r.Context(), height, code, args)
 		if err != nil {
 			return nil, NewBadRequestError(err.Error(), err)
 		}
+
+		return result, nil
 	}
 
-	return result, nil
+	return nil, NewBadRequestError(
+		err.Error(),
+		fmt.Errorf("either block ID or block height must be provided"),
+	)
 }
