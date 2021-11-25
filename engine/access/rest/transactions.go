@@ -6,8 +6,7 @@ import (
 )
 
 // getTransactionByID gets a transaction by requested ID.
-func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
-
+func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := r.id()
 	if err != nil {
 		return nil, NewBadRequestError("invalid ID", err)
@@ -21,7 +20,7 @@ func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenera
 	return transactionResponse(tx, link), nil
 }
 
-func getTransactionResultByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+func getTransactionResultByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := r.id()
 	if err != nil {
 		return nil, NewBadRequestError("invalid ID", err)
@@ -36,7 +35,7 @@ func getTransactionResultByID(r *requestDecorator, backend access.API, link Link
 }
 
 // createTransaction creates a new transaction from provided payload.
-func createTransaction(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+func createTransaction(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 
 	var txBody generated.TransactionsBody
 	err := r.bodyAs(&txBody)

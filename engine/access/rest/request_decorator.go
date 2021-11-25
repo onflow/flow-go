@@ -95,17 +95,9 @@ func (rd *requestDecorator) bodyAs(dst interface{}) error {
 }
 
 func (rd *requestDecorator) ids() ([]flow.Identifier, error) {
-	vars := mux.Vars(rd.Request)
-	return toIDs(vars["id"])
+	return toIDs(rd.getParam("id"))
 }
 
 func (rd *requestDecorator) id() (flow.Identifier, error) {
-	ids, err := rd.ids()
-	if err != nil {
-		return flow.Identifier{}, err
-	}
-	if len(ids) != 1 {
-		return flow.Identifier{}, fmt.Errorf("invalid number of IDs")
-	}
-	return ids[0], nil
+	return toID(rd.getParam("id"))
 }

@@ -18,7 +18,7 @@ const ExpandableFieldPayload = "payload"
 const ExpandableExecutionResult = "execution_result"
 
 // getBlocksByID gets blocks by provided ID or collection of IDs.
-func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 
 	ids, err := r.ids()
 	if err != nil {
@@ -38,7 +38,7 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 	return blocks, nil
 }
 
-func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	height := r.getParam("height")
 	startHeight := r.getParam("start_height")
 	endHeight := r.getParam("end_height")
@@ -103,7 +103,7 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 }
 
 // getBlockPayloadByID gets block payload by ID
-func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, StatusError) {
+func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, error) {
 
 	id, err := req.id()
 	if err != nil {
@@ -119,7 +119,7 @@ func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenera
 	return payload, nil
 }
 
-func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.API, link LinkGenerator) (*generated.Block, StatusError) {
+func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.API, link LinkGenerator) (*generated.Block, error) {
 	var responseBlock = new(generated.Block)
 	responseBlock.Expandable = new(generated.BlockExpandable)
 

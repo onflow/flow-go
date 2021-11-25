@@ -4,15 +4,15 @@ import (
 	"github.com/onflow/flow-go/access"
 )
 
-func getCollectionByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+func getCollectionByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := r.id()
 	if err != nil {
-		return nil, NewBadRequestError("invalid ID", err)
+		return nil, NewBadRequestError(err.Error(), err)
 	}
 
 	collection, err := backend.GetCollectionByID(r.Context(), id)
 	if err != nil {
-		return nil, NewBadRequestError("transaction fetching error", err)
+		return nil, err
 	}
 
 	return collectionResponse(collection), nil

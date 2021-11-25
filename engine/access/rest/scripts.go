@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
-func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, StatusError) {
+func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, error) {
 	blockID := r.getParam("block_id")
 	blockHeight := r.getParam("block_height")
 

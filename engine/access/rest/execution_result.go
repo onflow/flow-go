@@ -11,7 +11,7 @@ import (
 )
 
 // getExecutionResultByID gets Execution Result payload by ID
-func getExecutionResultByID(req *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+func getExecutionResultByID(req *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 
 	id, err := req.id()
 	if err != nil {
@@ -26,7 +26,7 @@ func getExecutionResultByID(req *requestDecorator, backend access.API, link Link
 	return executionResult, nil
 }
 
-func executionResultLookup(ctx context.Context, id flow.Identifier, backend access.API, linkGenerator LinkGenerator) (*generated.ExecutionResult, StatusError) {
+func executionResultLookup(ctx context.Context, id flow.Identifier, backend access.API, linkGenerator LinkGenerator) (*generated.ExecutionResult, error) {
 	executionResult, err := backend.GetExecutionResultForBlockID(ctx, id)
 	if err != nil {
 		return nil, idLookupError(&id, "execution result", err)
