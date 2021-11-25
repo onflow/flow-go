@@ -238,13 +238,17 @@ func toScriptArgs(script generated.ScriptsBody) ([][]byte, error) {
 	// todo(sideninja) validate
 	args := make([][]byte, len(script.Arguments))
 	for i, a := range script.Arguments {
-		args[i] = []byte(a)
+		arg, err := fromBase64(a)
+		if err != nil {
+			return nil, err
+		}
+		args[i] = arg
 	}
 	return args, nil
 }
 
 func toScriptSource(script generated.ScriptsBody) ([]byte, error) {
-	return []byte(script.Script), nil
+	return fromBase64(script.Script)
 }
 
 // Response section - converting flow models to response models.
