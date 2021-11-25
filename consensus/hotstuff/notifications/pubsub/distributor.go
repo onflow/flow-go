@@ -16,7 +16,7 @@ type Distributor struct {
 	lock        sync.RWMutex
 }
 
-var _ hotstuff.Consumer = &Distributor{}
+var _ hotstuff.Consumer = (*Distributor)(nil)
 
 func (p *Distributor) OnEventProcessed() {
 	p.lock.RLock()

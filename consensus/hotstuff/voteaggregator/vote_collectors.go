@@ -22,7 +22,7 @@ type VoteCollectors struct {
 	createCollector NewCollectorFactoryMethod         // factory method for creating collectors
 }
 
-var _ hotstuff.VoteCollectors = &VoteCollectors{}
+var _ hotstuff.VoteCollectors = (*VoteCollectors)(nil)
 
 func NewVoteCollectors(lowestView uint64, factoryMethod NewCollectorFactoryMethod) *VoteCollectors {
 	return &VoteCollectors{

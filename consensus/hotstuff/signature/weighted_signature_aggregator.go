@@ -27,7 +27,7 @@ type WeightedSignatureAggregator struct {
 	lock         sync.RWMutex                              // lock for atomic updates to totalWeight and collectedIDs
 }
 
-var _ hotstuff.WeightedSignatureAggregator = &WeightedSignatureAggregator{}
+var _ hotstuff.WeightedSignatureAggregator = (*WeightedSignatureAggregator)(nil)
 
 // NewWeightedSignatureAggregator returns a weighted aggregator initialized with a list of flow
 // identities, their respective public keys, a message and a domain separation tag. The identities
