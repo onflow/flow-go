@@ -168,8 +168,8 @@ func (s *JointFeldmanState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	// check failing dkg
 	if disqualifiedTotal > s.threshold || s.size-disqualifiedTotal <= s.threshold {
 		return nil, nil, nil,
-			fmt.Errorf(
-				"DKG failed because the diqualified nodes number is high: %d disqualified, threshold is %d, size is %d",
+			dkgFailureErrorf(
+				"Joint-Feldman failed because the diqualified nodes number is high: %d disqualified, threshold is %d, size is %d",
 				disqualifiedTotal, s.threshold, s.size)
 	}
 

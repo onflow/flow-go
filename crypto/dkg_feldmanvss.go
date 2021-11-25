@@ -105,7 +105,7 @@ func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	}
 	s.running = false
 	if !s.validKey {
-		return nil, nil, nil, errors.New("keys are not correct")
+		return nil, nil, nil, dkgFailureErrorf("received private key is invalid")
 	}
 	// private key of the current node
 	x := newPrKeyBLSBLS12381(&s.x)

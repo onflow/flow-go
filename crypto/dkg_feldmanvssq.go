@@ -151,7 +151,7 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	// If the leader is disqualified, all keys are ignored
 	// otherwise, the keys are valid
 	if s.disqualified {
-		return nil, nil, nil, errors.New("leader is disqualified")
+		return nil, nil, nil, dkgFailureErrorf("leader is disqualified")
 	}
 
 	// private key of the current node
