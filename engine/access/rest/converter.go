@@ -26,6 +26,14 @@ const MaxAllowedHeights = 50
 
 var MaxAllowedBlockIDs = MaxAllowedIDs
 
+func toBase64(byteValue []byte) string {
+	return base64.StdEncoding.EncodeToString(byteValue)
+}
+
+func fromBase64(bytesStr string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(bytesStr)
+}
+
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
 	if !valid {
@@ -113,7 +121,10 @@ func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
 }
 
 func toSignature(signature string) ([]byte, error) {
-	signatureBytes := []byte(signature)
+	signatureBytes, err := fromBase64(signature)
+	if err != nil {
+		return nil, err
+	}
 	if len(signatureBytes) > maxSignatureLength {
 		return nil, errors.New("signature length invalid")
 	}
@@ -160,10 +171,14 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		return flow.TransactionBody{}, fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArgumentsCnt)
 	}
 
+	// script arguments come in as a base64 encoded strings, decode base64 back to a string here
 	args := make([][]byte, argLen)
 	for _, arg := range tx.Arguments {
-		// todo validate
-		args = append(args, []byte(arg))
+		decodedArg, err := fromBase64(arg)
+		if err != nil {
+			return flow.TransactionBody{}, err
+		}
+		args = append(args, decodedArg)
 	}
 
 	proposal, err := toProposalKey(tx.ProposalKey)
@@ -200,9 +215,15 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		return flow.TransactionBody{}, err
 	}
 
+	// script comes in as a base64 encoded string, decode base64 back to a string here
+	script, err := fromBase64(tx.Script)
+	if err != nil {
+		return flow.TransactionBody{}, err
+	}
+
 	return flow.TransactionBody{
 		ReferenceBlockID:   flow.Identifier{},
-		Script:             []byte(tx.Script),
+		Script:             script,
 		Arguments:          args,
 		GasLimit:           uint64(tx.GasLimit),
 		ProposalKey:        proposal,
@@ -217,13 +238,17 @@ func toScriptArgs(script generated.ScriptsBody) ([][]byte, error) {
 	// todo(sideninja) validate
 	args := make([][]byte, len(script.Arguments))
 	for i, a := range script.Arguments {
-		args[i] = []byte(a)
+		arg, err := fromBase64(a)
+		if err != nil {
+			return nil, err
+		}
+		args[i] = arg
 	}
 	return args, nil
 }
 
 func toScriptSource(script generated.ScriptsBody) ([]byte, error) {
-	return []byte(script.Script), nil
+	return fromBase64(script.Script)
 }
 
 // Response section - converting flow models to response models.
@@ -244,7 +269,7 @@ func transactionSignatureResponse(signatures []flow.TransactionSignature) []gene
 				Address:     sig.Address.String(),
 				SignerIndex: int32(sig.SignerIndex),
 				KeyIndex:    int32(sig.KeyIndex),
-				Signature:   string(sig.Signature),
+				Signature:   toBase64(sig.Signature),
 			},
 		)
 	}
@@ -255,7 +280,7 @@ func transactionSignatureResponse(signatures []flow.TransactionSignature) []gene
 func transactionResponse(tx *flow.TransactionBody, link LinkGenerator) *generated.Transaction {
 	var args []string
 	for _, arg := range tx.Arguments {
-		args = append(args, string(arg))
+		args = append(args, toBase64(arg))
 	}
 
 	var auths []string
@@ -265,7 +290,7 @@ func transactionResponse(tx *flow.TransactionBody, link LinkGenerator) *generate
 
 	return &generated.Transaction{
 		Id:                 tx.ID().String(),
-		Script:             string(tx.Script),
+		Script:             toBase64(tx.Script),
 		Arguments:          args,
 		ReferenceBlockId:   tx.ReferenceBlockID.String(),
 		GasLimit:           int32(tx.GasLimit), // todo(sideninja) make sure this is ok
@@ -351,29 +376,25 @@ func blockLink(id flow.Identifier, link LinkGenerator) *generated.Links {
 	}
 }
 
-func blockResponse(flowBlock *flow.Block, link LinkGenerator) *generated.Block {
-	return &generated.Block{
-		Header:  blockHeaderResponse(flowBlock.Header),
-		Payload: blockPayloadResponse(flowBlock.Payload),
-		Links:   blockLink(flowBlock.ID(), link),
-	}
-}
-
 func blockHeaderResponse(flowHeader *flow.Header) *generated.BlockHeader {
 	return &generated.BlockHeader{
 		Id:                   flowHeader.ID().String(),
 		ParentId:             flowHeader.ParentID.String(),
 		Height:               int32(flowHeader.Height),
 		Timestamp:            flowHeader.Timestamp,
-		ParentVoterSignature: fmt.Sprint(flowHeader.ParentVoterSigData),
+		ParentVoterSignature: toBase64(flowHeader.ParentVoterSigData),
 	}
 }
 
-func blockPayloadResponse(flowPayload *flow.Payload) *generated.BlockPayload {
+func blockPayloadResponse(flowPayload *flow.Payload) (*generated.BlockPayload, error) {
+	blockSealResp, err := blockSealsResponse(flowPayload.Seals)
+	if err != nil {
+		return nil, err
+	}
 	return &generated.BlockPayload{
 		CollectionGuarantees: collectionGuaranteesResponse(flowPayload.Guarantees),
-		BlockSeals:           blockSealsResponse(flowPayload.Seals),
-	}
+		BlockSeals:           blockSealResp,
+	}, nil
 }
 
 func collectionGuaranteesResponse(flowCollGuarantee []*flow.CollectionGuarantee) []generated.CollectionGuarantee {
@@ -392,23 +413,58 @@ func collectionGuaranteeResponse(flowCollGuarantee *flow.CollectionGuarantee) ge
 	return generated.CollectionGuarantee{
 		CollectionId: flowCollGuarantee.CollectionID.String(),
 		SignerIds:    signerIDs,
-		Signature:    base64.StdEncoding.EncodeToString(flowCollGuarantee.Signature.Bytes()),
+		Signature:    toBase64(flowCollGuarantee.Signature.Bytes()),
 	}
 }
 
-func blockSealsResponse(flowSeals []*flow.Seal) []generated.BlockSeal {
+func blockSealsResponse(flowSeals []*flow.Seal) ([]generated.BlockSeal, error) {
 	seals := make([]generated.BlockSeal, len(flowSeals))
 	for i, seal := range flowSeals {
-		seals[i] = blockSealResponse(seal)
+		sealResp, err := blockSealResponse(seal)
+		if err != nil {
+			return []generated.BlockSeal{}, err
+		}
+		seals[i] = sealResp
 	}
-	return seals
+	return seals, nil
 }
 
-func blockSealResponse(flowSeal *flow.Seal) generated.BlockSeal {
-	return generated.BlockSeal{
-		BlockId:  flowSeal.BlockID.String(),
-		ResultId: flowSeal.ResultID.String(),
+func blockSealResponse(flowSeal *flow.Seal) (generated.BlockSeal, error) {
+
+	var aggregatedApprovalSignatures []generated.AggregatedSignature
+	for _, signature := range flowSeal.AggregatedApprovalSigs {
+
+		var verifierSignatures []string
+		for _, verifierSignature := range signature.VerifierSignatures {
+			verifierSignatures = append(verifierSignatures, toBase64(verifierSignature.Bytes()))
+		}
+		var signerIDs []string
+		for _, signerID := range signature.SignerIDs {
+			signerIDs = append(signerIDs, signerID.String())
+		}
+
+		aggregatedApprovalSignature := generated.AggregatedSignature{
+			VerifierSignatures: verifierSignatures,
+			SignerIds:          signerIDs,
+		}
+		aggregatedApprovalSignatures = append(aggregatedApprovalSignatures, aggregatedApprovalSignature)
 	}
+
+	finalState := ""
+	if len(flowSeal.FinalState) > 0 {
+		finalStateBytes, err := flowSeal.FinalState.MarshalJSON()
+		if err != nil {
+			return generated.BlockSeal{}, nil
+		}
+		finalState = string(finalStateBytes)
+	}
+
+	return generated.BlockSeal{
+		BlockId:                      flowSeal.BlockID.String(),
+		ResultId:                     flowSeal.ResultID.String(),
+		FinalState:                   finalState,
+		AggregatedApprovalSignatures: aggregatedApprovalSignatures,
+	}, nil
 }
 
 func collectionResponse(flowCollection *flow.LightCollection) generated.Collection {

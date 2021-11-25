@@ -18,10 +18,12 @@ const selectQueryParam = "select"
 func commonQueryParamMiddleware(queryParamName string) mux.MiddlewareFunc {
 	return func(handler http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			if values, ok := req.URL.Query()[queryParamName]; ok {
-				values := strings.Split(values[0], ",")
-				// save the query param value in the request context
-				req = addRequestAttribute(req, queryParamName, values)
+			if value, ok := req.URL.Query()[queryParamName]; ok {
+				if len(value) > 0 && len(value[0]) > 0 {
+					values := strings.Split(value[0], ",")
+					// save the query param value in the request context
+					req = addRequestAttribute(req, queryParamName, values)
+				}
 			}
 			handler.ServeHTTP(w, req)
 		})
