@@ -2,10 +2,9 @@ package factories
 
 import (
 	"fmt"
-	"github.com/gammazero/workerpool"
-	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus"
@@ -16,6 +15,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"

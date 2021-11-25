@@ -6,16 +6,20 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/model/flow"
@@ -54,6 +58,7 @@ type Node struct {
 	compliance *compliance.Engine
 	sync       *synceng.Engine
 	hot        module.HotStuff
+	aggregator hotstuff.VoteAggregator
 	state      *bprotocol.MutableState
 	headers    *storage.Headers
 	net        *Network
@@ -212,17 +217,55 @@ func createNode(
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
 
-	// initialize the persister
-	persist := persister.New(db, rootHeader.ChainID)
-
 	prov := &mocknetwork.Engine{}
 	prov.On("SubmitLocal", mock.Anything).Return(nil)
 
 	syncCore, err := synccore.New(log, synccore.DefaultConfig())
 	require.NoError(t, err)
 
+	hotstuffModules := &consensus.HotstuffModules{
+		Forks:                nil,
+		Validator:            nil,
+		Notifier:             notifier,
+		Committee:            committee,
+		Signer:               signer,
+		Persist:              persister.New(db, rootHeader.ChainID), // initialize the persister
+		QCCreatedDistributor: pubsub.NewQCCreatedDistributor(),
+	}
+
+	hotstuffModules, err = consensus.InitForks(rootHeader, headersDB, final, hotstuffModules, rootHeader, rootQC)
+	require.NoError(t, err)
+
+	started, err := hotstuffModules.Persist.GetStarted()
+	require.NoError(t, err)
+
+	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
+
+	workerPool := workerpool.New(2)
+	factoryMethod := func(view uint64) (hotstuff.VoteCollector, error) {
+		return votecollector.NewStateMachine(view, log, workerPool, notifier, voteProcessorFactory.Create), nil
+	}
+
+	voteCollectors := voteaggregator.NewVoteCollectors(started, factoryMethod)
+
+	hotstuffModules.Aggregator, err = voteaggregator.NewVoteAggregator(log, notifier, started, voteCollectors)
+	require.NoError(t, err)
+
 	// initialize the compliance engine
-	compCore, err := compliance.NewCore(log, metrics, tracer, metrics, metrics, cleaner, headersDB, payloadsDB, fullState, cache, syncCore)
+	compCore, err := compliance.NewCore(
+		log,
+		metrics,
+		tracer,
+		metrics,
+		metrics,
+		cleaner,
+		headersDB,
+		payloadsDB,
+		fullState,
+		cache,
+		syncCore,
+		hotstuffModules.Aggregator,
+	)
 	require.NoError(t, err)
 
 	comp, err := compliance.NewEngine(log, net, me, prov, compCore)
@@ -252,11 +295,16 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	pending := []*flow.Header{}
 	// initialize the block finalizer
-	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
-		committee, build, final, persist, signer, comp, rootHeader,
-		rootQC, rootHeader, pending, consensus.WithInitialTimeout(hotstuffTimeout), consensus.WithMinTimeout(hotstuffTimeout))
+	hot, err := consensus.NewParticipant(
+		log,
+		metrics,
+		build,
+		comp,
+		hotstuffModules,
+		consensus.WithInitialTimeout(hotstuffTimeout),
+		consensus.WithMinTimeout(hotstuffTimeout),
+	)
 
 	require.NoError(t, err)
 
@@ -266,6 +314,7 @@ func createNode(
 	node.sync = sync
 	node.state = fullState
 	node.hot = hot
+	node.aggregator = hotstuffModules.Aggregator
 	node.headers = headersDB
 	node.net = net
 	node.log = log

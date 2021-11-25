@@ -2,7 +2,6 @@ package consensus
 
 import (
 	"fmt"
-	validatorImpl "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"time"
 
 	"github.com/rs/zerolog"
@@ -17,6 +16,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	validatorImpl "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voter"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"

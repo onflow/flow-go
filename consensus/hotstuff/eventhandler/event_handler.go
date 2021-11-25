@@ -1,3 +1,4 @@
+//nolint
 package eventhandler
 
 import (
@@ -10,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 // EventHandler is the main handler for individual events that trigger state transition.
@@ -96,6 +96,7 @@ func (e *EventHandler) OnReceiveVote(vote *model.Vote) error {
 // It is assumed that the block proposal is incorporated. (its parent can be found
 // in the forks)
 func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
+	panic("to be deleted")
 
 	block := proposal.Block
 	curView := e.paceMaker.CurView()
@@ -145,8 +146,8 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return fmt.Errorf("cannot add block to fork (%x): %w", block.BlockID, err)
 	}
 
-	// store the proposer's vote in voteAggregator
-	stored := e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
+	//// store the proposer's vote in voteAggregator
+	//stored := e.voteAggregator.StoreProposerVote(proposal.ProposerVote())
 
 	// if the block is for the current view, then process the current block
 	if block.View == curView {
@@ -167,8 +168,8 @@ func (e *EventHandler) OnReceiveProposal(proposal *model.Proposal) error {
 		return fmt.Errorf("failed processing qc from block: %w", err)
 	}
 
-	newView := e.paceMaker.CurView() // in case we skipped ahead
-	log.Debug().Uint64("new_view", newView).Bool("proposer_vote_stored", stored).Msg("block proposal for non-current view processed")
+	//newView := e.paceMaker.CurView() // in case we skipped ahead
+	//log.Debug().Uint64("new_view", newView).Bool("proposer_vote_stored", stored).Msg("block proposal for non-current view processed")
 
 	return nil
 }
@@ -330,7 +331,8 @@ func (e *EventHandler) startNewView() error {
 // events are only for HotStuff-External components. The interaction of the HotStuff-internal
 // components is directly handled by the EventHandler.
 func (e *EventHandler) pruneSubcomponents() {
-	e.voteAggregator.PruneByView(e.forks.FinalizedView())
+	panic("to be deleted")
+	//e.voteAggregator.PruneByView(e.forks.FinalizedView())
 }
 
 // processBlockForCurrentView processes the block for the current view.
@@ -467,19 +469,20 @@ func (e *EventHandler) processBlockForCurrentViewIfIsNotNextLeader(block *model.
 // tryBuildQCForBlock checks whether there are enough votes to build a QC for the given block,
 // and process the QC if a QC was built.
 func (e *EventHandler) tryBuildQCForBlock(block *model.Block) error {
-	// if the block is not for the current view, try to build QC from votes for this block
-	qc, built, err := e.voteAggregator.BuildQCOnReceivedBlock(block)
-	if err != nil {
-		return fmt.Errorf("building qc for block (%x) failed: %w", block.BlockID, err)
-	}
-
-	if !built {
-		// if we don't have enough votes to build QC for this block, proceed with block.qc instead
-		qc = block.QC
-	}
-
-	// process the QC
-	return e.processQC(qc)
+	panic("to be deleted")
+	//// if the block is not for the current view, try to build QC from votes for this block
+	//qc, built, err := e.voteAggregator.BuildQCOnReceivedBlock(block)
+	//if err != nil {
+	//	return fmt.Errorf("building qc for block (%x) failed: %w", block.BlockID, err)
+	//}
+	//
+	//if !built {
+	//	// if we don't have enough votes to build QC for this block, proceed with block.qc instead
+	//	qc = block.QC
+	//}
+	//
+	//// process the QC
+	//return e.processQC(qc)
 }
 
 // processVote stores the vote and check whether a QC can be built.
@@ -487,41 +490,42 @@ func (e *EventHandler) tryBuildQCForBlock(block *model.Block) error {
 // It assumes the voting block can be found in forks
 func (e *EventHandler) processVote(vote *model.Vote) error {
 
-	log := e.log.With().
-		Uint64("block_view", vote.View).
-		Hex("block_id", logging.ID(vote.BlockID)).
-		Hex("signer", vote.SignerID[:]).
-		Logger()
-
-	// read the voting block
-	block, found := e.forks.GetBlock(vote.BlockID)
-	if !found {
-		// store the pending vote if voting block is not found.
-		// We don't need to proactively fetch the missing voting block, because the chain compliance layer has acknowledged
-		// the missing block and requested it already.
-		_, err := e.voteAggregator.StorePendingVote(vote)
-		if err != nil {
-			return fmt.Errorf("can not store pending vote: %w", err)
-		}
-		log.Debug().Msg("block for vote not found, caching for later")
-		return nil
-	}
-
-	// if the voting block can be found, we should be able to validate the vote
-	// and check if we can build a QC with it.
-	qc, built, err := e.voteAggregator.StoreVoteAndBuildQC(vote, block)
-	if err != nil {
-		return fmt.Errorf("building qc for block failed: %w", err)
-	}
-	// if we don't have enough votes to build QC for this block:
-	// nothing more to do for processing vote
-	if !built {
-		log.Debug().Msg("insufficient votes for QC, waiting for more")
-		return nil
-	}
-	log.Debug().Msg("enough votes for QC collected")
-
-	return e.processQC(qc)
+	panic("to be deleted")
+	//log := e.log.With().
+	//	Uint64("block_view", vote.View).
+	//	Hex("block_id", logging.ID(vote.BlockID)).
+	//	Hex("signer", vote.SignerID[:]).
+	//	Logger()
+	//
+	//// read the voting block
+	//block, found := e.forks.GetBlock(vote.BlockID)
+	//if !found {
+	//	// store the pending vote if voting block is not found.
+	//	// We don't need to proactively fetch the missing voting block, because the chain compliance layer has acknowledged
+	//	// the missing block and requested it already.
+	//	_, err := e.voteAggregator.StorePendingVote(vote)
+	//	if err != nil {
+	//		return fmt.Errorf("can not store pending vote: %w", err)
+	//	}
+	//	log.Debug().Msg("block for vote not found, caching for later")
+	//	return nil
+	//}
+	//
+	//// if the voting block can be found, we should be able to validate the vote
+	//// and check if we can build a QC with it.
+	//qc, built, err := e.voteAggregator.StoreVoteAndBuildQC(vote, block)
+	//if err != nil {
+	//	return fmt.Errorf("building qc for block failed: %w", err)
+	//}
+	//// if we don't have enough votes to build QC for this block:
+	//// nothing more to do for processing vote
+	//if !built {
+	//	log.Debug().Msg("insufficient votes for QC, waiting for more")
+	//	return nil
+	//}
+	//log.Debug().Msg("enough votes for QC collected")
+	//
+	//return e.processQC(qc)
 }
 
 // processQC stores the QC and check whether the QC will trigger view change.

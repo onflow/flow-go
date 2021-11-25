@@ -2,8 +2,6 @@ package compliance
 
 import (
 	"errors"
-	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
-	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"math/rand"
 	"testing"
 	"time"
@@ -13,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	realModule "github.com/onflow/flow-go/module"

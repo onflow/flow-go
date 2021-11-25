@@ -316,7 +316,8 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.validator = validator.New(in.committee, in.forks, in.verifier)
 
 	// initialize the vote aggregator
-	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.committee, in.validator, in.signer)
+	// TODO: fix creating of vote aggregator when fixing tests
+	//in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.committee, in.validator, in.signer)
 
 	// initialize the voter
 	in.voter = voter.New(in.signer, in.forks, in.persist, in.committee, DefaultVoted())

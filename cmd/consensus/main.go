@@ -6,11 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/gammazero/workerpool"
-	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"path/filepath"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go-sdk/client"
@@ -26,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -645,7 +645,8 @@ func main() {
 				node.Storage.Payloads,
 				mutableState,
 				proposals,
-				syncCore)
+				syncCore,
+				hotstuffModules.Aggregator)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
 			}

@@ -1,12 +1,11 @@
+//nolint
 package eventhandler_test
 
 import (
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -348,21 +347,23 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.validator = NewBlacklistValidator(es.T())
 	es.notifier = &notifications.NoopConsumer{}
 
-	eventhandler, err := eventhandler.New(
-		zerolog.New(os.Stderr),
-		es.paceMaker,
-		es.blockProducer,
-		es.forks,
-		es.persist,
-		es.communicator,
-		es.committee,
-		es.voteAggregator,
-		es.voter,
-		es.validator,
-		es.notifier)
-	require.NoError(es.T(), err)
+	panic("to be deleted")
 
-	es.eventhandler = eventhandler
+	//eventhandler, err := eventhandler.New(
+	//	zerolog.New(os.Stderr),
+	//	es.paceMaker,
+	//	es.blockProducer,
+	//	es.forks,
+	//	es.persist,
+	//	es.communicator,
+	//	es.committee,
+	//	es.voteAggregator,
+	//	es.voter,
+	//	es.validator,
+	//	es.notifier)
+	//require.NoError(es.T(), err)
+
+	es.eventhandler = nil
 
 	es.initView = curView
 	es.endView = curView
