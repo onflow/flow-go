@@ -16,12 +16,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestSecretDBRequirement tests that the DKGKeys constructor will return an
+// TestSecretDBRequirement tests that the BeaconPrivateKeys constructor will return an
 // error if instantiated using a database not marked with the correct type.
 func TestSecretDBRequirement(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		_, err := bstorage.NewDKGKeys(metrics, db)
+		_, err := bstorage.NewBeaconPrivateKeys(metrics, db)
 		require.Error(t, err)
 	})
 }
@@ -29,7 +29,7 @@ func TestSecretDBRequirement(t *testing.T) {
 func TestDKGKeysInsertAndRetrieve(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, bstorage.InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := bstorage.NewDKGKeys(metrics, db)
+		store, err := bstorage.NewBeaconPrivateKeys(metrics, db)
 		require.NoError(t, err)
 
 		rand.Seed(time.Now().UnixNano())

@@ -14,12 +14,12 @@ import (
 // using the database to retrieve the relevant DKG keys.
 type EpochAwareSignerStore struct {
 	epochLookup module.EpochLookup                // used to fetch epoch counter by view
-	keys        storage.DKGKeys                   // used to fetch DKG private key by epoch
+	keys        storage.BeaconPrivateKeys         // used to fetch DKG private key by epoch
 	signers     map[uint64]module.ThresholdSigner // cache of signers by epoch
 }
 
 // NewEpochAwareSignerStore instantiates a new EpochAwareSignerStore
-func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.DKGKeys) *EpochAwareSignerStore {
+func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.BeaconPrivateKeys) *EpochAwareSignerStore {
 	return &EpochAwareSignerStore{
 		epochLookup: epochLookup,
 		keys:        keys,

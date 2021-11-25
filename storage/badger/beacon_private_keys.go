@@ -13,12 +13,12 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-type DKGKeys struct {
+type BeaconPrivateKeys struct {
 	db    *badger.DB
 	cache *Cache
 }
 
-func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) (*DKGKeys, error) {
+func NewBeaconPrivateKeys(collector module.CacheMetrics, db *badger.DB) (*BeaconPrivateKeys, error) {
 
 	err := operation.EnsureSecretDB(db)
 	if err != nil {
@@ -40,7 +40,7 @@ func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) (*DKGKeys, error) 
 		}
 	}
 
-	dkgKeys := &DKGKeys{
+	dkgKeys := &BeaconPrivateKeys{
 		db: db,
 		cache: newCache(collector,
 			metrics.ResourceDKGKey,
@@ -52,11 +52,11 @@ func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) (*DKGKeys, error) 
 	return dkgKeys, nil
 }
 
-func (k *DKGKeys) storeTx(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(tx *transaction.Tx) error {
+func (k *BeaconPrivateKeys) storeTx(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(tx *transaction.Tx) error {
 	return k.cache.PutTx(epochCounter, info)
 }
 
-func (k *DKGKeys) retrieveTx(epochCounter uint64) func(tx *badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
+func (k *BeaconPrivateKeys) retrieveTx(epochCounter uint64) func(tx *badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
 	return func(tx *badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
 		val, err := k.cache.Get(epochCounter)(tx)
 		if err != nil {
@@ -66,11 +66,11 @@ func (k *DKGKeys) retrieveTx(epochCounter uint64) func(tx *badger.Txn) (*encodab
 	}
 }
 
-func (k *DKGKeys) InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) error {
+func (k *BeaconPrivateKeys) InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) error {
 	return operation.RetryOnConflictTx(k.db, transaction.Update, k.storeTx(epochCounter, info))
 }
 
-func (k *DKGKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64) (*encodable.RandomBeaconPrivKey, error) {
+func (k *BeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64) (*encodable.RandomBeaconPrivKey, error) {
 	tx := k.db.NewTransaction(false)
 	defer tx.Discard()
 	return k.retrieveTx(epochCounter)(tx)

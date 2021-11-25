@@ -41,7 +41,7 @@ type ReactorEngine struct {
 	log               zerolog.Logger
 	me                module.Local
 	State             protocol.State
-	keyStorage        storage.DKGKeys
+	keyStorage        storage.BeaconPrivateKeys
 	controller        module.DKGController
 	controllerFactory module.DKGControllerFactory
 	viewEvents        events.Views
@@ -53,7 +53,7 @@ func NewReactorEngine(
 	log zerolog.Logger,
 	me module.Local,
 	state protocol.State,
-	keyStorage storage.DKGKeys,
+	keyStorage storage.BeaconPrivateKeys,
 	controllerFactory module.DKGControllerFactory,
 	viewEvents events.Views,
 ) *ReactorEngine {
