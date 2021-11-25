@@ -172,10 +172,6 @@ func executionDataService(bs network.BlobService) *ExecutionDataService {
 	return NewExecutionDataService(codec, compressor, bs, metrics.NewNoopCollector(), zerolog.Nop())
 }
 
-func assertErrorType(t *testing.T, err error, target interface{}) {
-	assert.ErrorAs(t, err, &target)
-}
-
 func writeBlobTree(t *testing.T, s *serializer, data []byte, bs blockstore.Blockstore, timeout time.Duration) cid.Cid {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
@@ -241,7 +237,8 @@ func TestMalformedData(t *testing.T) {
 	test := func(data []byte) {
 		rootCid := writeBlobTree(t, eds.serializer, data, bs, time.Second)
 		_, err := getExecutionData(eds, rootCid, time.Second)
-		assertErrorType(t, err, new(MalformedDataError))
+		var malformedDataError *MalformedDataError
+		assert.ErrorAs(t, err, &malformedDataError)
 	}
 
 	// random bytes
@@ -265,7 +262,8 @@ func TestOversizedBlob(t *testing.T) {
 		cid, err := putBlob(bs, data, time.Second)
 		require.NoError(t, err)
 		_, err = getExecutionData(eds, cid, time.Second)
-		assertErrorType(t, err, new(BlobSizeLimitExceededError))
+		var blobSizeLimitExceededError *BlobSizeLimitExceededError
+		assert.ErrorAs(t, err, &blobSizeLimitExceededError)
 	}
 
 	// blob of random data
@@ -402,7 +400,8 @@ func TestGetIncompleteData(t *testing.T) {
 		})
 
 	_, err = getExecutionData(eds, rootCid, time.Second)
-	assertErrorType(t, err, new(BlobNotFoundError))
+	var blobNotFoundError *BlobNotFoundError
+	assert.ErrorAs(t, err, &blobNotFoundError)
 }
 
 func createBlobService(ctx irrecoverable.SignalerContext, t *testing.T, ds datastore.Batching, name string, dhtOpts ...dht.Option) (network.BlobService, host.Host) {
