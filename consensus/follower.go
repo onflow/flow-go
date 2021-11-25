@@ -25,7 +25,7 @@ func NewFollower(log zerolog.Logger, committee hotstuff.Committee, headers stora
 		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
 	}
 
-	// initialize the validator
+	// initialize the Validator
 	validator := validator.New(committee, finalizer, verifier)
 
 	// recover the hotstuff state as a follower

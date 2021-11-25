@@ -2,6 +2,7 @@ package hotstuff
 
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/module"
 )
 
 // BlockSigner abstracts the implementation of how a signature of a block or a vote is produced
@@ -26,6 +27,9 @@ type BlockSigner interface {
 // VoteAggregator also detects protocol violation, including invalid votes, double voting etc, and
 // notifies a HotStuff consumer for slashing.
 type VoteAggregator interface {
+	module.ReadyDoneAware
+	module.Startable
+
 	// AddVote verifies and aggregates a vote.
 	// The voting block could either be known or unknown.
 	// If the voting block is unknown, the vote won't be processed until AddBlock is called with the block.
