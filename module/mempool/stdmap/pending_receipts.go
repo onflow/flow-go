@@ -52,18 +52,18 @@ func NewPendingReceipts(headers storage.Headers, limit uint) *PendingReceipts {
 	// See https://github.com/onflow/flow-go/pull/387/files#r574228078
 	r.RegisterEjectionCallbacks(func(entity flow.Entity) {
 		receipt := entity.(*flow.ExecutionReceipt)
-		removeReceipt(receipt, r.entities, r.byPreviousResultID)
+		removeReceipt(receipt, r.backData, r.byPreviousResultID)
 	})
 	return r
 }
 
 func removeReceipt(
 	receipt *flow.ExecutionReceipt,
-	entities map[flow.Identifier]flow.Entity,
+	entities mempool.BackData,
 	byPreviousResultID map[flow.Identifier]receiptsSet) {
 
 	receiptID := receipt.ID()
-	delete(entities, receiptID)
+	entities.Rem(receiptID)
 
 	index := indexByPreviousResultID(receipt)
 	siblings := byPreviousResultID[index]
@@ -129,7 +129,7 @@ func (r *PendingReceipts) Rem(receiptID flow.Identifier) bool {
 		entity, ok := entities[receiptID]
 		if ok {
 			receipt := entity.(*flow.ExecutionReceipt)
-			removeReceipt(receipt, r.entities, r.byPreviousResultID)
+			removeReceipt(receipt, r.backData, r.byPreviousResultID)
 			removed = true
 		}
 		return nil
@@ -215,7 +215,7 @@ func (r *PendingReceipts) removeByHeight(height uint64, entities map[flow.Identi
 	for receiptID := range r.byHeight[height] {
 		entity, ok := entities[receiptID]
 		if ok {
-			removeReceipt(entity.(*flow.ExecutionReceipt), entities, r.byPreviousResultID)
+			removeReceipt(entity.(*flow.ExecutionReceipt), r.backData, r.byPreviousResultID)
 		}
 	}
 	delete(r.byHeight, height)

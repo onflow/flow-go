@@ -72,10 +72,10 @@ func (b *MapBackData) Size() uint {
 }
 
 // All returns all entities from the pool.
-func (b *MapBackData) All() []flow.Entity {
-	entities := make([]flow.Entity, 0, len(b.entities))
-	for _, item := range b.entities {
-		entities = append(entities, item)
+func (b *MapBackData) All() map[flow.Identifier]flow.Entity {
+	entities := make(map[flow.Identifier]flow.Entity)
+	for entityID, entity := range b.entities {
+		entities[entityID] = entity
 	}
 	return entities
 }

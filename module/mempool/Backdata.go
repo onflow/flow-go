@@ -25,7 +25,7 @@ type BackData interface {
 	Size() uint
 
 	// All returns all entities from the pool.
-	All() []flow.Entity
+	All() map[flow.Identifier]flow.Entity
 
 	// Clear removes all entities from the pool.
 	Clear()

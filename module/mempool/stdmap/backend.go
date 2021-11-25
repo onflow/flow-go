@@ -150,7 +150,12 @@ func (b *Backend) All() []flow.Entity {
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)All")
 	//defer binstat.Leave(bs2)
 	defer b.RUnlock()
-	return b.backData.All()
+	all := make([]flow.Entity, 0, b.backData.Size())
+	for _, e := range b.backData.All() {
+		all = append(all, e)
+	}
+
+	return all
 }
 
 // Clear removes all entities from the pool.
@@ -200,7 +205,7 @@ func (b *Backend) reduce() {
 	// this was a loop, but the loop is now in EjectTrueRandomFast()
 	// the ejections are batched, so this call to eject() may not actually
 	// do anything until the batch threshold is reached (currently 128)
-	if len(b.backData.All()) > int(b.guaranteedCapacity) {
+	if b.backData.Size() > b.guaranteedCapacity {
 		// get the key from the eject function
 		// we don't do anything if there is an error
 		if b.batchEject != nil {

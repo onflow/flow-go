@@ -15,7 +15,7 @@ import (
 // collection should be before performing a batch ejection
 const overCapacityThreshold = 128
 
-// [Batch]EjectFunc implements an ejection policy to remove elements when the mempool
+// BatchEjectFunc implements an ejection policy to remove elements when the mempool
 // exceeds its specified capacity. A custom ejection policy can be injected
 // into the memory pool upon creation to change the strategy of eviction.
 // The ejection policy is executed from within the thread that serves the
@@ -38,12 +38,13 @@ type EjectFunc func(b *Backend) (flow.Identifier, flow.Entity, bool)
 // entity set. It will, on average, iterate through half the entities of the set. However,
 // it provides us with a truly evenly distributed random selection.
 func EjectTrueRandom(b *Backend) (flow.Identifier, flow.Entity, bool) {
-	var entityID flow.Identifier
 	var entity flow.Entity
-	var bFound bool = false
+	var entityID flow.Identifier
+
+	bFound := false
 	i := 0
-	n := rand.Intn(len(b.entities))
-	for entityID, entity = range b.entities {
+	n := rand.Intn(int(b.backData.Size()))
+	for entityID, entity = range b.backData.All() {
 		if i == n {
 			bFound = true
 			break
@@ -57,14 +58,14 @@ func EjectTrueRandom(b *Backend) (flow.Identifier, flow.Entity, bool) {
 // threshold size, and will iterate through them and eject unneeded
 // entries if that is the case.  Return values are unused
 func EjectTrueRandomFast(b *Backend) bool {
-	currentSize := len(b.entities)
+	currentSize := b.backData.Size()
 
-	if b.guaranteedCapacity >= uint(currentSize) {
+	if b.guaranteedCapacity >= currentSize {
 		return false
 	}
 	// At this point, we know that currentSize > b.guaranteedCapacity. As
 	// currentSize fits into an int, b.guaranteedCapacity must also fit.
-	overcapacity := currentSize - int(b.guaranteedCapacity)
+	overcapacity := currentSize - b.guaranteedCapacity
 	if overcapacity <= overCapacityThreshold {
 		return false
 	}
@@ -72,7 +73,7 @@ func EjectTrueRandomFast(b *Backend) bool {
 	// Randomly select indices of elements to remove:
 	mapIndices := make([]int, 0, overcapacity)
 	for i := overcapacity; i > 0; i-- {
-		mapIndices = append(mapIndices, rand.Intn(currentSize))
+		mapIndices = append(mapIndices, rand.Intn(int(currentSize)))
 	}
 	sort.Ints(mapIndices) // inplace
 
@@ -82,9 +83,9 @@ func EjectTrueRandomFast(b *Backend) bool {
 	idx := 0                     // index into mapIndices
 	next2Remove := mapIndices[0] // index of the element to be removed next
 	i := 0                       // index into the entities map
-	for entityID, entity := range b.entities {
+	for entityID, entity := range b.backData.All() {
 		if i == next2Remove {
-			delete(b.entities, entityID) // remove entity
+			b.backData.Rem(entityID) // remove entity
 			for _, callback := range b.ejectionCallbacks {
 				callback(entity) // notify callback
 			}
@@ -94,10 +95,10 @@ func EjectTrueRandomFast(b *Backend) bool {
 			// There is a (1 in b.guaranteedCapacity) chance that the
 			// next value in mapIndices is a duplicate. If a duplicate is
 			// found, skip it by incrementing 'idx'
-			for ; idx < overcapacity && next2Remove == mapIndices[idx]; idx++ {
+			for ; idx < int(overcapacity) && next2Remove == mapIndices[idx]; idx++ {
 			}
 
-			if idx == overcapacity {
+			if idx == int(overcapacity) {
 				return true
 			}
 			next2Remove = mapIndices[idx]
@@ -164,17 +165,18 @@ func (q *LRUEjector) Eject(b *Backend) (flow.Identifier, flow.Entity, bool) {
 	// finds the oldest entity
 	oldestSQ := uint64(math.MaxUint64)
 	var oldestID flow.Identifier
-	for id := range b.entities {
+	for id := range b.backData.All() {
 		if sq, ok := q.table[id]; ok {
 			if sq < oldestSQ {
 				oldestID = id
 				oldestSQ = sq
 			}
+
 		}
 	}
 
 	// TODO:  don't do a lookup if it isn't necessary
-	oldestEntity, ok := b.entities[oldestID]
+	oldestEntity, ok := b.backData.ByID(oldestID)
 
 	if !ok {
 		oldestID, oldestEntity, ok = EjectTrueRandom(b)

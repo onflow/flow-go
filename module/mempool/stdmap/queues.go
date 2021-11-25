@@ -35,12 +35,14 @@ func (b *QueuesBackdata) All() []*queue.Queue {
 	entities := b.BackData.All()
 
 	queues := make([]*queue.Queue, len(entities))
-	for i, entity := range entities {
+	i := 0
+	for _, entity := range entities {
 		queue, ok := entity.(*queue.Queue)
 		if !ok {
 			panic(fmt.Sprintf("invalid entity in queue mempool (%T)", entity))
 		}
 		queues[i] = queue
+		i++
 	}
 	return queues
 }

@@ -195,7 +195,7 @@ func TestLRUEjector_UntrackEject(t *testing.T) {
 	// untracks the oldest item
 	ejector.Untrack(items[0])
 
-	bkend.entities = entities
+	bkend.backData = &MapBackData{entities: entities}
 
 	// next ejectable item should be the second oldest item
 	id, _, _ := ejector.Eject(&bkend)
@@ -222,7 +222,7 @@ func TestLRUEjector_EjectAll(t *testing.T) {
 		items[i] = id
 	}
 
-	bkend.entities = entities
+	bkend.backData = &MapBackData{entities: entities}
 
 	// ejects one by one
 	for i := 0; i < size; i++ {
