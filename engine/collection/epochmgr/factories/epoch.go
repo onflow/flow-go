@@ -120,7 +120,13 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
-	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads)
+	hotstuffModules, err := factory.hotstuff.CreateModules(epoch, cluster, state, headers, payloads, finalizer)
+	if err != nil {
+		err = fmt.Errorf("could not create consensus modules: %w", err)
+		return
+	}
+
+	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads, hotstuffModules.Aggregator)
 	if err != nil {
 		err = fmt.Errorf("could not create proposal engine: %w", err)
 		return
@@ -133,14 +139,10 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 	hotstuff, err = factory.hotstuff.Create(
-		epoch,
 		cluster,
-		state,
-		headers,
-		payloads,
 		builder,
-		finalizer,
 		proposalEng,
+		hotstuffModules,
 	)
 	if err != nil {
 		err = fmt.Errorf("could not create hotstuff: %w", err)

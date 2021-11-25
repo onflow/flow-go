@@ -385,7 +385,6 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 }
 
 func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
-
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	vote := messages.BlockVote{

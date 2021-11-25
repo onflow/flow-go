@@ -59,16 +59,12 @@ func NewHotStuffFactory(
 	return factory, nil
 }
 
-func (f *HotStuffFactory) Create(
-	epoch protocol.Epoch,
+func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	cluster protocol.Cluster,
 	clusterState cluster.State,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
-	builder module.Builder,
-	updater module.Finalizer,
-	communicator hotstuff.Communicator,
-) (module.HotStuff, error) {
+	updater module.Finalizer) (*consensus.HotstuffModules, error) {
 
 	// setup metrics/logging with the new chain ID
 	metrics := f.createMetrics(cluster.ChainID())
@@ -76,16 +72,10 @@ func (f *HotStuffFactory) Create(
 	notifier.AddConsumer(notifications.NewLogConsumer(f.log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
 	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID()))
-	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
 
 	hotstuffModules := &consensus.HotstuffModules{
-		Forks:                nil,
-		Validator:            nil,
 		Notifier:             notifier,
-		Committee:            nil,
-		Signer:               nil,
 		Persist:              persister.New(f.db, cluster.ChainID()),
-		Aggregator:           nil,
 		QCCreatedDistributor: pubsub.NewQCCreatedDistributor(),
 	}
 
@@ -127,6 +117,20 @@ func (f *HotStuffFactory) Create(
 	if err != nil {
 		return nil, err
 	}
+
+	return hotstuffModules, nil
+}
+
+func (f *HotStuffFactory) Create(
+	cluster protocol.Cluster,
+	builder module.Builder,
+	communicator hotstuff.Communicator,
+	hotstuffModules *consensus.HotstuffModules,
+) (module.HotStuff, error) {
+
+	// setup metrics/logging with the new chain ID
+	metrics := f.createMetrics(cluster.ChainID())
+	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
 
 	participant, err := consensus.NewParticipant(
 		f.log,

@@ -236,6 +236,9 @@ func createNode(
 	hotstuffModules, err = consensus.InitForks(rootHeader, headersDB, final, hotstuffModules, rootHeader, rootQC)
 	require.NoError(t, err)
 
+	hotstuffModules = consensus.InitValidator(metrics, hotstuffModules)
+	require.NoError(t, err)
+
 	started, err := hotstuffModules.Persist.GetStarted()
 	require.NoError(t, err)
 
