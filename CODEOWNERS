@@ -11,10 +11,9 @@
 /cmd/execution/** @m4ksio @ramtinms
 /engine/execution/** @m4ksio @ramtinms
 
-# Observation Stream
-/cmd/observation/** @psiemens
-/engine/observation/** @psiemens
-/protobuf/services/observation/** @psiemens
+# Access Stream
+/cmd/access/** @vishalchangrani
+/engine/access/** @vishalchangrani
 
 # Verification Stream
 /cmd/verification/** @ramtinms @yhassanzadeh13

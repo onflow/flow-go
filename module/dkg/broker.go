@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/retrymiddleware"
 )
 
 const (
@@ -28,6 +29,8 @@ const (
 	// retryMaxRead is the max number of times the broker will attempt to read messages
 	retryMaxRead = 3
 
+	// retryMaxConsecutiveFailures is the number of consecutive failures allowed before we attempt with fallback client
+	retryMaxConsecutiveFailures = 2
 	// retryDuration is the initial duration to wait between retries for all retryable
 	// requests - increases exponentially for subsequent retries
 	retryDuration = time.Second
@@ -41,19 +44,19 @@ const (
 // be used in conjunction with the DKG MessagingEngine for private messages, and
 // with the DKG smart-contract for broadcast messages.
 type Broker struct {
-	log                     zerolog.Logger
-	unit                    *engine.Unit
-	dkgInstanceID           string                     // unique identifier of the current dkg run (prevent replay attacks)
-	committee               flow.IdentityList          // IDs of DKG members
-	me                      module.Local               // used for signing bcast messages
-	myIndex                 int                        // index of this instance in the committee
-	dkgContractClients      []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
-	activeDKGContractClient int                        // index of the dkg contract client that is currently in use
-	tunnel                  *BrokerTunnel              // channels through which the broker communicates with the network engine
-	privateMsgCh            chan messages.DKGMessage   // channel to forward incoming private messages to consumers
-	broadcastMsgCh          chan messages.DKGMessage   // channel to forward incoming broadcast messages to consumers
-	messageOffset           uint                       // offset for next broadcast messages to fetch
-	shutdownCh              chan struct{}              // channel to stop the broker from listening
+	log                       zerolog.Logger
+	unit                      *engine.Unit
+	dkgInstanceID             string                     // unique identifier of the current dkg run (prevent replay attacks)
+	committee                 flow.IdentityList          // IDs of DKG members
+	me                        module.Local               // used for signing bcast messages
+	myIndex                   int                        // index of this instance in the committee
+	dkgContractClients        []module.DKGContractClient // array of clients to communicate with the DKG smart contract in priority order for fallbacks during retries
+	lastSuccessfulClientIndex int                        // index of the contract client that was last successful during retries
+	tunnel                    *BrokerTunnel              // channels through which the broker communicates with the network engine
+	privateMsgCh              chan messages.DKGMessage   // channel to forward incoming private messages to consumers
+	broadcastMsgCh            chan messages.DKGMessage   // channel to forward incoming broadcast messages to consumers
+	messageOffset             uint                       // offset for next broadcast messages to fetch
+	shutdownCh                chan struct{}              // channel to stop the broker from listening
 
 	broadcasts    uint       // broadcasts counts the number of successful broadcasts
 	broadcastLock sync.Mutex // protects access to broadcasts count variable
@@ -91,21 +94,6 @@ func NewBroker(
 	return b
 }
 
-// dkgContractClient returns active dkg contract client
-func (b *Broker) dkgContractClient() module.DKGContractClient {
-	return b.dkgContractClients[b.activeDKGContractClient]
-}
-
-func (b *Broker) updateActiveDKGContractClient() {
-	// if we have reached the end of our array start from beginning
-	if b.activeDKGContractClient == len(b.dkgContractClients)-1 {
-		b.activeDKGContractClient = 0
-		return
-	}
-
-	b.activeDKGContractClient++
-}
-
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 Implement DKGBroker
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
@@ -132,7 +120,6 @@ func (b *Broker) PrivateSend(dest int, data []byte) {
 // Broadcast signs and broadcasts a message to all participants.
 func (b *Broker) Broadcast(data []byte) {
 	b.unit.Launch(func() {
-
 		// NOTE: We're counting the number of times the underlying DKG
 		// requested a broadcast so we can detect an unhappy path. Thus incrementing
 		// broadcasts before we perform the broadcasts is okay.
@@ -157,23 +144,27 @@ func (b *Broker) Broadcast(data []byte) {
 			b.log.Fatal().Err(err).Msg("create retry mechanism")
 		}
 		maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
-		backoff := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
+		withJitter := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
+
+		clientIndex, dkgContractClient := b.getInitialContractClient()
+		onMaxConsecutiveRetries := func(totalAttempts int) {
+			clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
+			b.log.Warn().Msgf("broadcast: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
+		}
+		afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
 
 		attempts := 1
-		err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
-			err := b.dkgContractClient().Broadcast(bcastMsg)
+		err = retry.Do(context.Background(), afterConsecutiveFailures, func(ctx context.Context) error {
+			err := dkgContractClient.Broadcast(bcastMsg)
 			if err != nil {
 				b.log.Error().Err(err).Msgf("error broadcasting, retrying (%d)", attempts)
-
-				// retry with next fallback client after 2 failed attempts
-				if attempts%2 == 0 {
-					b.updateActiveDKGContractClient()
-					b.log.Warn().Msgf("broadcast: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.activeDKGContractClient)
-				}
+				attempts++
+				return retry.RetryableError(err)
 			}
 
-			attempts++
-			return retry.RetryableError(err)
+			// update our last successful client index for future calls
+			b.updateLastSuccessfulClient(clientIndex)
+			return nil
 		})
 
 		// Various network can conditions can result in errors while broadcasting DKG messages,
@@ -216,7 +207,6 @@ func (b *Broker) GetBroadcastMsgCh() <-chan messages.DKGMessage {
 // block whose seal is finalized. The function doesn't return until the received
 // messages are processed by the consumer because b.msgCh is not buffered.
 func (b *Broker) Poll(referenceBlock flow.Identifier) error {
-
 	// We only issue one poll at a time to avoid delivering duplicate broadcast messages.
 	// The messageOffset determines which messages are retrieved by a Poll,
 	// and is not updated until the end of this function.
@@ -228,23 +218,25 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
 	maxedExpRetry := retry.WithMaxRetries(retryMaxRead, expRetry)
-	backoff := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
+	withJitter := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
+
+	clientIndex, dkgContractClient := b.getInitialContractClient()
+	onMaxConsecutiveRetries := func(totalAttempts int) {
+		clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
+		b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
+	}
+	afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
 
 	var msgs []messages.BroadcastDKGMessage
-	attempts := 0
-	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
-		attempts++
-		// retry with next fallback client after 2 failed attempts
-		if attempts%2 == 0 {
-			b.updateActiveDKGContractClient()
-			b.log.Warn().Msgf("poll: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.activeDKGContractClient)
-		}
-
-		msgs, err = b.dkgContractClient().ReadBroadcast(b.messageOffset, referenceBlock)
+	err = retry.Do(b.unit.Ctx(), afterConsecutiveFailures, func(ctx context.Context) error {
+		msgs, err = dkgContractClient.ReadBroadcast(b.messageOffset, referenceBlock)
 		if err != nil {
 			err = fmt.Errorf("could not read broadcast messages(offset: %d, ref: %v): %w", b.messageOffset, referenceBlock, err)
 			return retry.RetryableError(err)
 		}
+
+		// update our last successful client index for future calls
+		b.updateLastSuccessfulClient(clientIndex)
 		return nil
 	})
 	// Various network conditions can result in errors while reading DKG messages
@@ -254,6 +246,8 @@ func (b *Broker) Poll(referenceBlock flow.Identifier) error {
 		return nil
 	}
 
+	b.unit.Lock()
+	defer b.unit.Unlock()
 	for _, msg := range msgs {
 		ok, err := b.verifyBroadcastMessage(msg)
 		if err != nil {
@@ -281,22 +275,24 @@ func (b *Broker) SubmitResult(pubKey crypto.PublicKey, groupKeys []crypto.Public
 		b.log.Fatal().Err(err).Msg("failed to create retry mechanism")
 	}
 	maxedExpRetry := retry.WithMaxRetries(retryMaxPublish, expRetry)
-	backoff := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
+	withJitter := retry.WithJitterPercent(retryJitterPercent, maxedExpRetry)
 
-	attempts := 0
-	err = retry.Do(b.unit.Ctx(), backoff, func(ctx context.Context) error {
-		attempts++
-		// retry with next fallback client after 2 failed attempts
-		if attempts%2 == 0 {
-			b.updateActiveDKGContractClient()
-			b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", attempts, b.activeDKGContractClient)
-		}
-
-		err := b.dkgContractClient().SubmitResult(pubKey, groupKeys)
+	clientIndex, dkgContractClient := b.getInitialContractClient()
+	onMaxConsecutiveRetries := func(totalAttempts int) {
+		clientIndex, dkgContractClient = b.updateContractClient(clientIndex)
+		b.log.Warn().Msgf("submit result: retrying on attempt (%d) with fallback access node at index (%d)", totalAttempts, clientIndex)
+	}
+	afterConsecutiveFailures := retrymiddleware.AfterConsecutiveFailures(retryMaxConsecutiveFailures, withJitter, onMaxConsecutiveRetries)
+	err = retry.Do(context.Background(), afterConsecutiveFailures, func(ctx context.Context) error {
+		err := dkgContractClient.SubmitResult(pubKey, groupKeys)
 		if err != nil {
 			b.log.Error().Err(err).Msg("error submitting DKG result, retrying")
+			return retry.RetryableError(err)
 		}
-		return retry.RetryableError(err)
+
+		// update our last successful client index for future calls
+		b.updateLastSuccessfulClient(clientIndex)
+		return nil
 	})
 
 	if err != nil {
@@ -313,6 +309,39 @@ func (b *Broker) Shutdown() {
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+// updateContractClient will return the last successful client index by default for all initial operations or else
+// it will return the appropriate client index with respect to last successful and number of client.
+func (b *Broker) updateContractClient(clientIndex int) (int, module.DKGContractClient) {
+	b.unit.Lock()
+	defer b.unit.Unlock()
+	if clientIndex == b.lastSuccessfulClientIndex {
+		if clientIndex == len(b.dkgContractClients)-1 {
+			clientIndex = 0
+		} else {
+			clientIndex++
+		}
+	} else {
+		clientIndex = b.lastSuccessfulClientIndex
+	}
+
+	return clientIndex, b.dkgContractClients[clientIndex]
+}
+
+// getInitialContractClient will return the last successful contract client or the initial
+func (b *Broker) getInitialContractClient() (int, module.DKGContractClient) {
+	b.unit.Lock()
+	defer b.unit.Unlock()
+	return b.lastSuccessfulClientIndex, b.dkgContractClients[b.lastSuccessfulClientIndex]
+}
+
+// updateLastSuccessfulClient set lastSuccessfulClientIndex in concurrency safe way
+func (b *Broker) updateLastSuccessfulClient(clientIndex int) {
+	b.unit.Lock()
+	defer b.unit.Unlock()
+
+	b.lastSuccessfulClientIndex = clientIndex
+}
 
 // listen is a blocking call that processes incoming messages from the network
 // engine.
