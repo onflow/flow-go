@@ -2,6 +2,8 @@ package factories
 
 import (
 	"fmt"
+	"github.com/gammazero/workerpool"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 
 	"github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog"
@@ -76,40 +78,62 @@ func (f *HotStuffFactory) Create(
 	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID()))
 	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
 
-	var committee hotstuff.Committee
+	hotstuffModules := &consensus.HotstuffModules{
+		Forks:                nil,
+		Validator:            nil,
+		Notifier:             notifier,
+		Committee:            nil,
+		Signer:               nil,
+		Persist:              persister.New(f.db, cluster.ChainID()),
+		Aggregator:           nil,
+		QCCreatedDistributor: pubsub.NewQCCreatedDistributor(),
+	}
+
 	var err error
-	committee, err = committees.NewClusterCommittee(f.protoState, payloads, cluster, epoch, f.me.NodeID())
+	hotstuffModules.Committee, err = committees.NewClusterCommittee(f.protoState, payloads, cluster, epoch, f.me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not create cluster committee: %w", err)
 	}
-	committee = committees.NewMetricsWrapper(committee, metrics) // wrapper for measuring time spent determining consensus committee relations
+	hotstuffModules.Committee = committees.NewMetricsWrapper(hotstuffModules.Committee, metrics) // wrapper for measuring time spent determining consensus committee relations
 
 	// create a signing provider
-	var signer hotstuff.SignerVerifier = verification.NewSingleSignerVerifier(committee, f.aggregator, f.me.NodeID())
-	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
-
-	persist := persister.New(f.db, cluster.ChainID())
+	hotstuffModules.Signer = verification.NewSingleSignerVerifier(hotstuffModules.Committee, f.aggregator, f.me.NodeID())
+	hotstuffModules.Signer = verification.NewMetricsWrapper(hotstuffModules.Signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
 	finalized, pending, err := recovery.FindLatest(clusterState, headers)
 	if err != nil {
 		return nil, err
 	}
 
-	participant, err := consensus.NewParticipant(
-		f.log,
-		notifier,
-		metrics,
+	hotstuffModules, err = consensus.InitForks(
+		finalized,
 		headers,
-		committee,
-		builder,
 		updater,
-		persist,
-		signer,
-		communicator,
+		hotstuffModules,
 		cluster.RootBlock().Header,
 		cluster.RootQC(),
-		finalized,
-		pending,
+	)
+	if err != nil {
+		return nil, err
+	}
+	hotstuffModules = consensus.InitValidator(metrics, hotstuffModules)
+
+	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(hotstuffModules.Committee,
+		hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
+
+	workerPool := workerpool.New(4)
+	hotstuffModules.Aggregator, err = consensus.NewVoteAggregator(f.log, finalized, pending, hotstuffModules, workerPool,
+		voteProcessorFactory)
+	if err != nil {
+		return nil, err
+	}
+
+	participant, err := consensus.NewParticipant(
+		f.log,
+		metrics,
+		builder,
+		communicator,
+		hotstuffModules,
 		f.opts...,
 	)
 	return participant, err
