@@ -26,6 +26,7 @@ func ExampleSelectFilter() {
 		"payload.block_seals.aggregated_approval_signatures.signer_ids",
 		"payload.collection_guarantees.signer_ids",
 		"execution_result.events.event_index",
+		"something.nonexisting",
 	}
 
 	filteredBlock, err := SelectFilter(blocks, selectKeys)

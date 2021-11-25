@@ -2,7 +2,6 @@ package rest
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/rs/zerolog"
@@ -80,7 +79,6 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logg
 		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
 		return
 	}
-	fmt.Println(string(encodedResponse))
 
 	// write response to response stream
 	_, writeErr := w.Write(encodedResponse)
