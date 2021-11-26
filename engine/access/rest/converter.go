@@ -66,7 +66,11 @@ func toIDs(ids string) ([]flow.Identifier, error) {
 }
 
 func toHeight(height string) (uint64, error) {
-	return strconv.ParseUint(height, 0, 64)
+	h, err := strconv.ParseUint(height, 0, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid height format")
+	}
+	return h, nil
 }
 
 func toHeights(height string) ([]uint64, error) {
