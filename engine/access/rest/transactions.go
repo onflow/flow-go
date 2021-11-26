@@ -14,7 +14,7 @@ func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenera
 
 	tx, err := backend.GetTransaction(r.Context(), id)
 	if err != nil {
-		return nil, NewBadRequestError("transaction result fetching error", err)
+		return nil, err
 	}
 
 	return transactionResponse(tx, link), nil
@@ -28,7 +28,7 @@ func getTransactionResultByID(r *requestDecorator, backend access.API, link Link
 
 	txr, err := backend.GetTransactionResult(r.Context(), id)
 	if err != nil {
-		return nil, NewBadRequestError("transaction result fetching error", err)
+		return nil, err
 	}
 
 	return transactionResultResponse(txr, id, link), nil
@@ -50,7 +50,7 @@ func createTransaction(r *requestDecorator, backend access.API, link LinkGenerat
 
 	err = backend.SendTransaction(r.Context(), &tx)
 	if err != nil {
-		return nil, NewBadRequestError("failed to send transaction", err)
+		return nil, err
 	}
 
 	return transactionResponse(&tx, link), nil
