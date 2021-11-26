@@ -63,7 +63,7 @@ func (ir *IncorporatedResultSeals) removeByHeight(height uint64) {
 func (ir *IncorporatedResultSeals) Add(seal *flow.IncorporatedResultSeal) (bool, error) {
 	added := false
 	sealID := seal.ID()
-	err := ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
+	err := ir.Backend.Run(func(_ mempool.BackData) error {
 		// skip elements below the pruned
 		if seal.Header.Height < ir.lowestHeight {
 			return nil
@@ -116,7 +116,7 @@ func (ir *IncorporatedResultSeals) ByID(id flow.Identifier) (*flow.IncorporatedR
 // Rem removes an IncorporatedResultSeal from the mempool
 func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
 	removed := false
-	err := ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
+	err := ir.Backend.Run(func(_ mempool.BackData) error {
 		var entity flow.Entity
 		entity, removed = ir.backData.Rem(id)
 		if !removed {
@@ -133,7 +133,7 @@ func (ir *IncorporatedResultSeals) Rem(id flow.Identifier) bool {
 }
 
 func (ir *IncorporatedResultSeals) Clear() {
-	err := ir.Backend.Run(func(_ map[flow.Identifier]flow.Entity) error {
+	err := ir.Backend.Run(func(_ mempool.BackData) error {
 		ir.backData.Clear()
 		ir.byHeight = make(map[uint64]sealSet)
 		return nil
@@ -152,13 +152,13 @@ func (ir *IncorporatedResultSeals) Clear() {
 // If `height` is smaller than the previous value, the previous value is kept
 // and the sentinel mempool.DecreasingPruningHeightError is returned.
 func (ir *IncorporatedResultSeals) PruneUpToHeight(height uint64) error {
-	return ir.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
+	return ir.Backend.Run(func(backData mempool.BackData) error {
 		if height < ir.lowestHeight {
 			return mempool.NewDecreasingPruningHeightErrorf(
 				"pruning height: %d, existing height: %d", height, ir.lowestHeight)
 		}
 
-		if len(entities) == 0 {
+		if backData.Size() == 0 {
 			ir.lowestHeight = height
 			return nil
 		}

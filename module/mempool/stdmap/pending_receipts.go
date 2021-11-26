@@ -76,9 +76,9 @@ func removeReceipt(
 // Add adds an execution receipt to the mempool.
 func (r *PendingReceipts) Add(receipt *flow.ExecutionReceipt) bool {
 	added := false
-	err := r.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
+	err := r.Backend.Run(func(backData mempool.BackData) error {
 		receiptID := receipt.ID()
-		_, exists := entities[receiptID]
+		_, exists := backData.ByID(receiptID)
 		if exists {
 			// duplication
 			return nil
@@ -94,7 +94,7 @@ func (r *PendingReceipts) Add(receipt *flow.ExecutionReceipt) bool {
 			return nil
 		}
 
-		entities[receiptID] = receipt
+		backData.Add(receiptID, receipt)
 
 		// update index AND the backdata in one "transaction"
 		previousResultID := indexByPreviousResultID(receipt)
@@ -125,8 +125,8 @@ func (r *PendingReceipts) Add(receipt *flow.ExecutionReceipt) bool {
 // Rem will remove a receipt by ID.
 func (r *PendingReceipts) Rem(receiptID flow.Identifier) bool {
 	removed := false
-	err := r.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
-		entity, ok := entities[receiptID]
+	err := r.Backend.Run(func(backData mempool.BackData) error {
+		entity, ok := backData.ByID(receiptID)
 		if ok {
 			receipt := entity.(*flow.ExecutionReceipt)
 			removeReceipt(receipt, r.backData, r.byPreviousResultID)
@@ -143,13 +143,13 @@ func (r *PendingReceipts) Rem(receiptID flow.Identifier) bool {
 // ByPreviousResultID returns receipts whose previous result ID matches the given ID
 func (r *PendingReceipts) ByPreviousResultID(previousResultID flow.Identifier) []*flow.ExecutionReceipt {
 	var receipts []*flow.ExecutionReceipt
-	err := r.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
+	err := r.Backend.Run(func(backData mempool.BackData) error {
 		siblings, foundIndex := r.byPreviousResultID[previousResultID]
 		if !foundIndex {
 			return nil
 		}
 		for receiptID := range siblings {
-			entity, ok := entities[receiptID]
+			entity, ok := backData.ByID(receiptID)
 			if !ok {
 				return fmt.Errorf("inconsistent index. can not find entity by id: %v", receiptID)
 			}
@@ -182,13 +182,13 @@ func (r *PendingReceipts) Size() uint {
 // If `height` is smaller than the previous value, the previous value is kept
 // and the sentinel mempool.DecreasingPruningHeightError is returned.
 func (r *PendingReceipts) PruneUpToHeight(height uint64) error {
-	return r.Backend.Run(func(entities map[flow.Identifier]flow.Entity) error {
+	return r.Backend.Run(func(backData mempool.BackData) error {
 		if height < r.lowestHeight {
 			return mempool.NewDecreasingPruningHeightErrorf(
 				"pruning height: %d, existing height: %d", height, r.lowestHeight)
 		}
 
-		if len(entities) == 0 {
+		if backData.Size() == 0 {
 			r.lowestHeight = height
 			return nil
 		}
@@ -198,12 +198,12 @@ func (r *PendingReceipts) PruneUpToHeight(height uint64) error {
 		if uint64(len(r.byHeight)) < height-r.lowestHeight {
 			for h := range r.byHeight {
 				if h < height {
-					r.removeByHeight(h, entities)
+					r.removeByHeight(h, backData)
 				}
 			}
 		} else {
 			for h := r.lowestHeight; h < height; h++ {
-				r.removeByHeight(h, entities)
+				r.removeByHeight(h, backData)
 			}
 		}
 		r.lowestHeight = height
@@ -211,9 +211,9 @@ func (r *PendingReceipts) PruneUpToHeight(height uint64) error {
 	})
 }
 
-func (r *PendingReceipts) removeByHeight(height uint64, entities map[flow.Identifier]flow.Entity) {
+func (r *PendingReceipts) removeByHeight(height uint64, backData mempool.BackData) {
 	for receiptID := range r.byHeight[height] {
-		entity, ok := entities[receiptID]
+		entity, ok := backData.ByID(receiptID)
 		if ok {
 			removeReceipt(entity.(*flow.ExecutionReceipt), r.backData, r.byPreviousResultID)
 		}

@@ -110,7 +110,7 @@ func (b *Backend) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 }
 
 // Run executes a function giving it exclusive access to the backdata
-func (b *Backend) Run(f func(backdata map[flow.Identifier]flow.Entity) error) error {
+func (b *Backend) Run(f func(backdata mempool.BackData) error) error {
 	//bs1 := binstat.EnterTime(binstat.BinStdmap + ".w_lock.(Backend)Run")
 	b.Lock()
 	//binstat.Leave(bs1)
@@ -118,7 +118,7 @@ func (b *Backend) Run(f func(backdata map[flow.Identifier]flow.Entity) error) er
 	//bs2 := binstat.EnterTime(binstat.BinStdmap + ".inlock.(Backend)Run")
 	//defer binstat.Leave(bs2)
 	defer b.Unlock()
-	err := b.backData.Run(f)
+	err := f(b.backData)
 	b.reduce()
 	return err
 }

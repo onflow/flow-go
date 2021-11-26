@@ -32,7 +32,4 @@ type BackData interface {
 
 	// Hash will use a merkle root hash to hash all items.
 	Hash() flow.Identifier
-
-	// Run executes a function giving it exclusive access to the backdata
-	Run(f func(backdata map[flow.Identifier]flow.Entity) error) error
 }

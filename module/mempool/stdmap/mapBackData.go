@@ -89,8 +89,3 @@ func (b *MapBackData) Clear() {
 func (b *MapBackData) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(b.All())...)
 }
-
-// Run executes a function giving it exclusive access to the backdata
-func (b *MapBackData) Run(f func(backdata map[flow.Identifier]flow.Entity) error) error {
-	return f(b.entities)
-}
