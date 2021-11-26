@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/cors"
+
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
 
 	"github.com/gorilla/mux"
@@ -32,9 +34,21 @@ func NewServer(handlers *Handlers, listenAddress string, logger zerolog.Logger) 
 			Handler(route.HandlerFunc)
 	}
 
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedHeaders: []string{"*"},
+		AllowedMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodPut,
+			http.MethodDelete,
+			http.MethodOptions,
+			http.MethodHead},
+	})
+
 	return &http.Server{
 		Addr:         listenAddress,
-		Handler:      router,
+		Handler:      c.Handler(router),
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,

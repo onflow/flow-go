@@ -61,6 +61,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
+	github.com/rs/cors v0.0.0-20160617231935-a62a804a8a00
 	github.com/rs/zerolog v1.19.0
 	github.com/schollz/progressbar/v3 v3.8.3
 	github.com/sethvargo/go-retry v0.1.0
