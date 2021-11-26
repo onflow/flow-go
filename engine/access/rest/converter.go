@@ -127,7 +127,7 @@ func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
 func toSignature(signature string) ([]byte, error) {
 	signatureBytes, err := fromBase64(signature)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid signature encoding")
 	}
 	if len(signatureBytes) > maxSignatureLength {
 		return nil, errors.New("signature length invalid")
@@ -180,7 +180,7 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 	for _, arg := range tx.Arguments {
 		decodedArg, err := fromBase64(arg)
 		if err != nil {
-			return flow.TransactionBody{}, err
+			return flow.TransactionBody{}, fmt.Errorf("invalid arguments encoding")
 		}
 		args = append(args, decodedArg)
 	}
@@ -222,7 +222,7 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 	// script comes in as a base64 encoded string, decode base64 back to a string here
 	script, err := fromBase64(tx.Script)
 	if err != nil {
-		return flow.TransactionBody{}, err
+		return flow.TransactionBody{}, fmt.Errorf("invalid transaction script encoding")
 	}
 
 	return flow.TransactionBody{
@@ -244,7 +244,7 @@ func toScriptArgs(script generated.ScriptsBody) ([][]byte, error) {
 	for i, a := range script.Arguments {
 		arg, err := fromBase64(a)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid script encoding")
 		}
 		args[i] = arg
 	}
@@ -252,7 +252,11 @@ func toScriptArgs(script generated.ScriptsBody) ([][]byte, error) {
 }
 
 func toScriptSource(script generated.ScriptsBody) ([]byte, error) {
-	return fromBase64(script.Script)
+	source, err := fromBase64(script.Script)
+	if err != nil {
+		return nil, fmt.Errorf("invalid script source encoding")
+	}
+	return source, nil
 }
 
 // Response section - converting flow models to response models.
@@ -267,15 +271,13 @@ func proposalKeyResponse(key *flow.ProposalKey) *generated.ProposalKey {
 
 func transactionSignatureResponse(signatures []flow.TransactionSignature) []generated.TransactionSignature {
 	sigs := make([]generated.TransactionSignature, len(signatures))
-	for _, sig := range signatures {
-		sigs = append(sigs,
-			generated.TransactionSignature{
-				Address:     sig.Address.String(),
-				SignerIndex: int32(sig.SignerIndex),
-				KeyIndex:    int32(sig.KeyIndex),
-				Signature:   toBase64(sig.Signature),
-			},
-		)
+	for i, sig := range signatures {
+		sigs[i] = generated.TransactionSignature{
+			Address:     sig.Address.String(),
+			SignerIndex: int32(sig.SignerIndex),
+			KeyIndex:    int32(sig.KeyIndex),
+			Signature:   toBase64(sig.Signature),
+		}
 	}
 
 	return sigs

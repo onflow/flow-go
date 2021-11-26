@@ -56,7 +56,7 @@ func TestGetCollections(t *testing.T) {
 			expected := fmt.Sprintf(`{"id":"%s","transactions":%s}`, col.ID().String(), bx) // todo missing link
 
 			assert.Equal(t, http.StatusOK, rr.Code)
-			assert.Equal(t, expected, rr.Body.String())
+			assert.JSONEq(t, expected, rr.Body.String())
 		}
 	})
 
@@ -92,7 +92,7 @@ func TestGetCollections(t *testing.T) {
 			rr := executeRequest(req, backend)
 
 			assert.Equal(t, test.status, rr.Code)
-			assert.Equal(t, test.response, rr.Body.String())
+			assert.JSONEq(t, test.response, rr.Body.String())
 		}
 
 	})

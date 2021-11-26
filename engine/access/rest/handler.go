@@ -58,15 +58,16 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}); ok {
 			if se.GRPCStatus().Code() == codes.NotFound {
 				h.errorResponse(w, http.StatusNotFound, se.GRPCStatus().Message(), errorLogger)
+				return
 			}
 			if se.GRPCStatus().Code() == codes.InvalidArgument {
 				h.errorResponse(w, http.StatusBadRequest, se.GRPCStatus().Message(), errorLogger)
+				return
 			}
-		} else {
-			h.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
 		}
 
-		// stop going further
+		// stop going further - catch all error
+		h.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
 		return
 	}
 
@@ -88,7 +89,7 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logg
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	// serialise response to JSON and handler errors
-	encodedResponse, encErr := json.Marshal(response)
+	encodedResponse, encErr := json.MarshalIndent(response, "", "\t")
 	if encErr != nil {
 		h.logger.Error().Err(encErr).Msg("failed to encode response")
 		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)

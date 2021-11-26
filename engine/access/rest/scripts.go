@@ -35,7 +35,7 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 	if blockID == "latest" || blockHeight == "latest" {
 		result, err := backend.ExecuteScriptAtLatestBlock(r.Context(), code, args)
 		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, err
 		}
 		return result, nil
 	}
@@ -48,7 +48,7 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 
 		result, err := backend.ExecuteScriptAtBlockID(r.Context(), id, code, args)
 		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, err
 		}
 
 		return result, nil
@@ -62,7 +62,7 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 
 		result, err := backend.ExecuteScriptAtBlockHeight(r.Context(), height, code, args)
 		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, err
 		}
 
 		return result, nil
