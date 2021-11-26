@@ -33,7 +33,7 @@ func collectionURL(param string) string {
 	return fmt.Sprintf("/v1/collections/%s", param)
 }
 
-func TestCollections(t *testing.T) {
+func TestGetCollections(t *testing.T) {
 	backend := &mock.API{}
 
 	t.Run("get by ID", func(t *testing.T) {
@@ -53,7 +53,7 @@ func TestCollections(t *testing.T) {
 			rr := executeRequest(req, backend)
 
 			bx, _ := json.Marshal(col.Transactions)
-			expected := fmt.Sprintf(`{"id":"%s","transactions":%s}`, col.ID().String(), bx)
+			expected := fmt.Sprintf(`{"id":"%s","transactions":%s}`, col.ID().String(), bx) // todo missing link
 
 			assert.Equal(t, http.StatusOK, rr.Code)
 			assert.Equal(t, expected, rr.Body.String())
