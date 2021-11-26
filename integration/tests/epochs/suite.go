@@ -46,7 +46,7 @@ func (s *Suite) SetupTest() {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 	}
 
 	// a ghost node masquerading as a consensus node
@@ -64,13 +64,14 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		ghostConNode,
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs tests", confs, 100, 50, 280)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, 200, 50, 380)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)

@@ -187,10 +187,10 @@ func (s *Suite) TestEpochJoin() {
 
 	testContainer.Container.Start(ctx)
 
-	nextEpochFirstView, err := snapshot.Epochs().Next().FirstView()
+	currEpochFinalView, err := snapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
-	s.BlockState.WaitForSealedView(s.T(), nextEpochFirstView)
+	s.BlockState.WaitForSealedView(s.T(), currEpochFinalView)
 
 	// get client configured to send request directly to our new access node
 	clientAddr := fmt.Sprintf(":%s", s.net.AccessPortsByContainerName[info.ContainerName])
