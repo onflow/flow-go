@@ -10,7 +10,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/state/protocol"
 	"github.com/rs/zerolog"
 	"strings"
 
@@ -66,13 +65,14 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
+		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		ghostConNode,
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs tests", confs, 200, 50, 380)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs tests", confs, 200, 100, 530)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
@@ -386,19 +386,4 @@ func (s *Suite) ExecuteReadApprovedNodesScript(ctx context.Context, env template
 	require.NoError(s.T(), err)
 
 	return v
-}
-
-func (s *Suite) WaitForEpochs(ctx context.Context, numOfEpochs int)  {
-	var epoch protocol.Epoch
-	var epochCounter uint64
-	for counter := 0; counter < numOfEpochs; counter++ {
-		// wait until the access node reaches the desired epoch
-		for epoch == nil || epochCounter != uint64(counter) {
-			snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-			require.NoError(s.T(), err)
-			epoch = snapshot.Epochs().Current()
-			epochCounter, err = epoch.Counter()
-			require.NoError(s.T(), err)
-		}
-	}
 }

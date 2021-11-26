@@ -186,7 +186,11 @@ func (s *Suite) TestEpochJoin() {
 	testContainer.WriteRootSnapshot(snapshot)
 
 	testContainer.Container.Start(ctx)
-	s.WaitForEpochs(ctx, 2)
+
+	nextEpochFirstView, err := snapshot.Epochs().Next().FirstView()
+	require.NoError(s.T(), err)
+
+	s.BlockState.WaitForSealedView(s.T(), nextEpochFirstView)
 
 	// get client configured to send request directly to our new access node
 	clientAddr := fmt.Sprintf(":%s", s.net.AccessPortsByContainerName[info.ContainerName])
@@ -200,17 +204,20 @@ func (s *Suite) TestEpochJoin() {
 	require.NoError(s.T(), err)
 
 	// most recent segment should have higher highest that the segment we bootstrapped with
-	require.True(s.T(), segment2.Highest().Header.Height > segment.Highest().Header.Height)
+	require.True(s.T(), segment2.Highest().Header.Height > segment.Highest().Header.Height, fmt.Sprintf("expected sealing segment that was used to bootstrap highest height %d to be lower than highest height %d of most recent segment", segment.Highest().Header.Height, segment2.Highest().Header.Height))
 
 	// sanity check: ensure id is in snapshot identities
 	ids, err := snapshot.Identities(filter.HasNodeID(info.NodeID))
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), ids[0].NodeID, info.NodeID)
+	require.Equal(s.T(), ids[0].NodeID, info.NodeID, fmt.Sprintf("expected newly staked node ID to be present in snapshot returned from node"))
 
 	// check that we can execute script on our newly staked and joined access node
 	proposedTable, err = client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
-	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()))
+	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by newly staked AN")
+
+	err = testContainer.Disconnect()
+	require.NoError(s.T(), err)
 
 	s.net.StopContainers()
 }
