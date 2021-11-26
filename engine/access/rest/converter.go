@@ -24,6 +24,8 @@ const maxAuthorizersCnt = 100
 const MaxAllowedIDs = 50 // todo(sideninja) discuss if we should restrict maximum on all IDs collection or is anywhere required more thant this
 const MaxAllowedHeights = 50
 
+//const MaxScriptLength =
+
 var MaxAllowedBlockIDs = MaxAllowedIDs
 
 func toBase64(byteValue []byte) string {
@@ -112,6 +114,10 @@ func toAddress(address string) (flow.Address, error) {
 }
 
 func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
+	if key == nil {
+		return flow.ProposalKey{}, fmt.Errorf("proposal key not provided")
+	}
+
 	address, err := toAddress(key.Address)
 	if err != nil {
 		return flow.ProposalKey{}, err
@@ -168,12 +174,33 @@ func toTransactionSignatures(sigs []generated.TransactionSignature) ([]flow.Tran
 	return signatures, nil
 }
 
-func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error) {
-
+func toTransaction(tx generated.TransactionsBody) (flow.TransactionBody, error) {
 	argLen := len(tx.Arguments)
 	if argLen > maxAllowedScriptArgumentsCnt {
 		return flow.TransactionBody{}, fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArgumentsCnt)
 	}
+
+	if tx.ProposalKey == nil {
+		return flow.TransactionBody{}, fmt.Errorf("proposal key not provided")
+	}
+	if tx.Script == "" {
+		return flow.TransactionBody{}, fmt.Errorf("script not provided")
+	}
+	if tx.Payer == "" {
+		return flow.TransactionBody{}, fmt.Errorf("payer not provided")
+	}
+	if len(tx.Authorizers) == 0 {
+		return flow.TransactionBody{}, fmt.Errorf("authorizers not provided")
+	}
+	if len(tx.EnvelopeSignatures) == 0 {
+		return flow.TransactionBody{}, fmt.Errorf("envelope sigantures not provided")
+	}
+	if tx.ReferenceBlockId == "" {
+		return flow.TransactionBody{}, fmt.Errorf("reference block not provided")
+	}
+	//if len(tx.Script) > MaxScriptLength { todo(sideninja) define limit
+	//	return flow.TransactionBody{}, fmt.Errorf("script exceeding the size limit")
+	//}
 
 	// script arguments come in as a base64 encoded strings, decode base64 back to a string here
 	args := make([][]byte, argLen)
@@ -225,8 +252,13 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		return flow.TransactionBody{}, fmt.Errorf("invalid transaction script encoding")
 	}
 
+	blockID, err := toID(tx.ReferenceBlockId)
+	if err != nil {
+		return flow.TransactionBody{}, err
+	}
+
 	return flow.TransactionBody{
-		ReferenceBlockID:   flow.Identifier{},
+		ReferenceBlockID:   blockID,
 		Script:             script,
 		Arguments:          args,
 		GasLimit:           uint64(tx.GasLimit),
