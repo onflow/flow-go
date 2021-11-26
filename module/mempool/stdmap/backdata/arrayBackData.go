@@ -4,8 +4,8 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const bucketSize = 16
-const bucketNum = 1000
+const bucketSize = uint64(16)
+const bucketNum = uint64(1000)
 
 type cachedEntity struct {
 	identifier flow.Identifier
