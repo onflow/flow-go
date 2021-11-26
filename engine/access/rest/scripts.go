@@ -8,8 +8,8 @@ import (
 )
 
 func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, StatusError) {
-	blockID := r.getParam("block_id")
-	blockHeight := r.getParam("block_height")
+	blockID := r.getVar("block_id")
+	blockHeight := r.getVar("block_height")
 
 	if blockID != "" && blockHeight != "" {
 		err := fmt.Errorf("can not provide both block ID and block height")

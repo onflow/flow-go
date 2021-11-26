@@ -53,9 +53,27 @@ func (rd *requestDecorator) selects() []string {
 	return rd.selectFields
 }
 
-func (rd *requestDecorator) getParam(name string) string {
+func (rd *requestDecorator) getVar(name string) string {
 	vars := mux.Vars(rd.Request)
 	return vars[name] // todo(sideninja) check if exists
+}
+
+func (rd *requestDecorator) getQueryParam(name string) string {
+	return rd.Request.URL.Query().Get(name)
+}
+
+func (rd *requestDecorator) getQueryParams(name string) []string {
+	param := rd.Request.URL.Query().Get(name)
+	// currently, the swagger generated Go REST client is incorrectly doing a `fmt.Sprintf("%v", id)` for the id slice
+	// resulting in the client sending the ids in the format [id1 id2 id3...]. This is a temporary workaround to
+	// accommodate the client for now. Issue to to fix the client: https://github.com/onflow/flow/issues/698
+	param = strings.TrimSuffix(param, "]")
+	param = strings.TrimPrefix(param, "[")
+	if len(param) == 0 {
+		return nil
+	}
+	params := strings.Split(param, ",")
+	return params
 }
 
 func (rd *requestDecorator) bodyAs(dst interface{}) error {

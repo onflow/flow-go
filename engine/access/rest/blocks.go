@@ -39,30 +39,32 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 }
 
 func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
-	height := r.getParam("height")
-	startHeight := r.getParam("start_height")
-	endHeight := r.getParam("end_height")
+	heights := r.getQueryParams("height")
+	startHeight := r.getQueryParam("start_height")
+	endHeight := r.getQueryParam("end_height")
 
 	// if both height and one or both of start and end height are provided
-	if height != "" && (startHeight != "" || endHeight != "") {
+	if len(heights) > 0 && (startHeight != "" || endHeight != "") {
 		err := fmt.Errorf("can only provide either heights or start and end height range")
 		return nil, NewBadRequestError(err.Error(), err)
 	}
 
 	// if neither height nor start and end height are provided
-	if height == "" && (startHeight == "" || endHeight == "") {
+	if len(heights) == 0 && (startHeight == "" || endHeight == "") {
 		err := fmt.Errorf("must provide either heights or start and end height range")
 		return nil, NewBadRequestError(err.Error(), err)
 	}
 
-	blocks := make([]*generated.Block, len(height))
+	var blocks []*generated.Block
 
-	if height != "" {
-		heights, err := toHeights(height)
+	if len(heights) > 0 {
+
+		heights, err := toHeights(heights)
 		if err != nil {
 			return nil, NewBadRequestError(err.Error(), err)
 		}
 
+		blocks = make([]*generated.Block, len(heights))
 		for i, h := range heights {
 			blkProvider := NewBlockProvider(backend, withHeight(h))
 			block, err := getBlock(blkProvider, r, backend, link)
@@ -95,7 +97,7 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 			if err != nil {
 				return nil, err
 			}
-			blocks[i] = block
+			blocks = append(blocks, block)
 		}
 	}
 
