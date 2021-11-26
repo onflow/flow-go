@@ -86,52 +86,52 @@ func routeDefinitions() []routeDefinition {
 	return []routeDefinition{
 		// Transactions
 		{
-			method:         "GET",
+			method:         http.MethodGet,
 			pattern:        "/transactions/{id}",
 			name:           getTransactionByIDRoute,
 			apiHandlerFunc: getTransactionByID,
 		}, {
-			method:         "POST",
+			method:         http.MethodPost,
 			pattern:        "/transactions",
 			name:           createTransactionRoute,
 			apiHandlerFunc: createTransaction,
 		},
 		// Transaction Results
 		{
-			method:         "GET",
+			method:         http.MethodGet,
 			pattern:        "/transaction_results/{id}",
 			name:           getTransactionResultByIDRoute,
 			apiHandlerFunc: getTransactionResultByID,
 		},
 		// Blocks
 		{
-			method:         "GET",
+			method:         http.MethodGet,
 			pattern:        "/blocks/{id}",
 			name:           getBlocksByIDRoute,
 			apiHandlerFunc: getBlocksByIDs,
 		}, {
-			method:         "GET",
+			method:         http.MethodGet,
 			pattern:        "/blocks",
 			name:           getBlocksByHeightRoute,
 			apiHandlerFunc: getBlocksByHeight,
 		},
 		// Block Payload
 		{
-			method:         "GET",
+			method:         http.MethodGet,
 			pattern:        "/blocks/{id}/payload",
 			name:           getBlockPayloadByIDRoute,
 			apiHandlerFunc: getBlockPayloadByID,
 		},
 		// Execution Result
 		{
-			method:         "GET",
+			method:         http.MethodGet,
 			pattern:        "/execution_results/{id}",
 			name:           getExecutionResultByIDRoute,
 			apiHandlerFunc: getExecutionResultByID,
 		},
 		// Collections
 		{
-			method:         "GET",
+			method:         http.MethodGet,
 			pattern:        "/collections/{id}",
 			name:           getCollectionByIDRoute,
 			apiHandlerFunc: getCollectionByID,
@@ -145,7 +145,7 @@ func routeDefinitions() []routeDefinition {
 		},
 		// Accounts
 		{
-			method:         "GET",
+			method:         http.MethodGet,
 			pattern:        "/accounts/{address}",
 			name:           getAccountRoute,
 			apiHandlerFunc: getAccount,

@@ -110,62 +110,109 @@ func TestRestAPI(t *testing.T) {
 	suite.Run(t, new(RestAPITestSuite))
 }
 
-func (suite *RestAPITestSuite) TestRestAPICall() {
+func (suite *RestAPITestSuite) TestGetBlock() {
 
-	suite.Run("GetBlockByID for a single ID - happy path", func() {
-
+	testBlockIDs := make([]string, rest.MaxAllowedBlockIDs)
+	testBlocks := make([]*flow.Block, rest.MaxAllowedBlockIDs)
+	for i := range testBlockIDs {
 		collections := unittest.CollectionListFixture(1)
 		block := unittest.BlockWithGuaranteesFixture(
 			unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
 		)
-		suite.blocks.On("ByID", block.ID()).Return(block, nil).Once()
+		block.Header.Height = uint64(i)
+		suite.blocks.On("ByID", block.ID()).Return(block, nil)
+		suite.blocks.On("ByHeight", block.Header.Height).Return(block, nil)
+		testBlocks[i] = block
+		testBlockIDs[i] = block.ID().String()
+	}
 
-		client := suite.restAPIClient()
+	client := suite.restAPIClient()
+
+	suite.Run("GetBlockByID for a single ID - happy path", func() {
+
+		testBlock := testBlocks[0]
+		suite.blocks.On("ByID", testBlock.ID()).Return(testBlock, nil).Once()
+
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		blocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{block.ID().String()}, expandAndSelectOptions())
+		respBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{testBlock.ID().String()}, optionsForBlockByID())
 		require.NoError(suite.T(), err)
 		require.Equal(suite.T(), http.StatusOK, resp.StatusCode)
-		require.Len(suite.T(), blocks, 1)
-		assert.Equal(suite.T(), block.ID().String(), blocks[0].Header.Id)
+		require.Len(suite.T(), respBlocks, 1)
+		assert.Equal(suite.T(), testBlock.ID().String(), testBlock.ID().String())
 
-		fmt.Println(blocks[0])
-		require.Nil(suite.T(), blocks[0].ExecutionResult)
-		jsonBytes, err := json.MarshalIndent(blocks[0], "", "\t")
+		fmt.Println(respBlocks[0])
+		require.Nil(suite.T(), respBlocks[0].ExecutionResult)
+		jsonBytes, err := json.MarshalIndent(respBlocks[0], "", "\t")
 		require.NoError(suite.T(), err)
 		fmt.Println(string(jsonBytes))
 	})
 
 	suite.Run("GetBlockByID for multiple IDs - happy path", func() {
 
-		client := suite.restAPIClient()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		blockIDs := make([]string, rest.MaxAllowedBlockIDs)
-		blocks := make([]*flow.Block, rest.MaxAllowedBlockIDs)
-		for i := range blockIDs {
-			id := unittest.IdentifierFixture()
-			blockIDs[i] = id.String()
-			collections := unittest.CollectionListFixture(1)
-			block := unittest.BlockWithGuaranteesFixture(
-				unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
-			)
-			blocks[i] = block
-			suite.blocks.On("ByID", id).Return(block, nil).Once()
-		}
-
 		// the swagger generated Go client code has bug where it generates a space delimited list of ids instead of a
 		// comma delimited one. hence, explicitly setting the ids as a csv here
-		blockIDSlice := []string{strings.Join(blockIDs, ",")}
+		blockIDSlice := []string{strings.Join(testBlockIDs, ",")}
 
-		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandAndSelectOptions())
+		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, optionsForBlockByID())
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
-		assert.Len(suite.T(), blocks, rest.MaxAllowedBlockIDs)
-		for i, b := range blocks {
+		assert.Len(suite.T(), actualBlocks, rest.MaxAllowedBlockIDs)
+		for i, b := range testBlocks {
 			assert.Equal(suite.T(), b.ID().String(), actualBlocks[i].Header.Id)
+		}
+
+		//jsonBytes, err := json.MarshalIndent(actualBlocks, "", "\t")
+		//require.NoError(suite.T(), err)
+		//fmt.Println(string(jsonBytes))
+	})
+
+	suite.Run("GetBlockByHeight by start and end height - happy path", func() {
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		//heights := []generated.BlockHeight{}
+		startHeight := testBlocks[0].Header.Height
+		lastIndex := len(testBlocks) - 1
+		endHeight := testBlocks[lastIndex].Header.Height
+
+		actualBlocks, resp, err := client.BlocksApi.BlocksGet(ctx, optionsForBlockByStartEndHeight(startHeight, endHeight))
+		require.NoError(suite.T(), err)
+		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
+		assert.Len(suite.T(), actualBlocks, lastIndex)
+		for i := 0; i < lastIndex; i++ {
+			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
+			assert.EqualValues(suite.T(), testBlocks[i].Header.Height, actualBlocks[i].Header.Height)
+		}
+
+		jsonBytes, err := json.MarshalIndent(actualBlocks, "", "\t")
+		require.NoError(suite.T(), err)
+		fmt.Println(string(jsonBytes))
+	})
+
+	suite.Run("GetBlockByHeight by heights - happy path", func() {
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		lastIndex := len(testBlocks)
+		var reqHeights = make([]uint64, len(testBlocks))
+		for i := 0; i < lastIndex; i++ {
+			reqHeights[i] = testBlocks[i].Header.Height
+		}
+
+		actualBlocks, resp, err := client.BlocksApi.BlocksGet(ctx, optionsForBlockByHeights(reqHeights))
+		require.NoError(suite.T(), err)
+		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
+		assert.Len(suite.T(), actualBlocks, lastIndex)
+		for i := 0; i < lastIndex; i++ {
+			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
+			assert.EqualValues(suite.T(), testBlocks[i].Header.Height, actualBlocks[i].Header.Height)
 		}
 
 		jsonBytes, err := json.MarshalIndent(actualBlocks, "", "\t")
@@ -182,66 +229,65 @@ func (suite *RestAPITestSuite) TestRestAPICall() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{nonExistingBlockID.String()}, expandAndSelectOptions())
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{nonExistingBlockID.String()}, optionsForBlockByID())
 		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", nonExistingBlockID.String()))
 	})
 
 	suite.Run("GetBlockByID with an invalid block ID", func() {
 
-		client := suite.restAPIClient()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
 		const invalidBlockID = "invalid_block_id"
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{invalidBlockID}, expandAndSelectOptions())
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{invalidBlockID}, optionsForBlockByID())
 		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("invalid ID %s", invalidBlockID))
 	})
 
 	suite.Run("GetBlockByID with more than the permissible number of block IDs", func() {
 
-		client := suite.restAPIClient()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		// lower the max allowed block ID count on the server for the test
-		rest.MaxAllowedBlockIDs = 10
 		blockIDs := make([]string, rest.MaxAllowedBlockIDs+1)
-		for i := range blockIDs {
-			blockIDs[i] = unittest.IdentifierFixture().String()
-		}
+		copy(blockIDs, testBlockIDs)
+		blockIDs[rest.MaxAllowedBlockIDs] = unittest.IdentifierFixture().String()
+
 		blockIDSlice := []string{strings.Join(blockIDs, ",")}
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandAndSelectOptions())
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, optionsForBlockByID())
 		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", rest.MaxAllowedBlockIDs))
 	})
 
 	suite.Run("GetBlockByID with one non-existing block ID", func() {
 
-		client := suite.restAPIClient()
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		blockIDs := make([]string, rest.MaxAllowedBlockIDs)
+		// replace one ID with a block ID for which the storage returns a not found error
 		rand.Seed(time.Now().Unix())
-		invalidBlockIndex := rand.Intn(len(blockIDs))
-		for i := range blockIDs {
-			id := unittest.IdentifierFixture()
-			blockIDs[i] = id.String()
-			if i == invalidBlockIndex {
-				// return a storage not found error for one of block ID in the request
-				suite.blocks.On("ByID", id).Return(nil, storage.ErrNotFound).Once()
-				continue
-			}
-			collections := unittest.CollectionListFixture(1)
-			block := unittest.BlockWithGuaranteesFixture(
-				unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
-			)
-			suite.blocks.On("ByID", id).Return(block, nil).Once()
-		}
+		invalidBlockIndex := rand.Intn(len(testBlocks))
+		invalidID := unittest.IdentifierFixture()
+		suite.blocks.On("ByID", invalidID).Return(nil, storage.ErrNotFound).Once()
+		blockIDs := make([]string, len(testBlockIDs))
+		copy(blockIDs, testBlockIDs)
+		blockIDs[invalidBlockIndex] = invalidID.String()
+
 		blockIDSlice := []string{strings.Join(blockIDs, ",")}
-		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, expandAndSelectOptions())
+		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, optionsForBlockByID())
 		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", blockIDs[invalidBlockIndex]))
 	})
 
+	suite.Run("GetBlockByHeight by non-existing height", func() {
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		invalidHeight := uint64(len(testBlocks))
+		var reqHeights = []uint64{invalidHeight}
+		suite.blocks.On("ByHeight", invalidHeight).Return(nil, storage.ErrNotFound).Once()
+
+		_, resp, err := client.BlocksApi.BlocksGet(ctx, optionsForBlockByHeights(reqHeights))
+		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block at height %d not found", invalidHeight))
+	})
 }
 
 func (suite *RestAPITestSuite) TearDownTest() {
@@ -268,9 +314,25 @@ func assertError(t *testing.T, resp *http.Response, err error, expectedCode int,
 	require.Contains(t, modelError.Message, expectedMsgSubstr)
 }
 
-func expandAndSelectOptions() *restclient.BlocksApiBlocksIdGetOpts {
+func optionsForBlockByID() *restclient.BlocksApiBlocksIdGetOpts {
 	return &restclient.BlocksApiBlocksIdGetOpts{
 		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id"}),
+	}
+}
+func optionsForBlockByStartEndHeight(startHeight, endHeight uint64) *restclient.BlocksApiBlocksGetOpts {
+	return &restclient.BlocksApiBlocksGetOpts{
+		Expand:      optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Select_:     optional.NewInterface([]string{"header.id", "header.height"}),
+		StartHeight: optional.NewInterface(startHeight),
+		EndHeight:   optional.NewInterface(endHeight),
+	}
+}
+
+func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOpts {
+	return &restclient.BlocksApiBlocksGetOpts{
+		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
+		Height:  optional.NewInterface(heights),
 	}
 }

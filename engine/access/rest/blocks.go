@@ -44,7 +44,7 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 	endHeight := r.getQueryParam("end_height")
 
 	// if both height and one or both of start and end height are provided
-	if len(heights) == 0 && (startHeight != "" || endHeight != "") {
+	if len(heights) > 0 && (startHeight != "" || endHeight != "") {
 		err := fmt.Errorf("can only provide either heights or start and end height range")
 		return nil, NewBadRequestError(err.Error(), err)
 	}
