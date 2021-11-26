@@ -36,16 +36,15 @@ func getTransactionResultByID(r *requestDecorator, backend access.API, link Link
 
 // createTransaction creates a new transaction from provided payload.
 func createTransaction(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
-
 	var txBody generated.TransactionsBody
 	err := r.bodyAs(&txBody)
 	if err != nil {
-		return nil, NewBadRequestError("invalid transaction request", err)
+		return nil, err
 	}
 
-	tx, err := toTransaction(&txBody)
+	tx, err := toTransaction(txBody)
 	if err != nil {
-		return nil, NewBadRequestError("invalid transaction request", err)
+		return nil, NewBadRequestError(err.Error(), err)
 	}
 
 	err = backend.SendTransaction(r.Context(), &tx)
