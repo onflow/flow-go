@@ -24,6 +24,8 @@ const maxAuthorizersCnt = 100
 const MaxAllowedIDs = 50 // todo(sideninja) discuss if we should restrict maximum on all IDs collection or is anywhere required more thant this
 const MaxAllowedHeights = 50
 
+//const MaxScriptLength =
+
 var MaxAllowedBlockIDs = MaxAllowedIDs
 
 func toBase64(byteValue []byte) string {
@@ -37,7 +39,7 @@ func fromBase64(bytesStr string) ([]byte, error) {
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
 	if !valid {
-		return flow.Identifier{}, errors.New("invalid ID")
+		return flow.Identifier{}, errors.New("invalid ID format")
 	}
 
 	flowID, err := flow.HexStringToIdentifier(id)
@@ -74,7 +76,11 @@ func toIDs(ids string) ([]flow.Identifier, error) {
 }
 
 func toHeight(height string) (uint64, error) {
-	return strconv.ParseUint(height, 0, 64)
+	h, err := strconv.ParseUint(height, 0, 64)
+	if err != nil {
+		return 0, fmt.Errorf("invalid height format")
+	}
+	return h, nil
 }
 
 func toHeights(rawHeights []string) ([]uint64, error) {
@@ -98,13 +104,17 @@ func toHeights(rawHeights []string) ([]uint64, error) {
 func toAddress(address string) (flow.Address, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{16}$`, address)
 	if !valid {
-		return flow.Address{}, errors.New("invalid address")
+		return flow.Address{}, fmt.Errorf("invalid address")
 	}
 
 	return flow.HexToAddress(address), nil
 }
 
 func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
+	if key == nil {
+		return flow.ProposalKey{}, fmt.Errorf("proposal key not provided")
+	}
+
 	address, err := toAddress(key.Address)
 	if err != nil {
 		return flow.ProposalKey{}, err
@@ -120,7 +130,7 @@ func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
 func toSignature(signature string) ([]byte, error) {
 	signatureBytes, err := fromBase64(signature)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid signature encoding")
 	}
 	if len(signatureBytes) > maxSignatureLength {
 		return nil, errors.New("signature length invalid")
@@ -149,31 +159,55 @@ func toTransactionSignature(transactionSignature *generated.TransactionSignature
 
 func toTransactionSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSignature, error) {
 	signatures := make([]flow.TransactionSignature, len(sigs))
-	for _, sig := range sigs {
+	for x, sig := range sigs {
 		signature, err := toTransactionSignature(&sig)
 		if err != nil {
 			return nil, err
 		}
 
-		signatures = append(signatures, signature)
+		signatures[x] = signature
 	}
 
 	return signatures, nil
 }
 
-func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error) {
-
+func toTransaction(tx generated.TransactionsBody) (flow.TransactionBody, error) {
 	argLen := len(tx.Arguments)
 	if argLen > maxAllowedScriptArgumentsCnt {
 		return flow.TransactionBody{}, fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArgumentsCnt)
 	}
+
+	if tx.ProposalKey == nil {
+		return flow.TransactionBody{}, fmt.Errorf("proposal key not provided")
+	}
+	if tx.Script == "" {
+		return flow.TransactionBody{}, fmt.Errorf("script not provided")
+	}
+	if tx.Payer == "" {
+		return flow.TransactionBody{}, fmt.Errorf("payer not provided")
+	}
+	if len(tx.Authorizers) == 0 {
+		return flow.TransactionBody{}, fmt.Errorf("authorizers not provided")
+	}
+	if len(tx.EnvelopeSignatures) == 0 {
+		return flow.TransactionBody{}, fmt.Errorf("envelope sigantures not provided")
+	}
+	if tx.ReferenceBlockId == "" {
+		return flow.TransactionBody{}, fmt.Errorf("reference block not provided")
+	}
+	if len(tx.Authorizers) > maxAuthorizersCnt {
+		return flow.TransactionBody{}, fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizersCnt)
+	}
+	//if len(tx.Script) > MaxScriptLength { todo(sideninja) define limit
+	//	return flow.TransactionBody{}, fmt.Errorf("script exceeding the size limit")
+	//}
 
 	// script arguments come in as a base64 encoded strings, decode base64 back to a string here
 	args := make([][]byte, argLen)
 	for _, arg := range tx.Arguments {
 		decodedArg, err := fromBase64(arg)
 		if err != nil {
-			return flow.TransactionBody{}, err
+			return flow.TransactionBody{}, fmt.Errorf("invalid arguments encoding")
 		}
 		args = append(args, decodedArg)
 	}
@@ -188,18 +222,14 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 		return flow.TransactionBody{}, err
 	}
 
-	authorizerCnt := len(tx.Authorizers)
-	if authorizerCnt > maxAuthorizersCnt {
-		return flow.TransactionBody{}, fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizersCnt)
-	}
-	auths := make([]flow.Address, authorizerCnt)
-	for _, auth := range tx.Authorizers {
+	auths := make([]flow.Address, len(tx.Authorizers))
+	for x, auth := range tx.Authorizers {
 		a, err := toAddress(auth)
 		if err != nil {
 			return flow.TransactionBody{}, err
 		}
 
-		auths = append(auths, a)
+		auths[x] = a
 	}
 
 	payloadSigs, err := toTransactionSignatures(tx.PayloadSignatures)
@@ -215,11 +245,16 @@ func toTransaction(tx *generated.TransactionsBody) (flow.TransactionBody, error)
 	// script comes in as a base64 encoded string, decode base64 back to a string here
 	script, err := fromBase64(tx.Script)
 	if err != nil {
+		return flow.TransactionBody{}, fmt.Errorf("invalid transaction script encoding")
+	}
+
+	blockID, err := toID(tx.ReferenceBlockId)
+	if err != nil {
 		return flow.TransactionBody{}, err
 	}
 
 	return flow.TransactionBody{
-		ReferenceBlockID:   flow.Identifier{},
+		ReferenceBlockID:   blockID,
 		Script:             script,
 		Arguments:          args,
 		GasLimit:           uint64(tx.GasLimit),
@@ -237,7 +272,7 @@ func toScriptArgs(script generated.ScriptsBody) ([][]byte, error) {
 	for i, a := range script.Arguments {
 		arg, err := fromBase64(a)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("invalid script encoding")
 		}
 		args[i] = arg
 	}
@@ -245,7 +280,11 @@ func toScriptArgs(script generated.ScriptsBody) ([][]byte, error) {
 }
 
 func toScriptSource(script generated.ScriptsBody) ([]byte, error) {
-	return fromBase64(script.Script)
+	source, err := fromBase64(script.Script)
+	if err != nil {
+		return nil, fmt.Errorf("invalid script source encoding")
+	}
+	return source, nil
 }
 
 // Response section - converting flow models to response models.
@@ -260,15 +299,13 @@ func proposalKeyResponse(key *flow.ProposalKey) *generated.ProposalKey {
 
 func transactionSignatureResponse(signatures []flow.TransactionSignature) []generated.TransactionSignature {
 	sigs := make([]generated.TransactionSignature, len(signatures))
-	for _, sig := range signatures {
-		sigs = append(sigs,
-			generated.TransactionSignature{
-				Address:     sig.Address.String(),
-				SignerIndex: int32(sig.SignerIndex),
-				KeyIndex:    int32(sig.KeyIndex),
-				Signature:   toBase64(sig.Signature),
-			},
-		)
+	for i, sig := range signatures {
+		sigs[i] = generated.TransactionSignature{
+			Address:     sig.Address.String(),
+			SignerIndex: int32(sig.SignerIndex),
+			KeyIndex:    int32(sig.KeyIndex),
+			Signature:   toBase64(sig.Signature),
+		}
 	}
 
 	return sigs
@@ -464,10 +501,19 @@ func blockSealResponse(flowSeal *flow.Seal) (generated.BlockSeal, error) {
 	}, nil
 }
 
+func idsResponse(ids []flow.Identifier) []string {
+	res := make([]string, len(ids))
+	for x, i := range ids {
+		res[x] = i.String()
+	}
+
+	return res
+}
+
 func collectionResponse(flowCollection *flow.LightCollection) generated.Collection {
 	return generated.Collection{
 		Id:           flowCollection.ID().String(),
-		Transactions: nil, // todo(sideninja) we receive light collection with only transaction ids, should we fetch txs by default?
+		Transactions: idsResponse(flowCollection.Transactions),
 		Links:        nil,
 	}
 }

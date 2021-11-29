@@ -127,6 +127,21 @@ func AccountKeyFixture(
 	}, nil
 }
 
+// AccountFixture returns a randomly generated account.
+func AccountFixture() (*flow.Account, error) {
+	key, err := AccountKeyFixture(128, crypto.ECDSAP256, hash.SHA3_256)
+	if err != nil {
+		return nil, err
+	}
+
+	return &flow.Account{
+		Address:   RandomAddressFixture(),
+		Balance:   100,
+		Keys:      []flow.AccountPublicKey{key.PublicKey(1000)},
+		Contracts: nil,
+	}, nil
+}
+
 func BlockFixture() flow.Block {
 	header := BlockHeaderFixture()
 	return *BlockWithParentFixture(&header)

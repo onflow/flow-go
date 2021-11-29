@@ -55,11 +55,11 @@ func (rd *requestDecorator) selects() []string {
 
 func (rd *requestDecorator) getVar(name string) string {
 	vars := mux.Vars(rd.Request)
-	return vars[name] // todo(sideninja) check if exists
+	return vars[name] // todo(sideninja) consider returning err if non-existing
 }
 
 func (rd *requestDecorator) getQueryParam(name string) string {
-	return rd.Request.URL.Query().Get(name)
+	return rd.Request.URL.Query().Get(name) // todo(sideninja) consider returning err if non-existing
 }
 
 func (rd *requestDecorator) getQueryParams(name string) []string {
@@ -89,29 +89,29 @@ func (rd *requestDecorator) bodyAs(dst interface{}) error {
 
 		switch {
 		case errors.As(err, &syntaxError):
-			msg := fmt.Sprintf("Request body contains badly-formed JSON (at position %d)", syntaxError.Offset)
-			return NewBadRequestError(msg, err)
+			err := fmt.Errorf("request body contains badly-formed JSON (at position %d)", syntaxError.Offset)
+			return NewBadRequestError(err)
 
 		case errors.Is(err, io.ErrUnexpectedEOF):
-			msg := "Request body contains badly-formed JSON"
-			return NewBadRequestError(msg, err)
+			err := fmt.Errorf("request body contains badly-formed JSON")
+			return NewBadRequestError(err)
 
 		case errors.As(err, &unmarshalTypeError):
-			msg := fmt.Sprintf("Request body contains an invalid value for the %q field (at position %d)", unmarshalTypeError.Field, unmarshalTypeError.Offset)
-			return NewBadRequestError(msg, err)
+			err := fmt.Errorf("request body contains an invalid value for the %q field (at position %d)", unmarshalTypeError.Field, unmarshalTypeError.Offset)
+			return NewBadRequestError(err)
 
 		case strings.HasPrefix(err.Error(), "json: unknown field "):
 			fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
-			msg := fmt.Sprintf("Request body contains unknown field %s", fieldName)
-			return NewBadRequestError(msg, err)
+			err := fmt.Errorf("Request body contains unknown field %s", fieldName)
+			return NewBadRequestError(err)
 
 		case errors.Is(err, io.EOF):
-			msg := "Request body must not be empty"
-			return NewBadRequestError(msg, err)
+			err := fmt.Errorf("request body must not be empty")
+			return NewBadRequestError(err)
 
 		case err.Error() == "http: request body too large":
-			msg := "Request body must not be larger than 1MB"
-			return NewRestError(http.StatusRequestEntityTooLarge, msg, err)
+			err := fmt.Errorf("request body must not be larger than 1MB")
+			return NewRestError(http.StatusRequestEntityTooLarge, err.Error(), err)
 
 		default:
 			return err
@@ -120,25 +120,17 @@ func (rd *requestDecorator) bodyAs(dst interface{}) error {
 
 	err = dec.Decode(&struct{}{})
 	if err != io.EOF {
-		msg := "Request body must only contain a single JSON object"
-		return NewBadRequestError(msg, err)
+		err := fmt.Errorf("request body must only contain a single JSON object")
+		return NewBadRequestError(err)
 	}
 
 	return nil
 }
 
 func (rd *requestDecorator) ids() ([]flow.Identifier, error) {
-	vars := mux.Vars(rd.Request)
-	return toIDs(vars["id"])
+	return toIDs(rd.getVar("id"))
 }
 
 func (rd *requestDecorator) id() (flow.Identifier, error) {
-	ids, err := rd.ids()
-	if err != nil {
-		return flow.Identifier{}, err
-	}
-	if len(ids) != 1 {
-		return flow.Identifier{}, fmt.Errorf("invalid number of IDs")
-	}
-	return ids[0], nil
+	return toID(rd.getVar("id"))
 }

@@ -2,6 +2,8 @@ package rest
 
 import (
 	"encoding/json"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"net/http"
 
 	"github.com/rs/zerolog"
@@ -16,7 +18,7 @@ type ApiHandlerFunc func(
 	r *requestDecorator,
 	backend access.API,
 	generator LinkGenerator,
-) (interface{}, StatusError)
+) (interface{}, error)
 
 // Handler is custom http handler implementing custom handler function.
 // Handler function allows easier handling of errors and responses as it
@@ -44,14 +46,28 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// execute handler function and check for error
 	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
 	if err != nil {
-		switch e := err.(type) {
-		case StatusError: // todo(sideninja) try handle not found error.Code - grpc unwrap
+		// rest status type error
+		if e, ok := err.(StatusError); ok {
 			h.errorResponse(w, e.Status(), e.UserMessage(), errorLogger)
-		default:
-			h.errorResponse(w, http.StatusInternalServerError, e.Error(), errorLogger)
+			return
 		}
 
-		// stop going further
+		// grpc status error
+		if se, ok := err.(interface {
+			GRPCStatus() *status.Status
+		}); ok {
+			if se.GRPCStatus().Code() == codes.NotFound {
+				h.errorResponse(w, http.StatusNotFound, se.GRPCStatus().Message(), errorLogger)
+				return
+			}
+			if se.GRPCStatus().Code() == codes.InvalidArgument {
+				h.errorResponse(w, http.StatusBadRequest, se.GRPCStatus().Message(), errorLogger)
+				return
+			}
+		}
+
+		// stop going further - catch all error
+		h.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
 		return
 	}
 
@@ -73,7 +89,7 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logg
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	// serialise response to JSON and handler errors
-	encodedResponse, encErr := json.Marshal(response)
+	encodedResponse, encErr := json.MarshalIndent(response, "", "\t")
 	if encErr != nil {
 		h.logger.Error().Err(encErr).Msg("failed to encode response")
 		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)

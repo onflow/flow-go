@@ -18,11 +18,11 @@ const ExpandableFieldPayload = "payload"
 const ExpandableExecutionResult = "execution_result"
 
 // getBlocksByID gets blocks by provided ID or collection of IDs.
-func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 
 	ids, err := r.ids()
 	if err != nil {
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	blocks := make([]*generated.Block, len(ids))
@@ -38,7 +38,7 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 	return blocks, nil
 }
 
-func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, StatusError) {
+func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	heights := r.getQueryParams("height")
 	startHeight := r.getQueryParam("start_height")
 	endHeight := r.getQueryParam("end_height")
@@ -46,13 +46,13 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 	// if both height and one or both of start and end height are provided
 	if len(heights) > 0 && (startHeight != "" || endHeight != "") {
 		err := fmt.Errorf("can only provide either heights or start and end height range")
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	// if neither height nor start and end height are provided
 	if len(heights) == 0 && (startHeight == "" || endHeight == "") {
 		err := fmt.Errorf("must provide either heights or start and end height range")
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	var blocks []*generated.Block
@@ -61,7 +61,7 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 
 		heights, err := toHeights(heights)
 		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, NewBadRequestError(err)
 		}
 
 		blocks = make([]*generated.Block, len(heights))
@@ -79,16 +79,16 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 	if startHeight != "" && endHeight != "" {
 		start, err := toHeight(startHeight)
 		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, NewBadRequestError(err)
 		}
 		end, err := toHeight(endHeight)
 		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, NewBadRequestError(err)
 		}
 
 		if start > end {
 			err := fmt.Errorf("start height must be lower than end height")
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, NewBadRequestError(err)
 		}
 
 		for i := start; i < end; i++ {
@@ -105,11 +105,11 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 }
 
 // getBlockPayloadByID gets block payload by ID
-func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, StatusError) {
+func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, error) {
 
 	id, err := req.id()
 	if err != nil {
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	blkProvider := NewBlockProvider(backend, withID(&id))
@@ -125,7 +125,7 @@ func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenera
 	return payload, nil
 }
 
-func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.API, link LinkGenerator) (*generated.Block, StatusError) {
+func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.API, link LinkGenerator) (*generated.Block, error) {
 	var responseBlock = new(generated.Block)
 	responseBlock.Expandable = new(generated.BlockExpandable)
 
