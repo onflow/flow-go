@@ -24,6 +24,14 @@ func transactionResultURL(id string) string {
 	return fmt.Sprintf("/v1/transaction_results/%s", id)
 }
 
+func copyMap(in map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
 func TestGetTransactions(t *testing.T) {
 	backend := &mock.API{}
 
@@ -140,8 +148,6 @@ func TestGetTransactionResult(t *testing.T) {
 			}
 		}`, bid.String(), id.String(), id.String())
 
-		fmt.Println(rr.Body.String())
-
 		assert.Equal(t, http.StatusOK, rr.Code)
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
@@ -157,37 +163,40 @@ func TestGetTransactionResult(t *testing.T) {
 
 func TestCreateTransaction(t *testing.T) {
 	backend := &mock.API{}
+	tx := unittest.TransactionBodyFixture()
+	tx.Arguments = [][]uint8{} // fix how fixture creates nil values
+	tx.PayloadSignatures = []flow.TransactionSignature{}
+	auth := make([]string, len(tx.Authorizers))
+	for i, a := range tx.Authorizers {
+		auth[i] = a.String()
+	}
+
+	jsonTx := map[string]interface{}{
+		"script":             toBase64(tx.Script),
+		"arguments":          tx.Arguments,
+		"reference_block_id": tx.ReferenceBlockID.String(),
+		"gas_limit":          tx.GasLimit,
+		"payer":              tx.Payer.String(),
+		"proposal_key": map[string]interface{}{
+			"address":         tx.ProposalKey.Address.String(),
+			"key_index":       tx.ProposalKey.KeyIndex,
+			"sequence_number": tx.ProposalKey.SequenceNumber,
+		},
+		"authorizers": auth,
+		"envelope_signatures": []map[string]interface{}{{
+			"address":      tx.EnvelopeSignatures[0].Address.String(),
+			"signer_index": int32(tx.EnvelopeSignatures[0].SignerIndex),
+			"key_index":    int32(tx.EnvelopeSignatures[0].KeyIndex),
+			"signature":    toBase64(tx.EnvelopeSignatures[0].Signature),
+		}},
+	}
+	validBody, _ := json.Marshal(jsonTx)
 
 	t.Run("create", func(t *testing.T) {
-		tx := unittest.TransactionBodyFixture()
-		auth := make([]string, len(tx.Authorizers))
-		for i, a := range tx.Authorizers {
-			auth[i] = a.String()
-		}
-		validBody, _ := json.Marshal(map[string]interface{}{
-			"script":             toBase64(tx.Script),
-			"arguments":          tx.Arguments,
-			"reference_block_id": tx.ReferenceBlockID.String(),
-			"gas_limit":          tx.GasLimit,
-			"payer":              tx.Payer.String(),
-			"proposal_key": map[string]interface{}{
-				"address":         tx.ProposalKey.Address.String(),
-				"key_index":       tx.ProposalKey.KeyIndex,
-				"sequence_number": tx.ProposalKey.SequenceNumber,
-			},
-			"authorizers": auth,
-			"envelope_signatures": map[string]interface{}{
-				"address":      tx.EnvelopeSignatures[0].Address.String(),
-				"signer_index": int32(tx.EnvelopeSignatures[0].SignerIndex),
-				"key_index":    int32(tx.EnvelopeSignatures[0].KeyIndex),
-				"signature":    toBase64(tx.EnvelopeSignatures[0].Signature),
-			},
-		})
-
 		req, _ := http.NewRequest("POST", "/v1/transactions", bytes.NewBuffer(validBody))
 
 		backend.Mock.
-			On("SendTransaction", mocks.Anything, tx).
+			On("SendTransaction", mocks.Anything, &tx).
 			Return(nil)
 
 		rr := executeRequest(req, backend)
@@ -227,6 +236,36 @@ func TestCreateTransaction(t *testing.T) {
 		)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, expected, rr.Body.String())
+		assert.JSONEq(t, expected, rr.Body.String())
+	})
+
+	t.Run("create invalid", func(t *testing.T) {
+		tests := []struct {
+			inputField string
+			inputValue string
+			output     string
+		}{
+			{"reference_block_id", "-1", `{"code":400, "message":"invalid ID format"}`},
+			{"reference_block_id", "", `{"code":400, "message":"reference block not provided"}`},
+			{"gas_limit", "-1", `{"code":400, "message":"Request body contains an invalid value for the \"gas_limit\" field (at position 256)"}`},
+			{"payer", "yo", `{"code":400, "message":"invalid address"}`},
+			{"proposal_key", "yo", `{"code":400, "message":"Request body contains an invalid value for the \"proposal_key\" field (at position 301)"}`},
+			{"authorizers", "", `{"code":400, "message":"Request body contains an invalid value for the \"authorizers\" field (at position 32)"}`},
+			{"authorizers", "yo", `{"code":400, "message":"Request body contains an invalid value for the \"authorizers\" field (at position 34)"}`},
+			{"envelope_signatures", "", `{"code":400, "message":"Request body contains an invalid value for the \"envelope_signatures\" field (at position 75)"}`},
+			{"payload_signatures", "", `{"code":400, "message":"Request body contains an invalid value for the \"payload_signatures\" field (at position 305)"}`},
+		}
+
+		for i, test := range tests {
+			testTx := copyMap(jsonTx)
+			testTx[test.inputField] = test.inputValue
+			validBody, _ = json.Marshal(testTx)
+
+			req, _ := http.NewRequest("POST", "/v1/transactions", bytes.NewBuffer(validBody))
+			rr := executeRequest(req, backend)
+
+			assert.Equal(t, http.StatusBadRequest, rr.Code)
+			assert.JSONEq(t, test.output, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
+		}
 	})
 }

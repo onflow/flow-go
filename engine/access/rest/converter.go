@@ -162,13 +162,13 @@ func toTransactionSignature(transactionSignature *generated.TransactionSignature
 
 func toTransactionSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSignature, error) {
 	signatures := make([]flow.TransactionSignature, len(sigs))
-	for _, sig := range sigs {
+	for x, sig := range sigs {
 		signature, err := toTransactionSignature(&sig)
 		if err != nil {
 			return nil, err
 		}
 
-		signatures = append(signatures, signature)
+		signatures[x] = signature
 	}
 
 	return signatures, nil
@@ -198,6 +198,9 @@ func toTransaction(tx generated.TransactionsBody) (flow.TransactionBody, error) 
 	if tx.ReferenceBlockId == "" {
 		return flow.TransactionBody{}, fmt.Errorf("reference block not provided")
 	}
+	if len(tx.Authorizers) > maxAuthorizersCnt {
+		return flow.TransactionBody{}, fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizersCnt)
+	}
 	//if len(tx.Script) > MaxScriptLength { todo(sideninja) define limit
 	//	return flow.TransactionBody{}, fmt.Errorf("script exceeding the size limit")
 	//}
@@ -222,18 +225,14 @@ func toTransaction(tx generated.TransactionsBody) (flow.TransactionBody, error) 
 		return flow.TransactionBody{}, err
 	}
 
-	authorizerCnt := len(tx.Authorizers)
-	if authorizerCnt > maxAuthorizersCnt {
-		return flow.TransactionBody{}, fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizersCnt)
-	}
-	auths := make([]flow.Address, authorizerCnt)
-	for _, auth := range tx.Authorizers {
+	auths := make([]flow.Address, len(tx.Authorizers))
+	for x, auth := range tx.Authorizers {
 		a, err := toAddress(auth)
 		if err != nil {
 			return flow.TransactionBody{}, err
 		}
 
-		auths = append(auths, a)
+		auths[x] = a
 	}
 
 	payloadSigs, err := toTransactionSignatures(tx.PayloadSignatures)
