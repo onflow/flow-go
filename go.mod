@@ -57,7 +57,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/atree v0.1.0-beta1.0.20211027184039-559ee654ece9
 	github.com/onflow/cadence v0.20.1
-	github.com/onflow/flow v0.2.3-0.20211124175618-139cd856b0ee
+	github.com/onflow/flow v0.2.3-0.20211126025920-28e602de8f8b
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
 	github.com/onflow/flow-emulator v0.20.3
@@ -70,6 +70,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.10.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
+	github.com/rs/cors v1.8.0
 	github.com/rs/zerolog v1.19.0
 	github.com/schollz/progressbar/v3 v3.8.3
 	github.com/sethvargo/go-retry v0.1.0

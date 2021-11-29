@@ -83,10 +83,7 @@ func toHeight(height string) (uint64, error) {
 	return h, nil
 }
 
-func toHeights(height string) ([]uint64, error) {
-	height = strings.TrimSuffix(height, "]")
-	height = strings.TrimPrefix(height, "[")
-	rawHeights := strings.Fields(height)
+func toHeights(rawHeights []string) ([]uint64, error) {
 
 	if len(rawHeights) > MaxAllowedHeights {
 		return nil, fmt.Errorf("at most %d heights can be requested at a time", MaxAllowedHeights)

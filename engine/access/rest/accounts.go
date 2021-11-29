@@ -6,7 +6,7 @@ import (
 )
 
 func getAccount(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
-	address, err := toAddress(r.getParam("address"))
+	address, err := toAddress(r.getVar("address"))
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
