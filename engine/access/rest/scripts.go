@@ -13,7 +13,7 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 
 	if blockID != "" && blockHeight != "" {
 		err := fmt.Errorf("can not provide both block ID and block height")
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	var scriptBody generated.ScriptsBody
@@ -24,12 +24,12 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 
 	args, err := toScriptArgs(scriptBody)
 	if err != nil {
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	code, err := toScriptSource(scriptBody)
 	if err != nil {
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	if blockID == "latest" || blockHeight == "latest" {
@@ -43,7 +43,7 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 	if blockID != "" {
 		id, err := toID(blockID)
 		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, NewBadRequestError(err)
 		}
 
 		result, err := backend.ExecuteScriptAtBlockID(r.Context(), id, code, args)
@@ -57,7 +57,7 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 	if blockHeight != "" {
 		height, err := toHeight(blockHeight)
 		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, NewBadRequestError(err)
 		}
 
 		result, err := backend.ExecuteScriptAtBlockHeight(r.Context(), height, code, args)
@@ -68,8 +68,5 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 		return result, nil
 	}
 
-	return nil, NewBadRequestError(
-		err.Error(),
-		fmt.Errorf("either block ID or block height must be provided"),
-	)
+	return nil, NewBadRequestError(fmt.Errorf("either block ID or block height must be provided"))
 }

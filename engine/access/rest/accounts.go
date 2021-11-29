@@ -8,7 +8,7 @@ import (
 func getAccount(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	address, err := toAddress(r.getParam("address"))
 	if err != nil {
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	var account *flow.Account

@@ -15,7 +15,7 @@ func getExecutionResultByID(req *requestDecorator, backend access.API, link Link
 
 	id, err := req.id()
 	if err != nil {
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	executionResult, err := executionResultLookup(req.Context(), id, backend, link)

@@ -22,7 +22,7 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 
 	ids, err := r.ids()
 	if err != nil {
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	blocks := make([]*generated.Block, len(ids))
@@ -46,13 +46,13 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 	// if both height and one or both of start and end height are provided
 	if height != "" && (startHeight != "" || endHeight != "") {
 		err := fmt.Errorf("can only provide either heights or start and end height range")
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	// if neither height nor start and end height are provided
 	if height == "" && (startHeight == "" || endHeight == "") {
 		err := fmt.Errorf("must provide either heights or start and end height range")
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	blocks := make([]*generated.Block, len(height))
@@ -60,7 +60,7 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 	if height != "" {
 		heights, err := toHeights(height)
 		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, NewBadRequestError(err)
 		}
 
 		for i, h := range heights {
@@ -77,16 +77,16 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 	if startHeight != "" && endHeight != "" {
 		start, err := toHeight(startHeight)
 		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, NewBadRequestError(err)
 		}
 		end, err := toHeight(endHeight)
 		if err != nil {
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, NewBadRequestError(err)
 		}
 
 		if start > end {
 			err := fmt.Errorf("start height must be lower than end height")
-			return nil, NewBadRequestError(err.Error(), err)
+			return nil, NewBadRequestError(err)
 		}
 
 		for i := start; i < end; i++ {
@@ -107,7 +107,7 @@ func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenera
 
 	id, err := req.id()
 	if err != nil {
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	blkProvider := NewBlockProvider(backend, withID(&id))

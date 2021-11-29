@@ -29,10 +29,10 @@ func NewNotFoundError(msg string, err error) *RestError {
 }
 
 // NewBadRequestError creates a new bad request rest error.
-func NewBadRequestError(msg string, err error) *RestError {
+func NewBadRequestError(err error) *RestError {
 	return &RestError{
 		status:      http.StatusBadRequest,
-		userMessage: msg,
+		userMessage: err.Error(),
 		err:         err,
 	}
 }

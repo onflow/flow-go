@@ -7,7 +7,7 @@ import (
 func getCollectionByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := r.id()
 	if err != nil {
-		return nil, NewBadRequestError(err.Error(), err)
+		return nil, NewBadRequestError(err)
 	}
 
 	collection, err := backend.GetCollectionByID(r.Context(), id)
