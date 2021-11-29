@@ -12,7 +12,7 @@ func getAccount(r *requestDecorator, backend access.API, link LinkGenerator) (in
 	}
 
 	var account *flow.Account
-	height := r.getQuery("height")
+	height := r.getQueryParam("height")
 	if height == "latest" || height == "" {
 		account, err = backend.GetAccountAtLatestBlock(r.Context(), address)
 		if err != nil {

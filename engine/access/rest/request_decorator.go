@@ -58,12 +58,8 @@ func (rd *requestDecorator) getVar(name string) string {
 	return vars[name] // todo(sideninja) consider returning err if non-existing
 }
 
-func (rd *requestDecorator) getQuery(name string) string {
-	return rd.Request.URL.Query().Get(name) // todo(sideninja) consider returning err if non-existing
-}
-
 func (rd *requestDecorator) getQueryParam(name string) string {
-	return rd.Request.URL.Query().Get(name)
+	return rd.Request.URL.Query().Get(name) // todo(sideninja) consider returning err if non-existing
 }
 
 func (rd *requestDecorator) getQueryParams(name string) []string {
@@ -132,9 +128,9 @@ func (rd *requestDecorator) bodyAs(dst interface{}) error {
 }
 
 func (rd *requestDecorator) ids() ([]flow.Identifier, error) {
-	return toIDs(rd.getParam("id"))
+	return toIDs(rd.getVar("id"))
 }
 
 func (rd *requestDecorator) id() (flow.Identifier, error) {
-	return toID(rd.getParam("id"))
+	return toID(rd.getVar("id"))
 }
