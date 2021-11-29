@@ -263,7 +263,7 @@ func TestValueConversion(t *testing.T) {
 				),
 			},
 		}
-		ledgerView := newView(payloads)
+		ledgerView := NewView(payloads)
 
 		migration := &StorageFormatV6Migration{}
 		migration.initPersistentSlabStorage(ledgerView)
@@ -322,7 +322,7 @@ func TestValueConversion(t *testing.T) {
 				),
 			},
 		}
-		ledgerView := newView(payloads)
+		ledgerView := NewView(payloads)
 
 		migration := &StorageFormatV6Migration{}
 		migration.initPersistentSlabStorage(ledgerView)
@@ -390,7 +390,7 @@ func TestValueConversion(t *testing.T) {
 				),
 			},
 		}
-		ledgerView := newView(payloads)
+		ledgerView := NewView(payloads)
 
 		migration := &StorageFormatV6Migration{}
 		migration.initPersistentSlabStorage(ledgerView)
@@ -507,7 +507,7 @@ func TestEncoding(t *testing.T) {
 				),
 			},
 		}
-		ledgerView := newView(payloads)
+		ledgerView := NewView(payloads)
 
 		migration := &StorageFormatV6Migration{}
 		migration.initPersistentSlabStorage(ledgerView)
@@ -593,7 +593,7 @@ func TestEncoding(t *testing.T) {
 				),
 			},
 		}
-		ledgerView := newView(payloads)
+		ledgerView := NewView(payloads)
 
 		migration := &StorageFormatV6Migration{}
 		migration.initPersistentSlabStorage(ledgerView)
@@ -689,7 +689,7 @@ func TestEncoding(t *testing.T) {
 				),
 			},
 		}
-		ledgerView := newView(payloads)
+		ledgerView := NewView(payloads)
 
 		migration := &StorageFormatV6Migration{}
 		migration.initPersistentSlabStorage(ledgerView)
@@ -819,7 +819,7 @@ func TestPayloadsMigration(t *testing.T) {
 	}
 
 	// Check whether the query works with old ledger
-	ledgerView := newView(payloads)
+	ledgerView := NewView(payloads)
 	value, err := ledgerView.Get(string(owner[:]), "", "Test")
 	require.NoError(t, err)
 	assert.NotNil(t, value)
@@ -836,7 +836,7 @@ func TestPayloadsMigration(t *testing.T) {
 
 	// Check whether the query works with new ledger
 
-	migratedLedgerView := newView(migratedPayloads)
+	migratedLedgerView := NewView(migratedPayloads)
 
 	key := []byte{0, 0, 0, 0, 0, 0, 0, 3}
 	prefixedKey := []byte(atree.LedgerBaseStorageSlabPrefix + string(key))
@@ -984,7 +984,7 @@ func invokeContractFunction(
 	contractName string,
 	funcName string,
 ) (val cadence.Value, err error) {
-	ledgerView := newView(payloads)
+	ledgerView := NewView(payloads)
 
 	stateHolder := fvmState.NewStateHolder(
 		fvmState.NewState(ledgerView),
@@ -1107,7 +1107,7 @@ func TestDeferredValues(t *testing.T) {
 		})
 	}
 
-	ledgerView := newView(payloads)
+	ledgerView := NewView(payloads)
 
 	migration := &StorageFormatV6Migration{}
 	migration.initPersistentSlabStorage(ledgerView)

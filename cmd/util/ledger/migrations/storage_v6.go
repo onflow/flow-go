@@ -131,7 +131,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 		)
 	}
 
-	ledgerView := newView(fvmPayloads)
+	ledgerView := NewView(fvmPayloads)
 	m.initPersistentSlabStorage(ledgerView)
 
 	m.initNewInterpreter()
@@ -241,7 +241,7 @@ func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
 	accounts := state.NewAccounts(stateHolder)
 
 	m.storage = runtime.NewStorage(
-		newAccountsAtreeLedger(accounts),
+		NewAccountsAtreeLedger(accounts),
 		func(f func(), _ func(metrics runtime.Metrics, duration time.Duration)) {
 			f()
 		},
@@ -249,7 +249,7 @@ func (m *StorageFormatV6Migration) initPersistentSlabStorage(v *view) {
 }
 
 func (m *StorageFormatV6Migration) getAccounts(payloads []ledger.Payload) state.Accounts {
-	l := newView(payloads)
+	l := NewView(payloads)
 	st := state.NewState(l)
 	sth := state.NewStateHolder(st)
 	accounts := state.NewAccounts(sth)
@@ -478,7 +478,7 @@ func (m *StorageFormatV6Migration) initNewInterpreter() {
 }
 
 func (m *StorageFormatV6Migration) initOldInterpreter(payloads []ledger.Payload) {
-	storageView := newView(payloads)
+	storageView := NewView(payloads)
 
 	inter, err := oldInter.NewInterpreter(
 		nil,
