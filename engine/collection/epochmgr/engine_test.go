@@ -54,7 +54,8 @@ func newMockComponents() *mockComponents {
 	unittest.ReadyDoneify(components.hotstuff)
 	unittest.ReadyDoneify(components.aggregator)
 
-	// for now only aggregator supports Startable, mock only it
+	// for now only aggregator and hotstuff supports module.Startable, mock only it
+	components.hotstuff.On("Start", mock.Anything)
 	components.aggregator.On("Start", mock.Anything)
 
 	return components

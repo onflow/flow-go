@@ -60,11 +60,19 @@ func NewEpochComponents(
 	}
 
 	builder := component.NewComponentManagerBuilder()
+	// start new worker that will start child components and wait for them to finish
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// start hotstuff and aggregator
+		hotstuff.Start(ctx)
 		aggregator.Start(ctx)
+		// wait until all components start
 		<-util.AllReady(components.prop, components.sync, components.hotstuff, components.aggregator)
+		// signal that startup has finished and we are ready to go
 		ready()
-		<-util.AllDone(components.prop, components.sync, components.hotstuff, components.aggregator)
+		// wait until parent context is cancelled and component stops
+		<-util.AllDone(components.hotstuff, components.aggregator)
+		// once startable components are stopped we can stop our engines that don't support module.Startable
+		<-util.AllDone(components.prop, components.sync)
 	})
 	components.ComponentManager = builder.Build()
 
