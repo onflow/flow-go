@@ -6,6 +6,14 @@ import (
 	"sync"
 )
 
+// This file contains the implementation of a Blob Channel,
+// which represents an in-memory pipe for blob data.
+//
+// It is safe for the sender and receiver objects returned
+// from IncomingBlobChannel or OutgoingBlobChannel to be used
+// in parallel with each other. However, it is not safe to use
+// the same sender / receiver in parallel.
+
 const defaultInitialBufCapacity = 1 << 17 // 128 KiB
 
 var ErrClosedBlobChannel = errors.New("send/receive on closed blob channel")
