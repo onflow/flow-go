@@ -12,6 +12,7 @@ import (
 	"github.com/rs/zerolog"
 )
 
+// EpochCounterReporter reports the current epoch counter from the FlowEpoch smart contract.
 type EpochCounterReporter struct {
 	Chain flow.Chain
 	Log   zerolog.Logger
@@ -38,7 +39,12 @@ func (e *EpochCounterReporter) Report(payload []ledger.Payload) error {
 	script := fvm.Script(scriptCode)
 	err = vm.Run(ctx, script, l, prog)
 	if err != nil {
-		return fmt.Errorf("error running GetCurrentEpochCounter script: %w", err)
+		e.Log.
+			Error().
+			Err(err).
+			Msg("error running GetCurrentEpochCounter script")
+		// don't fail the rest of the reporters
+		return nil
 	}
 
 	if script.Err == nil && script.Value != nil {
@@ -47,7 +53,7 @@ func (e *EpochCounterReporter) Report(payload []ledger.Payload) error {
 			Info().
 			Uint64("epochCounter", epochCounter).
 			Str("flowEpochAddress", address.HexWithPrefix()).
-			Msgf("Fetched epoch counter from the FlowEpoch smart contract")
+			Msg("Fetched epoch counter from the FlowEpoch smart contract")
 	} else {
 		e.Log.
 			Error().

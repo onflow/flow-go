@@ -73,23 +73,23 @@ func extractExecutionState(
 
 	}
 	if report {
-		//reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
+		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
 
 		rs = []ledger.Reporter{
 			&reporters.EpochCounterReporter{
 				Log:   log,
 				Chain: chain,
 			},
-			// &reporters.AccountReporter{
-			// 	Log:   log,
-			// 	Chain: chain,
-			// 	RWF:   reportFileWriterFactory,
-			// },
-			// &reporters.BalanceReporter{
-			// 	Log:   log,
-			// 	Chain: chain,
-			// 	RWF:   reportFileWriterFactory,
-			// },
+			&reporters.AccountReporter{
+				Log:   log,
+				Chain: chain,
+				RWF:   reportFileWriterFactory,
+			},
+			&reporters.BalanceReporter{
+				Log:   log,
+				Chain: chain,
+				RWF:   reportFileWriterFactory,
+			},
 		}
 	}
 	newState, err := led.ExportCheckpointAt(
