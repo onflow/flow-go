@@ -5,20 +5,34 @@ import (
 )
 
 const bucketSize = uint64(16)
-const bucketNum = uint64(1000)
+
+type slotStruct struct {
+	kvCount uint64 // slot age
+	kvIndex uint32 // link to key value pair
+	sum32   uint32 // 32bits of key sha256
+}
+
+type keyBucket struct {
+	slots [bucketSize]slotStruct
+}
 
 type cachedEntity struct {
-	identifier flow.Identifier
-	entity     flow.Entity
+	id     flow.Identifier
+	owner  uint64
+	entity flow.Entity
 }
 
 // ArrayBackData implements an array-based generic memory pool backed by a fixed size array.
 type ArrayBackData struct {
-	flc [bucketSize * bucketNum]cachedEntity // first-level cache
+	limit   uint64
+	size    uint64 // total number of non-expired key-values
+	buckets []keyBucket
 }
 
-func NewArrayBackData() ArrayBackData {
-	bd := ArrayBackData{}
+func NewArrayBackData(limit uint32, oversizeFactor uint32) ArrayBackData {
+	bd := ArrayBackData{
+		limit: uint64(limit * oversizeFactor),
+	}
 	return bd
 }
 
