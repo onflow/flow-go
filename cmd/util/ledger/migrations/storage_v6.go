@@ -182,14 +182,18 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 
 	m.Log.Info().Msg("Re-encoding converted values complete")
 
+	m.clearProgress()
 	if m.emptyDeferredValues > 0 {
-		m.clearProgress()
 		m.Log.Warn().Msgf("empty deferred values found: %d", m.emptyDeferredValues)
+	} else {
+		m.Log.Info().Msgf("empty deferred values found: %d", m.emptyDeferredValues)
 	}
 
+	m.clearProgress()
 	if m.skippedValues > 0 {
-		m.clearProgress()
 		m.Log.Warn().Msgf("values not migrated: %d", m.skippedValues)
+	} else {
+		m.Log.Info().Msgf("values not migrated: %d", m.skippedValues)
 	}
 
 	return ledgerView.Payloads(), nil
@@ -673,16 +677,32 @@ func (m *StorageFormatV6Migration) updateBrokenContracts(payloads []ledger.Paylo
 		switch {
 		case ownerHex == "ac98da57ce4dd4ef" && strings.HasSuffix(key, "MessageBoard"):
 			payloads[index].Value = []byte(knownContract_ac98da57ce4dd4ef_MessageBoard)
-			m.Log.Info().Msg("contract updated: ac98da57ce4dd4ef.MessageBoard")
+			m.Log.Info().Msg("contract code updated: ac98da57ce4dd4ef.MessageBoard")
+			_, err := m.reportFile.WriteString("contract code updated: ac98da57ce4dd4ef.MessageBoard\n")
+			if err != nil {
+				panic(err)
+			}
 		case ownerHex == "dee35303492e5a0b" && strings.HasSuffix(key, "FlowIDTableStaking"):
 			payloads[index].Value = []byte(knownContract_dee35303492e5a0b_FlowIDTableStaking)
-			m.Log.Info().Msg("contract updated: dee35303492e5a0b.FlowIDTableStaking")
+			m.Log.Info().Msg("contract code updated: dee35303492e5a0b.FlowIDTableStaking")
+			_, err := m.reportFile.WriteString("contract code updated: dee35303492e5a0b.FlowIDTableStaking\n")
+			if err != nil {
+				panic(err)
+			}
 		case ownerHex == "1864ff317a35af46" && strings.HasSuffix(key, "FlowIDTableStaking"):
 			payloads[index].Value = []byte(knownContract_1864ff317a35af46_FlowIDTableStaking)
-			m.Log.Info().Msg("contract updated: 1864ff317a35af46.FlowIDTableStaking")
+			m.Log.Info().Msg("contract code updated: 1864ff317a35af46.FlowIDTableStaking")
+			_, err := m.reportFile.WriteString("contract code updated: 1864ff317a35af46.FlowIDTableStaking\n")
+			if err != nil {
+				panic(err)
+			}
 		case ownerHex == "ab273f724a1625df" && strings.HasSuffix(key, "MultiMessageBoard"):
 			payloads[index].Value = []byte(knownContract_ab273f724a1625df_MultiMessageBoard)
-			m.Log.Info().Msg("contract updated: ab273f724a1625df.MultiMessageBoard")
+			m.Log.Info().Msg("contract code updated: ab273f724a1625df.MultiMessageBoard")
+			_, err := m.reportFile.WriteString("contract code updated: ab273f724a1625df.MultiMessageBoard\n")
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 }
@@ -989,7 +1009,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 				),
 			)
 			if er != nil {
-				panic(err)
+				panic(er)
 			}
 		case runtime.Error:
 			if parsingCheckingErr, ok := err.Unwrap().(*runtime.ParsingCheckingError); ok {
@@ -1001,7 +1021,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 					),
 				)
 				if er != nil {
-					panic(err)
+					panic(er)
 				}
 			} else {
 				_, er := c.migration.reportFile.WriteString(
@@ -1011,7 +1031,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 					),
 				)
 				if er != nil {
-					panic(err)
+					panic(er)
 				}
 			}
 		case newInter.Error:
@@ -1022,7 +1042,7 @@ func (c *ValueConverter) Convert(value oldInter.Value, expectedType newInter.Sta
 				),
 			)
 			if er != nil {
-				panic(err)
+				panic(er)
 			}
 		default:
 			panic(err)
