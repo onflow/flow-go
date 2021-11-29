@@ -2,14 +2,17 @@ package reporters
 
 import (
 	"fmt"
+
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+
 	"github.com/onflow/flow-go/cmd/util/ledger/migrations"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/rs/zerolog"
 )
 
 // EpochCounterReporter reports the current epoch counter from the FlowEpoch smart contract.
