@@ -35,18 +35,18 @@ import (
 // RestAPITestSuite tests that the Access node serves the REST API defined via the OpenApi spec accurately
 type RestAPITestSuite struct {
 	suite.Suite
-	state      *protocol.State
-	snapshot   *protocol.Snapshot
-	epochQuery *protocol.EpochQuery
-	log        zerolog.Logger
-	net        *network.Network
-	request    *module.Requester
-	collClient *accessmock.AccessAPIClient
-	execClient *accessmock.ExecutionAPIClient
-	me         *module.Local
-	chainID    flow.ChainID
-	metrics    *metrics.NoopCollector
-	rpcEng     *rpc.Engine
+	state             *protocol.State
+	sealedSnaphost    *protocol.Snapshot
+	finalizedSnapshot *protocol.Snapshot
+	log               zerolog.Logger
+	net               *network.Network
+	request           *module.Requester
+	collClient        *accessmock.AccessAPIClient
+	execClient        *accessmock.ExecutionAPIClient
+	me                *module.Local
+	chainID           flow.ChainID
+	metrics           *metrics.NoopCollector
+	rpcEng            *rpc.Engine
 
 	// storage
 	blocks       *storagemock.Blocks
@@ -60,12 +60,11 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.log = zerolog.New(os.Stdout)
 	suite.net = new(network.Network)
 	suite.state = new(protocol.State)
-	suite.snapshot = new(protocol.Snapshot)
+	suite.sealedSnaphost = new(protocol.Snapshot)
+	suite.finalizedSnapshot = new(protocol.Snapshot)
 
-	suite.epochQuery = new(protocol.EpochQuery)
-	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
-	suite.snapshot.On("Epochs").Return(suite.epochQuery).Maybe()
+	suite.state.On("Sealed").Return(suite.sealedSnaphost, nil)
+	suite.state.On("Final").Return(suite.finalizedSnapshot, nil)
 	suite.blocks = new(storagemock.Blocks)
 	suite.headers = new(storagemock.Headers)
 	suite.transactions = new(storagemock.Transactions)
@@ -125,6 +124,11 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		testBlocks[i] = block
 		testBlockIDs[i] = block.ID().String()
 	}
+
+	sealedBlock := testBlocks[len(testBlocks)-1]
+	finalizedBlock := testBlocks[len(testBlocks)-2]
+	suite.sealedSnaphost.On("Head").Return(sealedBlock.Header, nil)
+	suite.finalizedSnapshot.On("Head").Return(finalizedBlock.Header, nil)
 
 	client := suite.restAPIClient()
 
@@ -215,9 +219,33 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 			assert.EqualValues(suite.T(), testBlocks[i].Header.Height, actualBlocks[i].Header.Height)
 		}
 
-		jsonBytes, err := json.MarshalIndent(actualBlocks, "", "\t")
+		//jsonBytes, err := json.MarshalIndent(actualBlocks, "", "\t")
+		//require.NoError(suite.T(), err)
+		//fmt.Println(string(jsonBytes))
+	})
+
+	suite.Run("GetBlockByHeight for height=final - happy path", func() {
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		actualBlocks, resp, err := client.BlocksApi.BlocksGet(ctx, optionsForFinalizedBlock("final"))
 		require.NoError(suite.T(), err)
-		fmt.Println(string(jsonBytes))
+		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
+		assert.Len(suite.T(), actualBlocks, 1)
+		assert.Equal(suite.T(), finalizedBlock.ID().String(), actualBlocks[0].Header.Id)
+	})
+
+	suite.Run("GetBlockByHeight for height=sealed happy path", func() {
+
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
+		defer cancel()
+
+		actualBlocks, resp, err := client.BlocksApi.BlocksGet(ctx, optionsForFinalizedBlock("sealed"))
+		require.NoError(suite.T(), err)
+		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
+		assert.Len(suite.T(), actualBlocks, 1)
+		assert.Equal(suite.T(), sealedBlock.ID().String(), actualBlocks[0].Header.Id)
 	})
 
 	suite.Run("GetBlockByID with a non-existing block ID", func() {
@@ -334,5 +362,13 @@ func optionsForBlockByHeights(heights []uint64) *restclient.BlocksApiBlocksGetOp
 		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
 		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
 		Height:  optional.NewInterface(heights),
+	}
+}
+
+func optionsForFinalizedBlock(finalOrSealed string) *restclient.BlocksApiBlocksGetOpts {
+	return &restclient.BlocksApiBlocksGetOpts{
+		Expand:  optional.NewInterface([]string{rest.ExpandableFieldPayload}),
+		Select_: optional.NewInterface([]string{"header.id", "header.height"}),
+		Height:  optional.NewInterface(finalOrSealed),
 	}
 }
