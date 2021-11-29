@@ -107,7 +107,7 @@ func toHeights(height string) ([]uint64, error) {
 func toAddress(address string) (flow.Address, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{16}$`, address)
 	if !valid {
-		return flow.Address{}, errors.New("invalid address")
+		return flow.Address{}, fmt.Errorf("invalid address")
 	}
 
 	return flow.HexToAddress(address), nil

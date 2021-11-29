@@ -9,7 +9,7 @@ import (
 func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := r.id()
 	if err != nil {
-		return nil, NewBadRequestError("invalid ID", err)
+		return nil, NewBadRequestError(err.Error(), err)
 	}
 
 	tx, err := backend.GetTransaction(r.Context(), id)
@@ -23,7 +23,7 @@ func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenera
 func getTransactionResultByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := r.id()
 	if err != nil {
-		return nil, NewBadRequestError("invalid ID", err)
+		return nil, NewBadRequestError(err.Error(), err)
 	}
 
 	txr, err := backend.GetTransactionResult(r.Context(), id)

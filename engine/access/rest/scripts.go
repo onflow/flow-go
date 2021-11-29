@@ -19,7 +19,7 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 	var scriptBody generated.ScriptsBody
 	err := r.bodyAs(&scriptBody)
 	if err != nil {
-		return nil, NewBadRequestError("invalid script execution request", err)
+		return nil, err
 	}
 
 	args, err := toScriptArgs(scriptBody)
