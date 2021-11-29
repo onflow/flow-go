@@ -16,6 +16,8 @@ import (
 
 const ExpandableFieldPayload = "payload"
 const ExpandableExecutionResult = "execution_result"
+const sealedHeightQueryParam = "sealed"
+const finalHeightQueryParam = "final"
 
 // getBlocksByID gets blocks by provided ID or collection of IDs.
 func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
@@ -27,7 +29,7 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 
 	blocks := make([]*generated.Block, len(ids))
 	for i, id := range ids {
-		blkProvider := NewBlockProvider(backend, withID(&id))
+		blkProvider := NewBlockProvider(backend, forID(&id))
 		block, err := getBlock(blkProvider, r, backend, link)
 		if err != nil {
 			return nil, err
@@ -59,6 +61,20 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 
 	if len(heights) > 0 {
 
+		blocks = make([]*generated.Block, len(heights))
+
+		// if the query is /blocks/final or /blocks/sealed, lookup latest finalized or finalized + sealed block
+		if heights[0] == finalHeightQueryParam || heights[0] == sealedHeightQueryParam {
+			blkProvider := NewBlockProvider(backend, forFinalized(heights[0]))
+			block, err := getBlock(blkProvider, r, backend, link)
+			if err != nil {
+				return nil, err
+			}
+			blocks[0] = block
+			return blocks, nil
+		}
+
+		// if the query is /blocks/height=1000,1008,1049...
 		heights, err := toHeights(heights)
 		if err != nil {
 			return nil, NewBadRequestError(err)
@@ -66,7 +82,7 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 
 		blocks = make([]*generated.Block, len(heights))
 		for i, h := range heights {
-			blkProvider := NewBlockProvider(backend, withHeight(h))
+			blkProvider := NewBlockProvider(backend, forHeight(h))
 			block, err := getBlock(blkProvider, r, backend, link)
 			if err != nil {
 				return nil, err
@@ -92,7 +108,7 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 		}
 
 		for i := start; i < end; i++ {
-			blkProvider := NewBlockProvider(backend, withHeight(i))
+			blkProvider := NewBlockProvider(backend, forHeight(i))
 			block, err := getBlock(blkProvider, r, backend, link)
 			if err != nil {
 				return nil, err
@@ -112,7 +128,7 @@ func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenera
 		return nil, NewBadRequestError(err)
 	}
 
-	blkProvider := NewBlockProvider(backend, withID(&id))
+	blkProvider := NewBlockProvider(backend, forID(&id))
 	blk, statusErr := blkProvider.getBlock(req.Context())
 	if statusErr != nil {
 		return nil, statusErr
@@ -216,19 +232,33 @@ func heightLookupError(height uint64, entityType string, err error) StatusError 
 type blockProvider struct {
 	id      *flow.Identifier
 	height  uint64
+	final   bool
+	sealed  bool
 	backend access.API
 }
 
 type blockProviderOption func(blkProvider *blockProvider)
 
-func withID(id *flow.Identifier) blockProviderOption {
+func forID(id *flow.Identifier) blockProviderOption {
 	return func(blkProvider *blockProvider) {
 		blkProvider.id = id
 	}
 }
-func withHeight(height uint64) blockProviderOption {
+func forHeight(height uint64) blockProviderOption {
 	return func(blkProvider *blockProvider) {
 		blkProvider.height = height
+	}
+}
+
+func forFinalized(queryParam string) blockProviderOption {
+	return func(blkProvider *blockProvider) {
+		switch queryParam {
+		case sealedHeightQueryParam:
+			blkProvider.sealed = true
+			fallthrough
+		case finalHeightQueryParam:
+			blkProvider.final = true
+		}
 	}
 }
 
@@ -251,6 +281,16 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, St
 		}
 		return blk, nil
 	}
+
+	if blkProvider.final {
+		blk, err := blkProvider.backend.GetLatestBlock(ctx, blkProvider.sealed)
+		if err != nil {
+			// cannot be a 'not found' error since final and sealed block should always be found
+			return nil, NewRestError(http.StatusInternalServerError, "block lookup failed", err)
+		}
+		return blk, nil
+	}
+
 	blk, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
 	if err != nil {
 		return nil, heightLookupError(blkProvider.height, "block", err)
@@ -266,6 +306,16 @@ func (blkProvider *blockProvider) getHeader(ctx context.Context) (*flow.Header, 
 		}
 		return header, nil
 	}
+
+	if blkProvider.final {
+		blk, err := blkProvider.backend.GetLatestBlockHeader(ctx, blkProvider.sealed)
+		if err != nil {
+			// cannot be a 'not found' error since final and sealed block should always be found
+			return nil, NewRestError(http.StatusInternalServerError, "block lookup failed", err)
+		}
+		return blk, nil
+	}
+
 	header, err := blkProvider.backend.GetBlockHeaderByHeight(ctx, blkProvider.height)
 	if err != nil {
 		return nil, heightLookupError(blkProvider.height, "block", err)
