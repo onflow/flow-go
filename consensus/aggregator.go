@@ -14,15 +14,17 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// HotstuffModules is a helper structure which helps to initialize hotstuff modules
+// It contains main dependencies that are needed to inittialize hotstuff hotstuff.VoteAggregator and hotstuff.EventLoop
 type HotstuffModules struct {
-	Forks                hotstuff.Forks
-	Validator            hotstuff.Validator
-	Notifier             hotstuff.Consumer
-	Committee            hotstuff.Committee
-	Signer               hotstuff.SignerVerifier
-	Persist              hotstuff.Persister
-	Aggregator           hotstuff.VoteAggregator
-	QCCreatedDistributor *pubsub.QCCreatedDistributor
+	Forks                hotstuff.Forks               // information about multiple forks
+	Validator            hotstuff.Validator           // validator of proposals & votes
+	Notifier             hotstuff.Consumer            // observer for hotstuff events
+	Committee            hotstuff.Committee           // consensus committee
+	Signer               hotstuff.SignerVerifier      // signer of proposal & votes
+	Persist              hotstuff.Persister           // last state of consensus participant
+	Aggregator           hotstuff.VoteAggregator      // aggregator of votes, used by leader
+	QCCreatedDistributor *pubsub.QCCreatedDistributor // observer for qc created event, used by leader
 }
 
 // NewVoteAggregator creates new VoteAggregator and recover the Forks' state with all pending block
