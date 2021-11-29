@@ -113,7 +113,7 @@ type CombinedVoteProcessorV2 struct {
 	done             atomic.Bool
 }
 
-var _ hotstuff.VoteProcessor = &CombinedVoteProcessorV2{}
+var _ hotstuff.VoteProcessor = (*CombinedVoteProcessorV2)(nil)
 
 // Block returns block that is part of proposal that we are processing votes for.
 func (p *CombinedVoteProcessorV2) Block() *model.Block {

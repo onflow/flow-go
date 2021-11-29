@@ -10,7 +10,7 @@ import (
 // doesn't do anything.
 type NoopConsumer struct{}
 
-var _ hotstuff.Consumer = &NoopConsumer{}
+var _ hotstuff.Consumer = (*NoopConsumer)(nil)
 
 func NewNoopConsumer() *NoopConsumer {
 	nc := &NoopConsumer{}

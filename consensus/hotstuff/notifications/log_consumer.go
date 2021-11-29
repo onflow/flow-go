@@ -15,7 +15,7 @@ type LogConsumer struct {
 	log zerolog.Logger
 }
 
-var _ hotstuff.Consumer = &LogConsumer{}
+var _ hotstuff.Consumer = (*LogConsumer)(nil)
 
 func NewLogConsumer(log zerolog.Logger) *LogConsumer {
 	lc := &LogConsumer{

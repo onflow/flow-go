@@ -36,9 +36,9 @@ type VoteAggregatorV2 struct {
 	queuedVotes         *fifoqueue.FifoQueue
 }
 
-var _ hotstuff.VoteAggregatorV2 = &VoteAggregatorV2{}
-var _ module.ReadyDoneAware = &VoteAggregatorV2{}
-var _ module.Startable = &VoteAggregatorV2{}
+var _ hotstuff.VoteAggregatorV2 = (*VoteAggregatorV2)(nil)
+var _ module.ReadyDoneAware = (*VoteAggregatorV2)(nil)
+var _ module.Startable = (*VoteAggregatorV2)(nil)
 
 // NewVoteAggregatorV2 creates an instance of vote aggregator
 // Note: verifyingProcessorFactory is injected. Thereby, the code is agnostic to the

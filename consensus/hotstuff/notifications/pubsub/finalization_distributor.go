@@ -19,7 +19,7 @@ type FinalizationDistributor struct {
 	lock                          sync.RWMutex
 }
 
-var _ hotstuff.Consumer = &FinalizationDistributor{}
+var _ hotstuff.Consumer = (*FinalizationDistributor)(nil)
 
 func NewFinalizationDistributor() *FinalizationDistributor {
 	return &FinalizationDistributor{
