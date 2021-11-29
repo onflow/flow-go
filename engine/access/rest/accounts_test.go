@@ -2,13 +2,15 @@ package rest
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	mocks "github.com/stretchr/testify/mock"
 	"net/http"
 	"net/url"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	mocks "github.com/stretchr/testify/mock"
+
+	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func accountURL(address string, height string) string {

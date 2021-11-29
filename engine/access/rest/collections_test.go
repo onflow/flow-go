@@ -4,18 +4,21 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/model/flow"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/utils/unittest"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
+
+	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func executeRequest(req *http.Request, backend *mock.API) *httptest.ResponseRecorder {

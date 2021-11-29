@@ -5,15 +5,17 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/model/flow"
+	"net/http"
+	"net/url"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"net/http"
-	"net/url"
-	"testing"
+
+	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 func scriptsURL(id string, height string) string {

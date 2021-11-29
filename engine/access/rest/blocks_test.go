@@ -2,14 +2,16 @@ package rest
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/assert"
-	mocks "github.com/stretchr/testify/mock"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	mocks "github.com/stretchr/testify/mock"
+
+	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func blockURL(ids []string, start uint64, end uint64, payload bool) string {
