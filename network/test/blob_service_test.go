@@ -76,11 +76,13 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 		tops[i] = &conditionalTopology{topology.NewFullyConnectedTopology(), topologyActive.Load}
 	}
 
-	ids, mws, networks, _, cancel := GenerateIDsMiddlewaresNetworks(
-		suite.T(), suite.numNodes, logger, 100, tops, WithDHTOpts(p2p.AsServer(true)), WithPeerManagerOpts(p2p.WithInterval(time.Second)),
+	ctx, cancel := context.WithCancel(context.Background())
+	suite.cancel = cancel
+
+	ids, mws, networks, _ := GenerateIDsMiddlewaresNetworks(
+		ctx, suite.T(), suite.numNodes, logger, 100, tops, WithDHTOpts(p2p.AsServer(true)), WithPeerManagerOpts(p2p.WithInterval(time.Second)),
 	)
 	suite.networks = networks
-	suite.cancel = cancel
 
 	blobExchangeChannel := network.Channel("blob-exchange")
 

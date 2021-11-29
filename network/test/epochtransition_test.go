@@ -175,10 +175,11 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 
 // addNodes creates count many new nodes and appends them to the suite state variables
 func (suite *MutableIdentityTableSuite) addNodes(count int) {
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// create the ids, middlewares and networks
-	ids, mws, nets, _, cancel := GenerateIDsMiddlewaresNetworks(
-		suite.T(), count, suite.logger, 100, nil,
+	ids, mws, nets, _ := GenerateIDsMiddlewaresNetworks(
+		ctx, suite.T(), count, suite.logger, 100, nil,
 	)
 	suite.cancels = append(suite.cancels, cancel)
 

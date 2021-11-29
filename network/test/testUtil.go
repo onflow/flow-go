@@ -168,14 +168,16 @@ func GenerateMiddlewares(t *testing.T, logger zerolog.Logger, identities flow.Id
 }
 
 // GenerateNetworks generates the network for the given middlewares
-func GenerateNetworks(t *testing.T,
+func GenerateNetworks(
+	ctx context.Context,
+	t *testing.T,
 	log zerolog.Logger,
 	ids flow.IdentityList,
 	mws []network.Middleware,
 	csize int,
 	tops []network.Topology,
 	sms []network.SubscriptionManager,
-) ([]network.Network, context.CancelFunc) {
+) []network.Network {
 	count := len(ids)
 	nets := make([]network.Network, 0)
 	metrics := metrics.NewNoopCollector()
@@ -220,7 +222,6 @@ func GenerateNetworks(t *testing.T,
 		nets = append(nets, net)
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
 	netCtx, errChan := irrecoverable.WithSignaler(ctx)
 
 	go func() {
@@ -237,7 +238,7 @@ func GenerateNetworks(t *testing.T,
 		<-net.Ready()
 	}
 
-	return nets, cancel
+	return nets
 }
 
 // GenerateIDsAndMiddlewares returns nodeIDs, middlewares, and observables which can be subscirbed to in order to witness protect events from pubsub
@@ -283,18 +284,19 @@ func WithConnectionGating(enabled bool) func(*optsConfig) {
 	}
 }
 
-func GenerateIDsMiddlewaresNetworks(t *testing.T,
+func GenerateIDsMiddlewaresNetworks(
+	ctx context.Context,
+	t *testing.T,
 	n int,
 	log zerolog.Logger,
 	csize int,
 	tops []network.Topology,
 	opts ...func(*optsConfig),
-) (flow.IdentityList, []network.Middleware, []network.Network, []observable.Observable, context.CancelFunc) {
-
+) (flow.IdentityList, []network.Middleware, []network.Network, []observable.Observable) {
 	ids, mws, observables, _ := GenerateIDsAndMiddlewares(t, n, log, opts...)
 	sms := GenerateSubscriptionManagers(t, mws)
-	networks, netCancel := GenerateNetworks(t, log, ids, mws, csize, tops, sms)
-	return ids, mws, networks, observables, netCancel
+	networks := GenerateNetworks(ctx, t, log, ids, mws, csize, tops, sms)
+	return ids, mws, networks, observables
 }
 
 // GenerateEngines generates MeshEngines for the given networks
