@@ -1,0 +1,215 @@
+{
+  "tests": 
+    {
+      "github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPrivKey":
+      {
+        "test": "TestEncodableNetworkPrivKey",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPrivKeyNil":
+      {
+        "test": "TestEncodableNetworkPrivKeyNil",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPubKey":
+      {
+        "test": "TestEncodableNetworkPubKey",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableNetworkPubKeyNil":
+      {
+        "test": "TestEncodableNetworkPubKeyNil",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKey":
+      {
+        "test": "TestEncodableRandomBeaconPrivKey",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyNil":
+      {
+        "test": "TestEncodableRandomBeaconPrivKeyNil",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPubKey":
+      {
+        "test": "TestEncodableRandomBeaconPubKey",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPubKeyNil":
+      {
+        "test": "TestEncodableRandomBeaconPubKeyNil",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableStakingPrivKey":
+      {
+        "test": "TestEncodableStakingPrivKey",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableStakingPrivKeyNil":
+      {
+        "test": "TestEncodableStakingPrivKeyNil",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableStakingPubKey":
+      {
+        "test": "TestEncodableStakingPubKey",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableStakingPubKeyNil":
+      {
+        "test": "TestEncodableStakingPubKeyNil",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestIsHexString":
+      {
+        "test": "TestIsHexString",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 3,
+        "passed": 3,
+        "failed": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0
+        ]
+      },
+
+      "github.com/onflow/flow-go/model/encodable/TestEncodableRandomBeaconPrivKeyMsgPack":
+      {
+        "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+        "package": "github.com/onflow/flow-go/model/encodable",
+        "runs": 14,
+        "passed": 1,
+        "failed": 0,
+        "no_result": 13,
+        "failure_rate": 0,
+        "average_duration": 0,
+        "durations": [
+          0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        ]
+      }
+
+    } 
+}

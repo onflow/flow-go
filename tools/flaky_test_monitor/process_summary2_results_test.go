@@ -13,6 +13,7 @@ func TestProcessSummary2TestRun(t *testing.T) {
 	testDataMap := map[string]string{
 		"1 level 1 summary, 1 failure the rest pass":    "test1-1package-1failure",
 		"1 level 1 summary, 1 nil test, no other tests": "test2-1nil-test",
+		"many level 1 summaries, many nil tests":        "test3-multi-nil-tests",
 	}
 
 	for k, testDir := range testDataMap {
@@ -105,7 +106,7 @@ func runProcessSummary2TestRun(t *testing.T, testDir string) {
 
 	// expected test summary `failures` directory only has placeholder file with no expected failures
 	if len(expectedFailureDirEntries) == 1 && strings.HasPrefix(expectedFailureDirEntries[0].Name(), ".") {
-		// all expected `failures` sub-directories will have a ".placeholder" file to force saving empty
+		// all expected `failures` sub-directories with no expected failues will have a ".keep" file to force saving empty
 		// directory to git when there are no expected failures - we need to not count this placeholder file
 		require.Equal(t, 0, len(actualFailureDirEntries))
 	} else {
