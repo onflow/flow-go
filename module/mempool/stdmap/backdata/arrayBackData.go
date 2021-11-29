@@ -1,20 +1,21 @@
 package backdata
 
 import (
+	"encoding/binary"
+
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const bucketSize = uint64(16)
 
-type slotStruct struct {
-	kvCount uint64 // slot age
-	kvIndex uint32 // link to key value pair
-	sum32   uint32 // 32bits of key sha256
+type key struct {
+	keyIndex   uint64 // slot age
+	valueIndex uint32 // link to key value pair
+	idPrefix   uint32 // 32bits of key sha256
 }
 
-type keyBucket struct {
-	slots [bucketSize]slotStruct
-}
+// keyBucket represents a bucket of keys.
+type keyBucket [bucketSize]key
 
 type cachedEntity struct {
 	id     flow.Identifier
@@ -24,15 +25,22 @@ type cachedEntity struct {
 
 // ArrayBackData implements an array-based generic memory pool backed by a fixed size array.
 type ArrayBackData struct {
-	limit   uint64
-	size    uint64 // total number of non-expired key-values
-	buckets []keyBucket
+	limit    uint64
+	size     uint64 // total number of non-expired key-values
+	buckets  []keyBucket
+	entities []cachedEntity
 }
 
 func NewArrayBackData(limit uint32, oversizeFactor uint32) ArrayBackData {
+	// total buckets
+	bucketNum := uint64(limit*oversizeFactor) / bucketSize
+
 	bd := ArrayBackData{
-		limit: uint64(limit * oversizeFactor),
+		limit:    uint64(limit * oversizeFactor),
+		buckets:  make([]keyBucket, bucketNum),
+		entities: make([]cachedEntity, limit),
 	}
+
 	return bd
 }
 
@@ -80,4 +88,8 @@ func (a *ArrayBackData) Clear() {
 // Hash will use a merkle root hash to hash all items.
 func (a *ArrayBackData) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(a.All())...)
+}
+
+func uint64Prefix(id flow.Identifier) uint64 {
+	return binary.LittleEndian.Uint64(id[:64])
 }
