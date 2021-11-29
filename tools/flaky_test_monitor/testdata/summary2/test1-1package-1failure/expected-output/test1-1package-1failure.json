@@ -3,17 +3,17 @@
     {
       "github.com/onflow/flow-go/crypto/hash/TestSanitySha3_256":
       {
-      "test": "TestSanitySha3_256",
-      "package": "github.com/onflow/flow-go/crypto/hash",
-      "runs": 1,
-      "passed": 0,
-      "failed": 1,
-      "no_result": 0,
-      "failure_rate": 100,
-      "average_duration": 0,
-      "durations": [
-        0
-      ]
+        "test": "TestSanitySha3_256",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 1,
+        "passed": 0,
+        "failed": 1,
+        "no_result": 0,
+        "failure_rate": 100,
+        "average_duration": 0,
+        "durations": [
+          0
+        ]
       },
 
       "github.com/onflow/flow-go/crypto/hash/TestSanitySha3_384":
