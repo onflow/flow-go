@@ -603,7 +603,7 @@ func main() {
 				QCCreatedDistributor: pubsub.NewQCCreatedDistributor(),
 			}
 
-			hotstuffModules, err = consensus.InitForks(
+			hfForks, err := consensus.NewForks(
 				finalized,
 				node.Storage.Headers,
 				finalize,
@@ -614,7 +614,8 @@ func main() {
 			if err != nil {
 				return nil, err
 			}
-			hotstuffModules = consensus.InitValidator(mainMetrics, hotstuffModules)
+			hotstuffModules.Forks = hfForks
+			hotstuffModules.Validator = consensus.NewValidator(mainMetrics, hotstuffModules)
 
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
 

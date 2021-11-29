@@ -233,10 +233,10 @@ func createNode(
 		QCCreatedDistributor: pubsub.NewQCCreatedDistributor(),
 	}
 
-	hotstuffModules, err = consensus.InitForks(rootHeader, headersDB, final, hotstuffModules, rootHeader, rootQC)
+	hotstuffModules.Forks, err = consensus.NewForks(rootHeader, headersDB, final, hotstuffModules, rootHeader, rootQC)
 	require.NoError(t, err)
 
-	hotstuffModules = consensus.InitValidator(metrics, hotstuffModules)
+	hotstuffModules.Validator = consensus.NewValidator(metrics, hotstuffModules)
 	require.NoError(t, err)
 
 	started, err := hotstuffModules.Persist.GetStarted()

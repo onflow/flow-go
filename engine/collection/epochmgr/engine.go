@@ -176,7 +176,7 @@ func (e *Engine) Ready() <-chan struct{} {
 		epochs := make([]module.ReadyDoneAware, 0, len(e.epochs))
 		for _, epoch := range e.epochs {
 			epochs = append(epochs, epoch)
-			epoch.Start(epoch.signalerCtx) // start every component using it's own context
+			epoch.Start(epoch.signalerCtx) // start every component using its own context
 		}
 		// wait for all engines to start
 		<-util.AllReady(epochs...)

@@ -25,6 +25,7 @@ type HotstuffModules struct {
 	QCCreatedDistributor *pubsub.QCCreatedDistributor
 }
 
+// NewVoteAggregator creates new VoteAggregator and recover the Forks' state with all pending block
 func NewVoteAggregator(
 	log zerolog.Logger,
 	finalized *flow.Header,

@@ -23,7 +23,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 )
 
-// NewParticipant initialize the EventLoop instance and recover the Forks' state with all pending block
+// NewParticipant initialize the EventLoop instance with needed dependencies
 func NewParticipant(
 	log zerolog.Logger,
 	metrics module.HotstuffMetrics,
@@ -122,8 +122,9 @@ func NewParticipant(
 	return loop, nil
 }
 
-func InitForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, modules *HotstuffModules, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*HotstuffModules, error) {
-	finalizer, err := initFinalizer(final, headers, updater, modules.Notifier, rootHeader, rootQC)
+// NewForks creates new consensus forks manager
+func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, modules *HotstuffModules, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (hotstuff.Forks, error) {
+	finalizer, err := newFinalizer(final, headers, updater, modules.Notifier, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
 	}
@@ -135,19 +136,18 @@ func InitForks(final *flow.Header, headers storage.Headers, updater module.Final
 	}
 
 	// initialize the Forks manager
-	modules.Forks = forks.New(finalizer, forkchoice)
-
-	return modules, nil
+	return forks.New(finalizer, forkchoice), nil
 }
 
-func InitValidator(metrics module.HotstuffMetrics, modules *HotstuffModules) *HotstuffModules {
+// NewValidator creates new instance of hotstuff validator needed for votes & proposal validation
+func NewValidator(metrics module.HotstuffMetrics, modules *HotstuffModules) hotstuff.Validator {
 	// initialize the Validator
-	modules.Validator = validatorImpl.New(modules.Committee, modules.Forks, modules.Signer)
-	modules.Validator = validatorImpl.NewMetricsWrapper(modules.Validator, metrics) // wrapper for measuring time spent in Validator component
-	return modules
+	validator := validatorImpl.New(modules.Committee, modules.Forks, modules.Signer)
+	return validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 }
 
-func initFinalizer(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*finalizer.Finalizer, error) {
+// newFinalizer recovers trusted root and creates new finalizer
+func newFinalizer(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*finalizer.Finalizer, error) {
 	// recover the trusted root
 	trustedRoot, err := recoverTrustedRoot(final, headers, rootHeader, rootQC)
 	if err != nil {
@@ -163,6 +163,7 @@ func initFinalizer(final *flow.Header, headers storage.Headers, updater module.F
 	return finalizer, nil
 }
 
+// recoverTrustedRoot based on our local state returns root block and QC that can be used to initialize base state
 func recoverTrustedRoot(final *flow.Header, headers storage.Headers, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (*forks.BlockQC, error) {
 	if final.View < rootHeader.View {
 		return nil, fmt.Errorf("finalized Block has older view than trusted root")

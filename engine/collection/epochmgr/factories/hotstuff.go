@@ -95,7 +95,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 		return nil, err
 	}
 
-	hotstuffModules, err = consensus.InitForks(
+	hfForks, err := consensus.NewForks(
 		finalized,
 		headers,
 		updater,
@@ -106,7 +106,8 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	if err != nil {
 		return nil, err
 	}
-	hotstuffModules = consensus.InitValidator(metrics, hotstuffModules)
+	hotstuffModules.Forks = hfForks
+	hotstuffModules.Validator = consensus.NewValidator(metrics, hotstuffModules)
 
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(hotstuffModules.Committee,
 		hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
