@@ -222,7 +222,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
-			fnb.RootBlock.ID(),
+			fnb.SporkID,
 			fnb.BaseConfig.UnicastMessageTimeout,
 			true,
 			fnb.IDTranslator,
