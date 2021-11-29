@@ -423,33 +423,14 @@ func TestValueConversion(t *testing.T) {
 		t.Run("nonstorable", func(t *testing.T) {
 			t.Parallel()
 
-			type conversionPair struct {
-				oldValue         oldInter.Value
-				expectedNewValue newInter.Value
-			}
-
-			conversions := []conversionPair{
-				{
-					oldValue:         oldInter.BoundFunctionValue{},
-					expectedNewValue: newInter.BoundFunctionValue{},
-				},
-				{
-					oldValue:         &oldInter.InterpretedFunctionValue{},
-					expectedNewValue: &newInter.InterpretedFunctionValue{},
-				},
-				{
-					oldValue: oldInter.NewHostFunctionValue(
-						func(invocation oldInter.Invocation) oldInter.Value {
-							return oldInter.NilValue{}
-						},
-					),
-					expectedNewValue: newInter.NewHostFunctionValue(
-						func(invocation newInter.Invocation) newInter.Value {
-							return newInter.NilValue{}
-						},
-						nil,
-					),
-				},
+			values := []oldInter.Value{
+				oldInter.BoundFunctionValue{},
+				&oldInter.InterpretedFunctionValue{},
+				oldInter.NewHostFunctionValue(
+					func(invocation oldInter.Invocation) oldInter.Value {
+						return oldInter.NilValue{}
+					},
+				),
 			}
 
 			migration := &StorageFormatV6Migration{}
@@ -464,8 +445,8 @@ func TestValueConversion(t *testing.T) {
 				_ = converter.Convert(oldValue, nil)
 			}
 
-			for _, conversion := range conversions {
-				check(conversion.oldValue)
+			for _, value := range values {
+				check(value)
 			}
 		})
 	})
