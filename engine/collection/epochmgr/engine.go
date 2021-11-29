@@ -41,8 +41,7 @@ type EpochComponents struct {
 	aggregator hotstuff.VoteAggregator
 }
 
-var _ module.Startable = (*EpochComponents)(nil)
-var _ module.ReadyDoneAware = (*EpochComponents)(nil)
+var _ component.Component = (*EpochComponents)(nil)
 
 func NewEpochComponents(
 	state cluster.State,

@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/fifoqueue"
 	"github.com/onflow/flow-go/engine/consensus/sealing/counters"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
@@ -37,8 +36,7 @@ type VoteAggregator struct {
 }
 
 var _ hotstuff.VoteAggregator = (*VoteAggregator)(nil)
-var _ module.ReadyDoneAware = (*VoteAggregator)(nil)
-var _ module.Startable = (*VoteAggregator)(nil)
+var _ component.Component = (*VoteAggregator)(nil)
 
 // NewVoteAggregator creates an instance of vote aggregator
 // Note: verifyingProcessorFactory is injected. Thereby, the code is agnostic to the

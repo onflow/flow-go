@@ -117,6 +117,7 @@ func NewParticipant(
 		return nil, fmt.Errorf("could not initialize event loop: %w", err)
 	}
 
+	// add observer, event loop needs to receive events from distributor
 	modules.QCCreatedDistributor.AddConsumer(loop.SubmitTrustedQC)
 
 	return loop, nil

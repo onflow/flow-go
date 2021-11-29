@@ -208,7 +208,7 @@ func (m *VoteCollector) caching2Verifying(proposal *model.Proposal) error {
 	log := m.log.With().Hex("BlockID", blockID[:]).Logger()
 	newProc, err := m.createVerifyingProcessor(log, proposal)
 	if err != nil {
-		return fmt.Errorf("failed to create VerifyingVoteProcessor for proposal %v: %w", blockID, err)
+		return fmt.Errorf("failed to create VerifyingVoteProcessor for block %v: %w", blockID, err)
 	}
 	newProcWrapper := &atomicValueWrapper{processor: newProc}
 

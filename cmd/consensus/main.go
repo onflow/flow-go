@@ -623,7 +623,6 @@ func main() {
 			hotstuffModules.Validator = consensus.NewValidator(mainMetrics, hotstuffModules)
 
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
-
 			hotstuffModules.Aggregator, err = consensus.NewVoteAggregator(node.Logger, finalized, pending, hotstuffModules, workerPool.WorkerPool, voteProcessorFactory)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
