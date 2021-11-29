@@ -1167,7 +1167,7 @@ func TestDeferredValues(t *testing.T) {
 		nil,
 	)
 
-	_, err = migration.Migrate(payloads)
+	_, err = migration.migrate(payloads)
 	require.NoError(t, err)
 
 	var result newInter.Value = migration.newInter.ReadStored(
