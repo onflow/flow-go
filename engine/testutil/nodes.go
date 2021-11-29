@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -295,6 +296,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
 		return metrics.NewNoopCollector()
 	}
+	workerPool := workerpool.New(2)
 	hotstuffFactory, err := factories.NewHotStuffFactory(
 		node.Log,
 		node.Me,
@@ -302,6 +304,7 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 		node.PublicDB,
 		node.State,
 		createMetrics,
+		workerPool,
 		consensus.WithInitialTimeout(time.Second*2),
 	)
 	require.NoError(t, err)

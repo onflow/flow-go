@@ -34,6 +34,7 @@ type HotStuffFactory struct {
 	db            *badger.DB
 	protoState    protocol.State
 	createMetrics HotStuffMetricsFunc
+	workerPool    *workerpool.WorkerPool
 	opts          []consensus.Option
 }
 
@@ -44,6 +45,7 @@ func NewHotStuffFactory(
 	db *badger.DB,
 	protoState protocol.State,
 	createMetrics HotStuffMetricsFunc,
+	workerPool *workerpool.WorkerPool,
 	opts ...consensus.Option,
 ) (*HotStuffFactory, error) {
 
@@ -54,6 +56,7 @@ func NewHotStuffFactory(
 		db:            db,
 		protoState:    protoState,
 		createMetrics: createMetrics,
+		workerPool:    workerPool,
 		opts:          opts,
 	}
 	return factory, nil
@@ -121,8 +124,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(hotstuffModules.Committee,
 		hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
 
-	workerPool := workerpool.New(4)
-	hotstuffModules.Aggregator, err = consensus.NewVoteAggregator(f.log, finalized, pending, hotstuffModules, workerPool,
+	hotstuffModules.Aggregator, err = consensus.NewVoteAggregator(f.log, finalized, pending, hotstuffModules, f.workerPool,
 		voteProcessorFactory)
 	if err != nil {
 		return nil, err

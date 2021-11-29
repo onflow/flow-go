@@ -11,7 +11,7 @@ import (
 // interfaces and allows to use this structure as component.
 type WorkerPool struct {
 	*component.ComponentManager
-	pool *workerpool.WorkerPool
+	*workerpool.WorkerPool
 }
 
 // New performs initialization of worker pool and setups component manager
@@ -27,6 +27,6 @@ func New(maxWorkers int) *WorkerPool {
 
 	return &WorkerPool{
 		ComponentManager: builder.Build(),
-		pool:             pool,
+		WorkerPool:       pool,
 	}
 }

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gammazero/workerpool"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go-sdk/client"
@@ -66,6 +65,7 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
+	"github.com/onflow/flow-go/utils/workerpool"
 )
 
 func main() {
@@ -524,6 +524,11 @@ func main() {
 		}).
 		Component("hotstuff vote aggregator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
+			workerPool := workerpool.New(4)
+			builder.Component("vote aggregator worker pool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+				return workerPool, nil
+			})
+
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
 				node.DB,
@@ -619,10 +624,7 @@ func main() {
 
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
 
-			// TODO: add worker pool as separate component
-			workerPool := workerpool.New(4)
-
-			hotstuffModules.Aggregator, err = consensus.NewVoteAggregator(node.Logger, finalized, pending, hotstuffModules, workerPool, voteProcessorFactory)
+			hotstuffModules.Aggregator, err = consensus.NewVoteAggregator(node.Logger, finalized, pending, hotstuffModules, workerPool.WorkerPool, voteProcessorFactory)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
