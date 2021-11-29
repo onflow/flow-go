@@ -66,11 +66,16 @@ func extractExecutionState(
 			OutputDir: outputDir,
 		}
 
-		migrations = []ledger.Migration{
-			storageUsedUpdateMigration.Migrate,
-			mgr.PruneMigration,
+		storageFormatV6Migration := mgr.StorageFormatV6Migration{
+			Log:       log,
+			OutputDir: outputDir,
 		}
 
+		migrations = []ledger.Migration{
+			mgr.PruneMigration,
+			storageFormatV6Migration.Migrate,
+			storageUsedUpdateMigration.Migrate,
+		}
 	}
 	if report {
 		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
