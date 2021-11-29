@@ -73,26 +73,35 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
 	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID()))
 
-	hotstuffModules := &consensus.HotstuffModules{
-		Notifier:             notifier,
-		Persist:              persister.New(f.db, cluster.ChainID()),
-		QCCreatedDistributor: pubsub.NewQCCreatedDistributor(),
-	}
-
-	var err error
-	hotstuffModules.Committee, err = committees.NewClusterCommittee(f.protoState, payloads, cluster, epoch, f.me.NodeID())
+	var (
+		err       error
+		committee hotstuff.Committee
+	)
+	committee, err = committees.NewClusterCommittee(f.protoState, payloads, cluster, epoch, f.me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not create cluster committee: %w", err)
 	}
-	hotstuffModules.Committee = committees.NewMetricsWrapper(hotstuffModules.Committee, metrics) // wrapper for measuring time spent determining consensus committee relations
+	committee = committees.NewMetricsWrapper(committee, metrics) // wrapper for measuring time spent determining consensus committee relations
 
 	// create a signing provider
-	hotstuffModules.Signer = verification.NewSingleSignerVerifier(hotstuffModules.Committee, f.aggregator, f.me.NodeID())
-	hotstuffModules.Signer = verification.NewMetricsWrapper(hotstuffModules.Signer, metrics) // wrapper for measuring time spent with crypto-related operations
+	var signer hotstuff.SignerVerifier
+	signer = verification.NewSingleSignerVerifier(committee, f.aggregator, f.me.NodeID())
+	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
 	finalized, pending, err := recovery.FindLatest(clusterState, headers)
 	if err != nil {
 		return nil, err
+	}
+
+	hotstuffModules := &consensus.HotstuffModules{
+		Forks:                nil,
+		Validator:            nil,
+		Notifier:             notifier,
+		Committee:            committee,
+		Signer:               signer,
+		Persist:              persister.New(f.db, cluster.ChainID()),
+		Aggregator:           nil,
+		QCCreatedDistributor: pubsub.NewQCCreatedDistributor(),
 	}
 
 	hfForks, err := consensus.NewForks(
