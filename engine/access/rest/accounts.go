@@ -21,7 +21,7 @@ func getAccount(r *requestDecorator, backend access.API, link LinkGenerator) (in
 	} else {
 		h, err := toHeight(height)
 		if err != nil {
-			return nil, err
+			return nil, NewBadRequestError(err)
 		}
 		account, err = backend.GetAccountAtBlockHeight(r.Context(), address, h)
 		if err != nil {

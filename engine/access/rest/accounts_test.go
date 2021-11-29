@@ -95,14 +95,15 @@ func TestGetAccount(t *testing.T) {
 			url string
 			out string
 		}{
-			{accountURL("123", ""), `{"code":500, "message":"invalid address"}`},
+			{accountURL("123", ""), `{"code":400, "message":"invalid address"}`},
+			{accountURL(unittest.AddressFixture().String(), "foo"), `{"code":400, "message":"invalid height format"}`},
 		}
 
 		for i, test := range tests {
 			req, _ := http.NewRequest("GET", test.url, nil)
 			rr := executeRequest(req, backend)
 
-			assert.Equal(t, http.StatusOK, rr.Code)
+			assert.Equal(t, http.StatusBadRequest, rr.Code)
 			assert.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
 		}
 	})
