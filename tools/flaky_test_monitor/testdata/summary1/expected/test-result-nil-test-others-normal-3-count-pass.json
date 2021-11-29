@@ -401,9 +401,7 @@
           ],
           "result": "pass",
           "elapsed": 0
-        }
-      ],
-      "nil_tests": [
+        },
         {
           "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
           "package": "github.com/onflow/flow-go/model/encodable",

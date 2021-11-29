@@ -17,52 +17,50 @@
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
             "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
+            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
+          ],
+          "result": "",
+          "elapsed": 0
+        },
+        {
+          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+          "package": "github.com/onflow/flow-go/model/encodable",
+          "output": [
+            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
+            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
+          ],
+          "result": "",
+          "elapsed": 0
+        },
+        {
+          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+          "package": "github.com/onflow/flow-go/model/encodable",
+          "output": [
+            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
+            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
+          ],
+          "result": "",
+          "elapsed": 0
+        },
+        {
+          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+          "package": "github.com/onflow/flow-go/model/encodable",
+          "output": [
+            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
+            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
+          ],
+          "result": "",
+          "elapsed": 0
+        },
+        {
+          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+          "package": "github.com/onflow/flow-go/model/encodable",
+          "output": [
+            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
             "    keys_test.go:245: bytes: 194\n",
-            "PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
+            "--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
           ],
           "result": "pass",
-          "elapsed": 0
-        }
-      ],
-      "nil_tests": [
-        {
-          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
-          "package": "github.com/onflow/flow-go/model/encodable",
-          "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
-            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
-          ],
-          "result": "",
-          "elapsed": 0
-        },
-        {
-          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
-          "package": "github.com/onflow/flow-go/model/encodable",
-          "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
-            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
-          ],
-          "result": "",
-          "elapsed": 0
-        },
-        {
-          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
-          "package": "github.com/onflow/flow-go/model/encodable",
-          "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
-            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
-          ],
-          "result": "",
-          "elapsed": 0
-        },
-        {
-          "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
-          "package": "github.com/onflow/flow-go/model/encodable",
-          "output": [
-            "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
-            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
-          ],
-          "result": "",
           "elapsed": 0
         }
       ]
