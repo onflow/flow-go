@@ -75,6 +75,7 @@ func extractExecutionState(
 			mgr.PruneMigration,
 			storageFormatV6Migration.Migrate,
 			storageUsedUpdateMigration.Migrate,
+			mgr.PruneMigration, // we need post migration pruning before deploying trie update pruning
 		}
 	}
 	if report {
