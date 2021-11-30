@@ -24,6 +24,8 @@ func transactionURL(id string, expandable []string) string {
 	u, _ := url.Parse(fmt.Sprintf("/v1/transactions/%s", id))
 	q := u.Query()
 
+	// by default expand all since we test expanding with converters
+	expandable = append(expandable, []string{"proposal_key", "authorizers", "payload_signatures", "envelope_signatures"}...)
 	if len(expandable) > 0 {
 		q.Add("expand", strings.Join(expandable, ","))
 	}
@@ -41,7 +43,11 @@ func TestGetTransactions(t *testing.T) {
 
 	t.Run("get by ID", func(t *testing.T) {
 		tx := unittest.TransactionFixture()
-		req, _ := http.NewRequest("GET", transactionURL(tx.ID().String(), nil), nil)
+		req, _ := http.NewRequest(
+			"GET",
+			transactionURL(tx.ID().String(), nil),
+			nil,
+		)
 
 		backend.Mock.
 			On("GetTransaction", mocks.Anything, tx.ID()).
@@ -74,7 +80,7 @@ func TestGetTransactions(t *testing.T) {
 				  }
 			   ],
 			   "_links":{
-				  "_self":"%s"
+				  "_self":"/v1/transactions/%s"
 			   },
 				"_expandable": {
 					"proposal_key": "proposal_key",
@@ -87,7 +93,7 @@ func TestGetTransactions(t *testing.T) {
 			tx.ID().String(),
 			tx.ReferenceBlockID.String(),
 			toBase64(tx.EnvelopeSignatures[0].Signature),
-			transactionURL(tx.ID().String(), nil),
+			tx.ID().String(),
 			tx.ID().String(),
 		)
 
@@ -161,7 +167,7 @@ func TestGetTransactions(t *testing.T) {
 					}
 				},
 			   "_links":{
-				  "_self":"%s"
+				  "_self":"/v1/transactions/%s"
 			   },
 				"_expandable": {
 					"proposal_key": "proposal_key",
@@ -177,7 +183,7 @@ func TestGetTransactions(t *testing.T) {
 			tx.ReferenceBlockID.String(),
 			tx.ID().String(),
 			tx.ID().String(),
-			transactionURL(tx.ID().String(), nil),
+			tx.ID().String(),
 			tx.ID().String(),
 		)
 
@@ -337,14 +343,14 @@ func TestCreateTransaction(t *testing.T) {
 					"result": "/v1/transaction_results/%s"
 				},
 			   "_links":{
-				  "_self":"%s"
+				  "_self":"/v1/transactions/%s"
 			   }
 			}`,
 			tx.ID().String(),
 			tx.ReferenceBlockID.String(),
 			toBase64(tx.EnvelopeSignatures[0].Signature),
 			tx.ID().String(),
-			transactionURL(tx.ID().String(), nil),
+			tx.ID().String(),
 		)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -395,7 +401,7 @@ func transactionResultFixture(tx flow.Transaction) *access.TransactionResult {
 		Status:     flow.TransactionStatusSealed,
 		StatusCode: 1,
 		Events: []flow.Event{
-			unittest.EventFixture(flow.EventType(flow.EventAccountCreated), 0, 0, tx.ID(), 255),
+			unittest.EventFixture(flow.EventAccountCreated, 0, 0, tx.ID(), 255),
 		},
 		ErrorMessage: "",
 		BlockID:      tx.ReferenceBlockID,

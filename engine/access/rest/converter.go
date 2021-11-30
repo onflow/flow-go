@@ -311,7 +311,7 @@ func transactionSignatureResponse(signatures []flow.TransactionSignature) []gene
 	return sigs
 }
 
-func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult, link LinkGenerator) *generated.Transaction {
+func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult, link LinkGenerator, expands map[string]bool) *generated.Transaction {
 	var args []string
 	for _, arg := range tx.Arguments {
 		args = append(args, toBase64(arg))
@@ -330,7 +330,15 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 		result = transactionResultResponse(txr, tx.ID(), link)
 	}
 
-	return &generated.Transaction{
+	expandable := &generated.TransactionExpandable{
+		ProposalKey:        "proposal_key",
+		Authorizers:        "authorizers",
+		PayloadSignatures:  "payload_signatures",
+		EnvelopeSignatures: "envelope_signatures",
+		Result:             resultLink,
+	}
+
+	txResponse := &generated.Transaction{
 		Id:                 tx.ID().String(),
 		Script:             toBase64(tx.Script),
 		Arguments:          args,
@@ -343,14 +351,29 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 		EnvelopeSignatures: transactionSignatureResponse(tx.EnvelopeSignatures),
 		Result:             result,
 		Links:              self,
-		Expandable: &generated.TransactionExpandable{
-			ProposalKey:        "proposal_key",
-			Authorizers:        "authorizers",
-			PayloadSignatures:  "payload_signatures",
-			EnvelopeSignatures: "envelope_signatures",
-			Result:             resultLink,
-		},
+		Expandable:         expandable,
 	}
+
+	// todo(sideninja) discuss if we still need this expandable
+	if !expands[expandable.Authorizers] {
+		txResponse.Authorizers = nil
+	}
+	// todo(sideninja) discuss if we still need this expandable
+	if !expands[expandable.ProposalKey] {
+		txResponse.ProposalKey = nil
+	}
+	// todo(sideninja) discuss if we still need this expandable
+	if !expands[expandable.PayloadSignatures] {
+		fmt.Println("###1")
+		txResponse.PayloadSignatures = nil
+	}
+	// todo(sideninja) discuss if we still need this expandable
+	if !expands[expandable.EnvelopeSignatures] {
+		fmt.Println("###2")
+		txResponse.EnvelopeSignatures = nil
+	}
+
+	return txResponse
 }
 
 func eventResponse(event flow.Event) generated.Event {

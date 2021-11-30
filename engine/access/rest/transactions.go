@@ -25,10 +25,10 @@ func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenera
 			return nil, err
 		}
 
-		return transactionResponse(tx, txr, link), nil
+		return transactionResponse(tx, txr, link, r.expandFields), nil
 	}
 
-	return transactionResponse(tx, nil, link), nil
+	return transactionResponse(tx, nil, link, r.expandFields), nil
 }
 
 func getTransactionResultByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
@@ -63,5 +63,5 @@ func createTransaction(r *requestDecorator, backend access.API, link LinkGenerat
 		return nil, err
 	}
 
-	return transactionResponse(&tx, nil, link), nil
+	return transactionResponse(&tx, nil, link, r.expandFields), nil
 }
