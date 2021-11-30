@@ -85,6 +85,7 @@ func testBelowVote(t *testing.T) {
 	_, err := voter.ProduceVoteIfVotable(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "expecting block for current view")
+	require.False(t, model.IsNoVoteError(err))
 }
 
 func testAboveVote(t *testing.T) {
@@ -97,6 +98,7 @@ func testAboveVote(t *testing.T) {
 	_, err := voter.ProduceVoteIfVotable(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "expecting block for current view")
+	require.False(t, model.IsNoVoteError(err))
 }
 
 func testEqualLastVotedView(t *testing.T) {
@@ -109,6 +111,7 @@ func testEqualLastVotedView(t *testing.T) {
 	_, err := voter.ProduceVoteIfVotable(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "must be larger than the last voted view")
+	require.False(t, model.IsNoVoteError(err))
 }
 
 func testBelowLastVotedView(t *testing.T) {
@@ -121,6 +124,7 @@ func testBelowLastVotedView(t *testing.T) {
 	_, err := voter.ProduceVoteIfVotable(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "must be larger than the last voted view")
+	require.False(t, model.IsNoVoteError(err))
 }
 
 func testVotingAgain(t *testing.T) {
@@ -137,6 +141,7 @@ func testVotingAgain(t *testing.T) {
 	_, err = voter.ProduceVoteIfVotable(block, curView)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "must be larger than the last voted view")
+	require.False(t, model.IsNoVoteError(err))
 }
 
 func testVotingWhileNonCommitteeMember(t *testing.T) {
