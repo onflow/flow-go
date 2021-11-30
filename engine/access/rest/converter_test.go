@@ -29,7 +29,34 @@ func responseToMap(response interface{}) map[string]interface{} {
 
 func TestTransactions(t *testing.T) {
 
-	t.Run("transaction response", func(t *testing.T) {
+	t.Run("response", func(t *testing.T) {
+		tx := unittest.TransactionFixture()
+		response := transactionResponse(&tx.TransactionBody, nil, linkFixture(), nil)
+
+		res, _ := json.Marshal(response)
+		expected := fmt.Sprintf(`{
+		   "id":"%s",
+		   "script":"cHViIGZ1biBtYWluKCkge30=",
+		   "arguments":null,
+		   "reference_block_id":"%s",
+		   "gas_limit":10,
+		   "payer":"8c5303eaa26202d6",
+		   "_expandable":{
+			  "proposal_key":"proposal_key",
+			  "authorizers":"authorizers",
+			  "payload_signatures":"payload_signatures",
+			  "envelope_signatures":"envelope_signatures",
+			  "result":"/v1/transaction_results/%s"
+		   },
+		   "_links":{
+			  "_self":"/v1/transactions/%s"
+		   }
+		}`, tx.ID().String(), tx.ReferenceBlockID.String(), tx.ID().String(), tx.ID().String())
+
+		assert.JSONEq(t, expected, fmt.Sprintf("%s", res))
+	})
+
+	t.Run("response expands", func(t *testing.T) {
 		tx := unittest.TransactionFixture()
 		tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()} // add payload to fixture
 
@@ -52,7 +79,7 @@ func TestTransactions(t *testing.T) {
 
 	})
 
-	t.Run("transaction response with result", func(t *testing.T) {
+	t.Run("response with result", func(t *testing.T) {
 		tx := unittest.TransactionFixture()
 		txr := transactionResultFixture(tx)
 		tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()} // add payload to fixture
