@@ -483,8 +483,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		Name: networkConf.Name,
 	})
 
-	// create a temporary directory to store all bootstrapping files, these
-	// will be shared between all nodes
+	// create a temporary directory to store all bootstrapping files 
 	bootstrapDir, err := integrationBootstrapDir()
 	require.Nil(t, err)
 
