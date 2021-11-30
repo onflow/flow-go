@@ -16,7 +16,7 @@ type RandomBeaconReconstructor struct {
 	dkg                            hotstuff.DKG // to lookup signer index by signer ID
 }
 
-var _ hotstuff.RandomBeaconReconstructor = &RandomBeaconReconstructor{}
+var _ hotstuff.RandomBeaconReconstructor = (*RandomBeaconReconstructor)(nil)
 
 func NewRandomBeaconReconstructor(dkg hotstuff.DKG, randomBeaconInspector hotstuff.RandomBeaconInspector) *RandomBeaconReconstructor {
 	return &RandomBeaconReconstructor{
