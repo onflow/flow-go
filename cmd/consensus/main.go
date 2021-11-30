@@ -585,50 +585,49 @@ func main() {
 				node.Storage.Index,
 				node.RootChainID,
 			)
-
 			notifier.AddConsumer(finalizationDistributor)
 
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 
 			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			finalizedBlock, pendingBlocks, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
 			}
 
-			hotstuffModules = &consensus.HotstuffModules{
-				Forks:                nil,
-				Validator:            nil,
-				Notifier:             notifier,
-				Committee:            committee,
-				Signer:               signer,
-				Persist:              persist,
-				Aggregator:           nil,
-				QCCreatedDistributor: pubsub.NewQCCreatedDistributor(),
-			}
-
-			hfForks, err := consensus.NewForks(
-				finalized,
+			forks, err := consensus.NewForks(
+				finalizedBlock,
 				node.Storage.Headers,
 				finalize,
-				hotstuffModules,
+				notifier,
 				node.RootBlock.Header,
 				node.RootQC,
 			)
 			if err != nil {
 				return nil, err
 			}
-			hotstuffModules.Forks = hfForks
-			hotstuffModules.Validator = consensus.NewValidator(mainMetrics, hotstuffModules)
 
-			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
-			hotstuffModules.Aggregator, err = consensus.NewVoteAggregator(node.Logger, finalized, pending, hotstuffModules, workerPool.WorkerPool, voteProcessorFactory)
+			qcDistributor := pubsub.NewQCCreatedDistributor()
+			validator := consensus.NewValidator(mainMetrics, committee, forks, signer)
+			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+			aggregator, err := consensus.NewVoteAggregator(node.Logger, finalizedBlock, pendingBlocks, notifier, forks, validator, workerPool.WorkerPool, voteProcessorFactory)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
 
-			return hotstuffModules.Aggregator, nil
+			hotstuffModules = &consensus.HotstuffModules{
+				Notifier:             notifier,
+				Committee:            committee,
+				Signer:               signer,
+				Persist:              persist,
+				QCCreatedDistributor: qcDistributor,
+				Forks:                forks,
+				Validator:            validator,
+				Aggregator:           aggregator,
+			}
+
+			return aggregator, nil
 		}).
 		Component("compliance engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the entity database accessors
