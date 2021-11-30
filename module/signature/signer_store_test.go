@@ -30,7 +30,7 @@ func TestGetThresholdSignerWithNilPrivateKey(t *testing.T) {
 
 	unittest.RunWithTypedBadgerDB(t, storage.InitSecret, func(db *badger.DB) {
 
-		dkgKeys, err := storage.NewDKGKeys(metrics.NewNoopCollector(), db)
+		dkgKeys, err := storage.NewBeaconPrivateKeys(metrics.NewNoopCollector(), db)
 		assert.NoError(t, err)
 		signerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeys)
 
