@@ -560,3 +560,43 @@ func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublic
 
 	return keysResponse
 }
+
+func accountResponse(flowAccount *flow.Account, link LinkGenerator, expandKeys bool, expandContracts bool) (generated.Account, error) {
+
+	account := generated.Account{
+		Address: flowAccount.Address.String(),
+		Balance: int32(flowAccount.Balance),
+	}
+
+	if expandKeys {
+		account.Keys = accountKeysResponse(flowAccount.Keys)
+	} else {
+		account.Expandable = &generated.AccountExpandable{
+			Keys: expandableFieldKeys,
+		}
+	}
+
+	if expandContracts {
+		contracts := make(map[string]string, len(flowAccount.Contracts))
+		for name, code := range flowAccount.Contracts {
+			contracts[name] = toBase64(code)
+		}
+		account.Contracts = contracts
+	} else {
+		if account.Expandable == nil {
+			account.Expandable = &generated.AccountExpandable{}
+		}
+		account.Expandable.Contracts = expandableFieldContracts
+	}
+
+	selfLink, err := link.AccountLink(account.Address)
+	if err != nil {
+		return generated.Account{}, nil
+	}
+	account.Links = &generated.Links{
+		Self: selfLink,
+	}
+
+	return account, nil
+}
+
