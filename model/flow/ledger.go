@@ -9,19 +9,6 @@ import (
 	"github.com/onflow/flow-go/model/fingerprint"
 )
 
-var hexValues []byte = make([]byte, 512)
-
-func init() {
-	// create the 'hexValues' byte slice for use with Key
-	allchars := make([]byte, 256)
-	for i := 0; i < 256; i++ {
-		allchars[i] = byte(i)
-	}
-
-	// this is a table of all hex values
-	hex.Encode(hexValues, allchars)
-}
-
 type RegisterID struct {
 	Owner      string
 	Controller string
@@ -33,40 +20,21 @@ type RegisterID struct {
 func (r *RegisterID) String() string {
 	ownerLen := len(r.Owner)
 	controllerLen := len(r.Controller)
-	keyLen := len(r.Key)
-
+	
 	requiredLen := ((ownerLen + controllerLen + keyLen) * 2) + 2
 
 	arr := make([]byte, requiredLen)
-	n := 0
+	
+	hex.Encode(arr, []byte(r.Owner))
 
-	// we're converting characters in the string into the exact 2-character representation in hex
-	for i := 0; i < ownerLen; i++ {
-		arr[n] = hexValues[int(r.Owner[i])*2]
-		n++
-		arr[n] = hexValues[(int(r.Owner[i])*2)+1]
-		n++
-	}
+        arr[2*ownerLen] = byte('/')
 
-	arr[n] = byte('/')
-	n++
+        hex.Encode(arr[(2*ownerLen)+1:], []byte(r.Controller))
 
-	for j := 0; j < controllerLen; j++ {
-		arr[n] = hexValues[int(r.Controller[j])*2]
-		n++
-		arr[n] = hexValues[(int(r.Controller[j])*2)+1]
-		n++
-	}
+        arr[2*(ownerLen+controllerLen) + 1] = byte('/')
 
-	arr[n] = byte('/')
-	n++
-
-	for k := 0; k < keyLen; k++ {
-		arr[n] = hexValues[int(r.Key[k])*2]
-		n++
-		arr[n] = hexValues[(int(r.Key[k])*2)+1]
-		n++
-	}
+        hex.Encode(arr[2*(ownerLen+controllerLen+1):], []byte(r.Key))
+	
 	return string(arr)
 }
 
