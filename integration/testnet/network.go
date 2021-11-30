@@ -90,8 +90,8 @@ const (
 
 	integrationBootstrap = "flow-integration-bootstrap"
 
-	// DefaultMinimumNumOfAcessNodeIDS atleast 1 AN ID must be configured for LN & SN
-	DefaultMinimumNumOfAcessNodeIDS = 1
+	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
+	DefaultMinimumNumOfAccessNodeIDS = 1
 )
 
 func init() {
@@ -519,7 +519,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
 		}
 	}
-	require.True(t, len(accessNodeIDS) >= DefaultMinimumNumOfAcessNodeIDS, fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAcessNodeIDS))
+	require.True(t, len(accessNodeIDS) >= DefaultMinimumNumOfAccessNodeIDS, fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
 
 	// add each node to the network
 	for _, nodeConf := range confs {
