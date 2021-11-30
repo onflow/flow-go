@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/dgraph-io/badger/v2"
-	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus"
@@ -34,7 +33,6 @@ type HotStuffFactory struct {
 	db            *badger.DB
 	protoState    protocol.State
 	createMetrics HotStuffMetricsFunc
-	workerPool    *workerpool.WorkerPool
 	opts          []consensus.Option
 }
 
@@ -45,7 +43,6 @@ func NewHotStuffFactory(
 	db *badger.DB,
 	protoState protocol.State,
 	createMetrics HotStuffMetricsFunc,
-	workerPool *workerpool.WorkerPool,
 	opts ...consensus.Option,
 ) (*HotStuffFactory, error) {
 
@@ -56,7 +53,6 @@ func NewHotStuffFactory(
 		db:            db,
 		protoState:    protoState,
 		createMetrics: createMetrics,
-		workerPool:    workerPool,
 		opts:          opts,
 	}
 	return factory, nil
@@ -119,7 +115,6 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 		notifier,
 		forks,
 		validator,
-		f.workerPool,
 		voteProcessorFactory,
 	)
 	if err != nil {

@@ -49,7 +49,6 @@ import (
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	storagekv "github.com/onflow/flow-go/storage/badger"
-	"github.com/onflow/flow-go/utils/workerpool"
 )
 
 func main() {
@@ -375,12 +374,6 @@ func main() {
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
 		Component("epoch manager", func(nodeBuilder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-			workerPool := workerpool.New(4)
-			nodeBuilder.Component("epoch factory worker pool", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				return workerPool, nil
-			})
-
 			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err
@@ -460,7 +453,6 @@ func main() {
 				node.DB,
 				node.State,
 				createMetrics,
-				workerPool.WorkerPool,
 				opts...,
 			)
 			if err != nil {
