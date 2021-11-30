@@ -38,7 +38,12 @@ func getPrototype(code byte) (interface{}, error) {
 	}
 }
 
-// serializer encapulates the serialization and deserialization of data
+// serializer is used to serialize / deserialize Execution Data and CID lists for the
+// Execution Data Service. An object is serialized by encoding and compressing it using
+// the given codec and compressor.
+//
+// The serialized data is prefixed with a single byte header that identifies the underlying
+// data format. This allows adding new data types in a backwards compatible way.
 type serializer struct {
 	codec      encoding.Codec
 	compressor network.Compressor
