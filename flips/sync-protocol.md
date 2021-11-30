@@ -67,7 +67,7 @@ We should include a nonce with each Batch / Range Request, which replyers must i
 
 Since the nonce allows us to distinguish between responses to Batch and Range Requests, we can avoid optimistically setting the statuses of heights as Received for responses to Batch Requests.
 
-At any time, there is a single range of heights that the Sync Engine actively requests, which is tracked by the Sync Core. We call this the Active Range. The Active Range is parameterized by two variables:
+At any time, there is a single range of heights that the Sync Engine actively requests, which is tracked by the Sync Core. We call this the Active Range. The Active Range is parameterized by two variables, which effectively replace the `Heights` map from the existing implementation:
 * `RangeStart` is the start height of the range, which is greater than or equal to `LocalFinalizedHeight`, the local finalized block height.
 * `RangeEnd` is the end height of the range, which is less than or equal to `TargetFinalizedHeight`, the speculated finalized block height of the overall chain (more details below).
 
@@ -75,7 +75,9 @@ The Active Range has a default size of `DefaultRangeSize`. `RangeStart` is updat
 * If the local finalized height has increased by `h`, increase `RangeStart` by `h`.
 * If every height in the Active Range has been received from at least `MinResponses` different nodes, increase `RangeStart` by `DefaultRangeSize`.
 
-The second condition is needed to cover the last item in [Potential Problems](#potential-problems). To guarantee liveness, `MinResponses` should be set to a value greater than the maximum tolerable number of Byzantine nodes. Alternatively, we could increase `RangeEnd` by `DefaultRangeSize` instead of increasing `RangeStart`, thereby allowing the Active Range to grow without bound and obviating the need for any lower bound on `MinResponses`. A possible optimization here is that instead of waiting for the entire Active Range to satisfy the update condition, we can update as soon as any sub-range starting from `RangeStart` satisfies the condition.
+> **Note:** The second condition is needed to cover the last item in [Potential Problems](#potential-problems). To guarantee liveness, `MinResponses` should be set to a value greater than the maximum tolerable number of Byzantine nodes. Alternatively, we could increase `RangeEnd` by `DefaultRangeSize` instead of increasing `RangeStart`, thereby allowing the Active Range to grow without bound and obviating the need for any lower bound on `MinResponses`. 
+> 
+> A possible optimization here is that instead of waiting for the entire Active Range to satisfy the update condition, we can update as soon as any sub-range starting from `RangeStart` satisfies the condition.
 
 The Active Range can be broken up and requested by the Sync Engine in multiple segments, similar to the existing implementation.
 
