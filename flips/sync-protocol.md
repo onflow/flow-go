@@ -41,9 +41,9 @@ Each time the Sync Engine receives a Block Response, it calls [`HandleBlock`](ht
 * After a block corresponding to an item in `BlockIDs` is received, the item is not pruned until the local finalized height surpasses the height of the block. If a node is very far behind, `BlockIDs` could grow very large before the local finalization catches up.
 * `HandleHeight` iterates over the entire range from the local finalized height to the received height, queueing all new heights and requeueing heights which have already been received. This can be expensive if the node is very far behind.
 * The implementation of `ScanPending` is split into three steps:
-    * Iterate through `Heights` and `BlockIDs` and find all requestable heights and block IDs. 
-    * Group these requestable items into Ranges and Batches. 
-    * Select a subset of these Ranges and Batches to return based on a configurable limit on the maximum number of in-flight requests. 
+    * [Iterate through `Heights` and `BlockIDs` and find all requestable heights and block IDs](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go#L264-L326).
+    * Group these requestable items into [Ranges](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go#L360-L415) and [Batches](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go#L417-L439). 
+    * [Select a subset of these Ranges and Batches to return based on a configurable limit on the maximum number of in-flight requests](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go#L441-L454). 
 
   While conceptually easy to understand, this implementation is inefficient and performs many more loop iterations than necessary.
 * When the Sync Engine calls `ScanPending`, it passes in the local finalized height, which the Sync Core uses to prune requestable items. Since `Heights` and `BlockIDs` are both implemented using Go maps, pruning them involves iterating through all items to find the ones for which the associated block height is lower than the local finalized height, which is inefficient. Furthermore, pruning is triggered on every call to `ScanPending`, even if the local finalized height has not changed.
