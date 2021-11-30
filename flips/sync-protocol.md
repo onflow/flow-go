@@ -87,4 +87,4 @@ The value of `TargetFinalizedHeight` should reflect the Sync Height Responses th
 * Calculate a moving average of all the Sync Height Responses received. 
 * Maintain a sliding window of the most recent Sync Height Responses, and take the median value.
 
-However, there are many other valid approaches.
+There are many other valid approaches.
