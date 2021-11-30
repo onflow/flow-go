@@ -5,30 +5,44 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/mempool"
 )
 
 // NewCollectorFactoryMethod is a factory method to generate a VoteCollector for concrete view
-type NewCollectorFactoryMethod = func(view uint64) (hotstuff.VoteCollector, error)
+type NewCollectorFactoryMethod = func(view uint64, workers hotstuff.Workers) (hotstuff.VoteCollector, error)
 
 // VoteCollectors implements management of multiple vote collectors indexed by view.
 // Implements hotstuff.VoteCollectors interface. Creating a VoteCollector for a
 // particular view is lazy (instances are created on demand).
 // This structure is concurrently safe.
 type VoteCollectors struct {
+	*component.ComponentManager
 	lock            sync.RWMutex
 	lowestView      uint64                            // lowest view that we have pruned up to
 	collectors      map[uint64]hotstuff.VoteCollector // view -> VoteCollector
+	workerPool      hotstuff.Workerpool               // for processing votes that are already cached in VoteCollectors and waiting for respective block
 	createCollector NewCollectorFactoryMethod         // factory method for creating collectors
 }
 
 var _ hotstuff.VoteCollectors = &VoteCollectors{}
 
-func NewVoteCollectors(lowestView uint64, factoryMethod NewCollectorFactoryMethod) *VoteCollectors {
+func NewVoteCollectors(lowestView uint64, workerPool hotstuff.Workerpool, factoryMethod NewCollectorFactoryMethod) *VoteCollectors {
+	// Component manager for wrapped worker pool
+	componentBuilder := component.NewComponentManagerBuilder()
+	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		ready()
+		<-ctx.Done()
+		workerPool.StopWait() // wait till all workers exit
+	})
+
 	return &VoteCollectors{
-		lowestView:      lowestView,
-		collectors:      make(map[uint64]hotstuff.VoteCollector),
-		createCollector: factoryMethod,
+		ComponentManager: componentBuilder.Build(),
+		lowestView:       lowestView,
+		collectors:       make(map[uint64]hotstuff.VoteCollector),
+		workerPool:       workerPool,
+		createCollector:  factoryMethod,
 	}
 }
 
@@ -49,7 +63,7 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 		return cachedCollector, false, nil
 	}
 
-	collector, err := v.createCollector(view)
+	collector, err := v.createCollector(view, v.workerPool)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not create vote collector for view %d: %w", view, err)
 	}

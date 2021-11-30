@@ -65,7 +65,6 @@ import (
 	"github.com/onflow/flow-go/storage"
 	bstorage "github.com/onflow/flow-go/storage/badger"
 	"github.com/onflow/flow-go/utils/io"
-	"github.com/onflow/flow-go/utils/workerpool"
 )
 
 func main() {
@@ -523,12 +522,6 @@ func main() {
 			return ing, err
 		}).
 		Component("hotstuff vote aggregator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-			workerPool := workerpool.New(4)
-			builder.Component("vote aggregator worker pool", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-				return workerPool, nil
-			})
-
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
 				node.DB,
@@ -585,6 +578,7 @@ func main() {
 				node.Storage.Index,
 				node.RootChainID,
 			)
+
 			notifier.AddConsumer(finalizationDistributor)
 
 			// initialize the persister
@@ -611,7 +605,7 @@ func main() {
 			qcDistributor := pubsub.NewQCCreatedDistributor()
 			validator := consensus.NewValidator(mainMetrics, committee, forks, signer)
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
-			aggregator, err := consensus.NewVoteAggregator(node.Logger, finalizedBlock, pendingBlocks, notifier, forks, validator, workerPool.WorkerPool, voteProcessorFactory)
+			aggregator, err := consensus.NewVoteAggregator(node.Logger, finalizedBlock, pendingBlocks, notifier, forks, validator, voteProcessorFactory)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}

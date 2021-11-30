@@ -48,8 +48,7 @@ func NewVoteAggregator(
 	collectors hotstuff.VoteCollectors,
 ) (*VoteAggregator, error) {
 
-	queuedVotes, err := fifoqueue.NewFifoQueue(
-		fifoqueue.WithCapacity(defaultVoteQueueCapacity))
+	queuedVotes, err := fifoqueue.NewFifoQueue(fifoqueue.WithCapacity(defaultVoteQueueCapacity))
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize votes queue")
 	}
@@ -63,15 +62,18 @@ func NewVoteAggregator(
 		queuedVotesNotifier: engine.NewNotifier(),
 	}
 
+	// manager for own worker routines plus the internal collectors
 	componentBuilder := component.NewComponentManagerBuilder()
-
-	// launch as many workers as we need
-	for i := 0; i < defaultVoteAggregatorWorkers; i++ {
+	for i := 0; i < defaultVoteAggregatorWorkers; i++ { // manager for worker routines that process inbound votes
 		componentBuilder.AddWorker(aggregator.queuedVotesProcessingLoop)
 	}
+	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		collectors.Start(ctx)
+		ready()
+		<-ctx.Done()
+	})
 
 	aggregator.ComponentManager = componentBuilder.Build()
-
 	return aggregator, nil
 }
 

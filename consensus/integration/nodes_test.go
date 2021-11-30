@@ -238,12 +238,8 @@ func createNode(
 
 	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 
-	workerPool := workerpool.New(2)
-	factoryMethod := func(view uint64) (hotstuff.VoteCollector, error) {
-		return votecollector.NewStateMachine(view, log, workerPool, notifier, voteProcessorFactory.Create), nil
-	}
-
-	voteCollectors := voteaggregator.NewVoteCollectors(started, factoryMethod)
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	voteCollectors := voteaggregator.NewVoteCollectors(started, workerpool.New(2), createCollectorFactoryMethod)
 
 	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, started, voteCollectors)
 	require.NoError(t, err)

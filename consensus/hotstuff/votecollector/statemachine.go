@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 )
 
 var (
@@ -24,7 +24,7 @@ type VerifyingVoteProcessorFactory = func(log zerolog.Logger, proposal *model.Pr
 type VoteCollector struct {
 	sync.Mutex
 	log                      zerolog.Logger
-	workerPool               *workerpool.WorkerPool
+	workers                  hotstuff.Workers
 	notifier                 hotstuff.Consumer
 	createVerifyingProcessor VerifyingVoteProcessorFactory
 
@@ -45,10 +45,20 @@ type atomicValueWrapper struct {
 	processor hotstuff.VoteProcessor
 }
 
+func NewStateMachineFactory(
+	log zerolog.Logger,
+	notifier hotstuff.Consumer,
+	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
+) voteaggregator.NewCollectorFactoryMethod {
+	return func(view uint64, workers hotstuff.Workers) (hotstuff.VoteCollector, error) {
+		return NewStateMachine(view, log, workers, notifier, verifyingVoteProcessorFactory), nil
+	}
+}
+
 func NewStateMachine(
 	view uint64,
 	log zerolog.Logger,
-	workerPool *workerpool.WorkerPool,
+	workers hotstuff.Workers,
 	notifier hotstuff.Consumer,
 	verifyingVoteProcessorFactory VerifyingVoteProcessorFactory,
 ) *VoteCollector {
@@ -58,7 +68,7 @@ func NewStateMachine(
 		Logger()
 	sm := &VoteCollector{
 		log:                      log,
-		workerPool:               workerPool,
+		workers:                  workers,
 		notifier:                 notifier,
 		createVerifyingProcessor: verifyingVoteProcessorFactory,
 		votesCache:               *NewVotesCache(view),
@@ -249,6 +259,6 @@ func (m *VoteCollector) processCachedVotes(block *model.Block) {
 				m.log.Fatal().Err(err).Msg("internal error processing cached vote")
 			}
 		}
-		m.workerPool.Submit(voteProcessingTask)
+		m.workers.Submit(voteProcessingTask)
 	}
 }

@@ -21,14 +21,11 @@ func NewVoteAggregator(
 	notifier hotstuff.Consumer,
 	forks hotstuff.Forks,
 	validator hotstuff.Validator,
-	workerPool *workerpool.WorkerPool,
 	voteProcessorFactory hotstuff.VoteProcessorFactory,
 ) (hotstuff.VoteAggregator, error) {
 
-	createCollectorFactoryMethod := func(view uint64) (hotstuff.VoteCollector, error) {
-		return votecollector.NewStateMachine(view, log, workerPool, notifier, voteProcessorFactory.Create), nil
-	}
-	voteCollectors := voteaggregator.NewVoteCollectors(finalized.View, createCollectorFactoryMethod)
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	voteCollectors := voteaggregator.NewVoteCollectors(finalized.View, workerpool.New(4), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
 	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, finalized.View, voteCollectors)

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/gammazero/workerpool"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"go.uber.org/atomic"
@@ -30,18 +31,23 @@ type VoteCollectorsTestSuite struct {
 	factoryMethod    NewCollectorFactoryMethod
 	collectors       *VoteCollectors
 	lowestLevel      uint64
+	workerPool       *workerpool.WorkerPool
 }
 
 func (s *VoteCollectorsTestSuite) SetupTest() {
 	s.lowestLevel = 1000
 	s.mockedCollectors = make(map[uint64]*mocks.VoteCollector)
-	s.factoryMethod = func(view uint64) (hotstuff.VoteCollector, error) {
+	s.factoryMethod = func(view uint64, _ hotstuff.Workers) (hotstuff.VoteCollector, error) {
 		if collector, found := s.mockedCollectors[view]; found {
 			return collector, nil
 		}
 		return nil, fmt.Errorf("mocked collector %v not found: %w", view, factoryError)
 	}
-	s.collectors = NewVoteCollectors(s.lowestLevel, s.factoryMethod)
+	s.collectors = NewVoteCollectors(s.lowestLevel, s.workerPool, s.factoryMethod)
+}
+
+func (s *VoteCollectorsTestSuite) TearDownTest() {
+	s.workerPool.StopWait()
 }
 
 // prepareMockedCollector prepares a mocked collector and stores it in map, later it will be used
