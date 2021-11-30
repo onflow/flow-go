@@ -223,26 +223,20 @@ func createNode(
 	syncCore, err := synccore.New(log, synccore.DefaultConfig())
 	require.NoError(t, err)
 
-	hotstuffModules := &consensus.HotstuffModules{
-		Forks:                nil,
-		Validator:            nil,
-		Notifier:             notifier,
-		Committee:            committee,
-		Signer:               signer,
-		Persist:              persister.New(db, rootHeader.ChainID), // initialize the persister
-		QCCreatedDistributor: pubsub.NewQCCreatedDistributor(),
-	}
+	qcDistributor := pubsub.NewQCCreatedDistributor()
 
-	hotstuffModules.Forks, err = consensus.NewForks(rootHeader, headersDB, final, hotstuffModules, rootHeader, rootQC)
+	forks, err := consensus.NewForks(rootHeader, headersDB, final, notifier, rootHeader, rootQC)
 	require.NoError(t, err)
 
-	hotstuffModules.Validator = consensus.NewValidator(metrics, hotstuffModules)
+	validator := consensus.NewValidator(metrics, committee, forks, signer)
 	require.NoError(t, err)
 
-	started, err := hotstuffModules.Persist.GetStarted()
+	persist := persister.New(db, rootHeader.ChainID)
+
+	started, err := persist.GetStarted()
 	require.NoError(t, err)
 
-	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
+	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 
 	workerPool := workerpool.New(2)
 	factoryMethod := func(view uint64) (hotstuff.VoteCollector, error) {
@@ -251,8 +245,19 @@ func createNode(
 
 	voteCollectors := voteaggregator.NewVoteCollectors(started, factoryMethod)
 
-	hotstuffModules.Aggregator, err = voteaggregator.NewVoteAggregator(log, notifier, started, voteCollectors)
+	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, started, voteCollectors)
 	require.NoError(t, err)
+
+	hotstuffModules := &consensus.HotstuffModules{
+		Forks:                forks,
+		Validator:            validator,
+		Notifier:             notifier,
+		Committee:            committee,
+		Signer:               signer,
+		Persist:              persist,
+		QCCreatedDistributor: qcDistributor,
+		Aggregator:           aggregator,
+	}
 
 	// initialize the compliance engine
 	compCore, err := compliance.NewCore(
@@ -267,7 +272,7 @@ func createNode(
 		fullState,
 		cache,
 		syncCore,
-		hotstuffModules.Aggregator,
+		aggregator,
 	)
 	require.NoError(t, err)
 
