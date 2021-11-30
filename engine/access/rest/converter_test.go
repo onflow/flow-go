@@ -4,12 +4,13 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"testing"
+
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func linkFixture() LinkGenerator {
