@@ -712,3 +712,12 @@ func (proc *testDKGProcessor) invalidComplaintAnswerBroadcast(data []byte) {
 		}
 	}
 }
+
+func TestErrorTypes(t *testing.T) {
+	t.Run("dkgFailureError", func(t *testing.T) {
+		failureError := dkgFailureErrorf("some error")
+		otherError := fmt.Errorf("some error")
+		assert.True(t, IsDKGFailureError(failureError))
+		assert.False(t, IsDKGFailureError(otherError))
+	})
+}

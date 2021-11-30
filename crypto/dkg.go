@@ -63,18 +63,14 @@ type DKGState interface {
 // Such a failure can be local and only depends on the participant's view of what
 // happened in the protocol. The error can only be returned using the End() function.
 type dkgFailureError struct {
-	err error
+	error
 }
 
 // dkgFailureErrorf constructs a new dkgFailureError
 func dkgFailureErrorf(msg string, args ...interface{}) error {
 	return &dkgFailureError{
-		err: fmt.Errorf(msg, args...),
+		error: fmt.Errorf(msg, args...),
 	}
-}
-
-func (e dkgFailureError) Error() string {
-	return e.err.Error()
 }
 
 // IsInvalidInputsError checks if the input error is of a dkgFailureError type.
