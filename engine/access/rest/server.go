@@ -125,9 +125,9 @@ func routeDefinitions() []routeDefinition {
 		// Execution Result
 		{
 			method:         http.MethodGet,
-			pattern:        "/execution_results/{id}",
+			pattern:        "/execution_results",
 			name:           getExecutionResultByIDRoute,
-			apiHandlerFunc: getExecutionResultByID,
+			apiHandlerFunc: getExecutionResultsByBlockIDs,
 		},
 		// Collections
 		{
