@@ -103,9 +103,9 @@ func ValidatePublicKey(signAlgo runtime.SignatureAlgorithm, pk []byte) (valid bo
 
 	if err != nil {
 		if crypto.IsInvalidInputsError(err) {
-			return false, nil
+			return false, err
 		}
-		return false, fmt.Errorf("validate public key failed: %w", err)
+		panic(fmt.Errorf("validate public key failed with unexpected error %w", err))
 	}
 	return true, nil
 }
@@ -234,7 +234,12 @@ func (DefaultSignatureVerifier) Verify(
 
 	valid, err := publicKey.Verify(signature, message, hasher)
 	if err != nil {
-		return false, fmt.Errorf("failed to verify signature: %w", err)
+		// All inputs are guaranteed to be valid at this stage.
+		// The check for crypto.InvalidInputs is only a sanity check
+		if crypto.IsInvalidInputsError(err) {
+			return false, err
+		}
+		panic(fmt.Errorf("verify signature failed with unexpected error %w", err))
 	}
 
 	return valid, nil
