@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/rs/zerolog"
 	"go.uber.org/atomic"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 )
 
 var (

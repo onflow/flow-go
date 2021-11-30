@@ -578,6 +578,7 @@ func main() {
 				node.Storage.Index,
 				node.RootChainID,
 			)
+
 			notifier.AddConsumer(finalizationDistributor)
 
 			// initialize the persister
