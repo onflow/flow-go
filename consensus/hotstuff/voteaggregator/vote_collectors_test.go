@@ -37,6 +37,7 @@ type VoteCollectorsTestSuite struct {
 func (s *VoteCollectorsTestSuite) SetupTest() {
 	s.lowestLevel = 1000
 	s.mockedCollectors = make(map[uint64]*mocks.VoteCollector)
+	s.workerPool = workerpool.New(2)
 	s.factoryMethod = func(view uint64, _ hotstuff.Workers) (hotstuff.VoteCollector, error) {
 		if collector, found := s.mockedCollectors[view]; found {
 			return collector, nil

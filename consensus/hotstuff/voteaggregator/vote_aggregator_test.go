@@ -54,6 +54,7 @@ func (s *VoteAggregatorV2TestSuite) SetupTest() {
 
 	s.mockedCollectors = make(map[uint64]*mocks.VoteCollector)
 
+	s.collectors.On("Start", mock.Anything) // to support module.Startable
 	s.collectors.On("GetOrCreateCollector", mock.Anything).Return(
 		func(view uint64) hotstuff.VoteCollector {
 			return s.mockedCollectors[view]
