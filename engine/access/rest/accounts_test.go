@@ -17,6 +17,9 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+const expandableFieldKeys = "keys"
+const expandableFieldContracts = "contracts"
+
 func accountURL(t *testing.T, address string, height string) string {
 	u, err := url.ParseRequestURI(fmt.Sprintf("/v1/accounts/%s", address))
 	require.NoError(t, err)

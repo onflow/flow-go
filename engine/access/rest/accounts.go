@@ -6,8 +6,6 @@ import (
 )
 
 const blockHeightQueryParam = "block_height"
-const expandableFieldKeys = "keys"
-const expandableFieldContracts = "contracts"
 
 func getAccount(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	address, err := toAddress(r.getVar("address"))
