@@ -71,7 +71,7 @@ func TestIdentityEncodingMsgpack(t *testing.T) {
 */
 
 func TestIdentityList_Exists(t *testing.T) {
-	t.Run("should find a given elemen", func(t *testing.T) {
+	t.Run("should find a given element", func(t *testing.T) {
 		il1 := unittest.IdentityListFixture(10)
 		il2 := unittest.IdentityListFixture(1)
 
@@ -100,8 +100,73 @@ func TestIdentityList_IdentifierExists(t *testing.T) {
 	})
 }
 
-func TestIdentityList_Union(t *testing.T) {
+func TestIdentityList_UnionWithCopy(t *testing.T) {
+	t.Run("retains the original identity list", func(t *testing.T) {
+		// An identity list is a slice, i.e. it is vulnerable to in-place modifications via append.
+		// Per convention, all IdentityList operations should leave the original lists invariant.
+		// Here, we purposefully create a slice, whose backing array has enough space to
+		// include the elements we are going to add via Union. Furthermore, we force element duplication
+		// by taking the union of the IdentityList with itself. If the implementation is not careful
+		// about creating copies and works with the slices itself, it will modify the input and fail the test.
 
+		il := unittest.IdentityListFixture(20)
+		il = il[:10]
+		ilBackup := il.Copy()
+
+		_ = il.Union(il)
+		assert.Equal(t, ilBackup, il)
+	})
+	t.Run("should contain all identities", func(t *testing.T) {
+		il1 := unittest.IdentityListFixture(10)
+		il2 := unittest.IdentityListFixture(10)
+
+		union := il1.UnionWithCopy(il2)
+
+		uniques := make(map[flow.Identifier]struct{})
+
+		// should contain all items form 1 and 2, since there are no duplicates
+		assert.Len(t, union, len(il1)+len(il2))
+		for _, identity := range union {
+			_, in1 := il1.ByNodeID(identity.NodeID)
+			_, in2 := il2.ByNodeID(identity.NodeID)
+			// each item should be in one of the input lists
+			assert.True(t, in1 || in2)
+
+			// there should be no duplicates
+			_, dupe := uniques[identity.NodeID]
+			assert.False(t, dupe)
+			uniques[identity.NodeID] = struct{}{}
+		}
+	})
+
+	t.Run("should omit duplicates", func(t *testing.T) {
+		il1 := unittest.IdentityListFixture(10)
+		il2 := unittest.IdentityListFixture(10)
+		// add one duplicate between the two lists, which should be included only once
+		dup := il1[0]
+		il2[0] = dup
+
+		union := il1.UnionWithCopy(il2)
+
+		uniques := make(map[flow.Identifier]struct{})
+
+		// should contain one less than the sum of the two input list lengths since there is a dupe
+		assert.Len(t, union, len(il1)+len(il2)-1)
+		for _, identity := range union {
+			_, in1 := il1.ByNodeID(identity.NodeID)
+			_, in2 := il2.ByNodeID(identity.NodeID)
+			// each item should be in one of the input lists
+			assert.True(t, in1 || in2)
+
+			// there should be no duplicates
+			_, dupe := uniques[identity.NodeID]
+			assert.False(t, dupe)
+			uniques[identity.NodeID] = struct{}{}
+		}
+	})
+}
+
+func TestIdentityList_Union(t *testing.T) {
 	t.Run("should contain all identities", func(t *testing.T) {
 		il1 := unittest.IdentityListFixture(10)
 		il2 := unittest.IdentityListFixture(10)
@@ -150,7 +215,6 @@ func TestIdentityList_Union(t *testing.T) {
 			uniques[identity.NodeID] = struct{}{}
 		}
 	})
-
 }
 
 func TestSample(t *testing.T) {

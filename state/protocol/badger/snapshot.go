@@ -161,11 +161,8 @@ func (s *Snapshot) Identities(selector flow.IdentityFilter) (flow.IdentityList, 
 		return nil, err
 	}
 
-	// get identities from the current epoch first
-	identities := setup.Participants.Copy()
-
 	// sort the identities so the 'Exists' binary search works
-	identities = identities.Sort(order.ByNodeIDAsc)
+	identities := setup.Participants.Sort(order.ByNodeIDAsc)
 
 	// get identities that are in either last/next epoch but NOT in the current epoch
 	var otherEpochIdentities flow.IdentityList

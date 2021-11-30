@@ -58,12 +58,6 @@ func TestChunkDataPackRequestList_UniqueRequestInfo(t *testing.T) {
 
 	thisChunkIDReqInfo.Targets = thisChunkIDReqInfo.Targets.Sort(order.Canonical)
 
-	/*
-		sort.Slice(thisChunkIDReqInfo.Targets, func(p, q int) bool {
-			return bytes.Compare(*(thisChunkIDReqInfo.Targets[p])[:], *(thisChunkIDReqInfo.Targets[q])[:]) < 0
-		})
-	*/
-
 	require.Equal(t, thisChunkIDReqInfo.Agrees, thisReq1.Agrees.Union(thisReq2.Agrees))
 	require.Equal(t, thisChunkIDReqInfo.Disagrees, thisReq1.Disagrees.Union(thisReq2.Disagrees))
 	require.Equal(t, thisChunkIDReqInfo.Targets, thisReq1.Targets.Union(thisReq2.Targets))

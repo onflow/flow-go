@@ -78,6 +78,8 @@ func (r RandomizedTopology) GenerateFanout(ids flow.IdentityList, channels netwo
 		if err != nil {
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for topic %s: %w", myChannel, err)
 		}
+
+		// this will modify 'topicFanout'
 		myFanout = myFanout.Union(topicFanout)
 	}
 
