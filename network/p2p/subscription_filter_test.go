@@ -24,28 +24,29 @@ func TestFilterSubscribe(t *testing.T) {
 	// https://github.com/libp2p/go-libp2p-pubsub/issues/449
 	t.Skip()
 
+	sporkId := unittest.IdentifierFixture()
 	identity1, privateKey1 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	ids := flow.IdentityList{identity1, identity2}
 
-	node1 := createNode(t, identity1.NodeID, privateKey1, rootBlockID, createSubscriptionFilterPubsubOption(t, ids))
-	node2 := createNode(t, identity2.NodeID, privateKey2, rootBlockID, createSubscriptionFilterPubsubOption(t, ids))
+	node1 := createNode(t, identity1.NodeID, privateKey1, sporkId, mockSubscriptionFilterPubsubOption(ids))
+	node2 := createNode(t, identity2.NodeID, privateKey2, sporkId, mockSubscriptionFilterPubsubOption(ids))
 
 	unstakedKey := unittest.NetworkingPrivKeyFixture()
-	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, rootBlockID)
+	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, sporkId)
 
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(node2.Host())))
 	require.NoError(t, node1.AddPeer(context.TODO(), *host.InfoFromHost(unstakedNode.Host())))
 
-	badTopic := engine.TopicFromChannel(engine.SyncCommittee, rootBlockID)
+	badTopic := engine.TopicFromChannel(engine.SyncCommittee, sporkId)
 
-	sub1, err := node1.Subscribe(context.TODO(), badTopic)
+	sub1, err := node1.Subscribe(badTopic)
 	require.NoError(t, err)
 
-	sub2, err := node2.Subscribe(context.TODO(), badTopic)
+	sub2, err := node2.Subscribe(badTopic)
 	require.NoError(t, err)
 
-	unstakedSub, err := unstakedNode.Subscribe(context.TODO(), badTopic)
+	unstakedSub, err := unstakedNode.Subscribe(badTopic)
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool {
@@ -93,22 +94,23 @@ func TestFilterSubscribe(t *testing.T) {
 	// publish a message from node 2 and check that only node1 receives
 	testPublish(&wg, node2, sub1)
 
-	wg.Wait()
+	unittest.RequireReturnsBefore(t, wg.Wait, 1*time.Second, "timeout performing publish test")
 }
 
 // TestCanSubscribe tests that the subscription filter blocks a node from subscribing
-// to channels that its role shouldn't subscribe to
+// to channel that its role shouldn't subscribe to
 func TestCanSubscribe(t *testing.T) {
 	identity, privateKey := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
+	sporkId := unittest.IdentifierFixture()
 
-	collectionNode := createNode(t, identity.NodeID, privateKey, rootBlockID, createSubscriptionFilterPubsubOption(t, flow.IdentityList{identity}))
+	collectionNode := createNode(t, identity.NodeID, privateKey, sporkId, mockSubscriptionFilterPubsubOption(flow.IdentityList{identity}))
 	defer func() {
 		done, err := collectionNode.Stop()
 		require.NoError(t, err)
-		<-done
+		unittest.RequireCloseBefore(t, done, 1*time.Second, "could not stop collection node on time")
 	}()
 
-	goodTopic := engine.TopicFromChannel(engine.ProvideCollections, rootBlockID)
+	goodTopic := engine.TopicFromChannel(engine.ProvideCollections, sporkId)
 	_, err := collectionNode.pubSub.Join(goodTopic.String())
 	require.NoError(t, err)
 
@@ -119,21 +121,21 @@ func TestCanSubscribe(t *testing.T) {
 	}
 	for _, ch := range engine.Channels() {
 		if _, ok := allowedChannels[ch]; !ok {
-			badTopic = engine.TopicFromChannel(ch, rootBlockID)
+			badTopic = engine.TopicFromChannel(ch, sporkId)
 			break
 		}
 	}
 	_, err = collectionNode.pubSub.Join(badTopic.String())
 	require.Error(t, err)
 
-	clusterTopic := engine.TopicFromChannel(engine.ChannelSyncCluster(flow.Emulator), rootBlockID)
+	clusterTopic := engine.TopicFromChannel(engine.ChannelSyncCluster(flow.Emulator), sporkId)
 	_, err = collectionNode.pubSub.Join(clusterTopic.String())
 	require.NoError(t, err)
 }
 
-func createSubscriptionFilterPubsubOption(t *testing.T, ids flow.IdentityList) PubsubOption {
+func mockSubscriptionFilterPubsubOption(ids flow.IdentityList) PubsubOption {
 	idProvider := id.NewFixedIdentityProvider(ids)
 	return func(_ context.Context, h host.Host) (pubsub.Option, error) {
-		return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(h.ID(), rootBlockID, idProvider)), nil
+		return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(h.ID(), idProvider)), nil
 	}
 }

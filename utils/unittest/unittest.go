@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -264,4 +266,9 @@ func Concurrently(n int, f func(int)) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+// AssertEqualBlocksLenAndOrder asserts that both a segment of blocks have the same len and blocks are in the same order
+func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlocks []*flow.Block) {
+	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
 }

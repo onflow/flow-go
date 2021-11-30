@@ -72,7 +72,9 @@ func (tst *TestnetStateTracker) Track(t *testing.T, ctx context.Context, ghost *
 
 			if err != nil {
 				// Connection is closed, therefore there are no other messages and we can return here
-				if strings.Contains(err.Error(), "transport is closing") || strings.Contains(err.Error(), "EOF") {
+				if strings.Contains(err.Error(), "transport is closing") ||
+					strings.Contains(err.Error(), "EOF") ||
+					strings.Contains(err.Error(), "connection reset by peer") {
 					return
 				}
 			}

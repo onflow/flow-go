@@ -149,38 +149,20 @@ func TestBootstrapNonRoot(t *testing.T) {
 	rootBlock, err := rootSnapshot.Head()
 	require.NoError(t, err)
 
-	// should be able to bootstrap from snapshot after building one block
-	// ROOT <- B1 <- CHILD
-	t.Run("with one block built", func(t *testing.T) {
-		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
-			block1 := unittest.BlockWithParentFixture(rootBlock)
-			buildBlock(t, state, &block1)
-			child := unittest.BlockWithParentFixture(block1.Header)
-			buildBlock(t, state, &child)
-
-			return state.AtBlockID(block1.ID())
-		})
-
-		bootstrap(t, after, func(state *bprotocol.State, err error) {
-			require.NoError(t, err)
-			unittest.AssertSnapshotsEqual(t, after, state.Final())
-		})
-	})
-
 	// should be able to bootstrap from snapshot after sealing a non-root block
 	// ROOT <- B1 <- B2(S1) <- CHILD
 	t.Run("with sealed block", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
 			block1 := unittest.BlockWithParentFixture(rootBlock)
-			buildBlock(t, state, &block1)
+			buildBlock(t, state, block1)
 
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1), unittest.WithReceipts(receipt1)))
-			buildBlock(t, state, &block2)
+			buildBlock(t, state, block2)
 
 			child := unittest.BlockWithParentFixture(block2.Header)
-			buildBlock(t, state, &child)
+			buildBlock(t, state, child)
 
 			return state.AtBlockID(block2.ID())
 		})
@@ -330,7 +312,7 @@ func TestBootstrap_DisconnectedSealingSegment(t *testing.T) {
 	encodable := rootSnapshot.Encodable()
 	// add an un-connected tail block to the sealing segment
 	tail := unittest.BlockFixture()
-	encodable.SealingSegment = append([]*flow.Block{&tail}, encodable.SealingSegment...)
+	encodable.SealingSegment.Blocks = append([]*flow.Block{&tail}, encodable.SealingSegment.Blocks...)
 	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
 
 	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {

@@ -37,8 +37,6 @@ import (
 	"github.com/onflow/flow-go/engine/consensus/sealing"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/dkg"
-	dkgmodel "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
@@ -100,7 +98,7 @@ func main() {
 
 		err                     error
 		mutableState            protocol.MutableState
-		privateDKGData          *dkgmodel.DKGParticipantPriv
+		beaconPrivateKey        *encodable.RandomBeaconPrivKey
 		guarantees              mempool.Guarantees
 		receipts                mempool.ExecutionTree
 		seals                   mempool.IncorporatedResultSeals
@@ -117,7 +115,7 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
-		dkgKeyStore             *bstorage.DKGKeys
+		dkgKeyStore             *bstorage.BeaconPrivateKeys
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -172,7 +170,7 @@ func main() {
 			return nil
 		}).
 		Module("dkg key storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			dkgKeyStore, err = bstorage.NewDKGKeys(node.Metrics.Cache, node.SecretsDB)
+			dkgKeyStore, err = bstorage.NewBeaconPrivateKeys(node.Metrics.Cache, node.SecretsDB)
 			return err
 		}).
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -263,7 +261,7 @@ func main() {
 
 			// otherwise, load and save the key in DB for the current epoch (wrt
 			// root block)
-			privateDKGData, err = loadDKGPrivateData(node.BaseConfig.BootstrapDir, node.NodeID)
+			beaconPrivateKey, err = loadBeaconPrivateKey(node.BaseConfig.BootstrapDir, node.NodeID)
 			if err != nil {
 				return err
 			}
@@ -271,7 +269,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			err = dkgKeyStore.InsertMyDKGPrivateInfo(epochCounter, privateDKGData)
+			err = dkgKeyStore.InsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey)
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}
@@ -289,7 +287,7 @@ func main() {
 					if err != nil {
 						return err
 					}
-					_, err = dkgKeyStore.RetrieveMyDKGPrivateInfo(counter)
+					_, err = dkgKeyStore.RetrieveMyBeaconPrivateKey(counter)
 					if err != nil {
 						return err
 					}
@@ -625,7 +623,6 @@ func main() {
 				node.Logger,
 				mainMetrics,
 				node.Tracer,
-				node.Storage.Index,
 				node.RootChainID,
 			)
 
@@ -765,14 +762,14 @@ func main() {
 		Run()
 }
 
-func loadDKGPrivateData(dir string, myID flow.Identifier) (*dkg.DKGParticipantPriv, error) {
+func loadBeaconPrivateKey(dir string, myID flow.Identifier) (*encodable.RandomBeaconPrivKey, error) {
 	path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, myID)
 	data, err := io.ReadFile(filepath.Join(dir, path))
 	if err != nil {
 		return nil, err
 	}
 
-	var priv dkg.DKGParticipantPriv
+	var priv encodable.RandomBeaconPrivKey
 	err = json.Unmarshal(data, &priv)
 	if err != nil {
 		return nil, err

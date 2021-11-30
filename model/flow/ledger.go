@@ -124,6 +124,16 @@ func (s StateCommitment) MarshalJSON() ([]byte, error) {
 }
 
 func (s *StateCommitment) UnmarshalJSON(data []byte) error {
+	// first, attempt to unmarshal assuming data is a hex string representation
+	err := s.unmarshalJSONHexString(data)
+	if err == nil {
+		return nil
+	}
+	// fallback to unmarshalling as [32]byte
+	return s.unmarshalJSONByteArr(data)
+}
+
+func (s *StateCommitment) unmarshalJSONHexString(data []byte) error {
 	var stateCommitmentHex string
 	if err := json.Unmarshal(data, &stateCommitmentHex); err != nil {
 		return err
@@ -137,5 +147,14 @@ func (s *StateCommitment) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	*s = StateCommitment(h)
+	return nil
+}
+
+func (s *StateCommitment) unmarshalJSONByteArr(data []byte) error {
+	var stateCommitment [32]byte
+	if err := json.Unmarshal(data, &stateCommitment); err != nil {
+		return err
+	}
+	*s = stateCommitment
 	return nil
 }

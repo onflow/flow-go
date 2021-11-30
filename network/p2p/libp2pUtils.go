@@ -12,12 +12,12 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
-	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/multiformats/go-multiaddr"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
 var directionLookUp = map[network.Direction]string{
@@ -162,14 +162,6 @@ func IPPortFromMultiAddress(addrs ...multiaddr.Multiaddr) (string, string, error
 	return "", "", fmt.Errorf("ip address or hostname not found")
 }
 
-func FlowProtocolID(rootBlockID flow.Identifier) protocol.ID {
-	return protocol.ID(FlowLibP2POneToOneProtocolIDPrefix + rootBlockID.String())
-}
-
-func generatePingProtcolID(rootBlockID flow.Identifier) protocol.ID {
-	return protocol.ID(FlowLibP2PPingProtocolPrefix + rootBlockID.String())
-}
-
 // PeerAddressInfo generates the libp2p peer.AddrInfo for the given Flow.Identity.
 // A node in flow is defined by a flow.Identity while it is defined by a peer.AddrInfo in libp2p.
 // flow.Identity           ---> peer.AddrInfo
@@ -226,7 +218,7 @@ func streamLogger(log zerolog.Logger, stream libp2pnetwork.Stream) zerolog.Logge
 // flowStream returns the Flow protocol Stream in the connection if one exist, else it returns nil
 func flowStream(conn network.Conn) network.Stream {
 	for _, s := range conn.GetStreams() {
-		if isFlowProtocolStream(s) {
+		if unicast.IsFlowProtocolStream(s) {
 			return s
 		}
 	}
