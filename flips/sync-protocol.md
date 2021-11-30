@@ -2,7 +2,7 @@
 
 | Status        | Proposed                                                  |
 :-------------- |:--------------------------------------------------------- |
-| **FLIP #**    | ???                                                       |
+| **FLIP #**    | 1697                                                      |
 | **Author(s)** | Simon Zhu (simon.zhu@dapperlabs.com)                      |
 | **Sponsor**   | Simon Zhu (simon.zhu@dapperlabs.com)                      |
 | **Updated**   | 11/29/2021                                                |
@@ -14,32 +14,32 @@ Redesign the synchronization protocol to improve efficiency, robustness, and Byz
 ## Current Implementation
 
 The current synchronization protocol implementation consists of two main pieces:
-* The [Sync Engine](LINK) interfaces with the network layer and handles sending synchronization requests to other nodes and processing responses.
-* The [Sync Core](LINK) implements the core logic, configuration, and state management of the synchronization protocol.
+* The [Sync Engine](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/engine/common/synchronization/engine.go) interfaces with the network layer and handles sending synchronization requests to other nodes and processing responses.
+* The [Sync Core](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go) implements the core logic, configuration, and state management of the synchronization protocol.
 
 There are three types of synchronization requests:
-* A [Sync Height Request](LINK) is sent to share the local finalized height while requesting the same information from the recipient. It is replied to with a [Sync Height Response](LINK).
-* A [Batch Request](LINK) requests a list of blocks by ID. It is replied to with a [Block Response](LINK).
-* A [Range Request](LINK) requests a range of finalized blocks by height. It is replied to with a [Block Response](LINK).
+* A [Sync Height Request](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/model/messages/synchronization.go#L8-L14) is sent to share the local finalized height while requesting the same information from the recipient. It is replied to with a [Sync Height Response](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/model/messages/synchronization.go#L16-L22).
+* A [Batch Request](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/model/messages/synchronization.go#L34-L40) requests a list of blocks by ID. It is replied to with a [Block Response](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/model/messages/synchronization.go#L42-L48).
+* A [Range Request](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/model/messages/synchronization.go#L24-L32) requests a range of finalized blocks by height. It is replied to with a [Block Response](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/model/messages/synchronization.go#L42-L48).
 
 The Sync Core uses two data structures to track the statuses of requestable items:
-* [`Heights`](LINK) tracks the set of requestable finalized block heights. It is used to generate Ranges for the Sync Engine to request.
-* [`BlockIDs`](LINK) tracks the set of requestable block IDs. It is used to generate Batches for the Sync Engine to request.
+* [`Heights`](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go#L53) tracks the set of requestable finalized block heights. It is used to generate Ranges for the Sync Engine to request.
+* [`BlockIDs`](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go#L54) tracks the set of requestable block IDs. It is used to generate Batches for the Sync Engine to request.
 
-The Sync Engine periodically picks a small number of random nodes to send Sync Height Requests to. It also periodically calls [`ScanPending`](LINK) to get a list of requestable Ranges and Batches from the Sync Core, and picks some random nodes to send those requests to.
+The Sync Engine periodically picks a small number of random nodes to send Sync Height Requests to. It also periodically calls [`ScanPending`](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go#L148-L166) to get a list of requestable Ranges and Batches from the Sync Core, and picks some random nodes to send those requests to.
 
-Each time the [Compliance Core](LINK) processes a new block proposal, it calls [`RequestBlock`](LINK) to [request the block ID of the first ancestor which has not yet been received](LINK), which updates `BlockIDs` by queueing the block ID.
+Each time the Compliance Engine processes a new block proposal, it finds the first ancestor which has not yet been received (if one exists) and calls [`RequestBlock`](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go#L114-L126) to request the missing block ID. `RequestBlock` updates `BlockIDs` by queueing the block ID.
 
-Each time the Sync Engine receives a Sync Height Response, it calls [`HandleHeight`](LINK) to [pass the received height to the Sync Core](LINK), which updates `Heights` by queueing all heights between the local finalized height and the received height.
+Each time the Sync Engine receives a Sync Height Response, it calls [`HandleHeight`](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go#L95-L112) to pass the received height to the Sync Core, which updates `Heights` by queueing all heights between the local finalized height and the received height.
 
-Each time the Sync Engine receives a Block Response, it calls [`HandleBlock`](LINK) to pass each of the received blocks to the Sync Core, which updates the tracked statuses in `Heights` and `BlockIDs`.
+Each time the Sync Engine receives a Block Response, it calls [`HandleBlock`](https://github.com/onflow/flow-go/blob/39c455da40c8f0aa6f9962c48f4cd34a5cbacfc0/module/synchronization/core.go#L67-L93) to pass each of the received blocks to the Sync Core, which updates the tracked statuses in `Heights` and `BlockIDs`.
 
 ### Potential Problems 
 
 * The Sync Core optimistically sets the status of an item in `Heights` as Received as soon as *any* block with the corresponding height is received, even though it has no way of knowing whether the received block has actually been finalized by consensus. This could cause the height to stop being requested before the finalized block has actually been received. It's also possible that this could cause `Heights` to become fragmented (smaller requestable ranges).
 * Items in `BlockIDs` do not contain the block height, which means that they cannot be pruned until the corresponding block has actually been received. If a malicious block proposal causes a non-existent parent ID to be queued by the Compliance Core, the item will not be pruned until the maximum number of attempts is reached.
 * After a block corresponding to an item in `BlockIDs` is received, the item is not pruned until the local finalized height surpasses the height of the block. If a node is very far behind, `BlockIDs` could grow very large before the local finalization catches up.
-* [`HandleHeight`](LINK) iterates over the entire range from the local finalized height to the received height, queueing all new heights and requeueing heights which have already been received. This can be expensive if the node is very far behind.
+* `HandleHeight` iterates over the entire range from the local finalized height to the received height, queueing all new heights and requeueing heights which have already been received. This can be expensive if the node is very far behind.
 * The implementation of `ScanPending` is split into three steps:
     * Iterate through `Heights` and `BlockIDs` and find all requestable heights and block IDs. 
     * Group these requestable items into Ranges and Batches. 
