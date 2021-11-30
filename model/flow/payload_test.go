@@ -36,7 +36,6 @@ func TestPayloadEncodeEmptyJSON(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, decoded.Seals)
 	assert.Equal(t, payloadHash2, decoded.Hash())
-	assert.NotEqual(t, payload, encoded2)
 }
 
 func TestPayloadEncodeJSON(t *testing.T) {
