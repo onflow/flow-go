@@ -34,7 +34,6 @@ func TestNetworkSetupBasic(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleExecution),
 		testnet.NewNodeConfig(flow.RoleVerification),
 		testnet.NewNodeConfig(flow.RoleAccess),
-		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 	conf := testnet.NewNetworkConfig("meta_test_basic", nodes)
 
@@ -72,7 +71,6 @@ func TestNetworkSetupMultipleNodes(t *testing.T) {
 		testnet.NewNodeConfig(flow.RoleVerification),
 		testnet.NewNodeConfig(flow.RoleVerification),
 		testnet.NewNodeConfig(flow.RoleExecution),
-		testnet.NewNodeConfig(flow.RoleAccess),
 		testnet.NewNodeConfig(flow.RoleAccess),
 	}
 	conf := testnet.NewNetworkConfig("meta_test_multinodes", nodes)
