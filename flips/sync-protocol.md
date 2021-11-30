@@ -48,8 +48,8 @@ Each time the Sync Engine receives a Block Response, it calls [`HandleBlock`](ht
   While conceptually easy to understand, this implementation is inefficient and performs many more loop iterations than necessary.
 * When the Sync Engine calls `ScanPending`, it passes in the local finalized height, which the Sync Core uses to prune requestable items. Since `Heights` and `BlockIDs` are both implemented using Go maps, pruning them involves iterating through all items to find the ones for which the associated block height is lower than the local finalized height, which is inefficient. Furthermore, pruning is triggered on every call to `ScanPending`, even if the local finalized height has not changed.
 * There is no way to determine whether a Sync Height Response is honest or not. If `HandleHeight` is called for every received Sync Height Response, an attacker could cause `Heights` to grow unboundedly large by sending a Sync Height Response with an absurdly high height.
-* Processing a range of blocks may or may not advance the local finalized height. There are two reasons why it would not progress:
-  * The range contains blocks that are not actually finalized (e.g. received from a malicious node).
+* Processing a Range Request response may or may not advance the local finalized height. There are two reasons why it may not progress:
+  * The response contains blocks that are not actually finalized (e.g. received from a malicious node).
   * More blocks are needed to form a Three-Chain and advance the local finalized height. Although this case becomes increasingly unlikely with larger ranges, it is theoretically still possible under the relaxed version of the [HotStuff](https://arxiv.org/abs/1803.05069) algorithm.
 
   The Sync Core does not account for the second case, and so it is possible that the Sync Engine gets stuck requesting the same range over and over.
