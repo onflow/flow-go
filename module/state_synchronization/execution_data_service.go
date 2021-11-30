@@ -143,6 +143,12 @@ func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}, logg
 	<-done
 
 	if storeErr != nil {
+		// the blob channel may be closed as a result of the context being canceled,
+		// in which case we should return the context error.
+		if errors.Is(storeErr, blobs.ErrClosedBlobChannel) && ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
 		return nil, storeErr
 	}
 
