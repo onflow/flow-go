@@ -25,10 +25,11 @@ type cachedEntity struct {
 
 // ArrayBackData implements an array-based generic memory pool backed by a fixed size array.
 type ArrayBackData struct {
-	limit    uint64
-	size     uint64 // total number of non-expired key-values
-	buckets  []keyBucket
-	entities []cachedEntity
+	limit     uint64
+	size      uint64 // total number of non-expired key-values
+	bucketNum uint64 // total number of buckets (i.e., size of buckets)
+	buckets   []keyBucket
+	entities  []cachedEntity
 }
 
 func NewArrayBackData(limit uint32, oversizeFactor uint32) ArrayBackData {
@@ -90,6 +91,16 @@ func (a *ArrayBackData) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(a.All())...)
 }
 
-func uint64Prefix(id flow.Identifier) uint64 {
-	return binary.LittleEndian.Uint64(id[:64])
+func (a *ArrayBackData) add(k flow.Identifier, v flow.Entity) (bool, error) {
+
+}
+
+func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (uint32, uint64) {
+	// uint64(id[0:8]) used to compute bucket index for which this key (i.e., id) belongs to
+	bucketIndex := binary.LittleEndian.Uint64(id[0:8]) % a.bucketNum
+
+	// uint32(id[8:12]) used to compute a shorter key for this id to represent in memory.
+	idPrefix := binary.LittleEndian.Uint32(id[8:12])
+
+	return idPrefix, bucketIndex
 }
