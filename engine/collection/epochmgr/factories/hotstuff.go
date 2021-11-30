@@ -67,7 +67,8 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	clusterState cluster.State,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
-	updater module.Finalizer) (*consensus.HotstuffModules, error) {
+	updater module.Finalizer,
+) (*consensus.HotstuffModules, error) {
 
 	// setup metrics/logging with the new chain ID
 	metrics := f.createMetrics(cluster.ChainID())
@@ -91,46 +92,50 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	signer = verification.NewSingleSignerVerifier(committee, f.aggregator, f.me.NodeID())
 	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
-	finalized, pending, err := recovery.FindLatest(clusterState, headers)
+	finalizedBlock, pendingBlocks, err := recovery.FindLatest(clusterState, headers)
 	if err != nil {
 		return nil, err
 	}
 
-	hotstuffModules := &consensus.HotstuffModules{
-		Forks:                nil,
-		Validator:            nil,
-		Notifier:             notifier,
-		Committee:            committee,
-		Signer:               signer,
-		Persist:              persister.New(f.db, cluster.ChainID()),
-		Aggregator:           nil,
-		QCCreatedDistributor: pubsub.NewQCCreatedDistributor(),
-	}
-
-	hfForks, err := consensus.NewForks(
-		finalized,
+	forks, err := consensus.NewForks(
+		finalizedBlock,
 		headers,
 		updater,
-		hotstuffModules,
+		notifier,
 		cluster.RootBlock().Header,
 		cluster.RootQC(),
 	)
 	if err != nil {
 		return nil, err
 	}
-	hotstuffModules.Forks = hfForks
-	hotstuffModules.Validator = consensus.NewValidator(metrics, hotstuffModules)
 
-	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(hotstuffModules.Committee,
-		hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
-
-	hotstuffModules.Aggregator, err = consensus.NewVoteAggregator(f.log, finalized, pending, hotstuffModules, f.workerPool,
-		voteProcessorFactory)
+	qcDistributor := pubsub.NewQCCreatedDistributor()
+	validator := consensus.NewValidator(metrics, committee, forks, signer)
+	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+	aggregator, err := consensus.NewVoteAggregator(
+		f.log,
+		finalizedBlock,
+		pendingBlocks,
+		notifier,
+		forks,
+		validator,
+		f.workerPool,
+		voteProcessorFactory,
+	)
 	if err != nil {
 		return nil, err
 	}
 
-	return hotstuffModules, nil
+	return &consensus.HotstuffModules{
+		Forks:                forks,
+		Validator:            validator,
+		Notifier:             notifier,
+		Committee:            committee,
+		Signer:               signer,
+		Persist:              persister.New(f.db, cluster.ChainID()),
+		Aggregator:           aggregator,
+		QCCreatedDistributor: qcDistributor,
+	}, nil
 }
 
 func (f *HotStuffFactory) Create(

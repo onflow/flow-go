@@ -101,7 +101,7 @@ func NewParticipant(
 		modules.Persist,
 		communicator,
 		modules.Committee,
-		nil,
+		modules.Aggregator,
 		voter,
 		modules.Validator,
 		modules.Notifier,
@@ -124,14 +124,14 @@ func NewParticipant(
 }
 
 // NewForks creates new consensus forks manager
-func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, modules *HotstuffModules, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (hotstuff.Forks, error) {
-	finalizer, err := newFinalizer(final, headers, updater, modules.Notifier, rootHeader, rootQC)
+func NewForks(final *flow.Header, headers storage.Headers, updater module.Finalizer, notifier hotstuff.Consumer, rootHeader *flow.Header, rootQC *flow.QuorumCertificate) (hotstuff.Forks, error) {
+	finalizer, err := newFinalizer(final, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
 	}
 
 	// initialize the fork choice
-	forkchoice, err := forkchoice.NewNewestForkChoice(finalizer, modules.Notifier)
+	forkchoice, err := forkchoice.NewNewestForkChoice(finalizer, notifier)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize fork choice: %w", err)
 	}
@@ -141,9 +141,10 @@ func NewForks(final *flow.Header, headers storage.Headers, updater module.Finali
 }
 
 // NewValidator creates new instance of hotstuff validator needed for votes & proposal validation
-func NewValidator(metrics module.HotstuffMetrics, modules *HotstuffModules) hotstuff.Validator {
+// TODO: update signer to use new interface
+func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.Committee, forks hotstuff.ForksReader, signer hotstuff.SignerVerifier) hotstuff.Validator {
 	// initialize the Validator
-	validator := validatorImpl.New(modules.Committee, modules.Forks, modules.Signer)
+	validator := validatorImpl.New(committee, forks, signer)
 	return validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 }
 
