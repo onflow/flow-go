@@ -322,27 +322,29 @@ func transactionResponse(tx *flow.TransactionBody, link LinkGenerator) *generate
 		auths = append(auths, auth.String())
 	}
 
+	resultLink, _ := link.TransactionResultLink(tx.ID())
+	self, _ := selfLink(tx.ID(), link.TransactionLink)
+
 	return &generated.Transaction{
 		Id:                 tx.ID().String(),
 		Script:             toBase64(tx.Script),
 		Arguments:          args,
 		ReferenceBlockId:   tx.ReferenceBlockID.String(),
-		GasLimit:           int32(tx.GasLimit), // todo(sideninja) make sure this is ok
+		GasLimit:           int32(tx.GasLimit),
 		Payer:              tx.Payer.String(),
 		ProposalKey:        proposalKeyResponse(&tx.ProposalKey),
 		Authorizers:        auths,
 		PayloadSignatures:  transactionSignatureResponse(tx.PayloadSignatures),
 		EnvelopeSignatures: transactionSignatureResponse(tx.EnvelopeSignatures),
 		Result:             nil, // todo(sideninja) should we provide result, maybe have a wait for result http long pulling system would be super helpful (with reasonable timeout) but careful about resources and dos
-		Links:              transactionLink(tx.ID(), link),
-	}
-}
-
-func transactionLink(id flow.Identifier, link LinkGenerator) *generated.Links {
-	self, _ := link.TransactionLink(id)
-
-	return &generated.Links{
-		Self: self,
+		Links:              self,
+		Expandable: &generated.TransactionExpandable{
+			ProposalKey:        "proposal_key",
+			Authorizers:        "authorizers",
+			PayloadSignatures:  "payload_signatures",
+			EnvelopeSignatures: "envelope_signatures",
+			Result:             resultLink,
+		},
 	}
 }
 
@@ -385,28 +387,18 @@ func statusResponse(status flow.TransactionStatus) generated.TransactionStatus {
 func transactionResultResponse(txr *access.TransactionResult, txID flow.Identifier, link LinkGenerator) *generated.TransactionResult {
 	status := statusResponse(txr.Status)
 
+	self, _ := selfLink(txID, link.TransactionResultLink)
+
 	return &generated.TransactionResult{
 		BlockId:         txr.BlockID.String(),
 		Status:          &status,
 		ErrorMessage:    txr.ErrorMessage,
 		ComputationUsed: int32(0),
 		Events:          eventsResponse(txr.Events),
-		Expandable:      nil,
-		Links:           transactionResultLink(txID, link),
-	}
-}
-
-func transactionResultLink(txID flow.Identifier, link LinkGenerator) *generated.Links {
-	self, _ := link.TransactionResultLink(txID)
-	return &generated.Links{
-		Self: self,
-	}
-}
-
-func blockLink(id flow.Identifier, link LinkGenerator) *generated.Links {
-	self, _ := link.BlockLink(id)
-	return &generated.Links{
-		Self: self,
+		Expandable: &generated.TransactionResultExpandable{
+			Events: "events",
+		},
+		Links: self,
 	}
 }
 
