@@ -32,11 +32,33 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 		return nil, NewBadRequestError(err)
 	}
 
-	if blockID == "latest" || blockHeight == "latest" {
+	if blockHeight == "latest" || blockHeight == "sealed" {
 		result, err := backend.ExecuteScriptAtLatestBlock(r.Context(), code, args)
 		if err != nil {
 			return nil, err
 		}
+		return result, nil
+	}
+
+	if blockHeight == "final" {
+		finalBlock, err := backend.GetLatestBlockHeader(r.Context(), false)
+		if err != nil {
+			return nil, err
+		}
+		blockHeight = fmt.Sprintf("%d", finalBlock.Height)
+	}
+
+	if blockHeight != "" {
+		height, err := toHeight(blockHeight)
+		if err != nil {
+			return nil, NewBadRequestError(err)
+		}
+
+		result, err := backend.ExecuteScriptAtBlockHeight(r.Context(), height, code, args)
+		if err != nil {
+			return nil, err
+		}
+
 		return result, nil
 	}
 
@@ -47,20 +69,6 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 		}
 
 		result, err := backend.ExecuteScriptAtBlockID(r.Context(), id, code, args)
-		if err != nil {
-			return nil, err
-		}
-
-		return result, nil
-	}
-
-	if blockHeight != "" {
-		height, err := toHeight(blockHeight)
-		if err != nil {
-			return nil, NewBadRequestError(err)
-		}
-
-		result, err := backend.ExecuteScriptAtBlockHeight(r.Context(), height, code, args)
 		if err != nil {
 			return nil, err
 		}
