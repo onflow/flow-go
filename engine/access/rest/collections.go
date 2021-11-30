@@ -15,5 +15,5 @@ func getCollectionByID(r *requestDecorator, backend access.API, link LinkGenerat
 		return nil, err
 	}
 
-	return collectionResponse(collection), nil
+	return collectionResponse(collection, link), nil
 }

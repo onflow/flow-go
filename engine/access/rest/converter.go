@@ -510,11 +510,13 @@ func idsResponse(ids []flow.Identifier) []string {
 	return res
 }
 
-func collectionResponse(flowCollection *flow.LightCollection) generated.Collection {
+func collectionResponse(flowCollection *flow.LightCollection, link LinkGenerator) generated.Collection {
+	self, _ := selfLink(flowCollection.ID(), link.CollectionLink)
+
 	return generated.Collection{
 		Id:           flowCollection.ID().String(),
 		Transactions: idsResponse(flowCollection.Transactions),
-		Links:        nil,
+		Links:        self,
 	}
 }
 

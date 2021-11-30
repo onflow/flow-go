@@ -15,6 +15,7 @@ type LinkGenerator interface {
 	TransactionResultLink(id flow.Identifier) (string, error)
 	PayloadLink(id flow.Identifier) (string, error)
 	ExecutionResultLink(id flow.Identifier) (string, error)
+	CollectionLink(id flow.Identifier) (string, error)
 }
 
 type LinkGeneratorImpl struct {
@@ -43,6 +44,10 @@ func (generator *LinkGeneratorImpl) TransactionLink(id flow.Identifier) (string,
 
 func (generator *LinkGeneratorImpl) TransactionResultLink(id flow.Identifier) (string, error) {
 	return generator.link(getTransactionResultByIDRoute, id)
+}
+
+func (generator *LinkGeneratorImpl) CollectionLink(id flow.Identifier) (string, error) {
+	return generator.link(getCollectionByIDRoute, id)
 }
 
 func selfLink(id flow.Identifier, linkFun LinkFun) (*generated.Links, error) {
