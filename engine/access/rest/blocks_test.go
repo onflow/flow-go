@@ -31,7 +31,9 @@ func blockURL(ids []string, start uint64, end uint64, payload bool) string {
 }
 
 func TestGetBlocks(t *testing.T) {
+	t.Skip()
 	backend := &mock.API{}
+
 
 	t.Run("get block by ID", func(t *testing.T) {
 		block := unittest.BlockFixture()

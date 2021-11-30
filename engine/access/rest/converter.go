@@ -560,19 +560,3 @@ func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublic
 
 	return keysResponse
 }
-
-func accountResponse(account *flow.Account) generated.Account {
-	contracts := make(map[string]string, len(account.Contracts))
-	for name, code := range account.Contracts {
-		contracts[name] = string(code)
-	}
-
-	return generated.Account{
-		Address:    account.Address.String(),
-		Balance:    int32(account.Balance),
-		Keys:       accountKeysResponse(account.Keys),
-		Contracts:  contracts,
-		Expandable: nil,
-		Links:      nil,
-	}
-}

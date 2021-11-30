@@ -134,11 +134,15 @@ func AccountFixture() (*flow.Account, error) {
 		return nil, err
 	}
 
+	contracts := make(map[string][]byte, 2)
+	contracts["contract1"] = []byte("contract1")
+	contracts["contract2"] = []byte("contract2")
+
 	return &flow.Account{
 		Address:   RandomAddressFixture(),
 		Balance:   100,
 		Keys:      []flow.AccountPublicKey{key.PublicKey(1000)},
-		Contracts: nil,
+		Contracts: contracts,
 	}, nil
 }
 
