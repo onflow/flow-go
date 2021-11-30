@@ -73,12 +73,20 @@ func TestGetTransactions(t *testing.T) {
 			   ],
 			   "_links":{
 				  "_self":"%s"
-			   }
+			   },
+				"_expandable": {
+					"proposal_key": "proposal_key",
+					"authorizers": "authorizers",
+					"payload_signatures": "payload_signatures",
+					"envelope_signatures": "envelope_signatures",
+					"result": "/v1/transaction_results/%s"
+				}
 			}`,
 			tx.ID().String(),
 			tx.ReferenceBlockID.String(),
 			toBase64(tx.EnvelopeSignatures[0].Signature),
 			transactionURL(tx.ID().String()),
+			tx.ID().String(),
 		)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -90,7 +98,7 @@ func TestGetTransactions(t *testing.T) {
 		rr := executeRequest(req, backend)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
-		assert.JSONEq(t, `{"code":400, "message":"invalid ID"}`, rr.Body.String())
+		assert.JSONEq(t, `{"code":400, "message":"invalid ID format"}`, rr.Body.String())
 	})
 
 	t.Run("get by ID Non-existing", func(t *testing.T) {
