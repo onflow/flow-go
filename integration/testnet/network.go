@@ -121,6 +121,17 @@ func (net *FlowNetwork) Identities() flow.IdentityList {
 	return il
 }
 
+// ContainersByRole returns all the containers in the network with the specified role
+func (net *FlowNetwork) ContainersByRole(role flow.Role) []*Container {
+	cl := make([]*Container, 0, len(net.Containers))
+	for _, c := range net.Containers {
+		if c.Config.Role == role {
+			cl = append(cl, c)
+		}
+	}
+	return cl
+}
+
 // Root returns the root block generated for the network.
 func (net *FlowNetwork) Root() *flow.Block {
 	return net.root
