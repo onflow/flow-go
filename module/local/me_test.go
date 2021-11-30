@@ -3,8 +3,9 @@ package local
 import (
 	"testing"
 
-	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestInitializeWithMatchingKey(t *testing.T) {
