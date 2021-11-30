@@ -32,7 +32,7 @@ func TestCommonQueryParamMiddlewares(t *testing.T) {
 		query := req.URL.Query()
 		// add query params as per test case
 		if len(expandList) > 0 {
-			query.Add(expandQueryParam, strings.Join(expandList, ","))
+			query.Add(ExpandQueryParam, strings.Join(expandList, ","))
 		}
 		if len(selectList) > 0 {
 			query.Add(selectQueryParam, strings.Join(selectList, ","))

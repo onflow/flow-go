@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -30,6 +31,12 @@ func executeRequest(req *http.Request, backend *mock.API) *httptest.ResponseReco
 	router.ServeHTTP(rr, req)
 
 	return rr
+}
+
+func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
+	rr := executeRequest(req, backend)
+	require.Equal(t, http.StatusOK, rr.Code)
+	require.JSONEq(t, expectedRespBody, rr.Body.String())
 }
 
 func collectionURL(param string) string {

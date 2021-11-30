@@ -15,6 +15,7 @@ type LinkGenerator interface {
 	TransactionResultLink(id flow.Identifier) (string, error)
 	PayloadLink(id flow.Identifier) (string, error)
 	ExecutionResultLink(id flow.Identifier) (string, error)
+	AccountLink(address string) (string, error)
 }
 
 type LinkGeneratorImpl struct {
@@ -28,21 +29,25 @@ func NewLinkGeneratorImpl(router *mux.Router) *LinkGeneratorImpl {
 }
 
 func (generator *LinkGeneratorImpl) BlockLink(id flow.Identifier) (string, error) {
-	return generator.link(getBlocksByIDRoute, id)
+	return generator.linkForID(getBlocksByIDRoute, id)
 }
 func (generator *LinkGeneratorImpl) PayloadLink(id flow.Identifier) (string, error) {
-	return generator.link(getBlocksByIDRoute, id)
+	return generator.linkForID(getBlocksByIDRoute, id)
 }
 func (generator *LinkGeneratorImpl) ExecutionResultLink(id flow.Identifier) (string, error) {
-	return generator.link(getExecutionResultByIDRoute, id)
+	return generator.linkForID(getExecutionResultByIDRoute, id)
 }
 
 func (generator *LinkGeneratorImpl) TransactionLink(id flow.Identifier) (string, error) {
-	return generator.link(getTransactionByIDRoute, id) // todo(sideninja) handler now has route attribute, we could get the route from there and just use this as route builder to return the Link, also discuss having this return generated.Links, or even be moved to converters
+	return generator.linkForID(getTransactionByIDRoute, id) // todo(sideninja) handler now has route attribute, we could get the route from there and just use this as route builder to return the Link, also discuss having this return generated.Links, or even be moved to converters
 }
 
 func (generator *LinkGeneratorImpl) TransactionResultLink(id flow.Identifier) (string, error) {
-	return generator.link(getTransactionResultByIDRoute, id)
+	return generator.linkForID(getTransactionResultByIDRoute, id)
+}
+
+func (generator *LinkGeneratorImpl) AccountLink(address string) (string, error) {
+	return generator.link(getAccountRoute, "address", address)
 }
 
 func selfLink(id flow.Identifier, linkFun LinkFun) (*generated.Links, error) {
@@ -55,11 +60,14 @@ func selfLink(id flow.Identifier, linkFun LinkFun) (*generated.Links, error) {
 	}, nil
 }
 
-func (generator *LinkGeneratorImpl) link(route string, id flow.Identifier) (string, error) {
-	url, err := generator.router.Get(route).URLPath("id", id.String())
+func (generator *LinkGeneratorImpl) linkForID(route string, id flow.Identifier) (string, error) {
+	return generator.link(route, "id", id.String())
+}
+
+func (generator *LinkGeneratorImpl) link(route string, key string, value string) (string, error) {
+	url, err := generator.router.Get(route).URLPath(key, value)
 	if err != nil {
 		return "", err
 	}
-	// TODO: remove the leading '/v1' from the generated link
 	return url.String(), nil
 }

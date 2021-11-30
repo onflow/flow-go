@@ -561,18 +561,46 @@ func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublic
 	return keysResponse
 }
 
-func accountResponse(account *flow.Account) generated.Account {
-	contracts := make(map[string]string, len(account.Contracts))
-	for name, code := range account.Contracts {
-		contracts[name] = string(code)
+func accountResponse(flowAccount *flow.Account, link LinkGenerator, expand map[string]bool) (generated.Account, error) {
+
+	account := generated.Account{
+		Address: flowAccount.Address.String(),
+		Balance: int32(flowAccount.Balance),
 	}
 
-	return generated.Account{
-		Address:    account.Address.String(),
-		Balance:    int32(account.Balance),
-		Keys:       accountKeysResponse(account.Keys),
-		Contracts:  contracts,
-		Expandable: nil,
-		Links:      nil,
+	// TODO: change spec to include default values (so that this doesn't need to be done)
+	expandable := generated.AccountExpandable{
+		Keys:      "keys",
+		Contracts: "contracts",
 	}
+
+	if expand[expandable.Keys] {
+		account.Keys = accountKeysResponse(flowAccount.Keys)
+		expandable.Keys = ""
+	}
+
+	if expand[expandable.Contracts] {
+		contracts := make(map[string]string, len(flowAccount.Contracts))
+		for name, code := range flowAccount.Contracts {
+			contracts[name] = toBase64(code)
+		}
+		account.Contracts = contracts
+		expandable.Contracts = ""
+	}
+
+	if expandable == (generated.AccountExpandable{}) {
+		account.Expandable = nil
+	} else {
+		account.Expandable = &expandable
+	}
+
+	selfLink, err := link.AccountLink(account.Address)
+	if err != nil {
+		return generated.Account{}, nil
+	}
+	account.Links = &generated.Links{
+		Self: selfLink,
+	}
+
+	return account, nil
 }
