@@ -43,30 +43,20 @@ func TestScripts(t *testing.T) {
 		"arguments": []string{toBase64(validArgs)},
 	})
 
-	t.Run("get by ID Latest", func(t *testing.T) {
-		tests := []struct {
-			height string
-			id     string
-		}{
-			{height: "", id: "latest"},
-			{height: "latest", id: ""},
-		}
+	t.Run("get by Latest height", func(t *testing.T) {
+		req, _ := http.NewRequest("POST", scriptsURL("", "latest"), bytes.NewBuffer(validBody))
 
-		for _, test := range tests {
-			req, _ := http.NewRequest("POST", scriptsURL(test.id, test.height), bytes.NewBuffer(validBody))
+		backend.Mock.
+			On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}).
+			Return([]byte("hello world"), nil)
 
-			backend.Mock.
-				On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}).
-				Return([]byte("hello world"), nil)
+		rr := executeRequest(req, backend)
 
-			rr := executeRequest(req, backend)
-
-			assert.Equal(t, http.StatusOK, rr.Code)
-			assert.Equal(t, fmt.Sprintf(
-				"\"%s\"",
-				base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-			), rr.Body.String(), fmt.Sprintf("test details: %v", test))
-		}
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.Equal(t, fmt.Sprintf(
+			"\"%s\"",
+			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
+		), rr.Body.String())
 	})
 
 	t.Run("get by height", func(t *testing.T) {
@@ -107,6 +97,7 @@ func TestScripts(t *testing.T) {
 	t.Run("get error", func(t *testing.T) {
 		req, _ := http.NewRequest("POST", scriptsURL("", "1337"), bytes.NewBuffer(validBody))
 
+		backend = &mock.API{} // todo quick fix something is not remove on mock - solve tomorrow
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, uint64(1337), validCode, [][]byte{validArgs}).
 			Return(nil, status.Error(codes.Internal, "internal server error"))
@@ -128,7 +119,7 @@ func TestScripts(t *testing.T) {
 			{"invalidID", "", validBody, `{"code":400,"message":"invalid ID format"}`, http.StatusBadRequest},
 			{"", "invalid", validBody, `{"code":400,"message":"invalid height format"}`, http.StatusBadRequest},
 			{"", "-1", validBody, `{"code":400,"message":"invalid height format"}`, http.StatusBadRequest},
-			{"", "1337", nil, `{"code":400,"message":"invalid script execution request"}`, http.StatusBadRequest},
+			{"", "1337", nil, `{"code":400,"message":"request body must not be empty"}`, http.StatusBadRequest},
 		}
 
 		for _, test := range tests {

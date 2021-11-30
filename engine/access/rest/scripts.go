@@ -55,6 +55,7 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 		}
 
 		result, err := backend.ExecuteScriptAtBlockHeight(r.Context(), height, code, args)
+		fmt.Println(err, result, "######")
 		if err != nil {
 			return nil, err
 		}
