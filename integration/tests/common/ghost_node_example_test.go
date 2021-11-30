@@ -15,8 +15,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// These tests are just examples of how to use the ghost node in an integration tests.
-// They do no test any functionality and hence are marked to be skipped
+// Tests to check if the Ghost node works as expected
 
 // TestGhostNodeExample_Subscribe demonstrates how to emulate a node and receive all inbound events for it
 func TestGhostNodeExample_Subscribe(t *testing.T) {
