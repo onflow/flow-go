@@ -364,12 +364,10 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 	}
 	// todo(sideninja) discuss if we still need this expandable
 	if !expands[expandable.PayloadSignatures] {
-		fmt.Println("###1")
 		txResponse.PayloadSignatures = nil
 	}
 	// todo(sideninja) discuss if we still need this expandable
 	if !expands[expandable.EnvelopeSignatures] {
-		fmt.Println("###2")
 		txResponse.EnvelopeSignatures = nil
 	}
 
