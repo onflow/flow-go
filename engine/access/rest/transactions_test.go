@@ -130,7 +130,6 @@ func TestGetTransactionResult(t *testing.T) {
 			Return(txr, nil)
 
 		rr := executeRequest(req, backend)
-
 		expected := fmt.Sprintf(`{
 			"block_id": "%s",
 			"status": "Executed",
@@ -145,6 +144,9 @@ func TestGetTransactionResult(t *testing.T) {
 					"payload": ""
 				}
 			],
+			"_expandable": {
+				"events": "events"
+			},
 			"_links": {
 				"_self": "/v1/transaction_results/%s"
 			}
@@ -159,7 +161,7 @@ func TestGetTransactionResult(t *testing.T) {
 		rr := executeRequest(req, backend)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
-		assert.JSONEq(t, `{"code":400, "message":"invalid ID"}`, rr.Body.String())
+		assert.JSONEq(t, `{"code":400, "message":"invalid ID format"}`, rr.Body.String())
 	})
 }
 
@@ -227,6 +229,13 @@ func TestCreateTransaction(t *testing.T) {
 					 "signature":"%s"
 				  }
 			   ],
+				"_expandable": {
+					"proposal_key": "proposal_key",
+					"authorizers": "authorizers",
+					"payload_signatures": "payload_signatures",
+					"envelope_signatures": "envelope_signatures",
+					"result": "/v1/transaction_results/%s"
+				},
 			   "_links":{
 				  "_self":"%s"
 			   }
@@ -234,6 +243,7 @@ func TestCreateTransaction(t *testing.T) {
 			tx.ID().String(),
 			tx.ReferenceBlockID.String(),
 			toBase64(tx.EnvelopeSignatures[0].Signature),
+			tx.ID().String(),
 			transactionURL(tx.ID().String()),
 		)
 
@@ -249,13 +259,13 @@ func TestCreateTransaction(t *testing.T) {
 		}{
 			{"reference_block_id", "-1", `{"code":400, "message":"invalid ID format"}`},
 			{"reference_block_id", "", `{"code":400, "message":"reference block not provided"}`},
-			{"gas_limit", "-1", `{"code":400, "message":"Request body contains an invalid value for the \"gas_limit\" field (at position 256)"}`},
+			{"gas_limit", "-1", `{"code":400, "message":"request body contains an invalid value for the \"gas_limit\" field (at position 256)"}`},
 			{"payer", "yo", `{"code":400, "message":"invalid address"}`},
-			{"proposal_key", "yo", `{"code":400, "message":"Request body contains an invalid value for the \"proposal_key\" field (at position 301)"}`},
-			{"authorizers", "", `{"code":400, "message":"Request body contains an invalid value for the \"authorizers\" field (at position 32)"}`},
-			{"authorizers", "yo", `{"code":400, "message":"Request body contains an invalid value for the \"authorizers\" field (at position 34)"}`},
-			{"envelope_signatures", "", `{"code":400, "message":"Request body contains an invalid value for the \"envelope_signatures\" field (at position 75)"}`},
-			{"payload_signatures", "", `{"code":400, "message":"Request body contains an invalid value for the \"payload_signatures\" field (at position 305)"}`},
+			{"proposal_key", "yo", `{"code":400, "message":"request body contains an invalid value for the \"proposal_key\" field (at position 301)"}`},
+			{"authorizers", "", `{"code":400, "message":"request body contains an invalid value for the \"authorizers\" field (at position 32)"}`},
+			{"authorizers", "yo", `{"code":400, "message":"request body contains an invalid value for the \"authorizers\" field (at position 34)"}`},
+			{"envelope_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"envelope_signatures\" field (at position 75)"}`},
+			{"payload_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"payload_signatures\" field (at position 305)"}`},
 		}
 
 		for i, test := range tests {

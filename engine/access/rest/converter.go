@@ -311,7 +311,7 @@ func transactionSignatureResponse(signatures []flow.TransactionSignature) []gene
 	return sigs
 }
 
-func transactionResponse(tx *flow.TransactionBody, link LinkGenerator) *generated.Transaction {
+func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult, link LinkGenerator) *generated.Transaction {
 	var args []string
 	for _, arg := range tx.Arguments {
 		args = append(args, toBase64(arg))
@@ -325,6 +325,11 @@ func transactionResponse(tx *flow.TransactionBody, link LinkGenerator) *generate
 	resultLink, _ := link.TransactionResultLink(tx.ID())
 	self, _ := selfLink(tx.ID(), link.TransactionLink)
 
+	var result *generated.TransactionResult
+	if txr != nil {
+		result = transactionResultResponse(txr, tx.ID(), link)
+	}
+
 	return &generated.Transaction{
 		Id:                 tx.ID().String(),
 		Script:             toBase64(tx.Script),
@@ -336,7 +341,7 @@ func transactionResponse(tx *flow.TransactionBody, link LinkGenerator) *generate
 		Authorizers:        auths,
 		PayloadSignatures:  transactionSignatureResponse(tx.PayloadSignatures),
 		EnvelopeSignatures: transactionSignatureResponse(tx.EnvelopeSignatures),
-		Result:             nil, // todo(sideninja) should we provide result, maybe have a wait for result http long pulling system would be super helpful (with reasonable timeout) but careful about resources and dos
+		Result:             result,
 		Links:              self,
 		Expandable: &generated.TransactionExpandable{
 			ProposalKey:        "proposal_key",
