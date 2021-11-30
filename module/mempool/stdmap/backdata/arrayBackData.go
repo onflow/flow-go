@@ -1,7 +1,9 @@
 package backdata
 
 import (
+	"crypto/sha256"
 	"encoding/binary"
+	"math/rand"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -93,6 +95,40 @@ func (a *ArrayBackData) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(a.All())...)
 }
 
+func (a *ArrayBackData) add(entityID flow.Identifier, entity flow.Entity) (bool, error) {
+	idPrefix, bucketIndex := a.idPrefixAndBucketIndex(entityID)
+	slotToUse, slotFound, noDuplicate := a.slotInBucket(bucketIndex, idPrefix, entityID)
+	if !noDuplicate {
+		// entityID already exists
+		return false, nil
+	}
+
+	// come here to insert new key value pair
+	var kvIndex uint32
+	if kvCount < lruMax {
+		// come here if keyVals array NOT full yet
+		kvIndex = uint32(kvCount)
+	} else {
+		// come here if keyVals array IS full; need to eject LRU key value pair, or random key value pair
+		if lruOut == 1 {
+			kvIndex = uint32(rand.Intn(int(lruMax))) // todo: consider taking this from a random list of lruMax ints which never repeats :-)
+			//fmt.Printf("- random i=%d kvIndex=%d\\n", i, kvIndex)
+		} else {
+			kvIndex = uint32(kvCount % lruMax)
+		}
+		//zlog.Info().Uint64("kCount", kCount).Uint64("kCountThreshold", kCountThreshold).Uint64("vIndex", vIndex).Uint64("b", b).Uint64("slotOldest", slotOldest).Msg("run() // eject")
+	}
+	kvCount++
+	buckets[b].slots[slotToUse].kvCount = kvCount
+	buckets[b].slots[slotToUse].kvIndex = kvIndex
+	buckets[b].slots[slotToUse].sum32 = sum32
+	for n := 0; n < sha256.Size; n++ { // todo: faster way to copy?
+		keyVals[kvIndex].sum256[n] = sum256[n]
+	}
+	keyVals[kvIndex].value = i
+	keyVals[kvIndex].owner = (b * slotsPerBucket) + slotToUse
+}
+
 func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (uint32, uint64) {
 	// uint64(id[0:8]) used to compute bucket index for which this key (i.e., id) belongs to
 	bucketIndex := binary.LittleEndian.Uint64(id[0:8]) % a.bucketNum
@@ -103,11 +139,55 @@ func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (uint32, uint6
 	return idPrefix, bucketIndex
 }
 
-func (a ArrayBackData) evictionThreshold() uint64 {
+func (a ArrayBackData) expiryThreshold() uint64 {
 	var expiryThreshold uint64 = 0 // keyIndex(es) below expiryThreshold are eligible for eviction
 	if a.keyCount > a.limit {
 		expiryThreshold = a.keyCount - a.limit
 	}
 
 	return expiryThreshold
+}
+
+func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entityID flow.Identifier) (uint64, bool, bool) {
+	slotToUse := uint64(0)
+	slotFound := false
+	expiryThreshold := a.expiryThreshold()
+
+	oldestKeyInBucket := a.keyCount + 1 // use oldest kvCount in bucket to help with random ejection mode
+	for k := uint64(0); k < bucketSize; k++ {
+		if a.buckets[bucketIndex][k].keyIndex < oldestKeyInBucket {
+			oldestKeyInBucket = a.buckets[bucketIndex][k].keyIndex
+			slotFound = true
+			slotToUse = k
+		}
+
+		if a.buckets[bucketIndex][k].keyIndex <= expiryThreshold {
+			// come here if slot technically expired or never assigned
+			// TODO: count it as an available slot
+			continue
+		}
+
+		// come here if kvCount above threshold AKA slot valid / new enough
+		if a.buckets[bucketIndex][k].idPrefix != idPrefix {
+			continue
+		}
+
+		// come here to check if kvIndex / kvOwner still linked
+		kvIndex := a.buckets[bucketIndex][k].keyIndex
+		kvOwner := a.entities[kvIndex].owner
+		if ((bucketIndex * bucketSize) + k) != kvOwner {
+			a.buckets[bucketIndex][k].keyIndex = 0 // kvIndex / kvOwner no longer linked
+			continue
+		}
+
+		// come here to check remaining hash bits
+		if a.entities[kvIndex].id != entityID {
+			continue
+		}
+
+		// entity ID already exists in the bucket
+		return 0, false, false
+	}
+
+	return slotToUse, slotFound, true
 }
