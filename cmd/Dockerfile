@@ -1,7 +1,7 @@
 # syntax = docker/dockerfile:experimental
 # NOTE: Must be run in the context of the repo's root directory
 
-FROM golang:1.15-buster AS build-setup
+FROM golang:1.17-buster AS build-setup
 
 RUN apt-get update
 RUN apt-get -y install cmake zip sudo
@@ -66,7 +66,7 @@ RUN --mount=type=ssh \
 
 RUN chmod a+x /app/app
 
-FROM golang:1.15-buster as debug
+FROM golang:1.17-buster as debug
 
 RUN go get -u github.com/go-delve/delve/cmd/dlv
 
