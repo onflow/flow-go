@@ -7,18 +7,21 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	mocks "github.com/stretchr/testify/mock"
+	mock2 "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func accountURL(address string, height string) string {
-	u, _ := url.ParseRequestURI(fmt.Sprintf("/v1/accounts/%s", address))
+func accountURL(t *testing.T, address string, height string) string {
+	u, err := url.ParseRequestURI(fmt.Sprintf("/v1/accounts/%s", address))
+	require.NoError(t, err)
 	q := u.Query()
 
 	if height != "" {
-		q.Add("height", height)
+		q.Add("block_height", height)
 	}
 
 	u.RawQuery = q.Encode()
@@ -28,49 +31,49 @@ func accountURL(address string, height string) string {
 func TestGetAccount(t *testing.T) {
 	backend := &mock.API{}
 
-	t.Run("get by address at latest block", func(t *testing.T) {
-		heights := []string{"", "latest"}
+	t.Run("get by address at latest sealed block", func(t *testing.T) {
 
-		for _, h := range heights {
-			account, _ := unittest.AccountFixture()
-			req, _ := http.NewRequest("GET", accountURL(account.Address.String(), h), nil)
+		account := accountFixture(t)
 
-			backend.Mock.
-				On("GetAccountAtLatestBlock", mocks.Anything, account.Address).
-				Return(account, nil)
+		req := getAccountRequest(t, account, sealedHeightQueryParam)
 
-			rr := executeRequest(req, backend)
+		backend.Mock.
+			On("GetAccountAtLatestBlock", mock2.Anything, account.Address).
+			Return(account, nil)
 
-			expected := fmt.Sprintf(`{
-			   "address":"%s",
-			   "balance":100,
-			   "keys":[
-				  {
-					 "index":0,
-					 "public_key":"%s",
-					 "signing_algorithm":"ECDSA_P256",
-					 "hashing_algorithm":"SHA3_256",
-					 "sequence_number":0,
-					 "weight":1000,
-					 "revoked":false
-				  }
-			   ]
-			}`, account.Address, account.Keys[0].PublicKey.String())
+		expected := expectedResponse(account)
 
-			assert.Equal(t, http.StatusOK, rr.Code)
-			assert.JSONEq(t, expected, rr.Body.String())
-		}
+		assertOKResponse(t, req, expected, backend)
+
+	})
+
+	t.Run("get by address at latest finalized block", func(t *testing.T) {
+
+		var height uint64 = 100
+		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
+		account := accountFixture(t)
+
+		req := getAccountRequest(t, account, finalHeightQueryParam)
+		backend.Mock.
+			On("GetLatestBlockHeader", mock2.Anything, false).
+			Return(&block, nil)
+		backend.Mock.
+			On("GetAccountAtBlockHeight", mock2.Anything, account.Address, height).
+			Return(account, nil)
+
+		expected := expectedResponse(account)
+
+		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get by address at height", func(t *testing.T) {
-		account, _ := unittest.AccountFixture()
-		req, _ := http.NewRequest("GET", accountURL(account.Address.String(), "1337"), nil)
+		var height uint64 = 1337
+		account := accountFixture(t)
+		req := getAccountRequest(t, account, fmt.Sprintf("%d", height))
 
 		backend.Mock.
-			On("GetAccountAtBlockHeight", mocks.Anything, account.Address, uint64(1337)).
+			On("GetAccountAtBlockHeight", mock2.Anything, account.Address, height).
 			Return(account, nil)
-
-		rr := executeRequest(req, backend)
 
 		expected := fmt.Sprintf(`{
 			   "address":"%s",
@@ -88,8 +91,7 @@ func TestGetAccount(t *testing.T) {
 			   ]
 			}`, account.Address, account.Keys[0].PublicKey.String())
 
-		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.JSONEq(t, expected, rr.Body.String())
+		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("get invalid", func(t *testing.T) {
@@ -97,8 +99,8 @@ func TestGetAccount(t *testing.T) {
 			url string
 			out string
 		}{
-			{accountURL("123", ""), `{"code":400, "message":"invalid address"}`},
-			{accountURL(unittest.AddressFixture().String(), "foo"), `{"code":400, "message":"invalid height format"}`},
+			{accountURL(t, "123", ""), `{"code":400, "message":"invalid address"}`},
+			{accountURL(t, unittest.AddressFixture().String(), "foo"), `{"code":400, "message":"invalid height format"}`},
 		}
 
 		for i, test := range tests {
@@ -109,4 +111,34 @@ func TestGetAccount(t *testing.T) {
 			assert.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
 		}
 	})
+}
+
+func expectedResponse(account *flow.Account) string {
+	return fmt.Sprintf(`{
+			  "address":"%s",
+			  "balance":100,
+			  "keys":[
+				  {
+					 "index":0,
+					 "public_key":"%s",
+					 "signing_algorithm":"ECDSA_P256",
+					 "hashing_algorithm":"SHA3_256",
+					 "sequence_number":0,
+					 "weight":1000,
+					 "revoked":false
+				  }
+			  ]
+			}`, account.Address, account.Keys[0].PublicKey.String())
+}
+
+func getAccountRequest(t *testing.T, account *flow.Account, height string) *http.Request {
+	req, err := http.NewRequest("GET", accountURL(t, account.Address.String(), height), nil)
+	require.NoError(t, err)
+	return req
+}
+
+func accountFixture(t *testing.T) *flow.Account {
+	account, err := unittest.AccountFixture()
+	require.NoError(t, err)
+	return account
 }
