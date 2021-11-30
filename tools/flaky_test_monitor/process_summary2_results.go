@@ -122,9 +122,10 @@ func postProcessTestSummary2(testSummary2 TestSummary2) {
 		for _, duration := range testResultSummary.Durations {
 			durationSum += duration
 		}
-		testResultSummary.AverageDuration = durationSum / float32(testResultSummary.Runs)
+		testResultSummary.AverageDuration = convertTo2DecimalPlaces2(durationSum, testResultSummary.Runs)
 
 		// calculate failure rate for each test summary
-		testResultSummary.FailureRate = float32(testResultSummary.Failed/testResultSummary.Runs) * 100
+		testResultSummary.FailureRate = convertTo2DecimalPlaces(testResultSummary.Failed, testResultSummary.Runs)
+
 	}
 }
