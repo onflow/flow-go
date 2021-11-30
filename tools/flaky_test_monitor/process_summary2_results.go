@@ -104,8 +104,12 @@ func saveFailureMessage(testResult TestResult) {
 	}
 
 	// sub-directory names should be the same - each sub directory corresponds to a failed test name
-	err := os.Mkdir(failuresDir+testResult.Test, 0755)
-	assertErrNil(err, "error creating sub-dir under failuresDir")
+	// there could already be previous failures for this test, so it's important to check if failed
+	// test folder exists
+	if !folderExists(failuresDir + testResult.Test) {
+		err := os.Mkdir(failuresDir+testResult.Test, 0755)
+		assertErrNil(err, "error creating sub-dir under failuresDir")
+	}
 
 	// under each sub-directory, there should be 1 or more text files (failure1.txt, failure2.txt, etc)
 	// that holds the raw failure message for that test

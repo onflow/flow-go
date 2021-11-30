@@ -1,7 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
 	"strconv"
 )
 
@@ -24,4 +27,21 @@ func convertTo2DecimalPlacesInternal(numerator, denominator float32) float32 {
 	ratioFloat, err := strconv.ParseFloat(ratioString, 32)
 	assertErrNil(err, "failure parsing string to float")
 	return float32(ratioFloat)
+}
+
+func folderExists(path string) bool {
+	_, err := os.Stat(path)
+
+	// folder exists if there is no error
+	if err == nil {
+		return true
+	}
+
+	// folder doesn't exist if error is of specific type
+	if errors.Is(err, fs.ErrNotExist) {
+		return false
+	}
+
+	// should never get to here
+	panic("error checking if folder exists:" + err.Error())
 }
