@@ -32,7 +32,7 @@ type VoteCollector struct {
 	votesProcessor atomic.Value
 }
 
-var _ hotstuff.VoteCollector = &VoteCollector{}
+var _ hotstuff.VoteCollector = (*VoteCollector)(nil)
 
 func (m *VoteCollector) atomicLoadProcessor() hotstuff.VoteProcessor {
 	return m.votesProcessor.Load().(*atomicValueWrapper).processor

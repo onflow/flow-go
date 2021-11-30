@@ -19,12 +19,6 @@ import (
 	mockfinalizer "github.com/onflow/flow-go/module/mock"
 )
 
-// TestForks_ImplementsInterface tests that forks.Forks implements hotstuff.Forks
-// (compile-time test)
-func TestForks_ImplementsInterface(t *testing.T) {
-	var _ hotstuff.Forks = &forks.Forks{}
-}
-
 // TestForks_Initialization tests that Forks correctly reports trusted Root
 func TestForks_Initialization(t *testing.T) {
 	forks, _, _, root := initForks(t, 1)

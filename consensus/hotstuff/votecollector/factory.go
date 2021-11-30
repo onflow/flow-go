@@ -34,7 +34,7 @@ type VoteProcessorFactory struct {
 	baseFactory baseFactory
 }
 
-var _ hotstuff.VoteProcessorFactory = &VoteProcessorFactory{}
+var _ hotstuff.VoteProcessorFactory = (*VoteProcessorFactory)(nil)
 
 // Create instantiates a VerifyingVoteProcessor for the given block proposal.
 // A VerifyingVoteProcessor are only created for proposals with valid proposer votes.
