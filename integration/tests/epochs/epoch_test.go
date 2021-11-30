@@ -7,8 +7,8 @@ import (
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/suite"
 	"testing"
 	"time"
@@ -154,13 +154,17 @@ func (s *Suite) TestEpochJoin() {
 	proposedTable := s.ExecuteGetProposedTableScript(ctx, env, info.NodeID)
 	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), fmt.Sprintf("expected new node to be in proposed table: %x", info.NodeID))
 
-	nodeConfig := testnet.NewNodeConfig(role, testnet.WithID(info.NodeID))
+	containerConfigs := []func(config *testnet.NodeConfig){
+		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithID(info.NodeID),
+	}
+
+	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
 	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
 	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
-	// download root snapshot from access node, wait until we are in the epoch setup phase
-	// the following is never satisfied because ID is never found in snapshot
+	// download snapshot to bootstrap from
 	var snapshot *inmem.Snapshot
 	for {
 		snapshot, err = s.client.GetLatestProtocolSnapshot(ctx)
@@ -175,49 +179,43 @@ func (s *Suite) TestEpochJoin() {
 		time.Sleep(time.Second)
 	}
 
-	segment, err := snapshot.SealingSegment()
-	require.NoError(s.T(), err)
-
 	//add our container to the network
 	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
 	require.NoError(s.T(), err, "failed to add container to network")
+
 	//start our test container
 	testContainer := s.net.ContainerByID(info.NodeID)
 	testContainer.WriteRootSnapshot(snapshot)
-
 	testContainer.Container.Start(ctx)
 
-	currEpochFinalView, err := snapshot.Epochs().Current().FinalView()
+	// wait for new container to startup and start processing blocks
+	// wait for end of epoch
+	epochFinalView, err := snapshot.Epochs().Current().FinalView()
+	require.NoError(s.T(), err)
+	s.BlockState.WaitForSealedView(s.T(), epochFinalView)
+
+	// get head of snapshot we bootstrap from
+	bootstrapHead, err := snapshot.Head()
 	require.NoError(s.T(), err)
 
-	s.BlockState.WaitForSealedView(s.T(), currEpochFinalView)
-
-	// get client configured to send request directly to our new access node
+	// get snapshot directly from new AN and compare head with head from the
+	// snapshot that was used to bootstrap the node
 	clientAddr := fmt.Sprintf(":%s", s.net.AccessPortsByContainerName[info.ContainerName])
 	client, err := testnet.NewClient(clientAddr, s.net.Root().Header.ChainID.Chain())
 	require.NoError(s.T(), err)
-
 	snapshot, err = client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 
-	segment2, err := snapshot.SealingSegment()
+	head, err := snapshot.Head()
 	require.NoError(s.T(), err)
 
-	// most recent segment should have higher highest that the segment we bootstrapped with
-	require.True(s.T(), segment2.Highest().Header.Height > segment.Highest().Header.Height, fmt.Sprintf("expected sealing segment that was used to bootstrap highest height %d to be lower than highest height %d of most recent segment", segment.Highest().Header.Height, segment2.Highest().Header.Height))
+	// head should be higher than bootstrapHead if AN was staked, healthy and processing block proposals
+	require.True(s.T(), bootstrapHead.Height < head.Height, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height))
 
-	// sanity check: ensure id is in snapshot identities
-	ids, err := snapshot.Identities(filter.HasNodeID(info.NodeID))
+	// execute script directly on new AN to ensure it's functional
+	proposedTable, err = s.client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
-	require.Equal(s.T(), ids[0].NodeID, info.NodeID, fmt.Sprintf("expected newly staked node ID to be present in snapshot returned from node"))
-
-	// check that we can execute script on our newly staked and joined access node
-	proposedTable, err = client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
-	require.NoError(s.T(), err)
-	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by newly staked AN")
-
-	err = testContainer.Disconnect()
-	require.NoError(s.T(), err)
+	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by new AN.")
 
 	s.net.StopContainers()
 }

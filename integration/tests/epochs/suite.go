@@ -7,15 +7,14 @@ import (
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/rs/zerolog"
-	"strings"
-
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"strings"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
@@ -46,7 +45,7 @@ func (s *Suite) SetupTest() {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
 	// a ghost node masquerading as a consensus node
@@ -65,8 +64,8 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.DebugLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.DebugLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		ghostConNode,
 	}
 
@@ -165,7 +164,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		encMachinePubKey, err = flow.EncodeRuntimeAccountPublicKey(machineAccountPubKey)
 		require.NoError(s.T(), err)
 	}
-
+	fmt.Println(encMachinePubKey)
 	containerName := fmt.Sprintf("%s_test", role)
 
 	// register node using staking collection
@@ -384,4 +383,11 @@ func (s *Suite) ExecuteReadApprovedNodesScript(ctx context.Context, env template
 	require.NoError(s.T(), err)
 
 	return v
+}
+
+// pauseContainer pauses the named container in the network
+func (s *Suite) pauseContainer(name string)  {
+	container := s.net.ContainerByName(name)
+	err := container.Pause()
+	require.NoError(s.T(), err)
 }
