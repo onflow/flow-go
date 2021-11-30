@@ -20,21 +20,21 @@ type RegisterID struct {
 func (r *RegisterID) String() string {
 	ownerLen := len(r.Owner)
 	controllerLen := len(r.Controller)
-	
+
 	requiredLen := ((ownerLen + controllerLen + keyLen) * 2) + 2
 
 	arr := make([]byte, requiredLen)
-	
+
 	hex.Encode(arr, []byte(r.Owner))
 
-        arr[2*ownerLen] = byte('/')
+	arr[2*ownerLen] = byte('/')
 
-        hex.Encode(arr[(2*ownerLen)+1:], []byte(r.Controller))
+	hex.Encode(arr[(2*ownerLen)+1:], []byte(r.Controller))
 
-        arr[2*(ownerLen+controllerLen) + 1] = byte('/')
+	arr[2*(ownerLen+controllerLen)+1] = byte('/')
 
-        hex.Encode(arr[2*(ownerLen+controllerLen+1):], []byte(r.Key))
-	
+	hex.Encode(arr[2*(ownerLen+controllerLen+1):], []byte(r.Key))
+
 	return string(arr)
 }
 
