@@ -31,7 +31,7 @@ func Participant(
 		// recovery the proposer's vote
 		err = voteAggregator.AddBlock(proposal)
 		if err != nil {
-			return fmt.Errorf("could not process proposal: %w", err)
+			return fmt.Errorf("could not process proposal %v: %w", proposal.Block.BlockID, err)
 		}
 
 		return nil
