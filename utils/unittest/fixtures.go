@@ -129,7 +129,7 @@ func AccountKeyFixture(
 
 func BlockFixture() flow.Block {
 	header := BlockHeaderFixture()
-	return BlockWithParentFixture(&header)
+	return *BlockWithParentFixture(&header)
 }
 
 func FullBlockFixture() flow.Block {
@@ -190,7 +190,7 @@ func StateDeltaFixture() *messages.ExecutionStateDelta {
 	block := BlockWithParentFixture(&header)
 	return &messages.ExecutionStateDelta{
 		ExecutableBlock: entity.ExecutableBlock{
-			Block: &block,
+			Block: block,
 		},
 	}
 }
@@ -262,11 +262,11 @@ func WithExecutionResults(results ...*flow.ExecutionResult) func(*flow.Payload) 
 	}
 }
 
-func BlockWithParentFixture(parent *flow.Header) flow.Block {
+func BlockWithParentFixture(parent *flow.Header) *flow.Block {
 	payload := PayloadFixture()
 	header := BlockHeaderWithParentFixture(parent)
 	header.PayloadHash = payload.Hash()
-	return flow.Block{
+	return &flow.Block{
 		Header:  &header,
 		Payload: &payload,
 	}
@@ -297,7 +297,7 @@ func BlockWithParentAndProposerFixture(parent *flow.Header, proposer flow.Identi
 	block.Header.ProposerID = proposer
 	block.Header.ParentVoterIDs = []flow.Identifier{proposer}
 
-	return block
+	return *block
 }
 
 func BlockWithParentAndSeal(
@@ -316,7 +316,7 @@ func BlockWithParentAndSeal(
 	}
 
 	block.SetPayload(payload)
-	return &block
+	return block
 }
 
 func StateDeltaWithParentFixture(parent *flow.Header) *messages.ExecutionStateDelta {
@@ -560,7 +560,7 @@ func ExecutableBlockFixtureWithParent(collectionsSignerIDs [][]flow.Identifier, 
 	block.Header.PayloadHash = block.Payload.Hash()
 
 	executableBlock := &entity.ExecutableBlock{
-		Block:               &block,
+		Block:               block,
 		CompleteCollections: completeCollections,
 	}
 	// Preload the id
@@ -659,7 +659,7 @@ func WithBlock(block *flow.Block) func(*flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		startState := result.Chunks[0].StartState // retain previous start state in case it was user-defined
 		result.BlockID = blockID
-		result.Chunks = ChunkListFixture(uint(chunks), block.ID())
+		result.Chunks = ChunkListFixture(uint(chunks), blockID)
 		result.Chunks[0].StartState = startState // set start state to value before update
 		result.PreviousResultID = previousResultID
 	}
@@ -1699,7 +1699,7 @@ func ChainFixtureFrom(count int, parent *flow.Header) []*flow.Block {
 
 	for i := 0; i < count; i++ {
 		block := BlockWithParentFixture(parent)
-		blocks = append(blocks, &block)
+		blocks = append(blocks, block)
 		parent = block.Header
 	}
 

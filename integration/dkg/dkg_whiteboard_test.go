@@ -83,7 +83,7 @@ func createNode(
 
 	// keyKeys is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgKeys, err := badger.NewDKGKeys(core.Metrics, core.SecretsDB)
+	dkgKeys, err := badger.NewBeaconPrivateKeys(core.Metrics, core.SecretsDB)
 	require.NoError(t, err)
 	dkgState, err := badger.NewDKGState(core.PublicDB)
 	require.NoError(t, err)
@@ -285,10 +285,10 @@ func TestWithWhiteboard(t *testing.T) {
 	signatures := []crypto.Signature{}
 	indices := []uint{}
 	for i, n := range nodes {
-		priv, err := n.keyStorage.RetrieveMyDKGPrivateInfo(nextEpochSetup.Counter)
+		priv, err := n.keyStorage.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(t, err)
 
-		signer := signature.NewThresholdProvider("TAG", priv.RandomBeaconPrivKey.PrivateKey)
+		signer := signature.NewThresholdProvider("TAG", priv)
 		signers = append(signers, signer)
 
 		signature, err := signer.Sign(sigData)

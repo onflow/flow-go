@@ -1,14 +1,12 @@
 package storage
 
 import (
-	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 )
 
-// DKGKeys is the storage interface for storing random beacon private keys
-// resulting from the DKG.
-type DKGKeys interface {
-	InsertMyDKGPrivateInfo(epochCounter uint64, key *dkg.DKGParticipantPriv) error
-	RetrieveMyDKGPrivateInfo(epochCounter uint64) (*dkg.DKGParticipantPriv, error)
+type BeaconPrivateKeys interface {
+	InsertMyBeaconPrivateKey(epochCounter uint64, key *encodable.RandomBeaconPrivKey) error
+	RetrieveMyBeaconPrivateKey(epochCounter uint64) (*encodable.RandomBeaconPrivKey, error)
 }
 
 // DKGState is the storage interface for the state of in-progress and completed

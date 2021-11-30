@@ -5,26 +5,26 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/storage"
 )
 
-// InsertMyDKGPrivateInfo stores the random beacon private key for the given epoch.
+// InsertMyBeaconPrivateKey stores the random beacon private key for the given epoch.
 //
 // CAUTION: This method stores confidential information and should only be
 // used in the context of the secrets database. This is enforced in the above
 // layer (see storage.DKGKeys).
-func InsertMyDKGPrivateInfo(epochCounter uint64, info *dkg.DKGParticipantPriv) func(*badger.Txn) error {
-	return insert(makePrefix(codeDKGPrivateInfo, epochCounter), info)
+func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
+	return insert(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
 
-// RetrieveMyDKGPrivateInfo retrieves the random beacon private key for the given epoch.
+// RetrieveMyBeaconPrivateKey retrieves the random beacon private key for the given epoch.
 //
 // CAUTION: This method stores confidential information and should only be
 // used in the context of the secrets database. This is enforced in the above
 // layer (see storage.DKGKeys).
-func RetrieveMyDKGPrivateInfo(epochCounter uint64, info *dkg.DKGParticipantPriv) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeDKGPrivateInfo, epochCounter), info)
+func RetrieveMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
 
 // InsertDKGStartedForEpoch stores a flag indicating that the DKG has been started for

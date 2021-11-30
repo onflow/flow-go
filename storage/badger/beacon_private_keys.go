@@ -5,7 +5,7 @@ import (
 
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/metrics"
@@ -13,12 +13,12 @@ import (
 	"github.com/onflow/flow-go/storage/badger/transaction"
 )
 
-type DKGKeys struct {
+type BeaconPrivateKeys struct {
 	db    *badger.DB
 	cache *Cache
 }
 
-func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) (*DKGKeys, error) {
+func NewBeaconPrivateKeys(collector module.CacheMetrics, db *badger.DB) (*BeaconPrivateKeys, error) {
 
 	err := operation.EnsureSecretDB(db)
 	if err != nil {
@@ -27,20 +27,20 @@ func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) (*DKGKeys, error) 
 
 	store := func(key interface{}, val interface{}) func(*transaction.Tx) error {
 		epochCounter := key.(uint64)
-		info := val.(*dkg.DKGParticipantPriv)
-		return transaction.WithTx(operation.InsertMyDKGPrivateInfo(epochCounter, info))
+		info := val.(*encodable.RandomBeaconPrivKey)
+		return transaction.WithTx(operation.InsertMyBeaconPrivateKey(epochCounter, info))
 	}
 
 	retrieve := func(key interface{}) func(*badger.Txn) (interface{}, error) {
 		epochCounter := key.(uint64)
-		var info dkg.DKGParticipantPriv
+		var info encodable.RandomBeaconPrivKey
 		return func(tx *badger.Txn) (interface{}, error) {
-			err := operation.RetrieveMyDKGPrivateInfo(epochCounter, &info)(tx)
+			err := operation.RetrieveMyBeaconPrivateKey(epochCounter, &info)(tx)
 			return &info, err
 		}
 	}
 
-	dkgKeys := &DKGKeys{
+	dkgKeys := &BeaconPrivateKeys{
 		db: db,
 		cache: newCache(collector,
 			metrics.ResourceDKGKey,
@@ -52,25 +52,25 @@ func NewDKGKeys(collector module.CacheMetrics, db *badger.DB) (*DKGKeys, error) 
 	return dkgKeys, nil
 }
 
-func (k *DKGKeys) storeTx(epochCounter uint64, info *dkg.DKGParticipantPriv) func(tx *transaction.Tx) error {
+func (k *BeaconPrivateKeys) storeTx(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(tx *transaction.Tx) error {
 	return k.cache.PutTx(epochCounter, info)
 }
 
-func (k *DKGKeys) retrieveTx(epochCounter uint64) func(tx *badger.Txn) (*dkg.DKGParticipantPriv, error) {
-	return func(tx *badger.Txn) (*dkg.DKGParticipantPriv, error) {
+func (k *BeaconPrivateKeys) retrieveTx(epochCounter uint64) func(tx *badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
+	return func(tx *badger.Txn) (*encodable.RandomBeaconPrivKey, error) {
 		val, err := k.cache.Get(epochCounter)(tx)
 		if err != nil {
 			return nil, err
 		}
-		return val.(*dkg.DKGParticipantPriv), nil
+		return val.(*encodable.RandomBeaconPrivKey), nil
 	}
 }
 
-func (k *DKGKeys) InsertMyDKGPrivateInfo(epochCounter uint64, info *dkg.DKGParticipantPriv) error {
+func (k *BeaconPrivateKeys) InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) error {
 	return operation.RetryOnConflictTx(k.db, transaction.Update, k.storeTx(epochCounter, info))
 }
 
-func (k *DKGKeys) RetrieveMyDKGPrivateInfo(epochCounter uint64) (*dkg.DKGParticipantPriv, error) {
+func (k *BeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64) (*encodable.RandomBeaconPrivKey, error) {
 	tx := k.db.NewTransaction(false)
 	defer tx.Discard()
 	return k.retrieveTx(epochCounter)(tx)

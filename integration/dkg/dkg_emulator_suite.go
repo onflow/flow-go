@@ -410,7 +410,7 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 
 	// keyKeys is used to store the private key resulting from the node's
 	// participation in the DKG run
-	dkgKeys, err := badger.NewDKGKeys(core.Metrics, core.SecretsDB)
+	dkgKeys, err := badger.NewBeaconPrivateKeys(core.Metrics, core.SecretsDB)
 	s.Require().NoError(err)
 	dkgState, err := badger.NewDKGState(core.PublicDB)
 	s.Require().NoError(err)
