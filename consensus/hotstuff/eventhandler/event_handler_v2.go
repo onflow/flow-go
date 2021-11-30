@@ -31,9 +31,9 @@ type EventHandlerV2 struct {
 	ownProposal    flow.Identifier
 }
 
-var _ hotstuff.EventHandlerV2 = &EventHandlerV2{}
+var _ hotstuff.EventHandlerV2 = (*EventHandlerV2)(nil)
 
-// New creates an EventHandlerV2 instance with initial components.
+// NewEventHandlerV2 creates an EventHandlerV2 instance with initial components.
 func NewEventHandlerV2(
 	log zerolog.Logger,
 	paceMaker hotstuff.PaceMaker,
