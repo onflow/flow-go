@@ -29,6 +29,8 @@ func TestPayloadEncodeEmptyJSON(t *testing.T) {
 	payloadHash2 := payload.Hash()
 	assert.Equal(t, payloadHash2, payloadHash1)
 	encoded2, err := json.Marshal(payload)
+	assert.Equal(t, `{"Guarantees":null,"Seals":null,"Receipts":null,"Results":null}`, string(encoded2))
+	assert.Equal(t, string(encoded1), string(encoded2))
 	require.NoError(t, err)
 	err = json.Unmarshal(encoded2, &decoded)
 	require.NoError(t, err)
