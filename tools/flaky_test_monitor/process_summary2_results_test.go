@@ -77,6 +77,7 @@ func runProcessSummary2TestRun(t *testing.T, testDir string) {
 		require.Equal(t, expectedTestSummary.Runs, actualTestSummary.Runs)
 		require.Equal(t, expectedTestSummary.Passed, actualTestSummary.Passed)
 		require.Equal(t, expectedTestSummary.Failed, actualTestSummary.Failed)
+		require.Equal(t, expectedTestSummary.Skipped, actualTestSummary.Skipped)
 		require.Equal(t, expectedTestSummary.NoResult, actualTestSummary.NoResult)
 
 		require.Equal(t, expectedTestSummary.FailureRate, actualTestSummary.FailureRate)

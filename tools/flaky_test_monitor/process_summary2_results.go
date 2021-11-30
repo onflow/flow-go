@@ -18,6 +18,7 @@ type TestResultSummary struct {
 	Runs            int       `json:"runs"`
 	Passed          int       `json:"passed"`
 	Failed          int       `json:"failed"`
+	Skipped         int       `json:"skipped"`
 	NoResult        int       `json:"no_result"`
 	FailureRate     float32   `json:"failure_rate"`
 	AverageDuration float32   `json:"average_duration"`
@@ -62,7 +63,10 @@ func processSummary2TestRun(level1Directory string) TestSummary2 {
 					}
 				}
 
-				// increment # of passes, fails or no results for this test
+				// keep track of each duration so can later calculate average duration
+				testResultSummary.Durations = append(testResultSummary.Durations, testResult.Elapsed)
+
+				// increment # of passes, fails, skips or no results for this test
 				testResultSummary.Runs++
 				switch testResult.Result {
 				case "pass":
@@ -70,14 +74,19 @@ func processSummary2TestRun(level1Directory string) TestSummary2 {
 				case "fail":
 					testResultSummary.Failed++
 					saveFailureMessage(testResult)
+				case "skip":
+					testResultSummary.Skipped++
+
+					// don't count skip as a run
+					testResultSummary.Runs--
+
+					// truncate last duration - don't count durations of skips
+					testResultSummary.Durations = testResultSummary.Durations[:len(testResultSummary.Durations)-1]
 				case "":
 					testResultSummary.NoResult++
 				default:
 					panic(fmt.Sprintf("unexpected test result: %s", testResult.Result))
 				}
-
-				// keep track of each duration so can later calculate average duration
-				testResultSummary.Durations = append(testResultSummary.Durations, testResult.Elapsed)
 
 				testSummary2.TestResults[mapKey] = testResultSummary
 			}
