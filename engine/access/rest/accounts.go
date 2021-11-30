@@ -2,7 +2,6 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -46,7 +45,5 @@ func getAccount(r *requestDecorator, backend access.API, link LinkGenerator) (in
 		}
 	}
 
-	expandContracts := r.expands(expandableFieldContracts)
-	expandKeys := r.expands(expandableFieldKeys)
-	return accountResponse(account, link, expandKeys, expandContracts)
+	return accountResponse(account, link, r.expandFields)
 }
