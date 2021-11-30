@@ -394,6 +394,6 @@ func (s *Suite) pauseContainer(name string)  {
 
 // getTestContainerName returns a name for a test container in the form of ${role}_${nodeID}_test
 func (s *Suite) getTestContainerName(role flow.Role) string {
-	i := len(s.net.ContainersByRole(role)) + 1
+	i := len(s.net.ContainersByRole(role))+1
 	return fmt.Sprintf("%s_test_%d", role, i)
 }
