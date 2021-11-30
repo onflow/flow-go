@@ -444,6 +444,7 @@ func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 	}
 }
 
+// integrationBootstrapDir creates a temporary directory at /tmp/flow-integration-bootstrap
 func integrationBootstrapDir() (string, error) {
 	return ioutil.TempDir(TmpRoot, integrationBootstrap)
 }

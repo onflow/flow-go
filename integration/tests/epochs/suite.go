@@ -165,7 +165,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		require.NoError(s.T(), err)
 	}
 	fmt.Println(encMachinePubKey)
-	containerName := fmt.Sprintf("%s_test", role)
+	containerName := s.getTestContainerName(role, nodeID)
 
 	// register node using staking collection
 	result, err = s.registerNode(
@@ -390,4 +390,9 @@ func (s *Suite) pauseContainer(name string)  {
 	container := s.net.ContainerByName(name)
 	err := container.Pause()
 	require.NoError(s.T(), err)
+}
+
+// getTestContainerName returns a name for a test container in the form of ${role}_${nodeID}_test
+func (s *Suite) getTestContainerName(role flow.Role, nodeID flow.Identifier)  {
+	fmt.Sprintf("%s_%s_test", role, nodeID)
 }
