@@ -40,9 +40,11 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 
 		// a verification node
 		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
+
+		accessNode = testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel))
 	)
 
-	nodes := append([]testnet.NodeConfig{collNode, conNode1, conNode2, conNode3, realExeNode, verNode, ghostExeNode})
+	nodes := append([]testnet.NodeConfig{collNode, conNode1, conNode2, conNode3, realExeNode, verNode, ghostExeNode, accessNode})
 	conf := testnet.NewNetworkConfig("ghost_example_subscribe", nodes)
 
 	net := testnet.PrepareFlowNetwork(t, conf)
@@ -110,9 +112,11 @@ func TestGhostNodeExample_Send(t *testing.T) {
 
 		// a verification node
 		verNode = testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel))
+
+		accessNode = testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel))
 	)
 
-	nodes := append([]testnet.NodeConfig{realCollNode, ghostCollNode, conNode1, conNode2, conNode3, realExeNode, verNode})
+	nodes := append([]testnet.NodeConfig{realCollNode, ghostCollNode, conNode1, conNode2, conNode3, realExeNode, verNode, accessNode})
 	conf := testnet.NewNetworkConfig("ghost_example_send", nodes)
 
 	net := testnet.PrepareFlowNetwork(t, conf)
