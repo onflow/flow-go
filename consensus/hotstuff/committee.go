@@ -57,7 +57,7 @@ type DKG interface {
 
 // ComputeStakeThresholdForBuildingQC returns the stake that is minimally required for building a QC
 func ComputeStakeThresholdForBuildingQC(totalStake uint64) uint64 {
-	// Given totalStake, we need smallest integer t such that 2 * totalStake / 3 < t
+	// Given totalStake, we need the smallest integer t such that 2 * totalStake / 3 < t
 	// Formally, the minimally required stake is: 2 * Floor(totalStake/3) + max(1, totalStake mod 3)
 	floorOneThird := totalStake / 3 // integer division, includes floor
 	res := 2 * floorOneThird

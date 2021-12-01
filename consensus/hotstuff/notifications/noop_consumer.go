@@ -37,7 +37,7 @@ func (c *NoopConsumer) OnProposingBlock(*model.Proposal) {}
 
 func (c *NoopConsumer) OnVoting(*model.Vote) {}
 
-func (c *NoopConsumer) OnQcConstructedFromVotes(*flow.QuorumCertificate) {}
+func (c *NoopConsumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {}
 
 func (*NoopConsumer) OnStartingTimeout(*model.TimerInfo) {}
 
