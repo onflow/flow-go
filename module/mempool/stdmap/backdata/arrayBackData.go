@@ -97,8 +97,8 @@ func (a *ArrayBackData) Hash() flow.Identifier {
 
 func (a *ArrayBackData) add(entityID flow.Identifier, entity flow.Entity) (bool, error) {
 	idPrefix, bucketIndex := a.idPrefixAndBucketIndex(entityID)
-	slotToUse, slotFound, noDuplicate := a.slotInBucket(bucketIndex, idPrefix, entityID)
-	if !noDuplicate {
+	slotToUse, unique := a.slotInBucket(bucketIndex, idPrefix, entityID)
+	if !unique {
 		// entityID already exists
 		return false, nil
 	}
@@ -148,7 +148,7 @@ func (a ArrayBackData) expiryThreshold() uint64 {
 	return expiryThreshold
 }
 
-func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entityID flow.Identifier) (uint64, bool, bool) {
+func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entityID flow.Identifier) (uint64, bool) {
 	slotToUse := uint64(0)
 	slotFound := false
 	expiryThreshold := a.expiryThreshold()
@@ -186,8 +186,8 @@ func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entity
 		}
 
 		// entity ID already exists in the bucket
-		return 0, false, false
+		return 0, false
 	}
 
-	return slotToUse, slotFound, true
+	return slotToUse, true
 }
