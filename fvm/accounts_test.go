@@ -1199,8 +1199,8 @@ func TestGetAccountKey(t *testing.T) {
 							"weight: 1000.00000000, "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
 							"isRevoked: false, "+
-							"keyIndex: %d)"+
-							byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
+							"keyIndex: %d)",
+						byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
 						i,
 					)
 
@@ -1286,7 +1286,7 @@ func TestAccountBalanceFields(t *testing.T) {
 
 				assert.NoError(t, err)
 				assert.NoError(t, script.Err)
-				assert.Equal(t, cadence.UFix64(9999_5070), script.Value)
+				assert.Equal(t, cadence.UFix64(9999_3930), script.Value)
 			}),
 	)
 

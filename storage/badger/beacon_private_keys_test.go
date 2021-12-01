@@ -16,12 +16,12 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestSecretDBRequirement tests that the DKGKeys constructor will return an
+// TestSecretDBRequirement tests that the BeaconPrivateKeys constructor will return an
 // error if instantiated using a database not marked with the correct type.
 func TestSecretDBRequirement(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		_, err := bstorage.NewDKGKeys(metrics, db)
+		_, err := bstorage.NewBeaconPrivateKeys(metrics, db)
 		require.Error(t, err)
 	})
 }
@@ -29,28 +29,28 @@ func TestSecretDBRequirement(t *testing.T) {
 func TestDKGKeysInsertAndRetrieve(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, bstorage.InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
-		store, err := bstorage.NewDKGKeys(metrics, db)
+		store, err := bstorage.NewBeaconPrivateKeys(metrics, db)
 		require.NoError(t, err)
 
 		rand.Seed(time.Now().UnixNano())
 		epochCounter := rand.Uint64()
 
 		// attempt to get a non-existent key
-		_, err = store.RetrieveMyDKGPrivateInfo(epochCounter)
+		_, err = store.RetrieveMyBeaconPrivateKey(epochCounter)
 		assert.True(t, errors.Is(err, storage.ErrNotFound))
 
 		// store a key in db
-		expected := unittest.DKGParticipantPriv()
-		err = store.InsertMyDKGPrivateInfo(epochCounter, expected)
+		expected := unittest.RandomBeaconPriv()
+		err = store.InsertMyBeaconPrivateKey(epochCounter, expected)
 		require.NoError(t, err)
 
 		// retrieve the key by epoch counter
-		actual, err := store.RetrieveMyDKGPrivateInfo(epochCounter)
+		actual, err := store.RetrieveMyBeaconPrivateKey(epochCounter)
 		require.NoError(t, err)
 		assert.Equal(t, expected, actual)
 
 		// test storing same key
-		err = store.InsertMyDKGPrivateInfo(epochCounter, expected)
+		err = store.InsertMyBeaconPrivateKey(epochCounter, expected)
 		require.True(t, errors.Is(err, storage.ErrAlreadyExists))
 	})
 }

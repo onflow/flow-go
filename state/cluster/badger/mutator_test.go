@@ -302,7 +302,7 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 		next := unittest.BlockWithParentFixture(parent)
 		next.Payload.Guarantees = nil
 		next.SetPayload(*next.Payload)
-		err := suite.protoState.Extend(context.Background(), &next)
+		err := suite.protoState.Extend(context.Background(), next)
 		suite.Require().Nil(err)
 		err = suite.protoState.Finalize(context.Background(), next.ID())
 		suite.Require().Nil(err)

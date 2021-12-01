@@ -3,13 +3,13 @@ package operation
 import (
 	"github.com/dgraph-io/badger/v2"
 
-	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 )
 
-func InsertMyDKGPrivateInfo(epochCounter uint64, info *dkg.DKGParticipantPriv) func(*badger.Txn) error {
-	return insert(makePrefix(codeDKGPrivateInfo, epochCounter), info)
+func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
+	return insert(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
 
-func RetrieveMyDKGPrivateInfo(epochCounter uint64, info *dkg.DKGParticipantPriv) func(*badger.Txn) error {
-	return retrieve(makePrefix(codeDKGPrivateInfo, epochCounter), info)
+func RetrieveMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
