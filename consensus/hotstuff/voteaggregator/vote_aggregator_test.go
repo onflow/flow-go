@@ -204,7 +204,6 @@ func (as *AggregatorSuite) TestReceiveBlockBeforeSufficientVotes() {
 
 	vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[3].NodeID)
 	expectedVoters.AddVote(vote)
-	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
 	qc, built, err := as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 	require.NoError(as.T(), err)
 	require.True(as.T(), built)
@@ -228,9 +227,6 @@ func (as *AggregatorSuite) TestReceiveVoteAfterQCBuilt() {
 	for i := 0; i < 4; i++ {
 		vote := as.newMockVote(testView, bp.Block.BlockID, as.participants[i].NodeID)
 		expectedVoters.AddVote(vote)
-		if i == 3 {
-			as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
-		}
 		qc, _, _ = as.aggregator.StoreVoteAndBuildQC(vote, bp.Block)
 	}
 	as.notifier.AssertExpectations(as.T())
@@ -314,7 +310,6 @@ func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeBlock() {
 		require.True(as.T(), ok)
 	}
 	_ = as.aggregator.StoreProposerVote(proposerVote)
-	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	require.NoError(as.T(), err)
 	require.True(as.T(), built)
@@ -356,7 +351,6 @@ func (as *AggregatorSuite) TestReceiveSufficientVotesBeforeProposal() {
 	// now we have 4 votes in total, the last vote is our own vote
 	ownVote := as.newMockVote(testView, bp.Block.BlockID, as.participants[4].NodeID)
 	expectedVoters.AddVote(ownVote)
-	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
 	qc, built, err := as.aggregator.StoreVoteAndBuildQC(ownVote, bp.Block)
 	require.NoError(as.T(), err)
 	require.NotNil(as.T(), qc)
@@ -508,8 +502,6 @@ func (as *AggregatorSuite) TestVoteMixtureBeforeBlock() {
 	proposerVote := bp.ProposerVote()
 	expectedVoters.AddVote(proposerVote)
 	as.aggregator.StoreProposerVote(proposerVote)
-	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
-	as.notifier.On("OnQcConstructedFromVotes", mock.Anything).Return().Once()
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	require.NotNil(as.T(), qc)
 	require.True(as.T(), built)
@@ -643,7 +635,6 @@ func (as *AggregatorSuite) TestVoteOrderAfterBlock() {
 	proposerVote := bp.ProposerVote()
 	expectedVoters.AddVote(proposerVote)
 	as.aggregator.StoreProposerVote(proposerVote)
-	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
 	qc, built, err := as.aggregator.BuildQCOnReceivedBlock(bp.Block)
 	require.NotNil(as.T(), qc)
 	require.True(as.T(), built)
@@ -932,7 +923,6 @@ func (as *AggregatorSuite) TestSufficientRBSig() {
 
 	vote3 := as.newMockVote(testView, bp.Block.BlockID, as.participants[3].NodeID)
 	expectedVoters.AddVote(vote3)
-	as.notifier.On("OnQcConstructedFromVotes", as.qcForBlock(bp, expectedVoters)).Return().Once()
 	qc, built, err = as.aggregator.StoreVoteAndBuildQC(vote3, bp.Block)
 	require.NoError(as.T(), err)
 	require.True(as.T(), built)
