@@ -544,13 +544,13 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		suite.blocks.AssertExpectations(suite.T()) // no new call to UpdateLastFullBlockHeight should be made
 	})
 
-	suite.Run("missing collections are requested when count exceeds defaultMissingCollsForHeightThreshold", func() {
+	suite.Run("missing collections are requested when count exceeds defaultMissingCollsForAgeThreshold", func() {
 		// root block is the last complete block
 		rtnErr = nil
 		lastFullBlockHeight = rootBlkHeight
 
 		// lower the height threshold to request missing collections
-		defaultMissingCollsForHeightThreshold = 1
+		defaultMissingCollsForAgeThreshold = 1
 
 		// raise the block threshold to ensure it does not trigger missing collection request
 		defaultMissingCollsForBlkThreshold = blkCnt + 1
@@ -579,7 +579,7 @@ func (suite *Suite) TestUpdateLastFullBlockReceivedIndex() {
 		lastFullBlockHeight = rootBlkHeight
 
 		// raise the thresholds to avoid requesting missing collections
-		defaultMissingCollsForHeightThreshold = 3
+		defaultMissingCollsForAgeThreshold = 3
 		defaultMissingCollsForBlkThreshold = 3
 
 		// mark all blocks beyond the root block as incomplete
