@@ -137,82 +137,64 @@ type ComponentManagerBuilder interface {
 
 	// Build builds and returns a new ComponentManager instance
 	Build() *ComponentManager
-
-	// SetSerialStart configures the ComponentManager to start workers serially
-	// By default, workers are started in parallel and must have explicit dependency checks
-	// This allows using the order workers were added to manage dependencies implicitly
-	SetSerialStart(bool) ComponentManagerBuilder
 }
 
 type componentManagerBuilderImpl struct {
-	mu          sync.Mutex
-	built       bool
-	serialStart bool
-	workers     []ComponentWorker
+	workers []ComponentWorker
 }
 
 // NewComponentManagerBuilder returns a new ComponentManagerBuilder
 func NewComponentManagerBuilder() ComponentManagerBuilder {
-	return &componentManagerBuilderImpl{
-		mu: sync.Mutex{},
-	}
+	return &componentManagerBuilderImpl{}
 }
 
-func (c *componentManagerBuilderImpl) AddWorker(f ComponentWorker) ComponentManagerBuilder {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.workers = append(c.workers, f)
+// Add worker adds ComponentWorker closure to the ComponentManagerBuilder
+// All worker functions will be run in parallel when the ComponentManager is started.
+// Note: AddWorker is not concurrency-safe, and should only be called on an individual builder
+// within a single goroutine.
+func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) ComponentManagerBuilder {
+	c.workers = append(c.workers, worker)
 	return c
 }
 
-// SetSerialStart sets whether the workers should be started in serial or in parallel
-// Workers are started in the order they were added to the ComponentManagerBuilder. If enabled,
-// Start() will wait for the previous worker to call ready() before starting the next.
-func (c *componentManagerBuilderImpl) SetSerialStart(serial bool) ComponentManagerBuilder {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	c.serialStart = serial
-	return c
-}
-
-// Build returns a new ComponentManager instance with the added workers
-// Build must be called exactly once. Calling it more than once may result in workers being started
-// multiple times.
+// Build returns a new ComponentManager instance with the configured workers
+// Build may be called multiple times to create multiple individual ComponentManagers. This will
+// result in the worker routines being called multiple times. If this is unsafe, do not call it
+// more than once!
 func (c *componentManagerBuilderImpl) Build() *ComponentManager {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if c.built {
-		panic("component manager builder can only be used once")
-	}
-	c.built = true
-
 	return &ComponentManager{
 		started:        atomic.NewBool(false),
 		ready:          make(chan struct{}),
 		done:           make(chan struct{}),
 		shutdownSignal: make(chan struct{}),
-		serialStart:    c.serialStart,
 		workers:        c.workers,
 	}
 }
 
 var _ Component = (*ComponentManager)(nil)
 
-// ComponentManager is used to manage the worker routines of a Component
+// ComponentManager is used to manage the worker routines of a Component, and implements all of the
+// methods required by the Component interface, abstracting them away from individual implementations.
+//
+// Since component manager implements the Component interface, its Ready() and Done() methods are
+// idempotent, and can be called immediately after instantiation. The Ready() channel is closed when
+// all worker functions have called their ReadyFunc, and its Done() channel is closed after all workers
+// functions have returned.
+//
+// Shutdown is signalled by cancelling the irrecoverable.SignalerContext passed to Start(). This context
+// is also used by workers to communicate irrecoverable errors. All irrecoverable errors are considered
+// fatal an are propagated to the caller of Start() via the context's Throw method.
 type ComponentManager struct {
 	started        *atomic.Bool
 	ready          chan struct{}
 	done           chan struct{}
 	shutdownSignal chan struct{}
 
-	serialStart bool
-	workers     []ComponentWorker
+	workers []ComponentWorker
 }
 
 // Start initiates the ComponentManager by launching all worker routines.
+// Start must only be called once. It will panic if called more than once.
 func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	// Make sure we only start once. atomically check if started is false then set it to true.
 	// If it was not false, panic
@@ -229,13 +211,13 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 
 	// launch goroutine to propagate irrecoverable error
 	go func() {
-		// only signal when done channel is closed
+		// wait until the done channel is closed or an irrecoverable error is encountered
 		doneCtx, _ := util.WithDone(context.Background(), c.done)
 		if err := util.WaitError(doneCtx, errChan); err != nil {
 			cancel() // shutdown all workers
 
-			// we propagate the error directly to the parent because a failure in a
-			// worker routine is considered irrecoverable
+			// propagate the error directly to the parent because a failure in a worker routine
+			// is considered irrecoverable
 			parent.Throw(err)
 		}
 	}()

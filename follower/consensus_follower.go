@@ -173,7 +173,10 @@ func NewConsensusFollower(
 	anb.BaseConfig.NodeRole = "consensus_follower"
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(cf.onBlockFinalized)
 	cf.NodeConfig = anb.NodeConfig
-	cf.Component = anb.SerialStart().Build()
+	cf.Component, err = anb.Build()
+	if err != nil {
+		return nil, err
+	}
 
 	return cf, nil
 }
@@ -197,10 +200,8 @@ func (cf *ConsensusFollowerImpl) AddOnBlockFinalizedConsumer(consumer pubsub.OnB
 }
 
 // Run starts the consensus follower.
-// This is kept for backwards compatibility. Typical implementations will implement the following
-// code and call follower.Start() directly. This allows the implementor to inspect the irrecoverable
-// error returned on the error channel and restart if desired. The default behavior is to crash
-// the application with os.Exit(1).
+// This may also be implemented directly in a calling library to take advantage of error recovery
+// possible with the irrecoverable error handling.
 func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 	if util.CheckClosed(ctx.Done()) {
 		return
@@ -208,27 +209,28 @@ func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 
 	// Start the consensus follower with an irrecoverable signaler context. The returned error channel
 	// will receive irrecoverable errors thrown by the consensus follower or any of its child components.
-	// This allows us to listen for irrecoverable errors and restart the consensus follower if desired.
+	// This makes it possible to listen for irrecoverable errors and restart the consensus follower. In
+	// default implementation, a fatal error is thrown.
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go cf.Start(signalerCtx)
+	cf.Start(signalerCtx)
 
-	// setup logging listeners
+	// log when the follower has complete startup and is beginning to shut down
 	go func() {
-		if err := util.WaitClosed(signalerCtx, cf.Ready()); err != nil {
-			cf.Logger.Info().Msg("Consensus follower startup aborted")
+		if err := util.WaitClosed(ctx, cf.Ready()); err != nil {
 			return
 		}
 		cf.Logger.Info().Msg("Consensus follower startup complete")
 	}()
 
 	go func() {
-		<-signalerCtx.Done()
+		<-ctx.Done()
 		cf.Logger.Info().Msg("Consensus follower shutting down")
 	}()
 
-	// Wait for errors up until the follower is done. we don't care about context cancellation
-	// since that will trigger shutting down the follower then closing the Done channel.
+	// This context will be marked done when all components have stopped
 	doneCtx, _ := util.WithDone(context.Background(), cf.Done())
+
+	// Block here until all components have stopped or an irrecoverable error is received.
 	if err := util.WaitError(doneCtx, errChan); err != nil {
 		cf.Logger.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
 	}

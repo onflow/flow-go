@@ -505,10 +505,13 @@ func main() {
 			node.ProtocolEvents.AddConsumer(manager)
 
 			return manager, err
-		}).
-		SerialStart().
-		Build().
-		Run()
+		})
+
+	node, err := nodeBuilder.Build()
+	if err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+	node.Run()
 }
 
 // createQCContractClient creates QC contract client

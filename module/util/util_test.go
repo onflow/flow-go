@@ -1,6 +1,8 @@
 package util_test
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"testing"
 	"time"
@@ -148,5 +150,145 @@ func TestMergeChannels(t *testing.T) {
 			elements = append(elements, i)
 		}
 		assert.ElementsMatch(t, elements, []int{0, 1, 2})
+	})
+}
+
+func TestWaitClosed(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	t.Run("channel closed returns nil", func(t *testing.T) {
+		finished := make(chan struct{})
+		ch := make(chan struct{})
+		go func() {
+			err := util.WaitClosed(ctx, ch)
+			assert.NoError(t, err)
+			close(finished)
+		}()
+		close(ch)
+
+		select {
+		case <-finished:
+		case <-time.After(100 * time.Millisecond):
+			t.Error("timed out")
+		}
+	})
+
+	t.Run("context cancelled returns error", func(t *testing.T) {
+		testCtx, testCancel := context.WithCancel(ctx)
+		finished := make(chan struct{})
+		ch := make(chan struct{})
+		go func() {
+			err := util.WaitClosed(testCtx, ch)
+			assert.ErrorIs(t, err, context.Canceled)
+			close(finished)
+		}()
+		testCancel()
+
+		select {
+		case <-finished:
+		case <-time.After(100 * time.Millisecond):
+			t.Error("timed out")
+		}
+	})
+
+	t.Run("both conditions triggered returns nil", func(t *testing.T) {
+		// both conditions are met when WaitClosed is called. Since one is randomly selected,
+		// statistically there is a 99.9% chance that each condition will be picked first at
+		// least once during this test.
+		for i := 0; i < 10; i++ {
+			testCtx, testCancel := context.WithCancel(ctx)
+			finished := make(chan struct{})
+			ch := make(chan struct{})
+			close(ch)
+			testCancel()
+
+			go func() {
+				err := util.WaitClosed(testCtx, ch)
+				assert.NoError(t, err)
+				close(finished)
+			}()
+
+			select {
+			case <-finished:
+			case <-time.After(100 * time.Millisecond):
+				t.Error("timed out")
+			}
+		}
+	})
+}
+
+func TestCheckClosed(t *testing.T) {
+	done := make(chan struct{})
+	assert.False(t, util.CheckClosed(done))
+	close(done)
+	assert.True(t, util.CheckClosed(done))
+}
+
+func TestWaitError(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	testErr := errors.New("test error channel")
+	t.Run("error received returns error", func(t *testing.T) {
+		finished := make(chan struct{})
+		ch := make(chan error)
+
+		go func() {
+			err := util.WaitError(ctx, ch)
+			assert.ErrorIs(t, err, testErr)
+			close(finished)
+		}()
+		ch <- testErr
+
+		select {
+		case <-finished:
+		case <-time.After(100 * time.Millisecond):
+			t.Error("timed out")
+		}
+	})
+
+	t.Run("context cancelled returns error", func(t *testing.T) {
+		testCtx, testCancel := context.WithCancel(ctx)
+		finished := make(chan struct{})
+		ch := make(chan error)
+		go func() {
+			err := util.WaitError(testCtx, ch)
+			assert.NoError(t, err)
+			close(finished)
+		}()
+		testCancel()
+
+		select {
+		case <-finished:
+		case <-time.After(100 * time.Millisecond):
+			t.Error("timed out")
+		}
+	})
+
+	t.Run("both conditions triggered returns error", func(t *testing.T) {
+		// both conditions are met when WaitError is called. Since one is randomly selected,
+		// statistically there is a 99.9% chance that each condition will be picked first at
+		// least once during this test.
+		for i := 0; i < 10; i++ {
+			testCtx, testCancel := context.WithCancel(ctx)
+			finished := make(chan struct{})
+			ch := make(chan error, 1) // buffered so we can add before starting
+
+			ch <- testErr
+			testCancel()
+
+			go func() {
+				err := util.WaitError(testCtx, ch)
+				assert.ErrorIs(t, err, testErr)
+				close(finished)
+			}()
+
+			select {
+			case <-finished:
+			case <-time.After(100 * time.Millisecond):
+				t.Error("timed out")
+			}
+		}
 	})
 }

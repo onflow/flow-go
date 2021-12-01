@@ -365,8 +365,11 @@ func main() {
 			}
 
 			return sync, nil
-		}).
-		SerialStart().
-		Build().
-		Run()
+		})
+
+	node, err := nodeBuilder.Build()
+	if err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+	node.Run()
 }

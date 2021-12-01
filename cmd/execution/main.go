@@ -615,10 +615,13 @@ func main() {
 		Component("grpc server", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, node.Storage.Headers, node.State, events, results, txResults, node.RootChainID)
 			return rpcEng, nil
-		}).
-		SerialStart().
-		Build().
-		Run()
+		})
+
+	node, err := nodeBuilder.Build()
+	if err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+	node.Run()
 }
 
 // getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.

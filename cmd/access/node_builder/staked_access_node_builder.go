@@ -78,7 +78,6 @@ func (fnb *StakedAccessNodeBuilder) InitIDProviders() {
 }
 
 func (builder *StakedAccessNodeBuilder) Initialize() error {
-	builder.InitComponentBuilder()
 	builder.InitIDProviders()
 
 	// if this is an access node that supports unstaked followers, enqueue the unstaked network
@@ -102,7 +101,7 @@ func (builder *StakedAccessNodeBuilder) Initialize() error {
 	return nil
 }
 
-func (anb *StakedAccessNodeBuilder) Build() cmd.Node {
+func (anb *StakedAccessNodeBuilder) Build() (cmd.Node, error) {
 	anb.
 		BuildConsensusFollower().
 		Module("collection node client", func(node *cmd.NodeConfig) error {

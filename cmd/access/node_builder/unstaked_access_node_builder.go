@@ -117,8 +117,6 @@ func (anb *UnstakedAccessNodeBuilder) Initialize() error {
 		return err
 	}
 
-	anb.InitComponentBuilder()
-
 	anb.InitIDProviders()
 
 	anb.enqueueMiddleware()
@@ -287,7 +285,7 @@ func (anb *UnstakedAccessNodeBuilder) enqueueMiddleware() {
 
 // Build enqueues the sync engine and the follower engine for the unstaked access node.
 // Currently, the unstaked AN only runs the follower engine.
-func (anb *UnstakedAccessNodeBuilder) Build() cmd.Node {
+func (anb *UnstakedAccessNodeBuilder) Build() (cmd.Node, error) {
 	anb.BuildConsensusFollower()
 	return anb.FlowAccessNodeBuilder.Build()
 }

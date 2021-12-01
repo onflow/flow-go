@@ -37,8 +37,11 @@ func main() {
 		Component("RPC engine", func(node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			rpcEng, err := engine.New(node.Network, node.Logger, node.Me, node.State, rpcConf)
 			return rpcEng, err
-		}).
-		SerialStart().
-		Build().
-		Run()
+		})
+
+	node, err := nodeBuilder.Build()
+	if err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+	node.Run()
 }
