@@ -1009,7 +1009,6 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 }
 
-// TODO (ramtin) - skipping this test for now
 func TestGetAccountKey(t *testing.T) {
 
 	options := []fvm.Option{
