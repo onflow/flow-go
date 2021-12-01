@@ -48,7 +48,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 
 	me, err := local.New(nodeID, stakingPriv)
 	require.NoError(t, err)
-	signer := NewCombinedSignerV2(me, beaconKeyStore)
+	signer := NewCombinedSigner(me, beaconKeyStore)
 
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
@@ -57,7 +57,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	packer := signature.NewConsensusSigDataPacker(committee)
-	verifier := NewCombinedVerifierV2(committee, packer)
+	verifier := NewCombinedVerifier(committee, packer)
 
 	// check that a created proposal can be verified by a verifier
 	proposal, err := signer.CreateProposal(block)
@@ -111,7 +111,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 
 	me, err := local.New(nodeID, stakingPriv)
 	require.NoError(t, err)
-	signer := NewCombinedSignerV2(me, beaconKeyStore)
+	signer := NewCombinedSigner(me, beaconKeyStore)
 
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
@@ -124,7 +124,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	packer := signature.NewConsensusSigDataPacker(committee)
-	verifier := NewCombinedVerifierV2(committee, packer)
+	verifier := NewCombinedVerifier(committee, packer)
 
 	proposal, err := signer.CreateProposal(block)
 	require.NoError(t, err)

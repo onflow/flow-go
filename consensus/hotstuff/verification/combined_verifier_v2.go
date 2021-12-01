@@ -16,24 +16,24 @@ import (
 	modulesig "github.com/onflow/flow-go/module/signature"
 )
 
-// CombinedVerifierV2 is a verifier capable of verifying two signatures, one for each
+// CombinedVerifier is a verifier capable of verifying two signatures, one for each
 // scheme. The first type is a signature from a staking signer,
 // which verifies either a single or an aggregated signature. The second type is
 // a signature from a random beacon signer, which verifies either the signature share or
 // the reconstructed threshold signature.
-type CombinedVerifierV2 struct {
+type CombinedVerifier struct {
 	committee     hotstuff.Committee
 	stakingHasher hash.Hasher
 	beaconHasher  hash.Hasher
 	packer        hotstuff.Packer
 }
 
-// NewCombinedVerifierV2 creates a new combined verifier with the given dependencies.
+// NewCombinedVerifier creates a new combined verifier with the given dependencies.
 // - the hotstuff committee's state is used to retrieve the public keys for the staking signature;
 // - the merger is used to combine and split staking and random beacon signatures;
 // - the packer is used to unpack QC for verification;
-func NewCombinedVerifierV2(committee hotstuff.Committee, packer hotstuff.Packer) *CombinedVerifierV2 {
-	return &CombinedVerifierV2{
+func NewCombinedVerifier(committee hotstuff.Committee, packer hotstuff.Packer) *CombinedVerifier {
+	return &CombinedVerifier{
 		committee:     committee,
 		stakingHasher: crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
 		beaconHasher:  crypto.NewBLSKMAC(encoding.RandomBeaconTag),
@@ -46,7 +46,7 @@ func NewCombinedVerifierV2(committee hotstuff.Committee, packer hotstuff.Packer)
 // the vote included in a block proposal.
 // TODO: return error only, because when the sig is invalid, the returned bool
 // can't indicate whether it's staking sig was invalid, or beacon sig was invalid.
-func (c *CombinedVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
+func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
 
 	// create the to-be-signed message
 	msg := MakeVoteMessage(block.View, block.BlockID)
@@ -96,7 +96,7 @@ func (c *CombinedVerifierV2) VerifyVote(signer *flow.Identity, sigData []byte, b
 }
 
 // VerifyQC verifies the validity of a combined signature on a quorum certificate.
-func (c *CombinedVerifierV2) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
+func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
 
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {

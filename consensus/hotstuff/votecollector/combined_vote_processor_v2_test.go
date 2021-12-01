@@ -760,7 +760,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	require.NoError(t, err)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
-	signers := make(map[flow.Identifier]*verification.CombinedSignerV2)
+	signers := make(map[flow.Identifier]*verification.CombinedSigner)
 
 	// prepare staking signers, each signer has it's own private/public key pair
 	// stakingSigners sign only with staking key, meaning they have failed DKG
@@ -790,7 +790,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
 
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore)
+		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
 	for _, identity := range beaconSigners {
@@ -816,7 +816,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
 
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore)
+		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
 	leader := stakingSigners[0]
@@ -855,7 +855,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		packer := signature.NewConsensusSigDataPacker(committee)
 
 		// create verifier that will do crypto checks of created QC
-		verifier := verification.NewCombinedVerifierV2(committee, packer)
+		verifier := verification.NewCombinedVerifier(committee, packer)
 		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
 		validator := hotstuffvalidator.New(committee, forks, verifier)

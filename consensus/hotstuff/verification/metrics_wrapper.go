@@ -11,34 +11,36 @@ import (
 
 // SignerMetricsWrapper implements the hotstuff.SignerVerifier interface.
 // It wraps a hotstuff.SignerVerifier instance and measures the time which the HotStuff's core logic
-// spends in the hotstuff.SignerVerifier component, i.e. the with crypto-related operations.
+// spends in the hotstuff.Signer component, i.e. the with crypto-related operations.
 // The measured time durations are reported as values for the
 // SignerProcessingDuration metric.
+// TODO: to be moved to consensus/hotstuff/signature
 type SignerMetricsWrapper struct {
-	signer  hotstuff.SignerVerifier
+	signer  hotstuff.Signer
 	metrics module.HotstuffMetrics
 }
 
-func NewMetricsWrapper(signer hotstuff.SignerVerifier, metrics module.HotstuffMetrics) *SignerMetricsWrapper {
+func NewMetricsWrapper(signer hotstuff.Signer, metrics module.HotstuffMetrics) *SignerMetricsWrapper {
 	return &SignerMetricsWrapper{
 		signer:  signer,
 		metrics: metrics,
 	}
 }
 
-func (w SignerMetricsWrapper) VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
-	processStart := time.Now()
-	valid, err := w.signer.VerifyVote(voter, sigData, block)
-	w.metrics.SignerProcessingDuration(time.Since(processStart))
-	return valid, err
-}
-
-func (w SignerMetricsWrapper) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
-	processStart := time.Now()
-	valid, err := w.signer.VerifyQC(signers, sigData, block)
-	w.metrics.SignerProcessingDuration(time.Since(processStart))
-	return valid, err
-}
+// TODO: to be moved to VerifierMetricsWrapper
+// func (w SignerMetricsWrapper) VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
+// 	processStart := time.Now()
+// 	valid, err := w.signer.VerifyVote(voter, sigData, block)
+// 	w.metrics.SignerProcessingDuration(time.Since(processStart))
+// 	return valid, err
+// }
+//
+// func (w SignerMetricsWrapper) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
+// 	processStart := time.Now()
+// 	valid, err := w.signer.VerifyQC(signers, sigData, block)
+// 	w.metrics.SignerProcessingDuration(time.Since(processStart))
+// 	return valid, err
+// }
 
 func (w SignerMetricsWrapper) CreateProposal(block *model.Block) (*model.Proposal, error) {
 	processStart := time.Now()
