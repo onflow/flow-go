@@ -21,13 +21,13 @@ type Transaction struct {
 
 	Payer string `json:"payer"`
 
-	ProposalKey *ProposalKey `json:"proposal_key,omitempty"`
+	ProposalKey *ProposalKey `json:"proposal_key"`
 
-	Authorizers []string `json:"authorizers,omitempty"`
+	Authorizers []string `json:"authorizers"`
 
-	PayloadSignatures []TransactionSignature `json:"payload_signatures,omitempty"`
+	PayloadSignatures []TransactionSignature `json:"payload_signatures"`
 
-	EnvelopeSignatures []TransactionSignature `json:"envelope_signatures,omitempty"`
+	EnvelopeSignatures []TransactionSignature `json:"envelope_signatures"`
 
 	Result *TransactionResult `json:"result,omitempty"`
 

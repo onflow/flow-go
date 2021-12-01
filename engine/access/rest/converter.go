@@ -311,7 +311,7 @@ func transactionSignatureResponse(signatures []flow.TransactionSignature) []gene
 	return sigs
 }
 
-func transactionResponse(tx *flow.TransactionBody, link LinkGenerator) *generated.Transaction {
+func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult, link LinkGenerator, expands map[string]bool) *generated.Transaction {
 	var args []string
 	for _, arg := range tx.Arguments {
 		args = append(args, toBase64(arg))
@@ -322,28 +322,37 @@ func transactionResponse(tx *flow.TransactionBody, link LinkGenerator) *generate
 		auths = append(auths, auth.String())
 	}
 
-	return &generated.Transaction{
+	var expandable *generated.TransactionExpandable
+	var result *generated.TransactionResult
+	// if transaction result is provided then add that to the response, else add the expandable for the result
+	if txr != nil {
+		result = transactionResultResponse(txr, tx.ID(), link)
+	} else {
+		resultLink, _ := link.TransactionResultLink(tx.ID())
+		expandable = &generated.TransactionExpandable{
+			Result: resultLink,
+		}
+	}
+
+	self, _ := selfLink(tx.ID(), link.TransactionLink)
+
+	txResponse := &generated.Transaction{
 		Id:                 tx.ID().String(),
 		Script:             toBase64(tx.Script),
 		Arguments:          args,
 		ReferenceBlockId:   tx.ReferenceBlockID.String(),
-		GasLimit:           int32(tx.GasLimit), // todo(sideninja) make sure this is ok
+		GasLimit:           int32(tx.GasLimit),
 		Payer:              tx.Payer.String(),
 		ProposalKey:        proposalKeyResponse(&tx.ProposalKey),
 		Authorizers:        auths,
 		PayloadSignatures:  transactionSignatureResponse(tx.PayloadSignatures),
 		EnvelopeSignatures: transactionSignatureResponse(tx.EnvelopeSignatures),
-		Result:             nil, // todo(sideninja) should we provide result, maybe have a wait for result http long pulling system would be super helpful (with reasonable timeout) but careful about resources and dos
-		Links:              transactionLink(tx.ID(), link),
+		Result:             result,
+		Links:              self,
+		Expandable:         expandable,
 	}
-}
 
-func transactionLink(id flow.Identifier, link LinkGenerator) *generated.Links {
-	self, _ := link.TransactionLink(id)
-
-	return &generated.Links{
-		Self: self,
-	}
+	return txResponse
 }
 
 func eventResponse(event flow.Event) generated.Event {
@@ -385,28 +394,15 @@ func statusResponse(status flow.TransactionStatus) generated.TransactionStatus {
 func transactionResultResponse(txr *access.TransactionResult, txID flow.Identifier, link LinkGenerator) *generated.TransactionResult {
 	status := statusResponse(txr.Status)
 
+	self, _ := selfLink(txID, link.TransactionResultLink)
+
 	return &generated.TransactionResult{
 		BlockId:         txr.BlockID.String(),
 		Status:          &status,
 		ErrorMessage:    txr.ErrorMessage,
 		ComputationUsed: int32(0),
 		Events:          eventsResponse(txr.Events),
-		Expandable:      nil,
-		Links:           transactionResultLink(txID, link),
-	}
-}
-
-func transactionResultLink(txID flow.Identifier, link LinkGenerator) *generated.Links {
-	self, _ := link.TransactionResultLink(txID)
-	return &generated.Links{
-		Self: self,
-	}
-}
-
-func blockLink(id flow.Identifier, link LinkGenerator) *generated.Links {
-	self, _ := link.BlockLink(id)
-	return &generated.Links{
-		Self: self,
+		Links:           self,
 	}
 }
 
@@ -510,11 +506,14 @@ func idsResponse(ids []flow.Identifier) []string {
 	return res
 }
 
-func collectionResponse(flowCollection *flow.LightCollection) generated.Collection {
+func collectionResponse(flowCollection *flow.LightCollection, link LinkGenerator) generated.Collection {
+	self, _ := selfLink(flowCollection.ID(), link.CollectionLink)
+
 	return generated.Collection{
-		Id:           flowCollection.ID().String(),
-		Transactions: idsResponse(flowCollection.Transactions),
-		Links:        nil,
+		Id: flowCollection.ID().String(),
+		// TODO: broken after update to model
+		//Transactions: idsResponse(flowCollection.Transactions),
+		Links: self,
 	}
 }
 

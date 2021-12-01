@@ -11,9 +11,11 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 	blockID := r.getQueryParam("block_id")
 	blockHeight := r.getQueryParam("block_height")
 
+	if blockID == "" && blockHeight == "" {
+		return nil, NewBadRequestError(fmt.Errorf("either block ID or block height must be provided"))
+	}
 	if blockID != "" && blockHeight != "" {
-		err := fmt.Errorf("can not provide both block ID and block height")
-		return nil, NewBadRequestError(err)
+		return nil, NewBadRequestError(fmt.Errorf("can not provide both block ID and block height"))
 	}
 
 	var scriptBody generated.ScriptsBody
@@ -32,14 +34,6 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 		return nil, NewBadRequestError(err)
 	}
 
-	if blockID == "latest" || blockHeight == "latest" {
-		result, err := backend.ExecuteScriptAtLatestBlock(r.Context(), code, args)
-		if err != nil {
-			return nil, err
-		}
-		return result, nil
-	}
-
 	if blockID != "" {
 		id, err := toID(blockID)
 		if err != nil {
@@ -54,19 +48,32 @@ func executeScript(r *requestDecorator, backend access.API, _ LinkGenerator) (in
 		return result, nil
 	}
 
-	if blockHeight != "" {
-		height, err := toHeight(blockHeight)
-		if err != nil {
-			return nil, NewBadRequestError(err)
-		}
-
-		result, err := backend.ExecuteScriptAtBlockHeight(r.Context(), height, code, args)
+	if blockHeight == sealedHeightQueryParam {
+		result, err := backend.ExecuteScriptAtLatestBlock(r.Context(), code, args)
 		if err != nil {
 			return nil, err
 		}
-
 		return result, nil
 	}
 
-	return nil, NewBadRequestError(fmt.Errorf("either block ID or block height must be provided"))
+	var height uint64
+	if blockHeight == finalHeightQueryParam {
+		finalBlock, err := backend.GetLatestBlockHeader(r.Context(), false)
+		if err != nil {
+			return nil, err
+		}
+		height = finalBlock.Height
+	} else {
+		height, err = toHeight(blockHeight)
+		if err != nil {
+			return nil, NewBadRequestError(err)
+		}
+	}
+
+	result, err := backend.ExecuteScriptAtBlockHeight(r.Context(), height, code, args)
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

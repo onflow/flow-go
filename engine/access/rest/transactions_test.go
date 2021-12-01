@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,28 +19,31 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func transactionURL(id string) string {
-	return fmt.Sprintf("/v1/transactions/%s", id)
+func transactionURL(id string, expandResult bool) string {
+	u, _ := url.Parse(fmt.Sprintf("/v1/transactions/%s", id))
+	if expandResult {
+		q := u.Query()
+		// by default expand all since we test expanding with converters
+		q.Add("expand", transactionResult)
+		u.RawQuery = q.Encode()
+	}
+	return u.String()
 }
 
 func transactionResultURL(id string) string {
 	return fmt.Sprintf("/v1/transaction_results/%s", id)
 }
 
-func copyMap(in map[string]interface{}) map[string]interface{} {
-	out := make(map[string]interface{}, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
-}
-
 func TestGetTransactions(t *testing.T) {
 	backend := &mock.API{}
 
-	t.Run("get by ID", func(t *testing.T) {
+	t.Run("get by ID without results", func(t *testing.T) {
 		tx := unittest.TransactionFixture()
-		req, _ := http.NewRequest("GET", transactionURL(tx.ID().String()), nil)
+		req, _ := http.NewRequest(
+			"GET",
+			transactionURL(tx.ID().String(), false),
+			nil,
+		)
 
 		backend.Mock.
 			On("GetTransaction", mocks.Anything, tx.ID()).
@@ -71,14 +75,99 @@ func TestGetTransactions(t *testing.T) {
 					 "signature":"%s"
 				  }
 			   ],
+               "payload_signatures":[],
 			   "_links":{
-				  "_self":"%s"
+				  "_self":"/v1/transactions/%s"
+			   },
+				"_expandable": {
+					"result": "/v1/transaction_results/%s"
+				}
+			}`,
+			tx.ID().String(),
+			tx.ReferenceBlockID.String(),
+			toBase64(tx.EnvelopeSignatures[0].Signature),
+			tx.ID().String(),
+			tx.ID().String(),
+		)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		assert.JSONEq(t, expected, rr.Body.String())
+	})
+
+	t.Run("Get by ID with results", func(t *testing.T) {
+		tx := unittest.TransactionFixture()
+		txr := transactionResultFixture(tx)
+
+		req, _ := http.NewRequest(
+			"GET",
+			transactionURL(tx.ID().String(), true),
+			nil,
+		)
+
+		backend.Mock.
+			On("GetTransaction", mocks.Anything, tx.ID()).
+			Return(&tx.TransactionBody, nil)
+
+		backend.Mock.
+			On("GetTransactionResult", mocks.Anything, tx.ID()).
+			Return(txr, nil)
+
+		rr := executeRequest(req, backend)
+
+		expected := fmt.Sprintf(`
+			{
+			   "id":"%s",
+			   "script":"cHViIGZ1biBtYWluKCkge30=",
+			   "arguments":null,
+			   "reference_block_id":"%s",
+			   "gas_limit":10,
+			   "payer":"8c5303eaa26202d6",
+			   "proposal_key":{
+				  "address":"8c5303eaa26202d6",
+				  "key_index":1,
+				  "sequence_number":0
+			   },
+			   "authorizers":[
+				  "8c5303eaa26202d6"
+			   ],
+			   "envelope_signatures":[
+				  {
+					 "address":"8c5303eaa26202d6",
+					 "signer_index":0,
+					 "key_index":1,
+					 "signature":"%s"
+				  }
+			   ],
+                "payload_signatures":[],
+				"result": {
+					"block_id": "%s",
+					"status": "Sealed",
+					"error_message": "",
+					"computation_used": 0,
+					"events": [
+						{
+							"type": "flow.AccountCreated",
+							"transaction_id": "%s",
+							"transaction_index": 0,
+							"event_index": 0,
+							"payload": ""
+						}
+					],
+					"_links": {
+						"_self": "/v1/transaction_results/%s"
+					}
+				},
+			   "_links":{
+				  "_self":"/v1/transactions/%s"
 			   }
 			}`,
 			tx.ID().String(),
 			tx.ReferenceBlockID.String(),
 			toBase64(tx.EnvelopeSignatures[0].Signature),
-			transactionURL(tx.ID().String()),
+			tx.ReferenceBlockID.String(),
+			tx.ID().String(),
+			tx.ID().String(),
+			tx.ID().String(),
 		)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -86,16 +175,16 @@ func TestGetTransactions(t *testing.T) {
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", transactionURL("invalid"), nil)
+		req, _ := http.NewRequest("GET", transactionURL("invalid", false), nil)
 		rr := executeRequest(req, backend)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
-		assert.JSONEq(t, `{"code":400, "message":"invalid ID"}`, rr.Body.String())
+		assert.JSONEq(t, `{"code":400, "message":"invalid ID format"}`, rr.Body.String())
 	})
 
-	t.Run("get by ID Non-existing", func(t *testing.T) {
+	t.Run("get by ID non-existing", func(t *testing.T) {
 		tx := unittest.TransactionFixture()
-		req, _ := http.NewRequest("GET", transactionURL(tx.ID().String()), nil)
+		req, _ := http.NewRequest("GET", transactionURL(tx.ID().String(), false), nil)
 
 		backend.Mock.
 			On("GetTransaction", mocks.Anything, tx.ID()).
@@ -130,7 +219,6 @@ func TestGetTransactionResult(t *testing.T) {
 			Return(txr, nil)
 
 		rr := executeRequest(req, backend)
-
 		expected := fmt.Sprintf(`{
 			"block_id": "%s",
 			"status": "Executed",
@@ -155,11 +243,11 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", transactionURL("invalid"), nil)
+		req, _ := http.NewRequest("GET", transactionURL("invalid", false), nil)
 		rr := executeRequest(req, backend)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
-		assert.JSONEq(t, `{"code":400, "message":"invalid ID"}`, rr.Body.String())
+		assert.JSONEq(t, `{"code":400, "message":"invalid ID format"}`, rr.Body.String())
 	})
 }
 
@@ -227,21 +315,26 @@ func TestCreateTransaction(t *testing.T) {
 					 "signature":"%s"
 				  }
 			   ],
+                "payload_signatures":[],
+				"_expandable": {
+					"result": "/v1/transaction_results/%s"
+				},
 			   "_links":{
-				  "_self":"%s"
+				  "_self":"/v1/transactions/%s"
 			   }
 			}`,
 			tx.ID().String(),
 			tx.ReferenceBlockID.String(),
 			toBase64(tx.EnvelopeSignatures[0].Signature),
-			transactionURL(tx.ID().String()),
+			tx.ID().String(),
+			tx.ID().String(),
 		)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
 
-	t.Run("create invalid", func(t *testing.T) {
+	t.Run("post invalid transaction", func(t *testing.T) {
 		tests := []struct {
 			inputField string
 			inputValue string
@@ -249,13 +342,13 @@ func TestCreateTransaction(t *testing.T) {
 		}{
 			{"reference_block_id", "-1", `{"code":400, "message":"invalid ID format"}`},
 			{"reference_block_id", "", `{"code":400, "message":"reference block not provided"}`},
-			{"gas_limit", "-1", `{"code":400, "message":"Request body contains an invalid value for the \"gas_limit\" field (at position 256)"}`},
+			{"gas_limit", "-1", `{"code":400, "message":"request body contains an invalid value for the \"gas_limit\" field (at position 256)"}`},
 			{"payer", "yo", `{"code":400, "message":"invalid address"}`},
-			{"proposal_key", "yo", `{"code":400, "message":"Request body contains an invalid value for the \"proposal_key\" field (at position 301)"}`},
-			{"authorizers", "", `{"code":400, "message":"Request body contains an invalid value for the \"authorizers\" field (at position 32)"}`},
-			{"authorizers", "yo", `{"code":400, "message":"Request body contains an invalid value for the \"authorizers\" field (at position 34)"}`},
-			{"envelope_signatures", "", `{"code":400, "message":"Request body contains an invalid value for the \"envelope_signatures\" field (at position 75)"}`},
-			{"payload_signatures", "", `{"code":400, "message":"Request body contains an invalid value for the \"payload_signatures\" field (at position 305)"}`},
+			{"proposal_key", "yo", `{"code":400, "message":"request body contains an invalid value for the \"proposal_key\" field (at position 301)"}`},
+			{"authorizers", "", `{"code":400, "message":"request body contains an invalid value for the \"authorizers\" field (at position 32)"}`},
+			{"authorizers", "yo", `{"code":400, "message":"request body contains an invalid value for the \"authorizers\" field (at position 34)"}`},
+			{"envelope_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"envelope_signatures\" field (at position 75)"}`},
+			{"payload_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"payload_signatures\" field (at position 305)"}`},
 		}
 
 		for i, test := range tests {
@@ -270,4 +363,24 @@ func TestCreateTransaction(t *testing.T) {
 			assert.JSONEq(t, test.output, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
 		}
 	})
+}
+
+func copyMap(in map[string]interface{}) map[string]interface{} {
+	out := make(map[string]interface{}, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
+}
+
+func transactionResultFixture(tx flow.Transaction) *access.TransactionResult {
+	return &access.TransactionResult{
+		Status:     flow.TransactionStatusSealed,
+		StatusCode: 1,
+		Events: []flow.Event{
+			unittest.EventFixture(flow.EventAccountCreated, 0, 0, tx.ID(), 255),
+		},
+		ErrorMessage: "",
+		BlockID:      tx.ReferenceBlockID,
+	}
 }

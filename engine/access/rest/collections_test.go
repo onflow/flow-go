@@ -63,7 +63,13 @@ func TestGetCollections(t *testing.T) {
 			rr := executeRequest(req, backend)
 
 			bx, _ := json.Marshal(col.Transactions)
-			expected := fmt.Sprintf(`{"id":"%s","transactions":%s}`, col.ID().String(), bx) // todo missing link
+			expected := fmt.Sprintf(`{
+				"id":"%s",
+				"transactions":%s, 	
+				"_links": {
+					"_self": "/v1/collections/%s"
+				}
+			}`, col.ID().String(), bx, col.ID())
 
 			assert.Equal(t, http.StatusOK, rr.Code)
 			assert.JSONEq(t, expected, rr.Body.String())
