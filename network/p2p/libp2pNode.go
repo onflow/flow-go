@@ -336,7 +336,7 @@ func (n *Node) WithDefaultUnicastProtocol(defaultHandler libp2pnet.StreamHandler
 	for _, p := range preferred {
 		err := n.unicastManager.Register(p)
 		if err != nil {
-			return fmt.Errorf("could not register unicast protocls")
+			return fmt.Errorf("could not register unicast protocls: %w", err)
 		}
 	}
 

@@ -28,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/network/validator"
 	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
+	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -392,7 +393,12 @@ func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
 	_, isStaked := m.ov.Identities().ByNodeID(nodeID)
 
 	//create a new readConnection with the context of the middleware
-	conn := newReadConnection(m.ctx, s, m.processAuthenticatedMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize, isStaked)
+	conn := newReadConnection(m.ctx,
+		s, m.processAuthenticatedMessage,
+		log.With().Hex("remote_flow_id", logging.ID(nodeID)).Logger(),
+		m.metrics,
+		LargeMsgMaxUnicastMsgSize,
+		isStaked)
 
 	// kick off the reception loop to continuously receive messages
 	m.wg.Add(1)

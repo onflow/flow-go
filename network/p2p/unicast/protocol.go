@@ -48,7 +48,7 @@ type ProtocolFactory func(zerolog.Logger, flow.Identifier, libp2pnet.StreamHandl
 func ToProtocolNames(names []string) []ProtocolName {
 	p := make([]ProtocolName, 0)
 	for _, name := range names {
-		p = append(p, ProtocolName(name))
+		p = append(p, ProtocolName(strings.Trim(name, " ")))
 	}
 	return p
 }
