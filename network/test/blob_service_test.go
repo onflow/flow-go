@@ -51,7 +51,8 @@ type BlobServiceTestSuite struct {
 	numNodes     int
 }
 
-func TestBlobExchange(t *testing.T) {
+func TestBlobService(t *testing.T) {
+	t.Parallel()
 	suite.Run(t, new(BlobServiceTestSuite))
 }
 
@@ -116,11 +117,18 @@ func (suite *BlobServiceTestSuite) SetupTest() {
 
 func (suite *BlobServiceTestSuite) TearDownTest() {
 	suite.cancel()
+
 	netDoneChans := make([]<-chan struct{}, len(suite.networks))
 	for i, net := range suite.networks {
 		netDoneChans[i] = net.Done()
 	}
 	<-util.AllClosed(netDoneChans...)
+
+	suite.networks = nil
+	suite.cancel = nil
+	suite.blobServices = nil
+	suite.datastores = nil
+	suite.blobCids = nil
 }
 
 func (suite *BlobServiceTestSuite) TestGetBlobs() {
