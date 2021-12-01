@@ -58,23 +58,32 @@ func NewExecutionDataService(
 }
 
 // receiveBatch receives a batch of blobs from the given BlobReceiver, and returns them as a slice
-func (s *executionDataServiceImpl) receiveBatch(br *blobs.BlobReceiver) ([]blobs.Blob, error) {
+func (s *executionDataServiceImpl) receiveBatch(ctx context.Context, br *blobs.BlobReceiver) ([]blobs.Blob, error) {
 	var batch []blobs.Blob
-	var err error
 
 	for i := 0; i < defaultBlobBatchSize; i++ {
-		var blob blobs.Blob
-
-		blob, err = br.Receive()
+		blob, err := br.Receive()
 
 		if err != nil {
+			// the blob channel may be closed as a result of the context being
+			// canceled, in which case we should return the context error
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+
+			// the blob channel is closed, signal to the caller that no more
+			// blobs can be received
+			if i == 0 {
+				return nil, err
+			}
+
 			break
 		}
 
 		batch = append(batch, blob)
 	}
 
-	return batch, err
+	return batch, nil
 }
 
 // storeBlobs receives blobs from the given BlobReceiver, and stores them to the blobservice
@@ -87,7 +96,17 @@ func (s *executionDataServiceImpl) storeBlobs(parent context.Context, br *blobs.
 	var cids []cid.Cid
 
 	for {
-		batch, recvErr := s.receiveBatch(br) // retrieve one batch at a time
+		batch, recvErr := s.receiveBatch(ctx, br) // retrieve one batch at a time
+
+		if recvErr != nil {
+			if errors.Is(recvErr, blobs.ErrClosedBlobChannel) {
+				// all blobs have been received
+				break
+			}
+
+			return nil, recvErr
+		}
+
 		batchCids := zerolog.Arr()
 
 		for _, blob := range batch {
@@ -104,16 +123,6 @@ func (s *executionDataServiceImpl) storeBlobs(parent context.Context, br *blobs.
 		}
 
 		batchLogger.Debug().Msg("added batch to blobservice")
-
-		if recvErr != nil {
-			if recvErr != blobs.ErrClosedBlobChannel {
-				// this is an unexpected error, and should never occur
-				return nil, recvErr
-			}
-
-			// the blob channel was closed, meaning that all blobs have been received
-			break
-		}
 	}
 
 	return cids, nil
@@ -229,17 +238,7 @@ func (s *executionDataServiceImpl) retrieveBlobs(parent context.Context, bs *blo
 		if !ok {
 			var err error
 
-			blob, err = s.findBlob(blobChan, c, cachedBlobs, logger)
-
-			if err != nil {
-				var blobNotFound *BlobNotFoundError
-
-				// the blob channel may be closed as a result of the context being canceled,
-				// in which case we should return the context error.
-				if errors.As(err, &blobNotFound) && ctx.Err() != nil {
-					return ctx.Err()
-				}
-
+			if blob, err = s.findBlob(ctx, blobChan, c, cachedBlobs, logger); err != nil {
 				return err
 			}
 		}
@@ -261,6 +260,7 @@ func (s *executionDataServiceImpl) retrieveBlobs(parent context.Context, bs *blo
 // findBlob retrieves blobs from the given channel, caching them along the way, until it either
 // finds the target blob or exhausts the channel.
 func (s *executionDataServiceImpl) findBlob(
+	ctx context.Context,
 	blobChan <-chan blobs.Blob,
 	target cid.Cid,
 	cache map[cid.Cid]blobs.Blob,
@@ -285,6 +285,12 @@ func (s *executionDataServiceImpl) findBlob(
 		if blob.Cid() == target {
 			return blob, nil
 		}
+	}
+
+	// the blob channel may be closed as a result of the context being canceled,
+	// in which case we should return the context error.
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 
 	targetLogger.Debug().Msg("blob not found")
