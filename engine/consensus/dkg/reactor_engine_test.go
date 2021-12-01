@@ -41,6 +41,10 @@ type ReactorSuite struct {
 	firstBlock         *flow.Header
 	blocksByView       map[uint64]*flow.Header
 
+	// track how many warn-level logs are logged
+	warnsLogged int
+	logger      zerolog.Logger
+
 	local        *module.Local
 	currentEpoch *protocol.Epoch
 	nextEpoch    *protocol.Epoch
@@ -159,9 +163,12 @@ func (suite *ReactorSuite) SetupTest() {
 		mock.Anything,
 	).Return(suite.controller, nil)
 
+	suite.warnsLogged = 0
+	suite.logger = hookedLogger(&suite.warnsLogged)
+
 	suite.viewEvents = gadgets.NewViews()
 	suite.engine = dkg.NewReactorEngine(
-		unittest.Logger(),
+		suite.logger,
 		suite.local,
 		suite.state,
 		suite.dkgKeys,
@@ -188,6 +195,8 @@ func (suite *ReactorSuite) TestRunDKG_PhaseTransition() {
 	time.Sleep(50 * time.Millisecond)
 	suite.controller.AssertExpectations(suite.T())
 	suite.dkgKeys.AssertExpectations(suite.T())
+	// happy path - no warn logs expected
+	suite.Assert().Equal(0, suite.warnsLogged)
 }
 
 // TestRunDKG_StartupInSetupPhase tests that the DKG is started and completed
@@ -213,6 +222,8 @@ func (suite *ReactorSuite) TestRunDKG_StartupInSetupPhase() {
 	time.Sleep(50 * time.Millisecond)
 	suite.controller.AssertExpectations(suite.T())
 	suite.dkgKeys.AssertExpectations(suite.T())
+	// happy path - no warn logs expected
+	suite.Assert().Equal(0, suite.warnsLogged)
 }
 
 // TestRunDKG_StartupInSetupPhase_DKGAlreadyStarted tests that the DKG is NOT
@@ -236,12 +247,15 @@ func (suite *ReactorSuite) TestRunDKG_StartupInSetupPhase_DKGAlreadyStarted() {
 		suite.committee,
 		mock.Anything,
 	)
+
+	// we should log a warning that the DKG has already started
+	suite.Assert().Equal(1, suite.warnsLogged)
 }
 
 // TestReactorEngine_EpochCommittedPhaseStarted ensures that we are logging
 // a warning message whenever we have a mismatch between the locally produced DKG keys
 // and the keys produced by the DKG smart contract.
-func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
+func TestReactorEngine_InconsistentBeaconKeys(t *testing.T) {
 
 	rand.Seed(time.Now().UnixNano())
 	currentCounter := rand.Uint64()
@@ -289,14 +303,9 @@ func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 
 	viewEvents := gadgets.NewViews()
 
-	hookCalls := 0
-
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			hookCalls++
-		}
-	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+	// count number of warn-level logs
+	warnsLogged := 0
+	logger := hookedLogger(&warnsLogged)
 
 	engine := dkg.NewReactorEngine(
 		logger,
@@ -310,5 +319,16 @@ func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 
 	engine.EpochCommittedPhaseStarted(currentCounter, &firstBlock)
 
-	require.Equal(t, 1, hookCalls)
+	// we should log a warning that the keys are inconsistent
+	require.Equal(t, 1, warnsLogged)
+}
+
+// utility function to track the number of warn-level calls to a logger
+func hookedLogger(calls *int) zerolog.Logger {
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			*calls++
+		}
+	})
+	return zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 }

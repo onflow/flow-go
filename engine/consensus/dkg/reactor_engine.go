@@ -347,7 +347,11 @@ func (e *ReactorEngine) end(epochCounter uint64) func() error {
 	return func() error {
 		err := e.controller.End()
 		if err != nil {
-			return err
+			if crypto.IsDKGFailureError(err) {
+				e.log.Warn().Msgf("node %s with index %d failed DKG locally: %s", e.me.NodeID(), e.controller.GetIndex(), err.Error())
+			} else {
+				return err
+			}
 		}
 
 		privateShare, _, _ := e.controller.GetArtifacts()
