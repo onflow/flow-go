@@ -99,23 +99,6 @@ func TestMVP_Bootstrap(t *testing.T) {
 	t.Log("@@ finished running mvp test 2")
 }
 
-func TestMVP_Emulator(t *testing.T) {
-	// Start emulator manually for now, used for testing the test
-	// TODO - start an emulator instance
-	unittest.SkipUnless(t, unittest.TEST_WIP, "unimplemented")
-
-	// key, err := unittest.EmulatorRootKey()
-	// require.NoError(t, err)
-
-	// c, err := testnet.NewClientWithKey(":3569", key, flow.Emulator.Chain())
-	// require.NoError(t, err)
-
-	//TODO commented out because main test requires root for sending tx
-	// with valid reference block ID
-	//runMVPTest(t, c)
-	// _ = c
-}
-
 func buildMVPNetConfig() testnet.NetworkConfig {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
