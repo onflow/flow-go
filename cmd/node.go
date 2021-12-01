@@ -65,12 +65,16 @@ func (node *FlowNodeImp) Run() {
 
 	// Since this occurs after all components have stopped, it is not considered fatal
 	if err != nil {
-		node.logger.Error().Err(err).Msg("error encountered during shutdown cleanup")
+		node.logger.Error().Err(err).Msg("error encountered during cleanup")
 	}
 
 	node.logger.Info().Msgf("%s node shutdown complete", node.BaseConfig.NodeRole)
 }
 
+// run starts the node and blocks until a SIGINT/SIGTERM is received or an error is encountered.
+// It returns:
+//   - nil if a termination signal is received, and all components have been gracefully stopped.
+//   - error if a irrecoverable error is received
 func (node *FlowNodeImp) run() error {
 	ctx, cancel := context.WithCancel(context.Background())
 

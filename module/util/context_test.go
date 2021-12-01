@@ -9,7 +9,6 @@ import (
 )
 
 func TestWithDone(t *testing.T) {
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -28,7 +27,7 @@ func TestWithDone(t *testing.T) {
 	t.Run("cancelling parent returns context error", func(t *testing.T) {
 		done := make(chan struct{})
 		parentCtx, parentCancel := context.WithCancel(ctx)
-		doneCtx, _ := WithDone(parentCtx, done)
+		doneCtx, doneCancel := WithDone(parentCtx, done)
 		parentCancel()
 		select {
 		case <-doneCtx.Done():
@@ -36,6 +35,7 @@ func TestWithDone(t *testing.T) {
 			t.Error("expected context to be done")
 		}
 		assert.Equal(t, context.Canceled, doneCtx.Err())
+		doneCancel() // no leaking
 	})
 
 	t.Run("closing done returns ErrChannelClosed", func(t *testing.T) {
