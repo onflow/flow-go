@@ -387,10 +387,10 @@ PHONY: tool-remove-execution-fork
 tool-remove-execution-fork: docker-build-remove-execution-fork
 	docker container create --name remove-execution-fork $(CONTAINER_REGISTRY)/remove-execution-fork:latest;docker container cp remove-execution-fork:/bin/app ./remove-execution-fork;docker container rm remove-execution-fork
 
-# Check if the go version is 1.15 or higher. flow-go only supports go 1.15 and up.
+# Check if the go version is 1.16 or higher. flow-go only supports go 1.16 and up.
 .PHONY: check-go-version
 check-go-version:
-	go version | grep '1.1[5-9]'
+	go version | grep '1.1[6-9]'
 
 #----------------------------------------------------------------------
 # CD COMMANDS
