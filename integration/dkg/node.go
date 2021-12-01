@@ -33,7 +33,7 @@ type node struct {
 	testmock.GenericNode
 	account           *nodeAccount
 	dkgContractClient *DKGClientWrapper
-	keyStorage        storage.BeaconPrivateKeys
+	keyStorage        storage.SafeBeaconKeys
 	messagingEngine   *dkg.MessagingEngine
 	reactorEngine     *dkg.ReactorEngine
 }

@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
@@ -41,7 +42,6 @@ type ReactorEngine struct {
 	log               zerolog.Logger
 	me                module.Local
 	State             protocol.State
-	keyStorage        storage.BeaconPrivateKeys
 	dkgState          storage.DKGState
 	controller        module.DKGController
 	controllerFactory module.DKGControllerFactory
@@ -54,7 +54,6 @@ func NewReactorEngine(
 	log zerolog.Logger,
 	me module.Local,
 	state protocol.State,
-	keyStorage storage.BeaconPrivateKeys,
 	dkgState storage.DKGState,
 	controllerFactory module.DKGControllerFactory,
 	viewEvents events.Views,
@@ -69,7 +68,6 @@ func NewReactorEngine(
 		log:               logger,
 		me:                me,
 		State:             state,
-		keyStorage:        keyStorage,
 		dkgState:          dkgState,
 		controllerFactory: controllerFactory,
 		viewEvents:        viewEvents,
@@ -239,28 +237,48 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 // v2 by falling back to staking signatures in this case.
 //
 func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uint64) {
+
+	// the epoch counter the DKG just completed is for
+	dkgEpochCounter := currentEpochCounter + 1
+
+	// TODO - first check whether we've already stored the dkg end state, since
+	// we need to handle multiple calls to this method
+
+	// TODO execute in transaction scope of protocol event emitter, need to use
+	// lower-level storage access here (since State doesn't allow tx injection)
 	nextDKG, err := e.State.Final().Epochs().Next().DKG()
 	if err != nil {
-		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve next DKG info")
+		// CAUTION: this should never happen, indicates a storage failure or corruption
+		e.log.Fatal().Err(err).Msg("checking DKG key consistency: could not retrieve next DKG info")
 		return
 	}
 
-	dkgPrivInfo, err := e.keyStorage.RetrieveMyBeaconPrivateKey(currentEpochCounter + 1)
-	if err != nil {
-		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG private info for next epoch")
+	myBeaconPrivKey, err := e.dkgState.RetrieveMyBeaconPrivateKey(currentEpochCounter + 1)
+	if errors.Is(err, storage.ErrNotFound) {
+		e.log.Warn().Msg("checking DKG key consistency: no key found")
+		err := e.dkgState.SetDKGEndState(dkgEpochCounter, flow.DKGEndStateNoKey)
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("failed to set dkg end state")
+		}
+	} else if err != nil {
+		e.log.Fatal().Err(err).Msg("checking DKG key consistency: could not retrieve DKG private key for next epoch")
 		return
 	}
 
 	nextDKGPubKey, err := nextDKG.KeyShare(e.me.NodeID())
 	if err != nil {
-		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG public key for next epoch")
+		e.log.Fatal().Err(err).Msg("checking DKG key consistency: could not retrieve my DKG public key for next epoch")
 		return
 	}
 
-	localPubKey := dkgPrivInfo.PublicKey()
+	localPubKey := myBeaconPrivKey.PublicKey()
 
 	if !nextDKGPubKey.Equals(localPubKey) {
 		e.log.Warn().Msg("checking DKG key consistency: locally computed dkg public key does not match dkg public key for next epoch")
+		err := e.dkgState.SetDKGEndState(dkgEpochCounter, flow.DKGEndStateInconsistentKey)
+		if err != nil {
+			e.log.Fatal().Err(err).Msg("failed to set dkg end state")
+		}
 	}
 }
 
@@ -346,12 +364,14 @@ func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule
 func (e *ReactorEngine) end(epochCounter uint64) func() error {
 	return func() error {
 		err := e.controller.End()
-		if err != nil {
-			if crypto.IsDKGFailureError(err) {
-				e.log.Warn().Msgf("node %s with index %d failed DKG locally: %s", e.me.NodeID(), e.controller.GetIndex(), err.Error())
-			} else {
-				return err
+		if crypto.IsDKGFailureError(err) {
+			e.log.Warn().Msgf("node %s with index %d failed DKG locally: %s", e.me.NodeID(), e.controller.GetIndex(), err.Error())
+			err := e.dkgState.SetDKGEndState(epochCounter, flow.DKGEndStateDKGFailure)
+			if err != nil {
+				return fmt.Errorf("failed to set dkg end state following dkg end error: %w", err)
 			}
+		} else if err != nil {
+			return fmt.Errorf("unknown error ending the dkg: %w", err)
 		}
 
 		privateShare, _, _ := e.controller.GetArtifacts()
@@ -359,7 +379,7 @@ func (e *ReactorEngine) end(epochCounter uint64) func() error {
 		privKeyInfo := encodable.RandomBeaconPrivKey{
 			PrivateKey: privateShare,
 		}
-		err = e.keyStorage.InsertMyBeaconPrivateKey(epochCounter, &privKeyInfo)
+		err = e.dkgState.InsertMyBeaconPrivateKey(epochCounter, &privKeyInfo)
 		if err != nil {
 			return fmt.Errorf("couldn't save DKG private key in db: %w", err)
 		}
