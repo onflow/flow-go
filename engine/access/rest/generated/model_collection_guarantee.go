@@ -9,9 +9,9 @@
 package generated
 
 type CollectionGuarantee struct {
-	CollectionId string `json:"collection_id"`
+	CollectionId string `json:"collection_id,omitempty"`
 
-	SignerIds []string `json:"signer_ids"`
+	SignerIds []string `json:"signer_ids,omitempty"`
 
-	Signature string `json:"signature"`
+	Signature string `json:"signature,omitempty"`
 }

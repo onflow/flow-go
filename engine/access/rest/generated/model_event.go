@@ -9,13 +9,13 @@
 package generated
 
 type Event struct {
-	Type_ string `json:"type"`
+	Type_ string `json:"type,omitempty"`
 
-	TransactionId string `json:"transaction_id"`
+	TransactionId string `json:"transaction_id,omitempty"`
 
-	TransactionIndex int32 `json:"transaction_index"`
+	TransactionIndex int32 `json:"transaction_index,omitempty"`
 
-	EventIndex int32 `json:"event_index"`
+	EventIndex int32 `json:"event_index,omitempty"`
 
-	Payload string `json:"payload"`
+	Payload string `json:"payload,omitempty"`
 }

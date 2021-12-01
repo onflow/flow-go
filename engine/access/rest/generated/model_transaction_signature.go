@@ -9,11 +9,11 @@
 package generated
 
 type TransactionSignature struct {
-	Address string `json:"address"`
+	Address string `json:"address,omitempty"`
 
-	SignerIndex int32 `json:"signer_index"`
+	SignerIndex int32 `json:"signer_index,omitempty"`
 
-	KeyIndex int32 `json:"key_index"`
+	KeyIndex int32 `json:"key_index,omitempty"`
 
-	Signature string `json:"signature"`
+	Signature string `json:"signature,omitempty"`
 }

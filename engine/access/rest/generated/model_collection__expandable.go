@@ -8,8 +8,6 @@
  */
 package generated
 
-type AggregatedSignature struct {
-	VerifierSignatures []string `json:"verifier_signatures,omitempty"`
-
-	SignerIds []string `json:"signer_ids,omitempty"`
+type CollectionExpandable struct {
+	Transactions []string `json:"transactions,omitempty"`
 }

@@ -9,9 +9,11 @@
 package generated
 
 type Collection struct {
-	Id string `json:"id"`
+	Id string `json:"id,omitempty"`
 
-	Transactions []Transaction `json:"transactions"`
+	Transactions []Transaction `json:"transactions,omitempty"`
+
+	Expandable *CollectionExpandable `json:"_expandable,omitempty"`
 
 	Links *Links `json:"_links,omitempty"`
 }

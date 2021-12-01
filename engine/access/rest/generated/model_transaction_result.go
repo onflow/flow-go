@@ -9,15 +9,15 @@
 package generated
 
 type TransactionResult struct {
-	BlockId string `json:"block_id"`
+	BlockId string `json:"block_id,omitempty"`
 
-	Status *TransactionStatus `json:"status"`
+	Status *TransactionStatus `json:"status,omitempty"`
 
-	ErrorMessage string `json:"error_message"`
+	ErrorMessage string `json:"error_message,omitempty"`
 
-	ComputationUsed int32 `json:"computation_used"`
+	ComputationUsed int32 `json:"computation_used,omitempty"`
 
-	Events []Event `json:"events"`
+	Events []Event `json:"events,omitempty"`
 
 	Links *Links `json:"_links,omitempty"`
 }

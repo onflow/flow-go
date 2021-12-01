@@ -9,17 +9,17 @@
 package generated
 
 type AccountPublicKey struct {
-	Index int32 `json:"index"`
+	Index int32 `json:"index,omitempty"`
 
-	PublicKey string `json:"public_key"`
+	PublicKey string `json:"public_key,omitempty"`
 
-	SigningAlgorithm *SigningAlgorithm `json:"signing_algorithm"`
+	SigningAlgorithm *SigningAlgorithm `json:"signing_algorithm,omitempty"`
 
-	HashingAlgorithm *HashingAlgorithm `json:"hashing_algorithm"`
+	HashingAlgorithm *HashingAlgorithm `json:"hashing_algorithm,omitempty"`
 
-	SequenceNumber int32 `json:"sequence_number"`
+	SequenceNumber int32 `json:"sequence_number,omitempty"`
 
-	Weight int32 `json:"weight"`
+	Weight int32 `json:"weight,omitempty"`
 
-	Revoked bool `json:"revoked"`
+	Revoked bool `json:"revoked,omitempty"`
 }

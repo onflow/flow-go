@@ -9,9 +9,9 @@
 package generated
 
 type ProposalKey struct {
-	Address string `json:"address"`
+	Address string `json:"address,omitempty"`
 
-	KeyIndex int32 `json:"key_index"`
+	KeyIndex int32 `json:"key_index,omitempty"`
 
-	SequenceNumber int32 `json:"sequence_number"`
+	SequenceNumber int32 `json:"sequence_number,omitempty"`
 }

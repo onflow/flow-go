@@ -9,7 +9,7 @@
 package generated
 
 type BlockPayload struct {
-	CollectionGuarantees []CollectionGuarantee `json:"collection_guarantees"`
+	CollectionGuarantees []CollectionGuarantee `json:"collection_guarantees,omitempty"`
 
-	BlockSeals []BlockSeal `json:"block_seals"`
+	BlockSeals []BlockSeal `json:"block_seals,omitempty"`
 }

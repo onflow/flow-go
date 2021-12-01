@@ -9,7 +9,7 @@
 package generated
 
 type Block struct {
-	Header *BlockHeader `json:"header"`
+	Header *BlockHeader `json:"header,omitempty"`
 
 	Payload *BlockPayload `json:"payload,omitempty"`
 

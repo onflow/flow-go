@@ -9,9 +9,9 @@
 package generated
 
 type Account struct {
-	Address string `json:"address"`
+	Address string `json:"address,omitempty"`
 
-	Balance int32 `json:"balance"`
+	Balance int32 `json:"balance,omitempty"`
 
 	Keys []AccountPublicKey `json:"keys,omitempty"`
 
