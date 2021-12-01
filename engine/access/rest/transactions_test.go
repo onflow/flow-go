@@ -233,9 +233,6 @@ func TestGetTransactionResult(t *testing.T) {
 					"payload": ""
 				}
 			],
-			"_expandable": {
-				"events": "events"
-			},
 			"_links": {
 				"_self": "/v1/transaction_results/%s"
 			}
@@ -318,11 +315,8 @@ func TestCreateTransaction(t *testing.T) {
 					 "signature":"%s"
 				  }
 			   ],
+                "payload_signatures":[],
 				"_expandable": {
-					"proposal_key": "proposal_key",
-					"authorizers": "authorizers",
-					"payload_signatures": "payload_signatures",
-					"envelope_signatures": "envelope_signatures",
 					"result": "/v1/transaction_results/%s"
 				},
 			   "_links":{
