@@ -11,23 +11,23 @@ package generated
 type Transaction struct {
 	Id string `json:"id"`
 
-	Script string `json:"script"`
+	Script string `json:"script,omitempty"` // todo(sideninja) pending schema change
 
-	Arguments []string `json:"arguments"`
+	Arguments []string `json:"arguments,omitempty"` // todo(sideninja) pending schema change
 
-	ReferenceBlockId string `json:"reference_block_id"`
+	ReferenceBlockId string `json:"reference_block_id,omitempty"` // todo(sideninja) pending schema change
 
-	GasLimit int32 `json:"gas_limit"`
+	GasLimit int32 `json:"gas_limit,omitempty"` // todo(sideninja) pending schema change
 
-	Payer string `json:"payer"`
+	Payer string `json:"payer,omitempty"`
 
-	ProposalKey *ProposalKey `json:"proposal_key"`
+	ProposalKey *ProposalKey `json:"proposal_key,omitempty"` // todo(sideninja) pending schema change
 
-	Authorizers []string `json:"authorizers"`
+	Authorizers []string `json:"authorizers,omitempty"` // todo(sideninja) pending schema change
 
-	PayloadSignatures []TransactionSignature `json:"payload_signatures"`
+	PayloadSignatures []TransactionSignature `json:"payload_signatures,omitempty"` // todo(sideninja) pending schema change
 
-	EnvelopeSignatures []TransactionSignature `json:"envelope_signatures"`
+	EnvelopeSignatures []TransactionSignature `json:"envelope_signatures,omitempty"` // todo(sideninja) pending schema change
 
 	Result *TransactionResult `json:"result,omitempty"`
 

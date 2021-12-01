@@ -24,7 +24,7 @@ func transactionURL(id string, expandResult bool) string {
 	if expandResult {
 		q := u.Query()
 		// by default expand all since we test expanding with converters
-		q.Add("expand", transactionResult)
+		q.Add("expand", resultExpandable)
 		u.RawQuery = q.Encode()
 	}
 	return u.String()

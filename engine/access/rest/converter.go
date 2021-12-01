@@ -506,14 +506,31 @@ func idsResponse(ids []flow.Identifier) []string {
 	return res
 }
 
-func collectionResponse(flowCollection *flow.LightCollection, link LinkGenerator) generated.Collection {
-	self, _ := selfLink(flowCollection.ID(), link.CollectionLink)
+func collectionResponse(
+	collection *flow.LightCollection,
+	txs []*flow.TransactionBody,
+	link LinkGenerator,
+	expand map[string]bool,
+) generated.Collection {
+	self, _ := selfLink(collection.ID(), link.CollectionLink)
+
+	// todo(sideninja) define expandable on the model and schema
+
+	transactions := make([]generated.Transaction, len(collection.Transactions))
+	if expand[transactionsExpandable] {
+		for i, t := range txs {
+			transactions[i] = *transactionResponse(t, nil, link, nil)
+		}
+	} else {
+		for i, t := range collection.Transactions {
+			transactions[i] = generated.Transaction{Id: t.String()}
+		}
+	}
 
 	return generated.Collection{
-		Id: flowCollection.ID().String(),
-		// TODO: broken after update to model
-		//Transactions: idsResponse(flowCollection.Transactions),
-		Links: self,
+		Id:           collection.ID().String(),
+		Transactions: transactions,
+		Links:        self,
 	}
 }
 

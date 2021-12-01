@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -48,8 +49,8 @@ func TestGetCollections(t *testing.T) {
 
 	t.Run("get by ID", func(t *testing.T) {
 		inputs := []flow.LightCollection{
-			unittest.CollectionFixture(5).Light(),
 			unittest.CollectionFixture(0).Light(),
+			unittest.CollectionFixture(3).Light(),
 			unittest.CollectionFixture(100).Light(),
 		}
 
@@ -62,7 +63,12 @@ func TestGetCollections(t *testing.T) {
 
 			rr := executeRequest(req, backend)
 
-			bx, _ := json.Marshal(col.Transactions)
+			txs := make([]generated.Transaction, len(col.Transactions))
+			for i, tx := range col.Transactions {
+				txs[i] = generated.Transaction{Id: tx.String()}
+			}
+			bx, _ := json.Marshal(txs)
+
 			expected := fmt.Sprintf(`{
 				"id":"%s",
 				"transactions":%s, 	
@@ -73,6 +79,49 @@ func TestGetCollections(t *testing.T) {
 
 			assert.Equal(t, http.StatusOK, rr.Code)
 			assert.JSONEq(t, expected, rr.Body.String())
+		}
+	})
+
+	t.Run("get by ID expand transactions", func(t *testing.T) {
+		col := unittest.CollectionFixture(3).Light()
+
+		req, _ := http.NewRequest(
+			"GET",
+			fmt.Sprintf(
+				"%s?expand=transactions",
+				collectionURL(col.ID().String()),
+			),
+			nil,
+		)
+
+		backend.Mock.
+			On("GetCollectionByID", mocks.Anything, col.ID()).
+			Return(&col, nil)
+
+		transactions := make([]flow.TransactionBody, len(col.Transactions))
+		for i := range col.Transactions {
+			transactions[i] = unittest.TransactionBodyFixture()
+			col.Transactions[i] = transactions[i].ID() // overwrite tx ids
+
+			backend.Mock.
+				On("GetTransaction", mocks.Anything, transactions[i].ID()).
+				Return(&transactions[i], nil)
+		}
+
+		rr := executeRequest(req, backend)
+
+		assert.Equal(t, http.StatusOK, rr.Code)
+		// really hacky but we can't build whole response since it's really complex
+		// so we just make sure the transactions are included and have defined values
+		// anyhow we already test transaction responses in transaction tests
+		var res map[string]interface{}
+		err := json.Unmarshal(rr.Body.Bytes(), &res)
+		assert.NoError(t, err)
+		resTx := res["transactions"].([]interface{})
+		for i, r := range resTx {
+			c := r.(map[string]interface{})
+			assert.Equal(t, transactions[i].ID().String(), c["id"])
+			assert.NotNil(t, c["envelope_signatures"])
 		}
 	})
 
