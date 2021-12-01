@@ -81,10 +81,10 @@ The Active Range has a default size of `DefaultRangeSize`. `RangeStart` is updat
 
 The Active Range can be broken up and requested by the Sync Engine in multiple segments, similar to the existing implementation.
 
-We track the list of responses we've received for each height in a map called `Responses`, which we can use to avoid sending duplicate requests to the same node. We can also use it later on to slash nodes for sending faulty responses. 
+We track the list of responses we've received for each height in a data structure called `Responses`, which we can use to avoid sending duplicate requests to the same node. We can also use it later on to slash nodes for sending faulty responses. 
 
 The value of `TargetFinalizedHeight` should reflect the Sync Height Responses that have been received, yet account for the possibility that some of these responses are malicious. Therefore, the Sync Height Response processing logic should incorporate some sort of expiration mechanism. Some possibilities for determining `TargetFinalizedHeight` are:
 * Calculate a moving average of all the Sync Height Responses received. 
 * Maintain a sliding window of the most recent Sync Height Responses, and take the median value.
 
-There are many other valid approaches.
+These approaches do imply that `TargetFinalizedHeight` will always lag slightly behind the true finalized height. This may or may not be a problem depending on the block finalization rate, and there may be other approaches which avoid this.
