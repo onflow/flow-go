@@ -440,7 +440,16 @@ func (m *StorageFormatV6Migration) decodeAndConvert(
 	}
 
 	result := m.converter.Convert(rootValue, nil)
-	m.storage.WriteValue(nil, owner, key, newInter.NewSomeValueNonCopying(result))
+
+	result = result.Transfer(
+		m.newInter,
+		newInter.ReturnEmptyLocationRange,
+		atree.Address(owner),
+		true,
+		nil,
+	)
+
+	m.storage.WriteValue(m.newInter, owner, key, newInter.NewSomeValueNonCopying(result))
 
 	// Mark the payload as 'migrated'.
 	m.migratedPayloadPaths[path] = true
@@ -1111,7 +1120,7 @@ func (c *ValueConverter) VisitArrayValue(_ *oldInter.Interpreter, value *oldInte
 	c.result = newInter.NewArrayValue(
 		c.newInter,
 		arrayStaticType,
-		*value.Owner,
+		common.Address{},
 		newElements...,
 	)
 
@@ -1221,7 +1230,7 @@ func (c *ValueConverter) VisitCompositeValue(_ *oldInter.Interpreter, value *old
 		value.QualifiedIdentifier(),
 		value.Kind(),
 		fields,
-		*value.Owner,
+		common.Address{},
 	)
 
 	// Do not descent
@@ -1346,7 +1355,7 @@ func (c *ValueConverter) VisitDictionaryValue(inter *oldInter.Interpreter, value
 	c.result = newInter.NewDictionaryValueWithAddress(
 		c.newInter,
 		staticType,
-		*value.Owner,
+		common.Address{},
 		keysAndValues...,
 	)
 
