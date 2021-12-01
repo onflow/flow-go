@@ -466,7 +466,7 @@ func readDKGData() dkg.DKGData {
 
 	dkgData := dkg.DKGData{
 		PrivKeyShares: nil,
-		PubGroupKey:   encodableDKG.GroupKey,
+		PubGroupKey:   encodableDKG.GroupKey.PublicKey,
 		PubKeyShares:  nil,
 	}
 
