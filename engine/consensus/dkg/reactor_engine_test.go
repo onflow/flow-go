@@ -113,9 +113,12 @@ func TestEpochSetup(t *testing.T) {
 		mock.Anything,
 	).Return(controller, nil)
 
+	loggerCalls := 0
+	logger := hookedLogger(&loggerCalls)
+
 	viewEvents := gadgets.NewViews()
 	engine := dkg.NewReactorEngine(
-		unittest.Logger(),
+		logger,
 		me,
 		state,
 		keyStorage,
@@ -133,6 +136,8 @@ func TestEpochSetup(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 	controller.AssertExpectations(t)
 	keyStorage.AssertExpectations(t)
+	// logger shouldn't be called in the happy path
+	require.Equal(t, 0, loggerCalls)
 }
 
 // TestReactorEngine_EpochCommittedPhaseStarted ensures that we are logging
@@ -185,13 +190,7 @@ func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 	viewEvents := gadgets.NewViews()
 
 	hookCalls := 0
-
-	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
-		if level == zerolog.WarnLevel {
-			hookCalls++
-		}
-	})
-	logger := zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
+	logger := hookedLogger(&hookCalls)
 
 	engine := dkg.NewReactorEngine(
 		logger,
@@ -205,4 +204,14 @@ func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 	engine.EpochCommittedPhaseStarted(currentCounter, &firstBlock)
 
 	require.Equal(t, 1, hookCalls)
+}
+
+// utility function to track the number of calls to a logger
+func hookedLogger(calls *int) zerolog.Logger {
+	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
+		if level == zerolog.WarnLevel {
+			*calls++
+		}
+	})
+	return zerolog.New(os.Stdout).Level(zerolog.WarnLevel).Hook(hook)
 }
