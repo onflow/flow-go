@@ -1,6 +1,6 @@
 module github.com/onflow/flow-go/integration
 
-go 1.15
+go 1.16
 
 require (
 	github.com/DataDog/zstd v1.4.8 // indirect
@@ -17,17 +17,16 @@ require (
 	github.com/go-test/deep v1.0.7 // indirect
 	github.com/jedib0t/go-pretty v4.3.0+incompatible
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
-	github.com/onflow/cadence v0.19.1-0.20210920215340-75c54c6c01eb
+	github.com/onflow/cadence v0.20.1
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
 	github.com/onflow/flow-emulator v0.20.3
 	github.com/onflow/flow-ft/lib/go/templates v0.2.0
 	github.com/onflow/flow-go v0.18.0 // replaced by version on-disk
-	github.com/onflow/flow-go-sdk v0.21.0
-	github.com/onflow/flow-go/crypto v0.21.3 // replaced by version on-disk
-	github.com/onflow/flow/protobuf/go/flow v0.2.2
+	github.com/onflow/flow-go-sdk v0.24.0
+	github.com/onflow/flow-go/crypto v0.21.4-0.20211125190211-7b31c986316e // replaced by version on-disk
+	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/plus3it/gorecurcopy v0.0.1
-	github.com/prometheus/common v0.20.0 // indirect
 	github.com/rs/zerolog v1.21.0
 	github.com/stretchr/testify v1.7.0
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect

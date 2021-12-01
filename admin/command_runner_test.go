@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -88,18 +89,20 @@ func (suite *CommandRunnerSuite) SetupCommandRunner(opts ...CommandRunnerOption)
 func (suite *CommandRunnerSuite) TestHandler() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
-		suite.EqualValues(req.Data["string"], "foo")
-		suite.EqualValues(req.Data["number"], 123)
+		data := req.Data.(map[string]interface{})
+
+		suite.EqualValues(data["string"], "foo")
+		suite.EqualValues(data["number"], 123)
 		called = true
 
-		return nil
+		return "ok", nil
 	})
 
 	suite.SetupCommandRunner()
@@ -107,7 +110,7 @@ func (suite *CommandRunnerSuite) TestHandler() {
 	data := make(map[string]interface{})
 	data["string"] = "foo"
 	data["number"] = 123
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -127,7 +130,7 @@ func (suite *CommandRunnerSuite) TestUnimplementedHandler() {
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -144,21 +147,21 @@ func (suite *CommandRunnerSuite) TestUnimplementedHandler() {
 func (suite *CommandRunnerSuite) TestValidator() {
 	calls := 0
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
 		calls += 1
 
-		return nil
+		return "ok", nil
 	})
 
 	validatorErr := errors.New("unexpected value")
 	suite.bootstrapper.RegisterValidator("foo", func(req *CommandRequest) error {
-		if req.Data["key"] != "value" {
+		if req.Data.(map[string]interface{})["key"] != "value" {
 			return validatorErr
 		}
 		return nil
@@ -168,7 +171,7 @@ func (suite *CommandRunnerSuite) TestValidator() {
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -183,7 +186,7 @@ func (suite *CommandRunnerSuite) TestValidator() {
 	suite.Equal(calls, 1)
 
 	data["key"] = "blah"
-	val, err = structpb.NewStruct(data)
+	val, err = structpb.NewValue(data)
 	suite.NoError(err)
 	request.Data = val
 	_, err = suite.client.RunCommand(ctx, request)
@@ -194,21 +197,21 @@ func (suite *CommandRunnerSuite) TestValidator() {
 
 func (suite *CommandRunnerSuite) TestHandlerError() {
 	handlerErr := errors.New("handler error")
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
-		return handlerErr
+		return nil, handlerErr
 	})
 
 	suite.SetupCommandRunner()
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -224,16 +227,16 @@ func (suite *CommandRunnerSuite) TestHandlerError() {
 }
 
 func (suite *CommandRunnerSuite) TestTimeout() {
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		<-ctx.Done()
-		return ctx.Err()
+		return nil, ctx.Err()
 	})
 
 	suite.SetupCommandRunner()
 
 	data := make(map[string]interface{})
 	data["key"] = "value"
-	val, err := structpb.NewStruct(data)
+	val, err := structpb.NewValue(data)
 	suite.NoError(err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -250,17 +253,17 @@ func (suite *CommandRunnerSuite) TestTimeout() {
 func (suite *CommandRunnerSuite) TestHTTPServer() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
-		suite.EqualValues(req.Data["key"], "value")
+		suite.EqualValues(req.Data.(map[string]interface{})["key"], "value")
 		called = true
 
-		return nil
+		return "ok", nil
 	})
 
 	suite.SetupCommandRunner()
@@ -277,6 +280,36 @@ func (suite *CommandRunnerSuite) TestHTTPServer() {
 
 	suite.True(called)
 	suite.Equal("200 OK", resp.Status)
+}
+
+func (suite *CommandRunnerSuite) TestListCommands() {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+		return nil, nil
+	})
+	suite.bootstrapper.RegisterHandler("bar", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+		return nil, nil
+	})
+	suite.bootstrapper.RegisterHandler("baz", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
+		return nil, nil
+	})
+
+	suite.SetupCommandRunner()
+
+	url := fmt.Sprintf("http://%s/admin/run_command", suite.httpAddress)
+	reqBody := bytes.NewBuffer([]byte(`{"commandName": "list-commands"}`))
+	resp, err := http.Post(url, "application/json", reqBody)
+	require.NoError(suite.T(), err)
+	defer func() {
+		if resp.Body != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	suite.Equal("200 OK", resp.Status)
+
+	var response map[string][]string
+	require.NoError(suite.T(), json.NewDecoder(resp.Body).Decode(&response))
+	suite.Subset(response["output"], []string{"foo", "bar", "baz"})
 }
 
 func generateCerts(t *testing.T) (tls.Certificate, *x509.CertPool, tls.Certificate, *x509.CertPool) {
@@ -389,17 +422,17 @@ func generateCerts(t *testing.T) (tls.Certificate, *x509.CertPool, tls.Certifica
 func (suite *CommandRunnerSuite) TestTLS() {
 	called := false
 
-	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) error {
+	suite.bootstrapper.RegisterHandler("foo", func(ctx context.Context, req *CommandRequest) (interface{}, error) {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return nil, ctx.Err()
 		default:
 		}
 
-		suite.EqualValues(req.Data["key"], "value")
+		suite.EqualValues(req.Data.(map[string]interface{})["key"], "value")
 		called = true
 
-		return nil
+		return "ok", nil
 	})
 
 	serverCert, serverCertPool, clientCert, clientCertPool := generateCerts(suite.T())

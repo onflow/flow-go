@@ -167,7 +167,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 	err = client.SendTransaction(ctx, *tx)
 	cancel()
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// wait for the transaction to be included in a collection
 	suite.AwaitTransactionsIncluded(convert.IDFromSDK(tx.ID()))

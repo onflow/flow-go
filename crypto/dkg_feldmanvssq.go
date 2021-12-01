@@ -125,6 +125,10 @@ func (s *feldmanVSSQualState) NextTimeout() error {
 // key shares.
 // - the finalized private key which is the current node's own private key share
 // This is also a timeout to receiving all complaint answers
+// - the returned erorr is :
+//    - dkgFailureError if the leader was disqualified.
+//    - other error if Start() was not called, or NextTimeout() was not called twice
+//    - nil otherwise.
 func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
 		return nil, nil, nil, fmt.Errorf("dkg protocol %d is not running", s.currentIndex)
@@ -151,7 +155,7 @@ func (s *feldmanVSSQualState) End() (PrivateKey, PublicKey, []PublicKey, error) 
 	// If the leader is disqualified, all keys are ignored
 	// otherwise, the keys are valid
 	if s.disqualified {
-		return nil, nil, nil, errors.New("leader is disqualified")
+		return nil, nil, nil, dkgFailureErrorf("leader is disqualified")
 	}
 
 	// private key of the current node
@@ -180,7 +184,7 @@ func (s *feldmanVSSQualState) HandleBroadcastMsg(orig int, msg []byte) error {
 	}
 
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputsError(
+		return invalidInputsErrorf(
 			"wrong origin input, should be less than %d, got %d",
 			s.Size(),
 			orig)
@@ -224,7 +228,7 @@ func (s *feldmanVSSQualState) HandlePrivateMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputsError(
+		return invalidInputsErrorf(
 			"invalid origin, should be positive less than %d, got %d",
 			s.Size(),
 			orig)
@@ -265,7 +269,7 @@ func (s *feldmanVSSQualState) ForceDisqualify(node int) error {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return newInvalidInputsError(
+		return invalidInputsErrorf(
 			"invalid origin input, should be less than %d, got %d",
 			s.Size(), node)
 	}

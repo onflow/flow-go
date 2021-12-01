@@ -93,19 +93,23 @@ func (s *feldmanVSSstate) Start(seed []byte) error {
 	return nil
 }
 
-// End ends the protocol in the current node
+// End ends the protocol in the current node.
 // It returns the finalized public data and node private key share.
 // - the group public key corresponding to the group secret key
 // - all the public key shares corresponding to the nodes private
 // key shares.
 // - the finalized private key which is the current node's own private key share
+// - the returned erorr is :
+//    - dkgFailureError if the private key and vector are inconsistent.
+//    - other error if Start() was not called.
+//    - nil otherwise.
 func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
 		return nil, nil, nil, errors.New("dkg is not running")
 	}
 	s.running = false
 	if !s.validKey {
-		return nil, nil, nil, errors.New("keys are not correct")
+		return nil, nil, nil, dkgFailureErrorf("received private key is invalid")
 	}
 	// private key of the current node
 	x := newPrKeyBLSBLS12381(&s.x)
@@ -136,7 +140,7 @@ func (s *feldmanVSSstate) HandleBroadcastMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputsError(
+		return invalidInputsErrorf(
 			"wrong origin input, should be less than %d, got %d",
 			s.Size(),
 			orig)
@@ -172,7 +176,7 @@ func (s *feldmanVSSstate) HandlePrivateMsg(orig int, msg []byte) error {
 		return errors.New("dkg is not running")
 	}
 	if orig >= s.Size() || orig < 0 {
-		return newInvalidInputsError(
+		return invalidInputsErrorf(
 			"wrong origin, should be positive less than %d, got %d",
 			s.Size(),
 			orig)
@@ -209,7 +213,7 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 		return errors.New("dkg is not running")
 	}
 	if node >= s.Size() || node < 0 {
-		return newInvalidInputsError(
+		return invalidInputsErrorf(
 			"wrong origin input, should be less than %d, got %d",
 			s.Size(),
 			node)
@@ -224,9 +228,6 @@ func (s *feldmanVSSstate) ForceDisqualify(node int) error {
 func (s *feldmanVSSstate) generateShares(seed []byte) error {
 	err := seedRelic(seed)
 	if err != nil {
-		if IsInvalidInputsError(err) {
-			return newInvalidInputsError("generating shares failed: %s", err)
-		}
 		return fmt.Errorf("generating shares failed: %w", err)
 	}
 
@@ -373,7 +374,7 @@ func readVerifVector(A []pointG2, src []byte) error {
 	case valid:
 		return nil
 	case invalid:
-		return newInvalidInputsError("the verifcation vector does not serialize G2 points")
+		return invalidInputsErrorf("the verifcation vector does not serialize G2 points")
 	default:
 		return errors.New("reading the verifcation vector failed")
 	}

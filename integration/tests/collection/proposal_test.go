@@ -36,7 +36,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 		for j := 0; j < clusterSize; j++ {
 			node := suite.Collector(uint(i), uint(j))
 			client, err := client.New(node.Addr(testnet.ColNodeAPIPort), grpc.WithInsecure())
-			suite.Require().Nil(err)
+			suite.Require().NoError(err)
 			forCluster = append(forCluster, client)
 		}
 
@@ -65,7 +65,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 					ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 					err := target.SendTransaction(ctx, *tx)
 					cancel()
-					suite.Require().Nil(err)
+					suite.Require().NoError(err)
 				}()
 			}
 
@@ -101,9 +101,9 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 				go func() {
 					ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 					err := target1.SendTransaction(ctx, *tx)
-					suite.Require().Nil(err)
+					suite.Require().NoError(err)
 					err = target2.SendTransaction(ctx, *tx)
-					suite.Require().Nil(err)
+					suite.Require().NoError(err)
 					cancel()
 				}()
 			}
@@ -144,7 +144,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 					ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 					err := target.SendTransaction(ctx, *tx)
 					cancel()
-					suite.Require().Nil(err)
+					suite.Require().NoError(err)
 				}()
 			}
 
@@ -184,7 +184,7 @@ func (suite *CollectorSuite) TestProposal_MultiCluster() {
 						ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 						err := target.SendTransaction(ctx, *tx)
 						cancel()
-						suite.Require().Nil(err)
+						suite.Require().NoError(err)
 					}()
 				}
 			}
@@ -221,7 +221,7 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 			suite.Collector(0, uint(i)).Addr(testnet.ColNodeAPIPort),
 			grpc.WithInsecure(),
 		)
-		suite.Require().Nil(err)
+		suite.Require().NoError(err)
 	}
 
 	// send a bunch of transactions
@@ -235,7 +235,7 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 		go func() {
 			ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 			err = target.SendTransaction(ctx, *tx)
-			suite.Require().Nil(err)
+			suite.Require().NoError(err)
 			cancel()
 		}()
 
@@ -246,10 +246,10 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	suite.AwaitTransactionsIncluded(txIDs...)
 
 	// stop one of the nodes
-	suite.T().Logf("stopping COL1")
+	suite.T().Log("stopping COL1")
 	col1 := suite.Collector(0, 0)
 	err = col1.Disconnect()
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	// send some more transactions
 	txIDs = make([]flow.Identifier, 0, nTransactions)
@@ -261,7 +261,7 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 
 		ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 		err = target.SendTransaction(ctx, *tx)
-		suite.Require().Nil(err)
+		suite.Require().NoError(err)
 		cancel()
 
 		txIDs = append(txIDs, convert.IDFromSDK(tx.ID()))
@@ -271,10 +271,10 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	suite.AwaitTransactionsIncluded(txIDs...)
 
 	// stop another node
-	suite.T().Logf("stopping COL2")
+	suite.T().Log("stopping COL2")
 	col2 := suite.Collector(0, 1)
 	err = col2.Disconnect()
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	// send some more transactions
 	txIDs = make([]flow.Identifier, 0, nTransactions)
@@ -286,7 +286,7 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 
 		ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 		err = target.SendTransaction(ctx, *tx)
-		suite.Require().Nil(err)
+		suite.Require().NoError(err)
 		cancel()
 
 		txIDs = append(txIDs, convert.IDFromSDK(tx.ID()))
@@ -300,13 +300,13 @@ func (suite *CollectorSuite) TestProposal_Recovery() {
 	}
 
 	// restart the paused collectors
-	suite.T().Logf("restarting COL1")
+	suite.T().Log("restarting COL1")
 	err = col1.Connect()
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
-	suite.T().Logf("restarting COL2")
+	suite.T().Log("restarting COL2")
 	err = col2.Connect()
-	suite.Require().Nil(err)
+	suite.Require().NoError(err)
 
 	// now we can make progress again, but the paused collectors need to catch
 	// up to the current chain state first

@@ -20,6 +20,9 @@ func IsNodeStakedAt(snapshot Snapshot, id flow.Identifier) (bool, error) {
 
 // IsNodeStakedWithRoleAt returns whether or not the node with the given ID is a valid
 // staked, un-ejected node with the specified role as of the given state snapshot.
+// Expected errors during normal operations:
+//  * storage.ErrNotFound if snapshot references an unknown block
+// All other errors are unexpected and potential symptoms of internal state corruption.
 func IsNodeStakedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow.Role) (bool, error) {
 	return CheckNodeStatusAt(
 		snapshot,
@@ -32,6 +35,9 @@ func IsNodeStakedWithRoleAt(snapshot Snapshot, id flow.Identifier, role flow.Rol
 
 // CheckNodeStatusAt returns whether or not the node with the given ID is a valid identity at the given
 // state snapshot, and satisfies all checks.
+// Expected errors during normal operations:
+//  * storage.ErrNotFound if snapshot references an unknown block
+// All other errors are unexpected and potential symptoms of internal state corruption.
 func CheckNodeStatusAt(snapshot Snapshot, id flow.Identifier, checks ...flow.IdentityFilter) (bool, error) {
 	identity, err := snapshot.Identity(id)
 	if IsIdentityNotFound(err) {

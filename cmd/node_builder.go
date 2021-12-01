@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/admin"
+	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
@@ -70,7 +70,7 @@ type NodeBuilder interface {
 	Component(name string, f func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error)) NodeBuilder
 
 	// AdminCommand registers a new admin command with the admin server
-	AdminCommand(command string, handler admin.CommandHandler, validator admin.CommandValidator) NodeBuilder
+	AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder
 
 	// MustNot asserts that the given error must not occur.
 	// If the error is nil, returns a nil log event (which acts as a no-op).
@@ -129,7 +129,7 @@ type BaseConfig struct {
 	guaranteesCacheSize             uint
 	receiptsCacheSize               uint
 	db                              *badger.DB
-	LibP2PStreamCompression         string
+	PreferredUnicastProtocols       []string
 	NetworkReceivedMessageCacheSize int
 }
 
@@ -168,6 +168,7 @@ type NodeConfig struct {
 	RootResult                    *flow.ExecutionResult
 	RootSeal                      *flow.Seal
 	RootChainID                   flow.ChainID
+	SporkID                       flow.Identifier
 	SkipNwAddressBasedValidations bool
 }
 
@@ -199,7 +200,6 @@ func DefaultBaseConfig() *BaseConfig {
 		metricsEnabled:                  true,
 		receiptsCacheSize:               bstorage.DefaultCacheSize,
 		guaranteesCacheSize:             bstorage.DefaultCacheSize,
-		LibP2PStreamCompression:         p2p.NoCompression,
 		NetworkReceivedMessageCacheSize: p2p.DefaultCacheSize,
 	}
 }

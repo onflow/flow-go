@@ -8,7 +8,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
-	dkgmodel "github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -42,7 +41,7 @@ type ReactorEngine struct {
 	log               zerolog.Logger
 	me                module.Local
 	State             protocol.State
-	keyStorage        storage.DKGKeys
+	keyStorage        storage.BeaconPrivateKeys
 	controller        module.DKGController
 	controllerFactory module.DKGControllerFactory
 	viewEvents        events.Views
@@ -54,7 +53,7 @@ func NewReactorEngine(
 	log zerolog.Logger,
 	me module.Local,
 	state protocol.State,
-	keyStorage storage.DKGKeys,
+	keyStorage storage.BeaconPrivateKeys,
 	controllerFactory module.DKGControllerFactory,
 	viewEvents events.Views,
 ) *ReactorEngine {
@@ -173,18 +172,19 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 		return
 	}
 
-	dkgPrivInfo, err := e.keyStorage.RetrieveMyDKGPrivateInfo(currentEpochCounter + 1)
+	dkgPrivInfo, err := e.keyStorage.RetrieveMyBeaconPrivateKey(currentEpochCounter + 1)
 	if err != nil {
 		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG private info for next epoch")
 		return
 	}
 
-	nextDKGPubKey, err := nextDKG.KeyShare(dkgPrivInfo.NodeID)
+	nextDKGPubKey, err := nextDKG.KeyShare(e.me.NodeID())
 	if err != nil {
 		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG public key for next epoch")
+		return
 	}
 
-	localPubKey := dkgPrivInfo.RandomBeaconPrivKey.PublicKey()
+	localPubKey := dkgPrivInfo.PublicKey()
 
 	if !nextDKGPubKey.Equals(localPubKey) {
 		e.log.Warn().Msg("checking DKG key consistency: locally computed dkg public key does not match dkg public key for next epoch")
@@ -274,19 +274,19 @@ func (e *ReactorEngine) end(epochCounter uint64) func() error {
 	return func() error {
 		err := e.controller.End()
 		if err != nil {
-			return err
+			if crypto.IsDKGFailureError(err) {
+				e.log.Warn().Msgf("node %s with index %d failed DKG locally: %s", e.me.NodeID(), e.controller.GetIndex(), err.Error())
+			} else {
+				return err
+			}
 		}
 
 		privateShare, _, _ := e.controller.GetArtifacts()
 
-		privKeyInfo := dkgmodel.DKGParticipantPriv{
-			NodeID: e.me.NodeID(),
-			RandomBeaconPrivKey: encodable.RandomBeaconPrivKey{
-				PrivateKey: privateShare,
-			},
-			GroupIndex: e.controller.GetIndex(),
+		privKeyInfo := encodable.RandomBeaconPrivKey{
+			PrivateKey: privateShare,
 		}
-		err = e.keyStorage.InsertMyDKGPrivateInfo(epochCounter, &privKeyInfo)
+		err = e.keyStorage.InsertMyBeaconPrivateKey(epochCounter, &privKeyInfo)
 		if err != nil {
 			return fmt.Errorf("couldn't save DKG private key in db: %w", err)
 		}

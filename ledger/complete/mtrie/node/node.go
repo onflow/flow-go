@@ -55,20 +55,15 @@ func NewNode(height int,
 	payload *ledger.Payload,
 	hashValue hash.Hash,
 	maxDepth uint16,
-	regCount uint64) *Node {
-
-	var pl *ledger.Payload
-	if payload != nil {
-		pl = payload.DeepCopy()
-	}
-
+	regCount uint64,
+) *Node {
 	n := &Node{
 		lChild:    lchild,
 		rChild:    rchild,
 		height:    height,
 		path:      path,
 		hashValue: hashValue,
-		payload:   pl,
+		payload:   payload,
 		maxDepth:  maxDepth,
 		regCount:  regCount,
 	}
@@ -78,26 +73,27 @@ func NewNode(height int,
 // NewLeaf creates a compact leaf Node.
 // UNCHECKED requirement: height must be non-negative
 // UNCHECKED requirement: payload is non nil
+// UNCHECKED requirement: payload should be deep copied if received from external sources
 func NewLeaf(path ledger.Path,
 	payload *ledger.Payload,
-	height int) *Node {
-
+	height int,
+) *Node {
 	n := &Node{
 		lChild:   nil,
 		rChild:   nil,
 		height:   height,
 		path:     path,
-		payload:  payload.DeepCopy(),
+		payload:  payload,
 		maxDepth: 0,
-		regCount: uint64(1),
+		regCount: 1,
 	}
-	n.computeAndStoreHash()
+	n.hashValue = n.computeHash()
 	return n
 }
 
-// NewInterimNode creates a new Node with the provided value and no children.
-// UNCHECKED requirement: lchild.height and rchild.height must be smaller than height
-// UNCHECKED requirement: if lchild != nil then height = lchild.height + 1, and same for rchild
+// NewInterimNode creates a new interim Node.
+// UNCHECKED requirement:
+//  * for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
 func NewInterimNode(height int, lchild, rchild *Node) *Node {
 	var lMaxDepth, rMaxDepth uint16
 	var lRegCount, rRegCount uint64
@@ -118,14 +114,57 @@ func NewInterimNode(height int, lchild, rchild *Node) *Node {
 		maxDepth: utils.MaxUint16(lMaxDepth, rMaxDepth) + 1,
 		regCount: lRegCount + rRegCount,
 	}
-	n.computeAndStoreHash()
+	n.hashValue = n.computeHash()
 	return n
 }
 
-// computeAndStoreHash computes the node's hash value and
-// stores the result in the nodes internal `hashValue` field
-func (n *Node) computeAndStoreHash() {
-	n.hashValue = n.computeHash()
+// NewInterimCompactifiedNode creates a new compactified interim Node. For compactification,
+// we only consider the immediate children. When starting with a maximally pruned trie and
+// creating only InterimCompactifiedNodes during an update, the resulting trie remains maximally
+// pruned. Details on compactification:
+//  * If _both_ immediate children represent completely unallocated sub-tries, then the sub-trie
+//    with the new interim node is also completely empty. We return nil.
+//  * If either child is a leaf (i.e. representing a single allocated register) _and_ the other
+//    child represents a completely unallocated sub-trie, the new interim node also only holds
+//    a single allocated register. In this case, we return a compactified leaf.
+// UNCHECKED requirement:
+//  * for any child `c` that is non-nil, its height must satisfy: height = c.height + 1
+func NewInterimCompactifiedNode(height int, lChild, rChild *Node) *Node {
+	if lChild.IsDefaultNode() {
+		lChild = nil
+	}
+	if rChild.IsDefaultNode() {
+		rChild = nil
+	}
+
+	// CASE (a): _both_ children do _not_ contain any allocated registers:
+	if lChild == nil && rChild == nil {
+		return nil // return nil representing as completely empty sub-trie
+	}
+
+	// CASE (b): one child is a compactified leaf (single allocated register) _and_ the other child represents
+	// an empty subtrie => in total we have one allocated register, which we represent as single leaf node
+	if rChild == nil && lChild.IsLeaf() {
+		h := hash.HashInterNode(lChild.hashValue, ledger.GetDefaultHashForHeight(lChild.height))
+		return &Node{height: height, path: lChild.path, payload: lChild.payload, hashValue: h, maxDepth: 0, regCount: 1}
+	}
+	if lChild == nil && rChild.IsLeaf() {
+		h := hash.HashInterNode(ledger.GetDefaultHashForHeight(rChild.height), rChild.hashValue)
+		return &Node{height: height, path: rChild.path, payload: rChild.payload, hashValue: h, maxDepth: 0, regCount: 1}
+	}
+
+	// CASE (b): both children contain some allocated registers => we can't compactify; return a full interim leaf
+	return NewInterimNode(height, lChild, rChild)
+}
+
+// IsDefaultNode returns true iff the sub-trie represented by this root node contains
+// only unallocated registers. This is the case, if the node is nil or the node's hash
+// is equal to the default hash value at the respective height.
+func (n *Node) IsDefaultNode() bool {
+	if n == nil {
+		return true
+	}
+	return n.hashValue == ledger.GetDefaultHashForHeight(n.height)
 }
 
 // computeHash returns the hashValue of the node
@@ -161,11 +200,7 @@ func verifyCachedHashRecursive(n *Node) bool {
 	if n == nil {
 		return true
 	}
-	if !verifyCachedHashRecursive(n.lChild) {
-		return false
-	}
-
-	if !verifyCachedHashRecursive(n.rChild) {
+	if !verifyCachedHashRecursive(n.lChild) || !verifyCachedHashRecursive(n.rChild) {
 		return false
 	}
 

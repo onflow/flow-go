@@ -51,21 +51,28 @@ cmd/collection/collection:
 cmd/util/util:
 	go build -o cmd/util/util --tags relic cmd/util/main.go
 
+.PHONY: install-mock-generators
+install-mock-generators:
+	cd ${GOPATH}; \
+    GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v1.1.2; \
+    GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1;
+
 .PHONY: install-tools
-install-tools: crypto/relic/build check-go-version
+install-tools: crypto/relic/build check-go-version install-mock-generators
 	curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b ${GOPATH}/bin v1.41.1; \
 	cd ${GOPATH}; \
 	GO111MODULE=on go get github.com/golang/protobuf/protoc-gen-go@v1.3.2; \
 	GO111MODULE=on go get github.com/uber/prototool/cmd/prototool@v1.9.0; \
 	GO111MODULE=on go get github.com/gogo/protobuf/protoc-gen-gofast; \
-	GO111MODULE=on go get github.com/vektra/mockery/cmd/mockery@v1.1.2; \
-	GO111MODULE=on go get github.com/golang/mock/mockgen@v1.3.1; \
 	GO111MODULE=on go get golang.org/x/tools/cmd/stringer@master;
 
-.PHONY: unittest
-unittest:
+.PHONY: unittest-main
+unittest-main:
 	# test all packages with Relic library enabled
-	GO111MODULE=on go test $(if $(TEST_LONG),,-short) -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) --tags relic ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) -covermode=atomic $(if $(JSON_OUTPUT),-json,) $(if $(NUM_RUNS),-count $(NUM_RUNS),) --tags relic ./...
+
+.PHONY: unittest
+unittest: unittest-main
 	$(MAKE) -C crypto test
 	$(MAKE) -C crypto cross-blst-test
 	$(MAKE) -C integration test
@@ -114,6 +121,7 @@ generate-mocks:
 	GO111MODULE=on mockery -name '.*' -dir=state/cluster -case=underscore -output="state/cluster/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module -case=underscore -tags="relic" -output="./module/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir=module/mempool -case=underscore -output="./module/mempool/mock" -outpkg="mempool"
+	GO111MODULE=on mockery -name '.*' -dir=module/component -case=underscore -output="./module/component/mock" -outpkg="component"
 	GO111MODULE=on mockery -name '.*' -dir=network -case=underscore -output="./network/mocknetwork" -outpkg="mocknetwork"
 	GO111MODULE=on mockery -name '.*' -dir=storage -case=underscore -output="./storage/mock" -outpkg="mock"
 	GO111MODULE=on mockery -name '.*' -dir="state/protocol" -case=underscore -output="state/protocol/mock" -outpkg="mock"
@@ -182,17 +190,6 @@ docker-ci:
 		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
 		make ci
 
-# This command is should only be used by Team City (for linux)
-# Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
-.PHONY: docker-ci-team-city
-docker-ci-team-city:
-	docker run --env COVER=$(COVER) --env JSON_OUTPUT=$(JSON_OUTPUT) \
-		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
-		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
-		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
-		make ci
-
 # Runs integration tests in Docker  (for mac)
 .PHONY: docker-ci-integration
 docker-ci-integration:
@@ -206,37 +203,6 @@ docker-ci-integration:
 		-v /run/host-services/ssh-auth.sock:/run/host-services/ssh-auth.sock -e SSH_AUTH_SOCK="/run/host-services/ssh-auth.sock" \
 		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
 		make ci-integration
-
-# This command is should only be used by Team City (for linux)
-# Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
-.PHONY: docker-ci-integration-team-city
-docker-ci-integration-team-city:
-	docker run \
-		--env DOCKER_API_VERSION='1.39' \
-		--network host \
-		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
-		-v /tmp:/tmp \
-		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
-		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
-		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
-		make ci-integration
-
-# This command is should only be used by Team City (for linux)
-# Includes a TeamCity specific git fix, ref:https://github.com/akkadotnet/akka.net/issues/2834#issuecomment-494795604
-.PHONY: docker-ci-benchmark-team-city
-docker-ci-benchmark-team-city:
-	docker run \
-		--env DOCKER_API_VERSION='1.39' \
-		--network host \
-		-v ${SSH_AUTH_SOCK}:/tmp/ssh_auth_sock -e SSH_AUTH_SOCK="/tmp/ssh_auth_sock" \
-		-v /tmp:/tmp \
-		-v /var/run/docker.sock:/var/run/docker.sock \
-		-v "$(CURDIR)":/go/flow -v "/tmp/.cache":"/root/.cache" -v "/tmp/pkg":"/go/pkg" \
-		-v /opt/teamcity/buildAgent/system/git:/opt/teamcity/buildAgent/system/git \
-		-w "/go/flow" "$(CONTAINER_REGISTRY)/golang-cmake:v0.0.7" \
-		make ci-benchmark
-	cat /tmp/tx_per_second_test_teamcity.txt
 
 .PHONY: docker-build-collection
 docker-build-collection:
@@ -421,10 +387,10 @@ PHONY: tool-remove-execution-fork
 tool-remove-execution-fork: docker-build-remove-execution-fork
 	docker container create --name remove-execution-fork $(CONTAINER_REGISTRY)/remove-execution-fork:latest;docker container cp remove-execution-fork:/bin/app ./remove-execution-fork;docker container rm remove-execution-fork
 
-# Check if the go version is 1.15 or higher. flow-go only supports go 1.15 and up.
+# Check if the go version is 1.16 or higher. flow-go only supports go 1.16 and up.
 .PHONY: check-go-version
 check-go-version:
-	go version | grep '1.1[5-9]'
+	go version | grep '1.1[6-9]'
 
 #----------------------------------------------------------------------
 # CD COMMANDS

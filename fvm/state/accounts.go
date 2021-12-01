@@ -8,6 +8,7 @@ import (
 	"sort"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
@@ -34,6 +35,7 @@ func keyPublicKey(index uint64) string {
 
 type Accounts interface {
 	Exists(address flow.Address) (bool, error)
+	Get(address flow.Address) (*flow.Account, error)
 	GetPublicKeyCount(address flow.Address) (uint64, error)
 	AppendPublicKey(address flow.Address, key flow.AccountPublicKey) error
 	GetPublicKey(address flow.Address, keyIndex uint64) (flow.AccountPublicKey, error)
@@ -46,8 +48,8 @@ type Accounts interface {
 	GetValue(address flow.Address, key string) (flow.RegisterValue, error)
 	CheckAccountNotFrozen(address flow.Address) error
 	GetStorageUsed(address flow.Address) (uint64, error)
-	SetValue(address flow.Address, key string, value []byte) error
-	AllocateStorageIndex(address flow.Address) (uint64, error)
+	SetValue(address flow.Address, key string, value flow.RegisterValue) error
+	AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error)
 	SetAccountFrozen(address flow.Address, frozen bool) error
 }
 
@@ -63,30 +65,36 @@ func NewAccounts(stateHolder *StateHolder) *StatefulAccounts {
 	}
 }
 
-func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (uint64, error) {
-	var index uint64
+func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error) {
 	indexBytes, err := a.getValue(address, false, KeyStorageIndex)
 	if err != nil {
-		return 0, err
+		return atree.StorageIndex{}, err
 	}
 
 	if len(indexBytes) == 0 {
-		// if not exist for the first time set it to 1 and return
-		// note that zero is reserved for other puporses. (e.g. empty storageIndex checks)
-		index = 1
+		// if not exist for the first time set it to zero and return
+		indexBytes = []byte{0, 0, 0, 0, 0, 0, 0, 1}
 	} else if len(indexBytes) != uint64StorageSize {
-		// this should be fatal
-		return 0, fmt.Errorf("invalid storage index byte size (%d != 8)", len(indexBytes))
-	} else {
-		index = binary.BigEndian.Uint64(indexBytes)
+		return atree.StorageIndex{}, fmt.Errorf("invalid storage index byte size (%d != 8)", len(indexBytes))
 	}
 
-	newIndexBytes := make([]byte, uint64StorageSize)
-	binary.BigEndian.PutUint64(newIndexBytes, uint64(index+1))
+	var index atree.StorageIndex
+	copy(index[:], indexBytes[:8])
+	newIndexBytes := index.Next()
 
-	err = a.setValue(address, false, KeyStorageIndex, newIndexBytes)
+	// store nil so that the setValue for new allocated slabs would be faster
+	// and won't do ledger getValue for every new slabs (currently happening to compute storage size changes)
+	// this way the getValue would load this value from deltas
+	key := atree.SlabIndexToLedgerKey(index)
+	err = a.stateHolder.State().Set(string(address.Bytes()), "", string(key), []byte{}, false)
 	if err != nil {
-		return 0, fmt.Errorf("failed to store the key storage index: %w", err)
+		return atree.StorageIndex{}, fmt.Errorf("failed to store empty value for newly allocated storage index: %w", err)
+	}
+
+	// update the storageIndex bytes
+	err = a.setValue(address, false, KeyStorageIndex, newIndexBytes[:])
+	if err != nil {
+		return atree.StorageIndex{}, fmt.Errorf("failed to store the key storage index: %w", err)
 	}
 	return index, nil
 }
@@ -410,9 +418,9 @@ func (a *StatefulAccounts) GetValue(address flow.Address, key string) (flow.Regi
 
 func (a *StatefulAccounts) getValue(address flow.Address, isController bool, key string) (flow.RegisterValue, error) {
 	if isController {
-		return a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
+		return a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key, a.stateHolder.EnforceInteractionLimits())
 	}
-	return a.stateHolder.State().Get(string(address.Bytes()), "", key)
+	return a.stateHolder.State().Get(string(address.Bytes()), "", key, a.stateHolder.EnforceInteractionLimits())
 }
 
 // SetValue sets a value in address' storage
@@ -427,9 +435,9 @@ func (a *StatefulAccounts) setValue(address flow.Address, isController bool, key
 	}
 
 	if isController {
-		return a.stateHolder.State().Set(string(address.Bytes()), string(address.Bytes()), key, value)
+		return a.stateHolder.State().Set(string(address.Bytes()), string(address.Bytes()), key, value, a.stateHolder.EnforceInteractionLimits())
 	}
-	return a.stateHolder.State().Set(string(address.Bytes()), "", key, value)
+	return a.stateHolder.State().Set(string(address.Bytes()), "", key, value, a.stateHolder.EnforceInteractionLimits())
 }
 
 func (a *StatefulAccounts) updateRegisterSizeChange(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
@@ -493,10 +501,10 @@ func RegisterSize(address flow.Address, isController bool, key string, value flo
 // TODO handle errors
 func (a *StatefulAccounts) touch(address flow.Address, isController bool, key string) {
 	if isController {
-		_, _ = a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key)
+		_, _ = a.stateHolder.State().Get(string(address.Bytes()), string(address.Bytes()), key, a.stateHolder.EnforceInteractionLimits())
 		return
 	}
-	_, _ = a.stateHolder.State().Get(string(address.Bytes()), "", key)
+	_, _ = a.stateHolder.State().Get(string(address.Bytes()), "", key, a.stateHolder.EnforceInteractionLimits())
 }
 
 func (a *StatefulAccounts) TouchContract(contractName string, address flow.Address) {

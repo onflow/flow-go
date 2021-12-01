@@ -7,16 +7,17 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/atree"
+	"github.com/opentracing/opentracing-go"
+	traceLog "github.com/opentracing/opentracing-go/log"
+
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
 	"github.com/onflow/cadence/runtime/ast"
 	"github.com/onflow/cadence/runtime/common"
 	"github.com/onflow/cadence/runtime/interpreter"
-	"github.com/opentracing/opentracing-go"
-	traceLog "github.com/opentracing/opentracing-go/log"
 
-	"github.com/onflow/flow-go/fvm/blueprints"
 	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/handler"
@@ -28,22 +29,31 @@ import (
 )
 
 var _ runtime.Interface = &ScriptEnv{}
+var _ Environment = &ScriptEnv{}
 
 // ScriptEnv is a read-only mostly used for executing scripts.
 type ScriptEnv struct {
-	ctx           Context
-	sth           *state.StateHolder
-	vm            *VirtualMachine
-	accounts      state.Accounts
-	contracts     *handler.ContractHandler
-	programs      *handler.ProgramsHandler
-	accountKeys   *handler.AccountKeyHandler
-	metrics       *handler.MetricsHandler
-	uuidGenerator *state.UUIDGenerator
-	logs          []string
-	totalGasUsed  uint64
-	rng           *rand.Rand
-	traceSpan     opentracing.Span
+	ctx                Context
+	sth                *state.StateHolder
+	vm                 *VirtualMachine
+	accounts           state.Accounts
+	contracts          *handler.ContractHandler
+	programs           *handler.ProgramsHandler
+	accountKeys        *handler.AccountKeyHandler
+	metrics            *handler.MetricsHandler
+	computationHandler handler.ComputationMeteringHandler
+	uuidGenerator      *state.UUIDGenerator
+	logs               []string
+	rng                *rand.Rand
+	traceSpan          opentracing.Span
+}
+
+func (e *ScriptEnv) Context() *Context {
+	return &e.ctx
+}
+
+func (e *ScriptEnv) VM() *VirtualMachine {
+	return e.vm
 }
 
 func NewScriptEnvironment(
@@ -58,16 +68,18 @@ func NewScriptEnvironment(
 	programsHandler := handler.NewProgramsHandler(programs, sth)
 	accountKeys := handler.NewAccountKeyHandler(accounts)
 	metrics := handler.NewMetricsHandler(ctx.Metrics)
+	computationHandler := handler.NewComputationMeteringHandler(ctx.GasLimit)
 
 	env := &ScriptEnv{
-		ctx:           ctx,
-		sth:           sth,
-		vm:            vm,
-		metrics:       metrics,
-		accounts:      accounts,
-		accountKeys:   accountKeys,
-		uuidGenerator: uuidGenerator,
-		programs:      programsHandler,
+		ctx:                ctx,
+		sth:                sth,
+		vm:                 vm,
+		metrics:            metrics,
+		accounts:           accounts,
+		accountKeys:        accountKeys,
+		uuidGenerator:      uuidGenerator,
+		programs:           programsHandler,
+		computationHandler: computationHandler,
 	}
 
 	env.contracts = handler.NewContractHandler(
@@ -179,33 +191,21 @@ func (e *ScriptEnv) GetStorageCapacity(address common.Address) (value uint64, er
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetStorageCapacityScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	accountStorageCapacity := AccountStorageCapacityInvocation(e, e.traceSpan)
+	result, invokeErr := accountStorageCapacity(address)
 
-	// TODO (ramtin) this shouldn't be this way, it should call the invokeMeta
-	// and we handle the errors and still compute the state interactions
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	var capacity uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, storage capacity will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
 	// 2. There will also be an error in case the accounts balance times megabytesPerFlow constant overflows,
 	//		which shouldn't happen unless the the price of storage is reduced at least 100 fold
 	// 3. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-	if script.Err == nil {
-		// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
-		// divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
-		capacity = script.Value.ToGoValue().(uint64) / 100
+	if invokeErr != nil {
+		return 0, nil
 	}
 
-	return capacity, nil
+	// Return type is actually a UFix64 with the unit of megabytes so some conversion is necessary
+	// divide the unsigned int by (1e8 (the scale of Fix64) / 1e6 (for mega)) to get bytes (rounded down)
+	return storageMBUFixToBytesUInt(result), nil
 }
 
 func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err error) {
@@ -214,26 +214,14 @@ func (e *ScriptEnv) GetAccountBalance(address common.Address) (value uint64, err
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenBalanceScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	accountBalance := AccountBalanceInvocation(e, e.traceSpan)
+	result, invokeErr := accountBalance(address)
 
-	// TODO similar to the one above
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	var balance uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, balance will be 0.
-	if script.Err == nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if invokeErr != nil {
+		return 0, nil
 	}
-
-	return balance, nil
+	return result.ToGoValue().(uint64), nil
 }
 
 func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value uint64, err error) {
@@ -242,28 +230,16 @@ func (e *ScriptEnv) GetAccountAvailableBalance(address common.Address) (value ui
 		defer sp.Finish()
 	}
 
-	script := Script(blueprints.GetFlowTokenAvailableBalanceScript(flow.Address(address), e.ctx.Chain.ServiceAddress()))
+	accountAvailableBalance := AccountAvailableBalanceInvocation(e, e.traceSpan)
+	result, invokeErr := accountAvailableBalance(address)
 
-	// TODO similar to the one above
-	err = e.vm.Run(
-		e.ctx,
-		script,
-		e.sth.State().View(),
-		e.programs.Programs,
-	)
-	if err != nil {
-		return 0, err
-	}
-
-	var balance uint64
 	// TODO: Figure out how to handle this error. Currently if a runtime error occurs, available balance will be 0.
 	// 1. An error will occur if user has removed their FlowToken.Vault -- should this be allowed?
 	// 2. Any other error indicates a bug in our implementation. How can we reliably check the Cadence error?
-	if script.Err == nil {
-		balance = script.Value.ToGoValue().(uint64)
+	if invokeErr != nil {
+		return 0, nil
 	}
-
-	return balance, nil
+	return result.ToGoValue().(uint64), nil
 }
 
 func (e *ScriptEnv) ResolveLocation(
@@ -455,20 +431,15 @@ func (e *ScriptEnv) GenerateUUID() (uint64, error) {
 }
 
 func (e *ScriptEnv) GetComputationLimit() uint64 {
-	return e.ctx.GasLimit
+	return e.computationHandler.Limit()
 }
 
 func (e *ScriptEnv) SetComputationUsed(used uint64) error {
-	e.totalGasUsed = used
-	return nil
+	return e.computationHandler.AddUsed(used)
 }
 
 func (e *ScriptEnv) GetComputationUsed() uint64 {
-	return e.totalGasUsed
-}
-
-func (e *ScriptEnv) SetAccountFrozen(address common.Address, frozen bool) error {
-	return errors.NewOperationNotSupportedError("SetAccountFrozen")
+	return e.computationHandler.Used()
 }
 
 func (e *ScriptEnv) DecodeArgument(b []byte, t cadence.Type) (cadence.Value, error) {
@@ -711,7 +682,11 @@ func (e *ScriptEnv) Commit() ([]programs.ContractUpdateKey, error) {
 	return e.contracts.Commit()
 }
 
-// AllocateStorageIndex is not implemented in this enviornment
-func (e *ScriptEnv) AllocateStorageIndex(_ []byte) (uint64, error) {
-	return 0, errors.NewOperationNotSupportedError("AllocateStorageIndex")
+// AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
+func (e *ScriptEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
+	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
+	if err != nil {
+		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
+	}
+	return v, nil
 }

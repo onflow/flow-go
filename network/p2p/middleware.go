@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/validator"
 	psValidator "github.com/onflow/flow-go/network/validator/pubsub"
 	_ "github.com/onflow/flow-go/utils/binstat"
@@ -67,6 +68,7 @@ type Middleware struct {
 	wg                         *sync.WaitGroup
 	libP2PNode                 *Node
 	libP2PNodeFactory          LibP2PFactoryFunc
+	preferredUnicasts          []unicast.ProtocolName
 	me                         flow.Identifier
 	metrics                    module.NetworkMetrics
 	rootBlockID                flow.Identifier
@@ -85,6 +87,12 @@ type MiddlewareOption func(*Middleware)
 func WithMessageValidators(validators ...network.MessageValidator) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.validators = validators
+	}
+}
+
+func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.preferredUnicasts = unicasts
 	}
 }
 
@@ -194,7 +202,7 @@ func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
 	return result
 }
 
-// Me returns the flow identifier of the this middleware
+// Me returns the flow identifier of this middleware
 func (m *Middleware) Me() flow.Identifier {
 	return m.me
 }
@@ -245,7 +253,10 @@ func (m *Middleware) start(ctx context.Context) error {
 	}
 
 	m.libP2PNode = libP2PNode
-	m.libP2PNode.SetFlowProtocolStreamHandler(m.handleIncomingStream)
+	err = m.libP2PNode.WithDefaultUnicastProtocol(m.handleIncomingStream, m.preferredUnicasts)
+	if err != nil {
+		return fmt.Errorf("could not register preferred unicast protocols on libp2p node: %w", err)
+	}
 
 	m.UpdateNodeAddresses()
 
@@ -399,7 +410,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 		validators = append(validators, psValidator.StakedValidator(m.ov.Identity))
 	}
 
-	s, err := m.libP2PNode.Subscribe(m.ctx, topic, validators...)
+	s, err := m.libP2PNode.Subscribe(topic, validators...)
 	if err != nil {
 		return fmt.Errorf("failed to subscribe for channel %s: %w", channel, err)
 	}
@@ -449,6 +460,13 @@ func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID pe
 
 // processMessage processes a message and eventually passes it to the overlay
 func (m *Middleware) processMessage(msg *message.Message) {
+	originID := flow.HashToID(msg.OriginID)
+
+	m.log.Debug().
+		Str("channel", msg.ChannelID).
+		Str("type", msg.Type).
+		Str("origin_id", originID.String()).
+		Msg("processing new message")
 
 	// run through all the message validators
 	for _, v := range m.validators {
@@ -459,7 +477,7 @@ func (m *Middleware) processMessage(msg *message.Message) {
 	}
 
 	// if validation passed, send the message to the overlay
-	err := m.ov.Receive(flow.HashToID(msg.OriginID), msg)
+	err := m.ov.Receive(originID, msg)
 	if err != nil {
 		m.log.Error().Err(err).Msg("could not deliver payload")
 	}
