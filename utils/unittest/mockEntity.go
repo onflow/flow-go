@@ -16,3 +16,15 @@ func (m MockEntity) ID() flow.Identifier {
 func (m MockEntity) CheckSum() flow.Identifier {
 	return m.id
 }
+
+func EntityListFixture(n uint) []*MockEntity {
+	list := make([]*MockEntity, n)
+
+	for i := uint(0); i < n; i++ {
+		list = append(list, &MockEntity{
+			id: IdentifierFixture(),
+		})
+	}
+
+	return list
+}
