@@ -1,14 +1,19 @@
 package backdata
 
 import (
-	"crypto/sha256"
 	"encoding/binary"
 	"math/rand"
 
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const bucketSize = uint64(16)
+type EjectionMode string
+
+const (
+	bucketSize     = uint64(16)
+	RandomEjection = EjectionMode("random-ejection")
+	LRUEjection    = EjectionMode("lru-ejection")
+)
 
 type key struct {
 	keyIndex   uint64 // slot age
@@ -27,23 +32,25 @@ type cachedEntity struct {
 
 // ArrayBackData implements an array-based generic memory pool backed by a fixed size array.
 type ArrayBackData struct {
-	limit     uint64
-	overLimit uint64
-	keyCount  uint64 // total number of non-expired key-values
-	bucketNum uint64 // total number of buckets (i.e., size of buckets)
-	buckets   []keyBucket
-	entities  []cachedEntity
+	limit        uint64
+	overLimit    uint64
+	keyCount     uint64 // total number of non-expired key-values
+	bucketNum    uint64 // total number of buckets (i.e., size of buckets)
+	ejectionMode EjectionMode
+	buckets      []keyBucket
+	entities     []cachedEntity
 }
 
-func NewArrayBackData(limit uint32, oversizeFactor uint32) ArrayBackData {
+func NewArrayBackData(limit uint32, oversizeFactor uint32, mode EjectionMode) ArrayBackData {
 	// total buckets
 	bucketNum := uint64(limit*oversizeFactor) / bucketSize
 
 	bd := ArrayBackData{
-		limit:     uint64(limit),
-		overLimit: uint64(limit * oversizeFactor),
-		buckets:   make([]keyBucket, bucketNum),
-		entities:  make([]cachedEntity, limit),
+		limit:        uint64(limit),
+		overLimit:    uint64(limit * oversizeFactor),
+		buckets:      make([]keyBucket, bucketNum),
+		entities:     make([]cachedEntity, limit),
+		ejectionMode: mode,
 	}
 
 	return bd
@@ -95,38 +102,22 @@ func (a *ArrayBackData) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(a.All())...)
 }
 
-func (a *ArrayBackData) add(entityID flow.Identifier, entity flow.Entity) (bool, error) {
+func (a *ArrayBackData) add(entityID flow.Identifier, entity flow.Entity) bool {
 	idPrefix, bucketIndex := a.idPrefixAndBucketIndex(entityID)
 	slotToUse, unique := a.slotInBucket(bucketIndex, idPrefix, entityID)
 	if !unique {
 		// entityID already exists
-		return false, nil
+		return false
 	}
 
-	// come here to insert new key value pair
-	var kvIndex uint32
-	if kvCount < lruMax {
-		// come here if keyVals array NOT full yet
-		kvIndex = uint32(kvCount)
-	} else {
-		// come here if keyVals array IS full; need to eject LRU key value pair, or random key value pair
-		if lruOut == 1 {
-			kvIndex = uint32(rand.Intn(int(lruMax))) // todo: consider taking this from a random list of lruMax ints which never repeats :-)
-			//fmt.Printf("- random i=%d kvIndex=%d\\n", i, kvIndex)
-		} else {
-			kvIndex = uint32(kvCount % lruMax)
-		}
-		//zlog.Info().Uint64("kCount", kCount).Uint64("kCountThreshold", kCountThreshold).Uint64("vIndex", vIndex).Uint64("b", b).Uint64("slotOldest", slotOldest).Msg("run() // eject")
-	}
-	kvCount++
-	buckets[b].slots[slotToUse].kvCount = kvCount
-	buckets[b].slots[slotToUse].kvIndex = kvIndex
-	buckets[b].slots[slotToUse].sum32 = sum32
-	for n := 0; n < sha256.Size; n++ { // todo: faster way to copy?
-		keyVals[kvIndex].sum256[n] = sum256[n]
-	}
-	keyVals[kvIndex].value = i
-	keyVals[kvIndex].owner = (b * slotsPerBucket) + slotToUse
+	entityIndex := a.valueIndexForEntity()
+	a.keyCount++
+	a.buckets[bucketIndex][slotToUse].keyIndex = a.keyCount
+	a.buckets[bucketIndex][slotToUse].valueIndex = entityIndex
+	a.buckets[bucketIndex][slotToUse].idPrefix = idPrefix
+	a.entities[entityIndex].entity = entity
+	a.entities[entityIndex].owner = (bucketIndex * bucketSize) + slotToUse
+	return true
 }
 
 func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (uint32, uint64) {
@@ -150,14 +141,12 @@ func (a ArrayBackData) expiryThreshold() uint64 {
 
 func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entityID flow.Identifier) (uint64, bool) {
 	slotToUse := uint64(0)
-	slotFound := false
 	expiryThreshold := a.expiryThreshold()
 
 	oldestKeyInBucket := a.keyCount + 1 // use oldest kvCount in bucket to help with random ejection mode
 	for k := uint64(0); k < bucketSize; k++ {
 		if a.buckets[bucketIndex][k].keyIndex < oldestKeyInBucket {
 			oldestKeyInBucket = a.buckets[bucketIndex][k].keyIndex
-			slotFound = true
 			slotToUse = k
 		}
 
@@ -190,4 +179,20 @@ func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entity
 	}
 
 	return slotToUse, true
+}
+
+func (a *ArrayBackData) valueIndexForEntity() uint32 {
+	if a.keyCount < a.limit {
+		// we are not over the limit yet.
+		return uint32(a.keyCount)
+	} else {
+		// array back data is full
+		if a.ejectionMode == RandomEjection {
+			// ejecting a random entity
+			return uint32(rand.Intn(int(a.limit)))
+		} else {
+			// ejecting oldest entity
+			return uint32(a.keyCount % a.limit)
+		}
+	}
 }
