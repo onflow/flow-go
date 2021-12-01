@@ -252,7 +252,7 @@ func (kp *KeyPart) DeepCopy() *KeyPart {
 	return &KeyPart{Type: kp.Type, Value: newV}
 }
 
-func (kp *KeyPart) MarshalJSON() ([]byte, error) {
+func (kp KeyPart) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type  uint16
 		Value string
@@ -298,7 +298,7 @@ type Migration func(payloads []Payload) ([]Payload, error)
 
 // Reporter reports on data from the state
 type Reporter interface {
-	// Name returns the name of the reporter
+	// Name returns the name of the reporter. Only used for logging.
 	Name() string
 	// Report accepts slice ledger payloads and reports the state of the ledger
 	Report(payloads []Payload) error

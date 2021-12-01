@@ -337,7 +337,7 @@ func (anb *UnstakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
-		anb.RootBlock.ID(),
+		anb.SporkID,
 		p2p.DefaultUnicastTimeout,
 		false, // no connection gating for the unstaked nodes
 		anb.IDTranslator,
