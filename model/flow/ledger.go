@@ -21,7 +21,7 @@ func (r *RegisterID) String() string {
 	ownerLen := len(r.Owner)
 	controllerLen := len(r.Controller)
 
-	requiredLen := ((ownerLen + controllerLen + keyLen) * 2) + 2
+	requiredLen := ((ownerLen + controllerLen + len(r.Key)) * 2) + 2
 
 	arr := make([]byte, requiredLen)
 
