@@ -33,9 +33,11 @@ const collectionCatchupDBPollInterval = 10 * time.Millisecond
 const fullBlockUpdateInterval = 1 * time.Minute
 
 // a threshold of number of blocks with missing collections beyond which collections should be re-requested
+// this is to prevent spamming the collection nodes with request
 const missingCollsForBlkThreshold = 100
 
-// a threshold of block height beyond which collections should be re-requested
+// a threshold of block height beyond which collections should be re-requested (regardless of the number of blocks for which collection are missing)
+// this is to ensure that if a collection is missing for a long time (in terms of block height) it is eventually re-requested
 const missingCollsForHeightThreshold = 100
 
 var defaultCollectionCatchupTimeout = collectionCatchupTimeout
@@ -574,7 +576,7 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 	}
 
 	// additionally, if more than threshold blocks have missing collection OR collections are missing since defaultMissingCollsForHeightThreshold, re-request those collections
-	if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold  || (finalizedHeight - lastFullHeight) > uint64(defaultMissingCollsForHeightThreshold) {
+	if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold || (finalizedHeight-lastFullHeight) > uint64(defaultMissingCollsForHeightThreshold) {
 		// warn log since this should generally not happen
 		e.log.Warn().
 			Int("missing_collection_blk_count", incompleteBlksCnt).
