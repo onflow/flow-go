@@ -2,7 +2,6 @@ package integration
 
 import (
 	"errors"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -98,9 +97,7 @@ func TestThreeInstances(t *testing.T) {
 }
 
 func TestSevenInstances(t *testing.T) {
-	if os.Getenv("TEST_FLAKY") == "" {
-		t.Skip()
-	}
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,

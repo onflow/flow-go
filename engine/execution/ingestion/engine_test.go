@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	mathRand "math/rand"
-	"os"
 	"sync"
 	"testing"
 	"time"
@@ -574,9 +573,7 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
-	if os.Getenv("TEST_FLAKY") == "" {
-		t.Skip("flaky")
-	}
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 
 	runWithEngine(t, func(ctx testingContext) {
 
@@ -1005,9 +1002,7 @@ func Test_SPOCKGeneration(t *testing.T) {
 }
 
 func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
-	if os.Getenv("TEST_FLAKY") == "" {
-		t.Skip("flaky")
-	}
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 
 	runWithEngine(t, func(ctx testingContext) {
 

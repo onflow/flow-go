@@ -1011,8 +1011,9 @@ func TestRemoveAccountKey(t *testing.T) {
 
 // TODO (ramtin) - skipping this test for now
 func TestGetAccountKey(t *testing.T) {
+	// TODO
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 
-	t.Skip()
 	options := []fvm.Option{
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 		fvm.WithCadenceLogging(true),

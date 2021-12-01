@@ -3,7 +3,6 @@ package ingest
 import (
 	"errors"
 	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/rs/zerolog"
@@ -236,9 +235,7 @@ func (suite *Suite) TestInvalidTransaction() {
 
 	suite.Run("invalid signature", func() {
 		// TODO cannot check signatures in MVP
-		if os.Getenv("TEST_WIP") == "" {
-			suite.T().Skip("skipping unimplemented test")
-		}
+		unittest.SkipUnless(suite.T(), unittest.TEST_WIP, "skipping unimplemented test")
 	})
 
 	suite.Run("invalid address", func() {

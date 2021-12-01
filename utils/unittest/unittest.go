@@ -18,6 +18,42 @@ import (
 	"github.com/onflow/flow-go/module/util"
 )
 
+type SkipReason int
+
+const (
+	TEST_FLAKY                         SkipReason = iota + 1 // flaky
+	TEST_WIP                                                 // not fully implemented / broken
+	TEST_CADENCE_STORAGE_FORMAT_PRE_V4                       // requires cadence storage format pre-v4
+	TEST_USES_GCP_BUCKET                                     // requires GCP bucket to be setup
+	TEST_DEPRECATED                                          // uses code that has been deprecated / disabled
+	TEST_LONG_RUNNING                                        // long running
+)
+
+func (s SkipReason) String() string {
+	switch s {
+	case TEST_FLAKY:
+		return "TEST_FLAKY"
+	case TEST_WIP:
+		return "TEST_WIP"
+	case TEST_CADENCE_STORAGE_FORMAT_PRE_V4:
+		return "TEST_CADENCE_STORAGE_FORMAT_PRE_V4"
+	case TEST_USES_GCP_BUCKET:
+		return "TEST_GCP_BUCKET"
+	case TEST_DEPRECATED:
+		return "TEST_DEPRECATED"
+	case TEST_LONG_RUNNING:
+		return "TEST_LONG"
+	}
+	return "UNKNOWN"
+}
+
+func SkipUnless(t *testing.T, reason SkipReason, message string) {
+	t.Helper()
+	if os.Getenv(reason.String()) == "" {
+		t.Skip(message)
+	}
+}
+
 func ExpectPanic(expectedMsg string, t *testing.T) {
 	if r := recover(); r != nil {
 		err := r.(error)
