@@ -15,16 +15,17 @@ import (
 
 // all route names
 const (
-	getTransactionByIDRoute       = "getTransactionByID"
-	getTransactionResultByIDRoute = "getTransactionResultByID"
-	createTransactionRoute        = "createTransaction"
-	getBlocksByIDRoute            = "getBlocksByIDs"
-	getBlocksByHeightRoute        = "getBlocksByHeight"
-	getCollectionByIDRoute        = "getCollectionByID"
-	executeScriptRoute            = "executeScript"
-	getBlockPayloadByIDRoute      = "getBlockPayloadByID"
-	getExecutionResultByIDRoute   = "getExecutionResultByID"
-	getAccountRoute               = "getAccount"
+	getTransactionByIDRoute          = "getTransactionByID"
+	getTransactionResultByIDRoute    = "getTransactionResultByID"
+	createTransactionRoute           = "createTransaction"
+	getBlocksByIDRoute               = "getBlocksByIDs"
+	getBlocksByHeightRoute           = "getBlocksByHeight"
+	getCollectionByIDRoute           = "getCollectionByID"
+	executeScriptRoute               = "executeScript"
+	getBlockPayloadByIDRoute         = "getBlockPayloadByID"
+	getExecutionResultByBlockIDRoute = "getExecutionResultByBlockID"
+	getExecutionResultByIDRoute      = "getExecutionResultByID"
+	getAccountRoute                  = "getAccount"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -126,8 +127,14 @@ func routeDefinitions() []routeDefinition {
 		{
 			method:         http.MethodGet,
 			pattern:        "/execution_results",
-			name:           getExecutionResultByIDRoute,
+			name:           getExecutionResultByBlockIDRoute,
 			apiHandlerFunc: getExecutionResultsByBlockIDs,
+		},
+		{
+			method:         http.MethodGet,
+			pattern:        "/execution_results/{id}",
+			name:           getExecutionResultByIDRoute,
+			apiHandlerFunc: getExecutionResultByID,
 		},
 		// Collections
 		{
