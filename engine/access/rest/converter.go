@@ -548,12 +548,14 @@ func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event
 	return events
 }
 
-func executionResultResponse(exeResult *flow.ExecutionResult) *generated.ExecutionResult {
+func executionResultResponse(exeResult *flow.ExecutionResult, link LinkGenerator) *generated.ExecutionResult {
+	self, _ := selfLink(exeResult.ID(), link.ExecutionResultLink)
+
 	return &generated.ExecutionResult{
 		Id:      exeResult.ID().String(),
 		BlockId: exeResult.BlockID.String(),
 		Events:  serviceEventListResponse(exeResult.ServiceEvents),
-		Links:   nil,
+		Links:   self,
 	}
 }
 
