@@ -1,11 +1,13 @@
-//nolint
 package eventhandler_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -31,13 +33,13 @@ const (
 // TestPaceMaker is a real pacemaker module with logging for view changes
 type TestPaceMaker struct {
 	hotstuff.PaceMaker
-	t *testing.T
+	t require.TestingT
 }
 
-func NewTestPaceMaker(t *testing.T, startView uint64, timeoutController *timeout.Controller, notifier hotstuff.Consumer) *TestPaceMaker {
+func NewTestPaceMaker(t require.TestingT, startView uint64, timeoutController *timeout.Controller, notifier hotstuff.Consumer) *TestPaceMaker {
 	p, err := pacemaker.New(startView, timeoutController, notifier)
 	if err != nil {
-		t.Fatal(err)
+		panic(err)
 	}
 	return &TestPaceMaker{p, t}
 }
@@ -45,26 +47,26 @@ func NewTestPaceMaker(t *testing.T, startView uint64, timeoutController *timeout
 func (p *TestPaceMaker) UpdateCurViewWithQC(qc *flow.QuorumCertificate) (*model.NewViewEvent, bool) {
 	oldView := p.CurView()
 	newView, changed := p.PaceMaker.UpdateCurViewWithQC(qc)
-	p.t.Logf("pacemaker.UpdateCurViewWithQC old view: %v, new view: %v\n", oldView, p.CurView())
+	log.Info().Msgf("pacemaker.UpdateCurViewWithQC old view: %v, new view: %v\n", oldView, p.CurView())
 	return newView, changed
 }
 
 func (p *TestPaceMaker) UpdateCurViewWithBlock(block *model.Block, isLeaderForNextView bool) (*model.NewViewEvent, bool) {
 	oldView := p.CurView()
 	newView, changed := p.PaceMaker.UpdateCurViewWithBlock(block, isLeaderForNextView)
-	p.t.Logf("pacemaker.UpdateCurViewWithBlock old view: %v, new view: %v\n", oldView, p.CurView())
+	log.Info().Msgf("pacemaker.UpdateCurViewWithBlock old view: %v, new view: %v\n", oldView, p.CurView())
 	return newView, changed
 }
 
 func (p *TestPaceMaker) OnTimeout() *model.NewViewEvent {
 	oldView := p.CurView()
 	newView := p.PaceMaker.OnTimeout()
-	p.t.Logf("pacemaker.OnTimeout old view: %v, new view: %v\n", oldView, p.CurView())
+	log.Info().Msgf("pacemaker.OnTimeout old view: %v, new view: %v\n", oldView, p.CurView())
 	return newView
 }
 
 // using a real pacemaker for testing event handler
-func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
+func initPaceMaker(t require.TestingT, view uint64) hotstuff.PaceMaker {
 	notifier := &mocks.Consumer{}
 	tc, err := timeout.NewConfig(
 		time.Duration(startRepTimeout*1e6),
@@ -74,7 +76,7 @@ func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
 		multiplicativeDecrease,
 		0)
 	if err != nil {
-		t.Fail()
+		t.FailNow()
 	}
 	pm := NewTestPaceMaker(t, view, timeout.NewController(tc), notifier)
 	notifier.On("OnStartingTimeout", mock.Anything).Return()
@@ -88,10 +90,10 @@ func initPaceMaker(t *testing.T, view uint64) hotstuff.PaceMaker {
 type VoteAggregator struct {
 	// if a blockID exists in qcs field, then a vote can be made into a QC
 	qcs map[flow.Identifier]*flow.QuorumCertificate
-	t   *testing.T
+	t   require.TestingT
 }
 
-func NewVoteAggregator(t *testing.T) *VoteAggregator {
+func NewVoteAggregator(t require.TestingT) *VoteAggregator {
 	return &VoteAggregator{
 		qcs: make(map[flow.Identifier]*flow.QuorumCertificate),
 		t:   t,
@@ -100,7 +102,7 @@ func NewVoteAggregator(t *testing.T) *VoteAggregator {
 
 func (v *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Block) (*flow.QuorumCertificate, bool, error) {
 	qc, ok := v.qcs[block.BlockID]
-	v.t.Logf("voteaggregator.StoreVoteAndBuildQC, qc built: %v, for view: %x, blockID: %v\n", ok, block.View, block.BlockID)
+	log.Info().Msgf("voteaggregator.StoreVoteAndBuildQC, qc built: %v, for view: %x, blockID: %v\n", ok, block.View, block.BlockID)
 
 	return qc, ok, nil
 }
@@ -115,13 +117,13 @@ func (v *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
 
 func (v *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*flow.QuorumCertificate, bool, error) {
 	qc, ok := v.qcs[block.BlockID]
-	v.t.Logf("voteaggregator.BuildQCOnReceivedBlock, qc built: %v, for view: %x, blockID: %v\n", ok, block.View, block.BlockID)
+	log.Info().Msgf("voteaggregator.BuildQCOnReceivedBlock, qc built: %v, for view: %x, blockID: %v\n", ok, block.View, block.BlockID)
 
 	return qc, ok, nil
 }
 
 func (v *VoteAggregator) PruneByView(view uint64) {
-	v.t.Logf("pruned at view:%v\n", view)
+	log.Info().Msgf("pruned at view:%v\n", view)
 }
 
 type Committee struct {
@@ -152,10 +154,10 @@ func (c *Committee) Self() flow.Identifier {
 type Voter struct {
 	votable       map[flow.Identifier]struct{}
 	lastVotedView uint64
-	t             *testing.T
+	t             require.TestingT
 }
 
-func NewVoter(t *testing.T, lastVotedView uint64) *Voter {
+func NewVoter(t require.TestingT, lastVotedView uint64) *Voter {
 	return &Voter{
 		votable:       make(map[flow.Identifier]struct{}),
 		lastVotedView: lastVotedView,
@@ -178,7 +180,7 @@ type Forks struct {
 	// blocks stores all the blocks that have been added to the forks
 	blocks    map[flow.Identifier]*model.Block
 	finalized uint64
-	t         *testing.T
+	t         require.TestingT
 	qc        *flow.QuorumCertificate
 	// addQC is to customize the logic to change finalized view
 	addQC func(qc *flow.QuorumCertificate) error
@@ -186,7 +188,7 @@ type Forks struct {
 	addBlock func(block *model.Block) error
 }
 
-func NewForks(t *testing.T, finalized uint64) *Forks {
+func NewForks(t require.TestingT, finalized uint64) *Forks {
 	f := &Forks{
 		blocks:    make(map[flow.Identifier]*model.Block),
 		finalized: finalized,
@@ -201,20 +203,26 @@ func NewForks(t *testing.T, finalized uint64) *Forks {
 	}
 	f.addBlock = func(block *model.Block) error {
 		f.blocks[block.BlockID] = block
+		if block.QC == nil {
+			panic(fmt.Sprintf("block has no QC: %v", block.View))
+		}
 		_ = f.addQC(block.QC)
 		return nil
 	}
+
+	qc := createQC(createBlock(finalized))
+	_ = f.addQC(qc)
 
 	return f
 }
 
 func (f *Forks) AddBlock(block *model.Block) error {
-	f.t.Logf("forks.AddBlock received Block for view: %v, qc: %v\n", block.View, block.QC.View)
+	log.Info().Msgf("forks.AddBlock received Block for view: %v, qc: %v\n", block.View, block.QC.View)
 	return f.addBlock(block)
 }
 
 func (f *Forks) AddQC(qc *flow.QuorumCertificate) error {
-	f.t.Logf("forks.AddQC received QC for view: %v\n", qc.View)
+	log.Info().Msgf("forks.AddQC received QC for view: %v\n", qc.View)
 	return f.addQC(qc)
 }
 
@@ -228,7 +236,7 @@ func (f *Forks) GetBlock(blockID flow.Identifier) (*model.Block, bool) {
 	if ok {
 		view = b.View
 	}
-	f.t.Logf("forks.GetBlock found: %v, view: %v\n", ok, view)
+	log.Info().Msgf("forks.GetBlock found: %v, view: %v\n", ok, view)
 	return b, ok
 }
 
@@ -239,20 +247,20 @@ func (f *Forks) GetBlocksForView(view uint64) []*model.Block {
 			blocks = append(blocks, b)
 		}
 	}
-	f.t.Logf("forks.GetBlocksForView found %v block(s) for view %v\n", len(blocks), view)
+	log.Info().Msgf("forks.GetBlocksForView found %v block(s) for view %v\n", len(blocks), view)
 	return blocks
 }
 
 func (f *Forks) MakeForkChoice(curView uint64) (*flow.QuorumCertificate, *model.Block, error) {
 	if f.qc == nil {
-		f.t.Fatalf("cannot make fork choice for curview: %v", curView)
+		log.Fatal().Msgf("cannot make fork choice for curview: %v", curView)
 	}
 
 	block, ok := f.blocks[f.qc.BlockID]
 	if !ok {
 		return nil, nil, fmt.Errorf("cannot block %V for fork choice qc", f.qc.BlockID)
 	}
-	f.t.Logf("forks.MakeForkChoice for view: %v, qc view: %v\n", curView, f.qc.View)
+	log.Info().Msgf("forks.MakeForkChoice for view: %v, qc view: %v\n", curView, f.qc.View)
 	return f.qc, block, nil
 }
 
@@ -269,10 +277,10 @@ type BlacklistValidator struct {
 	mocks.Validator
 	invalidProposals map[flow.Identifier]struct{}
 	unverifiable     map[flow.Identifier]struct{}
-	t                *testing.T
+	t                require.TestingT
 }
 
-func NewBlacklistValidator(t *testing.T) *BlacklistValidator {
+func NewBlacklistValidator(t require.TestingT) *BlacklistValidator {
 	return &BlacklistValidator{
 		invalidProposals: make(map[flow.Identifier]struct{}),
 		unverifiable:     make(map[flow.Identifier]struct{}),
@@ -284,7 +292,7 @@ func (v *BlacklistValidator) ValidateProposal(proposal *model.Proposal) error {
 	// check if is invalid
 	_, ok := v.invalidProposals[proposal.Block.BlockID]
 	if ok {
-		v.t.Logf("invalid proposal: %v\n", proposal.Block.View)
+		log.Info().Msgf("invalid proposal: %v\n", proposal.Block.View)
 		return model.InvalidBlockError{
 			BlockID: proposal.Block.BlockID,
 			View:    proposal.Block.View,
@@ -295,16 +303,16 @@ func (v *BlacklistValidator) ValidateProposal(proposal *model.Proposal) error {
 	// check if is unverifiable
 	_, ok = v.unverifiable[proposal.Block.BlockID]
 	if ok {
-		v.t.Logf("unverifiable proposal: %v\n", proposal.Block.View)
+		log.Info().Msgf("unverifiable proposal: %v\n", proposal.Block.View)
 		return model.ErrUnverifiableBlock
 	}
 
 	return nil
 }
 
-//func TestEventHandler(t *testing.T) {
-//	suite.Run(t, new(EventHandlerSuite))
-//}
+func TestEventHandler(t *testing.T) {
+	suite.Run(t, new(EventHandlerSuite))
+}
 
 type EventHandlerSuite struct {
 	suite.Suite
@@ -347,23 +355,21 @@ func (es *EventHandlerSuite) SetupTest() {
 	es.validator = NewBlacklistValidator(es.T())
 	es.notifier = &notifications.NoopConsumer{}
 
-	panic("to be deleted")
+	eventhandler, err := eventhandler.New(
+		zerolog.New(os.Stderr),
+		es.paceMaker,
+		es.blockProducer,
+		es.forks,
+		es.persist,
+		es.communicator,
+		es.committee,
+		es.voteAggregator,
+		es.voter,
+		es.validator,
+		es.notifier)
+	require.NoError(es.T(), err)
 
-	//eventhandler, err := eventhandler.New(
-	//	zerolog.New(os.Stderr),
-	//	es.paceMaker,
-	//	es.blockProducer,
-	//	es.forks,
-	//	es.persist,
-	//	es.communicator,
-	//	es.committee,
-	//	es.voteAggregator,
-	//	es.voter,
-	//	es.validator,
-	//	es.notifier)
-	//require.NoError(es.T(), err)
-
-	es.eventhandler = nil
+	es.eventhandler = eventhandler
 
 	es.initView = curView
 	es.endView = curView

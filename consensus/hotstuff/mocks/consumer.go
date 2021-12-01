@@ -60,9 +60,9 @@ func (_m *Consumer) OnProposingBlock(proposal *model.Proposal) {
 	_m.Called(proposal)
 }
 
-// OnQcConstructedFromVotes provides a mock function with given fields: _a0
-func (_m *Consumer) OnQcConstructedFromVotes(_a0 *flow.QuorumCertificate) {
-	_m.Called(_a0)
+// OnQcConstructedFromVotes provides a mock function with given fields: curView, qc
+func (_m *Consumer) OnQcConstructedFromVotes(curView uint64, qc *flow.QuorumCertificate) {
+	_m.Called(curView, qc)
 }
 
 // OnQcIncorporated provides a mock function with given fields: _a0

@@ -173,7 +173,7 @@ func (el *EventLoop) loop(ctx context.Context) error {
 			err := el.eventHandler.OnQCConstructed(qc)
 
 			// measure how long it takes for a QC to be processed
-			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnQc)
+			el.metrics.HotStuffBusyDuration(time.Since(processStart), metrics.HotstuffEventTypeOnQC)
 
 			if err != nil {
 				return fmt.Errorf("could not process QC: %w", err)
@@ -211,5 +211,5 @@ func (el *EventLoop) SubmitTrustedQC(qc *flow.QuorumCertificate) {
 
 	// the wait duration is measured as how long it takes from a qc being
 	// received to event handler commencing the processing of the qc
-	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnQc)
+	el.metrics.HotStuffWaitDuration(time.Since(received), metrics.HotstuffEventTypeOnQC)
 }

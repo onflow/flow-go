@@ -14,7 +14,7 @@ const (
 	HotstuffEventTypeTimeout    = "timeout"
 	HotstuffEventTypeOnProposal = "onproposal"
 	HotstuffEventTypeOnVote     = "onvote"
-	HotstuffEventTypeOnQc       = "onqc"
+	HotstuffEventTypeOnQC       = "onqc"
 )
 
 // HotstuffCollector implements only the metrics emitted by the HotStuff core logic.
