@@ -7,7 +7,7 @@ import (
 	"github.com/gorilla/mux"
 )
 
-const expandQueryParam = "expand"
+const ExpandQueryParam = "expand"
 const selectQueryParam = "select"
 
 // commonQueryParamMiddleware generates a Middleware function that extracts the given query parameter from the request
@@ -32,7 +32,7 @@ func commonQueryParamMiddleware(queryParamName string) mux.MiddlewareFunc {
 
 // QueryExpandable middleware extracts out the 'expand' query param field if present in the request
 func QueryExpandable() mux.MiddlewareFunc {
-	return commonQueryParamMiddleware(expandQueryParam)
+	return commonQueryParamMiddleware(ExpandQueryParam)
 }
 
 // QuerySelect middleware extracts out the 'select' query param field if present in the request
@@ -50,7 +50,7 @@ func getField(req *http.Request, key string) ([]string, bool) {
 }
 
 func GetFieldsToExpand(req *http.Request) ([]string, bool) {
-	return getField(req, expandQueryParam)
+	return getField(req, ExpandQueryParam)
 }
 
 func GetFieldsToSelect(req *http.Request) ([]string, bool) {

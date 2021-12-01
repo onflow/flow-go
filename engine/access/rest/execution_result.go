@@ -10,20 +10,29 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+const blockIDQueryParam = "block_id"
+
 // getExecutionResultByID gets Execution Result payload by ID
-func getExecutionResultByID(req *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
+func getExecutionResultsByBlockIDs(req *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 
-	id, err := req.id()
-	if err != nil {
-		return nil, NewBadRequestError(err)
+	blockIDs := req.getQueryParams(blockIDQueryParam)
+	if len(blockIDs) == 0 {
+		return nil, NewBadRequestError(fmt.Errorf("no blocks IDs specified"))
 	}
 
-	executionResult, err := executionResultLookup(req.Context(), id, backend, link)
-	if err != nil {
-		msg := fmt.Sprintf("failed to generate response for execution result ID %s", id.String())
-		return nil, NewRestError(http.StatusInternalServerError, msg, err)
+	var executionResults []*generated.ExecutionResult
+	for _, id := range blockIDs {
+		blkID, err := toID(id)
+		if err != nil {
+			return nil, NewBadRequestError(err)
+		}
+		executionResult, err := executionResultLookup(req.Context(), blkID, backend, link)
+		if err != nil {
+			return nil, NewBadRequestError(err)
+		}
+		executionResults = append(executionResults, executionResult)
 	}
-	return executionResult, nil
+	return executionResults, nil
 }
 
 func executionResultLookup(ctx context.Context, id flow.Identifier, backend access.API, linkGenerator LinkGenerator) (*generated.ExecutionResult, error) {
