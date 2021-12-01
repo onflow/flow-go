@@ -95,8 +95,10 @@ func runProcessSummary2TestRun(t *testing.T, testDir string) {
 
 	// check failure messages created
 	// there are 2 types of scenarios to test for
-	// 1. test summaries with no failures - these will not have a `failures` sub-directory
-	// 2. test summaries with failures - these will have a `failures` sub-directory
+	// 1. test summaries with no failures - these will have a `failures` sub-directory with a
+	//    `.keep` placeholder file (since empty folders can't be added to git)
+	// 2. test summaries with failures - these will have a `failures` sub-directory with failure messages saved
+	//    in text files (1 file/failure under separate sub-directory for each test that has failures)
 
 	// count expected failure directories (1 directory/test)
 	expectedFailureDirEntries, err := os.ReadDir(expectedFailureMessagesPath)

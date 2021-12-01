@@ -30,8 +30,9 @@ const failuresDir = "./failures/"
 // process level 1 summary files in a single directory and output level 2 summary
 func processSummary2TestRun(level1Directory string) TestSummary2 {
 	dirEntries, err := os.ReadDir(level1Directory)
-	os.Mkdir(failuresDir, 0755)
 	assertErrNil(err, "error reading level 1 directory")
+	err = os.Mkdir(failuresDir, 0755)
+	assertErrNil(err, "error creating failures directory")
 
 	testSummary2 := TestSummary2{}
 	testSummary2.TestResults = make(map[string]*TestResultSummary)
@@ -139,6 +140,5 @@ func postProcessTestSummary2(testSummary2 TestSummary2) {
 
 		// calculate failure rate for each test summary
 		testResultSummary.FailureRate = convertTo2DecimalPlaces(testResultSummary.Failed, testResultSummary.Runs)
-
 	}
 }
