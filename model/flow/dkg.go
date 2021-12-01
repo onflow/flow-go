@@ -15,3 +15,18 @@ const (
 	// DKGEndStateDKGFailure - the underlying DKG library reported an error.
 	DKGEndStateDKGFailure
 )
+
+func (state DKGEndState) String() string {
+	switch state {
+	case DKGEndStateSuccess:
+		return "DKGEndStateSuccess"
+	case DKGEndStateInconsistentKey:
+		return "DKGEndStateInconsistentKey"
+	case DKGEndStateNoKey:
+		return "DKGEndStateNoKey"
+	case DKGEndStateDKGFailure:
+		return "DKGEndStateDKGFailure"
+	default:
+		return "DKGEndStateUnknown"
+	}
+}
