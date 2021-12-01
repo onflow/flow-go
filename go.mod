@@ -15,7 +15,7 @@ require (
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
-	github.com/fxamacker/cbor/v2 v2.2.1-0.20210927235116-3d6d5d1de29b
+	github.com/fxamacker/cbor/v2 v2.3.1-0.20211029162100-5d5d7c3edd41
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
@@ -54,8 +54,8 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.3.3
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/atree v0.1.0-beta1.0.20211027184039-559ee654ece9
-	github.com/onflow/cadence v0.20.1
+	github.com/onflow/atree v0.1.1
+	github.com/onflow/cadence v0.20.2
 	github.com/onflow/flow v0.2.3-0.20211103155021-9254a66368d5
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
@@ -103,4 +103,4 @@ replace mellium.im/sasl => github.com/mellium/sasl v0.2.1
 
 replace github.com/onflow/flow-go/crypto => ./crypto
 
-replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.20.1-patch.1
+replace github.com/onflow/cadence => github.com/dapperlabs/cadence-internal v0.20.2-patch.1
