@@ -1,8 +1,9 @@
 package storage
 
 import (
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/module/dkg"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 type BeaconPrivateKeys interface {
@@ -21,22 +22,22 @@ type DKGState interface {
 	// GetDKGStarted checks whether the DKG has been started for the given epoch.
 	GetDKGStarted(epochCounter uint64) (bool, error)
 
-	// SetDKGEnded sets the flag indicating the DKG has ended for the given epoch.
-	SetDKGEnded(epochCounter uint64, endState dkg.EndState) error
+	// SetDKGEndState stores that the DKG has ended, and its end state.
+	SetDKGEndState(epochCounter uint64, endState flow.EndState) error
 
 	// InsertMyBeaconPrivateKey stores the random beacon private key for an epoch.
 	//
 	// CAUTION: these keys are stored before they are validated against the
 	// canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
 	// to guarantee only keys safe for signing are returned
-	InsertMyBeaconPrivateKey(epochCounter uint64, key *encodable.RandomBeaconPrivKey) error
+	InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error
 
 	// RetrieveMyBeaconPrivateKey retrieves the random beacon private key for an epoch.
 	//
 	// CAUTION: these keys are stored before they are validated against the
 	// canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
 	// to guarantee only keys safe for signing are returned
-	RetrieveMyBeaconPrivateKey(epochCounter uint64) (*encodable.RandomBeaconPrivKey, error)
+	RetrieveMyBeaconPrivateKey(epochCounter uint64) (crypto.PrivateKey, error)
 }
 
 // SafeBeaconKeys is a safe way to access beacon keys.
@@ -49,5 +50,5 @@ type SafeBeaconKeys interface {
 	// * (key, true, nil) if the key is present and confirmed valid
 	// * (nil, false, nil) if the key has been marked invalid (by SetDKGEnded)
 	// * (nil, false, error) for any other condition, or exception
-	RetrieveMyBeaconPrivateKey(epochCounter uint64) (key *encodable.RandomBeaconPrivKey, safe bool, err error)
+	RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error)
 }

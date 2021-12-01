@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -74,5 +75,26 @@ func TestDKGStartedForEpoch(t *testing.T) {
 			assert.NoError(t, err)
 			assert.False(t, started)
 		})
+	})
+}
+
+func TestDKGEndStateForEpoch(t *testing.T) {
+	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
+		epochCounter := rand.Uint64()
+
+		// should be able to write end state
+		endState := flow.EndStateSuccess
+		err := db.Update(InsertDKGEndStateForEpoch(epochCounter, endState))
+		assert.NoError(t, err)
+
+		// should be able to read end state
+		var readEndState flow.EndState
+		err = db.View(RetrieveDKGEndStateForEpoch(epochCounter, &readEndState))
+		assert.NoError(t, err)
+		assert.Equal(t, endState, readEndState)
+
+		// attempting to overwrite should error
+		err = db.Update(InsertDKGEndStateForEpoch(epochCounter, flow.EndStateDKGFailure))
+		assert.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
 }

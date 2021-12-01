@@ -6,6 +6,7 @@ import (
 	"github.com/dgraph-io/badger/v2"
 
 	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/storage"
 )
 
@@ -49,4 +50,14 @@ func RetrieveDKGStartedForEpoch(epochCounter uint64, started *bool) func(*badger
 		}
 		return nil
 	}
+}
+
+// InsertDKGEndStateForEpoch stores the DKG end state for the epoch.
+func InsertDKGEndStateForEpoch(epochCounter uint64, endState flow.EndState) func(*badger.Txn) error {
+	return insert(makePrefix(codeDKGEnded, epochCounter), endState)
+}
+
+// RetrieveDKGEndStateForEpoch retrieves the DKG end state for the epoch.
+func RetrieveDKGEndStateForEpoch(epochCounter uint64, endState *flow.EndState) func(*badger.Txn) error {
+	return retrieve(makePrefix(codeDKGEnded, epochCounter), endState)
 }
