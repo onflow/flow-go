@@ -252,7 +252,7 @@ func (kp *KeyPart) DeepCopy() *KeyPart {
 	return &KeyPart{Type: kp.Type, Value: newV}
 }
 
-func (kp *KeyPart) MarshalJSON() ([]byte, error) {
+func (kp KeyPart) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type  uint16
 		Value string
