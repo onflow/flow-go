@@ -54,7 +54,6 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.5.0
 	github.com/libp2p/go-tcp-transport v0.4.0
 	github.com/m4ksio/wal v1.0.0
-	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/multiformats/go-multiaddr v0.4.1
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/atree v0.1.0-beta1.0.20211027184039-559ee654ece9
@@ -87,6 +86,7 @@ require (
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.9.0
 	go.uber.org/multierr v1.7.0
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/net v0.0.0-20211123203042-d83791d6bcd9 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
