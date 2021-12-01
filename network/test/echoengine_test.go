@@ -90,7 +90,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateChannel() {
 // TestSingleMessage_Publish tests sending a single message from sender to receiver using
 // the Publish method of Conduit.
 func (suite *EchoEngineTestSuite) TestSingleMessage_Publish() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Publish")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Publish")
 	// set to false for no echo expectation
 	suite.singleMessage(false, suite.Publish)
 }
@@ -98,7 +98,7 @@ func (suite *EchoEngineTestSuite) TestSingleMessage_Publish() {
 // TestSingleMessage_Unicast tests sending a single message from sender to receiver using
 // the Unicast method of Conduit.
 func (suite *EchoEngineTestSuite) TestSingleMessage_Unicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Unicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Unicast")
 	// set to false for no echo expectation
 	suite.singleMessage(false, suite.Unicast)
 }
@@ -106,7 +106,7 @@ func (suite *EchoEngineTestSuite) TestSingleMessage_Unicast() {
 // TestSingleMessage_Multicast tests sending a single message from sender to receiver using
 // the Multicast method of Conduit.
 func (suite *EchoEngineTestSuite) TestSingleMessage_Multicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Multicast")
 	// set to false for no echo expectation
 	suite.singleMessage(false, suite.Multicast)
 }
@@ -115,7 +115,7 @@ func (suite *EchoEngineTestSuite) TestSingleMessage_Multicast() {
 // the Publish method of its Conduit.
 // It also evaluates the correct reception of an echo message back.
 func (suite *EchoEngineTestSuite) TestSingleEcho_Publish() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Publish")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Publish")
 	// set to true for an echo expectation
 	suite.singleMessage(true, suite.Publish)
 }
@@ -124,7 +124,7 @@ func (suite *EchoEngineTestSuite) TestSingleEcho_Publish() {
 // the Unicast method of its Conduit.
 // It also evaluates the correct reception of an echo message back.
 func (suite *EchoEngineTestSuite) TestSingleEcho_Unicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Unicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Unicast")
 	// set to true for an echo expectation
 	suite.singleMessage(true, suite.Unicast)
 }
@@ -133,7 +133,7 @@ func (suite *EchoEngineTestSuite) TestSingleEcho_Unicast() {
 // the Multicast method of its Conduit.
 // It also evaluates the correct reception of an echo message back.
 func (suite *EchoEngineTestSuite) TestSingleEcho_Multicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Multicast")
 	// set to true for an echo expectation
 	suite.singleMessage(true, suite.Multicast)
 }
@@ -142,7 +142,7 @@ func (suite *EchoEngineTestSuite) TestSingleEcho_Multicast() {
 // using the Publish method of its Conduit.
 // Sender and receiver are synced over reception.
 func (suite *EchoEngineTestSuite) TestMultiMsgSync_Publish() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Publish")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Publish")
 	// set to false for no echo expectation
 	suite.multiMessageSync(false, 10, suite.Publish)
 }
@@ -151,7 +151,7 @@ func (suite *EchoEngineTestSuite) TestMultiMsgSync_Publish() {
 // using the Unicast method of its Conduit.
 // Sender and receiver are synced over reception.
 func (suite *EchoEngineTestSuite) TestMultiMsgSync_Unicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Unicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Unicast")
 	// set to false for no echo expectation
 	suite.multiMessageSync(false, 10, suite.Unicast)
 }
@@ -160,7 +160,7 @@ func (suite *EchoEngineTestSuite) TestMultiMsgSync_Unicast() {
 // using the Multicast method of its Conduit.
 // Sender and receiver are synced over reception.
 func (suite *EchoEngineTestSuite) TestMultiMsgSync_Multicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Multicast")
 	// set to false for no echo expectation
 	suite.multiMessageSync(false, 10, suite.Multicast)
 }
@@ -170,7 +170,7 @@ func (suite *EchoEngineTestSuite) TestMultiMsgSync_Multicast() {
 // It also evaluates the correct reception of an echo message back for each send
 // sender and receiver are synced over reception.
 func (suite *EchoEngineTestSuite) TestEchoMultiMsgSync_Publish() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Publish")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Publish")
 	// set to true for an echo expectation
 	suite.multiMessageSync(true, 10, suite.Publish)
 }
@@ -180,7 +180,7 @@ func (suite *EchoEngineTestSuite) TestEchoMultiMsgSync_Publish() {
 // It also evaluates the correct reception of an echo message back for each send
 // sender and receiver are synced over reception.
 func (suite *EchoEngineTestSuite) TestEchoMultiMsgSync_Multicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Multicast")
 	// set to true for an echo expectation
 	suite.multiMessageSync(true, 10, suite.Multicast)
 }
@@ -189,7 +189,7 @@ func (suite *EchoEngineTestSuite) TestEchoMultiMsgSync_Multicast() {
 // using the Publish method of their Conduit.
 // Sender and receiver are not synchronized
 func (suite *EchoEngineTestSuite) TestMultiMsgAsync_Publish() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Publish")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Publish")
 	// set to false for no echo expectation
 	suite.multiMessageAsync(false, 10, suite.Publish)
 }
@@ -198,7 +198,7 @@ func (suite *EchoEngineTestSuite) TestMultiMsgAsync_Publish() {
 // using the Unicast method of their Conduit.
 // Sender and receiver are not synchronized
 func (suite *EchoEngineTestSuite) TestMultiMsgAsync_Unicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Unicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Unicast")
 	// set to false for no echo expectation
 	suite.multiMessageAsync(false, 10, suite.Unicast)
 }
@@ -207,7 +207,7 @@ func (suite *EchoEngineTestSuite) TestMultiMsgAsync_Unicast() {
 // using the Multicast method of their Conduit.
 // Sender and receiver are not synchronized.
 func (suite *EchoEngineTestSuite) TestMultiMsgAsync_Multicast() {
-	suite.skipTest("covered by TestEchoMultiMsgAsync_Multicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestEchoMultiMsgAsync_Multicast")
 	// set to false for no echo expectation
 	suite.multiMessageAsync(false, 10, suite.Multicast)
 }
@@ -243,7 +243,7 @@ func (suite *EchoEngineTestSuite) TestEchoMultiMsgAsync_Multicast() {
 // the received messages over Publish method of nodes' Conduits.
 // Messages are delivered to the receiver in a sequential manner.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Publish() {
-	suite.skipTest("covered by TestDuplicateMessageParallel_Publish")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestDuplicateMessageParallel_Publish")
 	suite.duplicateMessageSequential(suite.Publish)
 }
 
@@ -251,7 +251,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Publish() {
 // the received messages over Unicast method of nodes' Conduits.
 // Messages are delivered to the receiver in a sequential manner.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Unicast() {
-	suite.skipTest("covered by TestDuplicateMessageParallel_Unicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestDuplicateMessageParallel_Unicast")
 	suite.duplicateMessageSequential(suite.Unicast)
 }
 
@@ -259,7 +259,7 @@ func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Unicast() {
 // the received messages over Multicast method of nodes' Conduits.
 // Messages are delivered to the receiver in a sequential manner.
 func (suite *EchoEngineTestSuite) TestDuplicateMessageSequential_Multicast() {
-	suite.skipTest("covered by TestDuplicateMessageParallel_Multicast")
+	unittest.SkipUnless(suite.T(), unittest.TEST_LONG_RUNNING, "covered by TestDuplicateMessageParallel_Multicast")
 	suite.duplicateMessageSequential(suite.Multicast)
 }
 
@@ -687,12 +687,6 @@ func (suite *EchoEngineTestSuite) multiMessageAsync(echo bool, count int, send C
 				assert.Fail(suite.Suite.T(), "receiver failed to send an echo message back to sender")
 			}
 		}
-	}
-}
-
-func (suite *EchoEngineTestSuite) skipTest(reason string) {
-	if testing.Short() {
-		suite.T().Skip(reason)
 	}
 }
 

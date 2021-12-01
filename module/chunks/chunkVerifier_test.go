@@ -3,7 +3,6 @@ package chunks_test
 import (
 	"fmt"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -100,9 +99,7 @@ func (s *ChunkVerifierTestSuite) TestHappyPath() {
 
 // TestMissingRegisterTouchForUpdate tests verification given a chunkdatapack missing a register touch (update)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
-	if os.Getenv("TEST_DEPRECATED") == "" {
-		s.T().Skip("Check new partial ledger for missing keys")
-	}
+	unittest.SkipUnless(s.T(), unittest.TEST_DEPRECATED, "Check new partial ledger for missing keys")
 
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)
@@ -118,9 +115,7 @@ func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForUpdate() {
 
 // TestMissingRegisterTouchForRead tests verification given a chunkdatapack missing a register touch (read)
 func (s *ChunkVerifierTestSuite) TestMissingRegisterTouchForRead() {
-	if os.Getenv("TEST_DEPRECATED") == "" {
-		s.T().Skip("Check new partial ledger for missing keys")
-	}
+	unittest.SkipUnless(s.T(), unittest.TEST_DEPRECATED, "Check new partial ledger for missing keys")
 
 	vch := GetBaselineVerifiableChunk(s.T(), "", false)
 	assert.NotNil(s.T(), vch)

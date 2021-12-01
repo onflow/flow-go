@@ -118,10 +118,8 @@ func (t *testNodeList) networks() []*p2p.Network {
 }
 
 func TestEpochTransitionTestSuite(t *testing.T) {
-	if os.Getenv("TEST_FLAKY") == "" {
-		// Test is flaky, print it in order to avoid the unused linting error
-		t.Skip(fmt.Sprintf("test is flaky: %v", &MutableIdentityTableSuite{}))
-	}
+	// Test is flaky, print it in order to avoid the unused linting error
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, fmt.Sprintf("test is flaky: %v", &MutableIdentityTableSuite{}))
 }
 
 // signalIdentityChanged update IDs for all the current set of nodes (simulating an epoch)

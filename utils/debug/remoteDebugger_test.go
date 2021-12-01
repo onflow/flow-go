@@ -15,7 +15,7 @@ import (
 func TestDebugger_RunTransaction(t *testing.T) {
 
 	// this code is mostly a sample code so we skip by default
-	t.Skip()
+	// t.Skip()
 
 	grpcAddress := "localhost:3600"
 	chain := flow.Emulator.Chain()

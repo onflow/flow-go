@@ -317,10 +317,8 @@ func (suite *MutatorSuite) TestExtend_WithExpiredReferenceBlock() {
 }
 
 func (suite *MutatorSuite) TestExtend_WithReferenceBlockFromClusterChain() {
-	if os.Getenv("TEST_WIP") == "" {
-		// TODO skipping as this isn't implemented yet
-		suite.T().Skip()
-	}
+	// TODO skipping as this isn't implemented yet
+	unittest.SkipUnless(suite.T(), unittest.TEST_WIP, "skipping as this isn't implemented yet")
 
 	block := suite.Block()
 	// set genesis from cluster chain as reference block
