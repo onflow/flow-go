@@ -113,14 +113,14 @@ func executionData(t *testing.T, s *serializer, minSerializedSize uint64) (*Exec
 	}
 }
 
-func getExecutionData(eds *ExecutionDataService, rootCid cid.Cid, timeout time.Duration) (*ExecutionData, error) {
+func getExecutionData(eds ExecutionDataService, rootCid cid.Cid, timeout time.Duration) (*ExecutionData, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
 	return eds.Get(ctx, rootCid)
 }
 
-func addExecutionData(eds *ExecutionDataService, ed *ExecutionData, timeout time.Duration) (cid.Cid, error) {
+func addExecutionData(eds ExecutionDataService, ed *ExecutionData, timeout time.Duration) (cid.Cid, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
@@ -166,7 +166,7 @@ func allKeys(t *testing.T, bs blockstore.Blockstore, timeout time.Duration) []ci
 	}
 }
 
-func executionDataService(bs network.BlobService) *ExecutionDataService {
+func executionDataService(bs network.BlobService) *executionDataServiceImpl {
 	codec := new(cbor.Codec)
 	compressor := compressor.NewLz4Compressor()
 	return NewExecutionDataService(codec, compressor, bs, metrics.NewNoopCollector(), zerolog.Nop())

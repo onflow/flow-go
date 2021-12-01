@@ -23,8 +23,17 @@ const (
 
 var ErrBlobTreeDepthExceeded = errors.New("blob tree depth exceeded")
 
-// ExecutionDataService handles adding and getting execution data from a blobservice
-type ExecutionDataService struct {
+// ExecutionDataService handles adding/getting execution data to/from a blobservice
+type ExecutionDataService interface {
+	// Add constructs a blob tree for the given ExecutionData and
+	// adds it to the blobservice, and then returns the root CID.
+	Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error)
+
+	// Get gets the ExecutionData for the given root CID from the blobservice.
+	Get(ctx context.Context, rootCid cid.Cid) (*ExecutionData, error)
+}
+
+type executionDataServiceImpl struct {
 	serializer  *serializer
 	blobService network.BlobService
 	maxBlobSize int
@@ -38,8 +47,8 @@ func NewExecutionDataService(
 	blobService network.BlobService,
 	metrics module.ExecutionDataServiceMetrics,
 	logger zerolog.Logger,
-) *ExecutionDataService {
-	return &ExecutionDataService{
+) *executionDataServiceImpl {
+	return &executionDataServiceImpl{
 		&serializer{codec, compressor},
 		blobService,
 		defaultMaxBlobSize,
@@ -49,7 +58,7 @@ func NewExecutionDataService(
 }
 
 // receiveBatch receives a batch of blobs from the given BlobReceiver, and returns them as a slice
-func (s *ExecutionDataService) receiveBatch(br *blobs.BlobReceiver) ([]blobs.Blob, error) {
+func (s *executionDataServiceImpl) receiveBatch(br *blobs.BlobReceiver) ([]blobs.Blob, error) {
 	var batch []blobs.Blob
 	var err error
 
@@ -69,7 +78,7 @@ func (s *ExecutionDataService) receiveBatch(br *blobs.BlobReceiver) ([]blobs.Blo
 }
 
 // storeBlobs receives blobs from the given BlobReceiver, and stores them to the blobservice
-func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.BlobReceiver, logger zerolog.Logger) ([]cid.Cid, error) {
+func (s *executionDataServiceImpl) storeBlobs(parent context.Context, br *blobs.BlobReceiver, logger zerolog.Logger) ([]cid.Cid, error) {
 	defer br.Close()
 
 	ctx, cancel := context.WithCancel(parent)
@@ -114,7 +123,7 @@ func (s *ExecutionDataService) storeBlobs(parent context.Context, br *blobs.Blob
 //
 // blobs are added in a batched streaming fashion, using a separate goroutine to serialize the object and send the
 // blobs of serialized data over a blob channel to the main routine, which adds them in batches to the blobservice.
-func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}, logger zerolog.Logger) ([]cid.Cid, error) {
+func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}, logger zerolog.Logger) ([]cid.Cid, error) {
 	bcw, br := blobs.IncomingBlobChannel(s.maxBlobSize)
 
 	done := make(chan struct{})
@@ -156,7 +165,7 @@ func (s *ExecutionDataService) addBlobs(ctx context.Context, v interface{}, logg
 }
 
 // Add constructs a blob tree for the given ExecutionData and adds it to the blobservice, and then returns the root CID.
-func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error) {
+func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error) {
 	logger := s.logger.With().Str("block_id", sd.BlockID.String()).Logger()
 	logger.Debug().Msg("adding execution data")
 
@@ -200,7 +209,7 @@ func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.
 
 // retrieveBlobs retrieves the blobs for the given CIDs from the blobservice, and sends them to the given BlobSender
 // in the order specified by the CIDs.
-func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *blobs.BlobSender, cids []cid.Cid, logger zerolog.Logger) error {
+func (s *executionDataServiceImpl) retrieveBlobs(parent context.Context, bs *blobs.BlobSender, cids []cid.Cid, logger zerolog.Logger) error {
 	defer bs.Close()
 
 	ctx, cancel := context.WithCancel(parent)
@@ -251,7 +260,7 @@ func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *blobs.B
 
 // findBlob retrieves blobs from the given channel, caching them along the way, until it either
 // finds the target blob or exhausts the channel.
-func (s *ExecutionDataService) findBlob(
+func (s *executionDataServiceImpl) findBlob(
 	blobChan <-chan blobs.Blob,
 	target cid.Cid,
 	cache map[cid.Cid]blobs.Blob,
@@ -287,7 +296,7 @@ func (s *ExecutionDataService) findBlob(
 //
 // blobs are fetched from the blobservice and sent over a blob channel as they arrive, to a separate goroutine, which performs the
 // deserialization in a streaming fashion.
-func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid, logger zerolog.Logger) (interface{}, error) {
+func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid, logger zerolog.Logger) (interface{}, error) {
 	bcr, bs := blobs.OutgoingBlobChannel()
 
 	done := make(chan struct{})
@@ -326,7 +335,7 @@ func (s *ExecutionDataService) getBlobs(ctx context.Context, cids []cid.Cid, log
 }
 
 // Get gets the ExecutionData for the given root CID from the blobservice.
-func (s *ExecutionDataService) Get(ctx context.Context, rootCid cid.Cid) (*ExecutionData, error) {
+func (s *executionDataServiceImpl) Get(ctx context.Context, rootCid cid.Cid) (*ExecutionData, error) {
 	logger := s.logger.With().Str("cid", rootCid.String()).Logger()
 	logger.Debug().Msg("getting execution data")
 
