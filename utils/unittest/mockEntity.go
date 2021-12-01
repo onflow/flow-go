@@ -18,7 +18,7 @@ func (m MockEntity) Checksum() flow.Identifier {
 }
 
 func EntityListFixture(n uint) []*MockEntity {
-	list := make([]*MockEntity, n)
+	list := make([]*MockEntity, 0, n)
 
 	for i := uint(0); i < n; i++ {
 		list = append(list, &MockEntity{

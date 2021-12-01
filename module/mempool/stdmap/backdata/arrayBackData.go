@@ -44,8 +44,12 @@ type ArrayBackData struct {
 func NewArrayBackData(limit uint32, oversizeFactor uint32, mode EjectionMode) ArrayBackData {
 	// total buckets
 	bucketNum := uint64(limit*oversizeFactor) / bucketSize
+	if bucketNum == uint64(0) {
+		bucketNum = uint64(1)
+	}
 
 	bd := ArrayBackData{
+		bucketNum:    bucketNum,
 		limit:        uint64(limit),
 		overLimit:    uint64(limit * oversizeFactor),
 		buckets:      make([]keyBucket, bucketNum),
@@ -63,7 +67,7 @@ func (a *ArrayBackData) Has(entityID flow.Identifier) bool {
 
 // Add adds the given item to the pool.
 func (a *ArrayBackData) Add(entityID flow.Identifier, entity flow.Entity) bool {
-	return false
+	return a.add(entityID, entity)
 }
 
 // Rem will remove the item with the given hash.
@@ -83,8 +87,8 @@ func (a *ArrayBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 }
 
 // Size will return the size of the backend.
-func (a *ArrayBackData) Size() uint {
-	return uint(0)
+func (a ArrayBackData) Size() uint {
+	return uint(a.keyCount)
 }
 
 // All returns all entities from the pool.
