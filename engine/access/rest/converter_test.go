@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/rs/zerolog"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/assert"
 )
 
 func linkFixture() LinkGenerator {
@@ -53,7 +54,7 @@ func TestTransactions(t *testing.T) {
 		   }
 		}`, tx.ID().String(), tx.ReferenceBlockID.String(), tx.ID().String(), tx.ID().String())
 
-		assert.JSONEq(t, expected, fmt.Sprintf("%s", res))
+		assert.JSONEq(t, expected, string(res))
 	})
 
 	t.Run("response expands", func(t *testing.T) {

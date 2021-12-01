@@ -48,7 +48,7 @@ func (generator *LinkGeneratorImpl) TransactionResultLink(id flow.Identifier) (s
 }
 
 func (generator *LinkGeneratorImpl) CollectionLink(id flow.Identifier) (string, error) {
-	return generator.link(getCollectionByIDRoute, id)
+	return generator.linkForID(getCollectionByIDRoute, id)
 }
 
 func (generator *LinkGeneratorImpl) AccountLink(address string) (string, error) {

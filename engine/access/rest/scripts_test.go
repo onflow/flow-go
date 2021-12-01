@@ -44,7 +44,7 @@ func TestScripts(t *testing.T) {
 	})
 
 	t.Run("get by Latest height", func(t *testing.T) {
-		req, _ := http.NewRequest("POST", scriptsURL("", "latest"), bytes.NewBuffer(validBody))
+		req, _ := http.NewRequest("POST", scriptsURL("", sealedHeightQueryParam), bytes.NewBuffer(validBody))
 
 		backend.Mock.
 			On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}).
