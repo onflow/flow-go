@@ -174,6 +174,14 @@ func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.
 	var blobTreeNodes int
 
 	for {
+		cidArr := zerolog.Arr()
+
+		for _, cid := range cids {
+			cidArr.Str(cid.String())
+		}
+
+		logger.Debug().Array("cids", cidArr).Msg("added blobs")
+
 		blobTreeNodes += len(cids)
 
 		if len(cids) == 1 {
@@ -191,6 +199,7 @@ func (s *ExecutionDataService) Add(ctx context.Context, sd *ExecutionData) (cid.
 }
 
 // retrieveBlobs retrieves the blobs for the given CIDs from the blobservice, and sends them to the given BlobSender
+// in the order specified by the CIDs.
 func (s *ExecutionDataService) retrieveBlobs(parent context.Context, bs *blobs.BlobSender, cids []cid.Cid, logger zerolog.Logger) error {
 	defer bs.Close()
 
