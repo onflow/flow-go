@@ -17,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func scriptReq(id string, height string, body map[string]interface{}) *http.Request {
+func scriptReq(id string, height string, body interface{}) *http.Request {
 	u, _ := url.ParseRequestURI("/v1/scripts")
 	q := u.Query()
 
