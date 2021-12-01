@@ -13,7 +13,7 @@ func (m MockEntity) ID() flow.Identifier {
 	return m.id
 }
 
-func (m MockEntity) CheckSum() flow.Identifier {
+func (m MockEntity) Checksum() flow.Identifier {
 	return m.id
 }
 
