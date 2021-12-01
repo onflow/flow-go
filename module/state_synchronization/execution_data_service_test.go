@@ -405,7 +405,7 @@ func TestGetIncompleteData(t *testing.T) {
 }
 
 func createBlobService(ctx irrecoverable.SignalerContext, t *testing.T, ds datastore.Batching, name string, dhtOpts ...dht.Option) (network.BlobService, host.Host) {
-	h, err := libp2p.New(ctx)
+	h, err := libp2p.New()
 	require.NoError(t, err)
 
 	cr, err := dht.New(ctx, h, dhtOpts...)
@@ -481,7 +481,7 @@ func TestReprovider(t *testing.T) {
 	rootCid, err := addExecutionData(mockEds, expected, time.Second)
 	require.NoError(t, err)
 
-	h1, err := libp2p.New(ctx)
+	h1, err := libp2p.New()
 	require.NoError(t, err)
 	cr1, err := dht.New(ctx, h1, dht.Mode(dht.ModeServer))
 	require.NoError(t, err)
