@@ -70,6 +70,11 @@ type namedModuleFunc struct {
 	name string
 }
 
+type namedComponentFunc struct {
+	fn   ReadyDoneFactory
+	name string
+}
+
 // FlowNodeBuilder is the default builder struct used for all flow nodes
 // It runs a node process with following structure, in sequential order
 // Base inits (network, storage, state, logger)
@@ -83,6 +88,7 @@ type FlowNodeBuilder struct {
 	*NodeConfig
 	flags                    *pflag.FlagSet
 	modules                  []namedModuleFunc
+	components               []namedComponentFunc
 	preInitFns               []BuilderFunc
 	postInitFns              []BuilderFunc
 	extraFlagCheck           func() error
@@ -366,6 +372,8 @@ func (fnb *FlowNodeBuilder) initLogger() {
 	if err != nil {
 		log.Fatal().Err(err).Msg("invalid log level")
 	}
+	// loglevel is set to debug, then overridden by SetGlobalLevel. this allows admin commands to
+	// modify the level during runtime
 	log = log.Level(zerolog.DebugLevel)
 	zerolog.SetGlobalLevel(lvl)
 
@@ -417,7 +425,6 @@ func (fnb *FlowNodeBuilder) initMetrics() {
 	}
 }
 
-// TODO: should this be added in Initialize()?
 func (fnb *FlowNodeBuilder) initProfiler() {
 	if !fnb.BaseConfig.profilerEnabled {
 		return
@@ -737,6 +744,95 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	return nil
 }
 
+// handleComponents executes each component's factory method to instantiate all of the dependencies,
+// then registers the component with the ComponentManager to be started when the node starts.
+// It uses channel signals to ensure that the components are started serially.
+func (fnb *FlowNodeBuilder) handleComponents() error {
+	// the parent/started channels are used to enforce serial startup.
+	// - parent is the started channel of the previous component.
+	// - when a component is ready, it closes its started channel by calling the provided callback.
+	// components wait for their parent channel to close before starting, this ensures they start
+	// up serially, even though the ComponentManager will launch the goroutines in parallel.
+
+	// the first component is always started immediately
+	parent := make(chan struct{})
+	close(parent)
+
+	// run all components
+	for _, f := range fnb.components {
+		started := make(chan struct{})
+		err := fnb.handleComponent(f, parent, func() { close(started) })
+		if err != nil {
+			return err
+		}
+		parent = started
+	}
+	return nil
+}
+
+// handleComponent constructs a component using the provided ReadyDoneFactory, and registers a
+// worker with the ComponentManager to be run when the node is started.
+//
+// The ComponentManager starts all workers in parallel. Since some components have non-idempotent
+// ReadyDoneAware interfaces, we need to ensure that they are started serially. This is accomplished
+// using the parent channel and the started closure. Components wait for the parent channel to close
+// before starting, and then call the started function after they are ready(). The started function
+// closes the parent channel of the next component, and so on.
+//
+// TODO: Instead of this serial startup, components should wait for their depenedencies to be ready
+// using their ReadyDoneAware interface. After components are updated to use the idempotent
+// ReadyDoneAware interface and explicilty wait for their dependencies to be ready, we can remove
+// this channel chaining.
+func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parent <-chan struct{}, started func()) error {
+	log := fnb.Logger.With().Str("component", v.name).Logger()
+
+	// First, run the factory so all objects are instantiated. This will always be done serially
+	// to ensure dependencies are not nil when the next component factory is called.
+	readyAware, err := v.fn(fnb.NodeConfig)
+	if err != nil {
+		return fmt.Errorf("component %s initialization failed: %w", v.name, err)
+	}
+	log.Info().Msg("component initialization complete")
+
+	// Next, add a closure that starts the component when the node is started, and then waits for it
+	// to exit gracefully.
+	// Startup for all components will happen in parallel, and components can use their dependencies'
+	// ReadyDoneAware interface to wait until they are ready.
+	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// wait for the previous component to be ready before starting
+		if err := util.WaitClosed(ctx, parent); err != nil {
+			return
+		}
+
+		// if this is a component, use the Startable interface.
+		if component, ok := readyAware.(component.Component); ok {
+			go component.Start(ctx)
+		}
+
+		// Wait until the component is ready
+		if err := util.WaitClosed(ctx, readyAware.Ready()); err != nil {
+			// The context was cancelled. Continue to on to shutdown logic.
+			log.Info().Msg("component startup aborted")
+		} else {
+			log.Info().Msg("component startup complete")
+			ready()
+
+			// Signal to the next component that we're ready.
+			started()
+		}
+
+		// Component shutdown is signaled by cancelling its context.
+		<-ctx.Done()
+		log.Info().Msg("component shutdown started")
+
+		// Finally, wait until component has finished shutting down.
+		<-readyAware.Done()
+		log.Info().Msg("component shutdown complete")
+	})
+
+	return nil
+}
+
 // ExtraFlags enables binding additional flags beyond those defined in BaseConfig.
 func (fnb *FlowNodeBuilder) ExtraFlags(f func(*pflag.FlagSet)) NodeBuilder {
 	f(fnb.flags)
@@ -769,88 +865,16 @@ func (fnb *FlowNodeBuilder) MustNot(err error) *zerolog.Event {
 }
 
 // Component adds a new component to the node that conforms to the ReadyDoneAware
-// interface, and throws a Fatal() when an irrecoverable error is encountered
-// Use Component if the component cannot be restarted when an irrecoverable error is encountered
-// and the node should crash.
+// interface.
 //
-// When the node is run, this component will be started with `Ready`. When the
-// node is stopped, we will wait for the component to exit gracefully with
-// `Done`.
-func (fnb *FlowNodeBuilder) Component(name string, f ComponentBuilderFunc) NodeBuilder {
-	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		log := fnb.Logger.With().Str("component", name).Logger()
-
-		readyAware, err := f(fnb.NodeConfig)
-		if err != nil {
-			ctx.Throw(fmt.Errorf("component %s initialization failed: %w", name, err))
-		}
-		log.Info().Msg("component initialization complete")
-
-		// TODO: switch to using RunComponent after we've refactored each of the ReadyDoneAware
-		//       objects to implement component.Component
-		if component, ok := readyAware.(component.Component); ok {
-			go component.Start(ctx)
-		}
-
-		if err := util.WaitClosed(ctx, readyAware.Ready()); err != nil {
-			log.Info().Msg("component startup aborted")
-		} else {
-			log.Info().Msg("component startup complete")
-			ready()
-		}
-
-		<-ctx.Done()
-		log.Info().Msg("component shutdown started")
-
-		<-readyAware.Done()
-		log.Info().Msg("component shutdown complete")
+// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
+// In both cases, the object is started when the node is run, and the node will wait for the
+// component to exit gracefully.
+func (fnb *FlowNodeBuilder) Component(name string, f ReadyDoneFactory) NodeBuilder {
+	fnb.components = append(fnb.components, namedComponentFunc{
+		fn:   f,
+		name: name,
 	})
-
-	return fnb
-}
-
-// BackgroundComponent adds a new component to the node that conforms to the ReadyDoneAware
-// interface, and calls the provided error handler when an irrecoverable error is encountered.
-// Use BackgroundComponent if the component is not critical to the node's safe operation and
-// can/should be independently restarted when an irrecoverable error is encountered.
-//
-// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-func (fnb *FlowNodeBuilder) BackgroundComponent(name string, f BackgroundComponentBuilderFunc, errHandler component.OnError) NodeBuilder {
-	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		log := fnb.Logger.With().Str("component", name).Logger()
-
-		componentFactory := func() (component.Component, error) {
-			c, err := f(fnb.NodeConfig)
-			if err != nil {
-				return nil, err
-			}
-			log.Info().Msg("component initialization complete")
-
-			go func() {
-				if err := util.WaitClosed(ctx, c.Ready()); err != nil {
-					log.Info().Msg("component startup aborted")
-				} else {
-					log.Info().Msg("component startup complete")
-				}
-
-				<-ctx.Done()
-				log.Info().Msg("component shutdown started")
-			}()
-			return c, nil
-		}
-
-		// Note: we're marking the worker routine as ready before we even attempt to start the
-		// component. the idea behind a background component is that the system as a whole should
-		// not depend on it for safe operation, so the node does not need to wait for it to be ready.
-		ready()
-		err := component.RunComponent(ctx, componentFactory, errHandler)
-		if err != nil && err != ctx.Err() {
-			ctx.Throw(fmt.Errorf("component %s shutdown unexpectedly: %w", name, err))
-		}
-
-		log.Info().Msg("component shutdown complete")
-	})
-
 	return fnb
 }
 
@@ -943,8 +967,6 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 		return err
 	}
 
-	fnb.InitComponentBuilder()
-
 	// ID providers must be initialized before the network
 	fnb.InitIDProviders()
 
@@ -976,40 +998,25 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	})
 }
 
-func (fnb *FlowNodeBuilder) InitComponentBuilder() {
-	fnb.componentBuilder = component.NewComponentManagerBuilder().
-		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			fnb.onStart(ctx)
+func (fnb *FlowNodeBuilder) Build() (Node, error) {
+	// Initialize the builder so components can be added as workers
+	fnb.componentBuilder = component.NewComponentManagerBuilder()
 
-			// run all modules
-			for _, f := range fnb.modules {
-				if err := fnb.handleModule(f); err != nil {
-					ctx.Throw(err)
-				}
-			}
-			ready()
-		})
-}
-
-// SerialStart configures the node to start components serially
-// Ideally, components should have explicit dependency checks to handle startup ordering. This is
-// here to ensure the existing assumption that components are started in order serially remains
-// true until we've fully transitioned to explicit dependency checks
-func (fnb *FlowNodeBuilder) SerialStart() NodeBuilder {
-	fnb.componentBuilder.SetSerialStart(true)
-	return fnb
-}
-
-func (fnb *FlowNodeBuilder) Build() Node {
-	return &FlowNodeImp{
-		ComponentManager: fnb.componentBuilder.Build(),
-		NodeConfig:       fnb.NodeConfig,
-		Logger:           fnb.Logger,
-		postShutdown:     fnb.postShutdown,
+	// Run the prestart initialization. This includes anything that should be done before
+	// starting the components.
+	if err := fnb.onStart(); err != nil {
+		return nil, err
 	}
+
+	return NewNode(
+		fnb.componentBuilder.Build(),
+		fnb.NodeConfig,
+		fnb.Logger,
+		fnb.postShutdown,
+	), nil
 }
 
-func (fnb *FlowNodeBuilder) onStart(ctx irrecoverable.SignalerContext) {
+func (fnb *FlowNodeBuilder) onStart() error {
 
 	// seed random generator
 	rand.Seed(time.Now().UnixNano())
@@ -1032,7 +1039,7 @@ func (fnb *FlowNodeBuilder) onStart(ctx irrecoverable.SignalerContext) {
 
 	for _, f := range fnb.preInitFns {
 		if err := fnb.handlePreInit(f); err != nil {
-			ctx.Throw(err)
+			return err
 		}
 	}
 
@@ -1042,7 +1049,7 @@ func (fnb *FlowNodeBuilder) onStart(ctx irrecoverable.SignalerContext) {
 
 	for _, f := range fnb.postInitFns {
 		if err := fnb.handlePostInit(f); err != nil {
-			ctx.Throw(err)
+			return err
 		}
 	}
 
@@ -1052,10 +1059,26 @@ func (fnb *FlowNodeBuilder) onStart(ctx irrecoverable.SignalerContext) {
 		fnb.adminCommandBootstrapper.RegisterHandler(commandName, command.Handler)
 		fnb.adminCommandBootstrapper.RegisterValidator(commandName, command.Validator)
 	}
+
+	// run all modules
+	for _, f := range fnb.modules {
+		if err := fnb.handleModule(f); err != nil {
+			return err
+		}
+	}
+
+	// run all components
+	return fnb.handleComponents()
 }
 
-func (fnb *FlowNodeBuilder) postShutdown() {
-	fnb.closeDatabase()
+// postShutdown is called by the node before exiting
+// put any cleanup code here that should be run after all components have stopped
+func (fnb *FlowNodeBuilder) postShutdown() error {
+	err := fnb.closeDatabase()
+	if err != nil {
+		return fmt.Errorf("could not close database: %w", err)
+	}
+	return nil
 }
 
 func (fnb *FlowNodeBuilder) handlePreInit(f BuilderFunc) error {
@@ -1066,13 +1089,8 @@ func (fnb *FlowNodeBuilder) handlePostInit(f BuilderFunc) error {
 	return f(fnb.NodeConfig)
 }
 
-func (fnb *FlowNodeBuilder) closeDatabase() {
-	err := fnb.DB.Close()
-	if err != nil {
-		fnb.Logger.Error().
-			Err(err).
-			Msg("could not close database")
-	}
+func (fnb *FlowNodeBuilder) closeDatabase() error {
+	return fnb.DB.Close()
 }
 
 func (fnb *FlowNodeBuilder) extraFlagsValidation() error {

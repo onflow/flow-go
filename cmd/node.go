@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/signal"
 	"syscall"
@@ -25,53 +24,108 @@ type Node interface {
 	Run()
 }
 
+// FlowNodeImp is created by the FlowNodeBuilder with all components ready to be started.
+// The Run function starts all the components, and is blocked until either a termination
+// signal is received or a irrecoverable error is encountered.
 type FlowNodeImp struct {
-	*component.ComponentManager
+	component.Component
 	*NodeConfig
-	Logger       zerolog.Logger
-	postShutdown func()
+	logger       zerolog.Logger
+	postShutdown func() error
+	fatalHandler func(error, zerolog.Logger)
 }
 
-// Run calls Start() to start all the node modules and components. It also sets up a channel to gracefully shut
-// down each component if a SIGINT is received. Until a SIGINT is received, Run will block.
-// Since, Run is a blocking call it should only be used when running a node as it's own independent process.
-// Any unhandled irrecoverable errors thrown in child components will propagate up to here and result in a fatal
-// error
-func (node *FlowNodeImp) Run() {
-	ctx, cancel := context.WithCancel(context.Background())
-	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go node.Start(signalerCtx)
+// NewNode returns a new node instance
+func NewNode(manager *component.ComponentManager, cfg *NodeConfig, logger zerolog.Logger, f func() error) Node {
+	return &FlowNodeImp{
+		Component:    manager,
+		NodeConfig:   cfg,
+		logger:       logger,
+		postShutdown: f,
+		fatalHandler: handleFatal,
+	}
+}
 
+// Run starts all the node's components, then blocks until a SIGINT or SIGTERM is received, at
+// which point it gracefully shuts down.
+// Any unhandled irrecoverable errors thrown in child components will propagate up to here and
+// result in a fatal error.
+func (node *FlowNodeImp) Run() {
+	// Block until node is shutting down
+	err := node.run()
+
+	// Any error received is considered fatal.
+	if err != nil {
+		node.fatalHandler(err, node.logger)
+		return
+	}
+
+	// Run post shutdown cleanup logic
+	err = node.postShutdown()
+
+	// Since this occurs after all components have stopped, it is not considered fatal
+	if err != nil {
+		node.logger.Error().Err(err).Msg("error encountered during shutdown cleanup")
+	}
+
+	node.logger.Info().Msgf("%s node shutdown complete", node.BaseConfig.NodeRole)
+}
+
+func (node *FlowNodeImp) run() error {
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// 1: Start up
+	// Components will pass unhandled irrecoverable errors to this channel via signalerCtx (or a
+	// child context). Any errors received on this channel should halt the node.
+	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
+
+	// Start all the components
+	node.Start(signalerCtx)
+
+	// Log when all components have been started
 	go func() {
 		select {
 		case <-node.Ready():
-			node.Logger.Info().Msgf("%s node startup complete", node.BaseConfig.NodeRole)
+			node.logger.Info().Msgf("%s node startup complete", node.BaseConfig.NodeRole)
 		case <-ctx.Done():
 		}
 	}()
 
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt, syscall.SIGTERM)
+	// 2: Run the node
+	// This context will be marked done when SIGINT/SIGTERM is received.
+	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
 
-	// block till a SIGINT is received or a fatal error is encountered
-	sigCtx, _ := util.WithSignal(ctx, signalChan)
-	if err := util.WaitError(sigCtx, errChan); err != nil {
-		node.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
+	// Block here until either a signal or irrecoverable error is received.
+	err := util.WaitError(sigCtx, errChan)
+
+	// Stop relaying signals. Subsequent signals will be handled by the OS and will abort the
+	// process.
+	stop()
+
+	// If an irrecoverable error was received, abort
+	if err != nil {
+		return err
 	}
 
-	node.Logger.Info().Msgf("%s node shutting down", node.BaseConfig.NodeRole)
+	// Send shutdown signal to components
+	node.logger.Info().Msgf("%s node shutting down", node.BaseConfig.NodeRole)
 	cancel()
 
-	sigCtx, _ = util.WithSignal(context.Background(), signalChan)
-	doneCtx, _ := util.WithDone(sigCtx, node.Done())
-	if err := util.WaitError(doneCtx, errChan); err != nil {
-		node.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error during shutdown")
-	} else if errors.Is(sigCtx.Err(), util.ErrSignalReceived) {
-		node.Logger.Fatal().Msg("node shutdown aborted")
+	// 3: Shut down
+	// This context will be marked done when all components have stopped
+	doneCtx, _ := util.WithDone(context.Background(), node.Done())
+
+	// Block here until all components have stopped or an irrecoverable error is received.
+	err = util.WaitError(doneCtx, errChan)
+	if err != nil {
+		return err
 	}
 
-	node.postShutdown()
+	return nil
+}
 
-	node.Logger.Info().Msgf("%s node shutdown complete", node.BaseConfig.NodeRole)
-	os.Exit(0)
+// handleFatal handles irrecoverable errors by logging them and exiting the process.
+// This allows for easier testing and is not intended to be overriden in production.
+func handleFatal(err error, logger zerolog.Logger) {
+	logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
 }

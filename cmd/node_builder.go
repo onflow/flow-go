@@ -16,7 +16,6 @@ import (
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
@@ -28,8 +27,7 @@ import (
 const NotSet = "not set"
 
 type BuilderFunc func(nodeConfig *NodeConfig) error
-type ComponentBuilderFunc func(node *NodeConfig) (module.ReadyDoneAware, error)
-type BackgroundComponentBuilderFunc func(node *NodeConfig) (component.Component, error)
+type ReadyDoneFactory func(node *NodeConfig) (module.ReadyDoneAware, error)
 
 // NodeBuilder declares the initialization methods needed to bootstrap up a Flow node
 type NodeBuilder interface {
@@ -64,22 +62,12 @@ type NodeBuilder interface {
 	Module(name string, f BuilderFunc) NodeBuilder
 
 	// Component adds a new component to the node that conforms to the ReadyDoneAware
-	// interface, and throws a Fatal() when an irrecoverable error is encountered
-	// Use Component if the component cannot be restarted when an irrecoverable error is encountered
-	// and the node should crash.
+	// interface, and throws a Fatal() when an irrecoverable error is encountered.
 	//
-	// When the node is run, this component will be started with `Ready`. When the
-	// node is stopped, we will wait for the component to exit gracefully with
-	// `Done`.
-	Component(name string, f ComponentBuilderFunc) NodeBuilder
-
-	// BackgroundComponent adds a new component to the node that conforms to the ReadyDoneAware
-	// interface, and calls the provided error handler when an irrecoverable error is encountered.
-	// Use BackgroundComponent if the component is not critical to the node's safe operation and
-	// can/should be independently restarted when an irrecoverable error is encountered.
-	//
-	// Any irrecoverable errors thrown by the component will be passed to the provided error handler.
-	BackgroundComponent(name string, f BackgroundComponentBuilderFunc, errHandler component.OnError) NodeBuilder
+	// The ReadyDoneFactory may return either a `Component` or `ReadyDoneAware` instance.
+	// In both cases, the object is started according to its interface when the node is run,
+	// and the node will wait for the component to exit gracefully.
+	Component(name string, f ReadyDoneFactory) NodeBuilder
 
 	// AdminCommand registers a new admin command with the admin server
 	AdminCommand(command string, f func(config *NodeConfig) commands.AdminCommand) NodeBuilder
@@ -89,14 +77,9 @@ type NodeBuilder interface {
 	// If the error is not nil, returns a fatal log event containing the error.
 	MustNot(err error) *zerolog.Event
 
-	// SerialStart configures the node to start components serially
-	// By default, components are started in parallel and must have explicit dependency checks.
-	// This allows using the order components were added to manage dependencies implicitly
-	SerialStart() NodeBuilder
-
 	// Build finalizes the node configuration in preparation for start and returns a Node
 	// object that can be run
-	Build() Node
+	Build() (Node, error)
 
 	// PreInit registers a new PreInit function.
 	// PreInit functions run before the protocol state is initialized or any other modules or components are initialized

@@ -758,10 +758,13 @@ func main() {
 			node.ProtocolEvents.AddConsumer(reactorEngine)
 
 			return reactorEngine, nil
-		}).
-		SerialStart().
-		Build().
-		Run()
+		})
+
+	node, err := nodeBuilder.Build()
+	if err != nil {
+		nodeBuilder.Logger.Fatal().Err(err).Send()
+	}
+	node.Run()
 }
 
 func loadBeaconPrivateKey(dir string, myID flow.Identifier) (*encodable.RandomBeaconPrivKey, error) {

@@ -177,7 +177,7 @@ func (suite *MeshEngineTestSuite) allToAllScenario(send ConduitSendWrapperFunc) 
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
 		case <-suite.obs:
-		case <-time.After(2 * time.Second):
+		case <-time.After(8 * time.Second):
 			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
 		}
 	}
@@ -316,7 +316,7 @@ func (suite *MeshEngineTestSuite) messageSizeScenario(send ConduitSendWrapperFun
 	for i := 0; i < pubsub.GossipSubD*count; i++ {
 		select {
 		case <-suite.obs:
-		case <-time.After(2 * time.Second):
+		case <-time.After(8 * time.Second):
 			assert.FailNow(suite.T(), "could not receive pubsub tag indicating mesh formed")
 		}
 	}
