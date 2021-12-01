@@ -87,7 +87,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 
 		<-node.Ready()
 
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
 
 		<-finished
 

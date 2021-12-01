@@ -805,7 +805,8 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parent <-chan 
 		}
 
 		// if this is a component, use the Startable interface.
-		if component, ok := readyAware.(component.Component); ok {
+		var isComponent bool
+		if component, isComponent := readyAware.(component.Component); isComponent {
 			go component.Start(ctx)
 		}
 
@@ -813,6 +814,12 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parent <-chan 
 		if err := util.WaitClosed(ctx, readyAware.Ready()); err != nil {
 			// The context was cancelled. Continue to on to shutdown logic.
 			log.Info().Msg("component startup aborted")
+
+			// Non-idempotent ReadyDoneAware components trigger shutdown by calling Done(). Don't
+			// do that here since it may not be safe if the component is not Ready().
+			if !isComponent {
+				return
+			}
 		} else {
 			log.Info().Msg("component startup complete")
 			ready()

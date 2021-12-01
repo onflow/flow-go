@@ -73,8 +73,8 @@ type testComponent struct {
 }
 
 func (n *testComponent) Start(ctx irrecoverable.SignalerContext) {
+	defer close(n.started)
 	n.startFn(ctx, n.name)
-	close(n.started)
 }
 
 func (n *testComponent) Ready() <-chan struct{} {
@@ -105,7 +105,7 @@ func TestComponentsRunSerially(t *testing.T) {
 		return done
 	}
 	startFn := func(ctx irrecoverable.SignalerContext, name string) {
-		// add delay to ensure components are run in the right order
+		// add delay to test components are run serially
 		time.Sleep(100 * time.Millisecond)
 		logs = append(logs, fmt.Sprintf("%s started", name))
 	}

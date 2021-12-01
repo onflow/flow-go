@@ -210,11 +210,11 @@ func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 	// Start the consensus follower with an irrecoverable signaler context. The returned error channel
 	// will receive irrecoverable errors thrown by the consensus follower or any of its child components.
 	// This makes it possible to listen for irrecoverable errors and restart the consensus follower. In
-	// default implementation, a fatal error is thrown.
+	// the default implementation, a fatal error is thrown.
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 	cf.Start(signalerCtx)
 
-	// log when the follower has complete startup and is beginning to shut down
+	// log when the follower has complete startup and when it's beginning to shut down
 	go func() {
 		if err := util.WaitClosed(ctx, cf.Ready()); err != nil {
 			return

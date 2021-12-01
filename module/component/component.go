@@ -148,7 +148,7 @@ func NewComponentManagerBuilder() ComponentManagerBuilder {
 	return &componentManagerBuilderImpl{}
 }
 
-// Add worker adds ComponentWorker closure to the ComponentManagerBuilder
+// AddWorker adds a ComponentWorker closure to the ComponentManagerBuilder
 // All worker functions will be run in parallel when the ComponentManager is started.
 // Note: AddWorker is not concurrency-safe, and should only be called on an individual builder
 // within a single goroutine.
@@ -178,12 +178,12 @@ var _ Component = (*ComponentManager)(nil)
 //
 // Since component manager implements the Component interface, its Ready() and Done() methods are
 // idempotent, and can be called immediately after instantiation. The Ready() channel is closed when
-// all worker functions have called their ReadyFunc, and its Done() channel is closed after all workers
+// all worker functions have called their ReadyFunc, and its Done() channel is closed after all worker
 // functions have returned.
 //
 // Shutdown is signalled by cancelling the irrecoverable.SignalerContext passed to Start(). This context
 // is also used by workers to communicate irrecoverable errors. All irrecoverable errors are considered
-// fatal an are propagated to the caller of Start() via the context's Throw method.
+// fatal and are propagated to the caller of Start() via the context's Throw method.
 type ComponentManager struct {
 	started        *atomic.Bool
 	ready          chan struct{}
