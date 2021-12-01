@@ -35,13 +35,23 @@ func executeRequest(req *http.Request, backend *mock.API) *httptest.ResponseReco
 }
 
 func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
-	rr := executeRequest(req, backend)
-	require.Equal(t, http.StatusOK, rr.Code)
-	require.JSONEq(t, expectedRespBody, rr.Body.String())
+	assertResponse(t, req, http.StatusOK, expectedRespBody, backend)
 }
 
-func collectionURL(param string) string {
-	return fmt.Sprintf("/v1/collections/%s", param)
+func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {
+	rr := executeRequest(req, backend)
+	require.Equal(t, status, rr.Code)
+	require.JSONEq(t, expectedRespBody, rr.Body.String(), fmt.Sprintf("failed for req: %s", req.URL))
+}
+
+func getCollectionReq(id flow.Identifier, expandTransactions bool) *http.Request {
+	url := fmt.Sprintf("/v1/collections/%s", id)
+	if expandTransactions {
+		url = fmt.Sprintf("%s?expand=transactions", url)
+	}
+
+	req, _ := http.NewRequest("GET", url, nil)
+	return req
 }
 
 func TestGetCollections(t *testing.T) {
@@ -55,13 +65,9 @@ func TestGetCollections(t *testing.T) {
 		}
 
 		for _, col := range inputs {
-			req, _ := http.NewRequest("GET", collectionURL(col.ID().String()), nil)
-
 			backend.Mock.
 				On("GetCollectionByID", mocks.Anything, col.ID()).
 				Return(&col, nil)
-
-			rr := executeRequest(req, backend)
 
 			txs := make([]generated.Transaction, len(col.Transactions))
 			for i, tx := range col.Transactions {
@@ -77,26 +83,13 @@ func TestGetCollections(t *testing.T) {
 				}
 			}`, col.ID().String(), bx, col.ID())
 
-			assert.Equal(t, http.StatusOK, rr.Code)
-			assert.JSONEq(t, expected, rr.Body.String())
+			req := getCollectionReq(col.ID(), false)
+			assertOKResponse(t, req, expected, backend)
 		}
 	})
 
 	t.Run("get by ID expand transactions", func(t *testing.T) {
 		col := unittest.CollectionFixture(3).Light()
-
-		req, _ := http.NewRequest(
-			"GET",
-			fmt.Sprintf(
-				"%s?expand=transactions",
-				collectionURL(col.ID().String()),
-			),
-			nil,
-		)
-
-		backend.Mock.
-			On("GetCollectionByID", mocks.Anything, col.ID()).
-			Return(&col, nil)
 
 		transactions := make([]flow.TransactionBody, len(col.Transactions))
 		for i := range col.Transactions {
@@ -108,6 +101,11 @@ func TestGetCollections(t *testing.T) {
 				Return(&transactions[i], nil)
 		}
 
+		backend.Mock.
+			On("GetCollectionByID", mocks.Anything, col.ID()).
+			Return(&col, nil)
+
+		req := getCollectionReq(col.ID(), true)
 		rr := executeRequest(req, backend)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -147,17 +145,13 @@ func TestGetCollections(t *testing.T) {
 		}}
 
 		for _, test := range tests {
-			req, _ := http.NewRequest("GET", collectionURL(test.id), nil)
 			id, _ := flow.HexStringToIdentifier(test.id)
-
 			backend.Mock.
 				On("GetCollectionByID", mocks.Anything, id).
 				Return(test.mockValue, test.mockErr)
 
-			rr := executeRequest(req, backend)
-
-			assert.Equal(t, test.status, rr.Code)
-			assert.JSONEq(t, test.response, rr.Body.String())
+			req := getCollectionReq(id, false)
+			assertResponse(t, req, test.status, test.response, backend)
 		}
 
 	})

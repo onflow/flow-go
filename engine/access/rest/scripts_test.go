@@ -9,7 +9,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -18,7 +17,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-func scriptsURL(id string, height string) string {
+func scriptReq(id string, height string, body map[string]interface{}) *http.Request {
 	u, _ := url.ParseRequestURI("/v1/scripts")
 	q := u.Query()
 
@@ -30,89 +29,90 @@ func scriptsURL(id string, height string) string {
 	}
 
 	u.RawQuery = q.Encode()
-	return u.String()
+
+	jsonBody, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", u.String(), bytes.NewBuffer(jsonBody))
+
+	return req
 }
 
 func TestScripts(t *testing.T) {
-	backend := &mock.API{}
-
 	validCode := []byte(`pub fun main(foo: String): String { return foo }`)
 	validArgs := []byte(`{ "type": "String", "value": "hello world" }`)
-	validBody, _ := json.Marshal(map[string]interface{}{
+	validBody := map[string]interface{}{
 		"script":    toBase64(validCode),
 		"arguments": []string{toBase64(validArgs)},
-	})
+	}
 
 	t.Run("get by Latest height", func(t *testing.T) {
-		req, _ := http.NewRequest("POST", scriptsURL("", sealedHeightQueryParam), bytes.NewBuffer(validBody))
-
+		backend := &mock.API{}
 		backend.Mock.
 			On("ExecuteScriptAtLatestBlock", mocks.Anything, validCode, [][]byte{validArgs}).
 			Return([]byte("hello world"), nil)
 
-		rr := executeRequest(req, backend)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, fmt.Sprintf(
+		req := scriptReq("", sealedHeightQueryParam, validBody)
+		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), rr.Body.String())
+		), backend)
 	})
 
 	t.Run("get by height", func(t *testing.T) {
+		backend := &mock.API{}
 		height := uint64(1337)
-		req, _ := http.NewRequest("POST", scriptsURL("", fmt.Sprintf("%d", height)), bytes.NewBuffer(validBody))
 
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, height, validCode, [][]byte{validArgs}).
 			Return([]byte("hello world"), nil)
 
-		rr := executeRequest(req, backend)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, fmt.Sprintf(
+		req := scriptReq("", fmt.Sprintf("%d", height), validBody)
+		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), rr.Body.String())
+		), backend)
 	})
 
 	t.Run("get by ID", func(t *testing.T) {
-		id := "222dc5dd51b9e4910f687e475f892f495f3352362ba318b53e318b4d78131312"
-		req, _ := http.NewRequest("POST", scriptsURL(id, ""), bytes.NewBuffer(validBody))
+		backend := &mock.API{}
+		id, _ := flow.HexStringToIdentifier("222dc5dd51b9e4910f687e475f892f495f3352362ba318b53e318b4d78131312")
 
-		flowID, _ := flow.HexStringToIdentifier(id)
 		backend.Mock.
-			On("ExecuteScriptAtBlockID", mocks.Anything, flowID, validCode, [][]byte{validArgs}).
+			On("ExecuteScriptAtBlockID", mocks.Anything, id, validCode, [][]byte{validArgs}).
 			Return([]byte("hello world"), nil)
 
-		rr := executeRequest(req, backend)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.Equal(t, fmt.Sprintf(
+		req := scriptReq(id.String(), "", validBody)
+		assertOKResponse(t, req, fmt.Sprintf(
 			"\"%s\"",
 			base64.StdEncoding.EncodeToString([]byte(`hello world`)),
-		), rr.Body.String())
+		), backend)
 	})
 
 	t.Run("get error", func(t *testing.T) {
-		req, _ := http.NewRequest("POST", scriptsURL("", "1337"), bytes.NewBuffer(validBody))
-
-		backend = &mock.API{} // todo quick fix something is not remove on mock - solve tomorrow
+		backend := &mock.API{}
 		backend.Mock.
 			On("ExecuteScriptAtBlockHeight", mocks.Anything, uint64(1337), validCode, [][]byte{validArgs}).
 			Return(nil, status.Error(codes.Internal, "internal server error"))
 
-		rr := executeRequest(req, backend)
-
-		assert.Equal(t, http.StatusInternalServerError, rr.Code)
-		assert.JSONEq(t, `{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`, rr.Body.String())
+		req := scriptReq("", "1337", validBody)
+		assertResponse(
+			t,
+			req,
+			http.StatusInternalServerError,
+			`{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`,
+			backend,
+		)
 	})
 
 	t.Run("get invalid", func(t *testing.T) {
+		backend := &mock.API{}
+		backend.Mock.
+			On("ExecuteScriptAtBlockHeight", mocks.Anything, mocks.Anything, mocks.Anything, mocks.Anything).
+			Return(nil, nil)
+
 		tests := []struct {
 			id     string
 			height string
-			body   []byte
+			body   map[string]interface{}
 			out    string
 			status int
 		}{
@@ -123,11 +123,8 @@ func TestScripts(t *testing.T) {
 		}
 
 		for _, test := range tests {
-			req, _ := http.NewRequest("POST", scriptsURL(test.id, test.height), bytes.NewBuffer(test.body))
-			rr := executeRequest(req, backend)
-
-			assert.Equal(t, http.StatusBadRequest, rr.Code)
-			assert.JSONEq(t, test.out, rr.Body.String(), fmt.Sprintf("test details: %v", test))
+			req := scriptReq(test.id, test.height, test.body)
+			assertResponse(t, req, http.StatusBadRequest, test.out, backend)
 		}
 	})
 }
