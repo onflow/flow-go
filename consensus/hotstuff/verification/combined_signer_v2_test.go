@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -20,8 +21,11 @@ import (
 // Test that when DKG key is available for a view, a signed block can pass the validation
 // the sig include both staking sig and random beacon sig.
 func TestCombinedSignWithDKGKey(t *testing.T) {
+	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
+
 	// prepare data
 	dkgKey := unittest.DKGParticipantPriv()
+	dkgKey.NodeID = identities[0].NodeID
 	pk := dkgKey.RandomBeaconPrivKey.PublicKey()
 	signerID := dkgKey.NodeID
 	view := uint64(20)
@@ -78,6 +82,38 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 
 	expectedSig := signature.EncodeDoubleSig(stakingSig, beaconSig)
 	require.Equal(t, expectedSig, proposal.SigData)
+
+	// vote should be valid
+	vote, err = signer.CreateVote(block)
+	require.NoError(t, err)
+
+	valid, err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	require.NoError(t, err)
+	require.Equal(t, true, valid)
+
+	// vote on different bock should be invalid
+	block.BlockID[0]++
+	valid, err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	require.Error(t, err)
+	block.BlockID[0]--
+
+	// vote with changed view should be invalid
+	block.View++
+	valid, err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	require.Error(t, err)
+	block.View--
+
+	// vote by different signer should be invalid
+	wrongVoter := identities[1]
+	wrongVoter.StakingPubKey = unittest.StakingPrivKeyFixture().PublicKey()
+	valid, err = verifier.VerifyVote(wrongVoter, vote.SigData, block)
+	require.Error(t, err)
+
+	// vote with changed signature should be invalid
+	vote.SigData[4]++
+	valid, err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	require.Error(t, err)
+	vote.SigData[4]--
 }
 
 // Test that when DKG key is not available for a view, a signed block can pass the validation

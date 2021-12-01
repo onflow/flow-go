@@ -23,10 +23,9 @@ import (
 const epochCounter = uint64(42)
 
 func MakeSigners(t *testing.T,
-	committee hotstuff.Committee,
 	signerIDs []flow.Identifier,
 	stakingKeys []crypto.PrivateKey,
-	beaconKeys []crypto.PrivateKey) []hotstuff.Signer {
+	beaconKeys []crypto.PrivateKey, tag string) []hotstuff.Signer {
 
 	// generate our consensus node identities
 	require.NotEmpty(t, signerIDs)
@@ -34,12 +33,12 @@ func MakeSigners(t *testing.T,
 	var signers []hotstuff.Signer
 	if len(beaconKeys) != len(stakingKeys) {
 		for i, signerID := range signerIDs {
-			signer := MakeStakingSigner(t, committee, signerID, stakingKeys[i])
+			signer := MakeStakingSigner(t, signerID, stakingKeys[i], tag)
 			signers = append(signers, signer)
 		}
 	} else {
 		for i, signerID := range signerIDs {
-			signer := MakeBeaconSigner(t, committee, signerID, stakingKeys[i], beaconKeys[i])
+			signer := MakeBeaconSigner(t, signerID, stakingKeys[i], beaconKeys[i])
 			signers = append(signers, signer)
 		}
 	}
@@ -47,16 +46,15 @@ func MakeSigners(t *testing.T,
 	return signers
 }
 
-func MakeStakingSigner(t *testing.T, committee hotstuff.Committee, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSignerVerifier {
+func MakeStakingSigner(t *testing.T, signerID flow.Identifier, priv crypto.PrivateKey, tag string) *SingleSigner {
 	local, err := local.New(nil, priv)
 	require.NoError(t, err)
-	staking := signature.NewAggregationProvider("test_staking", local)
-	signer := NewSingleSignerVerifier(committee, staking, signerID)
+	staking := signature.NewAggregationProvider(tag, local)
+	signer := NewSingleSigner(staking, signerID)
 	return signer
 }
 
 func MakeBeaconSigner(t *testing.T,
-	committee hotstuff.Committee,
 	signerID flow.Identifier,
 	stakingPriv crypto.PrivateKey,
 	beaconPriv crypto.PrivateKey) *CombinedSigner {
