@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/ledger/common/hash"
 	"github.com/onflow/flow-go/ledger/common/utils"
 	"github.com/onflow/flow-go/ledger/complete/mtrie/trie"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // TestEmptyTrie tests whether the root hash of an empty trie matches the formal specification.
@@ -505,7 +506,7 @@ func Test_Pruning(t *testing.T) {
 	})
 
 	t.Run("smoke testing trie pruning", func(t *testing.T) {
-		t.Skip("skipping trie pruning smoke testing as its not needed to always run")
+		unittest.SkipUnless(t, unittest.TEST_LONG_RUNNING, "skipping trie pruning smoke testing as its not needed to always run")
 
 		numberOfSteps := 1000
 		numberOfUpdates := 750

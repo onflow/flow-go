@@ -2,11 +2,11 @@ package epochs
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-go/integration/utils"
+	"github.com/onflow/flow-go/utils/unittest"
 	"github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/integration/testnet"
@@ -23,9 +23,8 @@ func TestEpochs(t *testing.T) {
 // TestViewsProgress asserts epoch state transitions over two full epochs
 // without any nodes joining or leaving.
 func (s *Suite) TestViewsProgress() {
-	if os.Getenv("TEST_FLAKY") == "" {
-		s.T().Skip("flaky test")
-	}
+	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky test")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 

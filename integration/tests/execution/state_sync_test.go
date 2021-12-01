@@ -2,7 +2,6 @@ package execution
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	sdk "github.com/onflow/flow-go-sdk"
@@ -14,12 +13,11 @@ import (
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestExecutionStateSync(t *testing.T) {
-	if os.Getenv("TEST_DEPRECATED") == "" {
-		t.Skip("disable state sync")
-	}
+	unittest.SkipUnless(t, unittest.TEST_DEPRECATED, "state sync disabled")
 	tsuite.Run(t, new(StateSyncSuite))
 }
 

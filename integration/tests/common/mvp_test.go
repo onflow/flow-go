@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 	"time"
 
@@ -20,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // timeout for individual actions
@@ -38,9 +38,7 @@ func TestMVP_Network(t *testing.T) {
 }
 
 func TestMVP_Bootstrap(t *testing.T) {
-	if os.Getenv("TEST_WIP") == "" {
-		t.Skip("skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451")
-	}
+	unittest.SkipUnless(t, unittest.TEST_WIP, "skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451")
 
 	testingdock.Verbose = false
 
@@ -104,9 +102,7 @@ func TestMVP_Bootstrap(t *testing.T) {
 func TestMVP_Emulator(t *testing.T) {
 	// Start emulator manually for now, used for testing the test
 	// TODO - start an emulator instance
-	if os.Getenv("TEST_WIP") == "" {
-		t.Skip()
-	}
+	unittest.SkipUnless(t, unittest.TEST_WIP, "unimplemented")
 
 	// key, err := unittest.EmulatorRootKey()
 	// require.NoError(t, err)
