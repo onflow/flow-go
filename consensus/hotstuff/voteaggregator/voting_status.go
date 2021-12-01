@@ -1,13 +1,9 @@
 package voteaggregator
 
 import (
-	"errors"
-	"fmt"
-
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
 )
 
 // VotingStatus keeps track of incorporated votes for the same block
@@ -66,17 +62,19 @@ func (vs *VotingStatus) TryBuildQC() (*flow.QuorumCertificate, bool, error) {
 		return nil, false, nil
 	}
 
-	// build the aggregated signature
-	votes := getSliceForVotes(vs.votes)
-	qc, err := vs.signer.CreateQC(votes)
-	if errors.Is(err, signature.ErrInsufficientShares) {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, fmt.Errorf("could not create QC from votes: %w", err)
-	}
+	panic("To be removed")
 
-	return qc, true, nil
+	// build the aggregated signature
+	//votes := getSliceForVotes(vs.votes)
+	//qc, err := vs.signer.CreateQC(votes)
+	//if errors.Is(err, signature.ErrInsufficientShares) {
+	//	return nil, false, nil
+	//}
+	//if err != nil {
+	//	return nil, false, fmt.Errorf("could not create QC from votes: %w", err)
+	//}
+	//
+	//return qc, true, nil
 }
 
 func (vs *VotingStatus) hasEnoughStake() bool {

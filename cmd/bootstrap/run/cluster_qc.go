@@ -3,25 +3,39 @@ package run
 import (
 	"fmt"
 
+	"github.com/rs/zerolog"
+
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/cluster"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
-	"github.com/onflow/flow-go/module/signature"
 )
 
+// GenerateClusterRootQC creates votes and generates a QC based on participant data
 func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
 
-	validators, signers, err := createClusterValidators(participants)
+	signers, err := createClusterSigners(participants)
 	if err != nil {
 		return nil, err
+	}
+
+	identities := bootstrap.ToIdentityList(participants)
+
+	committee, err := committees.NewStaticCommittee(identities, flow.Identifier{}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	hotstuffValidator, err := createClusterValidator(committee)
+	if err != nil {
+		return nil, fmt.Errorf("could not create cluster validator: %w", err)
 	}
 
 	hotBlock := model.Block{
@@ -37,59 +51,63 @@ func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *clus
 	for _, signer := range signers {
 		vote, err := signer.CreateVote(&hotBlock)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("could not create cluster vote: %w", err)
 		}
 		votes = append(votes, vote)
 	}
 
-	// create the QC from the votes
-	qc, err := signers[0].CreateQC(votes)
+	logger := zerolog.Logger{}
+	var createdQC *flow.QuorumCertificate
+	voteProcessorFactory := votecollector.NewBootstrapStakingVoteProcessorFactory(logger, committee, func(qc *flow.QuorumCertificate) {
+		createdQC = qc
+	})
+	processor, err := voteProcessorFactory.Create(model.ProposalFromFlow(clusterBlock.Header, 0))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not create cluster vote processor: %w", err)
+	}
+
+	// create the QC from the votes
+	for _, vote := range votes {
+		err := processor.Process(vote)
+		if err != nil {
+			return nil, fmt.Errorf("could not process vote: %w", err)
+		}
 	}
 
 	// validate QC
-	err = validators[0].ValidateQC(qc, &hotBlock)
+	err = hotstuffValidator.ValidateQC(createdQC, &hotBlock)
 
-	return qc, err
+	return createdQC, err
 }
 
-func createClusterValidators(participants []bootstrap.NodeInfo) ([]hotstuff.Validator, []hotstuff.SignerVerifier, error) {
-
-	n := len(participants)
-	identities := bootstrap.ToIdentityList(participants)
-
-	signers := make([]hotstuff.SignerVerifier, n)
-	validators := make([]hotstuff.Validator, n)
+// createClusterValidator creates validator for cluster consensus
+func createClusterValidator(committee hotstuff.Committee) (hotstuff.Validator, error) {
+	verifier := verification.NewStakingVerifier()
 
 	forks := &mocks.ForksReader{}
+	hotstuffValidator := validator.New(committee, forks, verifier)
+	return hotstuffValidator, nil
+}
 
+// createClusterSigners create signers for cluster signers
+func createClusterSigners(participants []bootstrap.NodeInfo) ([]hotstuff.Signer, error) {
+	n := len(participants)
+	signers := make([]hotstuff.Signer, n)
 	for i, participant := range participants {
 		// get the participant keys
 		keys, err := participant.PrivateKeys()
 		if err != nil {
-			return nil, nil, fmt.Errorf("could not retrieve private keys for participant: %w", err)
+			return nil, fmt.Errorf("could not retrieve private keys for participant: %w", err)
 		}
 
 		// create local module
 		me, err := local.New(participant.Identity(), keys.StakingKey)
 		if err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 
-		committee, err := committees.NewStaticCommittee(identities, me.NodeID(), nil, nil)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		// create signer for participant
-		provider := signature.NewAggregationProvider(encoding.CollectorVoteTag, me)
-		signer := verification.NewSingleSignerVerifier(committee, provider, participant.NodeID)
+		signer := verification.NewStakingSigner(me, me.NodeID())
 		signers[i] = signer
-
-		// create validator
-		v := validator.New(committee, forks, signer)
-		validators[i] = v
 	}
-	return validators, signers, nil
+	return signers, nil
 }
