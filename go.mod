@@ -1,21 +1,22 @@
 module github.com/onflow/flow-go
 
-go 1.15
+go 1.16
 
 require (
 	cloud.google.com/go/storage v1.16.0
 	github.com/aws/aws-sdk-go-v2/config v1.8.0
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.5.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.15.0
+	github.com/benbjohnson/clock v1.3.0 // indirect
 	github.com/bsipos/thist v1.0.0
-	github.com/btcsuite/btcd v0.21.0-beta
+	github.com/btcsuite/btcd v0.22.0-beta
 	github.com/dapperlabs/testingdock v0.4.2
 	github.com/davecgh/go-spew v1.1.1
 	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
-	github.com/fxamacker/cbor/v2 v2.2.1-0.20210927235116-3d6d5d1de29b
+	github.com/fxamacker/cbor/v2 v2.3.1-0.20211029162100-5d5d7c3edd41
 	github.com/gammazero/workerpool v1.1.2
 	github.com/gogo/protobuf v1.3.2
 	github.com/golang/mock v1.6.0
@@ -28,46 +29,47 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.0-20200501113911-9a95f0fdbfea
 	github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.6.0
+	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/golang-lru v0.5.4
 	github.com/improbable-eng/grpc-web v0.12.0
-	github.com/ipfs/go-bitswap v0.4.0
+	github.com/ipfs/go-bitswap v0.5.0
 	github.com/ipfs/go-block-format v0.0.3
-	github.com/ipfs/go-cid v0.0.7
-	github.com/ipfs/go-datastore v0.4.5
-	github.com/ipfs/go-ipfs-blockstore v0.1.6
-	github.com/ipfs/go-ipfs-exchange-interface v0.0.1
+	github.com/ipfs/go-cid v0.1.0
+	github.com/ipfs/go-datastore v0.5.0
+	github.com/ipfs/go-ipfs-blockstore v1.1.1
+	github.com/ipfs/go-ipfs-exchange-interface v0.1.0
 	github.com/ipfs/go-log v1.0.5
-	github.com/ipld/go-ipld-prime v0.12.0 // indirect
+	github.com/ipld/go-ipld-prime v0.14.1 // indirect
 	github.com/jrick/bitset v1.0.0
-	github.com/kr/text v0.2.0 // indirect
 	github.com/libp2p/go-addr-util v0.1.0
-	github.com/libp2p/go-libp2p v0.14.4
-	github.com/libp2p/go-libp2p-core v0.8.6
-	github.com/libp2p/go-libp2p-discovery v0.5.0
-	github.com/libp2p/go-libp2p-kad-dht v0.13.0
-	github.com/libp2p/go-libp2p-pubsub v0.4.1
-	github.com/libp2p/go-libp2p-swarm v0.5.3
-	github.com/libp2p/go-libp2p-tls v0.1.3
-	github.com/libp2p/go-libp2p-transport-upgrader v0.4.6
-	github.com/libp2p/go-tcp-transport v0.2.7
+	github.com/libp2p/go-libp2p v0.16.0
+	github.com/libp2p/go-libp2p-core v0.11.0
+	github.com/libp2p/go-libp2p-discovery v0.6.0
+	github.com/libp2p/go-libp2p-kad-dht v0.15.0
+	github.com/libp2p/go-libp2p-pubsub v0.6.0
+	github.com/libp2p/go-libp2p-swarm v0.8.0
+	github.com/libp2p/go-libp2p-tls v0.3.1
+	github.com/libp2p/go-libp2p-transport-upgrader v0.5.0
+	github.com/libp2p/go-tcp-transport v0.4.0
 	github.com/m4ksio/wal v1.0.0
-	github.com/multiformats/go-multiaddr v0.3.3
+	github.com/multiformats/go-base32 v0.0.4 // indirect
+	github.com/multiformats/go-multiaddr v0.4.1
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/onflow/atree v0.1.0-beta1.0.20211027184039-559ee654ece9
-	github.com/onflow/cadence v0.20.1
+	github.com/onflow/atree v0.1.1
+	github.com/onflow/cadence v0.20.2
 	github.com/onflow/flow v0.2.3-0.20211103155021-9254a66368d5
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
 	github.com/onflow/flow-emulator v0.20.3
-	github.com/onflow/flow-go-sdk v0.21.0
-	github.com/onflow/flow-go/crypto v0.21.3
+	github.com/onflow/flow-go-sdk v0.24.0
+	github.com/onflow/flow-go/crypto v0.21.4-0.20211125190211-7b31c986316e
 	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/pelletier/go-toml v1.9.4 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible
 	github.com/pkg/errors v0.9.1
-	github.com/prometheus/client_golang v1.10.0
+	github.com/prometheus/client_golang v1.11.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
 	github.com/rs/zerolog v1.19.0
 	github.com/schollz/progressbar/v3 v3.8.3
@@ -82,20 +84,23 @@ require (
 	github.com/uber/jaeger-lib v2.4.0+incompatible // indirect
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
 	github.com/vmihailenco/msgpack/v4 v4.3.11
-	go.uber.org/atomic v1.7.0
-	go.uber.org/multierr v1.6.0
-	golang.org/x/crypto v0.0.0-20210817164053-32db794688a5
+	go.uber.org/atomic v1.9.0
+	go.uber.org/multierr v1.7.0
+	go.uber.org/zap v1.19.1 // indirect
+	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
+	golang.org/x/net v0.0.0-20211123203042-d83791d6bcd9 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/sys v0.0.0-20211124211545-fe61309f8881 // indirect
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
-	google.golang.org/api v0.49.0
-	google.golang.org/genproto v0.0.0-20210903162649-d08c68adba83
+	google.golang.org/api v0.58.0
+	google.golang.org/genproto v0.0.0-20211007155348-82e027067bd4
 	google.golang.org/grpc v1.40.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
 	google.golang.org/protobuf v1.27.1
 	gopkg.in/ini.v1 v1.63.0 // indirect
 	gotest.tools v2.2.0+incompatible
+	lukechampine.com/blake3 v1.1.7 // indirect
 	pgregory.net/rapid v0.4.7
 )
 
