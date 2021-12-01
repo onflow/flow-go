@@ -177,7 +177,10 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 			dialAddrs, err))
 	}
 
-	lg.Debug().Str("dial_address", fmt.Sprintf("%v", dialAddrs)).Msg("stream successfully created to remote peer")
+	lg.Info().
+		Str("networking_protocol_id", string(stream.Protocol())).
+		Str("dial_address", fmt.Sprintf("%v", dialAddrs)).
+		Msg("stream successfully created to remote peer")
 	return stream, nil
 }
 
