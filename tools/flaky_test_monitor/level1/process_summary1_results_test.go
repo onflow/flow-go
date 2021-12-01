@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flaky-test-monitor/helpers"
 	"fmt"
 	"log"
 	"os"
@@ -55,10 +56,10 @@ func TestProcessSummary1TestRun(t *testing.T) {
 // HELPERS - UTILITIES
 
 func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
-	const expectedJsonFilePath = "./testdata/summary1/expected/"
-	const rawJsonFilePath = "./testdata/summary1/raw/"
+	const expectedJsonFilePath = "../testdata/summary1/expected/"
+	const rawJsonFilePath = "../testdata/summary1/raw/"
 
-	var expectedTestRun TestRun
+	var expectedTestRun helpers.TestRun
 	// read in expected JSON from file
 	expectedJsonBytes, err := os.ReadFile(expectedJsonFilePath + jsonExpectedActualFile)
 	require.Nil(t, err)
@@ -84,7 +85,7 @@ func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
 		})
 
 		// init TestMap to empty - otherwise get comparison failure because would be nil
-		expectedTestRun.PackageResults[k].TestMap = make(map[string][]TestResult)
+		expectedTestRun.PackageResults[k].TestMap = make(map[string][]helpers.TestResult)
 	}
 
 	// these hard coded values simulate a real test run that would obtain these environment variables dynamically
@@ -103,7 +104,7 @@ func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
 	checkTestRuns(t, expectedTestRun, actualTestRun)
 }
 
-func checkTestRuns(t *testing.T, expectedTestRun TestRun, actualTestRun TestRun) {
+func checkTestRuns(t *testing.T, expectedTestRun helpers.TestRun, actualTestRun helpers.TestRun) {
 	// it's difficult to determine why 2 test runs aren't equal, so we will check the different sub components of them to see where a potential discrepancy exists
 	require.Equal(t, expectedTestRun.CommitDate, actualTestRun.CommitDate)
 	require.Equal(t, expectedTestRun.CommitSha, actualTestRun.CommitSha)
@@ -133,7 +134,7 @@ func checkTestRuns(t *testing.T, expectedTestRun TestRun, actualTestRun TestRun)
 	require.Equal(t, expectedTestRun, actualTestRun)
 }
 
-func checkTestResults(t *testing.T, expectedTestResults []TestResult, actualTestResults []TestResult) {
+func checkTestResults(t *testing.T, expectedTestResults []helpers.TestResult, actualTestResults []helpers.TestResult) {
 	require.Equal(t, len(expectedTestResults), len(actualTestResults))
 	for testResultIndex := range expectedTestResults {
 

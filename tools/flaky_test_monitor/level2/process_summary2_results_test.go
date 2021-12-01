@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flaky-test-monitor/helpers"
 	"os"
 	"strings"
 	"testing"
@@ -45,16 +46,16 @@ func deleteFailuresDir(t *testing.T) {
 }
 
 func runProcessSummary2TestRun(t *testing.T, testDir string) {
-	inputTestDataPath := "./testdata/summary2/" + testDir + "/input/"
-	expectedOutputTestDataPath := "./testdata/summary2/" + testDir + "/expected-output/" + testDir + ".json"
-	expectedFailureMessagesPath := "./testdata/summary2/" + testDir + "/expected-output/failures/"
+	inputTestDataPath := "../testdata/summary2/" + testDir + "/input/"
+	expectedOutputTestDataPath := "../testdata/summary2/" + testDir + "/expected-output/" + testDir + ".json"
+	expectedFailureMessagesPath := "../testdata/summary2/" + testDir + "/expected-output/failures/"
 
 	// **************************************************************
 	actualTestSummary2 := processSummary2TestRun(inputTestDataPath)
 	// **************************************************************
 
 	// read in expected summary level 2
-	var expectedTestSummary2 TestSummary2
+	var expectedTestSummary2 helpers.TestSummary2
 	expectedTestSummary2JsonBytes, err := os.ReadFile(expectedOutputTestDataPath)
 	require.Nil(t, err)
 	require.NotEmpty(t, expectedTestSummary2JsonBytes)

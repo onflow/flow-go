@@ -2,51 +2,33 @@ package main
 
 import (
 	"encoding/json"
+	"flaky-test-monitor/helpers"
 	"fmt"
 	"os"
 )
 
-// models full level 2 summary of a test run from 1 or more level 1 test runs
-type TestSummary2 struct {
-	TestResults map[string]*TestResultSummary `json:"tests"`
-}
-
-// models all results from a specific test over many (level 1) test runs
-type TestResultSummary struct {
-	Test            string    `json:"test"`
-	Package         string    `json:"package"`
-	Runs            int       `json:"runs"`
-	Passed          int       `json:"passed"`
-	Failed          int       `json:"failed"`
-	Skipped         int       `json:"skipped"`
-	NoResult        int       `json:"no_result"`
-	FailureRate     float32   `json:"failure_rate"`
-	AverageDuration float32   `json:"average_duration"`
-	Durations       []float32 `json:"durations"`
-}
-
 const failuresDir = "./failures/"
 
 // process level 1 summary files in a single directory and output level 2 summary
-func processSummary2TestRun(level1Directory string) TestSummary2 {
+func processSummary2TestRun(level1Directory string) helpers.TestSummary2 {
 	dirEntries, err := os.ReadDir(level1Directory)
-	assertErrNil(err, "error reading level 1 directory")
+	helpers.AssertErrNil(err, "error reading level 1 directory")
 	err = os.Mkdir(failuresDir, 0755)
-	assertErrNil(err, "error creating failures directory")
+	helpers.AssertErrNil(err, "error creating failures directory")
 
-	testSummary2 := TestSummary2{}
-	testSummary2.TestResults = make(map[string]*TestResultSummary)
+	testSummary2 := helpers.TestSummary2{}
+	testSummary2.TestResults = make(map[string]*helpers.TestResultSummary)
 
 	// go through all level 1 summaries in a folder to create level 2 summary
 	for i := 0; i < len(dirEntries); i++ {
 		// read in each level 1 summary
-		var level1TestRun TestRun
+		var level1TestRun helpers.TestRun
 
 		level1JsonBytes, err := os.ReadFile(level1Directory + dirEntries[i].Name())
-		assertErrNil(err, "error reading level 1 json")
+		helpers.AssertErrNil(err, "error reading level 1 json")
 
 		err = json.Unmarshal(level1JsonBytes, &level1TestRun)
-		assertErrNil(err, "error unmarshalling level 1 test run")
+		helpers.AssertErrNil(err, "error unmarshalling level 1 test run")
 
 		// go through each level 1 summary and update level 2 summary
 		for _, packageResult := range level1TestRun.PackageResults {
@@ -58,7 +40,7 @@ func processSummary2TestRun(level1Directory string) TestSummary2 {
 				// this test doesn't have a summary so create it
 				// no need to specify other fields explicitly - default values will suffice
 				if !testResultSummaryExists {
-					testResultSummary = &TestResultSummary{
+					testResultSummary = &helpers.TestResultSummary{
 						Test:    testResult.Test,
 						Package: testResult.Package,
 					}
@@ -99,7 +81,7 @@ func processSummary2TestRun(level1Directory string) TestSummary2 {
 	return testSummary2
 }
 
-func saveFailureMessage(testResult TestResult) {
+func saveFailureMessage(testResult helpers.TestResult) {
 	if testResult.Result != "fail" {
 		panic(fmt.Sprintf("unexpected test result: " + testResult.Result))
 	}
@@ -107,38 +89,42 @@ func saveFailureMessage(testResult TestResult) {
 	// sub-directory names should be the same - each sub directory corresponds to a failed test name
 	// there could already be previous failures for this test, so it's important to check if failed
 	// test folder exists
-	if !folderExists(failuresDir + testResult.Test) {
+	if !helpers.FolderExists(failuresDir + testResult.Test) {
 		err := os.Mkdir(failuresDir+testResult.Test, 0755)
-		assertErrNil(err, "error creating sub-dir under failuresDir")
+		helpers.AssertErrNil(err, "error creating sub-dir under failuresDir")
 	}
 
 	// under each sub-directory, there should be 1 or more text files (failure1.txt, failure2.txt, etc)
 	// that holds the raw failure message for that test
 
 	dirEntries, err := os.ReadDir(failuresDir + testResult.Test)
-	assertErrNil(err, "error reading sub-dir entries under failuresDir")
+	helpers.AssertErrNil(err, "error reading sub-dir entries under failuresDir")
 
 	// failure text files will be named "failure1.txt", "failure2.txt", etc so we want to know how
 	// many failure files already exist in the sub-directory before creating the next one
 	failureFile, err := os.Create(failuresDir + testResult.Test + "/" + fmt.Sprintf("failure%d.txt", len(dirEntries)+1))
-	assertErrNil(err, "error creating failure file")
+	helpers.AssertErrNil(err, "error creating failure file")
 
 	for _, output := range testResult.Output {
 		_, err = failureFile.WriteString(output)
-		assertErrNil(err, "error writing to failure file")
+		helpers.AssertErrNil(err, "error writing to failure file")
 	}
 }
 
-func postProcessTestSummary2(testSummary2 TestSummary2) {
+func postProcessTestSummary2(testSummary2 helpers.TestSummary2) {
 	for _, testResultSummary := range testSummary2.TestResults {
 		// calculate average duration for each test summary
 		var durationSum float32 = 0
 		for _, duration := range testResultSummary.Durations {
 			durationSum += duration
 		}
-		testResultSummary.AverageDuration = convertTo2DecimalPlaces2(durationSum, testResultSummary.Runs)
+		testResultSummary.AverageDuration = helpers.ConvertTo2DecimalPlaces2(durationSum, testResultSummary.Runs)
 
 		// calculate failure rate for each test summary
-		testResultSummary.FailureRate = convertTo2DecimalPlaces(testResultSummary.Failed, testResultSummary.Runs)
+		testResultSummary.FailureRate = helpers.ConvertTo2DecimalPlaces(testResultSummary.Failed, testResultSummary.Runs)
 	}
+}
+
+func main() {
+	fmt.Println("hello level 2 summary")
 }
