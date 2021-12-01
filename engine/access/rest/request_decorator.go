@@ -118,6 +118,10 @@ func (rd *requestDecorator) bodyAs(dst interface{}) error {
 		}
 	}
 
+	if dst == nil {
+		return NewBadRequestError(fmt.Errorf("request body must not be empty"))
+	}
+
 	err = dec.Decode(&struct{}{})
 	if err != io.EOF {
 		err := fmt.Errorf("request body must only contain a single JSON object")
