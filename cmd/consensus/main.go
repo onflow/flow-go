@@ -115,7 +115,7 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
-		dkgKeyStore             *bstorage.BeaconPrivateKeys
+		dkgKeyStore             *bstorage.DKGState
 		dkgStateStore           *bstorage.DKGState
 	)
 
