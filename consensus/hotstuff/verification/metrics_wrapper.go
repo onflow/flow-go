@@ -5,7 +5,6 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
 
@@ -56,9 +55,9 @@ func (w SignerMetricsWrapper) CreateVote(block *model.Block) (*model.Vote, error
 	return vote, err
 }
 
-func (w SignerMetricsWrapper) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
-	processStart := time.Now()
-	qc, err := w.signer.CreateQC(votes)
-	w.metrics.SignerProcessingDuration(time.Since(processStart))
-	return qc, err
-}
+// func (w SignerMetricsWrapper) CreateQC(votes []*model.Vote) (*flow.QuorumCertificate, error) {
+// 	processStart := time.Now()
+// 	qc, err := w.signer.CreateQC(votes)
+// 	w.metrics.SignerProcessingDuration(time.Since(processStart))
+// 	return qc, err
+// }

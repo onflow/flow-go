@@ -10,11 +10,14 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
-	module_mock "github.com/onflow/flow-go/module/mock"
+	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
+	storagemock "github.com/onflow/flow-go/storage/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const epochCounter = uint64(42)
@@ -58,14 +61,23 @@ func MakeBeaconSigner(t *testing.T,
 	stakingPriv crypto.PrivateKey,
 	beaconPriv crypto.PrivateKey) *CombinedSigner {
 
-	local, err := local.New(nil, stakingPriv)
+	nodeID := unittest.IdentityFixture()
+	nodeID.NodeID = signerID
+	nodeID.StakingPubKey = stakingPriv.PublicKey()
+	local, err := local.New(nodeID, stakingPriv)
 	require.NoError(t, err)
 
-	thresholdSigner := signature.NewThresholdProvider("test_beacon", beaconPriv)
-	thresholdSignerStore := &module_mock.ThresholdSignerStore{}
-	thresholdSignerStore.On("GetThresholdSigner", mock.Anything).Return(thresholdSigner, nil)
+	epochLookup := &modulemock.EpochLookup{}
+	epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(epochCounter, nil)
 
-	signer := NewCombinedSigner(local, thresholdSignerStore)
+	dkgKey := unittest.DKGParticipantPriv()
+	keys := &storagemock.DKGKeys{}
+	// there is DKG key for this epoch
+	keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
+
+	beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+
+	signer := NewCombinedSigner(local, beaconKeyStore)
 
 	return signer
 }
