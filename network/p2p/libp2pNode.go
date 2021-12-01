@@ -13,7 +13,7 @@ import (
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/protocol"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p-core/routing"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
@@ -34,7 +34,7 @@ const (
 	// maximum number of attempts to be made to connect to a remote node for 1-1 direct communication
 	maxConnectAttempt = 3
 
-	// timeout for FindPeer queries to the DHT
+	// timeout for FindPeer queries to the routing system
 	// TODO: is this a sensible value?
 	findPeerQueryTimeout = 10 * time.Second
 )
@@ -53,7 +53,7 @@ type Node struct {
 	resolver        *dns.Resolver                          // dns resolver for libp2p (is nil if default)
 	pingService     *PingService
 	connMgr         connmgr.ConnManager
-	dht             *dht.IpfsDHT
+	routing         routing.Routing
 	topicValidation bool
 	pCache          *protocolPeerCache
 }
@@ -152,23 +152,23 @@ func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stre
 	lg := n.logger.With().Str("peer_id", peerID.Pretty()).Logger()
 
 	// If we do not currently have any addresses for the given peer, stream creation will almost
-	// certainly fail. If this Node was configured with a DHT, we can try to look up the address of
-	// the peer in the DHT as a last resort.
-	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.dht != nil {
-		lg.Info().Msg("address not found in peer store, searching for peer in dht")
+	// certainly fail. If this Node was configured with a routing system, we can try to use it to
+	// look up the address of the peer.
+	if len(n.host.Peerstore().Addrs(peerID)) == 0 && n.routing != nil {
+		lg.Info().Msg("address not found in peer store, searching for peer in routing system")
 
 		var err error
 		func() {
 			timedCtx, cancel := context.WithTimeout(ctx, findPeerQueryTimeout)
 			defer cancel()
-			// try to find the peer using the dht
-			_, err = n.dht.FindPeer(timedCtx, peerID)
+			// try to find the peer using the routing system
+			_, err = n.routing.FindPeer(timedCtx, peerID)
 		}()
 
 		if err != nil {
-			lg.Warn().Err(err).Msg("address not found in both peer store and dht")
+			lg.Warn().Err(err).Msg("address not found in both peer store and routing system")
 		} else {
-			lg.Debug().Msg("address not found in peer store, but found in dht search")
+			lg.Debug().Msg("address not found in peer store, but found in routing system search")
 		}
 	}
 	stream, dialAddrs, err := n.unicastManager.CreateStream(ctx, peerID, maxConnectAttempt)

@@ -10,6 +10,7 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/routing"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
@@ -77,19 +78,17 @@ func DefaultLibP2PNodeFactory(
 }
 
 type NodeBuilder interface {
-	SetSporkID(flow.Identifier) NodeBuilder
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
-	SetConnectionGater(*ConnGater) NodeBuilder
-	SetPubsubOptions(...PubsubOption) NodeBuilder
-	SetPingInfoProvider(PingInfoProvider) NodeBuilder
-	SetDHTOptions(...dht.Option) NodeBuilder
+	SetConnectionGating(bool) NodeBuilder
 	SetTopicValidation(bool) NodeBuilder
-	SetLogger(zerolog.Logger) NodeBuilder
+	SetPubsub(...PubsubOption) NodeBuilder
+	SetPingInfoProvider(PingInfoProvider) NodeBuilder
+	SetRoutingSystem(routing.Routing)
 	SetResolver(*dns.Resolver) NodeBuilder
 	Build(context.Context) (*Node, error)
 }
 
-type DefaultLibP2PNodeBuilder struct {
+type LibP2PNodeBuilder struct {
 	id               flow.Identifier
 	sporkId          flow.Identifier
 	logger           zerolog.Logger
@@ -98,14 +97,14 @@ type DefaultLibP2PNodeBuilder struct {
 	pingInfoProvider PingInfoProvider
 	resolver         *dns.Resolver
 	pubSubMaker      func(context.Context, host.Host, ...pubsub.Option) (*pubsub.PubSub, error)
-	hostMaker        func(context.Context, ...config.Option) (host.Host, error)
+	host             host.Host
 	pubSubOpts       []PubsubOption
 	dhtOpts          []dht.Option
 	topicValidation  bool
 }
 
-func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcrypto.PrivateKey) NodeBuilder {
-	return &DefaultLibP2PNodeBuilder{
+func NewNodeBuilder(logger zerolog.Logger, h host.Host, ps *pubsub.PubSub, sporkID flow.Identifier) *LibP2PNodeBuilder {
+	return &LibP2PNodeBuilder{
 		id: id,
 		pubSubMaker: func(ctx context.Context, h host.Host, opts ...pubsub.Option) (*pubsub.PubSub, error) {
 			return defaultPubSub(ctx, h, opts...)
@@ -114,12 +113,8 @@ func NewDefaultLibP2PNodeBuilder(id flow.Identifier, address string, flowKey fcr
 			return DefaultLibP2PHost(ctx, address, flowKey, opts...)
 		},
 		topicValidation: true,
+		sporkId:         sporkID,
 	}
-}
-
-func (builder *DefaultLibP2PNodeBuilder) SetDHTOptions(opts ...dht.Option) NodeBuilder {
-	builder.dhtOpts = opts
-	return builder
 }
 
 func (builder *DefaultLibP2PNodeBuilder) SetTopicValidation(enabled bool) NodeBuilder {
@@ -180,7 +175,7 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	}
 
 	if builder.sporkId == flow.ZeroID {
-		return nil, errors.New("root block ID must be provided")
+		return nil, errors.New("spork ID must be provided")
 	}
 
 	var opts []config.Option
@@ -222,7 +217,8 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 	node.unicastManager = unicast.NewUnicastManager(
 		builder.logger,
 		unicast.NewLibP2PStreamFactory(node.host),
-		builder.sporkId)
+		builder.sporkId,
+	)
 
 	node.pCache, err = newProtocolPeerCache(node.logger, libp2pHost)
 	if err != nil {
@@ -235,7 +231,14 @@ func (builder *DefaultLibP2PNodeBuilder) Build(ctx context.Context) (*Node, erro
 			return nil, err
 		}
 		node.dht = kdht
-		builder.pubSubOpts = append(builder.pubSubOpts, withDHTDiscovery(kdht))
+		builder.pubSubOpts = append(
+			builder.pubSubOpts,
+			PubSubOptionWrapper(
+				pubsub.WithDiscovery(
+					discovery.NewRoutingDiscovery(kdht),
+				),
+			),
+		)
 	}
 
 	if builder.pingInfoProvider != nil {
@@ -358,12 +361,5 @@ func DefaultPubsubOptions(maxPubSubMsgSize int) []PubsubOption {
 		// set max message size limit for 1-k PubSub messaging
 		PubSubOptionWrapper(pubsub.WithMaxMessageSize(maxPubSubMsgSize)),
 		// no discovery
-	}
-}
-
-func withDHTDiscovery(kdht *dht.IpfsDHT) PubsubOption {
-	return func(ctx context.Context, host host.Host) (pubsub.Option, error) {
-		routingDiscovery := discovery.NewRoutingDiscovery(kdht)
-		return pubsub.WithDiscovery(routingDiscovery), nil
 	}
 }
