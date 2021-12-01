@@ -27,7 +27,6 @@ require (
 	github.com/onflow/flow-go/crypto v0.21.4-0.20211125190211-7b31c986316e // replaced by version on-disk
 	github.com/onflow/flow/protobuf/go/flow v0.2.3
 	github.com/plus3it/gorecurcopy v0.0.1
-	github.com/prometheus/common v0.20.0 // indirect
 	github.com/rs/zerolog v1.21.0
 	github.com/stretchr/testify v1.7.0
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
