@@ -335,6 +335,10 @@ func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid,
 }
 
 // Get gets the ExecutionData for the given root CID from the blobservice.
+// The returned error will be:
+// - MalformedDataError if some level of the blob tree cannot be properly deserialized
+// - BlobSizeLimitExceededError if any blob in the blob tree exceeds the maximum blob size
+// - BlobNotFoundError if some CID in the blob tree could not be found from the blobservice
 func (s *executionDataServiceImpl) Get(ctx context.Context, rootCid cid.Cid) (*ExecutionData, error) {
 	logger := s.logger.With().Str("cid", rootCid.String()).Logger()
 	logger.Debug().Msg("getting execution data")
