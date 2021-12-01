@@ -168,12 +168,19 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	m.clearProgress()
 	m.Log.Info().Msg("Converting payloads complete")
 
+	m.Log.Info().Msg("Checking storage health...")
+	err := m.storage.CheckHealth()
+	if err != nil {
+		panic(err)
+	}
+	m.Log.Info().Msg("Storage health check complete")
+
 	// Encode the new values by calling `storage.Commit()`
 
 	m.Log.Info().Msg("Re-encoding converted values...")
 	m.incrementProgress()
 
-	err := m.storage.Commit(m.newInter, true)
+	err = m.storage.Commit(m.newInter, true)
 	if err != nil {
 		return nil, fmt.Errorf("failed to migrate payloads: %w", err)
 	}
