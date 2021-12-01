@@ -620,6 +620,7 @@ func TestEncoding(t *testing.T) {
 	})
 
 	t.Run("Composite", func(t *testing.T) {
+
 		t.Parallel()
 
 		inter, err := oldInter.NewInterpreter(nil, utils.TestLocation)
@@ -686,7 +687,7 @@ func TestEncoding(t *testing.T) {
 		assert.NoError(t, err)
 
 		encodedValues := ledgerView.Payloads()
-		require.Len(t, encodedValues, 6)
+		require.Len(t, encodedValues, 5)
 
 		for _, encValue := range encodedValues {
 			assert.False(t, oldInter.HasMagic(encValue.Value))
@@ -696,7 +697,7 @@ func TestEncoding(t *testing.T) {
 
 		storageId := atree.NewStorageID(
 			atree.Address(address),
-			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 2},
+			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 1},
 		)
 
 		slab, ok, err := migration.storage.Retrieve(storageId)
@@ -726,7 +727,7 @@ func TestEncoding(t *testing.T) {
 
 		storageId = atree.NewStorageID(
 			atree.Address(address),
-			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 3},
+			atree.StorageIndex{0, 0, 0, 0, 0, 0, 0, 2},
 		)
 
 		slab, ok, err = migration.storage.Retrieve(storageId)
@@ -813,13 +814,13 @@ func TestPayloadsMigration(t *testing.T) {
 	migratedPayloads, err := storageFormatV6Migration.migrate(payloads)
 	require.NoError(t, err)
 
-	assert.Len(t, migratedPayloads, 6)
+	assert.Len(t, migratedPayloads, 5)
 
 	// Check whether the query works with new ledger
 
 	migratedLedgerView := NewView(migratedPayloads)
 
-	key := []byte{0, 0, 0, 0, 0, 0, 0, 3}
+	key := []byte{0, 0, 0, 0, 0, 0, 0, 2}
 	prefixedKey := []byte(atree.LedgerBaseStorageSlabPrefix + string(key))
 
 	migratedValue, err := migratedLedgerView.Get(string(owner[:]), "", string(prefixedKey))
