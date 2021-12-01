@@ -25,7 +25,7 @@ const (
 	FlowLibP2PPingProtocolPrefix = FlowLibP2PProtocolCommonPrefix + "/ping/"
 
 	// FlowLibP2PProtocolGzipCompressedOneToOne represents the protocol id for compressed streams under gzip compressor.
-	FlowLibP2PProtocolGzipCompressedOneToOne = FlowLibP2POneToOneProtocolIDPrefix + "/gzip/"
+	FlowLibP2PProtocolGzipCompressedOneToOne = FlowLibP2POneToOneProtocolIDPrefix + "gzip/"
 )
 
 // IsFlowProtocolStream returns true if the libp2p stream is for a Flow protocol
