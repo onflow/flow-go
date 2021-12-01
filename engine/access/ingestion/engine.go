@@ -35,10 +35,14 @@ const fullBlockUpdateInterval = 1 * time.Minute
 // a threshold of number of blocks with missing collections beyond which collections should be re-requested
 const missingCollsForBlkThreshold = 100
 
+// a threshold of block height beyond which collections should be re-requested
+const missingCollsForHeightThreshold = 100
+
 var defaultCollectionCatchupTimeout = collectionCatchupTimeout
 var defaultCollectionCatchupDBPollInterval = collectionCatchupDBPollInterval
 var defaultFullBlockUpdateInterval = fullBlockUpdateInterval
 var defaultMissingCollsForBlkThreshold = missingCollsForBlkThreshold
+var defaultMissingCollsForHeightThreshold = missingCollsForHeightThreshold
 
 // Engine represents the ingestion engine, used to funnel data from other nodes
 // to a centralized location that can be queried by a user
@@ -569,8 +573,8 @@ func (e *Engine) updateLastFullBlockReceivedIndex() {
 		}
 	}
 
-	// additionally, if more than threshold blocks have missing collection, re-request those collections
-	if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold {
+	// additionally, if more than threshold blocks have missing collection OR collections are missing since defaultMissingCollsForHeightThreshold, re-request those collections
+	if incompleteBlksCnt >= defaultMissingCollsForBlkThreshold  || (finalizedHeight - lastFullHeight) > uint64(defaultMissingCollsForHeightThreshold) {
 		// warn log since this should generally not happen
 		e.log.Warn().
 			Int("missing_collection_blk_count", incompleteBlksCnt).
