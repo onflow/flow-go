@@ -33,5 +33,15 @@ func getExecutionResultsByBlockIDs(req *requestDecorator, backend access.API, li
 }
 
 func getExecutionResultByID(req *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
-	return nil, nil
+	id, err := req.id()
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := backend.GetExecutionResultByID(req.Context(), id)
+	if err != nil {
+		return nil, err
+	}
+
+	return executionResultResponse(res, link), nil
 }
