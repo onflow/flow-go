@@ -23,7 +23,7 @@ type DKGState interface {
 	GetDKGStarted(epochCounter uint64) (bool, error)
 
 	// SetDKGEndState stores that the DKG has ended, and its end state.
-	SetDKGEndState(epochCounter uint64, endState flow.EndState) error
+	SetDKGEndState(epochCounter uint64, endState flow.DKGEndState) error
 
 	// InsertMyBeaconPrivateKey stores the random beacon private key for an epoch.
 	//

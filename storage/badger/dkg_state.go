@@ -95,7 +95,7 @@ func (ds *DKGState) GetDKGStarted(epochCounter uint64) (bool, error) {
 	return started, err
 }
 
-func (ds *DKGState) SetDKGEndState(epochCounter uint64, endState flow.EndState) error {
+func (ds *DKGState) SetDKGEndState(epochCounter uint64, endState flow.DKGEndState) error {
 	return ds.db.Update(operation.InsertDKGEndStateForEpoch(epochCounter, endState))
 }
 
@@ -119,7 +119,7 @@ func (sk *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64)
 		}
 
 		// retrieve the end state, error on any storage error (including not found)
-		var endState flow.EndState
+		var endState flow.DKGEndState
 		err = operation.RetrieveDKGEndStateForEpoch(epochCounter, &endState)(txn)
 		if err != nil {
 			key = nil
@@ -128,7 +128,7 @@ func (sk *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64)
 		}
 
 		// for any end state besides success, return error
-		if endState != flow.EndStateSuccess {
+		if endState != flow.DKGEndStateSuccess {
 			key = nil
 			safe = false
 			return fmt.Errorf("retrieving beacon for unsuccessful dkg run (dkg end state: %s)", endState)

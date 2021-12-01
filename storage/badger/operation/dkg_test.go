@@ -83,18 +83,18 @@ func TestDKGEndStateForEpoch(t *testing.T) {
 		epochCounter := rand.Uint64()
 
 		// should be able to write end state
-		endState := flow.EndStateSuccess
+		endState := flow.DKGEndStateSuccess
 		err := db.Update(InsertDKGEndStateForEpoch(epochCounter, endState))
 		assert.NoError(t, err)
 
 		// should be able to read end state
-		var readEndState flow.EndState
+		var readEndState flow.DKGEndState
 		err = db.View(RetrieveDKGEndStateForEpoch(epochCounter, &readEndState))
 		assert.NoError(t, err)
 		assert.Equal(t, endState, readEndState)
 
 		// attempting to overwrite should error
-		err = db.Update(InsertDKGEndStateForEpoch(epochCounter, flow.EndStateDKGFailure))
+		err = db.Update(InsertDKGEndStateForEpoch(epochCounter, flow.DKGEndStateDKGFailure))
 		assert.ErrorIs(t, err, storage.ErrAlreadyExists)
 	})
 }
