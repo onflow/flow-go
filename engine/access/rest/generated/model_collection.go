@@ -11,7 +11,7 @@ package generated
 type Collection struct {
 	Id string `json:"id"`
 
-	Transactions []string `json:"transactions"`
+	Transactions []Transaction `json:"transactions"`
 
 	Links *Links `json:"_links,omitempty"`
 }

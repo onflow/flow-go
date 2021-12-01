@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,17 +19,14 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func transactionURL(id string, expandable []string) string {
+func transactionURL(id string, expandResult bool) string {
 	u, _ := url.Parse(fmt.Sprintf("/v1/transactions/%s", id))
-	q := u.Query()
-
-	// by default expand all since we test expanding with converters
-	expandable = append(expandable, []string{"proposal_key", "authorizers", "payload_signatures", "envelope_signatures"}...)
-	if len(expandable) > 0 {
-		q.Add("expand", strings.Join(expandable, ","))
+	if expandResult {
+		q := u.Query()
+		// by default expand all since we test expanding with converters
+		q.Add("expand", transactionResult)
+		u.RawQuery = q.Encode()
 	}
-
-	u.RawQuery = q.Encode()
 	return u.String()
 }
 
@@ -41,11 +37,11 @@ func transactionResultURL(id string) string {
 func TestGetTransactions(t *testing.T) {
 	backend := &mock.API{}
 
-	t.Run("get by ID", func(t *testing.T) {
+	t.Run("get by ID without results", func(t *testing.T) {
 		tx := unittest.TransactionFixture()
 		req, _ := http.NewRequest(
 			"GET",
-			transactionURL(tx.ID().String(), nil),
+			transactionURL(tx.ID().String(), false),
 			nil,
 		)
 
@@ -79,14 +75,11 @@ func TestGetTransactions(t *testing.T) {
 					 "signature":"%s"
 				  }
 			   ],
+               "payload_signatures":[],
 			   "_links":{
 				  "_self":"/v1/transactions/%s"
 			   },
 				"_expandable": {
-					"proposal_key": "proposal_key",
-					"authorizers": "authorizers",
-					"payload_signatures": "payload_signatures",
-					"envelope_signatures": "envelope_signatures",
 					"result": "/v1/transaction_results/%s"
 				}
 			}`,
@@ -107,7 +100,7 @@ func TestGetTransactions(t *testing.T) {
 
 		req, _ := http.NewRequest(
 			"GET",
-			transactionURL(tx.ID().String(), []string{"result"}),
+			transactionURL(tx.ID().String(), true),
 			nil,
 		)
 
@@ -145,6 +138,7 @@ func TestGetTransactions(t *testing.T) {
 					 "signature":"%s"
 				  }
 			   ],
+                "payload_signatures":[],
 				"result": {
 					"block_id": "%s",
 					"status": "Sealed",
@@ -159,29 +153,18 @@ func TestGetTransactions(t *testing.T) {
 							"payload": ""
 						}
 					],
-					"_expandable": {
-						"events": "events"
-					},
 					"_links": {
 						"_self": "/v1/transaction_results/%s"
 					}
 				},
 			   "_links":{
 				  "_self":"/v1/transactions/%s"
-			   },
-				"_expandable": {
-					"proposal_key": "proposal_key",
-					"authorizers": "authorizers",
-					"payload_signatures": "payload_signatures",
-					"envelope_signatures": "envelope_signatures",
-					"result": "/v1/transaction_results/%s"
-				}
+			   }
 			}`,
 			tx.ID().String(),
 			tx.ReferenceBlockID.String(),
 			toBase64(tx.EnvelopeSignatures[0].Signature),
 			tx.ReferenceBlockID.String(),
-			tx.ID().String(),
 			tx.ID().String(),
 			tx.ID().String(),
 			tx.ID().String(),
@@ -192,16 +175,16 @@ func TestGetTransactions(t *testing.T) {
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", transactionURL("invalid", nil), nil)
+		req, _ := http.NewRequest("GET", transactionURL("invalid", false), nil)
 		rr := executeRequest(req, backend)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
 		assert.JSONEq(t, `{"code":400, "message":"invalid ID format"}`, rr.Body.String())
 	})
 
-	t.Run("get by ID Non-existing", func(t *testing.T) {
+	t.Run("get by ID non-existing", func(t *testing.T) {
 		tx := unittest.TransactionFixture()
-		req, _ := http.NewRequest("GET", transactionURL(tx.ID().String(), nil), nil)
+		req, _ := http.NewRequest("GET", transactionURL(tx.ID().String(), false), nil)
 
 		backend.Mock.
 			On("GetTransaction", mocks.Anything, tx.ID()).
@@ -263,7 +246,7 @@ func TestGetTransactionResult(t *testing.T) {
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", transactionURL("invalid", nil), nil)
+		req, _ := http.NewRequest("GET", transactionURL("invalid", false), nil)
 		rr := executeRequest(req, backend)
 
 		assert.Equal(t, http.StatusBadRequest, rr.Code)
@@ -357,7 +340,7 @@ func TestCreateTransaction(t *testing.T) {
 		assert.JSONEq(t, expected, rr.Body.String())
 	})
 
-	t.Run("create invalid", func(t *testing.T) {
+	t.Run("post invalid transaction", func(t *testing.T) {
 		tests := []struct {
 			inputField string
 			inputValue string

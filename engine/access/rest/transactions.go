@@ -19,16 +19,16 @@ func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenera
 		return nil, err
 	}
 
+	var txr *access.TransactionResult
+	// only lookup result if transaction result is to be expanded
 	if r.expands(transactionResult) {
-		txr, err := backend.GetTransactionResult(r.Context(), id)
+		txr, err = backend.GetTransactionResult(r.Context(), id)
 		if err != nil {
 			return nil, err
 		}
-
-		return transactionResponse(tx, txr, link, r.expandFields), nil
 	}
 
-	return transactionResponse(tx, nil, link, r.expandFields), nil
+	return transactionResponse(tx, txr, link, r.expandFields), nil
 }
 
 func getTransactionResultByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {

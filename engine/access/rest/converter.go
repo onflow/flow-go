@@ -322,21 +322,19 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 		auths = append(auths, auth.String())
 	}
 
-	resultLink, _ := link.TransactionResultLink(tx.ID())
-	self, _ := selfLink(tx.ID(), link.TransactionLink)
-
+	var expandable *generated.TransactionExpandable
 	var result *generated.TransactionResult
+	// if transaction result is provided then add that to the response, else add the expandable for the result
 	if txr != nil {
 		result = transactionResultResponse(txr, tx.ID(), link)
+	} else {
+		resultLink, _ := link.TransactionResultLink(tx.ID())
+		expandable = &generated.TransactionExpandable{
+			Result: resultLink,
+		}
 	}
 
-	expandable := &generated.TransactionExpandable{
-		ProposalKey:        "proposal_key",
-		Authorizers:        "authorizers",
-		PayloadSignatures:  "payload_signatures",
-		EnvelopeSignatures: "envelope_signatures",
-		Result:             resultLink,
-	}
+	self, _ := selfLink(tx.ID(), link.TransactionLink)
 
 	txResponse := &generated.Transaction{
 		Id:                 tx.ID().String(),
@@ -352,23 +350,6 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 		Result:             result,
 		Links:              self,
 		Expandable:         expandable,
-	}
-
-	// todo(sideninja) discuss if we still need this expandable
-	if !expands[expandable.Authorizers] {
-		txResponse.Authorizers = nil
-	}
-	// todo(sideninja) discuss if we still need this expandable
-	if !expands[expandable.ProposalKey] {
-		txResponse.ProposalKey = nil
-	}
-	// todo(sideninja) discuss if we still need this expandable
-	if !expands[expandable.PayloadSignatures] {
-		txResponse.PayloadSignatures = nil
-	}
-	// todo(sideninja) discuss if we still need this expandable
-	if !expands[expandable.EnvelopeSignatures] {
-		txResponse.EnvelopeSignatures = nil
 	}
 
 	return txResponse
@@ -421,10 +402,7 @@ func transactionResultResponse(txr *access.TransactionResult, txID flow.Identifi
 		ErrorMessage:    txr.ErrorMessage,
 		ComputationUsed: int32(0),
 		Events:          eventsResponse(txr.Events),
-		Expandable: &generated.TransactionResultExpandable{
-			Events: "events",
-		},
-		Links: self,
+		Links:           self,
 	}
 }
 
@@ -532,9 +510,10 @@ func collectionResponse(flowCollection *flow.LightCollection, link LinkGenerator
 	self, _ := selfLink(flowCollection.ID(), link.CollectionLink)
 
 	return generated.Collection{
-		Id:           flowCollection.ID().String(),
-		Transactions: idsResponse(flowCollection.Transactions),
-		Links:        self,
+		Id: flowCollection.ID().String(),
+		// TODO: broken after update to model
+		//Transactions: idsResponse(flowCollection.Transactions),
+		Links: self,
 	}
 }
 
