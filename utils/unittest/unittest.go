@@ -21,11 +21,11 @@ import (
 type SkipReason int
 
 const (
-	TEST_FLAKY           SkipReason = iota + 1 // flaky
-	TEST_WIP                                   // not fully implemented / broken
-	TEST_USES_GCP_BUCKET                       // requires GCP bucket to be setup
-	TEST_DEPRECATED                            // uses code that has been deprecated / disabled
-	TEST_LONG_RUNNING                          // long running
+	TEST_FLAKY               SkipReason = iota + 1 // flaky
+	TEST_WIP                                       // not fully implemented / broken
+	TEST_REQUIRES_GCP_ACCESS                       // requires the environment to be configured with GCP credentials
+	TEST_DEPRECATED                                // uses code that has been deprecated / disabled
+	TEST_LONG_RUNNING                              // long running
 )
 
 func (s SkipReason) String() string {
@@ -34,8 +34,8 @@ func (s SkipReason) String() string {
 		return "TEST_FLAKY"
 	case TEST_WIP:
 		return "TEST_WIP"
-	case TEST_USES_GCP_BUCKET:
-		return "TEST_GCP_BUCKET"
+	case TEST_REQUIRES_GCP_ACCESS:
+		return "TEST_REQUIRES_GCP_ACCESS"
 	case TEST_DEPRECATED:
 		return "TEST_DEPRECATED"
 	case TEST_LONG_RUNNING:

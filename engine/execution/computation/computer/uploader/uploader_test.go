@@ -130,7 +130,7 @@ func Test_AsyncUploader(t *testing.T) {
 }
 
 func Test_GCPBucketUploader(t *testing.T) {
-	testutils.SkipUnless(t, testutils.TEST_USES_GCP_BUCKET, "requires GCP Bucket setup")
+	testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
 
 	bucketName := os.Getenv("FLOW_TEST_GCP_BUCKET_NAME")
 	if bucketName == "" {
