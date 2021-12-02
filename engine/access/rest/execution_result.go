@@ -9,7 +9,7 @@ import (
 
 const blockIDQueryParam = "block_id"
 
-// getExecutionResultByID gets Execution Result payload by ID
+// getExecutionResultByID gets Execution Result payload by block IDs.
 func getExecutionResultsByBlockIDs(req *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	queryID := req.getQueryParam(blockIDQueryParam)
 	if len(queryID) == 0 {
@@ -21,6 +21,7 @@ func getExecutionResultsByBlockIDs(req *requestDecorator, backend access.API, li
 		return nil, err
 	}
 
+	// for each block ID we retrieve execution result
 	results := make([]*generated.ExecutionResult, len(blockIDs))
 	for i, id := range blockIDs {
 		res, err := backend.GetExecutionResultForBlockID(req.Context(), id)
@@ -33,6 +34,7 @@ func getExecutionResultsByBlockIDs(req *requestDecorator, backend access.API, li
 	return results, nil
 }
 
+// getExecutionResultByID gets execution result by the ID.
 func getExecutionResultByID(req *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := req.id()
 	if err != nil {

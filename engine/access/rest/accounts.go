@@ -7,12 +7,14 @@ import (
 
 const blockHeightQueryParam = "block_height"
 
+// getAccount handler retrieves account by address and returns the response
 func getAccount(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	address, err := toAddress(r.getVar("address"))
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
+	// retrieve account and decide based on provided query params which rpc method to envoke
 	var account *flow.Account
 	height := r.getQueryParam(blockHeightQueryParam)
 	switch height {
@@ -32,7 +34,7 @@ func getAccount(r *requestDecorator, backend access.API, link LinkGenerator) (in
 		if err != nil {
 			return nil, err
 		}
-	default:
+	default: // by default, we get an account at the latest block
 		h, err := toHeight(height)
 		if err != nil {
 			return nil, NewBadRequestError(err)

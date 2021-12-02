@@ -31,6 +31,7 @@ func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenera
 	return transactionResponse(tx, txr, link, r.expandFields), nil
 }
 
+// getTransactionResultByID retrieves transaction result by the transaction ID.
 func getTransactionResultByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := r.id()
 	if err != nil {

@@ -24,9 +24,11 @@ const maxAuthorizersCnt = 100
 const MaxAllowedIDs = 50 // todo(sideninja) discuss if we should restrict maximum on all IDs collection or is anywhere required more thant this
 const MaxAllowedHeights = 50
 
-//const MaxScriptLength =
-
 var MaxAllowedBlockIDs = MaxAllowedIDs
+
+// Converters section from request data to typed models
+// all methods names in this section are prefixed with 'to'
+//
 
 func toBase64(byteValue []byte) string {
 	return base64.StdEncoding.EncodeToString(byteValue)
@@ -290,7 +292,9 @@ func toScriptSource(script generated.ScriptsBody) ([]byte, error) {
 	return source, nil
 }
 
-// Response section - converting flow models to response models.
+// Response section converting flow models to response models
+// all methods names in this section are appended with 'response'
+//
 
 func proposalKeyResponse(key *flow.ProposalKey) *generated.ProposalKey {
 	return &generated.ProposalKey{
