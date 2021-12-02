@@ -495,65 +495,6 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 	}
 
 	// add all identities together
-	union := append(other, il...)
-
-	// sort by node id.  This will enable duplicate checks later
-	sort.Slice(union, func(p, q int) bool {
-		num1 := union[p].NodeID[:]
-		num2 := union[q].NodeID[:]
-		lenID := len(num1)
-
-		// assume the length is a multiple of 8, for performance.  it's 32 bytes
-		for i := 0; ; i += 8 {
-			chunk1 := binary.BigEndian.Uint64(num1[i:])
-			chunk2 := binary.BigEndian.Uint64(num2[i:])
-
-			if chunk1 < chunk2 {
-				return true
-			} else if chunk1 > chunk2 {
-				return false
-			} else if i >= lenID-8 {
-				// we're on the last chunk of 8 bytes, the nodeid's are equal
-				return false
-			}
-		}
-	})
-
-	// at this point, 'union' has a sorted slice of identities, with duplicates
-	lenUnion := len(union)
-
-	// check for duplicates, there can only be duplicates if lenUnion > 1
-	for i := 1; i < lenUnion; i++ {
-		// detect a duplicate, only allocate 'retval' if necessary
-		if union[i].NodeID == union[i-1].NodeID {
-			retval := make(IdentityList, 0, len(il)+len(other))
-			retval = append(retval, union[0:i]...)
-
-			i++
-
-			// loop over the rest of the slice, appending non-duplicates
-			for ; i < lenUnion; i++ {
-				if union[i].NodeID == union[i-1].NodeID {
-					continue
-				}
-				retval = append(retval, union[i])
-			}
-			// time to return
-			return retval
-		}
-	}
-
-	return union
-}
-
-// this form of Union will not alter the 'other' argument
-func (il IdentityList) UnionWithCopy(other IdentityList) IdentityList {
-	// stores the output, the union of the two lists
-	if (len(il) + len(other)) == 0 {
-		return IdentityList{}
-	}
-
-	// add all identities together
 	union := make(IdentityList, 0, len(il)+len(other))
 	union = append(union, il[:]...)
 	union = append(union, other[:]...)
