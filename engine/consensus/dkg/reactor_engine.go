@@ -168,13 +168,13 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first
 func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
 	nextDKG, err := e.State.Final().Epochs().Next().DKG()
 	if err != nil {
-		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve next DKG info")
+		e.log.Err(err).Msg("checking random beacon key consistency: could not retrieve next DKG info")
 		return
 	}
 
 	beaconPrivateKey, err := e.keyStorage.RetrieveMyBeaconPrivateKey(currentEpochCounter + 1)
 	if err != nil {
-		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG private info for next epoch")
+		e.log.Err(err).Msg("checking random beacon key consistency: could not retrieve beacon private key for next epoch")
 		return
 	}
 
@@ -183,16 +183,16 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 		return
 	}
 
-	nextDKGPubKey, err := nextDKG.KeyShare(e.me.NodeID())
+	nextBeaconPubKey, err := nextDKG.KeyShare(e.me.NodeID())
 	if err != nil {
-		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG public key for next epoch")
+		e.log.Err(err).Msg("checking random beacon key consistency: could not retrieve beacon public key for next epoch")
 		return
 	}
 
 	localPubKey := beaconPrivateKey.PublicKey()
 
-	if !nextDKGPubKey.Equals(localPubKey) {
-		e.log.Warn().Msg("checking DKG key consistency: locally computed dkg public key does not match dkg public key for next epoch")
+	if !nextBeaconPubKey.Equals(localPubKey) {
+		e.log.Warn().Msg("checking random beacon key consistency: locally computed public key does not match public key for next epoch")
 	}
 }
 
