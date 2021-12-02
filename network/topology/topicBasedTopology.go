@@ -60,7 +60,7 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels netwo
 		if !ok {
 			return nil, fmt.Errorf("could not extract roles for channel: %s", myChannel)
 		}
-		// this will modify 'roles'
+
 		myInteractingRoles = myInteractingRoles.Union(roles)
 	}
 
@@ -77,7 +77,6 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels netwo
 			return nil, fmt.Errorf("failed to derive list of peer nodes to connect for role %s: %w", role, err)
 		}
 
-		// this will modify 'roleFanout'
 		myFanout = myFanout.Union(roleFanout)
 	}
 
@@ -90,7 +89,6 @@ func (t TopicBasedTopology) GenerateFanout(ids flow.IdentityList, channels netwo
 			return nil, fmt.Errorf("could not generate fanout for topic %s: %w", myChannel, err)
 		}
 
-		// this will modify 'topicFanout'
 		myFanout = myFanout.Union(topicFanout)
 	}
 
