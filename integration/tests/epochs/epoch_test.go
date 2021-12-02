@@ -2,18 +2,20 @@ package epochs
 
 import (
 	"context"
-	"testing"
-
+	"fmt"
 	"github.com/onflow/cadence"
-	"github.com/onflow/flow-go/integration/utils"
-	"github.com/onflow/flow-go/utils/unittest"
-	"github.com/stretchr/testify/suite"
-
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/flow-go/integration/testnet"
+	"github.com/onflow/flow-go/integration/utils"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/onflow/flow-go/utils/unittest"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"testing"
 )
 
 func TestEpochs(t *testing.T) {
@@ -138,31 +140,70 @@ func (s *Suite) TestEpochJoin() {
 
 	env := utils.LocalnetEnv()
 
+	role := flow.RoleAccess
+
 	// stake a new node
-	info := s.StakeNode(ctx, env, flow.RoleConsensus)
+	info := s.StakeNode(ctx, env, role)
 
-	// get node info from staking table
-	nodeInfoCDC := s.ExecuteGetNodeInfoScript(ctx, env, info.NodeID)
-	nodeInfo, ok := nodeInfoCDC.(cadence.Struct)
-	require.True(s.T(), ok)
-
-	// make sure node info we generated matches what we get from the flow staking table
-	nodeIDFromState := string(nodeInfo.Fields[0].(cadence.String))
-	require.Equal(s.T(), info.NodeID.String(), nodeIDFromState, "expected node ID generated in test to equal node ID from staking table ")
-
-	result := s.SetApprovedNodesScript(ctx, env, append(s.net.Identities().NodeIDs(), info.NodeID)...)
-	require.NoError(s.T(), result.Error)
-
-	// get new approved nodes list and make sure new node was added correctly
+	// ensure node ID in approved list
 	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
+	require.Contains(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(info.NodeID.String()), fmt.Sprintf("expected new node to be in approved nodes list: %x", info.NodeID))
 
-	found := false
-	for _, val := range approvedNodes.(cadence.Array).Values {
-		if string(val.(cadence.String)) == info.NodeID.String() {
-			found = true
-		}
+	// check if node is in proposed table
+	proposedTable := s.ExecuteGetProposedTableScript(ctx, env, info.NodeID)
+	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), fmt.Sprintf("expected new node to be in proposed table: %x", info.NodeID))
+
+	containerConfigs := []func(config *testnet.NodeConfig){
+		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithID(info.NodeID),
 	}
 
-	require.True(s.T(), found, "node id for new node not found in approved list after setting the approved list")
+	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
+	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
+	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
+	require.NoError(s.T(), err)
+
+	s.WaitForPhase(ctx, flow.EpochPhaseSetup)
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+
+	//add our container to the network
+	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
+	require.NoError(s.T(), err, "failed to add container to network")
+
+	//start our test container
+	testContainer := s.net.ContainerByID(info.NodeID)
+	testContainer.WriteRootSnapshot(snapshot)
+	testContainer.Container.Start(ctx)
+
+	// wait for new container to startup and start processing blocks
+	// wait for end of epoch
+	epochFinalView, err := snapshot.Epochs().Current().FinalView()
+	require.NoError(s.T(), err)
+	s.BlockState.WaitForSealedView(s.T(), epochFinalView)
+
+	// get head of snapshot we bootstrap from
+	bootstrapHead, err := snapshot.Head()
+	require.NoError(s.T(), err)
+
+	// get snapshot directly from new AN and compare head with head from the
+	// snapshot that was used to bootstrap the node
+	clientAddr := fmt.Sprintf(":%s", s.net.AccessPortsByContainerName[info.ContainerName])
+	client, err := testnet.NewClient(clientAddr, s.net.Root().Header.ChainID.Chain())
+	require.NoError(s.T(), err)
+	snapshot, err = client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+
+	head, err := snapshot.Head()
+	require.NoError(s.T(), err)
+
+	// head should now be at-least 20 blocks higher from when we started
+	require.True(s.T(), head.Height - bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height))
+
+	// execute script directly on new AN to ensure it's functional
+	proposedTable, err = client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
+	require.NoError(s.T(), err)
+	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by new AN.")
+
 	s.net.StopContainers()
 }

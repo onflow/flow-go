@@ -259,24 +259,24 @@ func (c *Client) UserAddress(txResp *sdk.TransactionResult) (sdk.Address, bool) 
 	return address, found
 }
 
-func (c *Client) TokenAmountByRole(role flow.Role) (string, error) {
+func (c *Client) TokenAmountByRole(role flow.Role) (string, float64, error) {
 	if role == flow.RoleCollection {
-		return "250000.0", nil
+		return "250000.0",250000.0, nil
 	}
 	if role == flow.RoleConsensus {
-		return "500000.0", nil
+		return "500000.0", 500000.0, nil
 	}
 	if role == flow.RoleExecution {
-		return "1250000.0", nil
+		return "1250000.0", 1250000.0,nil
 	}
 	if role == flow.RoleVerification {
-		return "135000.0", nil
+		return "135000.0", 135000.0, nil
 	}
 	if role == flow.RoleAccess {
-		return "0.0", nil
+		return "0.0", 0.0, nil
 	}
 
-	return "", fmt.Errorf("could not get token amount by role: %v", role)
+	return "", 0, fmt.Errorf("could not get token amount by role: %v", role)
 }
 
 func (c *Client) GetAccount(accountAddress sdk.Address) (*sdk.Account, error) {

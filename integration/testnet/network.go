@@ -87,6 +87,11 @@ const (
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
 	DefaultViewsInEpoch          uint64 = 180
+
+	integrationBootstrap = "flow-integration-bootstrap"
+
+	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
+	DefaultMinimumNumOfAccessNodeIDS = 1
 )
 
 func init() {
@@ -95,19 +100,19 @@ func init() {
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
-	t                  *testing.T
-	suite              *testingdock.Suite
-	config             NetworkConfig
-	cli                *dockerclient.Client
-	network            *testingdock.Network
-	Containers         map[string]*Container
-	ConsensusFollowers map[flow.Identifier]consensus_follower.ConsensusFollower
-	AccessPorts        map[string]string
-	root               *flow.Block
-	result             *flow.ExecutionResult
-	seal               *flow.Seal
-	bootstrapDir       string
-	allPorts           map[string]struct{}
+	t                          *testing.T
+	suite                      *testingdock.Suite
+	config                     NetworkConfig
+	cli                        *dockerclient.Client
+	network                    *testingdock.Network
+	Containers                 map[string]*Container
+	ConsensusFollowers         map[flow.Identifier]consensus_follower.ConsensusFollower
+	AccessPorts                map[string]string
+	AccessPortsByContainerName map[string]string
+	root                       *flow.Block
+	result                     *flow.ExecutionResult
+	seal                       *flow.Seal
+	BootstrapDir               string
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -117,6 +122,17 @@ func (net *FlowNetwork) Identities() flow.IdentityList {
 		il = append(il, c.Config.Identity())
 	}
 	return il
+}
+
+// ContainersByRole returns all the containers in the network with the specified role
+func (net *FlowNetwork) ContainersByRole(role flow.Role) []*Container {
+	cl := make([]*Container, 0, len(net.Containers))
+	for _, c := range net.Containers {
+		if c.Config.Role == role {
+			cl = append(cl, c)
+		}
+	}
+	return cl
 }
 
 // Root returns the root block generated for the network.
@@ -442,6 +458,11 @@ func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 	}
 }
 
+// integrationBootstrapDir creates a temporary directory at /tmp/flow-integration-bootstrap
+func integrationBootstrapDir() (string, error) {
+	return ioutil.TempDir(TmpRoot, integrationBootstrap)
+}
+
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// number of nodes
@@ -465,31 +486,40 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		Name: networkConf.Name,
 	})
 
-	// create a temporary directory to store all bootstrapping files, these
-	// will be shared between all nodes
-	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
+	// create a temporary directory to store all bootstrapping files 
+	bootstrapDir, err := integrationBootstrapDir()
 	require.Nil(t, err)
 
-	fmt.Printf("bootstrapDir: %s \n", bootstrapDir)
+	fmt.Printf("BootstrapDir: %s \n", bootstrapDir)
 
 	root, result, seal, confs, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
-		t:                  t,
-		cli:                dockerClient,
-		config:             networkConf,
-		suite:              suite,
-		network:            network,
-		Containers:         make(map[string]*Container, nNodes),
-		ConsensusFollowers: make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
-		AccessPorts:        make(map[string]string),
-		root:               root,
-		seal:               seal,
-		result:             result,
-		bootstrapDir:       bootstrapDir,
-		allPorts:           make(map[string]struct{}),
+		t:                          t,
+		cli:                        dockerClient,
+		config:                     networkConf,
+		suite:                      suite,
+		network:                    network,
+		Containers:                 make(map[string]*Container, nNodes),
+		ConsensusFollowers:         make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
+		AccessPorts:                make(map[string]string),
+		AccessPortsByContainerName: make(map[string]string),
+		root:                       root,
+		seal:                       seal,
+		result:                     result,
+		BootstrapDir:               bootstrapDir,
 	}
+
+	// check that at-least 2 full access nodes must be configure in your test suite
+	// in order to provide a secure GRPC connection for LN & SN nodes
+	accessNodeIDS := make([]string, 0)
+	for _, n := range confs {
+		if n.Role == flow.RoleAccess && !n.Ghost {
+			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
+		}
+	}
+	require.True(t, len(accessNodeIDS) >= DefaultMinimumNumOfAccessNodeIDS, fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
 
 	// add each node to the network
 	for _, nodeConf := range confs {
@@ -517,16 +547,6 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	return flowNetwork
 }
 
-func (net *FlowNetwork) getRandomPort(t *testing.T) string {
-	for {
-		port := testingdock.RandomPort(t)
-		if _, ok := net.allPorts[port]; !ok {
-			net.allPorts[port] = struct{}{}
-			return port
-		}
-	}
-}
-
 func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotPath string, followerConf ConsensusFollowerConfig, containers []ContainerConfig) {
 	tmpdir, err := ioutil.TempDir(TmpRoot, "flow-consensus-follower")
 	require.NoError(t, err)
@@ -551,7 +571,7 @@ func (net *FlowNetwork) addConsensusFollower(t *testing.T, rootProtocolSnapshotP
 	require.NoError(t, err)
 
 	// consensus follower
-	bindPort := net.getRandomPort(t)
+	bindPort := testingdock.RandomPort(t)
 	bindAddr := fmt.Sprintf("0.0.0.0:%s", bindPort)
 	opts := append(
 		followerConf.Opts,
@@ -654,7 +674,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		switch nodeConf.Role {
 		case flow.RoleCollection:
 
-			hostPort := net.getRandomPort(t)
+			hostPort := testingdock.RandomPort(t)
 			containerPort := "9000/tcp"
 
 			nodeContainer.bindPort(hostPort, containerPort)
@@ -670,12 +690,12 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 		case flow.RoleExecution:
 
-			hostPort := net.getRandomPort(t)
+			hostPort := testingdock.RandomPort(t)
 			containerPort := "9000/tcp"
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
-			hostMetricsPort := net.getRandomPort(t)
+			hostMetricsPort := testingdock.RandomPort(t)
 			containerMetricsPort := "8080/tcp"
 
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
@@ -702,9 +722,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
 
 		case flow.RoleAccess:
-			hostGRPCPort := net.getRandomPort(t)
-			hostHTTPProxyPort := net.getRandomPort(t)
-			hostSecureGRPCPort := net.getRandomPort(t)
+			hostGRPCPort := testingdock.RandomPort(t)
+			hostHTTPProxyPort := testingdock.RandomPort(t)
+			hostSecureGRPCPort := testingdock.RandomPort(t)
 			containerGRPCPort := "9000/tcp"
 			containerSecureGRPCPort := "9001/tcp"
 			containerHTTPProxyPort := "8000/tcp"
@@ -721,10 +741,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
 			nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 			net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
+			net.AccessPortsByContainerName[nodeContainer.Name()] = hostGRPCPort
 			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 
 			if nodeConf.SupportsUnstakedNodes {
-				hostExternalNetworkPort := net.getRandomPort(t)
+				hostExternalNetworkPort := testingdock.RandomPort(t)
 				nodeContainer.bindPort(hostExternalNetworkPort, fmt.Sprintf("%s/tcp", strconv.Itoa(DefaultFlowPort)))
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
 				nodeContainer.addFlag("supports-unstaked-node", "true")
@@ -742,7 +763,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 		}
 	} else {
-		hostPort := net.getRandomPort(t)
+		hostPort := testingdock.RandomPort(t)
 		containerPort := "9000/tcp"
 
 		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
@@ -778,7 +799,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 }
 
 func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
-	err := WriteJSON(filepath.Join(net.bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
+	err := WriteJSON(filepath.Join(net.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
 	require.NoError(net.t, err)
 }
 
