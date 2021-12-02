@@ -1,6 +1,7 @@
 package backdata
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -11,7 +12,7 @@ import (
 func TestArrayBackData_BelowLimit(t *testing.T) {
 	size := 10
 
-	bd := NewArrayBackData(uint32(size), 1, RandomEjection)
+	bd := NewArrayBackData(uint32(size), 1, LRUEjection)
 
 	entities := unittest.EntityListFixture(uint(size))
 
@@ -20,11 +21,13 @@ func TestArrayBackData_BelowLimit(t *testing.T) {
 		// adding each element must be successful.
 		require.True(t, bd.Add(e.ID(), e))
 
-		// size of back data should be incremented by each addition.
+		// total of back data should be incremented by each addition.
 		require.Equal(t, bd.Size(), uint(i+1))
 
 		// entity should be placed at index i in back data
-		require.Equal(t, e, bd.entities[i].entity)
+		id, entity, _ := bd.entities.get(uint32(i))
+		require.Equal(t, e.ID(), id)
+		require.Equal(t, e, entity)
 	}
 
 	// sanity checks
@@ -35,7 +38,8 @@ func TestArrayBackData_BelowLimit(t *testing.T) {
 		// also, since we have not yet over-limited, entities are received valueIndex in the same order they
 		// are added.
 		require.Equal(t, bd.buckets[0][i].valueIndex, uint32(i))
-		require.Equal(t, bd.entities[i].owner, uint64(i))
+		_, _, owner := bd.entities.get(uint32(i))
+		require.Equal(t, owner, uint64(i))
 	}
 
 	// getting inserted elements
@@ -43,5 +47,34 @@ func TestArrayBackData_BelowLimit(t *testing.T) {
 		actual, ok := bd.ByID(expected.ID())
 		require.True(t, ok)
 		require.Equal(t, expected, actual)
+	}
+}
+
+func TestArrayBackData_TwoBuckets(t *testing.T) {
+	size := 30 // bucket total is 16, hence, we end up having two buckets.
+
+	bd := NewArrayBackData(uint32(size), 8, LRUEjection)
+
+	entities := unittest.EntityListFixture(uint(size))
+
+	// adding elements
+	for i, e := range entities {
+		// adding each element must be successful.
+		require.True(t, bd.Add(e.ID(), e))
+
+		// total of back data should be incremented by each addition.
+		require.Equal(t, bd.Size(), uint(i+1))
+
+		// entity should be placed at index i in back data
+		_, entity, _ := bd.entities.get(uint32(i))
+		require.Equal(t, e, entity)
+	}
+
+	// getting inserted elements
+	for i, expected := range entities {
+		actual, ok := bd.ByID(expected.ID())
+		require.True(t, ok)
+		require.Equal(t, expected, actual)
+		fmt.Println(i)
 	}
 }

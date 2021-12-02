@@ -2,8 +2,6 @@ package backdata
 
 import (
 	"encoding/binary"
-	"fmt"
-	"math/rand"
 
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -25,37 +23,29 @@ type key struct {
 // keyBucket represents a bucket of keys.
 type keyBucket [bucketSize]key
 
-type cachedEntity struct {
-	id     flow.Identifier
-	owner  uint64
-	entity flow.Entity
-}
-
-// ArrayBackData implements an array-based generic memory pool backed by a fixed size array.
+// ArrayBackData implements an array-based generic memory pool backed by a fixed total array.
 type ArrayBackData struct {
-	limit        uint64
-	overLimit    uint64
-	keyCount     uint64 // total number of non-expired key-values
-	bucketNum    uint64 // total number of buckets (i.e., size of buckets)
-	ejectionMode EjectionMode
-	buckets      []keyBucket
-	entities     []cachedEntity
+	limit     uint64
+	overLimit uint64
+	keyCount  uint64 // total number of non-expired key-values
+	bucketNum uint64 // total number of buckets (i.e., total of buckets)
+	buckets   []keyBucket
+	entities  *entityList
 }
 
 func NewArrayBackData(limit uint32, oversizeFactor uint32, mode EjectionMode) ArrayBackData {
 	// total buckets
 	bucketNum := uint64(limit*oversizeFactor) / bucketSize
-	if bucketNum == uint64(0) {
-		bucketNum = uint64(1)
+	if uint64(limit*oversizeFactor)%bucketSize != 0 {
+		bucketNum++
 	}
 
 	bd := ArrayBackData{
-		bucketNum:    bucketNum,
-		limit:        uint64(limit),
-		overLimit:    uint64(limit * oversizeFactor),
-		buckets:      make([]keyBucket, bucketNum),
-		entities:     make([]cachedEntity, limit),
-		ejectionMode: mode,
+		bucketNum: bucketNum,
+		limit:     uint64(limit),
+		overLimit: uint64(limit * oversizeFactor),
+		buckets:   make([]keyBucket, bucketNum),
+		entities:  newEntityList(uint64(limit), mode),
 	}
 
 	return bd
@@ -87,9 +77,9 @@ func (a *ArrayBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	return a.get(entityID)
 }
 
-// Size will return the size of the backend.
+// Size will return the total of the backend.
 func (a ArrayBackData) Size() uint {
-	return uint(a.keyCount)
+	return uint(a.entities.size())
 }
 
 // All returns all entities from the pool.
@@ -115,14 +105,11 @@ func (a *ArrayBackData) put(entityID flow.Identifier, entity flow.Entity) bool {
 		return false
 	}
 
-	entityIndex := a.valueIndexForEntity()
 	a.keyCount++
+	entityIndex := a.entities.add(entityID, entity, a.ownerIndexOf(bucketIndex, slotToUse))
 	a.buckets[bucketIndex][slotToUse].keyIndex = a.keyCount
 	a.buckets[bucketIndex][slotToUse].valueIndex = entityIndex
 	a.buckets[bucketIndex][slotToUse].idPrefix = idPrefix
-	a.entities[entityIndex].entity = entity
-	a.entities[entityIndex].id = entityID
-	a.entities[entityIndex].owner = (bucketIndex * bucketSize) + slotToUse
 	return true
 }
 
@@ -133,7 +120,7 @@ func (a ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bool) {
 			continue
 		}
 
-		valueIndex, linked := a.valueIndexOf(bucketIndex, k)
+		id, entity, linked := a.linkedEntityOf(bucketIndex, k)
 		if !linked {
 			// valueIndex does not represent value entity for this key
 			// this happens upon an ejection on values
@@ -141,12 +128,11 @@ func (a ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bool) {
 		}
 
 		// come here to check remaining hash bits
-		if a.entities[valueIndex].id != entityID {
-			fmt.Printf("id mismatch: expected: %x got: %x \n", a.entities[valueIndex].id, entityID)
+		if id != entityID {
 			continue
 		}
 
-		return a.entities[valueIndex].entity, true
+		return entity, true
 	}
 
 	return nil, false
@@ -194,13 +180,13 @@ func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entity
 		}
 
 		// come here to check if kvIndex / kvOwner still linked
-		valueIndex, linked := a.valueIndexOf(bucketIndex, k)
+		id, _, linked := a.linkedEntityOf(bucketIndex, k)
 		if !linked {
 			continue
 		}
 
 		// come here to check remaining hash bits
-		if a.entities[valueIndex].id != entityID {
+		if id != entityID {
 			continue
 		}
 
@@ -211,28 +197,16 @@ func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entity
 	return slotToUse, true
 }
 
-func (a *ArrayBackData) valueIndexForEntity() uint32 {
-	if a.keyCount < a.limit {
-		// we are not over the limit yet.
-		return uint32(a.keyCount)
-	} else {
-		// array back data is full
-		if a.ejectionMode == RandomEjection {
-			// ejecting a random entity
-			return uint32(rand.Intn(int(a.limit)))
-		} else {
-			// ejecting oldest entity
-			return uint32(a.keyCount % a.limit)
-		}
-	}
+func (a ArrayBackData) ownerIndexOf(bucketIndex uint64, slotIndex uint64) uint64 {
+	return (bucketIndex * bucketSize) + slotIndex
 }
 
-func (a *ArrayBackData) valueIndexOf(bucketIndex uint64, slot uint64) (uint32, bool) {
+func (a *ArrayBackData) linkedEntityOf(bucketIndex uint64, slot uint64) (flow.Identifier, flow.Entity, bool) {
 	valueIndex := a.buckets[bucketIndex][slot].valueIndex
-	kvOwner := a.entities[valueIndex].owner
-	if ((bucketIndex * bucketSize) + slot) != kvOwner {
+	id, entity, owner := a.entities.get(valueIndex)
+	if ((bucketIndex * bucketSize) + slot) != owner {
 		a.buckets[bucketIndex][slot].keyIndex = 0 // kvIndex / kvOwner no longer linked
-		return 0, false
+		return flow.Identifier{}, nil, false
 	}
-	return valueIndex, true
+	return id, entity, true
 }
