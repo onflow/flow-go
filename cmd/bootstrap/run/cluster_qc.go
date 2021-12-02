@@ -74,6 +74,10 @@ func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *clus
 		}
 	}
 
+	if createdQC == nil {
+		return nil, fmt.Errorf("not enough votes to create qc for bootstrapping")
+	}
+
 	// validate QC
 	err = hotstuffValidator.ValidateQC(createdQC, &hotBlock)
 
