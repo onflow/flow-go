@@ -885,11 +885,13 @@ func PrivateNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.No
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	nodeID := IdentifierFixture()
+	stakingKey := StakingPrivKeyByIdentifier(nodeID)
 	identity := flow.Identity{
-		NodeID:  nodeID,
-		Address: fmt.Sprintf("address-%v", nodeID[0:7]),
-		Role:    flow.RoleConsensus,
-		Stake:   1000,
+		NodeID:        nodeID,
+		Address:       fmt.Sprintf("address-%v", nodeID[0:7]),
+		Role:          flow.RoleConsensus,
+		Stake:         1000,
+		StakingPubKey: stakingKey.PublicKey(),
 	}
 	for _, apply := range opts {
 		apply(&identity)
@@ -1773,6 +1775,21 @@ func PrivateKeyFixture(algo crypto.SigningAlgorithm, seedLength int) crypto.Priv
 		panic(err)
 	}
 	return sk
+}
+
+// PrivateKeyFixtureByIdentifier returns a private key for a given node.
+// given the same identifier, it will always return the same private key
+func PrivateKeyFixtureByIdentifier(algo crypto.SigningAlgorithm, seedLength int, id flow.Identifier) crypto.PrivateKey {
+	seed := append(id[:], id[:]...)
+	sk, err := crypto.GeneratePrivateKey(algo, seed[:seedLength])
+	if err != nil {
+		panic(err)
+	}
+	return sk
+}
+
+func StakingPrivKeyByIdentifier(id flow.Identifier) crypto.PrivateKey {
+	return PrivateKeyFixtureByIdentifier(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381, id)
 }
 
 // NetworkingPrivKeyFixture returns random ECDSAP256 private key

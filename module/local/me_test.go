@@ -8,6 +8,8 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// should be able to initialize with a Identity whose PublicKey matches with
+// the given private key's public key
 func TestInitializeWithMatchingKey(t *testing.T) {
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	nodeID := unittest.IdentityFixture()
@@ -18,6 +20,8 @@ func TestInitializeWithMatchingKey(t *testing.T) {
 	require.Equal(t, nodeID.NodeID, me.NodeID())
 }
 
+// should fail to initialize with a Identity whose PublicKey mismatch with
+// the given private key's public key
 func TestInitializeWithMisMatchingKey(t *testing.T) {
 	stakingPriv := unittest.StakingPrivKeyFixture()
 	badPriv := unittest.StakingPrivKeyFixture()
