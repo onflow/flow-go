@@ -83,7 +83,7 @@ func (a *ArrayBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flo
 
 // ByID returns the given item from the pool.
 func (a *ArrayBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
-
+	return nil, false
 }
 
 // Size will return the size of the backend.
@@ -123,6 +123,30 @@ func (a *ArrayBackData) put(entityID flow.Identifier, entity flow.Entity) bool {
 	a.entities[entityIndex].owner = (bucketIndex * bucketSize) + slotToUse
 	return true
 }
+
+//func (a ArrayBackData) get(entityID flow.Identifier) (flow.Identifier, bool) {
+//	idPrefix, bucketIndex := a.idPrefixAndBucketIndex(entityID)
+//	for k := uint64(0); k < bucketSize; k++ {
+//		if a.buckets[bucketIndex][k].idPrefix != idPrefix {
+//			continue
+//		}
+//
+//		valueIndex := a.buckets[bucketIndex][k]
+//		// checking health of key <-> value link
+//		// come here to check if kvIndex / kvOwner still linked
+//		if !a.keyValueLinked(bucketIndex, k) {
+//
+//		}
+//
+//		// come here to check remaining hash bits
+//		if a.entities[kvIndex].id != entityID {
+//			continue
+//		}
+//
+//		// entity ID already exists in the bucket
+//		return 0, false
+//	}
+//}
 
 func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (uint32, uint64) {
 	// uint64(id[0:8]) used to compute bucket index for which this key (i.e., id) belongs to
@@ -166,15 +190,13 @@ func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entity
 		}
 
 		// come here to check if kvIndex / kvOwner still linked
-		kvIndex := a.buckets[bucketIndex][k].keyIndex
-		kvOwner := a.entities[kvIndex].owner
-		if ((bucketIndex * bucketSize) + k) != kvOwner {
-			a.buckets[bucketIndex][k].keyIndex = 0 // kvIndex / kvOwner no longer linked
+		valueIndex, linked := a.valueIndexOf(bucketIndex, k)
+		if !linked {
 			continue
 		}
 
 		// come here to check remaining hash bits
-		if a.entities[kvIndex].id != entityID {
+		if a.entities[valueIndex].id != entityID {
 			continue
 		}
 
@@ -199,4 +221,14 @@ func (a *ArrayBackData) valueIndexForEntity() uint32 {
 			return uint32(a.keyCount % a.limit)
 		}
 	}
+}
+
+func (a *ArrayBackData) valueIndexOf(bucketIndex uint64, slot uint64) (uint64, bool) {
+	valueIndex := a.buckets[bucketIndex][slot].keyIndex
+	kvOwner := a.entities[valueIndex].owner
+	if ((bucketIndex * bucketSize) + slot) != kvOwner {
+		a.buckets[bucketIndex][slot].keyIndex = 0 // kvIndex / kvOwner no longer linked
+		return 0, false
+	}
+	return valueIndex, true
 }
