@@ -14,7 +14,7 @@ import (
 )
 
 // TestInsertMyDKGPrivateInfo_StoreRetrieve tests writing and reading private DKG info.
-func TestMyDKGPrivateInfo_StoreRetrieve(t *testing.T) {
+func TestMyBeaconPrivateKey_StoreRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
 		t.Run("when not stored", func(t *testing.T) {
