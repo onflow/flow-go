@@ -103,7 +103,7 @@ func NewParticipant(
 	voter := voter.New(modules.Signer, modules.Forks, modules.Persist, modules.Committee, voted)
 
 	// initialize the event handler
-	_, err = eventhandler.New(
+	_, err = eventhandler.NewEventHandler(
 		log,
 		pacemaker,
 		producer,
