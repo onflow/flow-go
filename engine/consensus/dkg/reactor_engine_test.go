@@ -9,7 +9,9 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
@@ -22,13 +24,53 @@ import (
 	"github.com/onflow/flow-go/utils/unittest/mocks"
 )
 
-// TestEpochSetup ensures that, upon receiving an EpochSetup event, the engine
-// correctly creates a new DKGController and registers phase transitions based
-// on the views specified in the current epoch, as well as regular calls to the
-// DKG smart-contract.
+// ReactorSuite is the test suite for the reactor engine.
+type ReactorSuite struct {
+	suite.Suite
+
+	// config
+	dkgStartView       uint64
+	dkgPhase1FinalView uint64
+	dkgPhase2FinalView uint64
+	dkgPhase3FinalView uint64
+
+	epochCounter       uint64            // current epoch counter
+	myIndex            int               // my index in the DKG
+	committee          flow.IdentityList // the DKG committee
+	expectedPrivateKey crypto.PrivateKey
+	firstBlock         *flow.Header
+	blocksByView       map[uint64]*flow.Header
+
+	// track how many warn-level logs are logged
+	warnsLogged int
+	logger      zerolog.Logger
+
+	local        *module.Local
+	currentEpoch *protocol.Epoch
+	nextEpoch    *protocol.Epoch
+	epochQuery   *mocks.EpochQuery
+	snapshot     *protocol.Snapshot
+	state        *protocol.State
+	viewEvents   *gadgets.Views
+
+	dkgState   *storage.DKGState
+	controller *module.DKGController
+	factory    *module.DKGControllerFactory
+
+	engine *dkg.ReactorEngine
+}
+
+func (suite *ReactorSuite) NextEpochCounter() uint64 {
+	return suite.epochCounter + 1
+}
+
+func TestReactorSuite(t *testing.T) {
+	suite.Run(t, new(ReactorSuite))
+}
+
+// SetupTest prepares the DKG test.
 //
 // The EpochSetup event is received at view 100.
-
 // The current epoch is configured with DKG phase transitions at views 150, 200,
 // and 250. In between phase transitions, the controller calls the DKG
 // smart-contract every 10 views.
@@ -41,109 +83,177 @@ import (
 // Phase2Final: 200
 // polling    : 210 220 230 240 250
 // Phase3Final: 250
-func TestEpochSetup(t *testing.T) {
-	rand.Seed(time.Now().UnixNano())
-	currentCounter := rand.Uint64()
-	nextCounter := currentCounter + 1
-	committee := unittest.IdentityListFixture(10)
-	myIndex := 5
-	me := new(module.Local)
-	me.On("NodeID").Return(committee[myIndex].NodeID)
+func (suite *ReactorSuite) SetupTest() {
+
+	suite.dkgStartView = 100
+	suite.dkgPhase1FinalView = 150
+	suite.dkgPhase2FinalView = 200
+	suite.dkgPhase3FinalView = 250
+
+	suite.epochCounter = rand.Uint64()
+	suite.committee = unittest.IdentityListFixture(10)
+	suite.myIndex = 5
+
+	suite.local = new(module.Local)
+	suite.local.On("NodeID").Return(suite.committee[suite.myIndex].NodeID)
 
 	// create a block for each view of interest
-	blocks := make(map[uint64]*flow.Header)
-	var view uint64
-	for view = 100; view <= 250; view += dkg.DefaultPollStep {
-		header := unittest.BlockHeaderFixture()
-		header.View = view
-		blocks[view] = &header
+	suite.blocksByView = make(map[uint64]*flow.Header)
+	for view := suite.dkgStartView; view <= suite.dkgPhase3FinalView; view += dkg.DefaultPollStep {
+		header := unittest.BlockHeaderFixture(unittest.HeaderWithView(view))
+		suite.blocksByView[view] = &header
 	}
-	firstBlock := blocks[100]
+	suite.firstBlock = suite.blocksByView[100]
 
 	// expectedPrivKey is the expected private share produced by the dkg run. We
 	// will mock the controller to return this value, and we will check it
 	// against the value that gets inserted in the DB at the end.
-	expectedPrivKey := unittest.NetworkingPrivKeyFixture()
+	suite.expectedPrivateKey = unittest.PrivateKeyFixture(crypto.BLSBLS12381, 48)
 
-	currentEpoch := new(protocol.Epoch)
-	currentEpoch.On("Counter").Return(currentCounter, nil)
-	currentEpoch.On("DKGPhase1FinalView").Return(uint64(150), nil)
-	currentEpoch.On("DKGPhase2FinalView").Return(uint64(200), nil)
-	currentEpoch.On("DKGPhase3FinalView").Return(uint64(250), nil)
-	nextEpoch := new(protocol.Epoch)
-	nextEpoch.On("Counter").Return(nextCounter, nil)
-	nextEpoch.On("InitialIdentities").Return(committee, nil)
+	// mock protocol state
+	suite.currentEpoch = new(protocol.Epoch)
+	suite.currentEpoch.On("Counter").Return(suite.epochCounter, nil)
+	suite.currentEpoch.On("DKGPhase1FinalView").Return(suite.dkgPhase1FinalView, nil)
+	suite.currentEpoch.On("DKGPhase2FinalView").Return(suite.dkgPhase2FinalView, nil)
+	suite.currentEpoch.On("DKGPhase3FinalView").Return(suite.dkgPhase3FinalView, nil)
+	suite.nextEpoch = new(protocol.Epoch)
+	suite.nextEpoch.On("Counter").Return(suite.NextEpochCounter(), nil)
+	suite.nextEpoch.On("InitialIdentities").Return(suite.committee, nil)
 
-	epochQuery := mocks.NewEpochQuery(t, currentCounter)
-	epochQuery.Add(currentEpoch)
-	epochQuery.Add(nextEpoch)
-	snapshot := new(protocol.Snapshot)
-	snapshot.On("Epochs").Return(epochQuery)
-	state := new(protocol.State)
-	state.On("AtBlockID", firstBlock.ID()).Return(snapshot)
+	suite.epochQuery = mocks.NewEpochQuery(suite.T(), suite.epochCounter)
+	suite.epochQuery.Add(suite.currentEpoch)
+	suite.epochQuery.Add(suite.nextEpoch)
+	suite.snapshot = new(protocol.Snapshot)
+	suite.snapshot.On("Epochs").Return(suite.epochQuery)
+	suite.snapshot.On("Head").Return(suite.firstBlock, nil)
+	suite.state = new(protocol.State)
+	suite.state.On("AtBlockID", suite.firstBlock.ID()).Return(suite.snapshot)
+	suite.state.On("Final").Return(suite.snapshot)
 
 	// ensure that an attempt is made to insert the expected dkg private share
 	// for the next epoch.
-	keyStorage := new(storage.BeaconPrivateKeys)
-	keyStorage.On("InsertMyBeaconPrivateKey", mock.Anything, mock.Anything).Run(
+	suite.dkgState = new(storage.DKGState)
+	suite.dkgState.On("SetDKGStarted", suite.NextEpochCounter()).Return(nil).Once()
+	suite.dkgState.On("InsertMyBeaconPrivateKey", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			epochCounter := args.Get(0).(uint64)
-			require.Equal(t, nextCounter, epochCounter)
+			require.Equal(suite.T(), suite.NextEpochCounter(), epochCounter)
 			dkgPriv := args.Get(1).(*encodable.RandomBeaconPrivKey)
-			require.Equal(t, expectedPrivKey, dkgPriv.PrivateKey)
+			require.Equal(suite.T(), suite.expectedPrivateKey, dkgPriv.PrivateKey)
 		}).
 		Return(nil).
 		Once()
 
-	// we will ensure that the controller state transitions get called
-	// appropriately
-	controller := new(module.DKGController)
-	controller.On("Run").Return(nil).Once()
-	controller.On("EndPhase1").Return(nil).Once()
-	controller.On("EndPhase2").Return(nil).Once()
-	controller.On("End").Return(nil).Once()
-	controller.On("Poll", mock.Anything).Return(nil).Times(15)
-	controller.On("GetArtifacts").Return(expectedPrivKey, nil, nil).Once()
-	controller.On("SubmitResult").Return(nil).Once()
+	// we will ensure that the controller state transitions get called appropriately
+	suite.controller = new(module.DKGController)
+	suite.controller.On("Run").Return(nil).Once()
+	suite.controller.On("EndPhase1").Return(nil).Once()
+	suite.controller.On("EndPhase2").Return(nil).Once()
+	suite.controller.On("End").Return(nil).Once()
+	suite.controller.On("Poll", mock.Anything).Return(nil).Times(15)
+	suite.controller.On("GetArtifacts").Return(suite.expectedPrivateKey, nil, nil).Once()
+	suite.controller.On("SubmitResult").Return(nil).Once()
 
-	factory := new(module.DKGControllerFactory)
-	factory.On("Create",
-		dkgmodule.CanonicalInstanceID(firstBlock.ChainID, nextCounter),
-		committee,
+	suite.factory = new(module.DKGControllerFactory)
+	suite.factory.On("Create",
+		dkgmodule.CanonicalInstanceID(suite.firstBlock.ChainID, suite.NextEpochCounter()),
+		suite.committee,
 		mock.Anything,
-	).Return(controller, nil)
+	).Return(suite.controller, nil)
 
-	loggerCalls := 0
-	logger := hookedLogger(&loggerCalls)
+	suite.warnsLogged = 0
+	suite.logger = hookedLogger(&suite.warnsLogged)
 
-	viewEvents := gadgets.NewViews()
-	engine := dkg.NewReactorEngine(
-		logger,
-		me,
-		state,
-		keyStorage,
-		factory,
-		viewEvents,
+	suite.viewEvents = gadgets.NewViews()
+	suite.engine = dkg.NewReactorEngine(
+		suite.logger,
+		suite.local,
+		suite.state,
+		suite.dkgState,
+		suite.factory,
+		suite.viewEvents,
 	)
+}
 
-	engine.EpochSetupPhaseStarted(currentCounter, firstBlock)
+// TestRunDKG_PhaseTransition tests that the DKG is started and completed successfully
+// after a phase transition from StakingPhase->SetupPhase.
+func (suite *ReactorSuite) TestRunDKG_PhaseTransition() {
 
-	for view = 100; view <= 250; view += dkg.DefaultPollStep {
-		viewEvents.BlockFinalized(blocks[view])
+	// the dkg for this epoch has not been started
+	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(false, nil).Once()
+	// protocol event indicating the setup phase is starting
+	suite.engine.EpochSetupPhaseStarted(suite.epochCounter, suite.firstBlock)
+
+	for view := uint64(100); view <= 250; view += dkg.DefaultPollStep {
+		suite.viewEvents.BlockFinalized(suite.blocksByView[view])
 	}
 
 	// check that the appropriate callbacks were registered
 	time.Sleep(50 * time.Millisecond)
-	controller.AssertExpectations(t)
-	keyStorage.AssertExpectations(t)
-	// logger shouldn't be called in the happy path
-	require.Equal(t, 0, loggerCalls)
+	suite.controller.AssertExpectations(suite.T())
+	suite.dkgState.AssertExpectations(suite.T())
+	// happy path - no warn logs expected
+	suite.Assert().Equal(0, suite.warnsLogged)
+}
+
+// TestRunDKG_StartupInSetupPhase tests that the DKG is started and completed
+// successfully when the engine starts up during the EpochSetup phase, and the
+// DKG for this epoch has not been started previously. This is the case for
+// consensus nodes joining the network at an epoch boundary.
+//
+func (suite *ReactorSuite) TestRunDKG_StartupInSetupPhase() {
+
+	// we are in the EpochSetup phase
+	suite.snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil).Once()
+	// the dkg for this epoch has not been started
+	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(false, nil).Once()
+
+	// start up the engine
+	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
+
+	for view := uint64(100); view <= 250; view += dkg.DefaultPollStep {
+		suite.viewEvents.BlockFinalized(suite.blocksByView[view])
+	}
+
+	// check that the appropriate callbacks were registered
+	time.Sleep(50 * time.Millisecond)
+	suite.controller.AssertExpectations(suite.T())
+	suite.dkgState.AssertExpectations(suite.T())
+	// happy path - no warn logs expected
+	suite.Assert().Equal(0, suite.warnsLogged)
+}
+
+// TestRunDKG_StartupInSetupPhase_DKGAlreadyStarted tests that the DKG is NOT
+// started, when the engine starts up during the EpochSetup phase, and the DKG
+// for this epoch HAS been started previously. This will be the case for
+// consensus nodes which restart during the DKG.
+//
+func (suite *ReactorSuite) TestRunDKG_StartupInSetupPhase_DKGAlreadyStarted() {
+
+	// we are in the EpochSetup phase
+	suite.snapshot.On("Phase").Return(flow.EpochPhaseSetup, nil).Once()
+	// the dkg for this epoch has been started
+	suite.dkgState.On("GetDKGStarted", suite.NextEpochCounter()).Return(true, nil).Once()
+
+	// start up the engine
+	unittest.AssertClosesBefore(suite.T(), suite.engine.Ready(), time.Second)
+
+	// we should not have instantiated the DKG
+	suite.factory.AssertNotCalled(suite.T(), "Create",
+		dkgmodule.CanonicalInstanceID(suite.firstBlock.ChainID, suite.NextEpochCounter()),
+		suite.committee,
+		mock.Anything,
+	)
+
+	// we should log a warning that the DKG has already started
+	suite.Assert().Equal(1, suite.warnsLogged)
 }
 
 // TestReactorEngine_EpochCommittedPhaseStarted ensures that we are logging
 // a warning message whenever we have a mismatch between the locally produced DKG keys
 // and the keys produced by the DKG smart contract.
-func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
+func TestReactorEngine_InconsistentBeaconKeys(t *testing.T) {
+
 	rand.Seed(time.Now().UnixNano())
 	currentCounter := rand.Uint64()
 	nextCounter := currentCounter + 1
@@ -160,9 +270,10 @@ func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 	// to be logged.
 	priv := unittest.RandomBeaconPriv()
 
-	keyStorage := new(storage.BeaconPrivateKeys)
-	keyStorage.On("RetrieveMyBeaconPrivateKey", currentCounter+1).Return(priv, nil)
 	factory := new(module.DKGControllerFactory)
+	dkgState := new(storage.DKGState)
+	dkgState.On("RetrieveMyBeaconPrivateKey", currentCounter+1).Return(priv, nil)
+	dkgState.On("SetDKGEndState", currentCounter+1, flow.DKGEndStateInconsistentKey).Return(nil)
 
 	nextDKG := new(protocol.DKG)
 	nextDKG.On("KeyShare", id).Return(privKey.PublicKey(), nil)
@@ -189,24 +300,26 @@ func TestReactorEngine_EpochCommittedPhaseStarted(t *testing.T) {
 
 	viewEvents := gadgets.NewViews()
 
-	hookCalls := 0
-	logger := hookedLogger(&hookCalls)
+	// count number of warn-level logs
+	warnsLogged := 0
+	logger := hookedLogger(&warnsLogged)
 
 	engine := dkg.NewReactorEngine(
 		logger,
 		me,
 		state,
-		keyStorage,
+		dkgState,
 		factory,
 		viewEvents,
 	)
 
 	engine.EpochCommittedPhaseStarted(currentCounter, &firstBlock)
 
-	require.Equal(t, 1, hookCalls)
+	// we should log a warning that the keys are inconsistent
+	require.Equal(t, 1, warnsLogged)
 }
 
-// utility function to track the number of calls to a logger
+// utility function to track the number of warn-level calls to a logger
 func hookedLogger(calls *int) zerolog.Logger {
 	hook := zerolog.HookFunc(func(e *zerolog.Event, level zerolog.Level, message string) {
 		if level == zerolog.WarnLevel {
