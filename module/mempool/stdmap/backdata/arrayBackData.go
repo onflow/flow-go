@@ -67,7 +67,7 @@ func (a *ArrayBackData) Has(entityID flow.Identifier) bool {
 
 // Add adds the given item to the pool.
 func (a *ArrayBackData) Add(entityID flow.Identifier, entity flow.Entity) bool {
-	return a.add(entityID, entity)
+	return a.put(entityID, entity)
 }
 
 // Rem will remove the item with the given hash.
@@ -83,7 +83,7 @@ func (a *ArrayBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flo
 
 // ByID returns the given item from the pool.
 func (a *ArrayBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
-	return nil, false
+
 }
 
 // Size will return the size of the backend.
@@ -106,7 +106,7 @@ func (a *ArrayBackData) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(a.All())...)
 }
 
-func (a *ArrayBackData) add(entityID flow.Identifier, entity flow.Entity) bool {
+func (a *ArrayBackData) put(entityID flow.Identifier, entity flow.Entity) bool {
 	idPrefix, bucketIndex := a.idPrefixAndBucketIndex(entityID)
 	slotToUse, unique := a.slotInBucket(bucketIndex, idPrefix, entityID)
 	if !unique {
