@@ -30,5 +30,5 @@ func getCollectionByID(r *requestDecorator, backend access.API, link LinkGenerat
 		}
 	}
 
-	return collectionResponse(collection, transactions, link, r.expandFields), nil
+	return collectionResponse(collection, transactions, link, r.expandFields)
 }

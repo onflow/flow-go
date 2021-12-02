@@ -9,11 +9,11 @@
 package generated
 
 type ExecutionResult struct {
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 
-	BlockId string `json:"block_id,omitempty"`
+	BlockId string `json:"block_id"`
 
-	Events []Event `json:"events,omitempty"`
+	Events []Event `json:"events"`
 
 	Links *Links `json:"_links,omitempty"`
 }

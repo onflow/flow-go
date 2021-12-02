@@ -13,13 +13,13 @@ import (
 )
 
 type BlockHeader struct {
-	Id string `json:"id,omitempty"`
+	Id string `json:"id"`
 
-	ParentId string `json:"parent_id,omitempty"`
+	ParentId string `json:"parent_id"`
 
-	Height int32 `json:"height,omitempty"`
+	Height int32 `json:"height"`
 
-	Timestamp time.Time `json:"timestamp,omitempty"`
+	Timestamp time.Time `json:"timestamp"`
 
-	ParentVoterSignature string `json:"parent_voter_signature,omitempty"`
+	ParentVoterSignature string `json:"parent_voter_signature"`
 }

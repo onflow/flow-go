@@ -134,6 +134,7 @@ func expectedExpandedResponse(account *flow.Account) string {
 				  }
 			  ],
               "_links":{"_self":"/v1/accounts/%s" },
+              "_expandable": {},
               "contracts": {"contract1":"Y29udHJhY3Qx", "contract2":"Y29udHJhY3Qy"}
 			}`, account.Address, account.Keys[0].PublicKey.String(), account.Address)
 }

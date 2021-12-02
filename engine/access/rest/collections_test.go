@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
-
-	"github.com/onflow/flow-go/engine/access/rest/generated"
 
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
@@ -42,10 +41,11 @@ func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, 
 func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {
 	rr := executeRequest(req, backend)
 	require.Equal(t, status, rr.Code)
-	require.JSONEq(t, expectedRespBody, rr.Body.String(), fmt.Sprintf("failed for req: %s", req.URL))
+	actualResponseBody := rr.Body.String()
+	require.JSONEq(t, expectedRespBody, actualResponseBody, fmt.Sprintf("failed for req: %s", req.URL))
 }
 
-func getCollectionReq(id flow.Identifier, expandTransactions bool) *http.Request {
+func getCollectionReq(id string, expandTransactions bool) *http.Request {
 	url := fmt.Sprintf("/v1/collections/%s", id)
 	if expandTransactions {
 		url = fmt.Sprintf("%s?expand=transactions", url)
@@ -60,8 +60,8 @@ func TestGetCollections(t *testing.T) {
 
 	t.Run("get by ID", func(t *testing.T) {
 		inputs := []flow.LightCollection{
-			unittest.CollectionFixture(0).Light(),
-			unittest.CollectionFixture(3).Light(),
+			unittest.CollectionFixture(1).Light(),
+			unittest.CollectionFixture(10).Light(),
 			unittest.CollectionFixture(100).Light(),
 		}
 
@@ -70,21 +70,23 @@ func TestGetCollections(t *testing.T) {
 				On("GetCollectionByID", mocks.Anything, col.ID()).
 				Return(&col, nil)
 
-			txs := make([]generated.Transaction, len(col.Transactions))
+			txs := make([]string, len(col.Transactions))
 			for i, tx := range col.Transactions {
-				txs[i] = generated.Transaction{Id: tx.String()}
+				txs[i] = fmt.Sprintf("\"/v1/transactions/%s\"", tx.String())
 			}
-			bx, _ := json.Marshal(txs)
+			transactionsStr := fmt.Sprintf("[%s]", strings.Join(txs, ","))
 
 			expected := fmt.Sprintf(`{
-				"id":"%s",
-				"transactions":%s, 	
+				"id":"%s",	
 				"_links": {
 					"_self": "/v1/collections/%s"
-				}
-			}`, col.ID().String(), bx, col.ID())
+				},
+                "_expandable": {
+                   "transactions": %s
+                }
+			}`, col.ID(), col.ID(), transactionsStr)
 
-			req := getCollectionReq(col.ID(), false)
+			req := getCollectionReq(col.ID().String(), false)
 			assertOKResponse(t, req, expected, backend)
 		}
 	})
@@ -106,7 +108,7 @@ func TestGetCollections(t *testing.T) {
 			On("GetCollectionByID", mocks.Anything, col.ID()).
 			Return(&col, nil)
 
-		req := getCollectionReq(col.ID(), true)
+		req := getCollectionReq(col.ID().String(), true)
 		rr := executeRequest(req, backend)
 
 		assert.Equal(t, http.StatusOK, rr.Code)
@@ -125,6 +127,7 @@ func TestGetCollections(t *testing.T) {
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {
+		testID := unittest.IdentifierFixture()
 		tests := []struct {
 			id        string
 			mockValue *flow.LightCollection
@@ -132,7 +135,7 @@ func TestGetCollections(t *testing.T) {
 			response  string
 			status    int
 		}{{
-			"efb41e75f21e99bdf0ce62a0afc52fdaeb352c3e8f409b63aa3a076fd26e2b3a",
+			testID.String(),
 			nil,
 			status.Error(codes.NotFound, "not found"),
 			`{"code":404,"message":"not found"}`,
@@ -146,12 +149,14 @@ func TestGetCollections(t *testing.T) {
 		}}
 
 		for _, test := range tests {
-			id, _ := flow.HexStringToIdentifier(test.id)
-			backend.Mock.
-				On("GetCollectionByID", mocks.Anything, id).
-				Return(test.mockValue, test.mockErr)
-
-			req := getCollectionReq(id, false)
+			id, err := flow.HexStringToIdentifier(test.id)
+			if err == nil {
+				// setup the backend mock ti return a not found error if this is a valid id
+				backend.Mock.
+					On("GetCollectionByID", mocks.Anything, id).
+					Return(test.mockValue, test.mockErr)
+			}
+			req := getCollectionReq(test.id, false)
 			assertResponse(t, req, test.status, test.response, backend)
 		}
 

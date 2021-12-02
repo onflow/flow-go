@@ -9,11 +9,11 @@
 package generated
 
 type BlockSeal struct {
-	BlockId string `json:"block_id,omitempty"`
+	BlockId string `json:"block_id"`
 
-	ResultId string `json:"result_id,omitempty"`
+	ResultId string `json:"result_id"`
 
-	FinalState string `json:"final_state,omitempty"`
+	FinalState string `json:"final_state"`
 
-	AggregatedApprovalSignatures []AggregatedSignature `json:"aggregated_approval_signatures,omitempty"`
+	AggregatedApprovalSignatures []AggregatedSignature `json:"aggregated_approval_signatures"`
 }

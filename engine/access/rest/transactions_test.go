@@ -86,6 +86,7 @@ func TestGetTransactions(t *testing.T) {
 			{
 			   "id":"%s",
 			   "script":"cHViIGZ1biBtYWluKCkge30=",
+               "arguments": null,
 			   "reference_block_id":"%s",
 			   "gas_limit":10,
 			   "payer":"8c5303eaa26202d6",
@@ -97,6 +98,7 @@ func TestGetTransactions(t *testing.T) {
 			   "authorizers":[
 				  "8c5303eaa26202d6"
 			   ],
+               "payload_signatures": [],
 			   "envelope_signatures":[
 				  {
 					 "address":"8c5303eaa26202d6",
@@ -136,6 +138,7 @@ func TestGetTransactions(t *testing.T) {
 			{
 			   "id":"%s",
 			   "script":"cHViIGZ1biBtYWluKCkge30=",
+               "arguments": null,
 			   "reference_block_id":"%s",
 			   "gas_limit":10,
 			   "payer":"8c5303eaa26202d6",
@@ -147,6 +150,7 @@ func TestGetTransactions(t *testing.T) {
 			   "authorizers":[
 				  "8c5303eaa26202d6"
 			   ],
+               "payload_signatures": [],
 			   "envelope_signatures":[
 				  {
 					 "address":"8c5303eaa26202d6",
@@ -173,6 +177,7 @@ func TestGetTransactions(t *testing.T) {
 						"_self": "/v1/transaction_results/%s"
 					}
 				},
+               "_expandable": {},
 			   "_links":{
 				  "_self":"/v1/transactions/%s"
 			   }

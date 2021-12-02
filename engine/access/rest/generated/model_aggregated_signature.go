@@ -9,7 +9,7 @@
 package generated
 
 type AggregatedSignature struct {
-	VerifierSignatures []string `json:"verifier_signatures,omitempty"`
+	VerifierSignatures []string `json:"verifier_signatures"`
 
-	SignerIds []string `json:"signer_ids,omitempty"`
+	SignerIds []string `json:"signer_ids"`
 }

@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -146,11 +145,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		require.Len(suite.T(), respBlocks, 1)
 		assert.Equal(suite.T(), testBlock.ID().String(), testBlock.ID().String())
 
-		fmt.Println(respBlocks[0])
 		require.Nil(suite.T(), respBlocks[0].ExecutionResult)
-		jsonBytes, err := json.MarshalIndent(respBlocks[0], "", "\t")
-		require.NoError(suite.T(), err)
-		fmt.Println(string(jsonBytes))
 	})
 
 	suite.Run("GetBlockByID for multiple IDs - happy path", func() {
@@ -193,10 +188,6 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
 			assert.EqualValues(suite.T(), testBlocks[i].Header.Height, actualBlocks[i].Header.Height)
 		}
-
-		jsonBytes, err := json.MarshalIndent(actualBlocks, "", "\t")
-		require.NoError(suite.T(), err)
-		fmt.Println(string(jsonBytes))
 	})
 
 	suite.Run("GetBlockByHeight by heights - happy path", func() {
@@ -218,10 +209,6 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
 			assert.EqualValues(suite.T(), testBlocks[i].Header.Height, actualBlocks[i].Header.Height)
 		}
-
-		//jsonBytes, err := json.MarshalIndent(actualBlocks, "", "\t")
-		//require.NoError(suite.T(), err)
-		//fmt.Println(string(jsonBytes))
 	})
 
 	suite.Run("GetBlockByHeight for height=final - happy path", func() {
