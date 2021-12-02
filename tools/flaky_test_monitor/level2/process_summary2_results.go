@@ -126,5 +126,14 @@ func postProcessTestSummary2(testSummary2 helpers.TestSummary2) {
 }
 
 func main() {
-	fmt.Println("hello level 2 summary")
+	// need to pass in single argument of where level 1 summary files exist
+	if len(os.Args[1:]) != 1 {
+		panic("wrong number of arguments - expected single argument with directory of level 1 files")
+	}
+
+	if !helpers.FolderExists(os.Args[1]) {
+		panic("directory doesn't exist")
+	}
+
+	processSummary2TestRun(helpers.AddTrailingSlash(os.Args[1]))
 }
