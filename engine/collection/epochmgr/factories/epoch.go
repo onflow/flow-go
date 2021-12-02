@@ -3,6 +3,7 @@ package factories
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine/collection/epochmgr"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/mempool/epochs"
@@ -53,6 +54,7 @@ func (factory *EpochComponentsFactory) Create(
 	proposal network.Engine,
 	sync network.Engine,
 	hotstuff module.HotStuff,
+	voteAggregator hotstuff.VoteAggregator,
 	err error,
 ) {
 
@@ -120,7 +122,14 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
-	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads)
+	hotstuffModules, err := factory.hotstuff.CreateModules(epoch, cluster, state, headers, payloads, finalizer)
+	if err != nil {
+		err = fmt.Errorf("could not create consensus modules: %w", err)
+		return
+	}
+	voteAggregator = hotstuffModules.Aggregator
+
+	proposalEng, err := factory.proposal.Create(mutableState, headers, payloads, hotstuffModules.Aggregator)
 	if err != nil {
 		err = fmt.Errorf("could not create proposal engine: %w", err)
 		return
@@ -133,14 +142,12 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 	hotstuff, err = factory.hotstuff.Create(
-		epoch,
 		cluster,
 		state,
-		headers,
-		payloads,
 		builder,
-		finalizer,
+		headers,
 		proposalEng,
+		hotstuffModules,
 	)
 	if err != nil {
 		err = fmt.Errorf("could not create hotstuff: %w", err)

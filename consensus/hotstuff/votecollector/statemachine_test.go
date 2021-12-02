@@ -50,11 +50,11 @@ func (s *StateMachineTestSuite) SetupTest() {
 	s.mockedProcessors = make(map[flow.Identifier]*mocks.VerifyingVoteProcessor)
 	s.notifier = &mocks.Consumer{}
 
-	s.factoryMethod = func(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
-		if processor, found := s.mockedProcessors[block.BlockID]; found {
+	s.factoryMethod = func(log zerolog.Logger, block *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
+		if processor, found := s.mockedProcessors[block.Block.BlockID]; found {
 			return processor, nil
 		}
-		return nil, fmt.Errorf("mocked processor %v not found: %w", block.BlockID, factoryError)
+		return nil, fmt.Errorf("mocked processor %v not found: %w", block.Block.BlockID, factoryError)
 	}
 
 	s.workerPool = workerpool.New(4)
@@ -100,7 +100,7 @@ func (s *StateMachineTestSuite) TestStatus_StateTransitions() {
 // factory are handed through (potentially wrapped), but are not replaced.
 func (s *StateMachineTestSuite) Test_FactoryErrorPropagation() {
 	factoryError := errors.New("factory error")
-	factory := func(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
+	factory := func(log zerolog.Logger, block *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
 		return nil, factoryError
 	}
 	s.collector.createVerifyingProcessor = factory

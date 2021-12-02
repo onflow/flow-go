@@ -33,7 +33,7 @@ type EventHandlerV2Suite struct {
 	blockProducer  *BlockProducer
 	communicator   *mocks.Communicator
 	committee      *Committee
-	voteAggregator *mocks.VoteAggregatorV2
+	voteAggregator *mocks.VoteAggregator
 	voter          *Voter
 	validator      *BlacklistValidator
 	notifier       hotstuff.Consumer
@@ -57,7 +57,7 @@ func (es *EventHandlerV2Suite) SetupTest() {
 	es.communicator.On("BroadcastProposalWithDelay", mock.Anything, mock.Anything).Return(nil)
 	es.communicator.On("SendVote", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	es.committee = NewCommittee()
-	es.voteAggregator = &mocks.VoteAggregatorV2{}
+	es.voteAggregator = &mocks.VoteAggregator{}
 	es.voter = NewVoter(es.T(), finalized)
 	es.validator = NewBlacklistValidator(es.T())
 	es.notifier = &notifications.NoopConsumer{}

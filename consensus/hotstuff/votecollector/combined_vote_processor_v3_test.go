@@ -884,7 +884,6 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	}
 
 	baseFactory := &combinedVoteProcessorFactoryBaseV3{
-		log:         unittest.Logger(),
 		committee:   committee,
 		onQCCreated: onQCCreated,
 		packer:      signature.NewConsensusSigDataPacker(committee),
@@ -892,7 +891,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	voteProcessorFactory := VoteProcessorFactory{
 		baseFactory: baseFactory.Create,
 	}
-	voteProcessor, err := voteProcessorFactory.Create(proposal)
+	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
 	require.NoError(t, err)
 
 	// process votes by new leader, this will result in producing new QC

@@ -865,8 +865,8 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		qcCreated = true
 	}
 
-	voteProcessorFactory := NewCombinedVoteProcessorFactory(unittest.Logger(), committee, onQCCreated)
-	voteProcessor, err := voteProcessorFactory.Create(proposal)
+	voteProcessorFactory := NewCombinedVoteProcessorFactory(committee, onQCCreated)
+	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
 	require.NoError(t, err)
 
 	// process votes by new leader, this will result in producing new QC

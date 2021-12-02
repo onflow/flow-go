@@ -58,10 +58,10 @@ func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *clus
 
 	logger := zerolog.Logger{}
 	var createdQC *flow.QuorumCertificate
-	voteProcessorFactory := votecollector.NewBootstrapStakingVoteProcessorFactory(logger, committee, func(qc *flow.QuorumCertificate) {
+	voteProcessorFactory := votecollector.NewBootstrapStakingVoteProcessorFactory(committee, func(qc *flow.QuorumCertificate) {
 		createdQC = qc
 	})
-	processor, err := voteProcessorFactory.Create(model.ProposalFromFlow(clusterBlock.Header, 0))
+	processor, err := voteProcessorFactory.Create(logger, model.ProposalFromFlow(clusterBlock.Header, 0))
 	if err != nil {
 		return nil, fmt.Errorf("could not create cluster vote processor: %w", err)
 	}

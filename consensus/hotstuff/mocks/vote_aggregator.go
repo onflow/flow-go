@@ -3,8 +3,7 @@
 package mocks
 
 import (
-	flow "github.com/onflow/flow-go/model/flow"
-
+	irrecoverable "github.com/onflow/flow-go/module/irrecoverable"
 	mock "github.com/stretchr/testify/mock"
 
 	model "github.com/onflow/flow-go/consensus/hotstuff/model"
@@ -15,102 +14,77 @@ type VoteAggregator struct {
 	mock.Mock
 }
 
-// BuildQCOnReceivedBlock provides a mock function with given fields: block
-func (_m *VoteAggregator) BuildQCOnReceivedBlock(block *model.Block) (*flow.QuorumCertificate, bool, error) {
+// AddBlock provides a mock function with given fields: block
+func (_m *VoteAggregator) AddBlock(block *model.Proposal) error {
 	ret := _m.Called(block)
 
-	var r0 *flow.QuorumCertificate
-	if rf, ok := ret.Get(0).(func(*model.Block) *flow.QuorumCertificate); ok {
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*model.Proposal) error); ok {
 		r0 = rf(block)
 	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.QuorumCertificate)
-		}
-	}
-
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(*model.Block) bool); ok {
-		r1 = rf(block)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	var r2 error
-	if rf, ok := ret.Get(2).(func(*model.Block) error); ok {
-		r2 = rf(block)
-	} else {
-		r2 = ret.Error(2)
-	}
-
-	return r0, r1, r2
-}
-
-// PruneByView provides a mock function with given fields: view
-func (_m *VoteAggregator) PruneByView(view uint64) {
-	_m.Called(view)
-}
-
-// StorePendingVote provides a mock function with given fields: vote
-func (_m *VoteAggregator) StorePendingVote(vote *model.Vote) (bool, error) {
-	ret := _m.Called(vote)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(*model.Vote) bool); ok {
-		r0 = rf(vote)
-	} else {
-		r0 = ret.Get(0).(bool)
-	}
-
-	var r1 error
-	if rf, ok := ret.Get(1).(func(*model.Vote) error); ok {
-		r1 = rf(vote)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
-}
-
-// StoreProposerVote provides a mock function with given fields: vote
-func (_m *VoteAggregator) StoreProposerVote(vote *model.Vote) bool {
-	ret := _m.Called(vote)
-
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(*model.Vote) bool); ok {
-		r0 = rf(vote)
-	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Error(0)
 	}
 
 	return r0
 }
 
-// StoreVoteAndBuildQC provides a mock function with given fields: vote, block
-func (_m *VoteAggregator) StoreVoteAndBuildQC(vote *model.Vote, block *model.Block) (*flow.QuorumCertificate, bool, error) {
-	ret := _m.Called(vote, block)
+// AddVote provides a mock function with given fields: vote
+func (_m *VoteAggregator) AddVote(vote *model.Vote) {
+	_m.Called(vote)
+}
 
-	var r0 *flow.QuorumCertificate
-	if rf, ok := ret.Get(0).(func(*model.Vote, *model.Block) *flow.QuorumCertificate); ok {
-		r0 = rf(vote, block)
+// Done provides a mock function with given fields:
+func (_m *VoteAggregator) Done() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*flow.QuorumCertificate)
+			r0 = ret.Get(0).(<-chan struct{})
 		}
 	}
 
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(*model.Vote, *model.Block) bool); ok {
-		r1 = rf(vote, block)
+	return r0
+}
+
+// InvalidBlock provides a mock function with given fields: block
+func (_m *VoteAggregator) InvalidBlock(block *model.Proposal) error {
+	ret := _m.Called(block)
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*model.Proposal) error); ok {
+		r0 = rf(block)
 	} else {
-		r1 = ret.Get(1).(bool)
+		r0 = ret.Error(0)
 	}
 
-	var r2 error
-	if rf, ok := ret.Get(2).(func(*model.Vote, *model.Block) error); ok {
-		r2 = rf(vote, block)
+	return r0
+}
+
+// PruneUpToView provides a mock function with given fields: view
+func (_m *VoteAggregator) PruneUpToView(view uint64) {
+	_m.Called(view)
+}
+
+// Ready provides a mock function with given fields:
+func (_m *VoteAggregator) Ready() <-chan struct{} {
+	ret := _m.Called()
+
+	var r0 <-chan struct{}
+	if rf, ok := ret.Get(0).(func() <-chan struct{}); ok {
+		r0 = rf()
 	} else {
-		r2 = ret.Error(2)
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(<-chan struct{})
+		}
 	}
 
-	return r0, r1, r2
+	return r0
+}
+
+// Start provides a mock function with given fields: _a0
+func (_m *VoteAggregator) Start(_a0 irrecoverable.SignalerContext) {
+	_m.Called(_a0)
 }

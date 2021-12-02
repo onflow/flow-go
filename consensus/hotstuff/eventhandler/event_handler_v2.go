@@ -24,7 +24,7 @@ type EventHandlerV2 struct {
 	persist        hotstuff.Persister
 	communicator   hotstuff.Communicator
 	committee      hotstuff.Committee
-	voteAggregator hotstuff.VoteAggregatorV2
+	voteAggregator hotstuff.VoteAggregator
 	voter          hotstuff.Voter
 	validator      hotstuff.Validator
 	notifier       hotstuff.Consumer
@@ -42,7 +42,7 @@ func NewEventHandlerV2(
 	persist hotstuff.Persister,
 	communicator hotstuff.Communicator,
 	committee hotstuff.Committee,
-	voteAggregator hotstuff.VoteAggregatorV2,
+	voteAggregator hotstuff.VoteAggregator,
 	voter hotstuff.Voter,
 	validator hotstuff.Validator,
 	notifier hotstuff.Consumer,

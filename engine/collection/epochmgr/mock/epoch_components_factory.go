@@ -5,6 +5,8 @@ package mock
 import (
 	cluster "github.com/onflow/flow-go/state/cluster"
 
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff"
+
 	mock "github.com/stretchr/testify/mock"
 
 	module "github.com/onflow/flow-go/module"
@@ -20,7 +22,7 @@ type EpochComponentsFactory struct {
 }
 
 // Create provides a mock function with given fields: epoch
-func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, network.Engine, network.Engine, module.HotStuff, error) {
+func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, network.Engine, network.Engine, module.HotStuff, hotstuff.VoteAggregator, error) {
 	ret := _m.Called(epoch)
 
 	var r0 cluster.State
@@ -59,12 +61,21 @@ func (_m *EpochComponentsFactory) Create(epoch protocol.Epoch) (cluster.State, n
 		}
 	}
 
-	var r4 error
-	if rf, ok := ret.Get(4).(func(protocol.Epoch) error); ok {
+	var r4 hotstuff.VoteAggregator
+	if rf, ok := ret.Get(4).(func(protocol.Epoch) hotstuff.VoteAggregator); ok {
 		r4 = rf(epoch)
 	} else {
-		r4 = ret.Error(4)
+		if ret.Get(4) != nil {
+			r4 = ret.Get(4).(hotstuff.VoteAggregator)
+		}
 	}
 
-	return r0, r1, r2, r3, r4
+	var r5 error
+	if rf, ok := ret.Get(5).(func(protocol.Epoch) error); ok {
+		r5 = rf(epoch)
+	} else {
+		r5 = ret.Error(5)
+	}
+
+	return r0, r1, r2, r3, r4, r5
 }
