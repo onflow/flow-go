@@ -278,6 +278,11 @@ func main() {
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}
+			// mark the root DKG as successful, so it is considered safe
+			err = dkgState.SetDKGEndState(epochCounter, flow.DKGEndStateSuccess)
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+				return err
+			}
 
 			// Given an epoch, checkEpochKey returns an error if we are a
 			// participant in the epoch and we don't have the corresponding DKG
