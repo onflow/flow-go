@@ -373,7 +373,7 @@ func main() {
 		}).
 		// Epoch manager encapsulates and manages epoch-dependent engines as we
 		// transition between epochs
-		Component("epoch manager", func(nodeBuilder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Component("epoch manager", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			clusterStateFactory, err := factories.NewClusterStateFactory(node.DB, node.Metrics.Cache, node.Tracer)
 			if err != nil {
 				return nil, err

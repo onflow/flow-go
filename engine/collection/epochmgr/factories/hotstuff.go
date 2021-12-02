@@ -88,9 +88,9 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	signer = verification.NewSingleSignerVerifier(committee, f.aggregator, f.me.NodeID())
 	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
-	finalizedBlock, pendingBlocks, err := recovery.FindLatest(clusterState, headers)
+	finalizedBlock, err := clusterState.Final().Head()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not get cluster finalized block: %w", err)
 	}
 
 	forks, err := consensus.NewForks(
@@ -111,10 +111,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	aggregator, err := consensus.NewVoteAggregator(
 		f.log,
 		finalizedBlock,
-		pendingBlocks,
 		notifier,
-		forks,
-		validator,
 		voteProcessorFactory,
 	)
 	if err != nil {
@@ -135,7 +132,9 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 
 func (f *HotStuffFactory) Create(
 	cluster protocol.Cluster,
+	clusterState cluster.State,
 	builder module.Builder,
+	headers storage.Headers,
 	communicator hotstuff.Communicator,
 	hotstuffModules *consensus.HotstuffModules,
 ) (module.HotStuff, error) {
@@ -144,11 +143,18 @@ func (f *HotStuffFactory) Create(
 	metrics := f.createMetrics(cluster.ChainID())
 	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
 
+	finalizedBlock, pendingBlocks, err := recovery.FindLatest(clusterState, headers)
+	if err != nil {
+		return nil, err
+	}
+
 	participant, err := consensus.NewParticipant(
 		f.log,
 		metrics,
 		builder,
 		communicator,
+		finalizedBlock,
+		pendingBlocks,
 		hotstuffModules,
 		f.opts...,
 	)

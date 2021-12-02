@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	validatorImpl "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voter"
+	"github.com/onflow/flow-go/consensus/recovery"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/storage"
@@ -29,6 +30,8 @@ func NewParticipant(
 	metrics module.HotstuffMetrics,
 	builder module.Builder,
 	communicator hotstuff.Communicator,
+	finalized *flow.Header,
+	pending []*flow.Header,
 	modules *HotstuffModules,
 	options ...Option,
 ) (module.HotStuff, error) {
@@ -61,7 +64,14 @@ func NewParticipant(
 		return nil, fmt.Errorf("could not recover last voted: %w", err)
 	}
 
-	// TODO: can we prune VoteAggregator to some height at this point? Do we have all needed info?
+	// prune vote aggregator to initial view
+	modules.Aggregator.PruneUpToView(finalized.View)
+
+	// recover the hotstuff state, mainly to recover all pending blocks in Forks
+	err = recovery.Participant(log, modules.Forks, modules.Aggregator, modules.Validator, finalized, pending)
+	if err != nil {
+		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
+	}
 
 	// initialize the timeout config
 	timeoutConfig, err := timeout.NewConfig(

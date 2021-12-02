@@ -9,7 +9,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
-	"github.com/onflow/flow-go/consensus/recovery"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -17,10 +16,7 @@ import (
 func NewVoteAggregator(
 	log zerolog.Logger,
 	finalized *flow.Header,
-	pending []*flow.Header,
 	notifier hotstuff.Consumer,
-	forks hotstuff.Forks,
-	validator hotstuff.Validator,
 	voteProcessorFactory hotstuff.VoteProcessorFactory,
 ) (hotstuff.VoteAggregator, error) {
 
@@ -31,12 +27,6 @@ func NewVoteAggregator(
 	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, finalized.View, voteCollectors)
 	if err != nil {
 		return nil, fmt.Errorf("could not create vote aggregator: %w", err)
-	}
-
-	// recover the hotstuff state, mainly to recover all pending blocks in Forks
-	err = recovery.Participant(log, forks, aggregator, validator, finalized, pending)
-	if err != nil {
-		return nil, fmt.Errorf("could not recover hotstuff state: %w", err)
 	}
 
 	return aggregator, nil

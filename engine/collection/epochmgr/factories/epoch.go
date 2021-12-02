@@ -143,7 +143,9 @@ func (factory *EpochComponentsFactory) Create(
 	}
 	hotstuff, err = factory.hotstuff.Create(
 		cluster,
+		state,
 		builder,
+		headers,
 		proposalEng,
 		hotstuffModules,
 	)

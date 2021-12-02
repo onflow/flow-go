@@ -584,10 +584,9 @@ func main() {
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 
-			// query the last finalized block and pending blocks for recovery
-			finalizedBlock, pendingBlocks, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			finalizedBlock, err := node.State.Final().Head()
 			if err != nil {
-				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
+				return nil, err
 			}
 
 			forks, err := consensus.NewForks(
@@ -605,7 +604,7 @@ func main() {
 			qcDistributor := pubsub.NewQCCreatedDistributor()
 			validator := consensus.NewValidator(mainMetrics, committee, forks, signer)
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
-			aggregator, err := consensus.NewVoteAggregator(node.Logger, finalizedBlock, pendingBlocks, notifier, forks, validator, voteProcessorFactory)
+			aggregator, err := consensus.NewVoteAggregator(node.Logger, finalizedBlock, notifier, voteProcessorFactory)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}
@@ -623,7 +622,7 @@ func main() {
 
 			return aggregator, nil
 		}).
-		Component("compliance engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Module("compliance engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// initialize the entity database accessors
 			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
 
@@ -643,18 +642,17 @@ func main() {
 				syncCore,
 				hotstuffModules.Aggregator)
 			if err != nil {
-				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
+				return fmt.Errorf("could not initialize compliance core: %w", err)
 			}
 
 			// initialize the compliance engine
 			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
 			if err != nil {
-				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
+				return fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
-			return comp, nil
+			return nil
 		}).
-		Component("hotstuff participant", func(nodebuilder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
+		Component("hotstuff participant", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
 			var build module.Builder
 			build, err = builder.NewBuilder(
@@ -694,12 +692,19 @@ func main() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
 
+			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			if err != nil {
+				return nil, err
+			}
+
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
 				mainMetrics,
 				build,
 				comp,
+				finalizedBlock,
+				pending,
 				hotstuffModules,
 				opts...,
 			)
