@@ -10,12 +10,9 @@ MOD_DIR="/pkg/mod/"
 VERSION="$(cat ../go.mod | grep github.com/onflow/flow-go/crypto | cut -d' ' -f 2)"
 DEP_DIR="$(go env GOPATH)/pkg/mod/github.com/onflow/flow-go/crypto@${VERSION}"
 
-# echo $GO_MOD_CADENCE
-
-echo $DEP_DIR
 if [[ "$PKG_DIR" != *"$MOD_DIR"* ]]; then
 
-   go get github.com/onflow/flow-go/crypto
+   cd ..; go mod tidy; cd -
 
   # grant permissions if not existant
    if [[ ! -r ${PKG_DIR}  || ! -w ${PKG_DIR} || ! -x ${PKG_DIR} ]]; then
