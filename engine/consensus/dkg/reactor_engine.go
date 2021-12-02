@@ -172,9 +172,14 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 		return
 	}
 
-	dkgPrivInfo, err := e.keyStorage.RetrieveMyBeaconPrivateKey(currentEpochCounter + 1)
+	beaconPrivateKey, err := e.keyStorage.RetrieveMyBeaconPrivateKey(currentEpochCounter + 1)
 	if err != nil {
 		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG private info for next epoch")
+		return
+	}
+
+	if beaconPrivateKey == nil {
+		e.log.Warn().Msg("locally computed private key for next epoch is nil")
 		return
 	}
 
@@ -184,7 +189,7 @@ func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, f
 		return
 	}
 
-	localPubKey := dkgPrivInfo.PublicKey()
+	localPubKey := beaconPrivateKey.PublicKey()
 
 	if !nextDKGPubKey.Equals(localPubKey) {
 		e.log.Warn().Msg("checking DKG key consistency: locally computed dkg public key does not match dkg public key for next epoch")
