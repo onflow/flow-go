@@ -1,4 +1,4 @@
-package run
+package dkg
 
 import (
 	"fmt"

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"io/ioutil"
 	"math/rand"
 	"os"
@@ -1064,7 +1065,7 @@ func runDKG(confs []ContainerConfig) (dkgmod.DKGData, error) {
 		return dkgmod.DKGData{}, err
 	}
 
-	dkg, err := run.RunFastKG(nConsensusNodes, dkgSeed)
+	dkg, err := dkg.RunFastKG(nConsensusNodes, dkgSeed)
 	if err != nil {
 		return dkgmod.DKGData{}, err
 	}
