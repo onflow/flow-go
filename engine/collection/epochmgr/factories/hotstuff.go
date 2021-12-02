@@ -84,7 +84,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	committee = committees.NewMetricsWrapper(committee, metrics) // wrapper for measuring time spent determining consensus committee relations
 
 	// create a signing provider
-	var signer hotstuff.Signer = verification.NewSingleSigner(f.aggregator, f.me.NodeID())
+	var signer hotstuff.Signer = verification.NewStakingSigner(f.me)
 	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
 	finalizedBlock, err := clusterState.Final().Head()

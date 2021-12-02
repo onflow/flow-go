@@ -455,7 +455,7 @@ func main() {
 				return nil, err
 			}
 
-			signer := verification.NewSingleSigner(staking, node.Me.NodeID())
+			signer := verification.NewStakingSigner(node.Me)
 
 			// construct QC contract client
 			qcContractClients, err := createQCContractClients(node, machineAccountInfo, flowClientConfigs)

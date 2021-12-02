@@ -106,7 +106,7 @@ func createClusterSigners(participants []bootstrap.NodeInfo) ([]hotstuff.Signer,
 			return nil, err
 		}
 
-		signer := verification.NewStakingSigner(me, me.NodeID())
+		signer := verification.NewStakingSigner(me)
 		signers[i] = signer
 	}
 	return signers, nil
