@@ -1,3 +1,13 @@
+
+
+## Remote Debugger 
+
+Remote debugger provides utils needed to run transactions and scripts against live network data. It uses GRPC endpoints on an execution nodes to fetch registers and block info when running a transaction. This is mostly provided for debugging purpose and should not be used for production level operations. 
+If you use the caching method you can run the transaction once and use the cached values to run transaction in debugging mode. 
+
+### sample code 
+
+```GO
 package debug_test
 
 import (
@@ -14,16 +24,12 @@ import (
 
 func TestDebugger_RunTransaction(t *testing.T) {
 
-	// this code is mostly a sample code so we skip by default
-	t.Skip()
-
 	grpcAddress := "localhost:3600"
 	chain := flow.Emulator.Chain()
 	debugger := debug.NewRemoteDebugger(grpcAddress, chain, zerolog.New(os.Stdout).With().Logger())
 
 	const scriptTemplate = `
 	import FlowServiceAccount from 0x%s
-
 	transaction() {
 		prepare(signer: AuthAccount) {
 			log(signer.balance)
@@ -65,3 +71,6 @@ func TestDebugger_RunTransaction(t *testing.T) {
 	require.NoError(t, txErr)
 	require.NoError(t, err)
 }
+
+
+```

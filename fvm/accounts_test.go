@@ -1009,10 +1009,8 @@ func TestRemoveAccountKey(t *testing.T) {
 	}
 }
 
-// TODO (ramtin) - skipping this test for now
 func TestGetAccountKey(t *testing.T) {
 
-	t.Skip()
 	options := []fvm.Option{
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(zerolog.Nop())),
 		fvm.WithCadenceLogging(true),
@@ -1091,13 +1089,13 @@ func TestGetAccountKey(t *testing.T) {
 
 				expected := fmt.Sprintf(
 					"AccountKey("+
+						"keyIndex: %d, "+
 						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
-						"weight: 1000.00000000, "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
-						"isRevoked: false, "+
-						"keyIndex: %d)",
-					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
+						"weight: 1000.00000000, "+
+						"isRevoked: false)",
 					keyIndex,
+					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1143,13 +1141,13 @@ func TestGetAccountKey(t *testing.T) {
 
 				expected := fmt.Sprintf(
 					"AccountKey("+
+						"keyIndex: %d, "+
 						"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
-						"weight: 1000.00000000, "+
 						"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
-						"isRevoked: false, "+
-						"keyIndex: %d)",
-					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
+						"weight: 1000.00000000, "+
+						"isRevoked: false)",
 					keyIndex,
+					byteSliceToCadenceArrayLiteral(key.PublicKey.Encode()),
 				)
 
 				assert.Equal(t, expected, tx.Logs[0])
@@ -1195,13 +1193,13 @@ func TestGetAccountKey(t *testing.T) {
 				for i := 0; i < keyCount; i++ {
 					expected := fmt.Sprintf(
 						"AccountKey("+
+							"keyIndex: %d, "+
 							"publicKey: PublicKey(publicKey: %s, signatureAlgorithm: SignatureAlgorithm(rawValue: 1), isValid: true), "+
-							"weight: 1000.00000000, "+
 							"hashAlgorithm: HashAlgorithm(rawValue: 3), "+
-							"isRevoked: false, "+
-							"keyIndex: %d)",
-						byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
+							"weight: 1000.00000000, "+
+							"isRevoked: false)",
 						i,
+						byteSliceToCadenceArrayLiteral(keys[i].PublicKey.Encode()),
 					)
 
 					assert.Equal(t, expected, tx.Logs[i])
