@@ -4,24 +4,32 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	sdk "github.com/onflow/flow-go-sdk"
+	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
-
-	sdkcrypto "github.com/onflow/flow-go-sdk/crypto"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
+	"strings"
+	"time"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+const (
+	stakingAuctionViews = 200
+	dkgPhaseViews       = 50
+	epochViewsLength    = 380
+
+	waitTimeout =  2 * time.Minute
 )
 
 type Suite struct {
@@ -35,7 +43,6 @@ type Suite struct {
 }
 
 func (s *Suite) SetupTest() {
-
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
@@ -65,14 +72,12 @@ func (s *Suite) SetupTest() {
 		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		ghostConNode,
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs tests", confs, 100, 50, 280)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, stakingAuctionViews, dkgPhaseViews, epochViewsLength)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
@@ -85,9 +90,8 @@ func (s *Suite) SetupTest() {
 	// start tracking blocks
 	s.Track(s.T(), ctx, s.Ghost())
 
-	client, err := testnet.NewClient(
-		fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort]),
-		s.net.Root().Header.ChainID.Chain())
+	addr := fmt.Sprintf(":%s", s.net.AccessPorts[testnet.AccessNodeAPIPort])
+	client, err := testnet.NewClient(addr, s.net.Root().Header.ChainID.Chain())
 	require.NoError(s.T(), err)
 
 	s.client = client
@@ -116,8 +120,10 @@ type StakedNodeOperationInfo struct {
 	StakingAccountKey       sdkcrypto.PrivateKey
 	NetworkingKey           sdkcrypto.PrivateKey
 	StakingKey              sdkcrypto.PrivateKey
+	MachineAccountAddress   flow.Address
 	MachineAccountKey       sdkcrypto.PrivateKey
 	MachineAccountPublicKey flow.AccountPublicKey
+	ContainerName           string
 }
 
 // StakeNode will generate initial keys needed for a SN/LN node and onboard this node using the following steps;
@@ -144,16 +150,11 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	)
 	require.NoError(s.T(), err)
 
-	stakeAmount, err := s.client.TokenAmountByRole(role)
+	_, stakeAmount, err := s.client.TokenAmountByRole(role)
 	require.NoError(s.T(), err)
 
 	// fund account with token amount to stake
-	result, err := s.fundAccount(ctx, stakingAccountAddress, stakeAmount)
-	require.NoError(s.T(), err)
-	require.NoError(s.T(), result.Error)
-
-	// fund account for storage
-	result, err = s.fundAccount(ctx, stakingAccountAddress, "10.0")
+	result, err := s.fundAccount(ctx, stakingAccountAddress, fmt.Sprintf("%f", stakeAmount+10.0))
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
@@ -165,11 +166,14 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
-	tokenAmount, err := s.client.TokenAmountByRole(role)
-	require.NoError(s.T(), err)
+	// if node has a machine account key encode it
+	var encMachinePubKey []byte
+	if machineAccountKey != nil {
+		encMachinePubKey, err = flow.EncodeRuntimeAccountPublicKey(machineAccountPubKey)
+		require.NoError(s.T(), err)
+	}
 
-	encMachinePubKey, err := flow.EncodeRuntimeAccountPublicKey(machineAccountPubKey)
-	require.NoError(s.T(), err)
+	containerName := s.getTestContainerName(role)
 
 	// register node using staking collection
 	result, err = s.registerNode(
@@ -179,15 +183,20 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		stakingAccount,
 		nodeID,
 		role,
-		"localhost:9000",
-		networkingKey.PublicKey().String()[2:],
-		stakingKey.PublicKey().String()[2:],
-		tokenAmount,
+		testnet.GetPrivateNodeInfoAddress(containerName),
+		strings.TrimPrefix(networkingKey.PublicKey().String(), "0x"),
+		strings.TrimPrefix(stakingKey.PublicKey().String(), "0x"),
+		fmt.Sprintf("%f", stakeAmount),
 		hex.EncodeToString(encMachinePubKey),
 	)
+
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
+	result = s.SetApprovedNodesScript(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
+	require.NoError(s.T(), result.Error)
+
+	s.checkStakingAuctionInProgress(ctx)
 	return &StakedNodeOperationInfo{
 		NodeID:                  nodeID,
 		Role:                    role,
@@ -198,7 +207,39 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		NetworkingKey:           networkingKey,
 		MachineAccountKey:       machineAccountKey,
 		MachineAccountPublicKey: machineAccountPubKey,
+		ContainerName:           containerName,
 	}
+}
+
+// checkStakingAuctionInProgress util func that asserts we are the staking auction phase
+func (s *Suite) checkStakingAuctionInProgress(ctx context.Context) {
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	phase, err := snapshot.Phase()
+	require.NoError(s.T(), err)
+	head, err := snapshot.Head()
+	require.NoError(s.T(), err)
+
+	require.Equal(s.T(), flow.EpochPhaseStaking, phase)
+	require.True(s.T(), stakingAuctionViews > head.View)
+}
+
+// WaitForPhase waits for epoch phase and will timeout after 2 minutes
+func (s *Suite) WaitForPhase(ctx context.Context, phase flow.EpochPhase) {
+	condition := func() bool {
+		snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+		require.NoError(s.T(), err)
+
+		currentPhase, err := snapshot.Phase()
+		require.NoError(s.T(), err)
+
+		return currentPhase == phase
+	}
+	require.Eventually(s.T(),
+		condition,
+		waitTimeout,
+		100*time.Millisecond,
+		fmt.Sprintf("did not reach epoch phase (%s) within %v seconds", phase, waitTimeout))
 }
 
 // transfers tokens to receiver from service account
@@ -226,12 +267,12 @@ func (s *Suite) fundAccount(ctx context.Context, receiver sdk.Address, tokenAmou
 	return result, nil
 }
 
-// generates inital keys needed to bootstrap account
+// generates initial keys needed to bootstrap account
 func (s *Suite) generateAccountKeys(role flow.Role) (
 	operatorAccountKey,
 	networkingKey,
 	stakingKey,
-	machineAccountKey sdkcrypto.PrivateKey,
+	machineAccountKey crypto.PrivateKey,
 	machineAccountPubKey flow.AccountPublicKey,
 ) {
 	operatorAccountKey = unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256)
@@ -264,7 +305,6 @@ func (s *Suite) createAccount(ctx context.Context,
 
 	addr, err := s.client.CreateAccount(ctx, accountKey, payerAccount, payer, sdk.Identifier(latestBlockID))
 	require.NoError(s.T(), err)
-
 	return addr, nil
 }
 
@@ -334,23 +374,12 @@ func (s *Suite) registerNode(
 
 	result, err := s.client.WaitForSealed(ctx, registerNodeTx.ID())
 	require.NoError(s.T(), err)
-
 	return result, nil
 }
 
-// @TODO use templates repo
-const getNodeInfo = `import FlowIDTableStaking from 0xf8d6e0586b0a20c7
-
-// This script gets all the info about a node and returns it
-
-pub fun main(nodeID: String): FlowIDTableStaking.NodeInfo {
-    return FlowIDTableStaking.NodeInfo(nodeID: nodeID)
-}`
-
-func (s *Suite) ExecuteGetNodeInfoScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
-	v, err := s.client.ExecuteScriptBytes(ctx, []byte(getNodeInfo), []cadence.Value{cadence.String(nodeID.String())})
+func (s *Suite) ExecuteGetProposedTableScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
+	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
-
 	return v
 }
 
@@ -394,4 +423,17 @@ func (s *Suite) ExecuteReadApprovedNodesScript(ctx context.Context, env template
 	require.NoError(s.T(), err)
 
 	return v
+}
+
+// pauseContainer pauses the named container in the network
+func (s *Suite) pauseContainer(name string) {
+	container := s.net.ContainerByName(name)
+	err := container.Pause()
+	require.NoError(s.T(), err)
+}
+
+// getTestContainerName returns a name for a test container in the form of ${role}_${nodeID}_test
+func (s *Suite) getTestContainerName(role flow.Role) string {
+	i := len(s.net.ContainersByRole(role)) + 1
+	return fmt.Sprintf("%s_test_%d", role, i)
 }

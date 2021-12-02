@@ -37,14 +37,14 @@ jobs:
 
       - name: Run benchmark on current branch
         run: |
-          go test ./fvm --bench . --tags relic -shuffle=on -count ${{ steps.settings.outputs.benchmark_repetitions }} | tee new.txt
+          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm --bench . --tags relic -shuffle=on; done) | tee new.txt
 
       - name: Checkout base branch
         run: git checkout ${{ github.event.pull_request.base.sha }}
 
       - name: Run benchmark on base branch
         run: |
-          go test ./fvm --bench . --tags relic -shuffle=on  -count ${{ steps.settings.outputs.benchmark_repetitions }} | tee old.txt
+          (for i in {1..${{ steps.settings.outputs.benchmark_repetitions }}}; do go test ./fvm --bench . --tags relic -shuffle=on; done) | tee old.txt
 
       # see https://trstringer.com/github-actions-multiline-strings/ to see why this part is complex
       - name: Use benchstat for comparison
@@ -73,7 +73,7 @@ jobs:
 
             This branch with compared with the base branch ${{  github.event.pull_request.base.label }} commit ${{ github.event.pull_request.base.sha }}
 
-            The command `go test ./fvm --bench . --tags relic -shuffle=on -count N` was used.
+            The command `(for i in {1..N}; do go test ./fvm --bench . --tags relic -shuffle=on; done)` was used.
 
             Bench tests were run a total of ${{ steps.settings.outputs.benchmark_repetitions }} times on each branch.
 
