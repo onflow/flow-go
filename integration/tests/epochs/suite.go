@@ -29,7 +29,7 @@ const (
 	dkgPhaseViews       = 50
 	epochViewsLength    = 380
 
-	waitTimeout =  60 * time.Second
+	waitTimeout =  2 * time.Minute
 )
 
 type Suite struct {
@@ -226,7 +226,6 @@ func (s *Suite) checkStakingAuctionInProgress(ctx context.Context) {
 
 // WaitForPhase waits for epoch phase and will timeout after 2 minutes
 func (s *Suite) WaitForPhase(ctx context.Context, phase flow.EpochPhase) {
-	timeout := 2 * waitTimeout
 	condition := func() bool {
 		snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
 		require.NoError(s.T(), err)
@@ -238,9 +237,9 @@ func (s *Suite) WaitForPhase(ctx context.Context, phase flow.EpochPhase) {
 	}
 	require.Eventually(s.T(),
 		condition,
-		timeout,
+		waitTimeout,
 		100*time.Millisecond,
-		fmt.Sprintf("did not reach epoch phase (%s) within %v seconds", phase, timeout))
+		fmt.Sprintf("did not reach epoch phase (%s) within %v seconds", phase, waitTimeout))
 }
 
 // transfers tokens to receiver from service account
