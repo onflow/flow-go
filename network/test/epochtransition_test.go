@@ -119,7 +119,7 @@ func (t *testNodeList) networks() []network.Network {
 
 func TestEpochTransitionTestSuite(t *testing.T) {
 	// Test is flaky, print it in order to avoid the unused linting error
-	t.Skip(fmt.Sprintf("test is flaky: %v", &MutableIdentityTableSuite{}))
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, fmt.Sprintf("test is flaky: %v", &MutableIdentityTableSuite{}))
 }
 
 // signalIdentityChanged update IDs for all the current set of nodes (simulating an epoch)

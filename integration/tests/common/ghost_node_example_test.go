@@ -64,7 +64,7 @@ func TestGhostNodeExample_Subscribe(t *testing.T) {
 	assert.NoError(t, err)
 
 	// wait for 5 blocks proposals
-	for i:=0;i<5;{
+	for i := 0; i < 5; {
 		from, event, err := msgReader.Next()
 		assert.NoError(t, err)
 
