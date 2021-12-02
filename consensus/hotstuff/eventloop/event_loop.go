@@ -20,7 +20,7 @@ import (
 type EventLoop struct {
 	*component.ComponentManager
 	log                zerolog.Logger
-	eventHandler       hotstuff.EventHandlerV2
+	eventHandler       hotstuff.EventHandler
 	metrics            module.HotstuffMetrics
 	proposals          chan *model.Proposal
 	quorumCertificates chan *flow.QuorumCertificate
@@ -31,7 +31,7 @@ var _ hotstuff.EventLoop = (*EventLoop)(nil)
 var _ component.Component = (*EventLoop)(nil)
 
 // NewEventLoop creates an instance of EventLoop.
-func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandlerV2, startTime time.Time) (*EventLoop, error) {
+func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
 	quorumCertificates := make(chan *flow.QuorumCertificate)
 
