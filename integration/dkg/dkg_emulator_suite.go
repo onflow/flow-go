@@ -412,6 +412,8 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 	// participation in the DKG run
 	dkgKeys, err := badger.NewBeaconPrivateKeys(core.Metrics, core.SecretsDB)
 	s.Require().NoError(err)
+	dkgState, err := badger.NewDKGState(core.PublicDB)
+	s.Require().NoError(err)
 
 	// brokerTunnel is used to communicate between the messaging engine and the
 	// DKG broker/controller
@@ -452,6 +454,7 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 		core.Me,
 		core.State,
 		dkgKeys,
+		dkgState,
 		dkg.NewControllerFactory(
 			controllerFactoryLogger,
 			core.Me,
