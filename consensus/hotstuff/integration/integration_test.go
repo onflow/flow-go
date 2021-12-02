@@ -41,6 +41,7 @@ func TestSingleInstance(t *testing.T) {
 }
 
 func TestThreeInstances(t *testing.T) {
+	t.Skip("to enable once replacing vote aggregator")
 
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
