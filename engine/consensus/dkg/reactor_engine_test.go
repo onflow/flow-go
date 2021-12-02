@@ -273,6 +273,7 @@ func TestReactorEngine_InconsistentBeaconKeys(t *testing.T) {
 	factory := new(module.DKGControllerFactory)
 	dkgState := new(storage.DKGState)
 	dkgState.On("RetrieveMyBeaconPrivateKey", currentCounter+1).Return(priv, nil)
+	dkgState.On("SetDKGEndState", currentCounter+1, flow.DKGEndStateInconsistentKey).Return(nil)
 
 	nextDKG := new(protocol.DKG)
 	nextDKG.On("KeyShare", id).Return(privKey.PublicKey(), nil)
