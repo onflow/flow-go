@@ -39,29 +39,34 @@ func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandle
 		linkGenerator:  generator,
 	}
 }
+
+// ServerHTTP function acts as a wrapper to each request providing common handling functionality
+// such as logging, error handling, request decorators
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
+
+	// create request decorator with parsed values
 	decoratedRequest := newRequestDecorator(r)
 
 	// execute handler function and check for error
 	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
 	if err != nil {
-		// rest status type error
+		// rest status type error should be returned with status and user message provided
 		if e, ok := err.(StatusError); ok {
 			h.errorResponse(w, e.Status(), e.UserMessage(), errorLogger)
 			return
 		}
 
-		// grpc status error
+		// handle grpc status error returned from the backend calls, we are forwarding the message to the client
 		if se, ok := err.(interface {
 			GRPCStatus() *status.Status
 		}); ok {
-			if se.GRPCStatus().Code() == codes.NotFound {
+			if se.GRPCStatus().Code() == codes.NotFound { // handle not found error with correct status
 				h.errorResponse(w, http.StatusNotFound, se.GRPCStatus().Message(), errorLogger)
 				return
 			}
-			if se.GRPCStatus().Code() == codes.InvalidArgument {
+			if se.GRPCStatus().Code() == codes.InvalidArgument { // handle not valid errors with correct status
 				h.errorResponse(w, http.StatusBadRequest, se.GRPCStatus().Message(), errorLogger)
 				return
 			}
@@ -86,6 +91,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	h.jsonResponse(w, response, errorLogger)
 }
 
+// jsonResponse builds a JSON response and send it to the client
 func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logger zerolog.Logger) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
@@ -116,6 +122,7 @@ func (h *Handler) errorResponse(
 	responseMessage string,
 	logger zerolog.Logger,
 ) {
+	// create error response model
 	modelError := generated.ModelError{
 		Code:    int32(returnCode),
 		Message: responseMessage,
