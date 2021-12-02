@@ -111,7 +111,8 @@ func (sk *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64)
 	err = sk.state.db.View(func(txn *badger.Txn) error {
 
 		// retrieve the key, error on any storage error
-		key, err = sk.state.retrieveKeyTx(epochCounter)(txn)
+		var encodableKey *encodable.RandomBeaconPrivKey
+		encodableKey, err = sk.state.retrieveKeyTx(epochCounter)(txn)
 		if err != nil {
 			key = nil
 			safe = false
@@ -136,6 +137,7 @@ func (sk *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64)
 
 		// return the key only for successful end state
 		safe = true
+		key = encodableKey.PrivateKey
 		return nil
 	})
 	return

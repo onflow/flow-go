@@ -143,7 +143,8 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 			assert.NoError(t, err)
 
 			key, safe, err := safeKeys.RetrieveMyBeaconPrivateKey(epochCounter)
-			assert.NotNil(t, expected, key)
+			assert.NotNil(t, key)
+			assert.True(t, expected.Equals(key))
 			assert.True(t, safe)
 			assert.NoError(t, err)
 		})
