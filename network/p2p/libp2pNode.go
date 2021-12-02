@@ -17,7 +17,6 @@ import (
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/model/flow"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/dns"
@@ -49,7 +48,6 @@ type Node struct {
 	logger          zerolog.Logger                         // used to provide logging
 	topics          map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs            map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
-	id              flow.Identifier                        // used to represent id of flow node running this instance of libP2P node
 	resolver        *dns.Resolver                          // dns resolver for libp2p (is nil if default)
 	pingService     *PingService
 	connMgr         connmgr.ConnManager

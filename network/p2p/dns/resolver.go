@@ -9,8 +9,9 @@ import (
 
 	madns "github.com/multiformats/go-multiaddr-dns"
 
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/module"
+	"github.com/onflow/flow-go/module/component"
+	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 //go:linkname runtimeNano runtime.nanotime
@@ -31,10 +32,12 @@ type Resolver struct {
 	c              *cache
 	res            madns.BasicResolver // underlying resolver
 	collector      module.ResolverMetrics
-	unit           *engine.Unit
 	processingIPs  map[string]struct{} // ongoing ip lookups through underlying resolver
 	processingTXTs map[string]struct{} // ongoing txt lookups through underlying resolver
+
 }
+
+var _ component.Component = (*Resolver)(nil)
 
 // optFunc is the option function for Resolver.
 type optFunc func(resolver *Resolver)
@@ -61,7 +64,6 @@ func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 		collector:      collector,
 		processingIPs:  map[string]struct{}{},
 		processingTXTs: map[string]struct{}{},
-		unit:           engine.NewUnit(),
 	}
 
 	for _, opt := range opts {
@@ -69,6 +71,10 @@ func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 	}
 
 	return resolver
+}
+
+func (r *Resolver) Start(ctx irrecoverable.SignalerContext) {
+	return r.unit.Ready()
 }
 
 // Ready initializes the resolver and returns a channel that is closed when the initialization is done.
