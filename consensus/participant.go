@@ -16,7 +16,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	validatorImpl "github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voter"
 	"github.com/onflow/flow-go/consensus/recovery"
@@ -35,7 +37,7 @@ func NewParticipant(
 	builder module.Builder,
 	updater module.Finalizer,
 	persist hotstuff.Persister,
-	signer hotstuff.SignerVerifier,
+	signer hotstuff.Signer,
 	communicator hotstuff.Communicator,
 	rootHeader *flow.Header,
 	rootQC *flow.QuorumCertificate,
@@ -67,9 +69,12 @@ func NewParticipant(
 		return nil, fmt.Errorf("could not recover forks: %w", err)
 	}
 
+	packer := signature.NewConsensusSigDataPacker(committee)
+	verifier := verification.NewCombinedVerifier(committee, packer)
+
 	// initialize the validator
 	var validator hotstuff.Validator
-	validator = validatorImpl.New(committee, forks, signer)
+	validator = validatorImpl.New(committee, forks, verifier)
 	validator = validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 
 	// get the last view we started
@@ -85,7 +90,8 @@ func NewParticipant(
 	}
 
 	// initialize the vote aggregator
-	aggregator := voteaggregator.New(notifier, 0, committee, validator, signer)
+	// TODO: replace with vote aggregator v2
+	aggregator := voteaggregator.New(notifier, 0, committee, validator, nil)
 
 	// recover the hotstuff state, mainly to recover all pending blocks
 	// in forks
