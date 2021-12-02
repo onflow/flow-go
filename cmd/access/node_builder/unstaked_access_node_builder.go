@@ -245,7 +245,7 @@ func (anb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.NodeB
 			Address:       anb.BindAddr,
 		}
 
-		me, err := local.New(self, nil)
+		me, err := local.NewNoKey(self)
 		anb.MustNot(err).Msg("could not initialize local")
 		node.Me = me
 	}
