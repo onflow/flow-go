@@ -202,6 +202,6 @@ func (s *DKGSuite) TestNodesDown() {
 // between consensus node and access node, as well as connection issues between
 // access node and execution node, or the execution node being down).
 func (s *DKGSuite) TestEmulatorProblems() {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
+	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky test")
 	s.runTest(numberOfNodes, true)
 }
