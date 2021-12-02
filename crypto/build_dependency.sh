@@ -5,6 +5,27 @@ set -euo pipefail
 PKG_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 RELIC_DIR_NAME="relic"
 RELIC_DIR="${PKG_DIR}/${RELIC_DIR_NAME}"
+MOD_DIR="/pkg/mod/"
+# Looks into the go mod file, takes the line with the crypto dependency, and uses "cut" command to extract module version using a space character as the delimiter
+VERSION="$(cat ../go.mod | grep github.com/onflow/flow-go/crypto | cut -d' ' -f 2)"
+DEP_DIR="$(go env GOPATH)/pkg/mod/github.com/onflow/flow-go/crypto@${VERSION}"
+
+# echo $GO_MOD_CADENCE
+
+echo $DEP_DIR
+if [[ "$PKG_DIR" != *"$MOD_DIR"* ]]; then
+
+  # grant permissions if not existant
+   if [[ ! -r ${PKG_DIR}  || ! -w ${PKG_DIR} || ! -x ${PKG_DIR} ]]; then
+      sudo chmod -R 755 ${PKG_DIR}
+   fi
+
+   cd ${DEP_DIR}
+
+   go generate
+
+   cd -
+fi
 
 # grant permissions if not existant
 if [[ ! -r ${PKG_DIR}  || ! -w ${PKG_DIR} || ! -x ${PKG_DIR} ]]; then
