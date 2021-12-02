@@ -156,7 +156,7 @@ tidy:
 	git diff --exit-code
 
 .PHONY: lint
-lint:
+lint: tidy
 	# GO111MODULE=on revive -config revive.toml -exclude storage/ledger/trie ./...
 	golangci-lint run -v --build-tags relic ./...
 
