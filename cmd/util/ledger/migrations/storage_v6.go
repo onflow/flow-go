@@ -137,7 +137,7 @@ func (m *StorageFormatV6Migration) migrate(payloads []ledger.Payload) ([]ledger.
 	m.initNewInterpreter()
 	m.initOldInterpreter(payloads)
 
-	m.deferredValuePaths = m.getDeferredKeys(payloads)
+	m.deferredValuePaths = m.getDeferredKeys(storagePayloads)
 
 	m.converter = NewValueConverter(m)
 
@@ -277,16 +277,7 @@ func (m *StorageFormatV6Migration) getDeferredKeys(payloads []ledger.Payload) ma
 
 		keyParts := payload.Key.KeyParts
 		rawOwner := keyParts[0].Value
-		rawController := keyParts[1].Value
 		rawKey := keyParts[2].Value
-
-		if state.IsFVMStateKey(
-			string(rawOwner),
-			string(rawController),
-			string(rawKey),
-		) {
-			continue
-		}
 
 		value, version := oldInter.StripMagic(payload.Value)
 
