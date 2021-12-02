@@ -53,7 +53,6 @@ type ReactorSuite struct {
 	state        *protocol.State
 	viewEvents   *gadgets.Views
 
-	dkgKeys    *storage.BeaconPrivateKeys
 	dkgState   *storage.DKGState
 	controller *module.DKGController
 	factory    *module.DKGControllerFactory
@@ -133,8 +132,9 @@ func (suite *ReactorSuite) SetupTest() {
 
 	// ensure that an attempt is made to insert the expected dkg private share
 	// for the next epoch.
-	suite.dkgKeys = new(storage.BeaconPrivateKeys)
-	suite.dkgKeys.On("InsertMyBeaconPrivateKey", mock.Anything, mock.Anything).Run(
+	suite.dkgState = new(storage.DKGState)
+	suite.dkgState.On("SetDKGStarted", suite.NextEpochCounter()).Return(nil).Once()
+	suite.dkgState.On("InsertMyBeaconPrivateKey", mock.Anything, mock.Anything).Run(
 		func(args mock.Arguments) {
 			epochCounter := args.Get(0).(uint64)
 			require.Equal(suite.T(), suite.NextEpochCounter(), epochCounter)
@@ -143,8 +143,6 @@ func (suite *ReactorSuite) SetupTest() {
 		}).
 		Return(nil).
 		Once()
-	suite.dkgState = new(storage.DKGState)
-	suite.dkgState.On("SetDKGStarted", suite.NextEpochCounter()).Return(nil).Once()
 
 	// we will ensure that the controller state transitions get called appropriately
 	suite.controller = new(module.DKGController)
@@ -171,7 +169,6 @@ func (suite *ReactorSuite) SetupTest() {
 		suite.logger,
 		suite.local,
 		suite.state,
-		suite.dkgKeys,
 		suite.dkgState,
 		suite.factory,
 		suite.viewEvents,
@@ -194,7 +191,7 @@ func (suite *ReactorSuite) TestRunDKG_PhaseTransition() {
 	// check that the appropriate callbacks were registered
 	time.Sleep(50 * time.Millisecond)
 	suite.controller.AssertExpectations(suite.T())
-	suite.dkgKeys.AssertExpectations(suite.T())
+	suite.dkgState.AssertExpectations(suite.T())
 	// happy path - no warn logs expected
 	suite.Assert().Equal(0, suite.warnsLogged)
 }
@@ -221,7 +218,7 @@ func (suite *ReactorSuite) TestRunDKG_StartupInSetupPhase() {
 	// check that the appropriate callbacks were registered
 	time.Sleep(50 * time.Millisecond)
 	suite.controller.AssertExpectations(suite.T())
-	suite.dkgKeys.AssertExpectations(suite.T())
+	suite.dkgState.AssertExpectations(suite.T())
 	// happy path - no warn logs expected
 	suite.Assert().Equal(0, suite.warnsLogged)
 }
@@ -273,10 +270,9 @@ func TestReactorEngine_InconsistentBeaconKeys(t *testing.T) {
 	// to be logged.
 	priv := unittest.RandomBeaconPriv()
 
-	keyStorage := new(storage.BeaconPrivateKeys)
-	keyStorage.On("RetrieveMyBeaconPrivateKey", currentCounter+1).Return(priv, nil)
 	factory := new(module.DKGControllerFactory)
 	dkgState := new(storage.DKGState)
+	dkgState.On("RetrieveMyBeaconPrivateKey", currentCounter+1).Return(priv, nil)
 
 	nextDKG := new(protocol.DKG)
 	nextDKG.On("KeyShare", id).Return(privKey.PublicKey(), nil)
@@ -311,7 +307,6 @@ func TestReactorEngine_InconsistentBeaconKeys(t *testing.T) {
 		logger,
 		me,
 		state,
-		keyStorage,
 		dkgState,
 		factory,
 		viewEvents,
