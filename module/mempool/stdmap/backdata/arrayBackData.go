@@ -83,7 +83,7 @@ func (a *ArrayBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flo
 
 // ByID returns the given item from the pool.
 func (a *ArrayBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
-	return nil, false
+	return a.get(entityID)
 }
 
 // Size will return the size of the backend.
@@ -124,29 +124,30 @@ func (a *ArrayBackData) put(entityID flow.Identifier, entity flow.Entity) bool {
 	return true
 }
 
-//func (a ArrayBackData) get(entityID flow.Identifier) (flow.Identifier, bool) {
-//	idPrefix, bucketIndex := a.idPrefixAndBucketIndex(entityID)
-//	for k := uint64(0); k < bucketSize; k++ {
-//		if a.buckets[bucketIndex][k].idPrefix != idPrefix {
-//			continue
-//		}
-//
-//		valueIndex := a.buckets[bucketIndex][k]
-//		// checking health of key <-> value link
-//		// come here to check if kvIndex / kvOwner still linked
-//		if !a.keyValueLinked(bucketIndex, k) {
-//
-//		}
-//
-//		// come here to check remaining hash bits
-//		if a.entities[kvIndex].id != entityID {
-//			continue
-//		}
-//
-//		// entity ID already exists in the bucket
-//		return 0, false
-//	}
-//}
+func (a ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bool) {
+	idPrefix, bucketIndex := a.idPrefixAndBucketIndex(entityID)
+	for k := uint64(0); k < bucketSize; k++ {
+		if a.buckets[bucketIndex][k].idPrefix != idPrefix {
+			continue
+		}
+
+		valueIndex, linked := a.valueIndexOf(bucketIndex, k)
+		if !linked {
+			// valueIndex does not represent value entity for this key
+			// this happens upon an ejection on values
+			return nil, false
+		}
+
+		// come here to check remaining hash bits
+		if a.entities[valueIndex].id != entityID {
+			continue
+		}
+
+		return a.entities[valueIndex].entity, true
+	}
+
+	return nil, false
+}
 
 func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (uint32, uint64) {
 	// uint64(id[0:8]) used to compute bucket index for which this key (i.e., id) belongs to

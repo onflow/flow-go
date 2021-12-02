@@ -37,4 +37,11 @@ func TestArrayBackData_Add(t *testing.T) {
 		require.Equal(t, bd.buckets[0][i].valueIndex, uint32(i))
 		require.Equal(t, bd.entities[i].owner, uint64(i))
 	}
+
+	// getting inserted elements
+	for _, expected := range entities {
+		actual, ok := bd.ByID(expected.ID())
+		require.True(t, ok)
+		require.Equal(t, expected, actual)
+	}
 }
