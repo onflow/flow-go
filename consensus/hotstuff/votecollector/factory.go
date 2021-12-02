@@ -94,3 +94,53 @@ func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Comm
 		baseFactory: base.Create,
 	}
 }
+
+// BootstrapVoteProcessorFactory acts as adaptor for concrete vote processor factories
+// Comparing to VoteProcessorFactory, doesn't check validity of proposal since for root block there
+// is no proposal.
+type BootstrapVoteProcessorFactory struct {
+	baseFactory baseFactory
+}
+
+var _ hotstuff.VoteProcessorFactory = (*BootstrapVoteProcessorFactory)(nil)
+
+// Create instantiates a VerifyingVoteProcessor for the given block proposal.
+// A VerifyingVoteProcessor is created for any proposal. This should be used only for bootstrapping process
+// where no proposal is available.
+// Expected error returns during normal operations:
+// * model.InvalidBlockError - proposal has invalid proposer vote
+func (f *BootstrapVoteProcessorFactory) Create(proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
+	processor, err := f.baseFactory(proposal.Block)
+	if err != nil {
+		return nil, fmt.Errorf("instantiating vote processor for block %v failed: %w", proposal.Block.BlockID, err)
+	}
+	return processor, nil
+}
+
+// NewBootstrapCombinedVoteProcessorFactory implements hotstuff.VoteProcessorFactory for
+// members of a consensus cluster. Used only for bootstrapping.
+func NewBootstrapCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *BootstrapVoteProcessorFactory {
+	base := &combinedVoteProcessorFactoryBaseV2{
+		log:         log,
+		committee:   committee,
+		onQCCreated: onQCCreated,
+		packer:      signature.NewConsensusSigDataPacker(committee),
+	}
+	return &BootstrapVoteProcessorFactory{
+		baseFactory: base.Create,
+	}
+}
+
+// NewBootstrapStakingVoteProcessorFactory implements hotstuff.VoteProcessorFactory for
+// members of a collector cluster. For their cluster-local hotstuff, collectors
+// only sign with their staking key. Used only for bootstrapping.
+func NewBootstrapStakingVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *BootstrapVoteProcessorFactory {
+	base := &stakingVoteProcessorFactoryBase{
+		log:         log,
+		committee:   committee,
+		onQCCreated: onQCCreated,
+	}
+	return &BootstrapVoteProcessorFactory{
+		baseFactory: base.Create,
+	}
+}

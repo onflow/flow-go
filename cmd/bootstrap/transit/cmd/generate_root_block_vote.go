@@ -9,14 +9,12 @@ import (
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	hotstuffSig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/io"
 )
 
@@ -72,17 +70,13 @@ func generateVote(c *cobra.Command, args []string) {
 		NetworkPubKey: nodeInfo.NetworkPrivKey.PrivateKey.PublicKey(),
 	}
 
-	local, err := local.New(identity, nodeInfo.StakingPrivKey.PrivateKey)
+	me, err := local.New(identity, nodeInfo.StakingPrivKey.PrivateKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("creating local signer abstraction failed")
 	}
 
-	merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-	stakingSigner := signature.NewAggregationProvider(encoding.ConsensusVoteTag, local)
-	beaconVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-	beaconSigner := signature.NewThresholdProvider(encoding.RandomBeaconTag, randomBeaconPrivKey)
-	beaconStore := signature.NewSingleSignerStore(beaconSigner)
-	signer := verification.NewCombinedSigner(nil, stakingSigner, beaconVerifier, merger, beaconStore, nodeID)
+	beaconKeyStore := hotstuffSig.NewStaticRandomBeaconSignerStore(randomBeaconPrivKey)
+	signer := verification.NewCombinedSigner(me, beaconKeyStore)
 
 	path = filepath.Join(flagBootDir, bootstrap.PathRootBlockData)
 	data, err = io.ReadFile(path)
