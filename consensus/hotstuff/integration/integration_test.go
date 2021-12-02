@@ -20,6 +20,7 @@ const safeTimeout = 2 * time.Second
 const safeDecreaseFactor = 0.85
 
 func TestSingleInstance(t *testing.T) {
+	t.Skip("to enable once replacing vote aggregator")
 
 	// set up a single instance to run
 	// NOTE: currently, the HotStuff logic will infinitely call back on itself
