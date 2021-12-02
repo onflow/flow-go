@@ -50,43 +50,54 @@ func TestArrayBackData_BelowLimit(t *testing.T) {
 	}
 }
 
-func TestArrayBackData_TwoBuckets(t *testing.T) {
-	size := 30 // bucket total is 16, hence, we end up having two buckets.
-
-	bd := NewArrayBackData(uint32(size), 8, LRUEjection)
-
-	entities := unittest.EntityListFixture(uint(size))
-
-	// adding elements
-	for i, e := range entities {
-		// adding each element must be successful.
-		require.True(t, bd.Add(e.ID(), e))
-
-		// total of back data should be incremented by each addition.
-		require.Equal(t, bd.Size(), uint(i+1))
-
-		// entity should be placed at index i in back data
-		_, entity, _ := bd.entities.get(uint32(i))
-		require.Equal(t, e, entity)
+func TestArrayBackDataStoreAndRetrievalWithoutEjection(t *testing.T) {
+	for _, tc := range []struct {
+		limit           uint32
+		overLimitFactor uint32
+		entityCount     uint32
+		helpers         []func(*testing.T, *ArrayBackData, []*unittest.MockEntity)
+	}{
+		{ // two buckets, entities below limit.
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     10,
+		},
+		{ // two buckets, entities equal to limit.
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     30,
+		},
+		{ // multiple buckets, high limit, low entities.
+			limit:           10000,
+			overLimitFactor: 16,
+			entityCount:     1000,
+		},
+		{ // multiple buckets, entities equal to limit.
+			limit:           10000,
+			overLimitFactor: 16,
+			entityCount:     10000,
+		},
+	} {
+		t.Run(fmt.Sprintf("%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
+			testArrayBackDataStoreAndRetrievalWithoutEjection(t, tc.limit, tc.overLimitFactor, tc.entityCount)
+		})
 	}
 
-	// getting inserted elements
-	for i, expected := range entities {
-		actual, ok := bd.ByID(expected.ID())
-		require.True(t, ok)
-		require.Equal(t, expected, actual)
-		fmt.Println(i)
-	}
 }
 
-func TestArrayBackData_MultipleBuckets(t *testing.T) {
-	withTestScenario(t, 200, 8, 200,
+func testArrayBackDataStoreAndRetrievalWithoutEjection(t *testing.T, limit uint32, overLimitFactor uint32, entityCount uint32, helpers ...func(*testing.T, *ArrayBackData, []*unittest.MockEntity)) {
+	h := []func(*testing.T, *ArrayBackData, []*unittest.MockEntity){
 		func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
 			testAddingEntities(t, backData, entities)
 		},
-		func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+	}
+	h = append(h, helpers...)
+
+	withTestScenario(t, limit, overLimitFactor, entityCount,
+		append(h, func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
 			testRetrievingSavedEntities(t, backData, entities)
-		})
+		})...,
+	)
 }
 
 func withTestScenario(t *testing.T,
