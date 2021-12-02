@@ -87,31 +87,31 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	vote, err = signer.CreateVote(block)
 	require.NoError(t, err)
 
-	valid, err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	voteValid, err := verifier.VerifyVote(nodeID, vote.SigData, block)
 	require.NoError(t, err)
-	require.Equal(t, true, valid)
+	require.Equal(t, true, voteValid)
 
 	// vote on different bock should be invalid
 	block.BlockID[0]++
-	valid, err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	_, err = verifier.VerifyVote(nodeID, vote.SigData, block)
 	require.Error(t, err)
 	block.BlockID[0]--
 
 	// vote with changed view should be invalid
 	block.View++
-	valid, err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	_, err = verifier.VerifyVote(nodeID, vote.SigData, block)
 	require.Error(t, err)
 	block.View--
 
 	// vote by different signer should be invalid
 	wrongVoter := identities[1]
 	wrongVoter.StakingPubKey = unittest.StakingPrivKeyFixture().PublicKey()
-	valid, err = verifier.VerifyVote(wrongVoter, vote.SigData, block)
+	_, err = verifier.VerifyVote(wrongVoter, vote.SigData, block)
 	require.Error(t, err)
 
 	// vote with changed signature should be invalid
 	vote.SigData[4]++
-	valid, err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	_, err = verifier.VerifyVote(nodeID, vote.SigData, block)
 	require.Error(t, err)
 	vote.SigData[4]--
 }
