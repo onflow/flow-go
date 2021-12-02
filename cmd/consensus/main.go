@@ -115,7 +115,8 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
-		dkgKeyStore             *bstorage.BeaconPrivateKeys
+		dkgState                *bstorage.DKGState
+		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -169,8 +170,12 @@ func main() {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		Module("dkg key storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			dkgKeyStore, err = bstorage.NewBeaconPrivateKeys(node.Metrics.Cache, node.SecretsDB)
+		Module("dkg state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			dkgState, err = bstorage.NewDKGState(node.Metrics.Cache, node.SecretsDB)
+			return err
+		}).
+		Module("beacon keys", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			safeBeaconKeys, err = bstorage.NewSafeBeaconPrivateKeys(dkgState)
 			return err
 		}).
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -269,7 +274,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			err = dkgKeyStore.InsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey)
+			err = dkgState.InsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey)
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}
@@ -287,7 +292,7 @@ func main() {
 					if err != nil {
 						return err
 					}
-					_, err = dkgKeyStore.RetrieveMyBeaconPrivateKey(counter)
+					_, err = dkgState.RetrieveMyBeaconPrivateKey(counter)
 					if err != nil {
 						return err
 					}
@@ -604,7 +609,7 @@ func main() {
 
 			epochLookup := epochs.NewEpochLookup(node.State)
 
-			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeyStore)
+			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, safeBeaconKeys)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.SignerVerifier
@@ -743,7 +748,7 @@ func main() {
 				node.Logger,
 				node.Me,
 				node.State,
-				dkgKeyStore,
+				dkgState,
 				dkgmodule.NewControllerFactory(
 					node.Logger,
 					node.Me,
