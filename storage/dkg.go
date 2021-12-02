@@ -2,14 +2,8 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-type BeaconPrivateKeys interface {
-	InsertMyBeaconPrivateKey(epochCounter uint64, key *encodable.RandomBeaconPrivKey) error
-	RetrieveMyBeaconPrivateKey(epochCounter uint64) (*encodable.RandomBeaconPrivKey, error)
-}
 
 // DKGState is the storage interface for storing all artifacts and state
 // related to the DKG process, including the latest state of a running or
@@ -48,7 +42,7 @@ type SafeBeaconKeys interface {
 	//
 	// Returns:
 	// * (key, true, nil) if the key is present and confirmed valid
-	// * (nil, false, nil) if the key has been marked invalid (by SetDKGEnded)
+	// * (nil, false, nil) if there is no key, or the key has been marked invalid (by SetDKGEnded)
 	// * (nil, false, error) for any other condition, or exception
 	RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error)
 }

@@ -92,7 +92,7 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 		safeKeys, err := bstorage.NewSafeBeaconPrivateKeys(dkgState)
 		require.NoError(t, err)
 
-		t.Run("non-existent key", func(t *testing.T) {
+		t.Run("non-existent key - should error", func(t *testing.T) {
 			epochCounter := rand.Uint64()
 			key, safe, err := safeKeys.RetrieveMyBeaconPrivateKey(epochCounter)
 			assert.Nil(t, key)
@@ -100,7 +100,7 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 			assert.Error(t, err)
 		})
 
-		t.Run("existent key, non-existent dkg end state", func(t *testing.T) {
+		t.Run("existent key, non-existent dkg end state - should error", func(t *testing.T) {
 			epochCounter := rand.Uint64()
 
 			// store a key
@@ -114,7 +114,7 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 			assert.Error(t, err)
 		})
 
-		t.Run("existent key, unsuccessful dkg", func(t *testing.T) {
+		t.Run("existent key, unsuccessful dkg - not safe", func(t *testing.T) {
 			epochCounter := rand.Uint64()
 
 			// store a key
@@ -128,10 +128,10 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 			key, safe, err := safeKeys.RetrieveMyBeaconPrivateKey(epochCounter)
 			assert.Nil(t, key)
 			assert.False(t, safe)
-			assert.Error(t, err)
+			assert.NoError(t, err)
 		})
 
-		t.Run("existent key, successful dkg", func(t *testing.T) {
+		t.Run("existent key, successful dkg - safe", func(t *testing.T) {
 			epochCounter := rand.Uint64()
 
 			// store a key
