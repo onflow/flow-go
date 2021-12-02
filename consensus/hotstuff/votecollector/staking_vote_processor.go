@@ -30,14 +30,13 @@ import (
 // by `votecollector.VoteProcessorFactory` which adds the logic to verify
 // the proposer's vote (decorator pattern).
 type stakingVoteProcessorFactoryBase struct {
-	log         zerolog.Logger
 	committee   hotstuff.Committee
 	onQCCreated hotstuff.OnQCCreated
 }
 
 // Create creates StakingVoteProcessor for processing votes for the given block.
 // Caller must treat all errors as exceptions
-func (f *stakingVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
+func (f *stakingVoteProcessorFactoryBase) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
 	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants: %w", err)
@@ -60,7 +59,7 @@ func (f *stakingVoteProcessorFactoryBase) Create(block *model.Block) (hotstuff.V
 	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
 
 	return &StakingVoteProcessor{
-		log:              f.log,
+		log:              log,
 		block:            block,
 		stakingSigAggtor: stakingSigAggtor,
 		onQCCreated:      f.onQCCreated,

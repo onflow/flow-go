@@ -12,6 +12,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/uber/jaeger-client-go"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -41,6 +43,7 @@ type Core struct {
 	pending           module.PendingBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff
+	voteAggregator    hotstuff.VoteAggregator
 }
 
 // NewCore instantiates the business logic for the main consensus' compliance engine.
@@ -56,6 +59,7 @@ func NewCore(
 	state protocol.MutableState,
 	pending module.PendingBlockBuffer,
 	sync module.BlockRequester,
+	voteAggregator hotstuff.VoteAggregator,
 ) (*Core, error) {
 
 	e := &Core{
@@ -71,6 +75,7 @@ func NewCore(
 		pending:           pending,
 		sync:              sync,
 		hotstuff:          nil, // use `WithConsensus`
+		voteAggregator:    voteAggregator,
 	}
 
 	e.mempool.MempoolEntries(metrics.ResourceProposal, e.pending.Size())
@@ -341,8 +346,12 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.BlockVote) e
 	log.Info().Msg("forwarding block vote to hotstuff") // to keep logging consistent with proposals
 
 	// forward the vote to hotstuff for processing
-	// TODO: replace vote submitting directly with vote aggregator in V2
-	//c.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
+	c.voteAggregator.AddVote(&model.Vote{
+		View:     vote.View,
+		BlockID:  vote.BlockID,
+		SignerID: originID,
+		SigData:  vote.SigData,
+	})
 
 	return nil
 }

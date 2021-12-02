@@ -20,7 +20,7 @@ import (
 // Therefore, baseFactory does _not_ implement `hotstuff.VoteProcessorFactory` by itself.
 // The VoteProcessorFactory adds the missing logic to verify the proposer's vote, by
 // wrapping the baseFactory (decorator pattern).
-type baseFactory func(block *model.Block) (hotstuff.VerifyingVoteProcessor, error)
+type baseFactory func(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error)
 
 // VoteProcessorFactory implements `hotstuff.VoteProcessorFactory`. Its main purpose
 // is to construct instances of VerifyingVoteProcessors for a given block proposal.
@@ -40,8 +40,8 @@ var _ hotstuff.VoteProcessorFactory = (*VoteProcessorFactory)(nil)
 // A VerifyingVoteProcessor are only created for proposals with valid proposer votes.
 // Expected error returns during normal operations:
 // * model.InvalidBlockError - proposal has invalid proposer vote
-func (f *VoteProcessorFactory) Create(proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
-	processor, err := f.baseFactory(proposal.Block)
+func (f *VoteProcessorFactory) Create(log zerolog.Logger, proposal *model.Proposal) (hotstuff.VerifyingVoteProcessor, error) {
+	processor, err := f.baseFactory(log, proposal.Block)
 	if err != nil {
 		return nil, fmt.Errorf("instantiating vote processor for block %v failed: %w", proposal.Block.BlockID, err)
 	}
@@ -63,9 +63,8 @@ func (f *VoteProcessorFactory) Create(proposal *model.Proposal) (hotstuff.Verify
 // NewStakingVoteProcessorFactory implements hotstuff.VoteProcessorFactory for
 // members of a collector cluster. For their cluster-local hotstuff, collectors
 // only sign with their staking key.
-func NewStakingVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
+func NewStakingVoteProcessorFactory(committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
 	base := &stakingVoteProcessorFactoryBase{
-		log:         log,
 		committee:   committee,
 		onQCCreated: onQCCreated,
 	}
@@ -83,9 +82,8 @@ func NewStakingVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Commi
 // participant can sign with its staking key; thereby it contributes only to consensus but
 // not the random beacon. There should be an economic incentive for the nodes to preferably
 // sign with their random beacon key.
-func NewCombinedVoteProcessorFactory(log zerolog.Logger, committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
+func NewCombinedVoteProcessorFactory(committee hotstuff.Committee, onQCCreated hotstuff.OnQCCreated) *VoteProcessorFactory {
 	base := &combinedVoteProcessorFactoryBaseV2{
-		log:         log,
 		committee:   committee,
 		onQCCreated: onQCCreated,
 		packer:      signature.NewConsensusSigDataPacker(committee),

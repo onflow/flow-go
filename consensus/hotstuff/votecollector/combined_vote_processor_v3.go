@@ -31,7 +31,6 @@ import (
 // the proposer's vote (decorator pattern).
 // nolint:unused
 type combinedVoteProcessorFactoryBaseV3 struct {
-	log         zerolog.Logger
 	committee   hotstuff.Committee
 	onQCCreated hotstuff.OnQCCreated
 	packer      hotstuff.Packer
@@ -40,7 +39,7 @@ type combinedVoteProcessorFactoryBaseV3 struct {
 // Create creates CombinedVoteProcessorV3 for processing votes for the given block.
 // Caller must treat all errors as exceptions
 // nolint:unused
-func (f *combinedVoteProcessorFactoryBaseV3) Create(block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
+func (f *combinedVoteProcessorFactoryBaseV3) Create(log zerolog.Logger, block *model.Block) (hotstuff.VerifyingVoteProcessor, error) {
 	allParticipants, err := f.committee.Identities(block.BlockID, filter.Any)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving consensus participants at block %v: %w", block.BlockID, err)
@@ -90,7 +89,7 @@ func (f *combinedVoteProcessorFactoryBaseV3) Create(block *model.Block) (hotstuf
 	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
 
 	return &CombinedVoteProcessorV3{
-		log:              f.log,
+		log:              log,
 		block:            block,
 		stakingSigAggtor: stakingSigAggtor,
 		rbSigAggtor:      rbSigAggtor,

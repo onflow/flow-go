@@ -6,7 +6,7 @@ import (
 
 // HotStuff defines the interface to the core HotStuff algorithm. It includes
 // a method to start the event loop, and utilities to submit block proposals
-// and votes received from other replicas.
+//  received from other replicas.
 type HotStuff interface {
 	ReadyDoneAware
 	Startable

@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
@@ -57,16 +58,13 @@ func NewHotStuffFactory(
 	return factory, nil
 }
 
-func (f *HotStuffFactory) Create(
-	epoch protocol.Epoch,
+func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	cluster protocol.Cluster,
 	clusterState cluster.State,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
-	builder module.Builder,
 	updater module.Finalizer,
-	communicator hotstuff.Communicator,
-) (module.HotStuff, error) {
+) (*consensus.HotstuffModules, error) {
 
 	// setup metrics/logging with the new chain ID
 	metrics := f.createMetrics(cluster.ChainID())
@@ -74,10 +72,11 @@ func (f *HotStuffFactory) Create(
 	notifier.AddConsumer(notifications.NewLogConsumer(f.log))
 	notifier.AddConsumer(hotmetrics.NewMetricsConsumer(metrics))
 	notifier.AddConsumer(notifications.NewTelemetryConsumer(f.log, cluster.ChainID()))
-	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
 
-	var committee hotstuff.Committee
-	var err error
+	var (
+		err       error
+		committee hotstuff.Committee
+	)
 	committee, err = committees.NewClusterCommittee(f.protoState, payloads, cluster, epoch, f.me.NodeID())
 	if err != nil {
 		return nil, fmt.Errorf("could not create cluster committee: %w", err)
@@ -85,31 +84,78 @@ func (f *HotStuffFactory) Create(
 	committee = committees.NewMetricsWrapper(committee, metrics) // wrapper for measuring time spent determining consensus committee relations
 
 	// create a signing provider
-	var signer hotstuff.SignerVerifier = verification.NewSingleSignerVerifier(committee, f.aggregator, f.me.NodeID())
+	var signer hotstuff.SignerVerifier
+	signer = verification.NewSingleSignerVerifier(committee, f.aggregator, f.me.NodeID())
 	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
-	persist := persister.New(f.db, cluster.ChainID())
+	finalizedBlock, err := clusterState.Final().Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get cluster finalized block: %w", err)
+	}
 
-	finalized, pending, err := recovery.FindLatest(clusterState, headers)
+	forks, err := consensus.NewForks(
+		finalizedBlock,
+		headers,
+		updater,
+		notifier,
+		cluster.RootBlock().Header,
+		cluster.RootQC(),
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	qcDistributor := pubsub.NewQCCreatedDistributor()
+	validator := consensus.NewValidator(metrics, committee, forks, signer)
+	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+	aggregator, err := consensus.NewVoteAggregator(
+		f.log,
+		finalizedBlock,
+		notifier,
+		voteProcessorFactory,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return &consensus.HotstuffModules{
+		Forks:                forks,
+		Validator:            validator,
+		Notifier:             notifier,
+		Committee:            committee,
+		Signer:               signer,
+		Persist:              persister.New(f.db, cluster.ChainID()),
+		Aggregator:           aggregator,
+		QCCreatedDistributor: qcDistributor,
+	}, nil
+}
+
+func (f *HotStuffFactory) Create(
+	cluster protocol.Cluster,
+	clusterState cluster.State,
+	builder module.Builder,
+	headers storage.Headers,
+	communicator hotstuff.Communicator,
+	hotstuffModules *consensus.HotstuffModules,
+) (module.HotStuff, error) {
+
+	// setup metrics/logging with the new chain ID
+	metrics := f.createMetrics(cluster.ChainID())
+	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
+
+	finalizedBlock, pendingBlocks, err := recovery.FindLatest(clusterState, headers)
 	if err != nil {
 		return nil, err
 	}
 
 	participant, err := consensus.NewParticipant(
 		f.log,
-		notifier,
 		metrics,
-		headers,
-		committee,
 		builder,
-		updater,
-		persist,
-		signer,
 		communicator,
-		cluster.RootBlock().Header,
-		cluster.RootQC(),
-		finalized,
-		pending,
+		finalizedBlock,
+		pendingBlocks,
+		hotstuffModules,
 		f.opts...,
 	)
 	return participant, err

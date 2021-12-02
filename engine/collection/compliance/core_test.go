@@ -11,6 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
@@ -39,13 +41,14 @@ type ComplianceCoreSuite struct {
 	childrenDB map[flow.Identifier][]*cluster.PendingBlock
 
 	// mocked dependencies
-	state    *clusterstate.MutableState
-	snapshot *clusterstate.Snapshot
-	metrics  *metrics.NoopCollector
-	headers  *storage.Headers
-	pending  *module.PendingClusterBlockBuffer
-	hotstuff *module.HotStuff
-	sync     *module.BlockRequester
+	state          *clusterstate.MutableState
+	snapshot       *clusterstate.Snapshot
+	metrics        *metrics.NoopCollector
+	headers        *storage.Headers
+	pending        *module.PendingClusterBlockBuffer
+	hotstuff       *module.HotStuff
+	sync           *module.BlockRequester
+	voteAggregator *hotstuff.VoteAggregator
 
 	// engine under test
 	core *Core
@@ -141,6 +144,8 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	// set up hotstuff module mock
 	cs.hotstuff = &module.HotStuff{}
 
+	cs.voteAggregator = &hotstuff.VoteAggregator{}
+
 	// set up synchronization module mock
 	cs.sync = &module.BlockRequester{}
 	cs.sync.On("RequestBlock", mock.Anything).Return(nil)
@@ -150,7 +155,16 @@ func (cs *ComplianceCoreSuite) SetupTest() {
 	cs.metrics = metrics.NewNoopCollector()
 
 	// initialize the engine
-	e, err := NewCore(unittest.Logger(), cs.metrics, cs.metrics, cs.metrics, cs.headers, cs.state, cs.pending)
+	e, err := NewCore(
+		unittest.Logger(),
+		cs.metrics,
+		cs.metrics,
+		cs.metrics,
+		cs.headers,
+		cs.state,
+		cs.pending,
+		cs.voteAggregator,
+	)
 	require.NoError(cs.T(), err, "engine initialization should pass")
 
 	cs.core = e
@@ -299,9 +313,6 @@ func (cs *ComplianceCoreSuite) TestProcessBlockAndDescendants() {
 }
 
 func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
-	cs.T().Skip("this test needs to be updated in V2 since vote processing will be part of" +
-		"vote aggregator")
-
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	vote := messages.ClusterBlockVote{
@@ -310,7 +321,12 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 		SigData: unittest.SignatureFixture(),
 	}
 
-	cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
+	cs.voteAggregator.On("AddVote", &model.Vote{
+		View:     vote.View,
+		BlockID:  vote.BlockID,
+		SignerID: originID,
+		SigData:  vote.SigData,
+	}).Return()
 
 	// execute the vote submission
 	err := cs.core.OnBlockVote(originID, &vote)

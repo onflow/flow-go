@@ -20,12 +20,12 @@ func NewFollower(log zerolog.Logger, committee hotstuff.Committee, headers stora
 	verifier hotstuff.Verifier, notifier hotstuff.FinalizationConsumer, rootHeader *flow.Header,
 	rootQC *flow.QuorumCertificate, finalized *flow.Header, pending []*flow.Header) (*hotstuff.FollowerLoop, error) {
 
-	finalizer, err := initFinalizer(finalized, headers, updater, notifier, rootHeader, rootQC)
+	finalizer, err := newFinalizer(finalized, headers, updater, notifier, rootHeader, rootQC)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize finalizer: %w", err)
 	}
 
-	// initialize the validator
+	// initialize the Validator
 	validator := validator.New(committee, finalizer, verifier)
 
 	// recover the hotstuff state as a follower

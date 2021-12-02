@@ -6,16 +6,20 @@ import (
 	"time"
 
 	"github.com/dgraph-io/badger/v2"
+	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus"
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/model/flow"
@@ -54,6 +58,7 @@ type Node struct {
 	compliance *compliance.Engine
 	sync       *synceng.Engine
 	hot        module.HotStuff
+	aggregator hotstuff.VoteAggregator
 	state      *bprotocol.MutableState
 	headers    *storage.Headers
 	net        *Network
@@ -212,17 +217,59 @@ func createNode(
 	// initialize the block finalizer
 	final := finalizer.NewFinalizer(db, headersDB, fullState, trace.NewNoopTracer())
 
-	// initialize the persister
-	persist := persister.New(db, rootHeader.ChainID)
-
 	prov := &mocknetwork.Engine{}
 	prov.On("SubmitLocal", mock.Anything).Return(nil)
 
 	syncCore, err := synccore.New(log, synccore.DefaultConfig())
 	require.NoError(t, err)
 
+	qcDistributor := pubsub.NewQCCreatedDistributor()
+
+	forks, err := consensus.NewForks(rootHeader, headersDB, final, notifier, rootHeader, rootQC)
+	require.NoError(t, err)
+
+	validator := consensus.NewValidator(metrics, committee, forks, signer)
+	require.NoError(t, err)
+
+	persist := persister.New(db, rootHeader.ChainID)
+
+	started, err := persist.GetStarted()
+	require.NoError(t, err)
+
+	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	voteCollectors := voteaggregator.NewVoteCollectors(started, workerpool.New(2), createCollectorFactoryMethod)
+
+	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, started, voteCollectors)
+	require.NoError(t, err)
+
+	hotstuffModules := &consensus.HotstuffModules{
+		Forks:                forks,
+		Validator:            validator,
+		Notifier:             notifier,
+		Committee:            committee,
+		Signer:               signer,
+		Persist:              persist,
+		QCCreatedDistributor: qcDistributor,
+		Aggregator:           aggregator,
+	}
+
 	// initialize the compliance engine
-	compCore, err := compliance.NewCore(log, metrics, tracer, metrics, metrics, cleaner, headersDB, payloadsDB, fullState, cache, syncCore)
+	compCore, err := compliance.NewCore(
+		log,
+		metrics,
+		tracer,
+		metrics,
+		metrics,
+		cleaner,
+		headersDB,
+		payloadsDB,
+		fullState,
+		cache,
+		syncCore,
+		aggregator,
+	)
 	require.NoError(t, err)
 
 	comp, err := compliance.NewEngine(log, net, me, prov, compCore)
@@ -252,11 +299,18 @@ func createNode(
 	)
 	require.NoError(t, err)
 
-	pending := []*flow.Header{}
 	// initialize the block finalizer
-	hot, err := consensus.NewParticipant(log, dis, metrics, headersDB,
-		committee, build, final, persist, signer, comp, rootHeader,
-		rootQC, rootHeader, pending, consensus.WithInitialTimeout(hotstuffTimeout), consensus.WithMinTimeout(hotstuffTimeout))
+	hot, err := consensus.NewParticipant(
+		log,
+		metrics,
+		build,
+		comp,
+		rootHeader,
+		[]*flow.Header{},
+		hotstuffModules,
+		consensus.WithInitialTimeout(hotstuffTimeout),
+		consensus.WithMinTimeout(hotstuffTimeout),
+	)
 
 	require.NoError(t, err)
 
@@ -266,6 +320,7 @@ func createNode(
 	node.sync = sync
 	node.state = fullState
 	node.hot = hot
+	node.aggregator = hotstuffModules.Aggregator
 	node.headers = headersDB
 	node.net = net
 	node.log = log
