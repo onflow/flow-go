@@ -85,8 +85,6 @@ func createNode(
 	// participation in the DKG run
 	dkgState, err := badger.NewDKGState(core.Metrics, core.SecretsDB)
 	require.NoError(t, err)
-	dkgKeys, err := badger.NewSafeBeaconPrivateKeys(dkgState)
-	require.NoError(t, err)
 
 	// configure the state snapthost at firstBlock to return the desired
 	// Epochs
@@ -166,7 +164,7 @@ func createNode(
 
 	node := node{
 		GenericNode:     core,
-		keyStorage:      dkgKeys,
+		dkgState:        dkgState,
 		messagingEngine: messagingEngine,
 		reactorEngine:   reactorEngine,
 	}
@@ -183,7 +181,6 @@ func TestWithWhiteboard(t *testing.T) {
 	// whiteboard is a shared object where DKG nodes can publish/read broadcast
 	// messages, as well as publish end results, using a special
 	// DKGContractClient.
-	// TODO: replace with a real smart-contract and emulator
 	whiteboard := newWhiteboard()
 
 	chainID := flow.Testnet
@@ -284,9 +281,8 @@ func TestWithWhiteboard(t *testing.T) {
 	signatures := []crypto.Signature{}
 	indices := []uint{}
 	for i, n := range nodes {
-		priv, safe, err := n.keyStorage.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+		priv, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(t, err)
-		require.True(t, safe)
 
 		signer := signature.NewThresholdProvider("TAG", priv)
 		signers = append(signers, signer)
