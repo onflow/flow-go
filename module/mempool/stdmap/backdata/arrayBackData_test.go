@@ -78,3 +78,40 @@ func TestArrayBackData_TwoBuckets(t *testing.T) {
 		fmt.Println(i)
 	}
 }
+
+func TestArrayBackData_MultipleBuckets(t *testing.T) {
+	size := 200 // bucket size is 16, hence total buckets are 13.
+
+	// adding elements
+	for i, e := range entities {
+		// adding each element must be successful.
+		require.True(t, bd.Add(e.ID(), e))
+
+		// total of back data should be incremented by each addition.
+		require.Equal(t, bd.Size(), uint(i+1))
+
+		// entity should be placed at index i in back data
+		_, entity, _ := bd.entities.get(uint32(i))
+		require.Equal(t, e, entity)
+	}
+
+	// getting inserted elements
+	for _, expected := range entities {
+		actual, ok := bd.ByID(expected.ID())
+		require.True(t, ok)
+		require.Equal(t, expected, actual)
+	}
+}
+
+func withTestHelpers(t *testing.T,
+	size uint32,
+	overLimitFactor uint32,
+	entityCount uint32,
+	helpers ...func(*testing.T, *ArrayBackData, []*unittest.MockEntity)) {
+	bd := NewArrayBackData(size, overLimitFactor, LRUEjection)
+	entities := unittest.EntityListFixture(uint(entityCount))
+
+	for _, helper := range helpers {
+		helper(t, bd, entities)
+	}
+}

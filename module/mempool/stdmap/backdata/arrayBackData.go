@@ -33,14 +33,14 @@ type ArrayBackData struct {
 	entities  *entityList
 }
 
-func NewArrayBackData(limit uint32, oversizeFactor uint32, mode EjectionMode) ArrayBackData {
+func NewArrayBackData(limit uint32, oversizeFactor uint32, mode EjectionMode) *ArrayBackData {
 	// total buckets
 	bucketNum := uint64(limit*oversizeFactor) / bucketSize
 	if uint64(limit*oversizeFactor)%bucketSize != 0 {
 		bucketNum++
 	}
 
-	bd := ArrayBackData{
+	bd := &ArrayBackData{
 		bucketNum: bucketNum,
 		limit:     uint64(limit),
 		overLimit: uint64(limit * oversizeFactor),
