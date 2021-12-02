@@ -85,7 +85,7 @@ func (f *HotStuffFactory) Create(
 	committee = committees.NewMetricsWrapper(committee, metrics) // wrapper for measuring time spent determining consensus committee relations
 
 	// create a signing provider
-	var signer hotstuff.SignerVerifier = verification.NewSingleSignerVerifier(committee, f.aggregator, f.me.NodeID())
+	var signer hotstuff.Signer = verification.NewSingleSigner(f.aggregator, f.me.NodeID())
 	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
 	persist := persister.New(f.db, cluster.ChainID())

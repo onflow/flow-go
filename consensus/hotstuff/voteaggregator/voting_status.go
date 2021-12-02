@@ -1,15 +1,14 @@
 package voteaggregator
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
 )
 
+// TODO: to be removed and replaced by vote aggregator v2
 // VotingStatus keeps track of incorporated votes for the same block
 type VotingStatus struct {
 	signer           hotstuff.SignerVerifier
@@ -66,29 +65,20 @@ func (vs *VotingStatus) TryBuildQC() (*flow.QuorumCertificate, bool, error) {
 		return nil, false, nil
 	}
 
+	return nil, false, fmt.Errorf("to be removed")
 	// build the aggregated signature
-	votes := getSliceForVotes(vs.votes)
-	qc, err := vs.signer.CreateQC(votes)
-	if errors.Is(err, signature.ErrInsufficientShares) {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, fmt.Errorf("could not create QC from votes: %w", err)
-	}
-
-	return qc, true, nil
+	// votes := getSliceForVotes(vs.votes)
+	// qc, err := vs.signer.CreateQC(votes)
+	// if errors.Is(err, signature.ErrInsufficientShares) {
+	// 	return nil, false, nil
+	// }
+	// if err != nil {
+	// 	return nil, false, fmt.Errorf("could not create QC from votes: %w", err)
+	// }
+	//
+	// return qc, true, nil
 }
 
 func (vs *VotingStatus) hasEnoughStake() bool {
 	return vs.accumulatedStake >= vs.stakeThreshold
-}
-
-func getSliceForVotes(votes map[flow.Identifier]*model.Vote) []*model.Vote {
-	var voteSlice = make([]*model.Vote, 0, len(votes))
-
-	for _, vote := range votes {
-		voteSlice = append(voteSlice, vote)
-	}
-
-	return voteSlice
 }
