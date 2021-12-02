@@ -228,6 +228,12 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 		return fmt.Errorf("internal error constructing QC from votes: %w", err)
 	}
 
+	p.log.Info().
+		Hex("block_id", qc.BlockID[:]).
+		Uint64("view", qc.View).
+		Int("num_signers", len(qc.SignerIDs)).
+		Msg("new qc has been created")
+
 	p.onQCCreated(qc)
 
 	return nil
