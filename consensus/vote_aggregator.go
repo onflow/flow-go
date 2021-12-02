@@ -24,7 +24,7 @@ func NewVoteAggregator(
 	voteCollectors := voteaggregator.NewVoteCollectors(finalized.View, workerpool.New(4), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
-	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, finalized.View, voteCollectors)
+	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, finalized.View+1, voteCollectors)
 	if err != nil {
 		return nil, fmt.Errorf("could not create vote aggregator: %w", err)
 	}

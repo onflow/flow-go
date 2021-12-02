@@ -22,9 +22,9 @@ type VoteCollectors interface {
 	//  * mempool.DecreasingPruningHeightError
 	GetOrCreateCollector(view uint64) (collector VoteCollector, created bool, err error)
 
-	// PruneUpToView prunes the vote collectors whose view is below the given view.
+	// PruneUpToView prunes the vote collectors with views _below_ the given view.
 	// If `view` is smaller than the previous value, the previous value is kept
-	// and no operations will be made.
+	// and the method call is a NoOp.
 	PruneUpToView(view uint64)
 }
 

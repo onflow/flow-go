@@ -50,9 +50,8 @@ type VoteAggregator interface {
 	// * mempool.DecreasingPruningHeightError if proposal's view has already been pruned
 	InvalidBlock(block *model.Proposal) error
 
-	// PruneUpToView prunes the vote collectors whose view is below the given view.
-	// If `view` is smaller than the previous value, the previous value is kept
-	// and no operations will be made. Sets highest pruned view which will be used
-	// to drop stale proposals and votes.
+	// PruneUpToView deletes all votes _below_ to the given view, as well as related indices.
+	// If `view` is smaller than the previous value, the previous value is kept and the
+	// method call is a NoOp. Votes or proposals with _smaller_ views will be dropped.
 	PruneUpToView(view uint64)
 }
