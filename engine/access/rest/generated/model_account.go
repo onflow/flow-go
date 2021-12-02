@@ -17,7 +17,7 @@ type Account struct {
 
 	Contracts map[string]string `json:"contracts,omitempty"`
 
-	Expandable *AccountExpandable `json:"_expandable,omitempty"`
+	Expandable *AccountExpandable `json:"_expandable"`
 
 	Links *Links `json:"_links,omitempty"`
 }

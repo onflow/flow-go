@@ -181,12 +181,11 @@ func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.
 
 	// if execution result is to be expanded, then lookup execution result else add expandable link for execution result
 	if req.expands(ExpandableExecutionResult) {
-		executionResult, err := executionResultLookup(req.Context(), id, backend, link)
+		executionResult, err := backend.GetExecutionResultForBlockID(req.Context(), id)
 		if err != nil {
-			msg := fmt.Sprintf("failed to generate response for block ID %s", id.String())
-			return nil, NewRestError(http.StatusInternalServerError, msg, err)
+			return nil, err
 		}
-		responseBlock.ExecutionResult = executionResult
+		responseBlock.ExecutionResult = executionResultResponse(executionResult, link)
 	} else {
 		var err error
 		responseBlock.Expandable.ExecutionResult, err = link.ExecutionResultLink(id)

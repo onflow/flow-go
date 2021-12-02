@@ -31,7 +31,7 @@ type Transaction struct {
 
 	Result *TransactionResult `json:"result,omitempty"`
 
-	Expandable *TransactionExpandable `json:"_expandable,omitempty"`
+	Expandable *TransactionExpandable `json:"_expandable"`
 
 	Links *Links `json:"_links,omitempty"`
 }

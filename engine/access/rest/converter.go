@@ -158,6 +158,9 @@ func toTransactionSignature(transactionSignature *generated.TransactionSignature
 }
 
 func toTransactionSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSignature, error) {
+	if len(sigs) == 0 {
+		return nil, nil
+	}
 	signatures := make([]flow.TransactionSignature, len(sigs))
 	for x, sig := range sigs {
 		signature, err := toTransactionSignature(&sig)
@@ -203,7 +206,7 @@ func toTransaction(tx generated.TransactionsBody) (flow.TransactionBody, error) 
 	//}
 
 	// script arguments come in as a base64 encoded strings, decode base64 back to a string here
-	args := make([][]byte, argLen)
+	var args [][]byte
 	for _, arg := range tx.Arguments {
 		decodedArg, err := fromBase64(arg)
 		if err != nil {
@@ -322,16 +325,14 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 		auths = append(auths, auth.String())
 	}
 
-	var expandable *generated.TransactionExpandable
+	var expandable = new(generated.TransactionExpandable)
 	var result *generated.TransactionResult
-	// if transaction result is provided then add that to the response, else add the expandable for the result
+	// if transaction result is provided then add that to the response, else add the result link to the expandable
 	if txr != nil {
 		result = transactionResultResponse(txr, tx.ID(), link)
 	} else {
 		resultLink, _ := link.TransactionResultLink(tx.ID())
-		expandable = &generated.TransactionExpandable{
-			Result: resultLink,
-		}
+		expandable.Result = resultLink
 	}
 
 	self, _ := selfLink(tx.ID(), link.TransactionLink)
@@ -506,15 +507,41 @@ func idsResponse(ids []flow.Identifier) []string {
 	return res
 }
 
-func collectionResponse(flowCollection *flow.LightCollection, link LinkGenerator) generated.Collection {
-	self, _ := selfLink(flowCollection.ID(), link.CollectionLink)
+func collectionResponse(
+	collection *flow.LightCollection,
+	txs []*flow.TransactionBody,
+	link LinkGenerator,
+	expand map[string]bool,
+) (generated.Collection, error) {
+
+	expandable := &generated.CollectionExpandable{}
+
+	self, err := selfLink(collection.ID(), link.CollectionLink)
+	if err != nil {
+		return generated.Collection{}, err
+	}
+
+	var transactions []generated.Transaction
+	if expand[transactionsExpandable] {
+		for _, t := range txs {
+			transactions = append(transactions, *transactionResponse(t, nil, link, nil))
+		}
+	} else {
+		expandable.Transactions = make([]string, len(collection.Transactions))
+		for i, tx := range collection.Transactions {
+			expandable.Transactions[i], err = link.TransactionLink(tx)
+			if err != nil {
+				return generated.Collection{}, err
+			}
+		}
+	}
 
 	return generated.Collection{
-		Id: flowCollection.ID().String(),
-		// TODO: broken after update to model
-		//Transactions: idsResponse(flowCollection.Transactions),
-		Links: self,
-	}
+		Id:           collection.ID().String(),
+		Transactions: transactions,
+		Links:        self,
+		Expandable:   expandable,
+	}, nil
 }
 
 func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event {
@@ -531,12 +558,14 @@ func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event
 	return events
 }
 
-func executionResultResponse(exeResult *flow.ExecutionResult) *generated.ExecutionResult {
+func executionResultResponse(exeResult *flow.ExecutionResult, link LinkGenerator) *generated.ExecutionResult {
+	self, _ := selfLink(exeResult.ID(), link.ExecutionResultLink)
+
 	return &generated.ExecutionResult{
 		Id:      exeResult.ID().String(),
 		BlockId: exeResult.BlockID.String(),
 		Events:  serviceEventListResponse(exeResult.ServiceEvents),
-		Links:   nil,
+		Links:   self,
 	}
 }
 
@@ -587,11 +616,7 @@ func accountResponse(flowAccount *flow.Account, link LinkGenerator, expand map[s
 		expandable.Contracts = ""
 	}
 
-	if expandable == (generated.AccountExpandable{}) {
-		account.Expandable = nil
-	} else {
-		account.Expandable = &expandable
-	}
+	account.Expandable = &expandable
 
 	selfLink, err := link.AccountLink(account.Address)
 	if err != nil {

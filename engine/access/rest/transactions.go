@@ -5,7 +5,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
-const transactionResult = "result"
+const resultExpandable = "result"
 
 // getTransactionByID gets a transaction by requested ID.
 func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
@@ -21,7 +21,7 @@ func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenera
 
 	var txr *access.TransactionResult
 	// only lookup result if transaction result is to be expanded
-	if r.expands(transactionResult) {
+	if r.expands(resultExpandable) {
 		txr, err = backend.GetTransactionResult(r.Context(), id)
 		if err != nil {
 			return nil, err

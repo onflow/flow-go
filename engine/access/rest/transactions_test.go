@@ -8,7 +8,6 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -19,241 +18,31 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func transactionURL(id string, expandResult bool) string {
+func getTransactionReq(id string, expandResult bool) *http.Request {
 	u, _ := url.Parse(fmt.Sprintf("/v1/transactions/%s", id))
 	if expandResult {
 		q := u.Query()
 		// by default expand all since we test expanding with converters
-		q.Add("expand", transactionResult)
+		q.Add("expand", resultExpandable)
 		u.RawQuery = q.Encode()
 	}
-	return u.String()
+
+	req, _ := http.NewRequest("GET", u.String(), nil)
+	return req
 }
 
-func transactionResultURL(id string) string {
-	return fmt.Sprintf("/v1/transaction_results/%s", id)
+func getTransactionResultReq(id string) *http.Request {
+	req, _ := http.NewRequest("GET", fmt.Sprintf("/v1/transaction_results/%s", id), nil)
+	return req
 }
 
-func TestGetTransactions(t *testing.T) {
-	backend := &mock.API{}
-
-	t.Run("get by ID without results", func(t *testing.T) {
-		tx := unittest.TransactionFixture()
-		req, _ := http.NewRequest(
-			"GET",
-			transactionURL(tx.ID().String(), false),
-			nil,
-		)
-
-		backend.Mock.
-			On("GetTransaction", mocks.Anything, tx.ID()).
-			Return(&tx.TransactionBody, nil)
-
-		rr := executeRequest(req, backend)
-
-		expected := fmt.Sprintf(`
-			{
-			   "id":"%s",
-			   "script":"cHViIGZ1biBtYWluKCkge30=",
-			   "arguments":null,
-			   "reference_block_id":"%s",
-			   "gas_limit":10,
-			   "payer":"8c5303eaa26202d6",
-			   "proposal_key":{
-				  "address":"8c5303eaa26202d6",
-				  "key_index":1,
-				  "sequence_number":0
-			   },
-			   "authorizers":[
-				  "8c5303eaa26202d6"
-			   ],
-			   "envelope_signatures":[
-				  {
-					 "address":"8c5303eaa26202d6",
-					 "signer_index":0,
-					 "key_index":1,
-					 "signature":"%s"
-				  }
-			   ],
-               "payload_signatures":[],
-			   "_links":{
-				  "_self":"/v1/transactions/%s"
-			   },
-				"_expandable": {
-					"result": "/v1/transaction_results/%s"
-				}
-			}`,
-			tx.ID().String(),
-			tx.ReferenceBlockID.String(),
-			toBase64(tx.EnvelopeSignatures[0].Signature),
-			tx.ID().String(),
-			tx.ID().String(),
-		)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.JSONEq(t, expected, rr.Body.String())
-	})
-
-	t.Run("Get by ID with results", func(t *testing.T) {
-		tx := unittest.TransactionFixture()
-		txr := transactionResultFixture(tx)
-
-		req, _ := http.NewRequest(
-			"GET",
-			transactionURL(tx.ID().String(), true),
-			nil,
-		)
-
-		backend.Mock.
-			On("GetTransaction", mocks.Anything, tx.ID()).
-			Return(&tx.TransactionBody, nil)
-
-		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, tx.ID()).
-			Return(txr, nil)
-
-		rr := executeRequest(req, backend)
-
-		expected := fmt.Sprintf(`
-			{
-			   "id":"%s",
-			   "script":"cHViIGZ1biBtYWluKCkge30=",
-			   "arguments":null,
-			   "reference_block_id":"%s",
-			   "gas_limit":10,
-			   "payer":"8c5303eaa26202d6",
-			   "proposal_key":{
-				  "address":"8c5303eaa26202d6",
-				  "key_index":1,
-				  "sequence_number":0
-			   },
-			   "authorizers":[
-				  "8c5303eaa26202d6"
-			   ],
-			   "envelope_signatures":[
-				  {
-					 "address":"8c5303eaa26202d6",
-					 "signer_index":0,
-					 "key_index":1,
-					 "signature":"%s"
-				  }
-			   ],
-                "payload_signatures":[],
-				"result": {
-					"block_id": "%s",
-					"status": "Sealed",
-					"error_message": "",
-					"computation_used": 0,
-					"events": [
-						{
-							"type": "flow.AccountCreated",
-							"transaction_id": "%s",
-							"transaction_index": 0,
-							"event_index": 0,
-							"payload": ""
-						}
-					],
-					"_links": {
-						"_self": "/v1/transaction_results/%s"
-					}
-				},
-			   "_links":{
-				  "_self":"/v1/transactions/%s"
-			   }
-			}`,
-			tx.ID().String(),
-			tx.ReferenceBlockID.String(),
-			toBase64(tx.EnvelopeSignatures[0].Signature),
-			tx.ReferenceBlockID.String(),
-			tx.ID().String(),
-			tx.ID().String(),
-			tx.ID().String(),
-		)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.JSONEq(t, expected, rr.Body.String())
-	})
-
-	t.Run("get by ID Invalid", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", transactionURL("invalid", false), nil)
-		rr := executeRequest(req, backend)
-
-		assert.Equal(t, http.StatusBadRequest, rr.Code)
-		assert.JSONEq(t, `{"code":400, "message":"invalid ID format"}`, rr.Body.String())
-	})
-
-	t.Run("get by ID non-existing", func(t *testing.T) {
-		tx := unittest.TransactionFixture()
-		req, _ := http.NewRequest("GET", transactionURL(tx.ID().String(), false), nil)
-
-		backend.Mock.
-			On("GetTransaction", mocks.Anything, tx.ID()).
-			Return(nil, status.Error(codes.NotFound, "not found"))
-
-		rr := executeRequest(req, backend)
-
-		assert.Equal(t, http.StatusNotFound, rr.Code)
-		assert.JSONEq(t, `{"code":404, "message":"not found"}`, rr.Body.String())
-	})
+func createTransactionReq(body interface{}) *http.Request {
+	jsonBody, _ := json.Marshal(body)
+	req, _ := http.NewRequest("POST", "/v1/transactions", bytes.NewBuffer(jsonBody))
+	return req
 }
 
-func TestGetTransactionResult(t *testing.T) {
-	backend := &mock.API{}
-
-	t.Run("get by ID", func(t *testing.T) {
-		id := unittest.IdentifierFixture()
-		bid := unittest.IdentifierFixture()
-		txr := &access.TransactionResult{
-			Status:     flow.TransactionStatusExecuted,
-			StatusCode: 10,
-			Events: []flow.Event{
-				unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
-			},
-			ErrorMessage: "",
-			BlockID:      bid,
-		}
-		req, _ := http.NewRequest("GET", transactionResultURL(id.String()), nil)
-
-		backend.Mock.
-			On("GetTransactionResult", mocks.Anything, id).
-			Return(txr, nil)
-
-		rr := executeRequest(req, backend)
-		expected := fmt.Sprintf(`{
-			"block_id": "%s",
-			"status": "Executed",
-			"error_message": "",
-			"computation_used": 0,
-			"events": [
-				{
-					"type": "flow.AccountCreated",
-					"transaction_id": "%s",
-					"transaction_index": 1,
-					"event_index": 0,
-					"payload": ""
-				}
-			],
-			"_links": {
-				"_self": "/v1/transaction_results/%s"
-			}
-		}`, bid.String(), id.String(), id.String())
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.JSONEq(t, expected, rr.Body.String())
-	})
-
-	t.Run("get by ID Invalid", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", transactionURL("invalid", false), nil)
-		rr := executeRequest(req, backend)
-
-		assert.Equal(t, http.StatusBadRequest, rr.Code)
-		assert.JSONEq(t, `{"code":400, "message":"invalid ID format"}`, rr.Body.String())
-	})
-}
-
-func TestCreateTransaction(t *testing.T) {
-	backend := &mock.API{}
-	tx := unittest.TransactionBodyFixture()
+func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 	tx.Arguments = [][]uint8{} // fix how fixture creates nil values
 	tx.PayloadSignatures = []flow.TransactionSignature{}
 	auth := make([]string, len(tx.Authorizers))
@@ -261,7 +50,7 @@ func TestCreateTransaction(t *testing.T) {
 		auth[i] = a.String()
 	}
 
-	jsonTx := map[string]interface{}{
+	return map[string]interface{}{
 		"script":             toBase64(tx.Script),
 		"arguments":          tx.Arguments,
 		"reference_block_id": tx.ReferenceBlockID.String(),
@@ -280,16 +69,207 @@ func TestCreateTransaction(t *testing.T) {
 			"signature":    toBase64(tx.EnvelopeSignatures[0].Signature),
 		}},
 	}
-	validBody, _ := json.Marshal(jsonTx)
+}
+
+func TestGetTransactions(t *testing.T) {
+
+	t.Run("get by ID without results", func(t *testing.T) {
+		backend := &mock.API{}
+		tx := unittest.TransactionFixture()
+		req := getTransactionReq(tx.ID().String(), false)
+
+		backend.Mock.
+			On("GetTransaction", mocks.Anything, tx.ID()).
+			Return(&tx.TransactionBody, nil)
+
+		expected := fmt.Sprintf(`
+			{
+			   "id":"%s",
+			   "script":"cHViIGZ1biBtYWluKCkge30=",
+               "arguments": null,
+			   "reference_block_id":"%s",
+			   "gas_limit":10,
+			   "payer":"8c5303eaa26202d6",
+			   "proposal_key":{
+				  "address":"8c5303eaa26202d6",
+				  "key_index":1,
+				  "sequence_number":0
+			   },
+			   "authorizers":[
+				  "8c5303eaa26202d6"
+			   ],
+               "payload_signatures": [],
+			   "envelope_signatures":[
+				  {
+					 "address":"8c5303eaa26202d6",
+					 "signer_index":0,
+					 "key_index":1,
+					 "signature":"%s"
+				  }
+			   ],
+			   "_links":{
+				  "_self":"/v1/transactions/%s"
+			   },
+				"_expandable": {
+					"result": "/v1/transaction_results/%s"
+				}
+			}`,
+			tx.ID(), tx.ReferenceBlockID, toBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
+
+		assertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("Get by ID with results", func(t *testing.T) {
+		backend := &mock.API{}
+		tx := unittest.TransactionFixture()
+		txr := transactionResultFixture(tx)
+
+		backend.Mock.
+			On("GetTransaction", mocks.Anything, tx.ID()).
+			Return(&tx.TransactionBody, nil)
+
+		backend.Mock.
+			On("GetTransactionResult", mocks.Anything, tx.ID()).
+			Return(txr, nil)
+
+		req := getTransactionReq(tx.ID().String(), true)
+
+		expected := fmt.Sprintf(`
+			{
+			   "id":"%s",
+			   "script":"cHViIGZ1biBtYWluKCkge30=",
+               "arguments": null,
+			   "reference_block_id":"%s",
+			   "gas_limit":10,
+			   "payer":"8c5303eaa26202d6",
+			   "proposal_key":{
+				  "address":"8c5303eaa26202d6",
+				  "key_index":1,
+				  "sequence_number":0
+			   },
+			   "authorizers":[
+				  "8c5303eaa26202d6"
+			   ],
+               "payload_signatures": [],
+			   "envelope_signatures":[
+				  {
+					 "address":"8c5303eaa26202d6",
+					 "signer_index":0,
+					 "key_index":1,
+					 "signature":"%s"
+				  }
+			   ],
+				"result": {
+					"block_id": "%s",
+					"status": "Sealed",
+					"error_message": "",
+					"computation_used": 0,
+					"events": [
+						{
+							"type": "flow.AccountCreated",
+							"transaction_id": "%s",
+							"transaction_index": 0,
+							"event_index": 0,
+							"payload": ""
+						}
+					],
+					"_links": {
+						"_self": "/v1/transaction_results/%s"
+					}
+				},
+               "_expandable": {},
+			   "_links":{
+				  "_self":"/v1/transactions/%s"
+			   }
+			}`,
+			tx.ID(), tx.ReferenceBlockID, toBase64(tx.EnvelopeSignatures[0].Signature), tx.ReferenceBlockID, tx.ID(), tx.ID(), tx.ID())
+		assertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get by ID Invalid", func(t *testing.T) {
+		backend := &mock.API{}
+
+		req := getTransactionReq("invalid", false)
+		expected := `{"code":400, "message":"invalid ID format"}`
+		assertResponse(t, req, http.StatusBadRequest, expected, backend)
+	})
+
+	t.Run("get by ID non-existing", func(t *testing.T) {
+		backend := &mock.API{}
+		tx := unittest.TransactionFixture()
+		req := getTransactionReq(tx.ID().String(), false)
+
+		backend.Mock.
+			On("GetTransaction", mocks.Anything, tx.ID()).
+			Return(nil, status.Error(codes.NotFound, "not found"))
+
+		expected := `{"code":404, "message":"not found"}`
+		assertResponse(t, req, http.StatusNotFound, expected, backend)
+	})
+}
+
+func TestGetTransactionResult(t *testing.T) {
+
+	t.Run("get by ID", func(t *testing.T) {
+		backend := &mock.API{}
+		id := unittest.IdentifierFixture()
+		bid := unittest.IdentifierFixture()
+		txr := &access.TransactionResult{
+			Status:     flow.TransactionStatusExecuted,
+			StatusCode: 10,
+			Events: []flow.Event{
+				unittest.EventFixture(flow.EventAccountCreated, 1, 0, id, 200),
+			},
+			ErrorMessage: "",
+			BlockID:      bid,
+		}
+
+		req := getTransactionResultReq(id.String())
+
+		backend.Mock.
+			On("GetTransactionResult", mocks.Anything, id).
+			Return(txr, nil)
+
+		expected := fmt.Sprintf(`{
+			"block_id": "%s",
+			"status": "Executed",
+			"error_message": "",
+			"computation_used": 0,
+			"events": [
+				{
+					"type": "flow.AccountCreated",
+					"transaction_id": "%s",
+					"transaction_index": 1,
+					"event_index": 0,
+					"payload": ""
+				}
+			],
+			"_links": {
+				"_self": "/v1/transaction_results/%s"
+			}
+		}`, bid.String(), id.String(), id.String())
+		assertOKResponse(t, req, expected, backend)
+	})
+
+	t.Run("get by ID Invalid", func(t *testing.T) {
+		backend := &mock.API{}
+		req := getTransactionResultReq("invalid")
+
+		expected := `{"code":400, "message":"invalid ID format"}`
+		assertResponse(t, req, http.StatusBadRequest, expected, backend)
+	})
+}
+
+func TestCreateTransaction(t *testing.T) {
 
 	t.Run("create", func(t *testing.T) {
-		req, _ := http.NewRequest("POST", "/v1/transactions", bytes.NewBuffer(validBody))
+		backend := &mock.API{}
+		tx := unittest.TransactionBodyFixture()
+		req := createTransactionReq(validCreateBody(tx))
 
 		backend.Mock.
 			On("SendTransaction", mocks.Anything, &tx).
 			Return(nil)
-
-		rr := executeRequest(req, backend)
 
 		expected := fmt.Sprintf(`
 			{
@@ -323,18 +303,12 @@ func TestCreateTransaction(t *testing.T) {
 				  "_self":"/v1/transactions/%s"
 			   }
 			}`,
-			tx.ID().String(),
-			tx.ReferenceBlockID.String(),
-			toBase64(tx.EnvelopeSignatures[0].Signature),
-			tx.ID().String(),
-			tx.ID().String(),
-		)
-
-		assert.Equal(t, http.StatusOK, rr.Code)
-		assert.JSONEq(t, expected, rr.Body.String())
+			tx.ID(), tx.ReferenceBlockID, toBase64(tx.EnvelopeSignatures[0].Signature), tx.ID(), tx.ID())
+		assertOKResponse(t, req, expected, backend)
 	})
 
 	t.Run("post invalid transaction", func(t *testing.T) {
+		backend := &mock.API{}
 		tests := []struct {
 			inputField string
 			inputValue string
@@ -351,26 +325,15 @@ func TestCreateTransaction(t *testing.T) {
 			{"payload_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"payload_signatures\" field (at position 305)"}`},
 		}
 
-		for i, test := range tests {
-			testTx := copyMap(jsonTx)
+		for _, test := range tests {
+			tx := unittest.TransactionBodyFixture()
+			testTx := validCreateBody(tx)
 			testTx[test.inputField] = test.inputValue
-			validBody, _ = json.Marshal(testTx)
+			req := createTransactionReq(testTx)
 
-			req, _ := http.NewRequest("POST", "/v1/transactions", bytes.NewBuffer(validBody))
-			rr := executeRequest(req, backend)
-
-			assert.Equal(t, http.StatusBadRequest, rr.Code)
-			assert.JSONEq(t, test.output, rr.Body.String(), fmt.Sprintf("test #%d failed: %v", i, test))
+			assertResponse(t, req, http.StatusBadRequest, test.output, backend)
 		}
 	})
-}
-
-func copyMap(in map[string]interface{}) map[string]interface{} {
-	out := make(map[string]interface{}, len(in))
-	for k, v := range in {
-		out[k] = v
-	}
-	return out
 }
 
 func transactionResultFixture(tx flow.Transaction) *access.TransactionResult {
