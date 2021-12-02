@@ -5,19 +5,16 @@ import (
 	"fmt"
 	"github.com/onflow/cadence"
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
+	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/state/protocol/inmem"
-	"github.com/rs/zerolog"
-	"github.com/stretchr/testify/suite"
-	"testing"
-	"time"
-
-	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"testing"
 )
 
 func TestEpochs(t *testing.T) {
@@ -164,20 +161,9 @@ func (s *Suite) TestEpochJoin() {
 	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
-	// download snapshot to bootstrap from
-	var snapshot *inmem.Snapshot
-	for {
-		snapshot, err = s.client.GetLatestProtocolSnapshot(ctx)
-		require.NoError(s.T(), err)
-
-		currentPhase, err := snapshot.Phase()
-		require.NoError(s.T(), err)
-		if currentPhase == flow.EpochPhaseSetup {
-			break
-		}
-
-		time.Sleep(time.Second)
-	}
+	s.WaitForPhase(ctx, flow.EpochPhaseSetup)
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
 
 	//add our container to the network
 	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
@@ -209,11 +195,11 @@ func (s *Suite) TestEpochJoin() {
 	head, err := snapshot.Head()
 	require.NoError(s.T(), err)
 
-	// head should be higher than bootstrapHead if AN was staked, healthy and processing block proposals
-	require.True(s.T(), bootstrapHead.Height < head.Height, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height))
+	// head should now be at-least 20 blocks higher from when we started
+	require.True(s.T(), head.Height - bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height))
 
 	// execute script directly on new AN to ensure it's functional
-	proposedTable, err = s.client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
+	proposedTable, err = client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by new AN.")
 

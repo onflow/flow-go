@@ -15,12 +15,21 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 	"strings"
+	"time"
 
 	"github.com/onflow/flow-go/engine/ghost/client"
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
+)
+
+const (
+	stakingAuctionViews = 200
+	dkgPhaseViews       = 50
+	epochViewsLength    = 380
+
+	waitTimeout =  60 * time.Second
 )
 
 type Suite struct {
@@ -68,7 +77,7 @@ func (s *Suite) SetupTest() {
 		ghostConNode,
 	}
 
-	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, 200, 50, 380)
+	netConf := testnet.NewNetworkConfigWithEpochConfig("epochs-tests", confs, stakingAuctionViews, dkgPhaseViews, epochViewsLength)
 
 	// initialize the network
 	s.net = testnet.PrepareFlowNetwork(s.T(), netConf)
@@ -187,6 +196,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	result = s.SetApprovedNodesScript(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
 	require.NoError(s.T(), result.Error)
 
+	s.checkStakingAuctionInProgress(ctx)
 	return &StakedNodeOperationInfo{
 		NodeID:                  nodeID,
 		Role:                    role,
@@ -199,6 +209,38 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		MachineAccountPublicKey: machineAccountPubKey,
 		ContainerName:           containerName,
 	}
+}
+
+// checkStakingAuctionInProgress util func that asserts we are the staking auction phase
+func (s *Suite) checkStakingAuctionInProgress(ctx context.Context) {
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	phase, err := snapshot.Phase()
+	require.NoError(s.T(), err)
+	head, err := snapshot.Head()
+	require.NoError(s.T(), err)
+
+	require.Equal(s.T(), flow.EpochPhaseStaking, phase)
+	require.True(s.T(), stakingAuctionViews > head.View)
+}
+
+// WaitForPhase waits for epoch phase and will timeout after 2 minutes
+func (s *Suite) WaitForPhase(ctx context.Context, phase flow.EpochPhase) {
+	timeout := 2 * waitTimeout
+	condition := func() bool {
+		snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+		require.NoError(s.T(), err)
+
+		currentPhase, err := snapshot.Phase()
+		require.NoError(s.T(), err)
+
+		return currentPhase == phase
+	}
+	require.Eventually(s.T(),
+		condition,
+		timeout,
+		100*time.Millisecond,
+		fmt.Sprintf("did not reach epoch phase (%s) within %v seconds", phase, timeout))
 }
 
 // transfers tokens to receiver from service account
@@ -385,7 +427,7 @@ func (s *Suite) ExecuteReadApprovedNodesScript(ctx context.Context, env template
 }
 
 // pauseContainer pauses the named container in the network
-func (s *Suite) pauseContainer(name string)  {
+func (s *Suite) pauseContainer(name string) {
 	container := s.net.ContainerByName(name)
 	err := container.Pause()
 	require.NoError(s.T(), err)
@@ -393,6 +435,6 @@ func (s *Suite) pauseContainer(name string)  {
 
 // getTestContainerName returns a name for a test container in the form of ${role}_${nodeID}_test
 func (s *Suite) getTestContainerName(role flow.Role) string {
-	i := len(s.net.ContainersByRole(role))+1
+	i := len(s.net.ContainersByRole(role)) + 1
 	return fmt.Sprintf("%s_test_%d", role, i)
 }
