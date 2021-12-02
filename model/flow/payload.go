@@ -17,25 +17,26 @@ func EmptyPayload() Payload {
 	return Payload{}
 }
 
-// JSONMarshal defines the JSON marshalling for block payloads. Enforce a
+// MarshalJSON defines the JSON marshalling for block payloads. Enforce a
 // consistent representation for empty slices.
-func (p *Payload) MarshalJSON() ([]byte, error) {
-	dup := *p // copy p
-
-	if len(dup.Guarantees) == 0 {
-		dup.Guarantees = nil
+func (p Payload) MarshalJSON() ([]byte, error) {
+	if len(p.Guarantees) == 0 {
+		p.Guarantees = nil
 	}
-	if len(dup.Receipts) == 0 {
-		dup.Receipts = nil
+	if len(p.Receipts) == 0 {
+		p.Receipts = nil
 	}
-	if len(dup.Seals) == 0 {
-		dup.Seals = nil
+	if len(p.Seals) == 0 {
+		p.Seals = nil
 	}
-	if len(dup.Results) == 0 {
-		dup.Results = nil
+	if len(p.Results) == 0 {
+		p.Results = nil
 	}
 
-	return json.Marshal(dup)
+	type payloadAlias Payload
+	return json.Marshal(struct{ payloadAlias }{
+		payloadAlias: payloadAlias(p),
+	})
 }
 
 // Hash returns the root hash of the payload.

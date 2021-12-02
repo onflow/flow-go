@@ -244,10 +244,10 @@ func (builder *StakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		networkMetrics,
 		builder.SporkID,
 		p2p.DefaultUnicastTimeout,
-		false, // no connection gating to allow unstaked nodes to connect
 		builder.IDTranslator,
 		p2p.WithMessageValidators(validators...),
 		p2p.WithPeerManager(peerManagerFactory),
+		p2p.WithConnectionGating(false),
 		// use default identifier provider
 	)
 

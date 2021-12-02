@@ -24,7 +24,8 @@ func TestEpochs(t *testing.T) {
 // TestViewsProgress asserts epoch state transitions over two full epochs
 // without any nodes joining or leaving.
 func (s *Suite) TestViewsProgress() {
-	s.T().Skip("flaky test - quarantining")
+	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky test")
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
