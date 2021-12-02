@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestArrayBackData_Add(t *testing.T) {
+func TestArrayBackData_BelowLimit(t *testing.T) {
 	size := 10
 
 	bd := NewArrayBackData(uint32(size), 1, RandomEjection)

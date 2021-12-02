@@ -2,6 +2,7 @@ package backdata
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/rand"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -120,6 +121,7 @@ func (a *ArrayBackData) put(entityID flow.Identifier, entity flow.Entity) bool {
 	a.buckets[bucketIndex][slotToUse].valueIndex = entityIndex
 	a.buckets[bucketIndex][slotToUse].idPrefix = idPrefix
 	a.entities[entityIndex].entity = entity
+	a.entities[entityIndex].id = entityID
 	a.entities[entityIndex].owner = (bucketIndex * bucketSize) + slotToUse
 	return true
 }
@@ -140,6 +142,7 @@ func (a ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bool) {
 
 		// come here to check remaining hash bits
 		if a.entities[valueIndex].id != entityID {
+			fmt.Printf("id mismatch: expected: %x got: %x \n", a.entities[valueIndex].id, entityID)
 			continue
 		}
 
@@ -224,8 +227,8 @@ func (a *ArrayBackData) valueIndexForEntity() uint32 {
 	}
 }
 
-func (a *ArrayBackData) valueIndexOf(bucketIndex uint64, slot uint64) (uint64, bool) {
-	valueIndex := a.buckets[bucketIndex][slot].keyIndex
+func (a *ArrayBackData) valueIndexOf(bucketIndex uint64, slot uint64) (uint32, bool) {
+	valueIndex := a.buckets[bucketIndex][slot].valueIndex
 	kvOwner := a.entities[valueIndex].owner
 	if ((bucketIndex * bucketSize) + slot) != kvOwner {
 		a.buckets[bucketIndex][slot].keyIndex = 0 // kvIndex / kvOwner no longer linked
