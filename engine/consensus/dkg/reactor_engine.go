@@ -283,10 +283,16 @@ func (e *ReactorEngine) end(epochCounter uint64) func() error {
 
 		privateShare, _, _ := e.controller.GetArtifacts()
 
-		privKeyInfo := encodable.RandomBeaconPrivKey{
-			PrivateKey: privateShare,
+		var beaconPrivateKey encodable.RandomBeaconPrivKey
+		// if privateShare (DKG output) is nil, store nil in the key storage,
+		// otherwise, wrap it as a RandomBeaconPrivKey instance and store it in the key storage.
+		if privateShare != nil {
+			beaconPrivateKey = encodable.RandomBeaconPrivKey{
+				PrivateKey: privateShare,
+			}
 		}
-		err = e.keyStorage.InsertMyBeaconPrivateKey(epochCounter, &privKeyInfo)
+
+		err = e.keyStorage.InsertMyBeaconPrivateKey(epochCounter, &beaconPrivateKey)
 		if err != nil {
 			return fmt.Errorf("couldn't save DKG private key in db: %w", err)
 		}
