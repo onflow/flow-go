@@ -211,7 +211,7 @@ func (va *VoteAggregator) InvalidBlock(proposal *model.Proposal) error {
 	return nil
 }
 
-// PruneUpToView will delete all votes equal or below to the given view, as well as related indexes.
+// PruneUpToView will delete all votes below to the given view, as well as related indexes.
 func (va *VoteAggregator) PruneUpToView(view uint64) {
 	// if someone else has updated view in parallel don't bother doing extra work for cleaning, whoever
 	// is able to advance counter will perform the cleanup
