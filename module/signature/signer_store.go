@@ -14,12 +14,12 @@ import (
 // using the database to retrieve the relevant DKG keys.
 type EpochAwareSignerStore struct {
 	epochLookup module.EpochLookup                // used to fetch epoch counter by view
-	keys        storage.DKGKeys                   // used to fetch DKG private key by epoch
+	keys        storage.BeaconPrivateKeys         // used to fetch DKG private key by epoch
 	signers     map[uint64]module.ThresholdSigner // cache of signers by epoch
 }
 
 // NewEpochAwareSignerStore instantiates a new EpochAwareSignerStore
-func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.DKGKeys) *EpochAwareSignerStore {
+func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.BeaconPrivateKeys) *EpochAwareSignerStore {
 	return &EpochAwareSignerStore{
 		epochLookup: epochLookup,
 		keys:        keys,
@@ -40,13 +40,13 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 		return signer, nil
 	}
 
-	privDKGData, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
+	privDKGData, err := s.keys.RetrieveMyBeaconPrivateKey(epoch)
 	if errors.Is(err, storage.ErrNotFound) {
 		signer = NewThresholdProvider(encoding.RandomBeaconTag, nil)
 	} else if err != nil {
 		return nil, fmt.Errorf("could not retrieve DKG private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
 	} else {
-		signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData.RandomBeaconPrivKey)
+		signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData)
 	}
 	s.signers[epoch] = signer
 
