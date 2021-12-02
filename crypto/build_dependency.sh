@@ -15,6 +15,8 @@ DEP_DIR="$(go env GOPATH)/pkg/mod/github.com/onflow/flow-go/crypto@${VERSION}"
 echo $DEP_DIR
 if [[ "$PKG_DIR" != *"$MOD_DIR"* ]]; then
 
+   go get github.com/onflow/flow-go/crypto
+
   # grant permissions if not existant
    if [[ ! -r ${PKG_DIR}  || ! -w ${PKG_DIR} || ! -x ${PKG_DIR} ]]; then
       sudo chmod -R 755 ${PKG_DIR}
