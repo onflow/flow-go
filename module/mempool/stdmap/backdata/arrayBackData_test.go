@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -148,8 +149,10 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		// first insertion forward, head of backData should always point to
 		// first entity in the list.
 		require.Equal(t, entities[0], backData.entities.getHead().entity)
+		require.True(t, backData.entities.getHead().prev.isUndefined())
 		require.Equal(t, entities[i], backData.entities.getTail().entity)
 		require.True(t, backData.entities.getTail().next.isUndefined())
+		tailAccessible(t, backData, uint64(i+1))
 	}
 }
 
@@ -158,5 +161,24 @@ func testRetrievingSavedEntities(t *testing.T, backData *ArrayBackData, entities
 		actual, ok := backData.ByID(expected.ID())
 		require.True(t, ok)
 		require.Equal(t, expected, actual)
+	}
+}
+
+func tailAccessible(t *testing.T, backData *ArrayBackData, total uint64) {
+	seen := make(map[flow.Identifier]struct{})
+	tailId := backData.entities.getTail().id
+
+	n := backData.entities.getHead()
+	for i := uint64(0); i < total; i++ {
+		if i == total-1 {
+			require.Equal(t, tailId, n.id, "tail not reachable after total steps")
+			return
+		}
+
+		require.NotEqualf(t, tailId, n.id, "tail visited in less expected steps (potential inconsistency)", i, total)
+		_, ok := seen[n.id]
+		require.False(t, ok, "duplicate identifiers found")
+
+		n = &backData.entities.entities[n.next.sliceIndex()]
 	}
 }
