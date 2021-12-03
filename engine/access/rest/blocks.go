@@ -14,11 +14,15 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
-const ExpandableFieldPayload = "payload"
-const ExpandableExecutionResult = "execution_result"
-const sealedHeightQueryParam = "sealed"
-const finalHeightQueryParam = "final"
-
+const (
+	ExpandableFieldPayload    = "payload"
+	ExpandableExecutionResult = "execution_result"
+	sealedHeightQueryParam    = "sealed"
+	finalHeightQueryParam     = "final"
+	startHeightQueryParam     = "start_height"
+	endHeightQueryParam       = "end_height"
+	heightQueryParam          = "height"
+)
 // getBlocksByID gets blocks by provided ID or collection of IDs.
 func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 
@@ -41,9 +45,9 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 }
 
 func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
-	heights := r.getQueryParams("height")
-	startHeight := r.getQueryParam("start_height")
-	endHeight := r.getQueryParam("end_height")
+	heights := r.getQueryParams(heightQueryParam)
+	startHeight := r.getQueryParam(startHeightQueryParam)
+	endHeight := r.getQueryParam(endHeightQueryParam)
 
 	// if both height and one or both of start and end height are provided
 	if len(heights) > 0 && (startHeight != "" || endHeight != "") {
