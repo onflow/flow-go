@@ -2,13 +2,15 @@ package rest
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/utils/unittest"
-	mocks "github.com/stretchr/testify/mock"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
+
+	mocks "github.com/stretchr/testify/mock"
+
+	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func getResultByIDReq(id string, blockIDs []string) *http.Request {
@@ -16,7 +18,7 @@ func getResultByIDReq(id string, blockIDs []string) *http.Request {
 
 	var u string
 	if id != "" {
-		u = fmt.Sprintf("%s%s", endpoint, id)
+		u = fmt.Sprintf("%s/%s", endpoint, id)
 	} else if len(blockIDs) > 0 {
 		p, _ := url.Parse(endpoint)
 		q := p.Query()

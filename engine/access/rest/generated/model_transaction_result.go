@@ -15,7 +15,7 @@ type TransactionResult struct {
 
 	ErrorMessage string `json:"error_message"`
 
-	ComputationUsed int32 `json:"computation_used"`
+	ComputationUsed string `json:"computation_used"`
 
 	Events []Event `json:"events"`
 

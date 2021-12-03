@@ -13,9 +13,9 @@ type Event struct {
 
 	TransactionId string `json:"transaction_id"`
 
-	TransactionIndex int32 `json:"transaction_index"`
+	TransactionIndex string `json:"transaction_index"`
 
-	EventIndex int32 `json:"event_index"`
+	EventIndex string `json:"event_index"`
 
 	Payload string `json:"payload"`
 }

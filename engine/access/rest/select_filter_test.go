@@ -46,10 +46,10 @@ func ExampleSelectFilter() {
 	//		"execution_result": {
 	//			"events": [
 	//				{
-	//					"event_index": 2
+	//					"event_index": "2"
 	//				},
 	//				{
-	//					"event_index": 3
+	//					"event_index": "3"
 	//				}
 	//			]
 	//		},
@@ -84,10 +84,10 @@ func ExampleSelectFilter() {
 	//		"execution_result": {
 	//			"events": [
 	//				{
-	//					"event_index": 2
+	//					"event_index": "2"
 	//				},
 	//				{
-	//					"event_index": 3
+	//					"event_index": "3"
 	//				}
 	//			]
 	//		},
@@ -136,7 +136,7 @@ func generateBlock() (generated.Block, error) {
 		Header: &generated.BlockHeader{
 			Id:                   dummyID,
 			ParentId:             dummyID,
-			Height:               100,
+			Height:               "100",
 			Timestamp:            time,
 			ParentVoterSignature: dummySignature,
 		},
@@ -169,15 +169,15 @@ func generateBlock() (generated.Block, error) {
 				{
 					Type_:            "type",
 					TransactionId:    dummyID,
-					TransactionIndex: 1,
-					EventIndex:       2,
+					TransactionIndex: "1",
+					EventIndex:       "2",
 					Payload:          "payload",
 				},
 				{
 					Type_:            "type",
 					TransactionId:    dummyID,
-					TransactionIndex: 1,
-					EventIndex:       3,
+					TransactionIndex: "1",
+					EventIndex:       "3",
 					Payload:          "payload",
 				},
 			},

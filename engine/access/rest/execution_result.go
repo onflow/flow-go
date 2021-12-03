@@ -28,7 +28,10 @@ func getExecutionResultsByBlockIDs(req *requestDecorator, backend access.API, li
 		if err != nil {
 			return nil, err
 		}
-		results[i] = executionResultResponse(res, link)
+		results[i], err = executionResultResponse(res, link)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return results, nil
@@ -46,5 +49,5 @@ func getExecutionResultByID(req *requestDecorator, backend access.API, link Link
 		return nil, err
 	}
 
-	return executionResultResponse(res, link), nil
+	return executionResultResponse(res, link)
 }

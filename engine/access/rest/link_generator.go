@@ -33,14 +33,14 @@ func (generator *LinkGeneratorImpl) BlockLink(id flow.Identifier) (string, error
 	return generator.linkForID(getBlocksByIDRoute, id)
 }
 func (generator *LinkGeneratorImpl) PayloadLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(getBlocksByIDRoute, id)
+	return generator.linkForID(getBlockPayloadByIDRoute, id)
 }
 func (generator *LinkGeneratorImpl) ExecutionResultLink(id flow.Identifier) (string, error) {
 	return generator.linkForID(getExecutionResultByIDRoute, id)
 }
 
 func (generator *LinkGeneratorImpl) TransactionLink(id flow.Identifier) (string, error) {
-	return generator.linkForID(getTransactionByIDRoute, id) // todo(sideninja) handler now has route attribute, we could get the route from there and just use this as route builder to return the Link, also discuss having this return generated.Links, or even be moved to converters
+	return generator.linkForID(getTransactionByIDRoute, id)
 }
 
 func (generator *LinkGeneratorImpl) TransactionResultLink(id flow.Identifier) (string, error) {

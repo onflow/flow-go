@@ -52,28 +52,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// execute handler function and check for error
 	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
 	if err != nil {
-		// rest status type error should be returned with status and user message provided
-		if e, ok := err.(StatusError); ok {
-			h.errorResponse(w, e.Status(), e.UserMessage(), errorLogger)
-			return
-		}
-
-		// handle grpc status error returned from the backend calls, we are forwarding the message to the client
-		if se, ok := err.(interface {
-			GRPCStatus() *status.Status
-		}); ok {
-			if se.GRPCStatus().Code() == codes.NotFound { // handle not found error with correct status
-				h.errorResponse(w, http.StatusNotFound, se.GRPCStatus().Message(), errorLogger)
-				return
-			}
-			if se.GRPCStatus().Code() == codes.InvalidArgument { // handle not valid errors with correct status
-				h.errorResponse(w, http.StatusBadRequest, se.GRPCStatus().Message(), errorLogger)
-				return
-			}
-		}
-
-		// stop going further - catch all error
-		h.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
+		h.errorHandler(w, err, errorLogger)
 		return
 	}
 
@@ -83,12 +62,38 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		response, err = SelectFilter(response, selectFields)
 		if err != nil {
-			h.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
+			h.errorHandler(w, err, errorLogger)
+			return
 		}
 	}
 
 	// write response to response stream
 	h.jsonResponse(w, response, errorLogger)
+}
+
+func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zerolog.Logger) {
+	// rest status type error should be returned with status and user message provided
+	if e, ok := err.(StatusError); ok {
+		h.errorResponse(w, e.Status(), e.UserMessage(), errorLogger)
+		return
+	}
+
+	// handle grpc status error returned from the backend calls, we are forwarding the message to the client
+	if se, ok := err.(interface {
+		GRPCStatus() *status.Status
+	}); ok {
+		if se.GRPCStatus().Code() == codes.NotFound {
+			h.errorResponse(w, http.StatusNotFound, se.GRPCStatus().Message(), errorLogger)
+			return
+		}
+		if se.GRPCStatus().Code() == codes.InvalidArgument {
+			h.errorResponse(w, http.StatusBadRequest, se.GRPCStatus().Message(), errorLogger)
+			return
+		}
+	}
+
+	// stop going further - catch all error
+	h.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
 }
 
 // jsonResponse builds a JSON response and send it to the client
