@@ -17,7 +17,7 @@ import (
 func TestMyBeaconPrivateKey_StoreRetrieve(t *testing.T) {
 	unittest.RunWithBadgerDB(t, func(db *badger.DB) {
 
-		t.Run("when not stored", func(t *testing.T) {
+		t.Run("should return error not found when not stored", func(t *testing.T) {
 			var stored encodable.RandomBeaconPrivKey
 			err := db.View(RetrieveMyBeaconPrivateKey(1, &stored))
 			assert.ErrorIs(t, err, storage.ErrNotFound)

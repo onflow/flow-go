@@ -175,7 +175,7 @@ func main() {
 			return err
 		}).
 		Module("beacon keys", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			safeBeaconKeys, err = bstorage.NewSafeBeaconPrivateKeys(dkgState)
+			safeBeaconKeys = bstorage.NewSafeBeaconPrivateKeys(dkgState)
 			return err
 		}).
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {

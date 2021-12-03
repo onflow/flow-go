@@ -31,8 +31,7 @@ func TestGetThresholdSigner(t *testing.T) {
 			metrics := metrics.NewNoopCollector()
 			dkgState, err := storage.NewDKGState(metrics, db)
 			require.NoError(t, err)
-			dkgKeys, err := storage.NewSafeBeaconPrivateKeys(dkgState)
-			require.NoError(t, err)
+			dkgKeys := storage.NewSafeBeaconPrivateKeys(dkgState)
 
 			err = dkgState.SetDKGEndState(epochCounter, flow.DKGEndStateDKGFailure)
 			require.NoError(t, err)
@@ -53,8 +52,7 @@ func TestGetThresholdSigner(t *testing.T) {
 			metrics := metrics.NewNoopCollector()
 			dkgState, err := storage.NewDKGState(metrics, db)
 			require.NoError(t, err)
-			dkgKeys, err := storage.NewSafeBeaconPrivateKeys(dkgState)
-			require.NoError(t, err)
+			dkgKeys := storage.NewSafeBeaconPrivateKeys(dkgState)
 
 			// store a key, mark the DKG as failed
 			err = dkgState.InsertMyBeaconPrivateKey(epochCounter, unittest.RandomBeaconPriv().PrivateKey)

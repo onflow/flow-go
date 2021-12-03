@@ -89,8 +89,7 @@ func TestSafeBeaconPrivateKeys(t *testing.T) {
 		metrics := metrics.NewNoopCollector()
 		dkgState, err := bstorage.NewDKGState(metrics, db)
 		require.NoError(t, err)
-		safeKeys, err := bstorage.NewSafeBeaconPrivateKeys(dkgState)
-		require.NoError(t, err)
+		safeKeys := bstorage.NewSafeBeaconPrivateKeys(dkgState)
 
 		t.Run("non-existent key - should error", func(t *testing.T) {
 			epochCounter := rand.Uint64()
