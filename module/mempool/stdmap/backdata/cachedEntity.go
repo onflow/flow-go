@@ -6,9 +6,29 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type doubleLinkedListPointer struct {
+	pointerValue uint32
+}
+
+func (d doubleLinkedListPointer) isUndefined() bool {
+	return d.pointerValue == uint32(0)
+}
+
+func (d *doubleLinkedListPointer) setUndefined() {
+	d.pointerValue = uint32(0)
+}
+
+func (d doubleLinkedListPointer) sliceIndex() uint32 {
+	return uint32(d.pointerValue) - 1
+}
+
+func (d *doubleLinkedListPointer) setPointer(sliceIndex uint32) {
+	d.pointerValue = sliceIndex + 1
+}
+
 type doubleLinkedListNode struct {
-	next uint64
-	prev uint64
+	next doubleLinkedListPointer
+	prev doubleLinkedListPointer
 }
 
 type cachedEntity struct {
@@ -20,14 +40,16 @@ type cachedEntity struct {
 
 type entityList struct {
 	total        uint64
-	head         int // index of the head of linked list in entities slice.
+	head         doubleLinkedListPointer // index of the head of linked list in entities slice.
+	tail         doubleLinkedListPointer // index of the tail of linked list in entities slice.
 	entities     []cachedEntity
 	ejectionMode EjectionMode
 }
 
 func newEntityList(limit uint64, ejectionMode EjectionMode) *entityList {
 	return &entityList{
-		head:         -1, // -1 means not-initialized.
+		head:         doubleLinkedListPointer{pointerValue: 0},
+		tail:         doubleLinkedListPointer{pointerValue: 0},
 		entities:     make([]cachedEntity, limit),
 		ejectionMode: ejectionMode,
 	}
@@ -38,10 +60,26 @@ func (e *entityList) add(entityId flow.Identifier, entity flow.Entity, owner uin
 	e.entities[entityIndex].entity = entity
 	e.entities[entityIndex].id = entityId
 	e.entities[entityIndex].owner = owner
+	e.entities[entityIndex].next.setUndefined()
+	e.entities[entityIndex].prev.setUndefined()
 
 	if !ejection {
 		e.total++
 	}
+
+	if e.head.isUndefined() {
+		// sets head
+		e.head.setPointer(entityIndex)
+		e.entities[e.head.sliceIndex()].prev.setUndefined()
+	}
+
+	if !e.tail.isUndefined() {
+		// links new entity to the tail
+		e.link(e.tail, entityIndex)
+	}
+
+	e.tail.setPointer(entityIndex)
+	e.entities[e.tail.sliceIndex()].next.setUndefined()
 
 	return entityIndex
 }
@@ -69,4 +107,27 @@ func (e entityList) valueIndexForEntity() (uint32, bool) {
 
 func (e entityList) size() uint64 {
 	return e.total
+}
+
+func (e entityList) getHead() *cachedEntity {
+	return &e.entities[e.head.sliceIndex()]
+}
+
+func (e entityList) getTail() *cachedEntity {
+	return &e.entities[e.tail.sliceIndex()]
+}
+
+func (e *entityList) link(prev doubleLinkedListPointer, next uint32) {
+	e.entities[prev.sliceIndex()].next.setPointer(next)
+	e.entities[next].prev = prev
+}
+
+func (e entityList) next(i uint64) flow.Entity {
+	nextIndex := e.entities[i].next.sliceIndex()
+	return e.entities[nextIndex].entity
+}
+
+func (e entityList) prev(i uint64) flow.Entity {
+	prevIndex := e.entities[i].prev.sliceIndex()
+	return e.entities[prevIndex].entity
 }

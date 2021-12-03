@@ -122,7 +122,8 @@ func withTestScenario(t *testing.T,
 
 	bd := NewArrayBackData(size, overLimitFactor, LRUEjection)
 	// head on underlying linked list value should be uninitialized
-	require.True(t, bd.entities.head.isUninitialized())
+	require.True(t, bd.entities.head.isUndefined())
+	require.Equal(t, bd.Size(), uint(0))
 	entities := unittest.EntityListFixture(uint(entityCount))
 
 	for _, helper := range helpers {
@@ -144,7 +145,11 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		require.Equal(t, e, entity)
 
 		// linked-list sanity check
-		require.Equal(t, entities[0], backData.entities.getHead())
+		// first insertion forward, head of backData should always point to
+		// first entity in the list.
+		require.Equal(t, entities[0], backData.entities.getHead().entity)
+		require.Equal(t, entities[i], backData.entities.getTail().entity)
+		// require.Equal(t, doubleLinkedListPointer(0), backData.entities.getTail().next.sliceIndex())
 	}
 }
 
