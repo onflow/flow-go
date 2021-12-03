@@ -40,6 +40,7 @@ const (
 	MetricsPort                = 8080
 	RPCPort                    = 9000
 	SecuredRPCPort             = 9001
+	HTTPPort                   = 8000
 )
 
 var (
@@ -447,6 +448,7 @@ func prepareAccessService(container testnet.ContainerConfig, i int) Service {
 	service.Command = append(service.Command, []string{
 		fmt.Sprintf("--rpc-addr=%s:%d", container.ContainerName, RPCPort),
 		fmt.Sprintf("--secure-rpc-addr=%s:%d", container.ContainerName, SecuredRPCPort),
+		fmt.Sprintf("--http-addr=%s:%d", container.ContainerName, HTTPPort),
 		fmt.Sprintf("--collection-ingress-port=%d", RPCPort),
 		"--log-tx-time-to-finalized",
 		"--log-tx-time-to-executed",
