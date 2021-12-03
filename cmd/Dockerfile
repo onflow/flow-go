@@ -6,18 +6,6 @@ FROM golang:1.17-buster AS build-setup
 RUN apt-get update
 RUN apt-get -y install cmake zip sudo
 
-## (1) Build Relic first to maximize caching
-FROM build-setup AS build-relic
-
-RUN mkdir /build
-WORKDIR /build
-
-# Copy over the crypto package
-COPY crypto ./crypto
-
-# Build Relic (this places build artifacts in /build/relic/build)
-RUN cd ./crypto/ && go generate
-
 ## (2) Build the app binary
 FROM build-setup AS build-env
 
@@ -31,8 +19,9 @@ ARG VERSION
 
 COPY . .
 
-# Copy over Relic build artifacts
-COPY --from=build-relic /build/crypto/relic/build ./crypto/relic/build
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    make crypto/relic/build
 
 FROM build-env as build-production
 WORKDIR /app
