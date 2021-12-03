@@ -130,12 +130,12 @@ func NewSafeBeaconPrivateKeys(state *DKGState) *SafeBeaconPrivateKeys {
 // * (key, true, nil) if the key is present and confirmed valid
 // * (nil, false, nil) if the key has been marked invalid (by SetDKGEnded)
 // * (nil, false, error) for any other condition, or exception
-func (sk *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error) {
-	err = sk.state.db.View(func(txn *badger.Txn) error {
+func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error) {
+	err = keys.state.db.View(func(txn *badger.Txn) error {
 
 		// retrieve the key, error on any storage error
 		var encodableKey *encodable.RandomBeaconPrivKey
-		encodableKey, err = sk.state.retrieveKeyTx(epochCounter)(txn)
+		encodableKey, err = keys.state.retrieveKeyTx(epochCounter)(txn)
 		if err != nil {
 			key = nil
 			safe = false
