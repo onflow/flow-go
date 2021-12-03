@@ -10,10 +10,10 @@ import (
 
 // EpochAwareSignerStore implements the SignerStore interface. It is epoch
 // aware, and provides the appropriate threshold signers on a per-view basis,
-// using the database to retrieve the relevant DKG keys.
+// using the database to retrieve the relevant beacon keys.
 type EpochAwareSignerStore struct {
 	epochLookup module.EpochLookup                // used to fetch epoch counter by view
-	keys        storage.SafeBeaconKeys            // used to fetch DKG private key by epoch
+	keys        storage.SafeBeaconKeys            // used to fetch beacon private key by epoch
 	signers     map[uint64]module.ThresholdSigner // cache of signers by epoch
 }
 
@@ -27,7 +27,7 @@ func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.SafeB
 }
 
 // GetThresholdSigner returns the threshold-signer for signing objects at a
-// given view. The view determines the epoch, which determines the DKG private
+// given view. The view determines the epoch, which determines the beacon private
 // key underlying the signer.
 func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.ThresholdSigner, error) {
 	epoch, err := s.epochLookup.EpochForViewWithFallback(view)
@@ -39,10 +39,10 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 		return signer, nil
 	}
 
-	privDKGData, safe, err := s.keys.RetrieveMyBeaconPrivateKey(epoch)
+	beaconPrivKey, safe, err := s.keys.RetrieveMyBeaconPrivateKey(epoch)
 	if err != nil {
 		// there are no expected errors here
-		return nil, fmt.Errorf("could not retrieve DKG private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
+		return nil, fmt.Errorf("could not retrieve beacon private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
 	}
 
 	if !safe {
@@ -53,7 +53,7 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 	} else {
 		// we have a beacon key which has been explicitly marked safe for use
 		// by the DKG process
-		signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData)
+		signer = NewThresholdProvider(encoding.RandomBeaconTag, beaconPrivKey)
 	}
 
 	s.signers[epoch] = signer
