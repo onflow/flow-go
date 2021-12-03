@@ -139,6 +139,6 @@ func expectedBlockResponseExpanded(block *flow.Block, execResult *flow.Execution
 		"_links": {
 			"_self": "%s"
 		}
-	}`, id, block.Header.ParentID.String(), uint(block.Header.Height), timestamp,
+	}`, id, block.Header.ParentID.String(), int32(block.Header.Height), timestamp,
 	toBase64(block.Header.ParentVoterSigData), execResultID, execResult.BlockID, execLink, blockLink)
 }
