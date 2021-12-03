@@ -289,6 +289,8 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 			log.Fatal().Err(err).Msg("failed to set dkg end state")
 		}
 	}
+
+	log.Info().Msgf("successfully ended DKG for epoch %d - my beacon pub key is %x", dkgEpochCounter, localPubKey.Encode())
 }
 
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
