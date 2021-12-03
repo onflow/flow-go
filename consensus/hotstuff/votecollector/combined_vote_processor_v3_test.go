@@ -18,7 +18,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
@@ -802,7 +802,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		// there is no DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
 
-		beaconSignerStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
@@ -828,7 +828,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 		// there is DKG key for this epoch
 		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
 
-		beaconSignerStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
@@ -869,7 +869,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
-		packer := signature.NewConsensusSigDataPacker(committee)
+		packer := hsig.NewConsensusSigDataPacker(committee)
 
 		// create verifier that will do crypto checks of created QC
 		verifier := verification.NewCombinedVerifierV3(committee, packer)
@@ -886,9 +886,9 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	baseFactory := &combinedVoteProcessorFactoryBaseV3{
 		committee:   committee,
 		onQCCreated: onQCCreated,
-		packer:      signature.NewConsensusSigDataPacker(committee),
+		packer:      hsig.NewConsensusSigDataPacker(committee),
 	}
-	voteProcessorFactory := VoteProcessorFactory{
+	voteProcessorFactory := &VoteProcessorFactory{
 		baseFactory: baseFactory.Create,
 	}
 	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)

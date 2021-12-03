@@ -20,14 +20,12 @@ import (
 
 // GenerateClusterRootQC creates votes and generates a QC based on participant data
 func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
-
 	signers, err := createClusterSigners(participants)
 	if err != nil {
 		return nil, err
 	}
 
 	identities := bootstrap.ToIdentityList(participants)
-
 	committee, err := committees.NewStaticCommittee(identities, flow.Identifier{}, nil, nil)
 	if err != nil {
 		return nil, err
