@@ -254,8 +254,8 @@ func main() {
 
 			// if the node is not part of the current epoch identities, we do
 			// not need to load the key
-			epoch := node.State.AtBlockID(node.RootBlock.ID()).Epochs().Current()
-			initialIdentities, err := epoch.InitialIdentities()
+			rootEpoch := node.State.AtBlockID(node.RootBlock.ID()).Epochs().Current()
+			initialIdentities, err := rootEpoch.InitialIdentities()
 			if err != nil {
 				return err
 			}
@@ -270,7 +270,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			epochCounter, err := epoch.Counter()
+			epochCounter, err := rootEpoch.Counter()
 			if err != nil {
 				return err
 			}
@@ -288,12 +288,12 @@ func main() {
 			// participant in the epoch and we don't have the corresponding DKG
 			// key in the database.
 			checkEpochKey := func(protocol.Epoch) error {
-				identities, err := epoch.InitialIdentities()
+				identities, err := rootEpoch.InitialIdentities()
 				if err != nil {
 					return err
 				}
 				if _, ok := identities.ByNodeID(node.NodeID); ok {
-					counter, err := epoch.Counter()
+					counter, err := rootEpoch.Counter()
 					if err != nil {
 						return err
 					}
