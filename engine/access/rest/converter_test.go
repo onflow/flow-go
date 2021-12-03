@@ -40,21 +40,21 @@ func TestTransactions(t *testing.T) {
 		   "script":"cHViIGZ1biBtYWluKCkge30=",
 		   "arguments":null,
 		   "reference_block_id":"%s",
-		   "gas_limit":10,
+		   "gas_limit":"10",
 		   "payer":"8c5303eaa26202d6",
            "authorizers":[
 				  "8c5303eaa26202d6"
 			   ],
            "proposal_key":{
                "address":"8c5303eaa26202d6",
-               "key_index":1,
-               "sequence_number":0
+               "key_index":"1",
+               "sequence_number":"0"
             },
            "envelope_signatures":[
                {
                   "address":"8c5303eaa26202d6",
-                  "signer_index":0,
-                  "key_index":1,
+                  "signer_index":"0",
+                  "key_index":"1",
                   "signature":"%s"
 				  }
             ],

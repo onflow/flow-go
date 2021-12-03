@@ -23,6 +23,7 @@ const (
 	endHeightQueryParam       = "end_height"
 	heightQueryParam          = "height"
 )
+
 // getBlocksByID gets blocks by provided ID or collection of IDs.
 func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 

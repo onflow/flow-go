@@ -54,18 +54,18 @@ func validCreateBody(tx flow.TransactionBody) map[string]interface{} {
 		"script":             toBase64(tx.Script),
 		"arguments":          tx.Arguments,
 		"reference_block_id": tx.ReferenceBlockID.String(),
-		"gas_limit":          tx.GasLimit,
+		"gas_limit":          fmt.Sprintf("%d", tx.GasLimit),
 		"payer":              tx.Payer.String(),
 		"proposal_key": map[string]interface{}{
 			"address":         tx.ProposalKey.Address.String(),
-			"key_index":       tx.ProposalKey.KeyIndex,
-			"sequence_number": tx.ProposalKey.SequenceNumber,
+			"key_index":       fmt.Sprintf("%d", tx.ProposalKey.KeyIndex),
+			"sequence_number": fmt.Sprintf("%d", tx.ProposalKey.SequenceNumber),
 		},
 		"authorizers": auth,
 		"envelope_signatures": []map[string]interface{}{{
 			"address":      tx.EnvelopeSignatures[0].Address.String(),
-			"signer_index": int32(tx.EnvelopeSignatures[0].SignerIndex),
-			"key_index":    int32(tx.EnvelopeSignatures[0].KeyIndex),
+			"signer_index": fmt.Sprintf("%d", tx.EnvelopeSignatures[0].SignerIndex),
+			"key_index":    fmt.Sprintf("%d", tx.EnvelopeSignatures[0].KeyIndex),
 			"signature":    toBase64(tx.EnvelopeSignatures[0].Signature),
 		}},
 	}
@@ -88,12 +88,12 @@ func TestGetTransactions(t *testing.T) {
 			   "script":"cHViIGZ1biBtYWluKCkge30=",
                "arguments": null,
 			   "reference_block_id":"%s",
-			   "gas_limit":10,
+			   "gas_limit":"10",
 			   "payer":"8c5303eaa26202d6",
 			   "proposal_key":{
 				  "address":"8c5303eaa26202d6",
-				  "key_index":1,
-				  "sequence_number":0
+				  "key_index":"1",
+				  "sequence_number":"0"
 			   },
 			   "authorizers":[
 				  "8c5303eaa26202d6"
@@ -102,8 +102,8 @@ func TestGetTransactions(t *testing.T) {
 			   "envelope_signatures":[
 				  {
 					 "address":"8c5303eaa26202d6",
-					 "signer_index":0,
-					 "key_index":1,
+					 "signer_index":"0",
+					 "key_index":"1",
 					 "signature":"%s"
 				  }
 			   ],
@@ -140,12 +140,12 @@ func TestGetTransactions(t *testing.T) {
 			   "script":"cHViIGZ1biBtYWluKCkge30=",
                "arguments": null,
 			   "reference_block_id":"%s",
-			   "gas_limit":10,
+			   "gas_limit":"10",
 			   "payer":"8c5303eaa26202d6",
 			   "proposal_key":{
 				  "address":"8c5303eaa26202d6",
-				  "key_index":1,
-				  "sequence_number":0
+				  "key_index":"1",
+				  "sequence_number":"0"
 			   },
 			   "authorizers":[
 				  "8c5303eaa26202d6"
@@ -154,8 +154,8 @@ func TestGetTransactions(t *testing.T) {
 			   "envelope_signatures":[
 				  {
 					 "address":"8c5303eaa26202d6",
-					 "signer_index":0,
-					 "key_index":1,
+					 "signer_index":"0",
+					 "key_index":"1",
 					 "signature":"%s"
 				  }
 			   ],
@@ -163,13 +163,13 @@ func TestGetTransactions(t *testing.T) {
 					"block_id": "%s",
 					"status": "Sealed",
 					"error_message": "",
-					"computation_used": 0,
+					"computation_used": "0",
 					"events": [
 						{
 							"type": "flow.AccountCreated",
 							"transaction_id": "%s",
-							"transaction_index": 0,
-							"event_index": 0,
+							"transaction_index": "0",
+							"event_index": "0",
 							"payload": ""
 						}
 					],
@@ -234,13 +234,13 @@ func TestGetTransactionResult(t *testing.T) {
 			"block_id": "%s",
 			"status": "Executed",
 			"error_message": "",
-			"computation_used": 0,
+			"computation_used": "0",
 			"events": [
 				{
 					"type": "flow.AccountCreated",
 					"transaction_id": "%s",
-					"transaction_index": 1,
-					"event_index": 0,
+					"transaction_index": "1",
+					"event_index": "0",
 					"payload": ""
 				}
 			],
@@ -277,12 +277,12 @@ func TestCreateTransaction(t *testing.T) {
 			   "script":"cHViIGZ1biBtYWluKCkge30=",
 			   "arguments":null,
 			   "reference_block_id":"%s",
-			   "gas_limit":10,
+			   "gas_limit":"10",
 			   "payer":"8c5303eaa26202d6",
 			   "proposal_key":{
 				  "address":"8c5303eaa26202d6",
-				  "key_index":1,
-				  "sequence_number":0
+				  "key_index":"1",
+				  "sequence_number":"0"
 			   },
 			   "authorizers":[
 				  "8c5303eaa26202d6"
@@ -290,8 +290,8 @@ func TestCreateTransaction(t *testing.T) {
 			   "envelope_signatures":[
 				  {
 					 "address":"8c5303eaa26202d6",
-					 "signer_index":0,
-					 "key_index":1,
+					 "signer_index":"0",
+					 "key_index":"1",
 					 "signature":"%s"
 				  }
 			   ],

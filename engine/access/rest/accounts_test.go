@@ -121,15 +121,15 @@ func TestGetAccount(t *testing.T) {
 func expectedExpandedResponse(account *flow.Account) string {
 	return fmt.Sprintf(`{
 			  "address":"%s",
-			  "balance":100,
+			  "balance":"100",
 			  "keys":[
 				  {
-					 "index":0,
+					 "index":"0",
 					 "public_key":"%s",
 					 "signing_algorithm":"ECDSA_P256",
 					 "hashing_algorithm":"SHA3_256",
-					 "sequence_number":0,
-					 "weight":1000,
+					 "sequence_number":"0",
+					 "weight":"1000",
 					 "revoked":false
 				  }
 			  ],
@@ -142,7 +142,7 @@ func expectedExpandedResponse(account *flow.Account) string {
 func expectedCondensedResponse(account *flow.Account) string {
 	return fmt.Sprintf(`{
 			  "address":"%s",
-			  "balance":100,
+			  "balance":"100",
               "_links":{"_self":"/v1/accounts/%s" },
               "_expandable":{"contracts":"contracts", "keys":"keys"}
 			}`, account.Address, account.Address)

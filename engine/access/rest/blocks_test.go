@@ -70,7 +70,6 @@ func TestGetBlocks(t *testing.T) {
 		expectedResp := expectedBlockResponsesExpanded([]*flow.Block{&block}, []*flow.ExecutionResult{executionResult})
 		assert.Equal(t, http.StatusOK, rr.Code)
 		actualResp := rr.Body.String()
-		fmt.Println(actualResp)
 		assert.JSONEq(t, expectedResp, actualResp)
 	})
 
@@ -80,11 +79,11 @@ func TestGetBlocks(t *testing.T) {
 		executionResults := unittest.ExecutionResultFixtures(2)
 
 		blockIDs := make([]string, len(blocks))
-		for i, b := range  blocks {
+		for i, b := range blocks {
 			blockIDs[i] = b.Header.ID().String()
 			backend.Mock.On("GetBlockByID", mocks.Anything, b.ID()).Return(b, nil)
 			backend.Mock.On("GetExecutionResultForBlockID", mocks.Anything, b.ID()).Return(executionResults[i], nil)
- 		}
+		}
 
 		req, err := http.NewRequest("GET", blockURL(blockIDs, 0, 0, true, true), nil)
 		require.NoError(t, err)
@@ -103,7 +102,7 @@ func expectedBlockResponsesExpanded(blocks []*flow.Block, execResult []*flow.Exe
 	for i, b := range blocks {
 		blockResponses[i] = expectedBlockResponseExpanded(b, execResult[i])
 	}
-	return fmt.Sprintf("[%s]",strings.Join(blockResponses, ","))
+	return fmt.Sprintf("[%s]", strings.Join(blockResponses, ","))
 }
 
 func expectedBlockResponseExpanded(block *flow.Block, execResult *flow.ExecutionResult) string {
@@ -119,7 +118,7 @@ func expectedBlockResponseExpanded(block *flow.Block, execResult *flow.Execution
 		"header": {
 			"id": "%s",
 			"parent_id": "%s",
-			"height": %d,
+			"height": "%d",
 			"timestamp": "%s",
 			"parent_voter_signature": "%s"
 		},
@@ -139,6 +138,6 @@ func expectedBlockResponseExpanded(block *flow.Block, execResult *flow.Execution
 		"_links": {
 			"_self": "%s"
 		}
-	}`, id, block.Header.ParentID.String(), int32(block.Header.Height), timestamp,
-	toBase64(block.Header.ParentVoterSigData), execResultID, execResult.BlockID, execLink, blockLink)
+	}`, id, block.Header.ParentID.String(), block.Header.Height, timestamp,
+		toBase64(block.Header.ParentVoterSigData), execResultID, execResult.BlockID, execLink, blockLink)
 }

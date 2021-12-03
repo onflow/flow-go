@@ -169,10 +169,6 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		for i, b := range testBlocks {
 			assert.Equal(suite.T(), b.ID().String(), actualBlocks[i].Header.Id)
 		}
-
-		//jsonBytes, err := json.MarshalIndent(actualBlocks, "", "\t")
-		//require.NoError(suite.T(), err)
-		//fmt.Println(string(jsonBytes))
 	})
 
 	suite.Run("GetBlockByHeight by start and end height - happy path", func() {
@@ -191,7 +187,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		assert.Len(suite.T(), actualBlocks, lastIndex)
 		for i := 0; i < lastIndex; i++ {
 			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
-			assert.EqualValues(suite.T(), testBlocks[i].Header.Height, actualBlocks[i].Header.Height)
+			assert.Equal(suite.T(), fmt.Sprintf("%d", testBlocks[i].Header.Height), actualBlocks[i].Header.Height)
 		}
 	})
 
@@ -212,7 +208,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		assert.Len(suite.T(), actualBlocks, lastIndex)
 		for i := 0; i < lastIndex; i++ {
 			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
-			assert.EqualValues(suite.T(), testBlocks[i].Header.Height, actualBlocks[i].Header.Height)
+			assert.Equal(suite.T(), fmt.Sprintf("%d", testBlocks[i].Header.Height), actualBlocks[i].Header.Height)
 		}
 	})
 

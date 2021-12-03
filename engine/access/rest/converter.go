@@ -38,6 +38,14 @@ func fromBase64(bytesStr string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(bytesStr)
 }
 
+func toUint64(uint64Str string) (uint64, error) {
+	return strconv.ParseUint(uint64Str, 10, 64)
+}
+
+func fromUint64(number uint64) string {
+	return fmt.Sprintf("%d", number)
+}
+
 func toID(id string) (flow.Identifier, error) {
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{64}$`, id)
 	if !valid {
@@ -122,10 +130,20 @@ func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
 		return flow.ProposalKey{}, err
 	}
 
+	keyIndex, err := toUint64(key.KeyIndex)
+	if err != nil {
+		return flow.ProposalKey{}, err
+	}
+
+	keySeqNumber, err := toUint64(key.SequenceNumber)
+	if err != nil {
+		return flow.ProposalKey{}, err
+	}
+
 	return flow.ProposalKey{
 		Address:        address,
-		KeyIndex:       uint64(key.KeyIndex),
-		SequenceNumber: uint64(key.SequenceNumber),
+		KeyIndex:       keyIndex,
+		SequenceNumber: keySeqNumber,
 	}, nil
 }
 
@@ -151,10 +169,20 @@ func toTransactionSignature(transactionSignature *generated.TransactionSignature
 		return flow.TransactionSignature{}, err
 	}
 
+	signerIndex, err := toUint64(transactionSignature.SignerIndex)
+	if err != nil {
+		return flow.TransactionSignature{}, err
+	}
+
+	keyIndex, err := toUint64(transactionSignature.KeyIndex)
+	if err != nil {
+		return flow.TransactionSignature{}, err
+	}
+
 	return flow.TransactionSignature{
 		Address:     address,
-		SignerIndex: int(transactionSignature.SignerIndex),
-		KeyIndex:    uint64(transactionSignature.KeyIndex),
+		SignerIndex: int(signerIndex),
+		KeyIndex:    keyIndex,
 		Signature:   signature,
 	}, nil
 }
@@ -258,11 +286,16 @@ func toTransaction(tx generated.TransactionsBody) (flow.TransactionBody, error) 
 		return flow.TransactionBody{}, err
 	}
 
+	gasLimit, err := toUint64(tx.GasLimit)
+	if err != nil {
+		return flow.TransactionBody{}, err
+	}
+
 	return flow.TransactionBody{
 		ReferenceBlockID:   blockID,
 		Script:             script,
 		Arguments:          args,
-		GasLimit:           uint64(tx.GasLimit),
+		GasLimit:           gasLimit,
 		ProposalKey:        proposal,
 		Payer:              payer,
 		Authorizers:        auths,
@@ -297,10 +330,11 @@ func toScriptSource(script generated.ScriptsBody) ([]byte, error) {
 //
 
 func proposalKeyResponse(key *flow.ProposalKey) *generated.ProposalKey {
+
 	return &generated.ProposalKey{
 		Address:        key.Address.String(),
-		KeyIndex:       int32(key.KeyIndex),
-		SequenceNumber: int32(key.SequenceNumber),
+		KeyIndex:       fromUint64(key.KeyIndex),
+		SequenceNumber: fromUint64(key.SequenceNumber),
 	}
 }
 
@@ -309,8 +343,8 @@ func transactionSignatureResponse(signatures []flow.TransactionSignature) []gene
 	for i, sig := range signatures {
 		sigs[i] = generated.TransactionSignature{
 			Address:     sig.Address.String(),
-			SignerIndex: int32(sig.SignerIndex),
-			KeyIndex:    int32(sig.KeyIndex),
+			SignerIndex: fmt.Sprintf("%d", sig.SignerIndex),
+			KeyIndex:    fromUint64(sig.KeyIndex),
 			Signature:   toBase64(sig.Signature),
 		}
 	}
@@ -346,7 +380,7 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 		Script:             toBase64(tx.Script),
 		Arguments:          args,
 		ReferenceBlockId:   tx.ReferenceBlockID.String(),
-		GasLimit:           int32(tx.GasLimit),
+		GasLimit:           fromUint64(tx.GasLimit),
 		Payer:              tx.Payer.String(),
 		ProposalKey:        proposalKeyResponse(&tx.ProposalKey),
 		Authorizers:        auths,
@@ -364,8 +398,8 @@ func eventResponse(event flow.Event) generated.Event {
 	return generated.Event{
 		Type_:            string(event.Type),
 		TransactionId:    event.TransactionID.String(),
-		TransactionIndex: int32(event.TransactionIndex),
-		EventIndex:       int32(event.EventIndex),
+		TransactionIndex: fmt.Sprintf("%d", event.TransactionIndex),
+		EventIndex:       fmt.Sprintf("%d", event.EventIndex),
 		Payload:          string(event.Payload),
 	}
 }
@@ -405,7 +439,7 @@ func transactionResultResponse(txr *access.TransactionResult, txID flow.Identifi
 		BlockId:         txr.BlockID.String(),
 		Status:          &status,
 		ErrorMessage:    txr.ErrorMessage,
-		ComputationUsed: int32(0),
+		ComputationUsed: fromUint64(0),
 		Events:          eventsResponse(txr.Events),
 		Links:           self,
 	}
@@ -415,7 +449,7 @@ func blockHeaderResponse(flowHeader *flow.Header) *generated.BlockHeader {
 	return &generated.BlockHeader{
 		Id:                   flowHeader.ID().String(),
 		ParentId:             flowHeader.ParentID.String(),
-		Height:               int32(flowHeader.Height),
+		Height:               fromUint64(flowHeader.Height),
 		Timestamp:            flowHeader.Timestamp,
 		ParentVoterSignature: toBase64(flowHeader.ParentVoterSigData),
 	}
@@ -545,8 +579,8 @@ func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event
 		events[i] = generated.Event{
 			Type_:            e.Type,
 			TransactionId:    "",
-			TransactionIndex: 0,
-			EventIndex:       0,
+			TransactionIndex: "0",
+			EventIndex:       "0",
 			Payload:          "", //e.Event,
 		}
 	}
@@ -574,12 +608,12 @@ func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublic
 		hashAlgo := generated.HashingAlgorithm(k.HashAlgo.String())
 
 		keysResponse[i] = generated.AccountPublicKey{
-			Index:            int32(k.Index),
+			Index:            fmt.Sprintf("%d", k.Index),
 			PublicKey:        k.PublicKey.String(),
 			SigningAlgorithm: &sigAlgo,
 			HashingAlgorithm: &hashAlgo,
-			SequenceNumber:   int32(k.SeqNumber),
-			Weight:           int32(k.Weight),
+			SequenceNumber:   fmt.Sprintf("%d", k.SeqNumber),
+			Weight:           fmt.Sprintf("%d", k.Weight),
 			Revoked:          k.Revoked,
 		}
 	}
@@ -591,7 +625,7 @@ func accountResponse(flowAccount *flow.Account, link LinkGenerator, expand map[s
 
 	account := generated.Account{
 		Address: flowAccount.Address.String(),
-		Balance: int32(flowAccount.Balance),
+		Balance: fmt.Sprintf("%d", flowAccount.Balance),
 	}
 
 	// TODO: change spec to include default values (so that this doesn't need to be done)

@@ -18,7 +18,7 @@ func getResultByIDReq(id string, blockIDs []string) *http.Request {
 
 	var u string
 	if id != "" {
-		u = fmt.Sprintf("%s%s", endpoint, id)
+		u = fmt.Sprintf("%s/%s", endpoint, id)
 	} else if len(blockIDs) > 0 {
 		p, _ := url.Parse(endpoint)
 		q := p.Query()

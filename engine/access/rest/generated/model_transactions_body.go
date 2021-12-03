@@ -15,7 +15,7 @@ type TransactionsBody struct {
 
 	ReferenceBlockId string `json:"reference_block_id"`
 
-	GasLimit int32 `json:"gas_limit"`
+	GasLimit string `json:"gas_limit"`
 
 	Payer string `json:"payer"`
 

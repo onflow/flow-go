@@ -11,7 +11,7 @@ package generated
 type Account struct {
 	Address string `json:"address"`
 
-	Balance int32 `json:"balance"`
+	Balance string `json:"balance"`
 
 	Keys []AccountPublicKey `json:"keys,omitempty"`
 
