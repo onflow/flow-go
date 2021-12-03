@@ -48,7 +48,7 @@ type SafeBeaconKeys interface {
 	//
 	// Returns:
 	// * (key, true, nil) if the key is present and confirmed valid
-	// * (nil, false, nil) if the key has been marked invalid (by SetDKGEnded)
+	// * (nil, false, nil) if no key was generated or the key has been marked invalid (by SetDKGEnded)
 	// * (nil, false, error) for any other condition, or exception
 	RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error)
 }
