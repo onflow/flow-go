@@ -32,6 +32,8 @@ import (
 )
 
 // RestAPITestSuite tests that the Access node serves the REST API defined via the OpenApi spec accurately
+// The tests starts the REST server locally and uses the Go REST client on onflow/flow repo to make the api requests.
+// The server uses storage mocks
 type RestAPITestSuite struct {
 	suite.Suite
 	state             *protocol.State
@@ -176,16 +178,15 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		//heights := []generated.BlockHeight{}
 		startHeight := testBlocks[0].Header.Height
-		lastIndex := len(testBlocks) - 1
-		endHeight := testBlocks[lastIndex].Header.Height
+		blkCnt := len(testBlocks)
+		endHeight := testBlocks[blkCnt - 1].Header.Height
 
 		actualBlocks, resp, err := client.BlocksApi.BlocksGet(ctx, optionsForBlockByStartEndHeight(startHeight, endHeight))
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
-		assert.Len(suite.T(), actualBlocks, lastIndex)
-		for i := 0; i < lastIndex; i++ {
+		assert.Len(suite.T(), actualBlocks, blkCnt)
+		for i := 0; i < blkCnt; i++ {
 			assert.Equal(suite.T(), testBlocks[i].ID().String(), actualBlocks[i].Header.Id)
 			assert.Equal(suite.T(), fmt.Sprintf("%d", testBlocks[i].Header.Height), actualBlocks[i].Header.Height)
 		}

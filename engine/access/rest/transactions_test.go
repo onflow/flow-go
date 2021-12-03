@@ -316,13 +316,13 @@ func TestCreateTransaction(t *testing.T) {
 		}{
 			{"reference_block_id", "-1", `{"code":400, "message":"invalid ID format"}`},
 			{"reference_block_id", "", `{"code":400, "message":"reference block not provided"}`},
-			{"gas_limit", "-1", `{"code":400, "message":"request body contains an invalid value for the \"gas_limit\" field (at position 256)"}`},
+			{"gas_limit", "-1", `{"code":400, "message":"invalid value for gas limit"}`},
 			{"payer", "yo", `{"code":400, "message":"invalid address"}`},
-			{"proposal_key", "yo", `{"code":400, "message":"request body contains an invalid value for the \"proposal_key\" field (at position 301)"}`},
+			{"proposal_key", "yo", `{"code":400, "message":"request body contains an invalid value for the \"proposal_key\" field (at position 307)"}`},
 			{"authorizers", "", `{"code":400, "message":"request body contains an invalid value for the \"authorizers\" field (at position 32)"}`},
 			{"authorizers", "yo", `{"code":400, "message":"request body contains an invalid value for the \"authorizers\" field (at position 34)"}`},
 			{"envelope_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"envelope_signatures\" field (at position 75)"}`},
-			{"payload_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"payload_signatures\" field (at position 305)"}`},
+			{"payload_signatures", "", `{"code":400, "message":"request body contains an invalid value for the \"payload_signatures\" field (at position 311)"}`},
 		}
 
 		for _, test := range tests {

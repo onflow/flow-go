@@ -288,7 +288,7 @@ func toTransaction(tx generated.TransactionsBody) (flow.TransactionBody, error) 
 
 	gasLimit, err := toUint64(tx.GasLimit)
 	if err != nil {
-		return flow.TransactionBody{}, err
+		return flow.TransactionBody{}, fmt.Errorf("invalid value for gas limit")
 	}
 
 	return flow.TransactionBody{
