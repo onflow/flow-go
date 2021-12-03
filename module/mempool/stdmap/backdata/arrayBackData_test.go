@@ -153,6 +153,7 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		require.Equal(t, entities[i], backData.entities.getTail().entity)
 		require.True(t, backData.entities.getTail().next.isUndefined())
 		tailAccessible(t, backData, uint64(i+1))
+		headAccessibleFromTail(t, backData, uint64(i+1))
 	}
 }
 
@@ -175,10 +176,29 @@ func tailAccessible(t *testing.T, backData *ArrayBackData, total uint64) {
 			return
 		}
 
-		require.NotEqualf(t, tailId, n.id, "tail visited in less expected steps (potential inconsistency)", i, total)
+		require.NotEqual(t, tailId, n.id, "tail visited in less expected steps (potential inconsistency)", i, total)
 		_, ok := seen[n.id]
 		require.False(t, ok, "duplicate identifiers found")
 
 		n = &backData.entities.entities[n.next.sliceIndex()]
+	}
+}
+
+func headAccessibleFromTail(t *testing.T, backData *ArrayBackData, steps uint64) {
+	seen := make(map[flow.Identifier]struct{})
+	headId := backData.entities.getHead().id
+
+	n := backData.entities.getTail()
+	for i := uint64(0); i < steps; i++ {
+		if i == steps-1 {
+			require.Equal(t, headId, n.id, "tail not reachable after total steps")
+			return
+		}
+
+		require.NotEqual(t, headId, n.id, "tail visited in less expected steps (potential inconsistency)", i, steps)
+		_, ok := seen[n.id]
+		require.False(t, ok, "duplicate identifiers found")
+
+		n = &backData.entities.entities[n.prev.sliceIndex()]
 	}
 }
