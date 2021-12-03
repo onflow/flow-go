@@ -36,10 +36,11 @@ require (
 	github.com/improbable-eng/grpc-web v0.12.0
 	github.com/ipfs/go-bitswap v0.5.0
 	github.com/ipfs/go-block-format v0.0.3
+	github.com/ipfs/go-blockservice v0.2.0
 	github.com/ipfs/go-cid v0.1.0
 	github.com/ipfs/go-datastore v0.5.0
-	github.com/ipfs/go-ipfs-blockstore v1.1.1
-	github.com/ipfs/go-ipfs-exchange-interface v0.1.0
+	github.com/ipfs/go-ipfs-blockstore v0.2.0
+	github.com/ipfs/go-ipfs-provider v0.7.0
 	github.com/ipfs/go-log v1.0.5
 	github.com/ipld/go-ipld-prime v0.14.1 // indirect
 	github.com/jrick/bitset v1.0.0
@@ -54,7 +55,6 @@ require (
 	github.com/libp2p/go-libp2p-transport-upgrader v0.5.0
 	github.com/libp2p/go-tcp-transport v0.4.0
 	github.com/m4ksio/wal v1.0.0
-	github.com/multiformats/go-base32 v0.0.4 // indirect
 	github.com/multiformats/go-multiaddr v0.4.1
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/atree v0.1.1
@@ -88,8 +88,7 @@ require (
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	go.uber.org/atomic v1.9.0
 	go.uber.org/multierr v1.7.0
-	go.uber.org/zap v1.19.1 // indirect
-	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
+	golang.org/x/crypto v0.0.0-20210921155107-089bfa567519
 	golang.org/x/exp v0.0.0-20200224162631-6cc2880d07d6
 	golang.org/x/net v0.0.0-20211123203042-d83791d6bcd9 // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c

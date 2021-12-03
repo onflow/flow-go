@@ -15,9 +15,8 @@ import (
 )
 
 const (
-	DefaultAccessNodeIDSMinimum = 2
-	DefaultAccessAPIPort        = "9000"
-	DefaultAccessAPISecurePort  = "9001"
+	DefaultAccessAPIPort       = "9000"
+	DefaultAccessAPISecurePort = "9001"
 )
 
 type FlowClientConfig struct {
