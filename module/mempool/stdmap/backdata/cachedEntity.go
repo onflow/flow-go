@@ -120,18 +120,31 @@ func (e *entityList) link(prev doubleLinkedListPointer, next uint32) {
 	e.entities[next].prev = prev
 }
 
-func (e *entityList) moveHead() uint32 {
-	oldHead := e.head.sliceIndex()
+func (e *entityList) invalidateEntity(sliceIndex uint32) {
+	prev := e.entities[sliceIndex].prev
+	next := e.entities[sliceIndex].next
 
-	// moves head forward
-	e.head = e.getHead().next
-	// new head should point to an undefined prev
-	e.getHead().prev.setUndefined()
+	if sliceIndex != e.head.sliceIndex() && sliceIndex != e.tail.sliceIndex() {
+		// links next and prev elements for non-head and non-tail element
+		e.link(prev, next.sliceIndex())
+	}
+
+	if sliceIndex == e.head.sliceIndex() {
+		// moves head forward
+		e.head = e.getHead().next
+		// new head should point to an undefined prev
+		e.getHead().prev.setUndefined()
+	}
+
+	if sliceIndex == e.tail.sliceIndex() {
+		// moves tail backward
+		e.tail = e.getTail().prev
+		// new tail should point to an undefined next
+		e.getTail().next.setUndefined()
+	}
 
 	// invalidates old head
-	e.entities[oldHead].id = flow.ZeroID
-	e.entities[oldHead].next.setUndefined()
-	e.entities[oldHead].prev.setUndefined()
-
-	return oldHead
+	e.entities[sliceIndex].id = flow.ZeroID
+	e.entities[sliceIndex].next.setUndefined()
+	e.entities[sliceIndex].prev.setUndefined()
 }
