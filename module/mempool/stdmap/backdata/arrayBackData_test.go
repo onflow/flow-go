@@ -82,10 +82,24 @@ func TestArrayBackDataStoreAndRetrievalWithoutEjection(t *testing.T) {
 			testArrayBackDataStoreAndRetrievalWithoutEjection(t, tc.limit, tc.overLimitFactor, tc.entityCount)
 		})
 	}
-
 }
 
 func testArrayBackDataStoreAndRetrievalWithoutEjection(t *testing.T, limit uint32, overLimitFactor uint32, entityCount uint32, helpers ...func(*testing.T, *ArrayBackData, []*unittest.MockEntity)) {
+	h := []func(*testing.T, *ArrayBackData, []*unittest.MockEntity){
+		func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+			testAddingEntities(t, backData, entities)
+		},
+	}
+	h = append(h, helpers...)
+
+	withTestScenario(t, limit, overLimitFactor, entityCount,
+		append(h, func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+			testRetrievingSavedEntities(t, backData, entities)
+		})...,
+	)
+}
+
+func testArrayBackDataStoreAndRetrievalWitEjection(t *testing.T, limit uint32, overLimitFactor uint32, entityCount uint32, helpers ...func(*testing.T, *ArrayBackData, []*unittest.MockEntity)) {
 	h := []func(*testing.T, *ArrayBackData, []*unittest.MockEntity){
 		func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
 			testAddingEntities(t, backData, entities)
@@ -105,7 +119,10 @@ func withTestScenario(t *testing.T,
 	overLimitFactor uint32,
 	entityCount uint32,
 	helpers ...func(*testing.T, *ArrayBackData, []*unittest.MockEntity)) {
+
 	bd := NewArrayBackData(size, overLimitFactor, LRUEjection)
+	// head on underlying linked list value should be uninitialized
+	require.True(t, bd.entities.head.isUninitialized())
 	entities := unittest.EntityListFixture(uint(entityCount))
 
 	for _, helper := range helpers {
@@ -125,6 +142,9 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		// entity should be placed at index i in back data
 		_, entity, _ := backData.entities.get(uint32(i))
 		require.Equal(t, e, entity)
+
+		// linked-list sanity check
+		require.Equal(t, entities[0], backData.entities.getHead())
 	}
 }
 
