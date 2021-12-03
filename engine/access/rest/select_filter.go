@@ -5,6 +5,35 @@ import (
 	"fmt"
 )
 
+// SelectFilter selects the specified keys from the given object. The keys are in the json dot notation and must refer
+// to leaf elements e.g. payload.collection_guarantees.signer_ids
+func SelectFilter(object interface{}, selectKeys []string) (interface{}, error) {
+
+	marshalled, err := json.Marshal(object)
+	if err != nil {
+		return nil, err
+	}
+
+	var outputMap = new(interface{})
+	err = json.Unmarshal(marshalled, outputMap)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := sliceToMap(selectKeys)
+
+	switch itemAsType := (*outputMap).(type) {
+	case []interface{}:
+		filterSlice(itemAsType, "", filter)
+	case map[string]interface{}:
+		filterObject(itemAsType, "", filter)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return *outputMap, nil
+}
+
 // filterObject filters a json struct. Prefix is the key prefix to use to find keys from the filterMap
 // Leaf elements whose keys are not found in the filter map will be removed
 func filterObject(jsonStruct map[string]interface{}, prefix string, filterMap map[string]bool) {
@@ -76,35 +105,6 @@ func filterSlice(jsonSlice []interface{}, prefix string, filterMap map[string]bo
 		}
 	}
 	return jsonSlice, false
-}
-
-// SelectFilter selects the specified keys from the given object. The keys are in the json dot notation and must refer
-// to leaf elements e.g. payload.collection_guarantees.signer_ids
-func SelectFilter(object interface{}, selectKeys []string) (interface{}, error) {
-
-	marshalled, err := json.Marshal(object)
-	if err != nil {
-		return nil, err
-	}
-
-	var outputMap = new(interface{})
-	err = json.Unmarshal(marshalled, outputMap)
-	if err != nil {
-		return nil, err
-	}
-
-	filter := sliceToMap(selectKeys)
-
-	switch itemAsType := (*outputMap).(type) {
-	case []interface{}:
-		filterSlice(itemAsType, "", filter)
-	case map[string]interface{}:
-		filterObject(itemAsType, "", filter)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return *outputMap, nil
 }
 
 func jsonPath(prefix string, key string) string {

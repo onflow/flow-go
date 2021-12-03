@@ -180,7 +180,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 
 		startHeight := testBlocks[0].Header.Height
 		blkCnt := len(testBlocks)
-		endHeight := testBlocks[blkCnt - 1].Header.Height
+		endHeight := testBlocks[blkCnt-1].Header.Height
 
 		actualBlocks, resp, err := client.BlocksApi.BlocksGet(ctx, optionsForBlockByStartEndHeight(startHeight, endHeight))
 		require.NoError(suite.T(), err)

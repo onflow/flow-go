@@ -5,7 +5,9 @@ This package and subpackages implement the REST API Server for the [Flow OpenAPI
 ## Packages:
 
 `rest`: The HTTP handlers for all the request, server generator and the select filter.
+
 `middleware`: The common [middlewares](https://github.com/gorilla/mux#middleware) that all request pass through.
+
 `generate`: The generated models from https://app.swaggerhub.com/ (note: only the generated models are included and not the api implementation since that part us custom)
 
 

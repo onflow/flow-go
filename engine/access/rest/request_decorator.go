@@ -14,7 +14,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// a convenience wrapper around the http request to make it easy to read request params
+// a convenience wrapper around the http request to make it easy to read request query params
 type requestDecorator struct {
 	*http.Request
 	expandFields map[string]bool
