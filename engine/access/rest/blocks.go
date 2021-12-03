@@ -60,10 +60,11 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 	var blocks []*generated.Block
 
 	if len(heights) > 0 {
+		// look up block by heights
 
 		blocks = make([]*generated.Block, len(heights))
 
-		// if the query is /blocks/final or /blocks/sealed, lookup latest finalized or finalized + sealed block
+		// if the query is /blocks?height=final or /blocks?height=sealed, lookup the last finalized or the last sealed block
 		if heights[0] == finalHeightQueryParam || heights[0] == sealedHeightQueryParam {
 			blkProvider := NewBlockProvider(backend, forFinalized(heights[0]))
 			block, err := getBlock(blkProvider, r, backend, link)
@@ -92,29 +93,28 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 		return blocks, nil
 	}
 
-	if startHeight != "" && endHeight != "" {
-		start, err := toHeight(startHeight)
-		if err != nil {
-			return nil, NewBadRequestError(err)
-		}
-		end, err := toHeight(endHeight)
-		if err != nil {
-			return nil, NewBadRequestError(err)
-		}
+	// lookup block by start and end height range
+	start, err := toHeight(startHeight)
+	if err != nil {
+		return nil, NewBadRequestError(err)
+	}
+	end, err := toHeight(endHeight)
+	if err != nil {
+		return nil, NewBadRequestError(err)
+	}
 
-		if start > end {
-			err := fmt.Errorf("start height must be lower than end height")
-			return nil, NewBadRequestError(err)
-		}
+	if start > end {
+		err := fmt.Errorf("start height must be lower than end height")
+		return nil, NewBadRequestError(err)
+	}
 
-		for i := start; i < end; i++ {
-			blkProvider := NewBlockProvider(backend, forHeight(i))
-			block, err := getBlock(blkProvider, r, backend, link)
-			if err != nil {
-				return nil, err
-			}
-			blocks = append(blocks, block)
+	for i := start; i < end; i++ {
+		blkProvider := NewBlockProvider(backend, forHeight(i))
+		block, err := getBlock(blkProvider, r, backend, link)
+		if err != nil {
+			return nil, err
 		}
+		blocks = append(blocks, block)
 	}
 
 	return blocks, nil
@@ -135,8 +135,7 @@ func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenera
 	}
 	payload, err := blockPayloadResponse(blk.Payload)
 	if err != nil {
-		msg := fmt.Sprintf("failed to generate response for block payload for ID %s", id.String())
-		return nil, NewRestError(http.StatusInternalServerError, msg, err)
+		return nil, err
 	}
 	return payload, nil
 }
@@ -145,66 +144,20 @@ func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.
 	var responseBlock = new(generated.Block)
 	responseBlock.Expandable = new(generated.BlockExpandable)
 
-	var id flow.Identifier
-	// if payload is to be expanded then lookup full block which contains both header and payload
-	if req.expands(ExpandableFieldPayload) {
-		blk, statusErr := blkProvider.getBlock(req.Context())
-		if statusErr != nil {
-			return nil, statusErr
-		}
-		headerResponse := blockHeaderResponse(blk.Header)
-		payloadResponse, err := blockPayloadResponse(blk.Payload)
-		if err != nil {
-			msg := fmt.Sprintf("failed to generate response for block ID %s", id.String())
-			return nil, NewRestError(http.StatusInternalServerError, msg, err)
-		}
-		responseBlock.Header, responseBlock.Payload = headerResponse, payloadResponse
-		id = blk.ID()
-	} else {
-
-		// else only lookup header and add expandable link for payload
-		header, statusErr := blkProvider.getHeader(req.Context())
-		if statusErr != nil {
-			return nil, statusErr
-		}
-		responseBlock.Header = blockHeaderResponse(header)
-		responseBlock.Payload = nil
-		id = header.ID()
-
-		payload, err := link.PayloadLink(id)
-		if err != nil {
-			msg := fmt.Sprintf("failed to generate response for block ID %s", id.String())
-			return nil, NewRestError(http.StatusInternalServerError, msg, err)
-		}
-		responseBlock.Expandable.Payload = payload
+	// lookup block
+	blk, statusErr := blkProvider.getBlock(req.Context())
+	if statusErr != nil {
+		return nil, statusErr
 	}
 
-	// if execution result is to be expanded, then lookup execution result else add expandable link for execution result
-	if req.expands(ExpandableExecutionResult) {
-		executionResult, err := backend.GetExecutionResultForBlockID(req.Context(), id)
-		if err != nil {
-			return nil, err
-		}
-		responseBlock.ExecutionResult = executionResultResponse(executionResult, link)
-	} else {
-		var err error
-		responseBlock.Expandable.ExecutionResult, err = link.ExecutionResultLink(id)
-		if err != nil {
-			msg := fmt.Sprintf("failed to generate response for block ID %s", id.String())
-			return nil, NewRestError(http.StatusInternalServerError, msg, err)
-		}
-	}
-
-	// add self link
-	selfLink, err := selfLink(id, link.BlockLink)
+	// lookup execution result
+	// (even if not specified as expandable, since we need the execution result ID to generate its expandable link)
+	executionResult, err := backend.GetExecutionResultForBlockID(req.Context(), blk.ID())
 	if err != nil {
-		msg := fmt.Sprintf("failed to generate response for block ID %s", id.String())
-		return nil, NewRestError(http.StatusInternalServerError, msg, err)
+		return nil, err
 	}
-	responseBlock.Links = selfLink
 
-	// ship it
-	return responseBlock, nil
+	return blockResponse(blk, executionResult, link, req.expandFields)
 }
 
 func idLookupError(id *flow.Identifier, entityType string, err error) StatusError {
@@ -295,29 +248,4 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, St
 		return nil, heightLookupError(blkProvider.height, "block", err)
 	}
 	return blk, nil
-}
-
-func (blkProvider *blockProvider) getHeader(ctx context.Context) (*flow.Header, StatusError) {
-	if blkProvider.id != nil {
-		header, err := blkProvider.backend.GetBlockHeaderByID(ctx, *blkProvider.id)
-		if err != nil {
-			return nil, idLookupError(blkProvider.id, "block", err)
-		}
-		return header, nil
-	}
-
-	if blkProvider.final {
-		blk, err := blkProvider.backend.GetLatestBlockHeader(ctx, blkProvider.sealed)
-		if err != nil {
-			// cannot be a 'not found' error since final and sealed block should always be found
-			return nil, NewRestError(http.StatusInternalServerError, "block lookup failed", err)
-		}
-		return blk, nil
-	}
-
-	header, err := blkProvider.backend.GetBlockHeaderByHeight(ctx, blkProvider.height)
-	if err != nil {
-		return nil, heightLookupError(blkProvider.height, "block", err)
-	}
-	return header, nil
 }

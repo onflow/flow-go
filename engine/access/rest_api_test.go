@@ -53,6 +53,7 @@ type RestAPITestSuite struct {
 	collections  *storagemock.Collections
 	transactions *storagemock.Transactions
 	receipts     *storagemock.ExecutionReceipts
+	executionResults *storagemock.ExecutionResults
 }
 
 func (suite *RestAPITestSuite) SetupTest() {
@@ -69,6 +70,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 	suite.transactions = new(storagemock.Transactions)
 	suite.collections = new(storagemock.Collections)
 	suite.receipts = new(storagemock.ExecutionReceipts)
+	suite.executionResults = new(storagemock.ExecutionResults)
 
 	suite.collClient = new(accessmock.AccessAPIClient)
 	suite.execClient = new(accessmock.ExecutionAPIClient)
@@ -95,7 +97,7 @@ func (suite *RestAPITestSuite) SetupTest() {
 	}
 
 	suite.rpcEng = rpc.New(suite.log, suite.state, config, suite.collClient, nil, suite.blocks, suite.headers, suite.collections, suite.transactions,
-		nil, nil, suite.chainID, suite.metrics, 0, 0, false, false, nil, nil)
+		nil, suite.executionResults, suite.chainID, suite.metrics, 0, 0, false, false, nil, nil)
 	unittest.AssertClosesBefore(suite.T(), suite.rpcEng.Ready(), 2*time.Second)
 
 	// wait for the server to startup
@@ -122,6 +124,9 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		suite.blocks.On("ByHeight", block.Header.Height).Return(block, nil)
 		testBlocks[i] = block
 		testBlockIDs[i] = block.ID().String()
+
+		execResult := unittest.ExecutionResultFixture()
+		suite.executionResults.On("ByBlockID", block.ID()).Return(execResult, nil)
 	}
 
 	sealedBlock := testBlocks[len(testBlocks)-1]

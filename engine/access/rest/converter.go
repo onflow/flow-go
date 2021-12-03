@@ -502,15 +502,6 @@ func blockSealResponse(flowSeal *flow.Seal) (generated.BlockSeal, error) {
 	}, nil
 }
 
-func idsResponse(ids []flow.Identifier) []string {
-	res := make([]string, len(ids))
-	for x, i := range ids {
-		res[x] = i.String()
-	}
-
-	return res
-}
-
 func collectionResponse(
 	collection *flow.LightCollection,
 	txs []*flow.TransactionBody,
@@ -562,15 +553,18 @@ func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event
 	return events
 }
 
-func executionResultResponse(exeResult *flow.ExecutionResult, link LinkGenerator) *generated.ExecutionResult {
-	self, _ := selfLink(exeResult.ID(), link.ExecutionResultLink)
+func executionResultResponse(exeResult *flow.ExecutionResult, link LinkGenerator) (*generated.ExecutionResult, error) {
+	self, err := selfLink(exeResult.ID(), link.ExecutionResultLink)
+	if err != nil {
+		return nil, err
+	}
 
 	return &generated.ExecutionResult{
 		Id:      exeResult.ID().String(),
 		BlockId: exeResult.BlockID.String(),
 		Events:  serviceEventListResponse(exeResult.ServiceEvents),
 		Links:   self,
-	}
+	}, nil
 }
 
 func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublicKey {
@@ -631,4 +625,64 @@ func accountResponse(flowAccount *flow.Account, link LinkGenerator, expand map[s
 	}
 
 	return account, nil
+}
+
+func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkGenerator, expand map[string]bool) (*generated.Block, error) {
+
+	var responseBlock = new(generated.Block)
+	responseBlock.Header = blockHeaderResponse(blk.Header)
+
+	expandable := &generated.BlockExpandable{
+		Payload:         ExpandableFieldPayload,
+		ExecutionResult: ExpandableExecutionResult,
+	}
+
+	id := blk.ID()
+
+	// add the payload to the response if it is specified as an expandable field
+	if expand[expandable.Payload] {
+		payloadResp, err := blockPayloadResponse(blk.Payload)
+		if err != nil {
+			return nil, err
+		}
+		responseBlock.Payload = payloadResp
+		expandable.Payload = ""
+	} else {
+		// else add the payload expandable link
+		payloadExpandable, err := link.PayloadLink(id)
+		if err != nil {
+			return nil, err
+		}
+		expandable.Payload = payloadExpandable
+	}
+
+	// add the execution result to the response if it is specified as an expandable field
+	if expand[expandable.ExecutionResult] {
+		execResultResp, err := executionResultResponse(execResult, link)
+		if err != nil {
+			return nil, err
+		}
+		responseBlock.ExecutionResult = execResultResp
+		expandable.ExecutionResult = ""
+	} else {
+		// else add the execution result expandable link
+		executionResultExpandable, err := link.ExecutionResultLink(execResult.ID())
+		if err != nil {
+			return nil, err
+		}
+		expandable.ExecutionResult = executionResultExpandable
+	}
+
+	// add the expandable
+	responseBlock.Expandable = expandable
+
+	// add self link
+	selfLink, err := selfLink(id, link.BlockLink)
+	if err != nil {
+		return nil, err
+	}
+	responseBlock.Links = selfLink
+
+	// ship it
+	return responseBlock, nil
 }
