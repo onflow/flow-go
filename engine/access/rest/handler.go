@@ -2,7 +2,6 @@ package rest
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"google.golang.org/grpc/codes"
@@ -61,9 +60,8 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	errLog := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
 	err := h.validator.Validate(r)
-	if err != nil { // todo(sideninja) retrieve message
-		fmt.Println("#ERRR", err)
-		h.errorResponse(w, http.StatusBadRequest, "", errLog)
+	if err != nil {
+		h.errorResponse(w, http.StatusBadRequest, err.Error(), errLog) // todo(sideninja) limit message
 		return
 	}
 
