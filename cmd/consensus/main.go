@@ -274,7 +274,7 @@ func main() {
 			if err != nil {
 				return err
 			}
-			err = dkgState.InsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey)
+			err = dkgState.InsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey.PrivateKey)
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}
