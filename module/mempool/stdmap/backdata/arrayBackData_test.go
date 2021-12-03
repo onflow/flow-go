@@ -149,7 +149,7 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		// first entity in the list.
 		require.Equal(t, entities[0], backData.entities.getHead().entity)
 		require.Equal(t, entities[i], backData.entities.getTail().entity)
-		// require.Equal(t, doubleLinkedListPointer(0), backData.entities.getTail().next.sliceIndex())
+		require.True(t, backData.entities.getTail().next.isUndefined())
 	}
 }
 
