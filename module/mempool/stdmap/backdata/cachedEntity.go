@@ -95,10 +95,11 @@ func (e entityList) valueIndexForEntity() (uint32, bool) {
 		// array back data is full
 		if e.ejectionMode == RandomEjection {
 			// ejecting a random entity
-			return uint32(rand.Uint64() % limit), true
+
+			return e.invalidateRandomEntity(), true
 		} else {
 			// ejecting eldest entity
-			return e.moveHead(), true
+			return e.invalidateHead(), true
 		}
 	}
 }
@@ -120,7 +121,20 @@ func (e *entityList) link(prev doubleLinkedListPointer, next uint32) {
 	e.entities[next].prev = prev
 }
 
-func (e *entityList) invalidateEntity(sliceIndex uint32) {
+func (e *entityList) invalidateHead() uint32 {
+	headSliceIndex := e.head.sliceIndex()
+	e.invalidateEntityAtIndex(headSliceIndex)
+
+	return headSliceIndex
+}
+
+func (e *entityList) invalidateRandomEntity() uint32 {
+	index := uint32(rand.Uint64() % e.total)
+	e.invalidateEntityAtIndex(index)
+	return index
+}
+
+func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 	prev := e.entities[sliceIndex].prev
 	next := e.entities[sliceIndex].next
 
