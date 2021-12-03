@@ -79,8 +79,6 @@ func (e *entityList) add(entityId flow.Identifier, entity flow.Entity, owner uin
 	}
 
 	e.tail.setPointer(entityIndex)
-	e.entities[e.tail.sliceIndex()].next.setUndefined()
-
 	return entityIndex
 }
 
