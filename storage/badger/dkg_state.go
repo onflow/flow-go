@@ -118,8 +118,9 @@ type SafeBeaconPrivateKeys struct {
 	state *DKGState
 }
 
-func NewSafeBeaconPrivateKeys(state *DKGState) (*SafeBeaconPrivateKeys, error) {
-	return &SafeBeaconPrivateKeys{state: state}, nil
+// NewSafeBeaconPrivateKeys returns a safe beacon key storage backed by Badger DB.
+func NewSafeBeaconPrivateKeys(state *DKGState) *SafeBeaconPrivateKeys {
+	return &SafeBeaconPrivateKeys{state: state}
 }
 
 // RetrieveMyBeaconPrivateKey retrieves my beacon private key for the given
