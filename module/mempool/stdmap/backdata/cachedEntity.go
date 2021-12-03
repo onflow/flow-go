@@ -119,13 +119,3 @@ func (e *entityList) link(prev doubleLinkedListPointer, next uint32) {
 	e.entities[prev.sliceIndex()].next.setPointer(next)
 	e.entities[next].prev = prev
 }
-
-func (e entityList) next(i uint64) flow.Entity {
-	nextIndex := e.entities[i].next.sliceIndex()
-	return e.entities[nextIndex].entity
-}
-
-func (e entityList) prev(i uint64) flow.Entity {
-	prevIndex := e.entities[i].prev.sliceIndex()
-	return e.entities[prevIndex].entity
-}
