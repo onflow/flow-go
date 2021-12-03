@@ -748,17 +748,17 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 // then registers the component with the ComponentManager to be started when the node starts.
 // It uses channel signals to ensure that the components are started serially.
 func (fnb *FlowNodeBuilder) handleComponents() error {
-	// the parent/started channels are used to enforce serial startup.
+	// The parent/started channels are used to enforce serial startup.
 	// - parent is the started channel of the previous component.
 	// - when a component is ready, it closes its started channel by calling the provided callback.
-	// components wait for their parent channel to close before starting, this ensures they start
+	// Components wait for their parent channel to close before starting, this ensures they start
 	// up serially, even though the ComponentManager will launch the goroutines in parallel.
 
-	// the first component is always started immediately
+	// The first component is always started immediately
 	parent := make(chan struct{})
 	close(parent)
 
-	// run all components
+	// Run all components
 	for _, f := range fnb.components {
 		started := make(chan struct{})
 		err := fnb.handleComponent(f, parent, func() { close(started) })
@@ -784,18 +784,8 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 // ReadyDoneAware interface and explicilty wait for their dependencies to be ready, we can remove
 // this channel chaining.
 func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parent <-chan struct{}, started func()) error {
-	log := fnb.Logger.With().Str("component", v.name).Logger()
-
-	// First, run the factory so all objects are instantiated. This will always be done serially
-	// to ensure dependencies are not nil when the next component factory is called.
-	readyAware, err := v.fn(fnb.NodeConfig)
-	if err != nil {
-		return fmt.Errorf("component %s initialization failed: %w", v.name, err)
-	}
-	log.Info().Msg("component initialization complete")
-
-	// Next, add a closure that starts the component when the node is started, and then waits for it
-	// to exit gracefully.
+	// Add a closure that starts the component when the node is started, and then waits for it to exit
+	// gracefully.
 	// Startup for all components will happen in parallel, and components can use their dependencies'
 	// ReadyDoneAware interface to wait until they are ready.
 	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -804,7 +794,17 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parent <-chan 
 			return
 		}
 
-		// if this is a component, use the Startable interface.
+		logger := fnb.Logger.With().Str("component", v.name).Logger()
+
+		// First, build the component using the factory method.
+		readyAware, err := v.fn(fnb.NodeConfig)
+		if err != nil {
+			ctx.Throw(fmt.Errorf("component %s initialization failed: %w", v.name, err))
+		}
+		logger.Info().Msg("component initialization complete")
+
+		// if this is a Component, use the Startable interface to start the component, otherwise
+		// Ready() will launch it.
 		var isComponent bool
 		if component, isComponent := readyAware.(component.Component); isComponent {
 			go component.Start(ctx)
@@ -813,7 +813,7 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parent <-chan 
 		// Wait until the component is ready
 		if err := util.WaitClosed(ctx, readyAware.Ready()); err != nil {
 			// The context was cancelled. Continue to on to shutdown logic.
-			log.Info().Msg("component startup aborted")
+			logger.Info().Msg("component startup aborted")
 
 			// Non-idempotent ReadyDoneAware components trigger shutdown by calling Done(). Don't
 			// do that here since it may not be safe if the component is not Ready().
@@ -821,7 +821,7 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parent <-chan 
 				return
 			}
 		} else {
-			log.Info().Msg("component startup complete")
+			logger.Info().Msg("component startup complete")
 			ready()
 
 			// Signal to the next component that we're ready.
@@ -830,11 +830,11 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parent <-chan 
 
 		// Component shutdown is signaled by cancelling its context.
 		<-ctx.Done()
-		log.Info().Msg("component shutdown started")
+		logger.Info().Msg("component shutdown started")
 
 		// Finally, wait until component has finished shutting down.
 		<-readyAware.Done()
-		log.Info().Msg("component shutdown complete")
+		logger.Info().Msg("component shutdown complete")
 	})
 
 	return nil

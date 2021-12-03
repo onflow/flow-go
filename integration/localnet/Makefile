@@ -47,6 +47,8 @@ init-short-epochs:
 
 .PHONY: start
 start:
+# only use --remove-orphans on the first call to docker-compose, otherwise it will remove containers setup by previous calls
+# within the same invocation of make
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.metrics.yml up -d --remove-orphans
 	DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1 docker-compose -f docker-compose.nodes.yml up --build -d
 
