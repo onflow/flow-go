@@ -9,7 +9,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -290,7 +289,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 		}
 	}
 
-	log.Info().Msgf("successfully ended DKG for epoch %d - my beacon pub key is %x", dkgEpochCounter, localPubKey.Encode())
+	log.Info().Msgf("successfully ended DKG, my beacon pub key for epoch %d is %x", dkgEpochCounter, localPubKey.Encode())
 }
 
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
@@ -387,10 +386,7 @@ func (e *ReactorEngine) end(epochCounter uint64) func() error {
 
 		privateShare, _, _ := e.controller.GetArtifacts()
 
-		privKeyInfo := encodable.RandomBeaconPrivKey{
-			PrivateKey: privateShare,
-		}
-		err = e.dkgState.InsertMyBeaconPrivateKey(epochCounter, &privKeyInfo)
+		err = e.dkgState.InsertMyBeaconPrivateKey(epochCounter, privateShare)
 		if err != nil {
 			return fmt.Errorf("couldn't save DKG private key in db: %w", err)
 		}
