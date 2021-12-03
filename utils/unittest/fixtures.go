@@ -737,6 +737,14 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 
 	return result
 }
+func ExecutionResultFixtures(number int)  []*flow.ExecutionResult {
+	ers := make([]*flow.ExecutionResult, 0, number)
+	for ; number > 0; number-- {
+		er := ExecutionResultFixture()
+		ers = append(ers, er)
+	}
+	return ers
+}
 
 func WithApproverID(approverID flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
