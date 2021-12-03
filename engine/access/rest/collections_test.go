@@ -26,7 +26,10 @@ import (
 func executeRequest(req *http.Request, backend *mock.API) *httptest.ResponseRecorder {
 	var b bytes.Buffer
 	logger := zerolog.New(&b)
-	router := initRouter(backend, logger)
+	router, err := initRouter(backend, logger)
+	if err != nil {
+		panic(err)
+	}
 
 	rr := httptest.NewRecorder()
 	router.ServeHTTP(rr, req)

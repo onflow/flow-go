@@ -2,6 +2,7 @@ package rest
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"google.golang.org/grpc/codes"
@@ -12,6 +13,11 @@ import (
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
+
+// Validator provides validation for http requests
+type Validator interface {
+	Validate(r *http.Request) error
+}
 
 // ApiHandlerFunc is a function that contains endpoint handling logic,
 // it fetches necessary resources and returns an error or response model.
@@ -29,22 +35,37 @@ type Handler struct {
 	backend        access.API
 	linkGenerator  LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
+	validator      Validator
 }
 
-func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandlerFunc, generator LinkGenerator) *Handler {
+func NewHandler(
+	logger zerolog.Logger,
+	backend access.API,
+	handlerFunc ApiHandlerFunc,
+	generator LinkGenerator,
+	validator Validator,
+) *Handler {
 	return &Handler{
 		logger:         logger,
 		backend:        backend,
 		apiHandlerFunc: handlerFunc,
 		linkGenerator:  generator,
+		validator:      validator,
 	}
 }
 
 // ServerHTTP function acts as a wrapper to each request providing common handling functionality
 // such as logging, error handling, request decorators
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// create a logger
+	errLog := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
-	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
+	err := h.validator.Validate(r)
+	if err != nil { // todo(sideninja) retrieve message
+		fmt.Println("#ERRR", err)
+		h.errorResponse(w, http.StatusBadRequest, "", errLog)
+		return
+	}
 
 	// create request decorator with parsed values
 	decoratedRequest := newRequestDecorator(r)
@@ -54,7 +75,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// rest status type error should be returned with status and user message provided
 		if e, ok := err.(StatusError); ok {
-			h.errorResponse(w, e.Status(), e.UserMessage(), errorLogger)
+			h.errorResponse(w, e.Status(), e.UserMessage(), errLog)
 			return
 		}
 
@@ -63,17 +84,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			GRPCStatus() *status.Status
 		}); ok {
 			if se.GRPCStatus().Code() == codes.NotFound { // handle not found error with correct status
-				h.errorResponse(w, http.StatusNotFound, se.GRPCStatus().Message(), errorLogger)
+				h.errorResponse(w, http.StatusNotFound, se.GRPCStatus().Message(), errLog)
 				return
 			}
 			if se.GRPCStatus().Code() == codes.InvalidArgument { // handle not valid errors with correct status
-				h.errorResponse(w, http.StatusBadRequest, se.GRPCStatus().Message(), errorLogger)
+				h.errorResponse(w, http.StatusBadRequest, se.GRPCStatus().Message(), errLog)
 				return
 			}
 		}
 
 		// stop going further - catch all error
-		h.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
+		h.errorResponse(w, http.StatusInternalServerError, err.Error(), errLog)
 		return
 	}
 
@@ -83,12 +104,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		var err error
 		response, err = SelectFilter(response, selectFields)
 		if err != nil {
-			h.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
+			h.errorResponse(w, http.StatusInternalServerError, err.Error(), errLog)
 		}
 	}
 
 	// write response to response stream
-	h.jsonResponse(w, response, errorLogger)
+	h.jsonResponse(w, response, errLog)
 }
 
 // jsonResponse builds a JSON response and send it to the client

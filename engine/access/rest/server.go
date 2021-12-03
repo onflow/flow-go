@@ -29,9 +29,12 @@ const (
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
-func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) *http.Server {
+func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) (*http.Server, error) {
 
-	router := initRouter(backend, logger)
+	router, err := initRouter(backend, logger)
+	if err != nil {
+		return nil, err
+	}
 
 	c := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
@@ -51,10 +54,10 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
-	}
+	}, nil
 }
 
-func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
+func initRouter(backend access.API, logger zerolog.Logger) (*mux.Router, error) {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
@@ -65,15 +68,21 @@ func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
 
 	var linkGenerator LinkGenerator = NewLinkGeneratorImpl(v1SubRouter)
 
+	// create a schema validation
+	validation, err := newSchemaValidation()
+	if err != nil {
+		return nil, err
+	}
+
 	for _, r := range routeDefinitions() {
-		h := NewHandler(logger, backend, r.apiHandlerFunc, linkGenerator)
+		h := NewHandler(logger, backend, r.apiHandlerFunc, linkGenerator, validation)
 		v1SubRouter.
 			Methods(r.method).
 			Path(r.pattern).
 			Name(r.name).
 			Handler(h)
 	}
-	return router
+	return router, nil
 }
 
 type routeDefinition struct {

@@ -17,7 +17,7 @@ import (
 func linkFixture() LinkGenerator {
 	backend := &mock.API{}
 	var log []byte
-	r := initRouter(backend, zerolog.New(bytes.NewBuffer(log)))
+	r, _ := initRouter(backend, zerolog.New(bytes.NewBuffer(log)))
 	return NewLinkGeneratorImpl(r)
 }
 
