@@ -70,7 +70,6 @@ func (is *InclusionSuite) SetupTest() {
 
 	nodeConfigs = append(nodeConfigs,
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 	)
 
 	// generate the network config

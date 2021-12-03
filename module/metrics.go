@@ -314,6 +314,16 @@ type WALMetrics interface {
 	DiskSize(uint64)
 }
 
+type ExecutionDataServiceMetrics interface {
+	ExecutionDataAddStarted()
+
+	ExecutionDataAddFinished(duration time.Duration, success bool, blobTreeNodes int)
+
+	ExecutionDataGetStarted()
+
+	ExecutionDataGetFinished(duration time.Duration, success bool, blobTreeNodes int)
+}
+
 type RuntimeMetrics interface {
 	// TransactionParsed reports the time spent parsing a single transaction
 	RuntimeTransactionParsed(dur time.Duration)
