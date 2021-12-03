@@ -24,7 +24,7 @@ const (
 	heightQueryParam          = "height"
 )
 
-// getBlocksByID gets blocks by provided ID or collection of IDs.
+// getBlocksByID gets blocks by provided ID or list of IDs.
 func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
 
 	ids, err := r.ids()
@@ -109,11 +109,12 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 	}
 
 	if start > end {
-		err := fmt.Errorf("start height must be lower than end height")
+		err := fmt.Errorf("start height must be less than or equal to end height")
 		return nil, NewBadRequestError(err)
 	}
 
-	for i := start; i < end; i++ {
+	// start and end height inclusive
+	for i := start; i <= end; i++ {
 		blkProvider := NewBlockProvider(backend, forHeight(i))
 		block, err := getBlock(blkProvider, r, backend, link)
 		if err != nil {
