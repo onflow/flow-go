@@ -29,6 +29,7 @@ func MakeCreateStakingCollectionTx(
 	stakingSigner crypto.Signer,
 	payerAddress sdk.Address,
 	latestBlockID sdk.Identifier,
+	sign bool,
 ) (*sdk.Transaction, error) {
 	accountKey := stakingAccount.Keys[stakingAccountKeyID]
 	tx := sdk.NewTransaction().
@@ -39,16 +40,19 @@ func MakeCreateStakingCollectionTx(
 		SetPayer(payerAddress).
 		AddAuthorizer(stakingAccount.Address)
 
-	//signing the payload as used AddAuthorizer
-	err := tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
-	if err != nil {
-		return nil, fmt.Errorf("could not sign payload: %w", err)
+	if sign {
+		//signing the payload as used AddAuthorizer
+		err := tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
+		if err != nil {
+			return nil, fmt.Errorf("could not sign payload: %w", err)
+		}
 	}
+
 	accountKey.SequenceNumber++
 	return tx, nil
 }
 
-func MakeCollectionRegisterNodeTx(
+func MakeStakingCollectionRegisterNodeTx(
 	env templates.Environment,
 	stakingAccount *sdk.Account,
 	stakingAccountKeyID int,
@@ -121,6 +125,46 @@ func MakeCollectionRegisterNodeTx(
 	err = tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
 	if err != nil {
 		return nil, fmt.Errorf("could not sign payload: %w", err)
+	}
+
+	return tx, nil
+}
+
+func MakeStakingCollectionCloseStakeTx(
+	env templates.Environment,
+	stakingAccount *sdk.Account,
+	stakingAccountKeyID int,
+	stakingSigner crypto.Signer,
+	payerAddress sdk.Address,
+	latestBlockID sdk.Identifier,
+	nodeID flow.Identifier,
+	sign bool,
+) (*sdk.Transaction, error) {
+	accountKey := stakingAccount.Keys[stakingAccountKeyID]
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateCollectionCloseStake(env)).
+		SetGasLimit(9999).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(stakingAccount.Address, stakingAccountKeyID, accountKey.SequenceNumber).
+		SetPayer(payerAddress).
+		AddAuthorizer(stakingAccount.Address)
+
+	id, _ := cadence.NewString(nodeID.String())
+	err := tx.AddArgument(id)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.AddArgument(cadence.NewOptional(nil))
+	if err != nil {
+		return nil, err
+	}
+
+	if sign {
+		err = tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
+		if err != nil {
+			return nil, fmt.Errorf("could not sign payload: %w", err)
+		}
 	}
 
 	return tx, nil

@@ -80,6 +80,7 @@ func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID
 
 	return nil
 }
+
 // GetPrivateNodeInfoAddress returns the node's address <name>:<port>
 func GetPrivateNodeInfoAddress(nodeName string) string {
 	return fmt.Sprintf("%s:%d", nodeName, DefaultFlowPort)

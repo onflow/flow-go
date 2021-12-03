@@ -11,6 +11,8 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -29,7 +31,7 @@ const (
 	dkgPhaseViews       = 50
 	epochViewsLength    = 380
 
-	waitTimeout =  2 * time.Minute
+	waitTimeout = 2 * time.Minute
 )
 
 type Suite struct {
@@ -162,7 +164,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	require.NoError(s.T(), err)
 
 	// create staking collection
-	result, err = s.createStakingCollection(ctx, env, stakingAccountKey, stakingAccount)
+	result, err = s.createStakingCollection(ctx, env, stakingAccountKey, stakingAccount, true)
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
@@ -176,7 +178,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	containerName := s.getTestContainerName(role)
 
 	// register node using staking collection
-	result, err = s.registerNode(
+	result, err = s.SubmitStakingCollectionRegisterNodeTx(
 		ctx,
 		env,
 		stakingAccountKey,
@@ -309,7 +311,7 @@ func (s *Suite) createAccount(ctx context.Context,
 }
 
 // creates a staking collection for the given node
-func (s *Suite) createStakingCollection(ctx context.Context, env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account) (*sdk.TransactionResult, error) {
+func (s *Suite) createStakingCollection(ctx context.Context, env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account, signPayload bool) (*sdk.TransactionResult, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -322,6 +324,7 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 		signer,
 		s.client.SDKServiceAddress(),
 		sdk.Identifier(latestBlockID),
+		signPayload,
 	)
 
 	err = s.client.SignAndSendTransaction(ctx, createStakingCollectionTx)
@@ -333,8 +336,8 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 	return result, nil
 }
 
-// submits register node transaction for staking collection
-func (s *Suite) registerNode(
+// SubmitStakingCollectionRegisterNodeTx submits tx that calls StakingCollection.registerNode
+func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 	ctx context.Context,
 	env templates.Environment,
 	accountKey sdkcrypto.PrivateKey,
@@ -352,7 +355,7 @@ func (s *Suite) registerNode(
 
 	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
 
-	registerNodeTx, err := utils.MakeCollectionRegisterNodeTx(
+	registerNodeTx, err := utils.MakeStakingCollectionRegisterNodeTx(
 		env,
 		stakingAccount,
 		0,
@@ -374,6 +377,40 @@ func (s *Suite) registerNode(
 
 	result, err := s.client.WaitForSealed(ctx, registerNodeTx.ID())
 	require.NoError(s.T(), err)
+	return result, nil
+}
+
+// SubmitStakingCollectionCloseStakeTx submits tx that calls StakingCollection.closeStake
+func (s *Suite) SubmitStakingCollectionCloseStakeTx(
+	ctx context.Context,
+	env templates.Environment,
+	accountKey sdkcrypto.PrivateKey,
+	stakingAccount *sdk.Account,
+	nodeID flow.Identifier,
+) (*sdk.TransactionResult, error) {
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
+
+	signer := sdkcrypto.NewInMemorySigner(accountKey, sdkcrypto.SHA2_256)
+
+	closeStakeTx, err := utils.MakeStakingCollectionCloseStakeTx(
+		env,
+		stakingAccount,
+		0,
+		signer,
+		s.client.SDKServiceAddress(),
+		sdk.Identifier(latestBlockID),
+		nodeID,
+		false,
+	)
+	require.NoError(s.T(), err)
+
+	err = s.client.SignAndSendTransaction(ctx, closeStakeTx)
+	require.NoError(s.T(), err)
+
+	result, err := s.client.WaitForSealed(ctx, closeStakeTx.ID())
+	require.NoError(s.T(), err)
+
 	return result, nil
 }
 
@@ -436,4 +473,94 @@ func (s *Suite) pauseContainer(name string) {
 func (s *Suite) getTestContainerName(role flow.Role) string {
 	i := len(s.net.ContainersByRole(role)) + 1
 	return fmt.Sprintf("%s_test_%d", role, i)
+}
+
+// assertNodeApprovedAndProposed executes the read approved nodes list and get proposed table scripts
+// and checks that the info.NodeID is in both list
+func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates.Environment, info *StakedNodeOperationInfo) {
+	// ensure node ID in approved list
+	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
+	require.Contains(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(info.NodeID.String()), fmt.Sprintf("expected new node to be in approved nodes list: %x", info.NodeID))
+
+	// check if node is in proposed table
+	proposedTable := s.ExecuteGetProposedTableScript(ctx, env, info.NodeID)
+	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), fmt.Sprintf("expected new node to be in proposed table: %x", info.NodeID))
+}
+
+// newTestContainerOnNetwork configures a new container on the suites network
+func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
+	containerConfigs := []func(config *testnet.NodeConfig){
+		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithID(info.NodeID),
+	}
+
+	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
+	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
+	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
+	require.NoError(s.T(), err)
+
+	//add our container to the network
+	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
+	require.NoError(s.T(), err, "failed to add container to network")
+	return s.net.ContainerByID(info.NodeID)
+}
+
+// StakeAndStartNewNode will stake a new node, start the container for that node after we have reached the epoch
+// setup phase, and wait until end of epoch before returning so that the node starts processing network messages
+func (s *Suite) StakeAndStartNewNode(ctx context.Context, env templates.Environment, role flow.Role) (*StakedNodeOperationInfo, *inmem.Snapshot, *testnet.Container) {
+	// stake our new node
+	info := s.StakeNode(ctx, env, role)
+
+	// make sure our node is in the approved nodes list and the proposed nodes table
+	s.assertNodeApprovedAndProposed(ctx, env, info)
+
+	// add a new container to the network with the info used to stake our node
+	testContainer := s.newTestContainerOnNetwork(role, info)
+
+	// wait for epoch setup phase before we start our container
+	s.WaitForPhase(ctx, flow.EpochPhaseSetup)
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	testContainer.WriteRootSnapshot(snapshot)
+	testContainer.Container.Start(ctx)
+
+	// wait for new container to startup and start processing blocks
+	// wait for end of epoch
+	epochFinalView, err := snapshot.Epochs().Current().FinalView()
+	require.NoError(s.T(), err)
+	s.BlockState.WaitForSealedView(s.T(), epochFinalView)
+
+	return info, snapshot, testContainer
+}
+
+// assertNetworkHealthyAfterANChange after an access node is removed or added to the network
+// this func can be used to perform sanity.
+// NOTE: rootSnapshot must be the snapshot that the node (info) was bootstrapped with.
+// 1. Check that there is no problem connecting directly to the AN provided and retrieve a protocol snapshot
+// 2. Check that the chain moved atleast 20 blocks from when the node was bootstrapped by comparing
+// head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
+// 3. Check that we can execute a script on the AN
+func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo) {
+	bootstrapHead, err := rootSnapshot.Head()
+	require.NoError(s.T(), err)
+
+	// get snapshot directly from new AN and compare head with head from the
+	// snapshot that was used to bootstrap the node
+	clientAddr := fmt.Sprintf(":%s", s.net.AccessPortsByContainerName[info.ContainerName])
+	client, err := testnet.NewClient(clientAddr, s.net.Root().Header.ChainID.Chain())
+	require.NoError(s.T(), err)
+	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+
+	head, err := snapshot.Head()
+	require.NoError(s.T(), err)
+
+	// head should now be at-least 20 blocks higher from when we started
+	require.True(s.T(), head.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height))
+
+	// execute script directly on new AN to ensure it's functional
+	proposedTable, err := client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
+	require.NoError(s.T(), err)
+	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by new AN.")
+
 }
