@@ -48,11 +48,11 @@ type RestAPITestSuite struct {
 	rpcEng            *rpc.Engine
 
 	// storage
-	blocks       *storagemock.Blocks
-	headers      *storagemock.Headers
-	collections  *storagemock.Collections
-	transactions *storagemock.Transactions
-	receipts     *storagemock.ExecutionReceipts
+	blocks           *storagemock.Blocks
+	headers          *storagemock.Headers
+	collections      *storagemock.Collections
+	transactions     *storagemock.Transactions
+	receipts         *storagemock.ExecutionReceipts
 	executionResults *storagemock.ExecutionResults
 }
 
