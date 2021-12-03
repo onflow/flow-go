@@ -7,7 +7,7 @@ RELIC_DIR_NAME="relic"
 RELIC_DIR="${PKG_DIR}/${RELIC_DIR_NAME}"
 MOD_DIR="/pkg/mod/"
 # Looks into the go mod file, takes the line with the crypto dependency, and uses "cut" command to extract module version using a space character as the delimiter
-VERSION="$(cat ../go.mod | grep github.com/onflow/flow-go/crypto | cut -d' ' -f 2)"
+VERSION="$(grep github.com/onflow/flow-go/crypto < ../go.mod | cut -d' ' -f 2)"
 DEP_DIR="$(go env GOPATH)/pkg/mod/github.com/onflow/flow-go/crypto@${VERSION}"
 
 if [[ "$PKG_DIR" != *"$MOD_DIR"* ]]; then
@@ -16,10 +16,10 @@ if [[ "$PKG_DIR" != *"$MOD_DIR"* ]]; then
 
   # grant permissions if not existant
    if [[ ! -r ${PKG_DIR}  || ! -w ${PKG_DIR} || ! -x ${PKG_DIR} ]]; then
-      sudo chmod -R 755 ${PKG_DIR}
+      sudo chmod -R 755 "${PKG_DIR}"
    fi
 
-   cd ${DEP_DIR}
+   cd "${DEP_DIR}"
 
    go generate
 
