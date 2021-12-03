@@ -6,7 +6,13 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+type doubleLinkedListNode struct {
+	next uint64
+	prev uint64
+}
+
 type cachedEntity struct {
+	doubleLinkedListNode
 	id     flow.Identifier
 	owner  uint64
 	entity flow.Entity
@@ -14,12 +20,14 @@ type cachedEntity struct {
 
 type entityList struct {
 	total        uint64
+	head         int // index of the head of linked list in entities slice.
 	entities     []cachedEntity
 	ejectionMode EjectionMode
 }
 
 func newEntityList(limit uint64, ejectionMode EjectionMode) *entityList {
 	return &entityList{
+		head:         -1, // -1 means not-initialized.
 		entities:     make([]cachedEntity, limit),
 		ejectionMode: ejectionMode,
 	}
