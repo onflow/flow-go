@@ -6,11 +6,12 @@ PKG_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 RELIC_DIR_NAME="relic"
 RELIC_DIR="${PKG_DIR}/${RELIC_DIR_NAME}"
 MOD_DIR="/pkg/mod/"
-# Looks into the go mod file, takes the line with the crypto dependency, and uses "cut" command to extract module version using a space character as the delimiter
-VERSION="$(grep github.com/onflow/flow-go/crypto < ../go.mod | cut -d' ' -f 2)"
-DEP_DIR="$(go env GOPATH)/pkg/mod/github.com/onflow/flow-go/crypto@${VERSION}"
 
-if [[ "$PKG_DIR" != *"$MOD_DIR"* ]]; then
+if [[ "$PKG_DIR" != *"$MOD_DIR"* && -f "../go.mod" ]]; then
+
+   # Looks into the go mod file, takes the line with the crypto dependency, and uses "cut" command to extract module version using a space character as the delimiter
+   VERSION="$(grep github.com/onflow/flow-go/crypto < ../go.mod | cut -d' ' -f 2)"
+   DEP_DIR="$(go env GOPATH)/pkg/mod/github.com/onflow/flow-go/crypto@${VERSION}"
 
    cd ..; go mod tidy; cd -
 
