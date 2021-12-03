@@ -143,7 +143,8 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 	firstID := first.ID()
 	nextEpochCounter := currentEpochCounter + 1
 	log := e.log.With().
-		Uint64("current_epoch", currentEpochCounter).
+		Uint64("cur_epoch", currentEpochCounter). // the epoch we are in the middle of
+		Uint64("next_epoch", nextEpochCounter).   // the epoch we are running the DKG for
 		Uint64("view", first.View).
 		Hex("block", firstID[:]).
 		Logger()
@@ -241,7 +242,10 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	// the epoch counter the DKG just completed is for
 	dkgEpochCounter := currentEpochCounter + 1
 
-	log := e.log.With().Uint64("cur_epoch", currentEpochCounter).Logger()
+	log := e.log.With().
+		Uint64("cur_epoch", currentEpochCounter). // the epoch we are in the middle of
+		Uint64("dkg_for_epoch", dkgEpochCounter). // the epoch the just-finished DKG was preparing for
+		Logger()
 
 	// TODO - first check whether we've already stored the dkg end state, since
 	// we need to handle multiple calls to this method
