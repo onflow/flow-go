@@ -98,7 +98,7 @@ func (e entityList) valueIndexForEntity() (uint32, bool) {
 			return uint32(rand.Uint64() % limit), true
 		} else {
 			// ejecting eldest entity
-			return uint32(e.total % limit), true
+			return e.moveHead(), true
 		}
 	}
 }
@@ -118,4 +118,20 @@ func (e entityList) getTail() *cachedEntity {
 func (e *entityList) link(prev doubleLinkedListPointer, next uint32) {
 	e.entities[prev.sliceIndex()].next.setPointer(next)
 	e.entities[next].prev = prev
+}
+
+func (e *entityList) moveHead() uint32 {
+	oldHead := e.head.sliceIndex()
+
+	// moves head forward
+	e.head = e.getHead().next
+	// new head should point to an undefined prev
+	e.getHead().prev.setUndefined()
+
+	// invalidates old head
+	e.entities[oldHead].id = flow.ZeroID
+	e.entities[oldHead].next.setUndefined()
+	e.entities[oldHead].prev.setUndefined()
+
+	return oldHead
 }
