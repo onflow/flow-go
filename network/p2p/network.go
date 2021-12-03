@@ -244,7 +244,7 @@ func (n *Network) handleRegisterBlockExchangeRequest(parent irrecoverable.Signal
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
 func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
-	respChan := make(chan *registerEngineResp)
+	respChan := make(chan *registerEngineResp, 1)
 
 	select {
 	case <-n.ComponentManager.ShutdownSignal():
@@ -266,7 +266,7 @@ func (n *Network) Register(channel network.Channel, engine network.Engine) (netw
 // RegisterBlockExchange registers a BlockExchange network on the given channel.
 // The returned BlockExchange can be used to request blocks from the network.
 func (n *Network) RegisterBlockExchange(channel network.Channel, bstore blockstore.Blockstore) (network.BlockExchange, error) {
-	respChan := make(chan *registerBlockExchangeResp)
+	respChan := make(chan *registerBlockExchangeResp, 1)
 
 	select {
 	case <-n.ComponentManager.ShutdownSignal():

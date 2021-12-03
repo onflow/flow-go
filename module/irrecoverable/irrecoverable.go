@@ -40,6 +40,11 @@ func (s *Signaler) Throw(err error) {
 	}
 }
 
+func (s *Signaler) Err() error {
+	// TODO: return thrown error if any
+	// TODO: add functionality to automatically cancel the context when the error is thrown
+}
+
 // We define a constrained interface to provide a drop-in replacement for context.Context
 // including in interfaces that compose it.
 type SignalerContext interface {
