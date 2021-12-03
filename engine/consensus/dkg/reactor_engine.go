@@ -241,6 +241,8 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	// the epoch counter the DKG just completed is for
 	dkgEpochCounter := currentEpochCounter + 1
 
+	log := e.log.With().Uint64("cur_epoch", currentEpochCounter).Logger()
+
 	// TODO - first check whether we've already stored the dkg end state, since
 	// we need to handle multiple calls to this method
 
@@ -249,35 +251,38 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	nextDKG, err := e.State.Final().Epochs().Next().DKG()
 	if err != nil {
 		// CAUTION: this should never happen, indicates a storage failure or corruption
-		e.log.Fatal().Err(err).Msg("checking DKG key consistency: could not retrieve next DKG info")
+		log.Fatal().Err(err).Msg("checking beacon key consistency: could not retrieve next DKG info")
 		return
 	}
 
 	myBeaconPrivKey, err := e.dkgState.RetrieveMyBeaconPrivateKey(currentEpochCounter + 1)
 	if errors.Is(err, storage.ErrNotFound) {
-		e.log.Warn().Msg("checking DKG key consistency: no key found")
+		log.Warn().Msg("checking beacon key consistency: no key found")
 		err := e.dkgState.SetDKGEndState(dkgEpochCounter, flow.DKGEndStateNoKey)
 		if err != nil {
-			e.log.Fatal().Err(err).Msg("failed to set dkg end state")
+			log.Fatal().Err(err).Msg("failed to set dkg end state")
 		}
 	} else if err != nil {
-		e.log.Fatal().Err(err).Msg("checking DKG key consistency: could not retrieve DKG private key for next epoch")
+		log.Fatal().Err(err).Msg("checking beacon key consistency: could not retrieve beacon private key for next epoch")
 		return
 	}
 
 	nextDKGPubKey, err := nextDKG.KeyShare(e.me.NodeID())
 	if err != nil {
-		e.log.Fatal().Err(err).Msg("checking DKG key consistency: could not retrieve my DKG public key for next epoch")
+		log.Fatal().Err(err).Msg("checking beacon key consistency: could not retrieve my beacon public key for next epoch")
 		return
 	}
 
 	localPubKey := myBeaconPrivKey.PublicKey()
 
 	if !nextDKGPubKey.Equals(localPubKey) {
-		e.log.Warn().Msg("checking DKG key consistency: locally computed dkg public key does not match dkg public key for next epoch")
+		log.Warn().
+			Hex("computed_beacon_pub_key", localPubKey.Encode()).
+			Hex("canonical_beacon_pub_key", nextDKGPubKey.Encode()).
+			Msg("checking beacon key consistency: locally computed beacon public key does not match beacon public key for next epoch")
 		err := e.dkgState.SetDKGEndState(dkgEpochCounter, flow.DKGEndStateInconsistentKey)
 		if err != nil {
-			e.log.Fatal().Err(err).Msg("failed to set dkg end state")
+			log.Fatal().Err(err).Msg("failed to set dkg end state")
 		}
 	}
 }
