@@ -51,10 +51,6 @@ type Middleware interface {
 	// Ping pings the target node and returns the ping RTT or an error
 	Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error)
 
-	// UpdateAllowList fetches the most recent identity of the nodes from overlay
-	// and updates the underlying libp2p node.
-	UpdateAllowList()
-
 	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()

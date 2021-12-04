@@ -4,9 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/libp2p/go-libp2p-core/host"
-	dht "github.com/libp2p/go-libp2p-kad-dht"
+	"github.com/libp2p/go-libp2p"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	madns "github.com/multiformats/go-multiaddr-dns"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
@@ -188,41 +189,60 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 //		No connection gater
 // 		Default Flow libp2p pubsub options
 func (builder *StakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier, networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
-
-	// The staked nodes act as the DHT servers
-	dhtOptions := []dht.Option{p2p.AsServer(true)}
-
-	psOpts := append(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize),
-		func(_ context.Context, h host.Host) (pubsub.Option, error) {
-			return pubsub.WithSubscriptionFilter(p2p.NewRoleBasedFilter(
-				h.ID(), builder.IdentityProvider,
-			)), nil
-		})
-
 	myAddr := builder.NodeConfig.Me.Address()
 	if builder.BaseConfig.BindAddr != cmd.NotSet {
 		myAddr = builder.BaseConfig.BindAddr
 	}
 
-	connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
-
-	resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
-
 	return func(ctx context.Context) (*p2p.Node, error) {
-		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
-			SetSporkID(builder.SporkID).
-			// no connection gater
-			SetConnectionManager(connManager).
-			// act as a DHT server
-			SetDHTOptions(dhtOptions...).
-			SetPubsubOptions(psOpts...).
-			SetLogger(builder.Logger).
-			SetResolver(resolver).
-			Build(ctx)
+		connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
+
+		resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
+		libp2pResolver, err := madns.NewResolver(madns.WithDefaultResolver(resolver))
+
+		var opts []libp2p.Option = []libp2p.Option{
+			libp2p.ConnectionManager(connManager),
+			libp2p.MultiaddrResolver(libp2pResolver),
+		}
+
+		host, err := p2p.DefaultLibP2PHost(ctx, myAddr, networkKey, opts...)
+
 		if err != nil {
 			return nil, err
 		}
-		builder.LibP2PNode = libp2pNode
+
+		kdht, err := p2p.NewDHT(ctx, host, p2p.AsServer(true))
+
+		if err != nil {
+			return nil, err
+		}
+
+		psOpts := append(
+			p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize),
+			pubsub.WithSubscriptionFilter(
+				p2p.NewRoleBasedFilter(
+					host.ID(), builder.IdentityProvider,
+				),
+			),
+			pubsub.WithDiscovery(discovery.NewRoutingDiscovery(kdht)),
+		)
+
+		ps, err := p2p.DefaultPubSub(ctx, host, psOpts...)
+		if err != nil {
+			return nil, err
+		}
+
+		node, err := p2p.NewNodeBuilder(builder.Logger, host, ps, builder.SporkID).
+			SetConnectionManager(connManager).
+			SetRoutingSystem(kdht).
+			Build()
+
+		if err != nil {
+			return nil, err
+		}
+
+		builder.LibP2PNode = node
+
 		return builder.LibP2PNode, nil
 	}
 }
@@ -247,7 +267,6 @@ func (builder *StakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		builder.IDTranslator,
 		p2p.WithMessageValidators(validators...),
 		p2p.WithPeerManager(peerManagerFactory),
-		p2p.WithConnectionGating(false),
 		// use default identifier provider
 	)
 

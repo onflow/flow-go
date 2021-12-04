@@ -10,8 +10,6 @@ import (
 	madns "github.com/multiformats/go-multiaddr-dns"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/component"
-	"github.com/onflow/flow-go/module/irrecoverable"
 )
 
 //go:linkname runtimeNano runtime.nanotime
@@ -34,11 +32,7 @@ type Resolver struct {
 	collector      module.ResolverMetrics
 	processingIPs  map[string]struct{} // ongoing ip lookups through underlying resolver
 	processingTXTs map[string]struct{} // ongoing txt lookups through underlying resolver
-	component.Component
-	cm component.ComponentManager
 }
-
-var _ component.Component = (*Resolver)(nil)
 
 // optFunc is the option function for Resolver.
 type optFunc func(resolver *Resolver)
@@ -71,9 +65,6 @@ func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 		opt(resolver)
 	}
 
-	resolver.cm = component.NewComponentManagerBuilder().Build()
-	resolver.Component = resolver.cm.Component()
-
 	return resolver
 }
 
@@ -102,8 +93,8 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 	}
 
 	if !fresh && r.shouldResolveIP(domain) {
-		r.cm.RunAsync(func(parent irrecoverable.SignalerContext) {
-			_, err := r.lookupResolverForIPAddr(parent, domain)
+		go func() {
+			_, err := r.lookupResolverForIPAddr(ctx, domain)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
 				invalidated := r.c.invalidateIPCacheEntry(domain)
@@ -112,7 +103,7 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 				}
 			}
 			r.doneResolvingIP(domain)
-		})
+		}()
 	}
 
 	r.collector.OnDNSCacheHit()
@@ -157,9 +148,9 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 	}
 
 	if !fresh && r.shouldResolveTXT(txt) {
-		r.cm.RunAsync(func(parent irrecoverable.SignalerContext) {
+		go func() {
 			defer r.doneResolvingTXT(txt)
-			_, err := r.lookupResolverForTXTAddr(parent, txt)
+			_, err := r.lookupResolverForTXTAddr(ctx, txt)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
 				invalidated := r.c.invalidateTXTCacheEntry(txt)
@@ -167,7 +158,7 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 					r.collector.OnDNSCacheInvalidated()
 				}
 			}
-		})
+		}()
 	}
 
 	r.collector.OnDNSCacheHit()

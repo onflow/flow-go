@@ -76,7 +76,6 @@ type Middleware struct {
 	peerManagerFactory         PeerManagerFactoryFunc
 	peerManager                *PeerManager
 	unicastMessageTimeout      time.Duration
-	connectionGating           bool
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
 	cm                         component.ComponentManager
@@ -100,12 +99,6 @@ func WithPreferredUnicastProtocols(unicasts []unicast.ProtocolName) MiddlewareOp
 func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 	return func(mw *Middleware) {
 		mw.peerManagerFactory = peerManagerFunc
-	}
-}
-
-func WithConnectionGating(enabled bool) MiddlewareOption {
-	return func(mw *Middleware) {
-		mw.connectionGating = enabled
 	}
 }
 
@@ -143,7 +136,6 @@ func NewMiddleware(
 		rootBlockID:           rootBlockID,
 		validators:            DefaultValidators(log, flowID),
 		unicastMessageTimeout: unicastMessageTimeout,
-		connectionGating:      false,
 		peerManagerFactory:    nil,
 		idTranslator:          idTranslator,
 	}
@@ -186,10 +178,6 @@ func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 	}
 
 	return m.peerIDs(identities.NodeIDs()), nil
-}
-
-func (m *Middleware) allPeers() peer.IDSlice {
-	return m.peerIDs(m.ov.Identities().NodeIDs())
 }
 
 func (m *Middleware) peerIDs(flowIDs flow.IdentifierList) peer.IDSlice {
@@ -267,10 +255,6 @@ func (m *Middleware) start(ctx context.Context) error {
 	}
 
 	m.UpdateNodeAddresses()
-
-	if m.connectionGating {
-		m.libP2PNode.UpdateAllowList(m.allPeers())
-	}
 
 	// create and use a peer manager if a peer manager factory was passed in during initialization
 	if m.peerManagerFactory != nil {
@@ -532,18 +516,6 @@ func (m *Middleware) Ping(targetID flow.Identifier) (message.PingResponse, time.
 	}
 
 	return m.libP2PNode.Ping(m.ctx, peerID)
-}
-
-// UpdateAllowList fetches the most recent identifiers of the nodes from overlay
-// and updates the underlying libp2p node.
-func (m *Middleware) UpdateAllowList() {
-	// update libp2pNode's approve lists if this middleware also does connection gating
-	if m.connectionGating {
-		m.libP2PNode.UpdateAllowList(m.allPeers())
-	}
-
-	// update peer connections if this middleware also does peer management
-	m.peerManagerUpdate()
 }
 
 // IsConnected returns true if this node is connected to the node with id nodeID.

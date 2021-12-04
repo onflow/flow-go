@@ -19,10 +19,8 @@ import (
 
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
-	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
-	"github.com/onflow/flow-go/utils/logging"
 )
 
 const (
@@ -42,13 +40,11 @@ const (
 type Node struct {
 	sync.Mutex
 	unicastManager  *unicast.Manager
-	connGater       *ConnGater                             // used to provide white listing
 	host            host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
 	pubSub          *pubsub.PubSub                         // reference to the libp2p PubSub component
 	logger          zerolog.Logger                         // used to provide logging
 	topics          map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs            map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
-	resolver        *dns.Resolver                          // dns resolver for libp2p (is nil if default)
 	pingService     *PingService
 	connMgr         connmgr.ConnManager
 	routing         routing.Routing
@@ -60,30 +56,22 @@ type Node struct {
 func (n *Node) Stop() (chan struct{}, error) {
 	var result error
 	done := make(chan struct{})
-	n.logger.Debug().
-		Hex("node_id", logging.ID(n.id)).
-		Msg("unsubscribing from all topics")
+	n.logger.Debug().Msg("unsubscribing from all topics")
 	for t := range n.topics {
 		if err := n.UnSubscribe(t); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
 
-	n.logger.Debug().
-		Hex("node_id", logging.ID(n.id)).
-		Msg("stopping libp2p node")
+	n.logger.Debug().Msg("stopping libp2p node")
 	if err := n.host.Close(); err != nil {
 		result = multierror.Append(result, err)
 	}
 
-	n.logger.Debug().
-		Hex("node_id", logging.ID(n.id)).
-		Msg("closing peer store")
+	n.logger.Debug().Msg("closing peer store")
 	// to prevent peerstore routine leak (https://github.com/libp2p/go-libp2p/issues/718)
 	if err := n.host.Peerstore().Close(); err != nil {
-		n.logger.Debug().
-			Hex("node_id", logging.ID(n.id)).
-			Err(err).Msg("closing peer store")
+		n.logger.Debug().Err(err).Msg("closing peer store")
 		result = multierror.Append(result, err)
 	}
 
@@ -109,14 +97,7 @@ func (n *Node) Stop() (chan struct{}, error) {
 			}
 		}
 
-		if n.resolver != nil {
-			// non-nil resolver means a non-default one, so it must be stopped.
-			n.resolver.Done()
-		}
-
-		n.logger.Debug().
-			Hex("node_id", logging.ID(n.id)).
-			Msg("libp2p node stopped successfully")
+		n.logger.Debug().Msg("libp2p node stopped successfully")
 	}(done)
 
 	return done, nil
@@ -230,7 +211,6 @@ func (n *Node) Subscribe(topic flownet.Topic, validators ...validator.MessageVal
 	n.subs[topic] = s
 
 	n.logger.Debug().
-		Hex("node_id", logging.ID(n.id)).
 		Str("topic", topic.String()).
 		Msg("subscribed to topic")
 	return s, err
@@ -269,7 +249,6 @@ func (n *Node) UnSubscribe(topic flownet.Topic) error {
 	delete(n.topics, topic)
 
 	n.logger.Debug().
-		Hex("node_id", logging.ID(n.id)).
 		Str("topic", topic.String()).
 		Msg("unsubscribed from topic")
 	return err
@@ -312,16 +291,6 @@ func (n *Node) Ping(ctx context.Context, peerID peer.ID) (message.PingResponse, 
 	}
 
 	return resp, rtt, nil
-}
-
-// UpdateAllowList allows the peer allow list to be updated.
-func (n *Node) UpdateAllowList(peers peer.IDSlice) {
-	if n.connGater == nil {
-		n.logger.Debug().Hex("node_id", logging.ID(n.id)).Msg("skipping update allow list, connection gating is not enabled")
-		return
-	}
-
-	n.connGater.update(peers)
 }
 
 // Host returns pointer to host object of node.

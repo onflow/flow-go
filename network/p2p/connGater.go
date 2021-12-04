@@ -17,39 +17,23 @@ var _ connmgr.ConnectionGater = (*ConnGater)(nil)
 // It provides node allowlisting by libp2p peer.ID which is derived from the node public networking key
 type ConnGater struct {
 	sync.RWMutex
-	peerIDAllowlist map[peer.ID]struct{} // the in-memory map of approved peer IDs
-	log             zerolog.Logger
+	peerFilter PeerFilter
+	log        zerolog.Logger
 }
 
-func NewConnGater(log zerolog.Logger) *ConnGater {
+type PeerFilter func(peer.ID) bool
+
+func NewConnGater(log zerolog.Logger, peerFilter PeerFilter) *ConnGater {
 	cg := &ConnGater{
-		log: log,
+		log:        log,
+		peerFilter: peerFilter,
 	}
 	return cg
 }
 
-// update updates the peer ID map
-func (c *ConnGater) update(pids peer.IDSlice) {
-
-	// create a new peer.ID map
-	peerIDs := make(map[peer.ID]struct{}, len(pids))
-
-	// for each peer.AddrInfo, create an entry in the map for the peer.ID
-	for _, pid := range pids {
-		peerIDs[pid] = struct{}{}
-	}
-
-	// cache the new map
-	c.Lock()
-	c.peerIDAllowlist = peerIDs
-	c.Unlock()
-
-	c.log.Info().Msg("approved list of peers updated")
-}
-
 // InterceptPeerDial - a callback which allows or disallows outbound connection
 func (c *ConnGater) InterceptPeerDial(p peer.ID) bool {
-	return c.validPeerID(p)
+	return c.peerFilter(p)
 }
 
 // InterceptAddrDial is not used. Currently, allowlisting is only implemented by Peer IDs and not multi-addresses
@@ -67,7 +51,7 @@ func (c *ConnGater) InterceptAccept(cm network.ConnMultiaddrs) bool {
 func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr network.ConnMultiaddrs) bool {
 	switch dir {
 	case network.DirInbound:
-		allowed := c.validPeerID(p)
+		allowed := c.peerFilter(p)
 		if !allowed {
 			// log the illegal connection attempt from the remote node
 			c.log.Info().
@@ -86,11 +70,4 @@ func (c *ConnGater) InterceptSecured(dir network.Direction, p peer.ID, addr netw
 // Decision to continue or drop the connection should have been made before this call
 func (c *ConnGater) InterceptUpgraded(network.Conn) (allow bool, reason control.DisconnectReason) {
 	return true, 0
-}
-
-func (c *ConnGater) validPeerID(p peer.ID) bool {
-	c.RLock()
-	defer c.RUnlock()
-	_, ok := c.peerIDAllowlist[p]
-	return ok
 }

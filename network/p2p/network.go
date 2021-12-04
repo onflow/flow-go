@@ -161,11 +161,11 @@ func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.Signaler
 	if !ok {
 		return nil, errors.New("middleware was of unexpected type")
 	}
-	if mw.libP2PNode.dht == nil {
+	if mw.libP2PNode.routing == nil {
 		return nil, errors.New("blob exchange is disabled because content routing is not configured")
 	}
 
-	bs := network.NewBlobService(mw.libP2PNode.host, mw.libP2PNode.dht, channel.String(), ds)
+	bs := network.NewBlobService(mw.libP2PNode.host, mw.libP2PNode.routing, channel.String(), ds)
 
 	// start the blob service using the network's context
 	bs.Start(parent)

@@ -9,12 +9,14 @@ import (
 	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	stream "github.com/libp2p/go-libp2p-transport-upgrader"
 	"github.com/libp2p/go-libp2p/config"
 	"github.com/libp2p/go-tcp-transport"
 	"github.com/multiformats/go-multiaddr"
+	madns "github.com/multiformats/go-multiaddr-dns"
 	"github.com/rs/zerolog"
 
 	fcrypto "github.com/onflow/flow-go/crypto"
@@ -43,27 +45,33 @@ func DefaultLibP2PNodeFactory(
 	metrics module.NetworkMetrics,
 	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
-	role string) (LibP2PFactoryFunc, error) {
-
-	connManager := NewConnManager(log, metrics)
-
-	resolver := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
-	libp2pResolver, err := madns.NewResolver(madns.WithDefaultResolver(resolver))
-
-	if err != nil {
-		return nil, err
-	}
-
-	psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
+	role string,
+) LibP2PFactoryFunc {
 
 	return func(ctx context.Context) (*Node, error) {
+		connManager := NewConnManager(log, metrics)
+
+		resolver := dns.NewResolver(metrics, dns.WithTTL(dnsResolverTTL))
+		libp2pResolver, err := madns.NewResolver(madns.WithDefaultResolver(resolver))
+
+		if err != nil {
+			return nil, err
+		}
+
+		psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
+
 		var opts []libp2p.Option = []libp2p.Option{
 			libp2p.ConnectionManager(connManager),
-			libp2p.ConnectionGater(), // TODO
+			libp2p.ConnectionGater(NewConnGater(log, func(pid peer.ID) bool {
+				_, found := idProvider.ByPeerID(pid)
+
+				return found
+			})),
+			libp2p.MultiaddrResolver(libp2pResolver),
 			libp2p.Ping(true),
 		}
 
-		h, err := DefaultLibP2PHost(ctx, address, flowKey)
+		h, err := DefaultLibP2PHost(ctx, address, flowKey, opts...)
 
 		if err != nil {
 			return nil, err
@@ -79,26 +87,14 @@ func DefaultLibP2PNodeFactory(
 			return nil, err
 		}
 
-		if err != nil {
-			return nil, fmt.Errorf("could not create libp2p resolver: %w", err)
-		}
-		select {
-		case <-resolver.Ready():
-		case <-time.After(30 * time.Second):
-			return nil, fmt.Errorf("could not start resolver on time")
-		}
-		opts = append(opts, libp2p.MultiaddrResolver(libp2pResolver))
-
 		return NewNodeBuilder(log, h, ps, sporkId).
-			SetConnectionGating(true).
 			SetConnectionManager(connManager).
 			SetPingInfoProvider(pingInfoProvider).
 			Build()
-	}, nil
+	}
 }
 
 type NodeBuilder interface {
-	SetConnectionGating(bool) NodeBuilder
 	SetTopicValidation(bool) NodeBuilder
 	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetRoutingSystem(routing.Routing) NodeBuilder
@@ -111,7 +107,6 @@ type LibP2PNodeBuilder struct {
 	logger           zerolog.Logger
 	host             host.Host
 	pubSub           *pubsub.PubSub
-	connectionGating bool
 	topicValidation  bool
 	connMngr         connmgr.ConnManager
 	rsys             routing.Routing
@@ -126,11 +121,6 @@ func NewNodeBuilder(logger zerolog.Logger, h host.Host, ps *pubsub.PubSub, spork
 		topicValidation: true,
 		sporkID:         sporkID,
 	}
-}
-
-func (builder *LibP2PNodeBuilder) SetConnectionGating(enabled bool) NodeBuilder {
-	builder.connectionGating = enabled
-	return builder
 }
 
 func (builder *LibP2PNodeBuilder) SetTopicValidation(enabled bool) NodeBuilder {
@@ -160,12 +150,6 @@ func (builder *LibP2PNodeBuilder) Build() (*Node, error) {
 		return nil, err
 	}
 
-	var connGater *ConnGater
-
-	if builder.connectionGating {
-		connGater = NewConnGater(builder.logger)
-	}
-
 	var pingService *PingService
 
 	if builder.pingInfoProvider != nil {
@@ -187,7 +171,6 @@ func (builder *LibP2PNodeBuilder) Build() (*Node, error) {
 			builder.sporkID,
 		),
 		pCache:      pCache,
-		connGater:   connGater,
 		pingService: pingService,
 		pubSub:      builder.pubSub,
 	}

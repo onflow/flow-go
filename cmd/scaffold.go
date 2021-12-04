@@ -189,7 +189,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			}
 		}
 
-		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
+		libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
 			fnb.Logger,
 			fnb.Me.NodeID(),
 			myAddr,
@@ -200,11 +200,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Metrics.Network,
 			pingProvider,
 			fnb.BaseConfig.DNSCacheTTL,
-			fnb.BaseConfig.NodeRole)
-
-		if err != nil {
-			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
-		}
+			fnb.BaseConfig.NodeRole,
+		)
 
 		var mwOpts []p2p.MiddlewareOption
 		if len(fnb.MsgValidators) > 0 {
@@ -215,8 +212,8 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
 		mwOpts = append(mwOpts,
 			p2p.WithPeerManager(peerManagerFactory),
-			p2p.WithConnectionGating(true),
-			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)))
+			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)),
+		)
 
 		fnb.Middleware = p2p.NewMiddleware(
 			fnb.Logger,
