@@ -143,31 +143,38 @@ func TestInvalidateEntity(t *testing.T) {
 			entityCount:     30,
 		},
 		{ // multiple buckets, high limit, low entities.
-			limit:           10000,
+			limit:           100,
 			overLimitFactor: 16,
-			entityCount:     1000,
+			entityCount:     10,
 		},
 		{ // multiple buckets, entities equal to limit.
-			limit:           10000,
+			limit:           100,
 			overLimitFactor: 16,
-			entityCount:     10000,
+			entityCount:     100,
 		},
 	} {
-		t.Run(fmt.Sprintf("%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
-			testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount)
+		// head invalidation test
+		t.Run(fmt.Sprintf("head-invalidation-%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
+			testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount, func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+				testInvalidatingHead(t, backData, entities)
+			})
+		})
+		// tail invalidation test
+		t.Run(fmt.Sprintf("tail-invalidation-%d-limit-%d-overlimit-%d-entities-", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
+			testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount, func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+				testInvalidatingTail(t, backData, entities)
+			})
 		})
 	}
 }
 
-func testInvalidateEntity(t *testing.T, limit uint32, overLimitFactor uint32, entityCount uint32) {
-	h := []func(*testing.T, *ArrayBackData, []*unittest.MockEntity){
+func testInvalidateEntity(t *testing.T, limit uint32, overLimitFactor uint32, entityCount uint32, helpers ...func(*testing.T, *ArrayBackData, []*unittest.MockEntity)) {
+	h := append([]func(*testing.T, *ArrayBackData, []*unittest.MockEntity){
 		func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
 			testAddingEntities(t, backData, entities)
 		},
-		func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
-			testInvalidatingHead(t, backData, entities)
-		},
-	}
+	}, helpers...)
+
 	withTestScenario(t, limit, overLimitFactor, entityCount, h...)
 }
 
@@ -232,9 +239,33 @@ func testInvalidatingHead(t *testing.T, backData *ArrayBackData, entities []*uni
 		// size of list should be shrunk after each invalidation.
 		require.Equal(t, uint64(size-i-1), backData.entities.size())
 
+		// except when the list is empty, head must be updated after invalidation,
 		// except when the list is empty, head and tail must be accessible after each invalidation
 		// i.e., the linked list remains connected despite invalidation.
 		if i != size-1 {
+			require.Equal(t, entities[i+1].ID(), backData.entities.getHead().id)
+			tailAccessible(t, backData, backData.entities.size())
+			headAccessibleFromTail(t, backData, backData.entities.size())
+		}
+	}
+}
+
+// testInvalidatingHead keeps invalidating the head and evaluates the linked-list keeps updating its head
+// and remains connected.
+func testInvalidatingTail(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+	size := len(entities)
+	for i := 0; i < size; i++ {
+		// invalidates tail index
+		backData.entities.invalidateEntityAtIndex(backData.entities.tail.sliceIndex())
+
+		// size of list should be shrunk after each invalidation.
+		require.Equal(t, uint64(size-i-1), backData.entities.size())
+
+		// except when the list is empty, tail must be updated after invalidation,
+		// and also head and tail must be accessible after each invalidation
+		// i.e., the linked list remains connected despite invalidation.
+		if i != size-1 {
+			require.Equal(t, entities[size-i-2].ID(), backData.entities.getTail().id)
 			tailAccessible(t, backData, backData.entities.size())
 			headAccessibleFromTail(t, backData, backData.entities.size())
 		}
