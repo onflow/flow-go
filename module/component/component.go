@@ -156,10 +156,6 @@ type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
 // It takes a SignalerContext which can be used to throw any irrecoverable errors it encounters.
 type ComponentTask func(ctx irrecoverable.SignalerContext) error
 
-// ComponentAsyncTask represents a routine which performs an async one-off task.
-// It takes a SignalerContext which can be used to throw any irrecoverable errors it encounters.
-type ComponentAsyncTask func(ctx irrecoverable.SignalerContext)
-
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
 	// AddWorker adds a worker routine for the ComponentManager
@@ -175,10 +171,13 @@ type ComponentManager interface {
 
 	// Run executes the given ComponentTask, passing in the context that the
 	// ComponentManager was started with.
-	// If shutdown has commenced,
-	// down. If f is executed, the unit will not shut down until after f returns.
+	// If the ComponentManager is shutdown before the task finishes executing,
+	// the returned error will be ErrComponentManagerShutdown.
 	Run(task ComponentTask) error
-	RunAsync(task ComponentAsyncTask)
+
+	// RunAsync executes the given ComponentAsyncTask asynchronously, passing
+	// in the context that the ComponentManager was started with.
+	RunAsync(task ComponentTask)
 
 	// ShutdownSignal returns a channel that is closed when shutdown has commenced.
 	// This can happen either if the ComponentManager's context is canceled, or a
@@ -206,10 +205,11 @@ func (c *componentManagerBuilderImpl) Build() ComponentManager {
 
 	taskRunner := &taskRunner{
 		tasks:          make(chan *runTaskRequest),
-		asyncTasks:     make(chan ComponentAsyncTask),
+		asyncTasks:     make(chan ComponentTask),
 		shutdownSignal: shutdownSignal,
 	}
 
+	// copy workers to a new slice to prevent further modifications
 	workers := make([]ComponentWorker, len(c.workers)+1)
 	workers[0] = taskRunner.handleTasks
 	copy(workers[1:], c.workers)
@@ -228,33 +228,32 @@ var ErrComponentManagerClosed = errors.New("component manager is closed")
 
 type taskRunner struct {
 	tasks          chan *runTaskRequest
-	asyncTasks     chan ComponentAsyncTask
+	asyncTasks     chan ComponentTask
 	shutdownSignal chan struct{}
 }
 
 type runTaskRequest struct {
-	task    ComponentTask
-	errChan chan error
+	task ComponentTask
+	done chan struct{}
 }
 
 func (t *taskRunner) Run(task ComponentTask) error {
-	errChan := make(chan error, 1)
+	done := make(chan struct{})
 
 	select {
 	case <-t.shutdownSignal:
 		return ErrComponentManagerClosed
-	case t.tasks <- &runTaskRequest{task, errChan}:
+	case t.tasks <- &runTaskRequest{task, done}:
 		select {
 		case <-t.shutdownSignal:
 			return ErrComponentManagerClosed
-		case err := <-errChan:
-			util.Check
-			return err
+		case <-done:
+			return nil
 		}
 	}
 }
 
-func (t *taskRunner) RunAsync(task ComponentAsyncTask) {
+func (t *taskRunner) RunAsync(task ComponentTask) {
 	go func() {
 		select {
 		case <-t.shutdownSignal:
@@ -277,8 +276,9 @@ func (t *taskRunner) handleTasks(ctx irrecoverable.SignalerContext, ready ReadyF
 
 			go func() {
 				defer tasksDone.Done()
+				defer close(taskRequest.done)
 
-				taskRequest.errChan <- taskRequest.task(ctx)
+				taskRequest.task(ctx)
 			}()
 		case asyncTask := <-t.asyncTasks:
 			tasksDone.Add(1)
