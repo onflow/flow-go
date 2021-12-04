@@ -165,8 +165,11 @@ func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 		}
 	}
 
-	// invalidates old head
+	// invalidates entity
 	e.entities[sliceIndex].id = flow.ZeroID
 	e.entities[sliceIndex].next.setUndefined()
 	e.entities[sliceIndex].prev.setUndefined()
+
+	// decrements size
+	e.total--
 }

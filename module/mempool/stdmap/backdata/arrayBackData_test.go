@@ -211,12 +211,23 @@ func testRetrievingSavedEntities(t *testing.T, backData *ArrayBackData, entities
 	}
 }
 
+// testInvalidatingHead keeps invalidating the head and evaluates the linked-list keeps updating its head
+// and remains connected.
 func testInvalidatingHead(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
 	size := len(entities)
 	for i := 0; i < size; i++ {
-
 		headIndex := backData.entities.invalidateHead()
 		require.Equal(t, uint32(i), headIndex)
+
+		// size of list should be shrunk after each invalidation.
+		require.Equal(t, uint64(size-i-1), backData.entities.size())
+
+		// except when the list is empty, head and tail must be accessible after each invalidation
+		// i.e., the linked list remains connected despite invalidation.
+		if i != size-1 {
+			tailAccessible(t, backData, backData.entities.size())
+			headAccessibleFromTail(t, backData, backData.entities.size())
+		}
 	}
 }
 
