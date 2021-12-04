@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const CHANNEL_CLOSE_LATENCY_ALLOWANCE = 20 * time.Millisecond
@@ -633,7 +634,7 @@ func (c *ComponentManagerMachine) Check(t *rapid.T) {
 }
 
 func TestComponentManager(t *testing.T) {
-	// unittest.SkipUnless(t, unittest.TEST_LONG_RUNNING, "skip because this test takes too long")
+	unittest.SkipUnless(t, unittest.TEST_LONG_RUNNING, "skip because this test takes too long")
 
 	rapid.Check(t, rapid.Run(&ComponentManagerMachine{}))
 }

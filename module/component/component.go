@@ -264,31 +264,18 @@ func (t *taskRunner) RunAsync(task ComponentTask) {
 }
 
 func (t *taskRunner) handleTasks(ctx irrecoverable.SignalerContext, ready ReadyFunc) {
-	var tasksDone sync.WaitGroup
-
-	defer tasksDone.Wait()
-
 	ready()
 
 	for {
 		select {
 		case taskRequest := <-t.tasks:
-			tasksDone.Add(1)
-
 			go func() {
-				defer tasksDone.Done()
 				defer close(taskRequest.done)
 
 				taskRequest.task(ctx)
 			}()
 		case asyncTask := <-t.asyncTasks:
-			tasksDone.Add(1)
-
-			go func() {
-				defer tasksDone.Done()
-
-				asyncTask(ctx)
-			}()
+			go asyncTask(ctx)
 		case <-ctx.Done():
 			return
 		}
