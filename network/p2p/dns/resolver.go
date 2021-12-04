@@ -34,7 +34,8 @@ type Resolver struct {
 	collector      module.ResolverMetrics
 	processingIPs  map[string]struct{} // ongoing ip lookups through underlying resolver
 	processingTXTs map[string]struct{} // ongoing txt lookups through underlying resolver
-
+	component.Component
+	cm component.ComponentManager
 }
 
 var _ component.Component = (*Resolver)(nil)
@@ -70,25 +71,15 @@ func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 		opt(resolver)
 	}
 
+	resolver.cm = component.NewComponentManagerBuilder().Build()
+	resolver.Component = resolver.cm.Component()
+
 	return resolver
-}
-
-func (r *Resolver) Start(ctx irrecoverable.SignalerContext) {
-	return r.unit.Ready()
-}
-
-// Ready initializes the resolver and returns a channel that is closed when the initialization is done.
-func (r *Resolver) Ready() <-chan struct{} {
-	return r.unit.Ready()
-}
-
-// Done terminates the resolver and returns a channel that is closed when the termination is done
-func (r *Resolver) Done() <-chan struct{} {
-	return r.unit.Done()
 }
 
 // LookupIPAddr implements BasicResolver interface for libp2p for looking up ip addresses through resolver.
 func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
+	// TODO: run here
 	started := runtimeNano()
 
 	addr, err := r.lookupIPAddr(ctx, domain)
@@ -111,8 +102,8 @@ func (r *Resolver) lookupIPAddr(ctx context.Context, domain string) ([]net.IPAdd
 	}
 
 	if !fresh && r.shouldResolveIP(domain) {
-		r.unit.Launch(func() {
-			_, err := r.lookupResolverForIPAddr(ctx, domain)
+		r.cm.RunAsync(func(parent irrecoverable.SignalerContext) {
+			_, err := r.lookupResolverForIPAddr(parent, domain)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
 				invalidated := r.c.invalidateIPCacheEntry(domain)
@@ -145,6 +136,7 @@ func (r *Resolver) lookupResolverForIPAddr(ctx context.Context, domain string) (
 // An expired txt on cache is still addressed through the cache, however, a request is fired up asynchronously
 // through the underlying basic resolver to resolve it from the network.
 func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) {
+	// TODO: run here
 
 	started := runtimeNano()
 
@@ -165,9 +157,9 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 	}
 
 	if !fresh && r.shouldResolveTXT(txt) {
-		r.unit.Launch(func() {
+		r.cm.RunAsync(func(parent irrecoverable.SignalerContext) {
 			defer r.doneResolvingTXT(txt)
-			_, err := r.lookupResolverForTXTAddr(ctx, txt)
+			_, err := r.lookupResolverForTXTAddr(parent, txt)
 			if err != nil {
 				// invalidates cached entry when hits error on resolving.
 				invalidated := r.c.invalidateTXTCacheEntry(txt)
@@ -176,7 +168,6 @@ func (r *Resolver) lookupTXT(ctx context.Context, txt string) ([]string, error) 
 				}
 			}
 		})
-
 	}
 
 	r.collector.OnDNSCacheHit()
