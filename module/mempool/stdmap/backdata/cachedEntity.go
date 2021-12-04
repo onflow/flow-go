@@ -146,15 +146,23 @@ func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 	if sliceIndex == e.head.sliceIndex() {
 		// moves head forward
 		e.head = e.getHead().next
-		// new head should point to an undefined prev
-		e.getHead().prev.setUndefined()
+		// new head should point head to an undefined prev,
+		// but we first check if list is not empty, i.e.,
+		// head itself is not undefined.
+		if !e.head.isUndefined() {
+			e.getHead().prev.setUndefined()
+		}
 	}
 
 	if sliceIndex == e.tail.sliceIndex() {
 		// moves tail backward
 		e.tail = e.getTail().prev
-		// new tail should point to an undefined next
-		e.getTail().next.setUndefined()
+		// new head should point tail to an undefined next,
+		// but we first check if list is not empty, i.e.,
+		// tail itself is not undefined.
+		if !e.tail.isUndefined() {
+			e.getTail().next.setUndefined()
+		}
 	}
 
 	// invalidates old head

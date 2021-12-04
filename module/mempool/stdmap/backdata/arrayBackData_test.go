@@ -115,6 +115,52 @@ func testArrayBackDataStoreAndRetrievalWitEjection(t *testing.T, limit uint32, o
 	)
 }
 
+func TestInvalidateEntity(t *testing.T) {
+	for _, tc := range []struct {
+		limit           uint32
+		overLimitFactor uint32
+		entityCount     uint32
+		helpers         []func(*testing.T, *ArrayBackData, []*unittest.MockEntity)
+	}{
+		{ // two buckets, entities below limit.
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     10,
+		},
+		{ // two buckets, entities equal to limit.
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     30,
+		},
+		{ // multiple buckets, high limit, low entities.
+			limit:           10000,
+			overLimitFactor: 16,
+			entityCount:     1000,
+		},
+		{ // multiple buckets, entities equal to limit.
+			limit:           10000,
+			overLimitFactor: 16,
+			entityCount:     10000,
+		},
+	} {
+		t.Run(fmt.Sprintf("%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
+			testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount)
+		})
+	}
+}
+
+func testInvalidateEntity(t *testing.T, limit uint32, overLimitFactor uint32, entityCount uint32) {
+	h := []func(*testing.T, *ArrayBackData, []*unittest.MockEntity){
+		func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+			testAddingEntities(t, backData, entities)
+		},
+		func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+			testInvalidatingHead(t, backData, entities)
+		},
+	}
+	withTestScenario(t, limit, overLimitFactor, entityCount, h...)
+}
+
 func withTestScenario(t *testing.T,
 	size uint32,
 	overLimitFactor uint32,
@@ -162,6 +208,15 @@ func testRetrievingSavedEntities(t *testing.T, backData *ArrayBackData, entities
 		actual, ok := backData.ByID(expected.ID())
 		require.True(t, ok)
 		require.Equal(t, expected, actual)
+	}
+}
+
+func testInvalidatingHead(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+	size := len(entities)
+	for i := 0; i < size; i++ {
+
+		headIndex := backData.entities.invalidateHead()
+		require.Equal(t, uint32(i), headIndex)
 	}
 }
 
