@@ -122,6 +122,16 @@ func TestInvalidateEntity(t *testing.T) {
 		entityCount     uint32
 		helpers         []func(*testing.T, *ArrayBackData, []*unittest.MockEntity)
 	}{
+		{ // edge-case empty list
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     0,
+		},
+		{ // edge-case single element-list
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     1,
+		},
 		{ // two buckets, entities below limit.
 			limit:           30,
 			overLimitFactor: 2,
