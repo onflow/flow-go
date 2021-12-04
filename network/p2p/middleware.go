@@ -79,7 +79,8 @@ type Middleware struct {
 	connectionGating           bool
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
-	*component.ComponentManager
+	cm                         component.ComponentManager
+	component.Component
 }
 
 type MiddlewareOption func(*Middleware)
@@ -151,7 +152,7 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	mw.ComponentManager = component.NewComponentManagerBuilder().
+	mw.cm = component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// TODO: refactor to avoid storing ctx altogether
 			mw.ctx = ctx
@@ -165,6 +166,8 @@ func NewMiddleware(
 			<-ctx.Done()
 			mw.stop()
 		}).Build()
+
+	mw.Component = mw.cm.Component()
 
 	return mw
 }

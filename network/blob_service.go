@@ -63,7 +63,7 @@ type BlobService interface {
 }
 
 type blobService struct {
-	*component.ComponentManager
+	component.Component
 	blockService blockservice.BlockService
 	reprovider   provider.Reprovider
 }
@@ -91,7 +91,7 @@ func NewBlobService(
 	prefix string,
 	ds datastore.Batching,
 	opts ...BlobServiceOption,
-) BlobService {
+) *blobService {
 	bs := &blobService{}
 	bstore := blockstore.NewBlockstore(ds)
 	bsNetwork := bsnet.NewFromIpfsHost(host, r, bsnet.Prefix(protocol.ID(prefix)))
@@ -103,7 +103,7 @@ func NewBlobService(
 		opt(config)
 	}
 
-	bs.ComponentManager = component.NewComponentManagerBuilder().
+	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			bs.blockService = blockservice.New(bstore, bitswap.New(ctx, bsNetwork, bstore))
 
@@ -132,6 +132,8 @@ func NewBlobService(
 			}
 		}).
 		Build()
+
+	bs.Component = cm.Component()
 
 	return bs
 }

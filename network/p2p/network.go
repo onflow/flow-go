@@ -20,6 +20,7 @@ import (
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/id"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/queue"
@@ -40,44 +41,21 @@ var NotEjectedFilter = filter.Not(filter.Ejected)
 // the protocols for handshakes, authentication, gossiping and heartbeats.
 type Network struct {
 	sync.RWMutex
-	identityProvider            id.IdentityProvider
-	logger                      zerolog.Logger
-	codec                       network.Codec
-	me                          module.Local
-	mw                          network.Middleware
-	top                         network.Topology // used to determine fanout connections
-	metrics                     module.NetworkMetrics
-	rcache                      *RcvCache // used to deduplicate incoming messages
-	queue                       network.MessageQueue
-	subMngr                     network.SubscriptionManager // used to keep track of subscribed channels
-	registerEngineRequests      chan *registerEngineRequest
-	registerBlobServiceRequests chan *registerBlobServiceRequest
-	*component.ComponentManager
+	identityProvider id.IdentityProvider
+	logger           zerolog.Logger
+	codec            network.Codec
+	me               module.Local
+	mw               network.Middleware
+	top              network.Topology // used to determine fanout connections
+	metrics          module.NetworkMetrics
+	rcache           *RcvCache // used to deduplicate incoming messages
+	queue            network.MessageQueue
+	subMngr          network.SubscriptionManager // used to keep track of subscribed channels
+	cm               component.ComponentManager
+	component.Component
 }
 
 var _ network.Network = (*Network)(nil)
-
-type registerEngineRequest struct {
-	channel  network.Channel
-	engine   network.Engine
-	respChan chan *registerEngineResp
-}
-
-type registerEngineResp struct {
-	conduit network.Conduit
-	err     error
-}
-
-type registerBlobServiceRequest struct {
-	channel  network.Channel
-	ds       datastore.Batching
-	respChan chan *registerBlobServiceResp
-}
-
-type registerBlobServiceResp struct {
-	blobService network.BlobService
-	err         error
-}
 
 var ErrNetworkShutdown = errors.New("network has already shutdown")
 
@@ -108,75 +86,25 @@ func NewNetwork(
 	}
 
 	o := &Network{
-		logger:                      log,
-		codec:                       codec,
-		me:                          me,
-		mw:                          mw,
-		rcache:                      rcache,
-		top:                         top,
-		metrics:                     metrics,
-		subMngr:                     sm,
-		identityProvider:            identityProvider,
-		registerEngineRequests:      make(chan *registerEngineRequest),
-		registerBlobServiceRequests: make(chan *registerBlobServiceRequest),
+		logger:           log,
+		codec:            codec,
+		me:               me,
+		mw:               mw,
+		rcache:           rcache,
+		top:              top,
+		metrics:          metrics,
+		subMngr:          sm,
+		identityProvider: identityProvider,
 	}
 
 	o.mw.SetOverlay(o)
 
-	o.ComponentManager = component.NewComponentManagerBuilder().
-		AddWorker(o.runMiddleware).
-		AddWorker(o.processRegisterEngineRequests).
-		AddWorker(o.processRegisterBlobServiceRequests).Build()
+	o.cm = component.NewComponentManagerBuilder().
+		AddWorker(o.runMiddleware).Build()
+
+	o.Component = o.cm.Component()
 
 	return o, nil
-}
-
-func (n *Network) processRegisterEngineRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	<-n.mw.Ready()
-	ready()
-
-	for {
-		select {
-		case req := <-n.registerEngineRequests:
-			conduit, err := n.handleRegisterEngineRequest(parent, req.channel, req.engine)
-			resp := &registerEngineResp{
-				conduit: conduit,
-				err:     err,
-			}
-
-			select {
-			case <-parent.Done():
-				return
-			case req.respChan <- resp:
-			}
-		case <-parent.Done():
-			return
-		}
-	}
-}
-
-func (n *Network) processRegisterBlobServiceRequests(parent irrecoverable.SignalerContext, ready component.ReadyFunc) {
-	<-n.mw.Ready()
-	ready()
-
-	for {
-		select {
-		case req := <-n.registerBlobServiceRequests:
-			blobService, err := n.handleRegisterBlobServiceRequest(parent, req.channel, req.ds)
-			resp := &registerBlobServiceResp{
-				blobService: blobService,
-				err:         err,
-			}
-
-			select {
-			case <-parent.Done():
-				return
-			case req.respChan <- resp:
-			}
-		case <-parent.Done():
-			return
-		}
-	}
 }
 
 func (n *Network) runMiddleware(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -249,45 +177,39 @@ func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.Signaler
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
 func (n *Network) Register(channel network.Channel, engine network.Engine) (network.Conduit, error) {
-	respChan := make(chan *registerEngineResp, 1)
-
-	select {
-	case <-n.ComponentManager.ShutdownSignal():
-		return nil, ErrNetworkShutdown
-	case n.registerEngineRequests <- &registerEngineRequest{
-		channel:  channel,
-		engine:   engine,
-		respChan: respChan,
-	}:
-		select {
-		case <-n.ComponentManager.ShutdownSignal():
-			return nil, ErrNetworkShutdown
-		case resp := <-respChan:
-			return resp.conduit, resp.err
-		}
+	if !util.CheckClosed(n.cm.Component().Ready()) {
+		return nil, errors.New("network is not ready")
 	}
+
+	var conduit network.Conduit
+	var err error
+
+	if runErr := n.cm.Run(func(ctx irrecoverable.SignalerContext) {
+		conduit, err = n.handleRegisterEngineRequest(ctx, channel, engine)
+	}); runErr != nil {
+		return nil, ErrNetworkShutdown
+	}
+
+	return conduit, err
 }
 
 // RegisterBlobService registers a BlobService on the given channel.
 // The returned BlobService can be used to request blobs from the network.
 func (n *Network) RegisterBlobService(channel network.Channel, ds datastore.Batching) (network.BlobService, error) {
-	respChan := make(chan *registerBlobServiceResp, 1)
-
-	select {
-	case <-n.ComponentManager.ShutdownSignal():
-		return nil, ErrNetworkShutdown
-	case n.registerBlobServiceRequests <- &registerBlobServiceRequest{
-		channel:  channel,
-		ds:       ds,
-		respChan: respChan,
-	}:
-		select {
-		case <-n.ComponentManager.ShutdownSignal():
-			return nil, ErrNetworkShutdown
-		case resp := <-respChan:
-			return resp.blobService, resp.err
-		}
+	if !util.CheckClosed(n.cm.Component().Ready()) {
+		return nil, errors.New("network is not ready")
 	}
+
+	var blobService network.BlobService
+	var err error
+
+	if runErr := n.cm.Run(func(ctx irrecoverable.SignalerContext) {
+		blobService, err = n.handleRegisterBlobServiceRequest(ctx, channel, ds)
+	}); runErr != nil {
+		return nil, ErrNetworkShutdown
+	}
+
+	return blobService, err
 }
 
 // unregister unregisters the engine for the specified channel. The engine will no longer be able to send or

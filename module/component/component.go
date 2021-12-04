@@ -149,12 +149,13 @@ type ReadyFunc func()
 // ComponentWorker represents a worker routine of a component.
 // It takes a SignalerContext which can be used to throw any irrecoverable errors it encounters,
 // as well as a ReadyFunc which must be called to signal that it is ready. The ComponentManager
-// waits until all workers have signaled that they are ready before closing its own Ready channel.
+// waits until all workers have signaled that they are ready before closing its Component's
+// Ready channel.
 type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
 
 // ComponentTask represents a one-off task.
 // It takes a SignalerContext which can be used to throw any irrecoverable errors it encounters.
-type ComponentTask func(ctx irrecoverable.SignalerContext) error
+type ComponentTask func(ctx irrecoverable.SignalerContext)
 
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
@@ -167,22 +168,22 @@ type ComponentManagerBuilder interface {
 
 // ComponentManager manages the worker routines and tasks of a Component.
 type ComponentManager interface {
-	Component
+	Component() Component
 
 	// Run executes the given ComponentTask, passing in the context that the
-	// ComponentManager was started with.
-	// If the ComponentManager is shutdown before the task finishes executing,
+	// ComponentManager's Component was started with.
+	// If the Component is shutdown before the task finishes executing,
 	// the returned error will be ErrComponentManagerShutdown.
 	Run(task ComponentTask) error
 
 	// RunAsync executes the given ComponentAsyncTask asynchronously, passing
-	// in the context that the ComponentManager was started with.
+	// in the context that the ComponentManager's Component was started with.
 	RunAsync(task ComponentTask)
 
-	// ShutdownSignal returns a channel that is closed when shutdown has commenced.
-	// This can happen either if the ComponentManager's context is canceled, or a
+	// ShutdownSignal returns a channel that is closed when shutdown of the
+	// Component has commenced.
+	// This can happen either if the Component's context is canceled, or a
 	// worker routine encounters an irrecoverable error.
-	// If this is called before Start, a nil channel will be returned.
 	ShutdownSignal() <-chan struct{}
 }
 
@@ -307,6 +308,10 @@ type componentManagerImpl struct {
 	*taskRunner
 }
 
+func (c *componentManagerImpl) Component() Component {
+	return c
+}
+
 // Start initiates the ComponentManager by launching all worker routines.
 func (c *componentManagerImpl) Start(parent irrecoverable.SignalerContext) {
 	// only start once
@@ -401,7 +406,6 @@ func (c *componentManagerImpl) Done() <-chan struct{} {
 // ShutdownSignal returns a channel that is closed when shutdown has commenced.
 // This can happen either if the ComponentManager's context is canceled, or a worker routine encounters
 // an irrecoverable error.
-// If this is called before Start, a nil channel will be returned.
 func (c *componentManagerImpl) ShutdownSignal() <-chan struct{} {
 	return c.shutdownSignal
 }
