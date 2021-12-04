@@ -79,7 +79,8 @@ type Middleware struct {
 	connectionGating           bool
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
-	*component.ComponentManager
+	cm                         component.ComponentManager
+	component.Component
 }
 
 type MiddlewareOption func(*Middleware)
@@ -102,6 +103,12 @@ func WithPeerManager(peerManagerFunc PeerManagerFactoryFunc) MiddlewareOption {
 	}
 }
 
+func WithConnectionGating(enabled bool) MiddlewareOption {
+	return func(mw *Middleware) {
+		mw.connectionGating = enabled
+	}
+}
+
 // NewMiddleware creates a new middleware instance
 // libP2PNodeFactory is the factory used to create a LibP2PNode
 // flowID is this node's Flow ID
@@ -118,7 +125,6 @@ func NewMiddleware(
 	metrics module.NetworkMetrics,
 	rootBlockID flow.Identifier,
 	unicastMessageTimeout time.Duration,
-	connectionGating bool,
 	idTranslator IDTranslator,
 	opts ...MiddlewareOption,
 ) *Middleware {
@@ -137,7 +143,7 @@ func NewMiddleware(
 		rootBlockID:           rootBlockID,
 		validators:            DefaultValidators(log, flowID),
 		unicastMessageTimeout: unicastMessageTimeout,
-		connectionGating:      connectionGating,
+		connectionGating:      false,
 		peerManagerFactory:    nil,
 		idTranslator:          idTranslator,
 	}
@@ -146,7 +152,7 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	mw.ComponentManager = component.NewComponentManagerBuilder().
+	mw.cm = component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// TODO: refactor to avoid storing ctx altogether
 			mw.ctx = ctx
@@ -160,6 +166,8 @@ func NewMiddleware(
 			<-ctx.Done()
 			mw.stop()
 		}).Build()
+
+	mw.Component = mw.cm.Component()
 
 	return mw
 }
@@ -266,7 +274,6 @@ func (m *Middleware) start(ctx context.Context) error {
 
 	// create and use a peer manager if a peer manager factory was passed in during initialization
 	if m.peerManagerFactory != nil {
-
 		m.peerManager, err = m.peerManagerFactory(m.libP2PNode.host, m.topologyPeers, m.log)
 		if err != nil {
 			return fmt.Errorf("failed to create peer manager: %w", err)

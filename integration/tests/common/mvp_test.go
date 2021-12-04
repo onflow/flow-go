@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // timeout for individual actions
@@ -37,9 +38,7 @@ func TestMVP_Network(t *testing.T) {
 }
 
 func TestMVP_Bootstrap(t *testing.T) {
-
-	// skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451
-	t.Skip()
+	unittest.SkipUnless(t, unittest.TEST_WIP, "skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451")
 
 	testingdock.Verbose = false
 
@@ -100,23 +99,6 @@ func TestMVP_Bootstrap(t *testing.T) {
 	t.Log("@@ finished running mvp test 2")
 }
 
-func TestMVP_Emulator(t *testing.T) {
-	// Start emulator manually for now, used for testing the test
-	// TODO - start an emulator instance
-	t.Skip()
-
-	// key, err := unittest.EmulatorRootKey()
-	// require.NoError(t, err)
-
-	// c, err := testnet.NewClientWithKey(":3569", key, flow.Emulator.Chain())
-	// require.NoError(t, err)
-
-	//TODO commented out because main test requires root for sending tx
-	// with valid reference block ID
-	//runMVPTest(t, c)
-	// _ = c
-}
-
 func buildMVPNetConfig() testnet.NetworkConfig {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
@@ -141,7 +123,6 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 	}
 

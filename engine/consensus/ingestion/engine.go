@@ -29,7 +29,7 @@ const defaultIngestionEngineWorkers = 3
 // link between collection nodes and consensus nodes and has a counterpart with
 // the same engine ID in the collection node.
 type Engine struct {
-	*component.ComponentManager
+	component.Component
 	log               zerolog.Logger         // used to log relevant actions with context
 	me                module.Local           // used to access local node information
 	con               network.Conduit        // conduit to receive/send guarantees
@@ -97,7 +97,7 @@ func New(
 		})
 	}
 
-	e.ComponentManager = componentManagerBuilder.Build()
+	e.Component = componentManagerBuilder.Build().Component()
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.ReceiveGuarantees, e)

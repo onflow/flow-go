@@ -13,6 +13,7 @@ import (
 
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const CHANNEL_CLOSE_LATENCY_ALLOWANCE = 20 * time.Millisecond
@@ -383,7 +384,8 @@ func (st *StateTransition) String() string {
 }
 
 type ComponentManagerMachine struct {
-	cm *component.ComponentManager
+	cm        component.ComponentManager
+	component component.Component
 
 	cancel                    context.CancelFunc
 	workerTransitionConsumers []WSTConsumer
@@ -513,7 +515,8 @@ func (c *ComponentManagerMachine) Init(t *rapid.T) {
 	}
 
 	c.cm = cmb.Build()
-	c.cm.Start(signalerCtx)
+	c.component = c.cm.Component()
+	c.component.Start(signalerCtx)
 
 	for i := 0; i < numWorkers; i++ {
 		c.workerStates[i] = WorkerStartingUp
@@ -588,7 +591,7 @@ func (c *ComponentManagerMachine) Check(t *rapid.T) {
 			WorkerStartupEncounteredFatal,
 		}).Contains(state) {
 			allWorkersReady = false
-			c.assertNotClosed(t, c.cm.Ready(), "worker %v has not finished startup but component manager ready channel is closed", workerID)
+			c.assertNotClosed(t, c.component.Ready(), "worker %v has not finished startup but component manager ready channel is closed", workerID)
 		}
 
 		if !(WorkerStateList{
@@ -599,7 +602,7 @@ func (c *ComponentManagerMachine) Check(t *rapid.T) {
 			WorkerDone,
 		}).Contains(state) {
 			allWorkersDone = false
-			c.assertNotClosed(t, c.cm.Done(), "worker %v has not exited but component manager done channel is closed", workerID)
+			c.assertNotClosed(t, c.component.Done(), "worker %v has not exited but component manager done channel is closed", workerID)
 		}
 
 		if (WorkerStateList{
@@ -615,11 +618,11 @@ func (c *ComponentManagerMachine) Check(t *rapid.T) {
 	}
 
 	if allWorkersReady {
-		c.assertClosed(t, c.cm.Ready(), "all workers are ready but component manager ready channel is not closed")
+		c.assertClosed(t, c.component.Ready(), "all workers are ready but component manager ready channel is not closed")
 	}
 
 	if allWorkersDone {
-		c.assertClosed(t, c.cm.Done(), "all workers are done but component manager done channel is not closed")
+		c.assertClosed(t, c.component.Done(), "all workers are done but component manager done channel is not closed")
 	}
 
 	if c.workerErrors != nil {
@@ -631,8 +634,7 @@ func (c *ComponentManagerMachine) Check(t *rapid.T) {
 }
 
 func TestComponentManager(t *testing.T) {
-	// skip because this test takes too long
-	t.Skip()
+	unittest.SkipUnless(t, unittest.TEST_LONG_RUNNING, "skip because this test takes too long")
 
 	rapid.Check(t, rapid.Run(&ComponentManagerMachine{}))
 }

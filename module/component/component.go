@@ -2,6 +2,7 @@ package component
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 
@@ -146,10 +147,15 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 type ReadyFunc func()
 
 // ComponentWorker represents a worker routine of a component.
-// It takes a SignalerContext which can be used to throw any irrecoverable errors it encouters,
+// It takes a SignalerContext which can be used to throw any irrecoverable errors it encounters,
 // as well as a ReadyFunc which must be called to signal that it is ready. The ComponentManager
-// waits until all workers have signaled that they are ready before closing its own Ready channel.
+// waits until all workers have signaled that they are ready before closing its Component's
+// Ready channel.
 type ComponentWorker func(ctx irrecoverable.SignalerContext, ready ReadyFunc)
+
+// ComponentTask represents a one-off task.
+// It takes a SignalerContext which can be used to throw any irrecoverable errors it encounters.
+type ComponentTask func(ctx irrecoverable.SignalerContext)
 
 // ComponentManagerBuilder provides a mechanism for building a ComponentManager
 type ComponentManagerBuilder interface {
@@ -157,7 +163,28 @@ type ComponentManagerBuilder interface {
 	AddWorker(ComponentWorker) ComponentManagerBuilder
 
 	// Build builds and returns a new ComponentManager instance
-	Build() *ComponentManager
+	Build() ComponentManager
+}
+
+// ComponentManager manages the worker routines and tasks of a Component.
+type ComponentManager interface {
+	Component() Component
+
+	// Run executes the given ComponentTask, passing in the context that the
+	// ComponentManager's Component was started with.
+	// If the Component is shutdown before the task finishes executing,
+	// the returned error will be ErrComponentManagerShutdown.
+	Run(task ComponentTask) error
+
+	// RunAsync executes the given ComponentAsyncTask asynchronously, passing
+	// in the context that the ComponentManager's Component was started with.
+	RunAsync(task ComponentTask)
+
+	// ShutdownSignal returns a channel that is closed when shutdown of the
+	// Component has commenced.
+	// This can happen either if the Component's context is canceled, or a
+	// worker routine encounters an irrecoverable error.
+	ShutdownSignal() <-chan struct{}
 }
 
 type componentManagerBuilderImpl struct {
@@ -174,34 +201,112 @@ func (c *componentManagerBuilderImpl) AddWorker(worker ComponentWorker) Componen
 	return c
 }
 
-func (c *componentManagerBuilderImpl) Build() *ComponentManager {
-	return &ComponentManager{
-		started: atomic.NewBool(false),
-		ready:   make(chan struct{}),
-		done:    make(chan struct{}),
-		workers: c.workers,
+func (c *componentManagerBuilderImpl) Build() ComponentManager {
+	shutdownSignal := make(chan struct{})
+
+	taskRunner := &taskRunner{
+		tasks:          make(chan *runTaskRequest),
+		asyncTasks:     make(chan ComponentTask),
+		shutdownSignal: shutdownSignal,
+	}
+
+	// copy workers to a new slice to prevent further modifications
+	workers := make([]ComponentWorker, len(c.workers)+1)
+	workers[0] = taskRunner.handleTasks
+	copy(workers[1:], c.workers)
+
+	return &componentManagerImpl{
+		started:        atomic.NewBool(false),
+		ready:          make(chan struct{}),
+		done:           make(chan struct{}),
+		shutdownSignal: shutdownSignal,
+		workers:        workers,
+		taskRunner:     taskRunner,
 	}
 }
 
-var _ Component = (*ComponentManager)(nil)
+var ErrComponentManagerClosed = errors.New("component manager is closed")
 
-// ComponentManager is used to manage the worker routines of a Component
-type ComponentManager struct {
+type taskRunner struct {
+	tasks          chan *runTaskRequest
+	asyncTasks     chan ComponentTask
+	shutdownSignal chan struct{}
+}
+
+type runTaskRequest struct {
+	task ComponentTask
+	done chan struct{}
+}
+
+func (t *taskRunner) Run(task ComponentTask) error {
+	done := make(chan struct{})
+
+	select {
+	case <-t.shutdownSignal:
+		return ErrComponentManagerClosed
+	case t.tasks <- &runTaskRequest{task, done}:
+		select {
+		case <-t.shutdownSignal:
+			return ErrComponentManagerClosed
+		case <-done:
+			return nil
+		}
+	}
+}
+
+func (t *taskRunner) RunAsync(task ComponentTask) {
+	go func() {
+		select {
+		case <-t.shutdownSignal:
+		case t.asyncTasks <- task:
+		}
+	}()
+}
+
+func (t *taskRunner) handleTasks(ctx irrecoverable.SignalerContext, ready ReadyFunc) {
+	ready()
+
+	for {
+		select {
+		case taskRequest := <-t.tasks:
+			go func() {
+				defer close(taskRequest.done)
+
+				taskRequest.task(ctx)
+			}()
+		case asyncTask := <-t.asyncTasks:
+			go asyncTask(ctx)
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+var _ ComponentManager = (*componentManagerImpl)(nil)
+
+type componentManagerImpl struct {
 	started        *atomic.Bool
 	ready          chan struct{}
 	done           chan struct{}
-	shutdownSignal <-chan struct{}
+	shutdownSignal chan struct{}
 
 	workers []ComponentWorker
+
+	*taskRunner
+}
+
+func (c *componentManagerImpl) Component() Component {
+	return c
 }
 
 // Start initiates the ComponentManager by launching all worker routines.
-func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
+func (c *componentManagerImpl) Start(parent irrecoverable.SignalerContext) {
 	// only start once
 	if c.started.CAS(false, true) {
 		ctx, cancel := context.WithCancel(parent)
 		signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-		c.shutdownSignal = ctx.Done()
+
+		go c.waitForShutdownSignal(ctx.Done())
 
 		// launch goroutine to propagate irrecoverable error
 		go func() {
@@ -246,6 +351,8 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 			}()
 		}
 
+		c.workers = nil
+
 		// launch goroutine to close ready channel
 		go c.waitForReady(&workersReady)
 
@@ -256,32 +363,36 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	}
 }
 
-func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
+func (c *componentManagerImpl) waitForShutdownSignal(shutdownSignal <-chan struct{}) {
+	<-shutdownSignal
+	close(c.shutdownSignal)
+}
+
+func (c *componentManagerImpl) waitForReady(workersReady *sync.WaitGroup) {
 	workersReady.Wait()
 	close(c.ready)
 }
 
-func (c *ComponentManager) waitForDone(workersDone *sync.WaitGroup) {
+func (c *componentManagerImpl) waitForDone(workersDone *sync.WaitGroup) {
 	workersDone.Wait()
 	close(c.done)
 }
 
 // Ready returns a channel which is closed once all the worker routines have been launched and are ready.
 // If any worker routines exit before they indicate that they are ready, the channel returned from Ready will never close.
-func (c *ComponentManager) Ready() <-chan struct{} {
+func (c *componentManagerImpl) Ready() <-chan struct{} {
 	return c.ready
 }
 
 // Done returns a channel which is closed once the ComponentManager has shut down.
 // This happens when all worker routines have shut down (either gracefully or by throwing an error).
-func (c *ComponentManager) Done() <-chan struct{} {
+func (c *componentManagerImpl) Done() <-chan struct{} {
 	return c.done
 }
 
 // ShutdownSignal returns a channel that is closed when shutdown has commenced.
 // This can happen either if the ComponentManager's context is canceled, or a worker routine encounters
 // an irrecoverable error.
-// If this is called before Start, a nil channel will be returned.
-func (c *ComponentManager) ShutdownSignal() <-chan struct{} {
+func (c *componentManagerImpl) ShutdownSignal() <-chan struct{} {
 	return c.shutdownSignal
 }
