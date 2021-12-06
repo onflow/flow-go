@@ -121,12 +121,7 @@ func (node *FlowNodeImp) run() error {
 	doneCtx, _ := util.WithDone(context.Background(), node.Done())
 
 	// Block here until all components have stopped or an irrecoverable error is received.
-	err = util.WaitError(doneCtx, errChan)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return util.WaitError(doneCtx, errChan)
 }
 
 // handleFatal handles irrecoverable errors by logging them and exiting the process.
