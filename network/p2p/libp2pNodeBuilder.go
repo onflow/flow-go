@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p"
-	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/routing"
@@ -58,8 +57,6 @@ func DefaultLibP2PNodeFactory(
 			return nil, err
 		}
 
-		psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
-
 		var opts []libp2p.Option = []libp2p.Option{
 			libp2p.ConnectionManager(connManager),
 			libp2p.ConnectionGater(NewConnGater(log, func(pid peer.ID) bool {
@@ -77,6 +74,8 @@ func DefaultLibP2PNodeFactory(
 			return nil, err
 		}
 
+		psOpts := DefaultPubsubOptions(maxPubSubMsgSize)
+
 		if role != "ghost" {
 			psOpts = append(psOpts, pubsub.WithSubscriptionFilter(NewRoleBasedFilter(h.ID(), idProvider)))
 		}
@@ -88,7 +87,6 @@ func DefaultLibP2PNodeFactory(
 		}
 
 		return NewNodeBuilder(log, h, ps, sporkId).
-			SetConnectionManager(connManager).
 			SetPingInfoProvider(pingInfoProvider).
 			Build()
 	}
@@ -96,7 +94,6 @@ func DefaultLibP2PNodeFactory(
 
 type NodeBuilder interface {
 	SetTopicValidation(bool) NodeBuilder
-	SetConnectionManager(connmgr.ConnManager) NodeBuilder
 	SetRoutingSystem(routing.Routing) NodeBuilder
 	SetPingInfoProvider(PingInfoProvider) NodeBuilder
 	Build() (*Node, error)
@@ -108,7 +105,6 @@ type LibP2PNodeBuilder struct {
 	host             host.Host
 	pubSub           *pubsub.PubSub
 	topicValidation  bool
-	connMngr         connmgr.ConnManager
 	rsys             routing.Routing
 	pingInfoProvider PingInfoProvider
 }
@@ -125,11 +121,6 @@ func NewNodeBuilder(logger zerolog.Logger, h host.Host, ps *pubsub.PubSub, spork
 
 func (builder *LibP2PNodeBuilder) SetTopicValidation(enabled bool) NodeBuilder {
 	builder.topicValidation = enabled
-	return builder
-}
-
-func (builder *LibP2PNodeBuilder) SetConnectionManager(connMngr connmgr.ConnManager) NodeBuilder {
-	builder.connMngr = connMngr
 	return builder
 }
 
@@ -162,7 +153,6 @@ func (builder *LibP2PNodeBuilder) Build() (*Node, error) {
 		subs:            make(map[flownet.Topic]*pubsub.Subscription),
 		logger:          builder.logger,
 		topicValidation: builder.topicValidation,
-		connMgr:         builder.connMngr,
 		routing:         builder.rsys,
 		host:            builder.host,
 		unicastManager: unicast.NewUnicastManager(

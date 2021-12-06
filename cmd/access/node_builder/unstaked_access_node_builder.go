@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/libp2p/go-libp2p-core/host"
+	"github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p-core/peer"
+	discovery "github.com/libp2p/go-libp2p-discovery"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	madns "github.com/multiformats/go-multiaddr-dns"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/crypto"
@@ -175,57 +177,81 @@ func (anb *UnstakedAccessNodeBuilder) validateParams() error {
 //		No connection gater
 // 		No connection manager
 // 		Default libp2p pubsub options
-func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier, networkKey crypto.PrivateKey) (p2p.LibP2PFactoryFunc, error) {
-
-	// the unstaked nodes act as the DHT clients
-	dhtOptions := []dht.Option{p2p.AsServer(false)}
-
-	// seed the DHT with the boostrap identities
-	bootstrapPeersOpt, err := p2p.WithBootstrapPeers(builder.bootstrapIdentities)
-	if err != nil {
-		return nil, err
-	}
-	dhtOptions = append(dhtOptions, bootstrapPeersOpt)
-
-	resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
-
-	var pis []peer.AddrInfo
-	for _, b := range builder.bootstrapIdentities {
-		pi, err := p2p.PeerAddressInfo(*b)
-		if err != nil {
-			return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
-		}
-		pis = append(pis, pi)
-	}
-
-	psOpts := append(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize),
-		func(_ context.Context, h host.Host) (pubsub.Option, error) {
-			return pubsub.WithSubscriptionFilter(p2p.NewRoleBasedFilter(
-				h.ID(), builder.IdentityProvider,
-			)), nil
-		},
-		// Note: using the WithDirectPeers option will automatically store these addresses
-		// as permanent addresses in the Peerstore and try to connect to them when the
-		// PubSubRouter starts up
-		p2p.PubSubOptionWrapper(pubsub.WithDirectPeers(pis)),
-	)
+func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier, networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 
 	return func(ctx context.Context) (*p2p.Node, error) {
-		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
-			SetSporkID(builder.SporkID).
-			// unlike the staked side of the network where currently all the node addresses are known upfront,
-			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
-			SetDHTOptions(dhtOptions...).
-			SetLogger(builder.Logger).
-			SetResolver(resolver).
-			SetPubsubOptions(psOpts...).
-			Build(ctx)
+		resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
+		libp2pResolver, err := madns.NewResolver(madns.WithDefaultResolver(resolver))
+
+		if err != nil {
+			return nil, fmt.Errorf("could not create resolver: %w", err)
+		}
+
+		var opts []libp2p.Option = []libp2p.Option{
+			libp2p.MultiaddrResolver(libp2pResolver),
+		}
+
+		host, err := p2p.DefaultLibP2PHost(ctx, builder.BaseConfig.BindAddr, networkKey, opts...)
+
 		if err != nil {
 			return nil, err
 		}
-		builder.LibP2PNode = libp2pNode
+
+		var pis []peer.AddrInfo
+
+		for _, b := range builder.bootstrapIdentities {
+			pi, err := p2p.PeerAddressInfo(*b)
+
+			if err != nil {
+				return nil, fmt.Errorf("could not extract peer address info from bootstrap identity %v: %w", b, err)
+			}
+
+			pis = append(pis, pi)
+		}
+
+		dhtOptions := []dht.Option{
+			p2p.AsServer(false),
+			dht.BootstrapPeers(pis...), // seed the DHT with the bootstrap identities
+		}
+
+		kdht, err := p2p.NewDHT(ctx, host, dhtOptions...)
+
+		if err != nil {
+			return nil, err
+		}
+
+		psOpts := append(
+			p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize),
+			pubsub.WithSubscriptionFilter(
+				p2p.NewRoleBasedFilter(
+					host.ID(), builder.IdentityProvider,
+				),
+			),
+			pubsub.WithDiscovery(discovery.NewRoutingDiscovery(kdht)),
+			// Note: using the WithDirectPeers option will automatically store these addresses
+			// as permanent addresses in the Peerstore and try to connect to them when the
+			// PubSubRouter starts up
+			pubsub.WithDirectPeers(pis),
+		)
+
+		ps, err := p2p.DefaultPubSub(ctx, host, psOpts...)
+
+		if err != nil {
+			return nil, err
+		}
+
+		node, err := p2p.NewNodeBuilder(builder.Logger, host, ps, builder.SporkID).
+			SetRoutingSystem(kdht).
+			Build()
+
+		if err != nil {
+			return nil, err
+		}
+
+		builder.LibP2PNode = node
+
 		return builder.LibP2PNode, nil
-	}, nil
+	}
 }
 
 // initUnstakedLocal initializes the unstaked node ID, network key and network address
@@ -264,10 +290,7 @@ func (anb *UnstakedAccessNodeBuilder) enqueueMiddleware() {
 			// for now we use the empty metrics NoopCollector till we have defined the new unstaked network metrics
 			unstakedNetworkMetrics := metrics.NewNoopCollector()
 
-			libP2PFactory, err := anb.initLibP2PFactory(unstakedNodeID, unstakedNetworkKey)
-			if err != nil {
-				return err
-			}
+			libP2PFactory := anb.initLibP2PFactory(unstakedNodeID, unstakedNetworkKey)
 
 			msgValidators := unstakedNetworkMsgValidators(node.Logger, node.IdentityProvider, unstakedNodeID)
 
@@ -338,7 +361,6 @@ func (anb *UnstakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		p2p.DefaultUnicastTimeout,
 		anb.IDTranslator,
 		p2p.WithMessageValidators(validators...),
-		p2p.WithConnectionGating(false),
 		// no peer manager
 		// use default identifier provider
 	)

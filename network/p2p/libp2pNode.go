@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/libp2p/go-libp2p-core/connmgr"
 	"github.com/libp2p/go-libp2p-core/host"
 	libp2pnet "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
@@ -46,7 +45,6 @@ type Node struct {
 	topics          map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
 	subs            map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
 	pingService     *PingService
-	connMgr         connmgr.ConnManager
 	routing         routing.Routing
 	topicValidation bool
 	pCache          *protocolPeerCache
@@ -275,8 +273,8 @@ func (n *Node) Ping(ctx context.Context, peerID peer.ID) (message.PingResponse, 
 
 	targetInfo := peer.AddrInfo{ID: peerID}
 
-	n.connMgr.Protect(targetInfo.ID, "ping")
-	defer n.connMgr.Unprotect(targetInfo.ID, "ping")
+	n.host.ConnManager().Protect(targetInfo.ID, "ping")
+	defer n.host.ConnManager().Unprotect(targetInfo.ID, "ping")
 
 	// connect to the target node
 	err := n.host.Connect(ctx, targetInfo)

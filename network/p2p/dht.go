@@ -4,10 +4,8 @@ import (
 	"context"
 
 	"github.com/libp2p/go-libp2p-core/host"
-	"github.com/libp2p/go-libp2p-core/peer"
 	dht "github.com/libp2p/go-libp2p-kad-dht"
 
-	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 )
 
@@ -41,18 +39,6 @@ func AsServer(enable bool) dht.Option {
 		return dht.Mode(dht.ModeServer)
 	}
 	return dht.Mode(dht.ModeClient)
-}
-
-func WithBootstrapPeers(bootstrapNodes flow.IdentityList) (dht.Option, error) {
-	var peers []peer.AddrInfo
-	for _, b := range bootstrapNodes {
-		peer, err := PeerAddressInfo(*b)
-		if err != nil {
-			return nil, err
-		}
-		peers = append(peers, peer)
-	}
-	return dht.BootstrapPeers(peers...), nil
 }
 
 func defaultDHTOptions() []dht.Option {

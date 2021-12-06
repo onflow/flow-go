@@ -200,6 +200,10 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier
 		resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 		libp2pResolver, err := madns.NewResolver(madns.WithDefaultResolver(resolver))
 
+		if err != nil {
+			return nil, fmt.Errorf("could not create resolver: %w", err)
+		}
+
 		var opts []libp2p.Option = []libp2p.Option{
 			libp2p.ConnectionManager(connManager),
 			libp2p.MultiaddrResolver(libp2pResolver),
@@ -228,6 +232,7 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier
 		)
 
 		ps, err := p2p.DefaultPubSub(ctx, host, psOpts...)
+
 		if err != nil {
 			return nil, err
 		}
