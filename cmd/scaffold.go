@@ -744,9 +744,9 @@ func (fnb *FlowNodeBuilder) handleModule(v namedModuleFunc) error {
 	return nil
 }
 
-// handleComponents executes each component's factory method to instantiate all of the dependencies,
-// then registers the component with the ComponentManager to be started when the node starts.
-// It uses channel signals to ensure that the components are started serially.
+// handleComponents registers the component's factory method with the ComponentManager to be run
+// when the node starts.
+// It uses signal channels to ensure that components are started serially.
 func (fnb *FlowNodeBuilder) handleComponents() error {
 	// The parent/started channels are used to enforce serial startup.
 	// - parent is the started channel of the previous component.
@@ -775,22 +775,22 @@ func (fnb *FlowNodeBuilder) handleComponents() error {
 //
 // The ComponentManager starts all workers in parallel. Since some components have non-idempotent
 // ReadyDoneAware interfaces, we need to ensure that they are started serially. This is accomplished
-// using the parent channel and the started closure. Components wait for the parent channel to close
-// before starting, and then call the started function after they are ready(). The started function
-// closes the parent channel of the next component, and so on.
+// using the parentReady channel and the started closure. Components wait for the parentReady channel
+// to close before starting, and then call the started callback after they are ready(). The started
+// callback closes the parentReady channel of the next component, and so on.
 //
 // TODO: Instead of this serial startup, components should wait for their depenedencies to be ready
 // using their ReadyDoneAware interface. After components are updated to use the idempotent
 // ReadyDoneAware interface and explicilty wait for their dependencies to be ready, we can remove
 // this channel chaining.
-func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parent <-chan struct{}, started func()) error {
+func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-chan struct{}, started func()) error {
 	// Add a closure that starts the component when the node is started, and then waits for it to exit
 	// gracefully.
 	// Startup for all components will happen in parallel, and components can use their dependencies'
 	// ReadyDoneAware interface to wait until they are ready.
 	fnb.componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		// wait for the previous component to be ready before starting
-		if err := util.WaitClosed(ctx, parent); err != nil {
+		if err := util.WaitClosed(ctx, parentReady); err != nil {
 			return
 		}
 
