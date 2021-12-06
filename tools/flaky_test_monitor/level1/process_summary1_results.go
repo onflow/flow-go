@@ -44,7 +44,7 @@ func processSummary1TestRun(resultReader ResultReader) helpers.TestRun {
 	packageResultMap := processTestRunLineByLine(scanner)
 
 	err := scanner.Err()
-	helpers.AssertErrNil(err, "error returning EOF for scanner")
+	helpers.AssertNoError(err, "error returning EOF for scanner")
 
 	postProcessTestRun(packageResultMap)
 
@@ -66,7 +66,7 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*helpers.Packag
 	for scanner.Scan() {
 		var rawTestStep helpers.RawTestStep
 		err := json.Unmarshal(scanner.Bytes(), &rawTestStep)
-		helpers.AssertErrNil(err, "error unmarshalling raw test step")
+		helpers.AssertNoError(err, "error unmarshalling raw test step")
 
 		// check if package result exists to hold test results
 		packageResult, packageResultExists := packageResultMap[rawTestStep.Package]
@@ -181,10 +181,10 @@ func finalizeTestRun(packageResultMap map[string]*helpers.PackageResult) helpers
 	}
 
 	commitDate, err := time.Parse(time.RFC3339, os.Getenv("COMMIT_DATE"))
-	helpers.AssertErrNil(err, "error parsing COMMIT_DATE")
+	helpers.AssertNoError(err, "error parsing COMMIT_DATE")
 
 	jobStarted, err := time.Parse(time.RFC3339, os.Getenv("JOB_STARTED"))
-	helpers.AssertErrNil(err, "error parsing JOB_STARTED")
+	helpers.AssertNoError(err, "error parsing JOB_STARTED")
 
 	var testRun helpers.TestRun
 	testRun.CommitDate = commitDate.UTC()

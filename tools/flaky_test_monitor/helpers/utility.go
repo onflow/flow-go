@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-func AssertErrNil(err error, panicMessage string) {
+func AssertNoError(err error, panicMessage string) {
 	if err != nil {
 		panic(panicMessage + ": " + err.Error())
 	}
@@ -36,7 +36,7 @@ func ConvertTo2DecimalPlaces(numerator, denominator int) float32 {
 func convertTo2DecimalPlacesInternal(numerator, denominator float32) float32 {
 	ratioString := fmt.Sprintf("%.2f", numerator/denominator)
 	ratioFloat, err := strconv.ParseFloat(ratioString, 32)
-	AssertErrNil(err, "failure parsing string to float")
+	AssertNoError(err, "failure parsing string to float")
 	return float32(ratioFloat)
 }
 
@@ -60,12 +60,12 @@ func FolderExists(path string) bool {
 // save test run/summary to local JSON file
 func SaveToFile(fileName string, testSummary interface{}) {
 	testSummaryBytes, err := json.MarshalIndent(testSummary, "", "  ")
-	AssertErrNil(err, "error marshalling json")
+	AssertNoError(err, "error marshalling json")
 
 	file, err := os.Create(fileName)
-	AssertErrNil(err, "error creating filename")
+	AssertNoError(err, "error creating filename")
 	defer file.Close()
 
 	_, err = file.Write(testSummaryBytes)
-	AssertErrNil(err, "error saving test summary to file")
+	AssertNoError(err, "error saving test summary to file")
 }

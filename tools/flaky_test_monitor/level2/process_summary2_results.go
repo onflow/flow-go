@@ -12,9 +12,9 @@ const failuresDir = "./failures/"
 // process level 1 summary files in a single directory and output level 2 summary
 func processSummary2TestRun(level1Directory string) helpers.TestSummary2 {
 	dirEntries, err := os.ReadDir(level1Directory)
-	helpers.AssertErrNil(err, "error reading level 1 directory")
+	helpers.AssertNoError(err, "error reading level 1 directory")
 	err = os.Mkdir(failuresDir, 0755)
-	helpers.AssertErrNil(err, "error creating failures directory")
+	helpers.AssertNoError(err, "error creating failures directory")
 
 	testSummary2 := helpers.TestSummary2{}
 	testSummary2.TestResults = make(map[string]*helpers.TestResultSummary)
@@ -25,10 +25,10 @@ func processSummary2TestRun(level1Directory string) helpers.TestSummary2 {
 		var level1TestRun helpers.TestRun
 
 		level1JsonBytes, err := os.ReadFile(level1Directory + dirEntries[i].Name())
-		helpers.AssertErrNil(err, "error reading level 1 json")
+		helpers.AssertNoError(err, "error reading level 1 json")
 
 		err = json.Unmarshal(level1JsonBytes, &level1TestRun)
-		helpers.AssertErrNil(err, "error unmarshalling level 1 test run")
+		helpers.AssertNoError(err, "error unmarshalling level 1 test run")
 
 		// go through each level 1 summary and update level 2 summary
 		for _, packageResult := range level1TestRun.PackageResults {
@@ -91,23 +91,23 @@ func saveFailureMessage(testResult helpers.TestResult) {
 	// test folder exists
 	if !helpers.FolderExists(failuresDir + testResult.Test) {
 		err := os.Mkdir(failuresDir+testResult.Test, 0755)
-		helpers.AssertErrNil(err, "error creating sub-dir under failuresDir")
+		helpers.AssertNoError(err, "error creating sub-dir under failuresDir")
 	}
 
 	// under each sub-directory, there should be 1 or more text files (failure1.txt, failure2.txt, etc)
 	// that holds the raw failure message for that test
 
 	dirEntries, err := os.ReadDir(failuresDir + testResult.Test)
-	helpers.AssertErrNil(err, "error reading sub-dir entries under failuresDir")
+	helpers.AssertNoError(err, "error reading sub-dir entries under failuresDir")
 
 	// failure text files will be named "failure1.txt", "failure2.txt", etc so we want to know how
 	// many failure files already exist in the sub-directory before creating the next one
 	failureFile, err := os.Create(failuresDir + testResult.Test + "/" + fmt.Sprintf("failure%d.txt", len(dirEntries)+1))
-	helpers.AssertErrNil(err, "error creating failure file")
+	helpers.AssertNoError(err, "error creating failure file")
 
 	for _, output := range testResult.Output {
 		_, err = failureFile.WriteString(output)
-		helpers.AssertErrNil(err, "error writing to failure file")
+		helpers.AssertNoError(err, "error writing to failure file")
 	}
 }
 
