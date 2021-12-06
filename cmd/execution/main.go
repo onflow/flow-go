@@ -11,7 +11,6 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -388,10 +387,46 @@ func main() {
 				chdpQueryTimeout,
 				chdpDeliveryTimeout,
 			)
+			if err != nil {
+				return nil, err
+			}
 
-			logEpochNumber(vm, vmCtx, executionState, node, node.Logger.With().Str("component", "provider engine").Logger())
+			// Get the epoch counter from the smart contract.
+			contractEpochCounter, err := getContractEpochCounter(vm, vmCtx, executionState)
+			// Failing to fetch the epoch counter from the smart contract is a fatal error.
+			if err != nil {
+				return nil, fmt.Errorf("cannot get epoch counter from the smart contract: %w", err)
+			}
+			// Get the epoch counter form the protocol state.
+			protocolStateEpochCounter, err := node.State.
+				Final().
+				Epochs().
+				Current().
+				Counter()
+			// Failing to fetch the epoch counter from the protocol state is a fatal error.
+			if err != nil {
+				return nil, fmt.Errorf("cannot get epoch counter from the protocol state: %w", err)
+			}
 
-			return providerEngine, err
+			if contractEpochCounter != protocolStateEpochCounter {
+				// Do not error, because immediately following a spork they will be mismatching,
+				// until the resetEpoch transaction is submitted.
+				node.Logger.
+					Warn().
+					Str("component", "provider engine").
+					Uint64("contractEpochCounter", contractEpochCounter).
+					Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
+					Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state mismatch!")
+			} else {
+				node.Logger.
+					Log().
+					Str("component", "provider engine").
+					Uint64("contractEpochCounter", contractEpochCounter).
+					Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
+					Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state match.")
+			}
+
+			return providerEngine, nil
 		}).
 		Component("checker engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			checkerEng = checker.New(
@@ -570,28 +605,12 @@ func main() {
 		}).Run()
 }
 
-// Get and log the epoch counters from the protocol state and from the FlowEpoch smart contract.
-func logEpochNumber(vm *fvm.VirtualMachine, vmCtx fvm.Context, executionState state.ExecutionState, node *cmd.NodeConfig, log zerolog.Logger) {
-	logFail := func(err error) {
-		log.Error().Err(err).Msg("could not log epoch number")
-	}
-
-	// Get the epoch counter form the protocol state
-	protocolStateEpoch, err := node.State.
-		Final().
-		Epochs().
-		Current().
-		Counter()
-	if err != nil {
-		logFail(err)
-		return
-	}
-
+// getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the latest executed block.
+func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, executionState state.ExecutionState) (uint64, error) {
 	// Get the address of the FlowEpoch smart contract
 	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
 	if err != nil {
-		logFail(err)
-		return
+		return 0, err
 	}
 	address := sc.Epoch.Address
 
@@ -605,13 +624,11 @@ func logEpochNumber(vm *fvm.VirtualMachine, vmCtx fvm.Context, executionState st
 	ctx := context.Background()
 	_, blockID, err := executionState.GetHighestExecutedBlockID(ctx)
 	if err != nil {
-		logFail(err)
-		return
+		return 0, err
 	}
 	stateCommit, err := executionState.StateCommitmentByBlockID(ctx, blockID)
 	if err != nil {
-		logFail(err)
-		return
+		return 0, err
 	}
 	blockView := executionState.NewView(stateCommit)
 
@@ -621,30 +638,20 @@ func logEpochNumber(vm *fvm.VirtualMachine, vmCtx fvm.Context, executionState st
 	// execute the script
 	err = vm.Run(vmCtx, script, blockView, prog)
 	if err != nil {
-		logFail(err)
-		return
+		return 0, err
 	}
 
-	// Log script results
+	// Return script results
 	if script.Err == nil && script.Value != nil {
 		epochCounter := script.Value.ToGoValue().(uint64)
-		log.
-			Info().
-			Uint64("contractEpochCounter", epochCounter).
-			Uint64("protocolStateEpochCounter", protocolStateEpoch).
-			Str("flowEpochAddress", address.HexWithPrefix()).
-			Msg("Fetched epoch counter from the FlowEpoch smart contract and from the protocol state.")
-		return
+		return epochCounter, nil
 	}
 
 	if script.Err != nil {
-		logFail(script.Err)
-		return
+		return 0, script.Err
 	}
 
-	if script.Value == nil {
-		logFail(fmt.Errorf("script returned no value"))
-	}
+	return 0, fmt.Errorf("script returned no value")
 }
 
 // copy the checkpoint files from the bootstrap folder to the execution state folder
