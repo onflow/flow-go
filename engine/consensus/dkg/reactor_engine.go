@@ -144,8 +144,8 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 	log := e.log.With().
 		Uint64("cur_epoch", currentEpochCounter). // the epoch we are in the middle of
 		Uint64("next_epoch", nextEpochCounter).   // the epoch we are running the DKG for
-		Uint64("view", first.View).
-		Hex("block", firstID[:]).
+		Uint64("first_block_view", first.View).   // view of first block in EpochSetup phase
+		Hex("first_block_id", firstID[:]).        // id of first block in EpochSetup phase
 		Logger()
 
 	// if we have started the dkg for this epoch already, exit
