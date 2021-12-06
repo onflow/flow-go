@@ -1,8 +1,6 @@
 package helpers
 
 import (
-	"encoding/json"
-	"os"
 	"time"
 )
 
@@ -22,19 +20,6 @@ type TestRun struct {
 	CommitDate     time.Time       `json:"commit_date"`
 	JobRunDate     time.Time       `json:"job_run_date"`
 	PackageResults []PackageResult `json:"results"`
-}
-
-// save TestRun to local JSON file
-func (testRun *TestRun) Save(fileName string) {
-	testRunBytes, err := json.MarshalIndent(testRun, "", "  ")
-	AssertErrNil(err, "error marshalling json")
-
-	file, err := os.Create(fileName)
-	AssertErrNil(err, "error creating filename")
-	defer file.Close()
-
-	_, err = file.Write(testRunBytes)
-	AssertErrNil(err, "error saving test run to file")
 }
 
 // models test result of an entire package which can have multiple tests

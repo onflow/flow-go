@@ -1,6 +1,7 @@
 package helpers
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -54,4 +55,17 @@ func FolderExists(path string) bool {
 
 	// should never get to here
 	panic("error checking if folder exists:" + err.Error())
+}
+
+// save test run/summary to local JSON file
+func SaveToFile(fileName string, testSummary interface{}) {
+	testSummaryBytes, err := json.MarshalIndent(testSummary, "", "  ")
+	AssertErrNil(err, "error marshalling json")
+
+	file, err := os.Create(fileName)
+	AssertErrNil(err, "error creating filename")
+	defer file.Close()
+
+	_, err = file.Write(testSummaryBytes)
+	AssertErrNil(err, "error saving test summary to file")
 }

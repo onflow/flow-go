@@ -209,5 +209,5 @@ func main() {
 
 	testRun := processSummary1TestRun(resultReader)
 
-	testRun.Save(resultReader.getResultsFileName())
+	helpers.SaveToFile(resultReader.getResultsFileName(), testRun)
 }

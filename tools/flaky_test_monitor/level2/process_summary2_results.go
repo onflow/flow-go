@@ -135,5 +135,6 @@ func main() {
 		panic("directory doesn't exist")
 	}
 
-	processSummary2TestRun(helpers.AddTrailingSlash(os.Args[1]))
+	testSummary2 := processSummary2TestRun(helpers.AddTrailingSlash(os.Args[1]))
+	helpers.SaveToFile("level2-summary.json", testSummary2)
 }

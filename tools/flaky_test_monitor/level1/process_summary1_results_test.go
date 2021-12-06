@@ -38,7 +38,7 @@ func TestProcessSummary1TestRun(t *testing.T) {
 		//multiple nil tests in a row
 		"5 nil tests in a row": "test-result-nil-test-single-5-count-pass.json",
 
-		//normal test at the of a test run with multiple nil tests in front of it
+		//normal test at the end of a test run with multiple nil tests in front of it
 		"4 nil tests in a row, 1 normal test": "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
 
 		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
