@@ -229,12 +229,16 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 	e.registerPhaseTransition(curDKGInfo.phase3FinalView, dkgmodule.Phase3, e.end(nextEpochCounter))
 }
 
-// handleEpochCommittedPhaseStarted checks that the local DKG completed and
-// that our locally computed key share is consistent with the canonical key vector.
+// handleEpochCommittedPhaseStarted is invoked upon the transition to the EpochCommitted
+// phase, when the canonical beacon key vector is incorporated into the protocol state.
 //
-// If our key is inconsistent, we log a warning message.
-// CAUTION: we will still sign using the inconsistent key, to be fixed with Crypto
-// v2 by falling back to staking signatures in this case.
+// This function checks that the local DKG completed and that our locally computed
+// key share is consistent with the canonical key vector. When this function returns,
+// an end state for the just-completed DKG is guaranteed to be stored (if not, the
+// program will crash).
+//
+// CAUTION: This function is not safe for concurrent use. This is not enforced within
+// the ReactorEngine - instead we rely on the protocol event emission being single-threaded
 //
 func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uint64, firstBlock *flow.Header) {
 
