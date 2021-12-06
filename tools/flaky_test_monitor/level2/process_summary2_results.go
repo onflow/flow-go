@@ -5,6 +5,7 @@ import (
 	"flaky-test-monitor/helpers"
 	"fmt"
 	"os"
+	"strings"
 )
 
 const failuresDir = "./failures/"
@@ -81,28 +82,34 @@ func processSummary2TestRun(level1Directory string) helpers.TestSummary2 {
 	return testSummary2
 }
 
+// for each failed test, we want to save the raw failed message as a text file
+// there could be multiple failures of the same test so we want to save each failed message in a separate text file
+// each test with failures will have a uniquely named (based on test name and package) sub-directory where failed messages are saved
+// e.g. "failures/TestSanitySha3_256+github.com-onflow-flow-go-crypto-hash" will store failed messages text files
+// from test TestSanitySha3_256 from the "github.com/onflow/flow-go/crypto/hash" package
 func saveFailureMessage(testResult helpers.TestResult) {
 	if testResult.Result != "fail" {
 		panic(fmt.Sprintf("unexpected test result: " + testResult.Result))
 	}
 
-	// sub-directory names should be the same - each sub directory corresponds to a failed test name
+	// each sub directory corresponds to a failed test name and package name
+	failuresDirFullPath := failuresDir + testResult.Test + "+" + strings.ReplaceAll(testResult.Package, "/", "-") + "/"
+
 	// there could already be previous failures for this test, so it's important to check if failed
 	// test folder exists
-	if !helpers.FolderExists(failuresDir + testResult.Test) {
-		err := os.Mkdir(failuresDir+testResult.Test, 0755)
+	if !helpers.FolderExists(failuresDirFullPath) {
+		err := os.Mkdir(failuresDirFullPath, 0755)
 		helpers.AssertNoError(err, "error creating sub-dir under failuresDir")
 	}
 
 	// under each sub-directory, there should be 1 or more text files (failure1.txt, failure2.txt, etc)
 	// that holds the raw failure message for that test
-
-	dirEntries, err := os.ReadDir(failuresDir + testResult.Test)
+	dirEntries, err := os.ReadDir(failuresDirFullPath)
 	helpers.AssertNoError(err, "error reading sub-dir entries under failuresDir")
 
 	// failure text files will be named "failure1.txt", "failure2.txt", etc so we want to know how
 	// many failure files already exist in the sub-directory before creating the next one
-	failureFile, err := os.Create(failuresDir + testResult.Test + "/" + fmt.Sprintf("failure%d.txt", len(dirEntries)+1))
+	failureFile, err := os.Create(failuresDirFullPath + fmt.Sprintf("failure%d.txt", len(dirEntries)+1))
 	helpers.AssertNoError(err, "error creating failure file")
 
 	for _, output := range testResult.Output {
