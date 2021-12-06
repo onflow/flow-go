@@ -11,10 +11,12 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/rs/zerolog"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
@@ -36,6 +38,8 @@ import (
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/extralog"
+	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -385,6 +389,8 @@ func main() {
 				chdpDeliveryTimeout,
 			)
 
+			logEpochNumber(vm, vmCtx, executionState, node, node.Logger.With().Str("component", "provider engine").Logger())
+
 			return providerEngine, err
 		}).
 		Component("checker engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
@@ -562,6 +568,81 @@ func main() {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, node.Storage.Headers, node.State, events, results, txResults, node.RootChainID)
 			return rpcEng, nil
 		}).Run()
+}
+
+func logEpochNumber(vm *fvm.VirtualMachine, vmCtx fvm.Context, executionState state.ExecutionState, node *cmd.NodeConfig, log zerolog.Logger) {
+	logFail := func(err error) {
+		log.Error().Err(err).Msg("could not log epoch number")
+	}
+
+	protocolStateEpoch, err := node.State.
+		AtBlockID(node.RootBlock.ID()).
+		Epochs().
+		Current().
+		Counter()
+	if err != nil {
+		logFail(err)
+		return
+	}
+
+	// Get the address of the FlowEpoch smart contract
+	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
+	if err != nil {
+		logFail(err)
+		return
+	}
+	address := sc.Epoch.Address
+
+	// Generate the script to get the epoch counter from the FlowEpoch smart contract
+	scriptCode := templates.GenerateGetCurrentEpochCounterScript(templates.Environment{
+		EpochAddress: address.Hex(),
+	})
+	script := fvm.Script(scriptCode)
+
+	// Get latest executed block and a view at that block
+	ctx := context.Background()
+	_, blockID, err := executionState.GetHighestExecutedBlockID(ctx)
+	if err != nil {
+		logFail(err)
+		return
+	}
+	stateCommit, err := executionState.StateCommitmentByBlockID(ctx, blockID)
+	if err != nil {
+		logFail(err)
+		return
+	}
+	blockView := executionState.NewView(stateCommit)
+
+	// Create empty programs cache
+	prog := programs.NewEmptyPrograms()
+
+	// execute the script
+	err = vm.Run(vmCtx, script, blockView, prog)
+	if err != nil {
+		logFail(err)
+		return
+	}
+
+	// Log script results
+	if script.Err == nil && script.Value != nil {
+		epochCounter := script.Value.ToGoValue().(uint64)
+		log.
+			Info().
+			Uint64("contractEpochCounter", epochCounter).
+			Uint64("protocolStateEpochCounter", protocolStateEpoch).
+			Str("flowEpochAddress", address.HexWithPrefix()).
+			Msg("Fetched epoch counter from the FlowEpoch smart contract")
+		return
+	}
+
+	if script.Err != nil {
+		logFail(script.Err)
+		return
+	}
+
+	if script.Value == nil {
+		logFail(fmt.Errorf("script returned no value"))
+	}
 }
 
 // copy the checkpoint files from the bootstrap folder to the execution state folder
