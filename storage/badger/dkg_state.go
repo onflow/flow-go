@@ -116,6 +116,13 @@ func (ds *DKGState) SetDKGEndState(epochCounter uint64, endState flow.DKGEndStat
 	return ds.db.Update(operation.InsertDKGEndStateForEpoch(epochCounter, endState))
 }
 
+// GetDKGEndState retrieves the DKG end state for the epoch.
+func (ds *DKGState) GetDKGEndState(epochCounter uint64) (flow.DKGEndState, error) {
+	var endState flow.DKGEndState
+	err := ds.db.Update(operation.RetrieveDKGEndStateForEpoch(epochCounter, &endState))
+	return endState, err
+}
+
 // SafeBeaconPrivateKeys is the safe beacon key storage backed by Badger DB.
 type SafeBeaconPrivateKeys struct {
 	state *DKGState
