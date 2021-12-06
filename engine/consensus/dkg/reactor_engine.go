@@ -371,12 +371,13 @@ func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule
 // end returns a callback that is used to end the DKG protocol, save the
 // resulting private key to storage, and publish the other results to the DKG
 // smart-contract.
-func (e *ReactorEngine) end(epochCounter uint64) func() error {
+func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 	return func() error {
+
 		err := e.controller.End()
 		if crypto.IsDKGFailureError(err) {
-			e.log.Warn().Msgf("node %s with index %d failed DKG locally: %s", e.me.NodeID(), e.controller.GetIndex(), err.Error())
-			err := e.dkgState.SetDKGEndState(epochCounter, flow.DKGEndStateDKGFailure)
+			e.log.Warn().Err(err).Msgf("node %s with index %d failed DKG locally", e.me.NodeID(), e.controller.GetIndex())
+			err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateDKGFailure)
 			if err != nil {
 				return fmt.Errorf("failed to set dkg end state following dkg end error: %w", err)
 			}
@@ -386,10 +387,21 @@ func (e *ReactorEngine) end(epochCounter uint64) func() error {
 
 		privateShare, _, _ := e.controller.GetArtifacts()
 
-		err = e.dkgState.InsertMyBeaconPrivateKey(epochCounter, privateShare)
-		if err != nil {
-			return fmt.Errorf("couldn't save DKG private key in db: %w", err)
+		if privateShare == nil {
+			// we failed to compute a private key - set the corresponding DKG failure state
+			e.log.Warn().Msg("computed nil private key share")
+			err = e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateNoKey)
+			if err != nil {
+				return fmt.Errorf("with nil key could not set dkg end state to %s: %w", flow.DKGEndStateNoKey, err)
+			}
+		} else {
+			// we only store our key if one was computed
+			err = e.dkgState.InsertMyBeaconPrivateKey(nextEpochCounter, privateShare)
+			if err != nil {
+				return fmt.Errorf("could not save beacon private key in db: %w", err)
+			}
 		}
+
 		err = e.controller.SubmitResult()
 		if err != nil {
 			return fmt.Errorf("couldn't publish DKG results: %w", err)

@@ -77,6 +77,9 @@ func (ds *DKGState) retrieveKeyTx(epochCounter uint64) func(tx *badger.Txn) (*en
 // canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
 // to guarantee only keys safe for signing are returned
 func (ds *DKGState) InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
+	if key == nil {
+		return fmt.Errorf("will not store nil beacon key")
+	}
 	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
 	return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.storeKeyTx(epochCounter, encodableKey))
 }

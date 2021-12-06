@@ -62,6 +62,12 @@ func TestDKGState_BeaconKeys(t *testing.T) {
 			assert.True(t, errors.Is(err, storage.ErrNotFound))
 		})
 
+		// attempt to store a nil key should fail (use DKGState.SetEndState(flow.DKGEndStateNoKey)
+		t.Run("should fail to store a nil key instead)", func(t *testing.T) {
+			err = store.InsertMyBeaconPrivateKey(epochCounter, nil)
+			assert.Error(t, err)
+		})
+
 		// store a key in db
 		expected := unittest.RandomBeaconPriv()
 		t.Run("should be able to store and read a key", func(t *testing.T) {
