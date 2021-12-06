@@ -578,7 +578,7 @@ func logEpochNumber(vm *fvm.VirtualMachine, vmCtx fvm.Context, executionState st
 
 	// Get the epoch counter form the protocol state
 	protocolStateEpoch, err := node.State.
-		AtBlockID(node.RootBlock.ID()).
+		Final().
 		Epochs().
 		Current().
 		Counter()
