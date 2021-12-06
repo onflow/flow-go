@@ -246,7 +246,7 @@ func (anb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(node *cmd.NodeCon
 		}
 
 		var err error
-		node.Me, err = local.New(self, nil)
+		node.Me, err = local.NewNoKey(self)
 		if err != nil {
 			return fmt.Errorf("could not initialize local: %w", err)
 		}
