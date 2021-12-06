@@ -14,6 +14,27 @@ type DKGState struct {
 	mock.Mock
 }
 
+// GetDKGEndState provides a mock function with given fields: epochCounter
+func (_m *DKGState) GetDKGEndState(epochCounter uint64) (flow.DKGEndState, error) {
+	ret := _m.Called(epochCounter)
+
+	var r0 flow.DKGEndState
+	if rf, ok := ret.Get(0).(func(uint64) flow.DKGEndState); ok {
+		r0 = rf(epochCounter)
+	} else {
+		r0 = ret.Get(0).(flow.DKGEndState)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(uint64) error); ok {
+		r1 = rf(epochCounter)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // GetDKGStarted provides a mock function with given fields: epochCounter
 func (_m *DKGState) GetDKGStarted(epochCounter uint64) (bool, error) {
 	ret := _m.Called(epochCounter)
