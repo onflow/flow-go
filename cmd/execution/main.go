@@ -633,7 +633,7 @@ func logEpochNumber(vm *fvm.VirtualMachine, vmCtx fvm.Context, executionState st
 			Uint64("contractEpochCounter", epochCounter).
 			Uint64("protocolStateEpochCounter", protocolStateEpoch).
 			Str("flowEpochAddress", address.HexWithPrefix()).
-			Msg("Fetched epoch counter from the FlowEpoch smart contract")
+			Msg("Fetched epoch counter from the FlowEpoch smart contract and from the protocol state.")
 		return
 	}
 
