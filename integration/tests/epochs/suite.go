@@ -414,6 +414,35 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	return result, nil
 }
 
+// SubmitAdminRemoveNodeTx will submit the admin remove node transaction
+func (s *Suite) SubmitAdminRemoveNodeTx(ctx context.Context,
+	env templates.Environment,
+	nodeID flow.Identifier,
+) (*sdk.TransactionResult, error) {
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
+
+	signer := sdkcrypto.NewInMemorySigner(s.client.AccountKeyPriv(), sdkcrypto.SHA2_256)
+
+	closeStakeTx, err := utils.MakeAdminRemoveNodeTx(
+		env,
+		s.client.Account(),
+		0,
+		signer,
+		sdk.Identifier(latestBlockID),
+		nodeID,
+	)
+	require.NoError(s.T(), err)
+
+	err = s.client.SignAndSendTransaction(ctx, closeStakeTx)
+	require.NoError(s.T(), err)
+
+	result, err := s.client.WaitForSealed(ctx, closeStakeTx.ID())
+	require.NoError(s.T(), err)
+
+	return result, nil
+}
+
 func (s *Suite) ExecuteGetProposedTableScript(ctx context.Context, env templates.Environment, nodeID flow.Identifier) cadence.Value {
 	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateReturnProposedTableScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)

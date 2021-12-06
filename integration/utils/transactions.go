@@ -170,6 +170,33 @@ func MakeStakingCollectionCloseStakeTx(
 	return tx, nil
 }
 
+// MakeAdminRemoveNodeTx makes the admin remove node transaction
+func MakeAdminRemoveNodeTx(
+	env templates.Environment,
+	adminAccount *sdk.Account,
+	adminAccountKeyID int,
+	adminSigner crypto.Signer,
+	latestBlockID sdk.Identifier,
+	nodeID flow.Identifier,
+) (*sdk.Transaction, error) {
+	accountKey := adminAccount.Keys[adminAccountKeyID]
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateRemoveNodeScript(env)).
+		SetGasLimit(9999).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
+		SetPayer(adminAccount.Address).
+		AddAuthorizer(adminAccount.Address)
+
+	id, _ := cadence.NewString(nodeID.String())
+	err := tx.AddArgument(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
+}
+
 func MakeTransferTokenTx(env templates.Environment, receiver sdk.Address, sender *sdk.Account, senderKeyID int, tokenAmount string, latestBlockID sdk.Identifier) (
 	*sdk.Transaction, error) {
 

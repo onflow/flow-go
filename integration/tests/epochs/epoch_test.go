@@ -163,8 +163,11 @@ func (s *Suite) TestEpochLeave() {
 	info, snapshot, _ := s.StakeAndStartNewNode(ctx, env, role)
 
 	// at this point our new node has started and is participating
-	// in the protocol, now we can pause our container to replace
-	err := containerToReplace.Pause()
+	// in the protocol, now we can remove the old node from the protocol and pause the container
+	result, err := s.SubmitAdminRemoveNodeTx(ctx, env, containerToReplace.Config.NodeID)
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), result.Error)
+	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
 
 	// assert network functional after pausing container
