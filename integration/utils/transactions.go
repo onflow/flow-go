@@ -29,7 +29,6 @@ func MakeCreateStakingCollectionTx(
 	stakingSigner crypto.Signer,
 	payerAddress sdk.Address,
 	latestBlockID sdk.Identifier,
-	sign bool,
 ) (*sdk.Transaction, error) {
 	accountKey := stakingAccount.Keys[stakingAccountKeyID]
 	tx := sdk.NewTransaction().
@@ -40,12 +39,10 @@ func MakeCreateStakingCollectionTx(
 		SetPayer(payerAddress).
 		AddAuthorizer(stakingAccount.Address)
 
-	if sign {
-		//signing the payload as used AddAuthorizer
-		err := tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
-		if err != nil {
-			return nil, fmt.Errorf("could not sign payload: %w", err)
-		}
+	//signing the payload as used AddAuthorizer
+	err := tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign payload: %w", err)
 	}
 
 	accountKey.SequenceNumber++
@@ -138,7 +135,6 @@ func MakeStakingCollectionCloseStakeTx(
 	payerAddress sdk.Address,
 	latestBlockID sdk.Identifier,
 	nodeID flow.Identifier,
-	sign bool,
 ) (*sdk.Transaction, error) {
 	accountKey := stakingAccount.Keys[stakingAccountKeyID]
 	tx := sdk.NewTransaction().
@@ -160,22 +156,19 @@ func MakeStakingCollectionCloseStakeTx(
 		return nil, err
 	}
 
-	if sign {
-		err = tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
-		if err != nil {
-			return nil, fmt.Errorf("could not sign payload: %w", err)
-		}
+	err = tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign payload: %w", err)
 	}
 
 	return tx, nil
 }
 
-// MakeAdminRemoveNodeTx makes the admin remove node transaction
+// MakeAdminRemoveNodeTx makes the admin remove node transaction.  This is equivalent to the node un-staking and will result in removal at the next epoch boundary
 func MakeAdminRemoveNodeTx(
 	env templates.Environment,
 	adminAccount *sdk.Account,
 	adminAccountKeyID int,
-	adminSigner crypto.Signer,
 	latestBlockID sdk.Identifier,
 	nodeID flow.Identifier,
 ) (*sdk.Transaction, error) {

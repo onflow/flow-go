@@ -164,7 +164,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	require.NoError(s.T(), err)
 
 	// create staking collection
-	result, err = s.createStakingCollection(ctx, env, stakingAccountKey, stakingAccount, true)
+	result, err = s.createStakingCollection(ctx, env, stakingAccountKey, stakingAccount)
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
@@ -311,7 +311,7 @@ func (s *Suite) createAccount(ctx context.Context,
 }
 
 // creates a staking collection for the given node
-func (s *Suite) createStakingCollection(ctx context.Context, env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account, signPayload bool) (*sdk.TransactionResult, error) {
+func (s *Suite) createStakingCollection(ctx context.Context, env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account) (*sdk.TransactionResult, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -324,7 +324,6 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 		signer,
 		s.client.SDKServiceAddress(),
 		sdk.Identifier(latestBlockID),
-		signPayload,
 	)
 
 	err = s.client.SignAndSendTransaction(ctx, createStakingCollectionTx)
@@ -401,7 +400,6 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 		s.client.SDKServiceAddress(),
 		sdk.Identifier(latestBlockID),
 		nodeID,
-		false,
 	)
 	require.NoError(s.T(), err)
 
@@ -422,13 +420,10 @@ func (s *Suite) SubmitAdminRemoveNodeTx(ctx context.Context,
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
-	signer := sdkcrypto.NewInMemorySigner(s.client.AccountKeyPriv(), sdkcrypto.SHA2_256)
-
 	closeStakeTx, err := utils.MakeAdminRemoveNodeTx(
 		env,
 		s.client.Account(),
 		0,
-		signer,
 		sdk.Identifier(latestBlockID),
 		nodeID,
 	)
@@ -470,7 +465,7 @@ func (s *Suite) SetApprovedNodesScript(ctx context.Context, env templates.Enviro
 		SetProposalKey(s.client.SDKServiceAddress(), 0, s.client.Account().Keys[0].SequenceNumber).
 		SetPayer(s.client.SDKServiceAddress()).
 		AddAuthorizer(idTableAddress)
-
+	s.client.Account().Keys[0].SequenceNumber++
 	err = tx.AddArgument(cadence.NewArray(ids))
 	require.NoError(s.T(), err)
 
@@ -509,11 +504,11 @@ func (s *Suite) getTestContainerName(role flow.Role) string {
 func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates.Environment, info *StakedNodeOperationInfo) {
 	// ensure node ID in approved list
 	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
-	require.Contains(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(info.NodeID.String()), fmt.Sprintf("expected new node to be in approved nodes list: %x", info.NodeID))
+	require.Containsf(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in approved nodes list: %x", info.NodeID)
 
 	// check if node is in proposed table
 	proposedTable := s.ExecuteGetProposedTableScript(ctx, env, info.NodeID)
-	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), fmt.Sprintf("expected new node to be in proposed table: %x", info.NodeID))
+	require.Containsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in proposed table: %x", info.NodeID)
 }
 
 // newTestContainerOnNetwork configures a new container on the suites network
@@ -534,9 +529,8 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 	return s.net.ContainerByID(info.NodeID)
 }
 
-// StakeAndStartNewNode will stake a new node, start the container for that node after we have reached the epoch
-// setup phase, and wait until end of epoch before returning so that the node starts processing network messages
-func (s *Suite) StakeAndStartNewNode(ctx context.Context, env templates.Environment, role flow.Role) (*StakedNodeOperationInfo, *inmem.Snapshot, *testnet.Container) {
+// StakeNewNode will stake a new node, and create the corresponding docker container for that node
+func (s *Suite) StakeNewNode(ctx context.Context, env templates.Environment, role flow.Role) (*StakedNodeOperationInfo, *testnet.Container) {
 	// stake our new node
 	info := s.StakeNode(ctx, env, role)
 
@@ -546,20 +540,7 @@ func (s *Suite) StakeAndStartNewNode(ctx context.Context, env templates.Environm
 	// add a new container to the network with the info used to stake our node
 	testContainer := s.newTestContainerOnNetwork(role, info)
 
-	// wait for epoch setup phase before we start our container
-	s.WaitForPhase(ctx, flow.EpochPhaseSetup)
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-	testContainer.WriteRootSnapshot(snapshot)
-	testContainer.Container.Start(ctx)
-
-	// wait for new container to startup and start processing blocks
-	// wait for end of epoch
-	epochFinalView, err := snapshot.Epochs().Current().FinalView()
-	require.NoError(s.T(), err)
-	s.BlockState.WaitForSealedView(s.T(), epochFinalView)
-
-	return info, snapshot, testContainer
+	return info, testContainer
 }
 
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network
