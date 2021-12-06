@@ -34,6 +34,18 @@ type doubleLinkedListNode struct {
 	prev doubleLinkedListPointer
 }
 
+type doubleLinkedList struct {
+	head doubleLinkedListPointer // index of the head of linked list in entities slice.
+	tail doubleLinkedListPointer // index of the tail of linked list in entities slice.
+}
+
+func newDoubleLinkedList() *doubleLinkedList {
+	return &doubleLinkedList{
+		head: doubleLinkedListPointer{pointerValue: 0},
+		tail: doubleLinkedListPointer{pointerValue: 0},
+	}
+}
+
 type cachedEntity struct {
 	doubleLinkedListNode
 	id     flow.Identifier
@@ -42,19 +54,19 @@ type cachedEntity struct {
 }
 
 type entityList struct {
-	total        uint64
-	head         doubleLinkedListPointer // index of the head of linked list in entities slice.
-	tail         doubleLinkedListPointer // index of the tail of linked list in entities slice.
-	entities     []cachedEntity
-	ejectionMode EjectionMode
+	total             uint64
+	freeEntities      *doubleLinkedList // keeps track of used entities in entities list
+	allocatedEntities *doubleLinkedList // keeps track of unused entities in entities list
+	entities          []cachedEntity
+	ejectionMode      EjectionMode
 }
 
 func newEntityList(limit uint64, ejectionMode EjectionMode) *entityList {
 	return &entityList{
-		head:         doubleLinkedListPointer{pointerValue: 0},
-		tail:         doubleLinkedListPointer{pointerValue: 0},
-		entities:     make([]cachedEntity, limit),
-		ejectionMode: ejectionMode,
+		freeEntities:      newDoubleLinkedList(),
+		allocatedEntities: newDoubleLinkedList(),
+		entities:          make([]cachedEntity, limit),
+		ejectionMode:      ejectionMode,
 	}
 }
 
@@ -70,18 +82,18 @@ func (e *entityList) add(entityId flow.Identifier, entity flow.Entity, owner uin
 		e.total++
 	}
 
-	if e.head.isUndefined() {
+	if e.allocatedEntities.head.isUndefined() {
 		// sets head
-		e.head.setPointer(entityIndex)
-		e.entities[e.head.sliceIndex()].prev.setUndefined()
+		e.allocatedEntities.head.setPointer(entityIndex)
+		e.entities[e.allocatedEntities.head.sliceIndex()].prev.setUndefined()
 	}
 
-	if !e.tail.isUndefined() {
+	if !e.allocatedEntities.tail.isUndefined() {
 		// links new entity to the tail
-		e.link(e.tail, entityIndex)
+		e.link(e.allocatedEntities.tail, entityIndex)
 	}
 
-	e.tail.setPointer(entityIndex)
+	e.allocatedEntities.tail.setPointer(entityIndex)
 	return entityIndex
 }
 
@@ -112,11 +124,11 @@ func (e entityList) size() uint64 {
 }
 
 func (e entityList) getHead() *cachedEntity {
-	return &e.entities[e.head.sliceIndex()]
+	return &e.entities[e.allocatedEntities.head.sliceIndex()]
 }
 
 func (e entityList) getTail() *cachedEntity {
-	return &e.entities[e.tail.sliceIndex()]
+	return &e.entities[e.allocatedEntities.tail.sliceIndex()]
 }
 
 func (e *entityList) link(prev doubleLinkedListPointer, next uint32) {
@@ -125,14 +137,14 @@ func (e *entityList) link(prev doubleLinkedListPointer, next uint32) {
 }
 
 func (e *entityList) invalidateHead() uint32 {
-	headSliceIndex := e.head.sliceIndex()
+	headSliceIndex := e.allocatedEntities.head.sliceIndex()
 	e.invalidateEntityAtIndex(headSliceIndex)
 
 	return headSliceIndex
 }
 
 func (e *entityList) invalidateRandomEntity() uint32 {
-	var index = e.head.sliceIndex()
+	var index = e.allocatedEntities.head.sliceIndex()
 
 	for i := 0; i < maximumRandomTrials; i++ {
 		candidate := uint32(rand.Uint64() % e.total)
@@ -151,29 +163,29 @@ func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 	prev := e.entities[sliceIndex].prev
 	next := e.entities[sliceIndex].next
 
-	if sliceIndex != e.head.sliceIndex() && sliceIndex != e.tail.sliceIndex() {
+	if sliceIndex != e.allocatedEntities.head.sliceIndex() && sliceIndex != e.allocatedEntities.tail.sliceIndex() {
 		// links next and prev elements for non-head and non-tail element
 		e.link(prev, next.sliceIndex())
 	}
 
-	if sliceIndex == e.head.sliceIndex() {
+	if sliceIndex == e.allocatedEntities.head.sliceIndex() {
 		// moves head forward
-		e.head = e.getHead().next
+		e.allocatedEntities.head = e.getHead().next
 		// new head should point head to an undefined prev,
 		// but we first check if list is not empty, i.e.,
 		// head itself is not undefined.
-		if !e.head.isUndefined() {
+		if !e.allocatedEntities.head.isUndefined() {
 			e.getHead().prev.setUndefined()
 		}
 	}
 
-	if sliceIndex == e.tail.sliceIndex() {
+	if sliceIndex == e.allocatedEntities.tail.sliceIndex() {
 		// moves tail backward
-		e.tail = e.getTail().prev
+		e.allocatedEntities.tail = e.getTail().prev
 		// new head should point tail to an undefined next,
 		// but we first check if list is not empty, i.e.,
 		// tail itself is not undefined.
-		if !e.tail.isUndefined() {
+		if !e.allocatedEntities.tail.isUndefined() {
 			e.getTail().next.setUndefined()
 		}
 	}

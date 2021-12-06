@@ -193,7 +193,7 @@ func withTestScenario(t *testing.T,
 
 	bd := NewArrayBackData(size, overLimitFactor, LRUEjection)
 	// head on underlying linked list value should be uninitialized
-	require.True(t, bd.entities.head.isUndefined())
+	require.True(t, bd.entities.allocatedEntities.head.isUndefined())
 	require.Equal(t, bd.Size(), uint(0))
 	entities := unittest.EntityListFixture(uint(entityCount))
 
@@ -236,7 +236,7 @@ func testRetrievingSavedEntities(t *testing.T, backData *ArrayBackData, entities
 }
 
 // testInvalidatingHead keeps invalidating elements at random and evaluates whether double-linked list remains
-// connected on both head and tail
+// connected on both head and tail.
 func testInvalidateAtRandom(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
 	size := len(entities)
 	for i := 0; i < size; i++ {
@@ -284,7 +284,7 @@ func testInvalidatingTail(t *testing.T, backData *ArrayBackData, entities []*uni
 	size := len(entities)
 	for i := 0; i < size; i++ {
 		// invalidates tail index
-		tail := backData.entities.tail.sliceIndex()
+		tail := backData.entities.allocatedEntities.tail.sliceIndex()
 		backData.entities.invalidateEntityAtIndex(tail)
 		// old head index must be invalidated
 		require.True(t, backData.entities.isInvalidated(tail))
