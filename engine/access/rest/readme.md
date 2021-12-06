@@ -13,8 +13,10 @@ This package and subpackages implement the REST API Server for the [Flow OpenAPI
 
 ## Request lifecycle
 
-1. Each HTTP request gets directed to the appropriate `ApiHandlerFunc` function as defined in `server.go` at server startup e.g. Get Blocks by ID or heights go to `blocks.go`, Get Collections go to `collections.go`.
-2. Before reaching the handler function, each request goes through a common set of middlewares.
-3. Within the handler function, the request is first validated, then a database lookup is performed and finally the appropriate response function is called. e.g. `blockResponse` for Block response.
-4. After the response is generated, the select filter is applied if a `select` query param has been specified.
+1. Every incoming request passes through a common set of middlewares - logging middleware, query expandable and query select middleware defined in the middleware package.
+2. A request is then sent to the `handler.ServeHTTP` function.
+3. The `handler.ServeHTTP` function calls the appropriate `ApiHandlerFunc` handler function as defined in `server.go` e.g. `getBlocksByIDs` in `blocks.go` for a get blocks by IDs request or `getBlocksByHeight` for a get blocks by heights request etc.
+4. Within the handler function, the request is first validated, then the necessary database lookups are performed and finally the appropriate response function is called. e.g. `blockResponse` for Block response.
+5. After the response is generated, the select filter is applied if a `select` query param has been specified.
+6. The Response is then sent to the client
 
