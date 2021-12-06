@@ -570,11 +570,13 @@ func main() {
 		}).Run()
 }
 
+// Get and log the epoch counters from the protocol state and from the FlowEpoch smart contract.
 func logEpochNumber(vm *fvm.VirtualMachine, vmCtx fvm.Context, executionState state.ExecutionState, node *cmd.NodeConfig, log zerolog.Logger) {
 	logFail := func(err error) {
 		log.Error().Err(err).Msg("could not log epoch number")
 	}
 
+	// Get the epoch counter form the protocol state
 	protocolStateEpoch, err := node.State.
 		AtBlockID(node.RootBlock.ID()).
 		Epochs().
