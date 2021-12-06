@@ -36,9 +36,9 @@ type FlowNodeImp struct {
 }
 
 // NewNode returns a new node instance
-func NewNode(manager *component.ComponentManager, cfg *NodeConfig, logger zerolog.Logger, f func() error) Node {
+func NewNode(component component.Component, cfg *NodeConfig, logger zerolog.Logger, f func() error) Node {
 	return &FlowNodeImp{
-		Component:    manager,
+		Component:    component,
 		NodeConfig:   cfg,
 		logger:       logger,
 		postShutdown: f,
@@ -76,13 +76,17 @@ func (node *FlowNodeImp) Run() {
 //   - nil if a termination signal is received, and all components have been gracefully stopped.
 //   - error if a irrecoverable error is received
 func (node *FlowNodeImp) run() error {
+	// Cancelling this context notifies all child components that it's time to shutdown
 	ctx, cancel := context.WithCancel(context.Background())
 
-	// 1: Start up
 	// Components will pass unhandled irrecoverable errors to this channel via signalerCtx (or a
 	// child context). Any errors received on this channel should halt the node.
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
 
+	// This context will be marked done when SIGINT/SIGTERM is received.
+	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+
+	// 1: Start up
 	// Start all the components
 	node.Start(signalerCtx)
 
@@ -96,9 +100,6 @@ func (node *FlowNodeImp) run() error {
 	}()
 
 	// 2: Run the node
-	// This context will be marked done when SIGINT/SIGTERM is received.
-	sigCtx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
-
 	// Block here until either a signal or irrecoverable error is received.
 	err := util.WaitError(sigCtx, errChan)
 

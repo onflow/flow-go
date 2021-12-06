@@ -14,28 +14,28 @@ import (
 )
 
 func TestRunShutsDownCleanly(t *testing.T) {
-	var log []string
+	testLogger := testLog{}
 	logger := zerolog.New(os.Stdout)
 	nodeConfig := &NodeConfig{BaseConfig: BaseConfig{NodeRole: "nodetest"}}
 	postShutdown := func() error {
-		log = append(log, "running cleanup")
+		testLogger.Log("running cleanup")
 		return nil
 	}
 	fatalHandler := func(err error, logger zerolog.Logger) {
-		log = append(log, "received fatal error: "+err.Error())
+		testLogger.Logf("received fatal error: %s", err)
 	}
 
 	t.Run("Run shuts down gracefully", func(t *testing.T) {
-		log = []string{}
+		testLogger.Reset()
 		manager := component.NewComponentManagerBuilder().
 			AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				log = append(log, "worker starting up")
+				testLogger.Log("worker starting up")
 				ready()
-				log = append(log, "worker startup complete")
+				testLogger.Log("worker startup complete")
 
 				<-ctx.Done()
-				log = append(log, "worker shutting down")
-				log = append(log, "worker shutdown complete")
+				testLogger.Log("worker shutting down")
+				testLogger.Log("worker shutdown complete")
 			}).
 			Build()
 		node := NewNode(manager, nodeConfig, logger, postShutdown)
@@ -58,24 +58,24 @@ func TestRunShutsDownCleanly(t *testing.T) {
 			"worker shutting down",
 			"worker shutdown complete",
 			"running cleanup",
-		}, log)
+		}, testLogger.logs)
 	})
 
 	t.Run("Run encounters error during postShutdown", func(t *testing.T) {
-		log = []string{}
+		testLogger.Reset()
 		manager := component.NewComponentManagerBuilder().
 			AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				log = append(log, "worker starting up")
+				testLogger.Log("worker starting up")
 				ready()
-				log = append(log, "worker startup complete")
+				testLogger.Log("worker startup complete")
 
 				<-ctx.Done()
-				log = append(log, "worker shutting down")
-				log = append(log, "worker shutdown complete")
+				testLogger.Log("worker shutting down")
+				testLogger.Log("worker shutdown complete")
 			}).
 			Build()
 		node := NewNode(manager, nodeConfig, logger, func() error {
-			log = append(log, "error during post shutdown")
+			testLogger.Log("error during post shutdown")
 			return errors.New("error during post shutdown")
 		})
 
@@ -87,7 +87,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 
 		<-node.Ready()
 
-		syscall.Kill(syscall.Getpid(), syscall.SIGTERM)
+		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
 
 		<-finished
 
@@ -97,22 +97,24 @@ func TestRunShutsDownCleanly(t *testing.T) {
 			"worker shutting down",
 			"worker shutdown complete",
 			"error during post shutdown",
-		}, log)
+		}, testLogger.logs)
 	})
 
 	t.Run("Run encounters irrecoverable error during startup", func(t *testing.T) {
-		log = []string{}
+		testLogger.Reset()
 		manager := component.NewComponentManagerBuilder().
 			AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				log = append(log, "worker starting up")
-				logger.Info().Msg("worker starting up")
+				testLogger.Log("worker starting up")
+
+				// throw an irrecoverable error
 				ctx.Throw(errors.New("worker startup error"))
+
 				ready()
-				log = append(log, "worker startup complete")
+				testLogger.Log("worker startup complete")
 
 				<-ctx.Done()
-				log = append(log, "worker shutting down")
-				log = append(log, "worker shutdown complete")
+				testLogger.Log("worker shutting down")
+				testLogger.Log("worker shutdown complete")
 			}).
 			Build()
 		node := NewNode(manager, nodeConfig, logger, postShutdown)
@@ -129,28 +131,29 @@ func TestRunShutsDownCleanly(t *testing.T) {
 		assert.Equal(t, []string{
 			"worker starting up",
 			"received fatal error: worker startup error",
-		}, log)
+		}, testLogger.logs)
 	})
 
 	t.Run("Run encounters irrecoverable error during runtime", func(t *testing.T) {
-		log = []string{}
+		testLogger.Reset()
 		manager := component.NewComponentManagerBuilder().
 			AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				log = append(log, "worker starting up")
+				testLogger.Log("worker starting up")
 				ready()
-				log = append(log, "worker startup complete")
+				testLogger.Log("worker startup complete")
 
+				// throw an irrecoverable error
 				ctx.Throw(errors.New("worker runtime error"))
 
 				<-ctx.Done()
-				log = append(log, "worker shutting down")
-				log = append(log, "worker shutdown complete")
+				testLogger.Log("worker shutting down")
+				testLogger.Log("worker shutdown complete")
 			}).
 			Build()
 		node := NewNode(manager, nodeConfig, logger, postShutdown)
 		node.(*FlowNodeImp).fatalHandler = func(err error, logger zerolog.Logger) {
 			logger.Info().Msg("handling fatal error")
-			log = append(log, "received fatal error: "+err.Error())
+			testLogger.Log("received fatal error: " + err.Error())
 		}
 
 		finished := make(chan struct{})
@@ -165,21 +168,24 @@ func TestRunShutsDownCleanly(t *testing.T) {
 			"worker starting up",
 			"worker startup complete",
 			"received fatal error: worker runtime error",
-		}, log)
+		}, testLogger.logs)
 	})
 
 	t.Run("Run encounters irrecoverable error during shutdown", func(t *testing.T) {
-		log = []string{}
+		testLogger.Reset()
 		manager := component.NewComponentManagerBuilder().
 			AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-				log = append(log, "worker starting up")
+				testLogger.Log("worker starting up")
 				ready()
-				log = append(log, "worker startup complete")
+				testLogger.Log("worker startup complete")
 
 				<-ctx.Done()
-				log = append(log, "worker shutting down")
+				testLogger.Log("worker shutting down")
+
+				// throw an irrecoverable error
 				ctx.Throw(errors.New("worker shutdown error"))
-				log = append(log, "worker shutdown complete")
+
+				testLogger.Log("worker shutdown complete")
 			}).
 			Build()
 		node := NewNode(manager, nodeConfig, logger, postShutdown)
@@ -202,6 +208,6 @@ func TestRunShutsDownCleanly(t *testing.T) {
 			"worker startup complete",
 			"worker shutting down",
 			"received fatal error: worker shutdown error",
-		}, log)
+		}, testLogger.logs)
 	})
 }

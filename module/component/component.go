@@ -231,13 +231,17 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	for _, worker := range c.workers {
 		worker := worker
 		go func() {
-			defer workersDone.Done()
 			var readyOnce sync.Once
 			worker(signalerCtx, func() {
 				readyOnce.Do(func() {
 					workersReady.Done()
 				})
 			})
+			// This must be called last. It can't be called in a defer statement because thrown
+			// irrecoverable errors cause an os.Goexit to be called, which will call all defers.
+			// This creates a race condition where this component manager could be marked done
+			// before the parent reads the error off the channel resulting in unsafe continuation.
+			workersDone.Done()
 		}()
 	}
 

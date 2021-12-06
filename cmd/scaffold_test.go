@@ -90,29 +90,29 @@ func TestComponentsRunSerially(t *testing.T) {
 	nb := FlowNode("scaffold test")
 	nb.componentBuilder = component.NewComponentManagerBuilder()
 
-	logs := []string{}
+	logger := testLog{}
 
 	readyFn := func(name string) <-chan struct{} {
-		logs = append(logs, fmt.Sprintf("%s ready", name))
 		ready := make(chan struct{})
-		close(ready)
+		defer close(ready)
+		logger.Logf("%s ready", name)
 		return ready
 	}
 	doneFn := func(name string) <-chan struct{} {
-		logs = append(logs, fmt.Sprintf("%s done", name))
 		done := make(chan struct{})
-		close(done)
+		defer close(done)
+		logger.Logf("%s done", name)
 		return done
 	}
 	startFn := func(ctx irrecoverable.SignalerContext, name string) {
 		// add delay to test components are run serially
-		time.Sleep(100 * time.Millisecond)
-		logs = append(logs, fmt.Sprintf("%s started", name))
+		time.Sleep(5 * time.Millisecond)
+		logger.Logf("%s started", name)
 	}
 
 	name1 := "component 1"
 	nb.Component(name1, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		logs = append(logs, fmt.Sprintf("%s initialized", name1))
+		logger.Logf("%s initialized", name1)
 		return &testReadyDone{
 			name:    name1,
 			readyFn: readyFn,
@@ -122,7 +122,7 @@ func TestComponentsRunSerially(t *testing.T) {
 
 	name2 := "component 2"
 	nb.Component(name2, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		logs = append(logs, fmt.Sprintf("%s initialized", name2))
+		logger.Logf("%s initialized", name2)
 		return &testComponent{
 			testReadyDone: &testReadyDone{
 				name:    name2,
@@ -136,7 +136,7 @@ func TestComponentsRunSerially(t *testing.T) {
 
 	name3 := "component 3"
 	nb.Component(name3, func(node *NodeConfig) (module.ReadyDoneAware, error) {
-		logs = append(logs, fmt.Sprintf("%s initialized", name3))
+		logger.Logf("%s initialized", name3)
 		return &testReadyDone{
 			name:    name3,
 			readyFn: readyFn,
@@ -154,17 +154,19 @@ func TestComponentsRunSerially(t *testing.T) {
 	cancel()
 	<-cm.Done()
 
+	logs := logger.logs
+
 	assert.Len(t, logs, 10)
 
 	// components are initialized in a specific order, so check that the order is correct
 	startLogs := logs[:len(logs)-3]
 	assert.Equal(t, []string{
 		"component 1 initialized",
-		"component 2 initialized",
-		"component 3 initialized",
 		"component 1 ready",
+		"component 2 initialized",
 		"component 2 started",
 		"component 2 ready",
+		"component 3 initialized",
 		"component 3 ready",
 	}, startLogs)
 
