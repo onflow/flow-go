@@ -6,6 +6,9 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// number of entries we try to eject before giving up and ejecting LRU
+const maximumRandomTrials = 10
+
 type doubleLinkedListPointer struct {
 	pointerValue uint32
 }
@@ -129,7 +132,17 @@ func (e *entityList) invalidateHead() uint32 {
 }
 
 func (e *entityList) invalidateRandomEntity() uint32 {
-	index := uint32(rand.Uint64() % e.total)
+	var index = e.head.sliceIndex()
+
+	for i := 0; i < maximumRandomTrials; i++ {
+		candidate := uint32(rand.Uint64() % e.total)
+		if !e.isInvalidated(candidate) {
+			// found an invalidated entity
+			index = candidate
+			break
+		}
+	}
+
 	e.invalidateEntityAtIndex(index)
 	return index
 }
@@ -172,4 +185,17 @@ func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 
 	// decrements size
 	e.total--
+}
+
+func (e entityList) isInvalidated(sliceIndex uint32) bool {
+	if e.entities[sliceIndex].id != flow.ZeroID {
+		return false
+	}
+
+	// if either next or prev pointers are linked, the entity is not invalidated.
+	if !e.entities[sliceIndex].next.isUndefined() || !e.entities[sliceIndex].prev.isUndefined() {
+		return false
+	}
+
+	return true
 }

@@ -153,7 +153,7 @@ func TestInvalidateEntity(t *testing.T) {
 			entityCount:     100,
 		},
 	} {
-		// head invalidation test
+		// head invalidation test (LRU)
 		t.Run(fmt.Sprintf("head-invalidation-%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
 			testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount, func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
 				testInvalidatingHead(t, backData, entities)
@@ -165,6 +165,13 @@ func TestInvalidateEntity(t *testing.T) {
 				testInvalidatingTail(t, backData, entities)
 			})
 		})
+		// random invalidation test
+		t.Run(fmt.Sprintf("random-invalidation-%d-limit-%d-overlimit-%d-entities-", tc.limit, tc.overLimitFactor, tc.entityCount),
+			func(t *testing.T) {
+				testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount, func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+					testInvalidateAtRandom(t, backData, entities)
+				})
+			})
 	}
 }
 
@@ -215,7 +222,7 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		require.True(t, backData.entities.getHead().prev.isUndefined())
 		require.Equal(t, entities[i], backData.entities.getTail().entity)
 		require.True(t, backData.entities.getTail().next.isUndefined())
-		tailAccessible(t, backData, uint64(i+1))
+		tailAccessibleFromHead(t, backData, uint64(i+1))
 		headAccessibleFromTail(t, backData, uint64(i+1))
 	}
 }
@@ -225,6 +232,25 @@ func testRetrievingSavedEntities(t *testing.T, backData *ArrayBackData, entities
 		actual, ok := backData.ByID(expected.ID())
 		require.True(t, ok)
 		require.Equal(t, expected, actual)
+	}
+}
+
+// testInvalidatingHead keeps invalidating elements at random and evaluates whether double-linked list remains
+// connected on both head and tail
+func testInvalidateAtRandom(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+	size := len(entities)
+	for i := 0; i < size; i++ {
+		backData.entities.invalidateRandomEntity()
+
+		// size of list should be shrunk after each invalidation.
+		require.Equal(t, uint64(size-i-1), backData.entities.size())
+
+		// except when the list is empty, head and tail must be accessible after each invalidation
+		// i.e., the linked list remains connected despite invalidation.
+		if i != size-1 {
+			tailAccessibleFromHead(t, backData, backData.entities.size())
+			headAccessibleFromTail(t, backData, backData.entities.size())
+		}
 	}
 }
 
@@ -238,25 +264,30 @@ func testInvalidatingHead(t *testing.T, backData *ArrayBackData, entities []*uni
 
 		// size of list should be shrunk after each invalidation.
 		require.Equal(t, uint64(size-i-1), backData.entities.size())
+		// old head index must be invalidated
+		require.True(t, backData.entities.isInvalidated(headIndex))
 
 		// except when the list is empty, head must be updated after invalidation,
 		// except when the list is empty, head and tail must be accessible after each invalidation
 		// i.e., the linked list remains connected despite invalidation.
 		if i != size-1 {
 			require.Equal(t, entities[i+1].ID(), backData.entities.getHead().id)
-			tailAccessible(t, backData, backData.entities.size())
+			tailAccessibleFromHead(t, backData, backData.entities.size())
 			headAccessibleFromTail(t, backData, backData.entities.size())
 		}
 	}
 }
 
-// testInvalidatingHead keeps invalidating the head and evaluates the linked-list keeps updating its head
+// testInvalidatingHead keeps invalidating the tail and evaluates the linked-list keeps updating its tail
 // and remains connected.
 func testInvalidatingTail(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
 	size := len(entities)
 	for i := 0; i < size; i++ {
 		// invalidates tail index
-		backData.entities.invalidateEntityAtIndex(backData.entities.tail.sliceIndex())
+		tail := backData.entities.tail.sliceIndex()
+		backData.entities.invalidateEntityAtIndex(tail)
+		// old head index must be invalidated
+		require.True(t, backData.entities.isInvalidated(tail))
 
 		// size of list should be shrunk after each invalidation.
 		require.Equal(t, uint64(size-i-1), backData.entities.size())
@@ -266,13 +297,13 @@ func testInvalidatingTail(t *testing.T, backData *ArrayBackData, entities []*uni
 		// i.e., the linked list remains connected despite invalidation.
 		if i != size-1 {
 			require.Equal(t, entities[size-i-2].ID(), backData.entities.getTail().id)
-			tailAccessible(t, backData, backData.entities.size())
+			tailAccessibleFromHead(t, backData, backData.entities.size())
 			headAccessibleFromTail(t, backData, backData.entities.size())
 		}
 	}
 }
 
-func tailAccessible(t *testing.T, backData *ArrayBackData, total uint64) {
+func tailAccessibleFromHead(t *testing.T, backData *ArrayBackData, total uint64) {
 	seen := make(map[flow.Identifier]struct{})
 	tailId := backData.entities.getTail().id
 
