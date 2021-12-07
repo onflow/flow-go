@@ -110,7 +110,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 	aggregator, err := consensus.NewVoteAggregator(
 		f.log,
-		// since we don't want to aggregate votes for finalized view, 
+		// since we don't want to aggregate votes for finalized view,
 		// the lowest retained view starts with the next view of the last finalized view.
 		finalizedBlock.View+1,
 		notifier,
