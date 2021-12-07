@@ -202,6 +202,16 @@ func (e *entityList) claimFreeHead() uint32 {
 		e.entities[e.free.head.sliceIndex()].prev.setUndefined()
 	}
 
+	// also we check if old head and tail aligned so to update
+	// tail as well
+	if e.free.tail.sliceIndex() == oldFreeHeadIndex {
+		e.free.tail.setUndefined()
+	}
+
+	// clears pointers of claimed head
+	e.entities[oldFreeHeadIndex].next.setUndefined()
+	e.entities[oldFreeHeadIndex].prev.setUndefined()
+
 	return oldFreeHeadIndex
 }
 
@@ -229,7 +239,7 @@ func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 
 	if sliceIndex == e.used.tail.sliceIndex() {
 		// moves tail backward
-		oldUsedTail, _ := e.getHeads()
+		oldUsedTail, _ := e.getTails()
 		e.used.tail = oldUsedTail.prev
 		// new head should point tail to an undefined next,
 		// but we first check if list is not empty, i.e.,
@@ -240,14 +250,31 @@ func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 		}
 	}
 
+	e.freeUpSliceIndex(sliceIndex)
+
+	// decrements size
+	e.total--
+}
+
+func (e *entityList) freeUpSliceIndex(sliceIndex uint32) {
 	// invalidates entity and adds it to free entities.
 	e.entities[sliceIndex].id = nil
 	e.entities[sliceIndex].next.setUndefined()
 	e.entities[sliceIndex].prev.setUndefined()
-	e.link(e.free.tail, sliceIndex)
 
-	// decrements size
-	e.total--
+	e.appendToFreeList(sliceIndex)
+}
+
+func (e *entityList) appendToFreeList(sliceIndex uint32) {
+	if e.free.head.isUndefined() {
+		// free list is empty
+		e.free.head.setPointer(sliceIndex)
+		e.free.tail.setPointer(sliceIndex)
+		return
+	}
+
+	e.link(e.free.tail, sliceIndex)
+	e.free.tail.setPointer(sliceIndex)
 }
 
 func (e entityList) isInvalidated(sliceIndex uint32) bool {
