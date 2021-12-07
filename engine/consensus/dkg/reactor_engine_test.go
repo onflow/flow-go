@@ -287,6 +287,7 @@ func (suite *ReactorEngineSuite_CommittedPhase) NextEpochCounter() uint64 {
 func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 
 	suite.epochCounter = rand.Uint64()
+	suite.dkgEndState = flow.DKGEndStateUnknown
 	suite.me = new(module.Local)
 
 	id := unittest.IdentifierFixture()
@@ -366,17 +367,62 @@ func (suite *ReactorEngineSuite_CommittedPhase) SetupTest() {
 	)
 }
 
-// TestInconsistentKey ensures that we are logging a warning message whenever
-// we have a mismatch between the locally produced DKG keys and the keys
-// produced by the DKG smart contract.
+// TestDKGSuccess tests the path where we are checking the global DKG
+// results and observe our key is consistent.
+// We should:
+// * set the DKG end state to Success
+func (suite *ReactorEngineSuite_CommittedPhase) TestDKGSuccess() {
+
+	// no change to suite - this is the happy path
+
+	suite.engine.EpochCommittedPhaseStarted(suite.epochCounter, suite.firstBlock)
+	suite.Require().Equal(0, suite.warnsLogged)
+	suite.Assert().Equal(flow.DKGEndStateSuccess, suite.dkgEndState)
+}
+
+// TestInconsistentKey tests the path where we are checking the global DKG
+// results and observe that our locally computed key is inconsistent.
+// We should:
+// * log a warning
+// * set the DKG end state accordingly
 func (suite *ReactorEngineSuite_CommittedPhase) TestInconsistentKey() {
 
 	// set our global pub key to a random value
 	suite.myGlobalBeaconPubKey = unittest.RandomBeaconPriv().PublicKey()
 
 	suite.engine.EpochCommittedPhaseStarted(suite.epochCounter, suite.firstBlock)
-	// we should log a warning that the keys are inconsistent
 	suite.Require().Equal(1, suite.warnsLogged)
+	suite.Assert().Equal(flow.DKGEndStateInconsistentKey, suite.dkgEndState)
+}
+
+// TestMissingKey tests the path where we are checking the global DKG results
+// and observe that we have not stored a locally computed key.
+// We should:
+// * log a warning
+// * set the DKG end state accordingly
+func (suite *ReactorEngineSuite_CommittedPhase) TestMissingKey() {
+
+	// remove our key
+	suite.myLocalBeaconKey = nil
+
+	suite.engine.EpochCommittedPhaseStarted(suite.epochCounter, suite.firstBlock)
+	suite.Require().Equal(1, suite.warnsLogged)
+	suite.Assert().Equal(flow.DKGEndStateNoKey, suite.dkgEndState)
+}
+
+// TestLocalDKGFailure tests the path where we are checking the global DKG
+// results and observe that we have already set the DKG end state as a failure.
+// We should:
+// * log a warning
+// * keep the dkg end state as it is
+func (suite *ReactorEngineSuite_CommittedPhase) TestLocalDKGFailure() {
+
+	// set dkg end state as failure
+	suite.dkgEndState = flow.DKGEndStateDKGFailure
+
+	suite.engine.EpochCommittedPhaseStarted(suite.epochCounter, suite.firstBlock)
+	suite.Require().Equal(1, suite.warnsLogged)
+	suite.Assert().Equal(flow.DKGEndStateDKGFailure, suite.dkgEndState)
 }
 
 // utility function to track the number of warn-level calls to a logger
