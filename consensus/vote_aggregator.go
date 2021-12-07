@@ -14,16 +14,16 @@ import (
 // NewVoteAggregator creates new VoteAggregator and recover the Forks' state with all pending block
 func NewVoteAggregator(
 	log zerolog.Logger,
-	lowestViewForVoteProcessing uint64,
+	lowestRetainedView uint64,
 	notifier hotstuff.Consumer,
 	voteProcessorFactory hotstuff.VoteProcessorFactory,
 ) (hotstuff.VoteAggregator, error) {
 
 	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
-	voteCollectors := voteaggregator.NewVoteCollectors(lowestViewForVoteProcessing, workerpool.New(4), createCollectorFactoryMethod)
+	voteCollectors := voteaggregator.NewVoteCollectors(lowestRetainedView, workerpool.New(4), createCollectorFactoryMethod)
 
 	// initialize the vote aggregator
-	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, lowestViewForVoteProcessing, voteCollectors)
+	aggregator, err := voteaggregator.NewVoteAggregator(log, notifier, lowestRetainedView, voteCollectors)
 	if err != nil {
 		return nil, fmt.Errorf("could not create vote aggregator: %w", err)
 	}
