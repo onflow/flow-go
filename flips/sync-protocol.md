@@ -60,31 +60,52 @@ The `RequestBlock` API should be updated to accept a block height, which should 
 
 Instead of pruning on every call to `ScanPending`, the Sync Core should keep track of the local finalized height from the latest call to `ScanPending`, and only trigger pruning if the height has actually changed. If necessary, it's possible to optimize the performance of pruning and avoid iterating through every item in `BlockIDs` by maintaining an additional mapping from block heights to the set of requestable block IDs at each height. 
 
-We should include a nonce with each Batch / Range Request, which replyers must include in their Block Responses. This nonce can be used to perform some validations:
-* The nonce in the response should correspond to an actual request that was sent.
-* If the response is for a Range Request, it should contain a single chain of blocks which begins at the start height of the requested range and is no longer than the size of the requested range.
-* If the response is for a Batch Request, it should contain a subset of the requested block IDs.
+Instead of sending synchronization requests via gossip, we should directly create a new stream to another node for each request and validate the response we receive:
+* A Range Request response should contain a single chain of blocks which begins at the start height of the requested range and is no longer than the size of the requested range.
+* A Batch Request response should contain a subset of the requested block IDs.
 
-Since the nonce allows us to distinguish between responses to Batch and Range Requests, we can avoid optimistically setting the statuses of heights as Received for responses to Batch Requests.
+This eliminates any ambiguity about whether a response corresponds to a Batch or Range Request, so we can avoid optimistically setting the statuses of heights as Received for responses to Batch Requests.
 
-At any time, there is a single range of heights that the Sync Engine actively requests, which is tracked by the Sync Core. We call this the Active Range. The Active Range is parameterized by two variables, which effectively replace the `Heights` map from the existing implementation:
-* `RangeStart` is the start height of the range, which is greater than or equal to `LocalFinalizedHeight`, the local finalized block height.
-* `RangeEnd` is the end height of the range, which is less than or equal to `TargetFinalizedHeight`, the speculated finalized block height of the overall chain (more details below).
+At any time, there is a single range of heights that the Sync Engine actively requests, which is tracked by the Sync Core. We call this the Active Range. The Active Range is parameterized by two variables `RangeStart` and `RangeEnd`, which effectively replace the `Heights` map from the existing implementation, but it can be broken up and requested by the Sync Engine in multiple segments. `RangeStart` should be greater than the local finalized block height, and `RangeEnd` should be less than or equal to the target finalized block height (more details below). The logic for updating the Active Range can be abstracted with an interface:
 
-The Active Range has a default size of `DefaultRangeSize`. `RangeStart` is updated according to the following conditions, and `RangeEnd` should always be updated as necessary to satisfy `RangeEnd - RangeStart >= DefaultRangeSize`:
-* If the local finalized height has increased by `h`, increase `RangeStart` by `h`.
-* If every height in the Active Range has been received from at least `MinResponses` different nodes, increase `RangeStart` by `DefaultRangeSize`.
+```golang
+type ActiveRange interface {
+    // Update processes a range of blocks received from a Range Request 
+    // response and updates the requestable height range.
+    Update(headers []flow.Header, originID flow.Identifier)
 
-> **Note:** The second condition is needed to cover the last item in [Potential Problems](#potential-problems). To guarantee liveness, `MinResponses` should be set to a value greater than the maximum tolerable number of Byzantine nodes. Alternatively, we could increase `RangeEnd` by `DefaultRangeSize` instead of increasing `RangeStart`, thereby allowing the Active Range to grow without bound and obviating the need for any lower bound on `MinResponses`. 
-> 
-> A possible optimization here is that instead of waiting for the entire Active Range to satisfy the update condition, we can update as soon as any sub-range starting from `RangeStart` satisfies the condition.
+    // LocalFinalizedHeight is called to notify a change in the local finalized height.
+    LocalFinalizedHeight(height uint64)
 
-The Active Range can be broken up and requested by the Sync Engine in multiple segments, similar to the existing implementation.
+    // TargetFinalizedHeight is called to notify a change in the target finalized height.
+    TargetFinalizedHeight(height uint64)
 
-We track the list of responses we've received for each height in a data structure called `Responses`, which we can use to avoid sending duplicate requests to the same node. We can also use it later on to slash nodes for sending faulty responses. 
+    // Get returns the range of requestable block heights.
+    Get() flow.Range
+}
+```
 
-The value of `TargetFinalizedHeight` should reflect the Sync Height Responses that have been received, yet account for the possibility that some of these responses are malicious. Therefore, the Sync Height Response processing logic should incorporate some sort of expiration mechanism. Some possibilities for determining `TargetFinalizedHeight` are:
-* Calculate a moving average of all the Sync Height Responses received. 
-* Maintain a sliding window of the most recent Sync Height Responses, and take the median value.
+There are many ways to implement this interface, but one possible approach is as follows:
+* Select values for parameters `DefaultRangeSize` and `MinResponses`
+* Let `PendingStart` be the first height greater than `LocalFinalizedHeight` that has been received less than `MinResponses` times
+* Let `RangeStart` be equal to `LocalFinalizedHeight + 1`
+* Let `RangeEnd` be the smaller of `TargetFinalizedHeight` and `PendingStart + DefaultRangeSize`
 
-These approaches do imply that `TargetFinalizedHeight` will always lag slightly behind the true finalized height. This may or may not be a problem depending on the block finalization rate, and there may be other approaches which avoid this.
+The reason we keep track of `PendingStart` is to ensure that `RangeEnd` eventually increases even if the local finalized height doesn't. This is needed to address the last item in [Potential Problems](#potential-problems). 
+
+The target finalized height represents the speculated finalized block height of the overall chain, and should reflect the Sync Height Responses that have been received while accounting for the possibility that some of these responses are malicious. Therefore, the Sync Height Response processing logic should incorporate some sort of expiration / filtering mechanism. The details of this logic can be abstracted with an interface:
+
+```golang
+type TargetFinalizedHeight interface {
+    // Update processes a height received from a Sync Height Response 
+    // and updates the finalized height estimate.
+    Update(height uint64, originID flow.Identifier)
+
+    // Get returns the estimated finalized height of the overall chain.
+    Get() uint64
+}
+```
+
+One possible approach is to maintain a sliding window of the most recent Sync Height Responses, and take the median of these values. This implies that the target finalized height will always lag slightly behind the true finalized height, which may or may not be a problem depending on the block finalization rate.
+
+
