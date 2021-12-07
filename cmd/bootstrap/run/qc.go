@@ -41,7 +41,8 @@ func (pd *ParticipantData) Identities() flow.IdentityList {
 
 // GenerateRootQC generates QC for root block, caller needs to provide votes for root QC and
 // participantData to build the QC.
-// NOTE: at the moment, we require private keys for one node because we we re-using the full business logic, which assumes that only consensus participants construct QCs, which also have produce votes.
+// NOTE: at the moment, we require private keys for one node because we we re-using the full business logic,
+//       which assumes that only consensus participants construct QCs, which also have produce votes.
 // TODO: modularize QC construction code (and code to verify QC) to be instantiated without needing private keys.
 func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *ParticipantData, identities flow.IdentityList) (*flow.QuorumCertificate, error) {
 	// create consensus committee's state
@@ -50,23 +51,17 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 		return nil, err
 	}
 
-	hotstuffValidator, err := createValidator(committee)
-	if err != nil {
-		return nil, err
-	}
-
-	logger := zerolog.Logger{}
+	// STEP 1: create VoteProcessor
 	var createdQC *flow.QuorumCertificate
-	voteProcessorFactory := votecollector.NewBootstrapCombinedVoteProcessorFactory(committee, func(qc *flow.QuorumCertificate) {
+	hotBlock := model.GenesisBlockFromFlow(block.Header)
+	processor, err := votecollector.NewBootstrapCombinedVoteProcessor(zerolog.Logger{}, committee, hotBlock, func(qc *flow.QuorumCertificate) {
 		createdQC = qc
 	})
-	processor, err := voteProcessorFactory.Create(logger, model.ProposalFromFlow(block.Header, 0))
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("could not CombinedVoteProcessor processor: %w", err)
 	}
-	hotBlock := model.GenesisBlockFromFlow(block.Header)
 
-	// create the QC from the votes
+	// STEP 2: feed the votes into the vote processor to create QC
 	for _, vote := range votes {
 		err := processor.Process(vote)
 		if err != nil {
@@ -74,24 +69,39 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 		}
 	}
 
-	// validate QC
-	err = hotstuffValidator.ValidateQC(createdQC, hotBlock)
+	// STEP 3: validate constructed QC
+	val, err := createValidator(committee)
+	if err != nil {
+		return nil, err
+	}
+	err = val.ValidateQC(createdQC, hotBlock)
 
 	return createdQC, err
 }
 
 // GenerateRootBlockVotes generates votes for root block based on participantData
 func GenerateRootBlockVotes(block *flow.Block, participantData *ParticipantData) ([]*model.Vote, error) {
-	signers, err := createSigners(participantData, participantData.Identities())
-	if err != nil {
-		return nil, err
-	}
-
 	hotBlock := model.GenesisBlockFromFlow(block.Header)
+	n := len(participantData.Participants)
+	fmt.Println("Number of staked nodes: ", n)
 
-	votes := make([]*model.Vote, 0, len(signers))
-	for _, signer := range signers {
-		vote, err := signer.CreateVote(hotBlock)
+	votes := make([]*model.Vote, 0, n)
+	for _, p := range participantData.Participants {
+		fmt.Println(p.NodeID, p.Address, p.StakingPubKey().String())
+
+		// create the participant's local identity
+		keys, err := p.PrivateKeys()
+		if err != nil {
+			return nil, fmt.Errorf("could not get private keys for participant: %w", err)
+		}
+		me, err := local.New(p.Identity(), keys.StakingKey)
+		if err != nil {
+			return nil, err
+		}
+
+		// create signer and use it to generate vote
+		beaconStore := hotstuffSig.NewStaticRandomBeaconSignerStore(p.RandomBeaconPrivKey)
+		vote, err := verification.NewCombinedSigner(me, beaconStore).CreateVote(hotBlock)
 		if err != nil {
 			return nil, err
 		}
@@ -108,43 +118,6 @@ func createValidator(committee hotstuff.Committee) (hotstuff.Validator, error) {
 	forks := &mocks.ForksReader{}
 	hotstuffValidator := validator.New(committee, forks, verifier)
 	return hotstuffValidator, nil
-}
-
-// createSigners creates signers that can sign votes with both staking & random beacon keys
-func createSigners(participantData *ParticipantData, identities flow.IdentityList) ([]hotstuff.Signer, error) {
-	n := len(participantData.Participants)
-
-	fmt.Println("len(participants)", len(participantData.Participants))
-	fmt.Println("len(identities)", len(identities))
-	for _, id := range identities {
-		fmt.Println(id.NodeID, id.Address, id.StakingPubKey.String())
-	}
-
-	groupSize := uint(len(participantData.Participants))
-	if groupSize < uint(n) {
-		return nil, fmt.Errorf("need at least as many signers as DKG participants, got %v and %v", groupSize, n)
-	}
-
-	signers := make([]hotstuff.Signer, n)
-	for i, participant := range participantData.Participants {
-		// get the participant private keys
-		keys, err := participant.PrivateKeys()
-		if err != nil {
-			return nil, fmt.Errorf("could not get private keys for participant: %w", err)
-		}
-
-		me, err := local.New(participant.Identity(), keys.StakingKey)
-		if err != nil {
-			return nil, err
-		}
-
-		// create signer
-		beaconStore := hotstuffSig.NewStaticRandomBeaconSignerStore(participant.RandomBeaconPrivKey)
-		signer := verification.NewCombinedSigner(me, beaconStore)
-		signers[i] = signer
-	}
-
-	return signers, nil
 }
 
 // GenerateQCParticipantData generates QC participant data used to create the

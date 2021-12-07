@@ -167,7 +167,7 @@ func TestFinalize_Deterministic(t *testing.T) {
 		// This doesn't mean that QC is invalid, but it will result in different structures,
 		// different QC => different service events => different result => different seal
 		// We need to use a different mechanism for comparing.
-		// Revisit if this test case is valid at all.
+		// ToDo: Revisit if this test case is valid at all.
 	})
 }
 
