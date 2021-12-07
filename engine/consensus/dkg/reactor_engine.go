@@ -235,7 +235,10 @@ func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow
 // This function checks that the local DKG completed and that our locally computed
 // key share is consistent with the canonical key vector. When this function returns,
 // an end state for the just-completed DKG is guaranteed to be stored (if not, the
-// program will crash).
+// program will crash). Since this function is invoked synchronously before the end
+// of the current epoch, this guarantees that when we reach the end of the current epoch
+// we will either have a usable beacon key (successful DKG) or a DKG failure end state
+// stored, so we can safely fall back to using our staking key.
 //
 // CAUTION: This function is not safe for concurrent use. This is not enforced within
 // the ReactorEngine - instead we rely on the protocol event emission being single-threaded
