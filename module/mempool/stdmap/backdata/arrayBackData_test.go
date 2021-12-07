@@ -34,12 +34,12 @@ func TestArrayBackData_BelowLimit(t *testing.T) {
 	for i := range entities {
 		// since we are below limit, elements should be added sequentially at bucket 0.
 		// first added element has a key index of 1, since 0 means unused key index in implementation.
-		require.Equal(t, bd.buckets[0][i].keyIndex, uint32(i+1))
+		require.Equal(t, bd.buckets[0][i].keyIndex, uint64(i+1))
 		// also, since we have not yet over-limited, entities are received valueIndex in the same order they
 		// are added.
 		require.Equal(t, bd.buckets[0][i].valueIndex, uint32(i))
 		_, _, owner := bd.entities.get(uint32(i))
-		require.Equal(t, owner, uint32(i))
+		require.Equal(t, owner, uint64(i))
 	}
 
 	// getting inserted elements
@@ -161,12 +161,14 @@ func TestInvalidateEntity(t *testing.T) {
 				testInvalidatingHead(t, backData, entities)
 			})
 		})
+
 		// tail invalidation test
 		t.Run(fmt.Sprintf("tail-invalidation-%d-limit-%d-overlimit-%d-entities-", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
 			testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount, func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
 				testInvalidatingTail(t, backData, entities)
 			})
 		})
+
 		// random invalidation test
 		t.Run(fmt.Sprintf("random-invalidation-%d-limit-%d-overlimit-%d-entities-", tc.limit, tc.overLimitFactor, tc.entityCount),
 			func(t *testing.T) {
@@ -318,6 +320,8 @@ func testRetrievingSavedEntities(t *testing.T, backData *ArrayBackData, entities
 // connected on both head and tail.
 func testInvalidateAtRandom(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
 	size := len(entities)
+	offset := int(backData.limit) - size
+
 	for i := 0; i < size; i++ {
 		backData.entities.invalidateRandomEntity()
 
@@ -327,18 +331,31 @@ func testInvalidateAtRandom(t *testing.T, backData *ArrayBackData, entities []*u
 		// except when the list is empty, head and tail must be accessible after each invalidation
 		// i.e., the linked list remains connected despite invalidation.
 		if i != size-1 {
+			// used list
 			tailAccessibleFromHead(t,
 				backData.entities.used.head.sliceIndex(),
 				backData.entities.used.tail.sliceIndex(),
 				backData,
 				backData.entities.size())
-			//tailAccessibleFromHead(t,
-			//	backData.entities.free.head.sliceIndex(),
-			//	backData.entities.free.tail.sliceIndex(),
-			//	backData,
-			//	backData.entities.size())
 
-			// headAccessibleFromTail(t, backData, backData.entities.size())
+			headAccessibleFromTail(t,
+				backData.entities.used.head.sliceIndex(),
+				backData.entities.used.tail.sliceIndex(),
+				backData,
+				backData.entities.size())
+
+			// free list
+			headAccessibleFromTail(t,
+				backData.entities.free.head.sliceIndex(),
+				backData.entities.free.tail.sliceIndex(),
+				backData,
+				uint32(i+1+offset))
+
+			tailAccessibleFromHead(t,
+				backData.entities.free.head.sliceIndex(),
+				backData.entities.free.tail.sliceIndex(),
+				backData,
+				uint32(i+1+offset))
 		}
 	}
 }
