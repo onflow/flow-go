@@ -45,7 +45,7 @@ func NewArrayBackData(limit uint32, oversizeFactor uint32, mode EjectionMode) *A
 		limit:     uint64(limit),
 		overLimit: uint64(limit * oversizeFactor),
 		buckets:   make([]keyBucket, bucketNum),
-		entities:  newEntityList(uint64(limit), mode),
+		entities:  newEntityList(limit, mode),
 	}
 
 	return bd

@@ -35,12 +35,12 @@ func TestArrayBackData_BelowLimit(t *testing.T) {
 	for i := range entities {
 		// since we are below limit, elements should be added sequentially at bucket 0.
 		// first added element has a key index of 1, since 0 means unused key index in implementation.
-		require.Equal(t, bd.buckets[0][i].keyIndex, uint64(i+1))
+		require.Equal(t, bd.buckets[0][i].keyIndex, uint32(i+1))
 		// also, since we have not yet over-limited, entities are received valueIndex in the same order they
 		// are added.
 		require.Equal(t, bd.buckets[0][i].valueIndex, uint32(i))
 		_, _, owner := bd.entities.get(uint32(i))
-		require.Equal(t, owner, uint64(i))
+		require.Equal(t, owner, uint32(i))
 	}
 
 	// getting inserted elements
@@ -222,8 +222,8 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		require.True(t, backData.entities.getHead().prev.isUndefined())
 		require.Equal(t, entities[i], backData.entities.getTail().entity)
 		require.True(t, backData.entities.getTail().next.isUndefined())
-		tailAccessibleFromHead(t, backData, uint64(i+1))
-		headAccessibleFromTail(t, backData, uint64(i+1))
+		tailAccessibleFromHead(t, backData, uint32(i+1))
+		headAccessibleFromTail(t, backData, uint32(i+1))
 	}
 }
 
@@ -243,7 +243,7 @@ func testInvalidateAtRandom(t *testing.T, backData *ArrayBackData, entities []*u
 		backData.entities.invalidateRandomEntity()
 
 		// size of list should be shrunk after each invalidation.
-		require.Equal(t, uint64(size-i-1), backData.entities.size())
+		require.Equal(t, uint32(size-i-1), backData.entities.size())
 
 		// except when the list is empty, head and tail must be accessible after each invalidation
 		// i.e., the linked list remains connected despite invalidation.
@@ -263,7 +263,7 @@ func testInvalidatingHead(t *testing.T, backData *ArrayBackData, entities []*uni
 		require.Equal(t, uint32(i), headIndex)
 
 		// size of list should be shrunk after each invalidation.
-		require.Equal(t, uint64(size-i-1), backData.entities.size())
+		require.Equal(t, uint32(size-i-1), backData.entities.size())
 		// old head index must be invalidated
 		require.True(t, backData.entities.isInvalidated(headIndex))
 
@@ -290,7 +290,7 @@ func testInvalidatingTail(t *testing.T, backData *ArrayBackData, entities []*uni
 		require.True(t, backData.entities.isInvalidated(tail))
 
 		// size of list should be shrunk after each invalidation.
-		require.Equal(t, uint64(size-i-1), backData.entities.size())
+		require.Equal(t, uint32(size-i-1), backData.entities.size())
 
 		// except when the list is empty, tail must be updated after invalidation,
 		// and also head and tail must be accessible after each invalidation
@@ -303,38 +303,38 @@ func testInvalidatingTail(t *testing.T, backData *ArrayBackData, entities []*uni
 	}
 }
 
-func tailAccessibleFromHead(t *testing.T, backData *ArrayBackData, total uint64) {
+func tailAccessibleFromHead(t *testing.T, backData *ArrayBackData, total uint32) {
 	seen := make(map[flow.Identifier]struct{})
 	tailId := backData.entities.getTail().id
 
 	n := backData.entities.getHead()
-	for i := uint64(0); i < total; i++ {
+	for i := uint32(0); i < total; i++ {
 		if i == total-1 {
 			require.Equal(t, tailId, n.id, "tail not reachable after total steps")
 			return
 		}
 
 		require.NotEqual(t, tailId, n.id, "tail visited in less expected steps (potential inconsistency)", i, total)
-		_, ok := seen[n.id]
+		_, ok := seen[*n.id]
 		require.False(t, ok, "duplicate identifiers found")
 
 		n = &backData.entities.entities[n.next.sliceIndex()]
 	}
 }
 
-func headAccessibleFromTail(t *testing.T, backData *ArrayBackData, steps uint64) {
+func headAccessibleFromTail(t *testing.T, backData *ArrayBackData, steps uint32) {
 	seen := make(map[flow.Identifier]struct{})
 	headId := backData.entities.getHead().id
 
 	n := backData.entities.getTail()
-	for i := uint64(0); i < steps; i++ {
+	for i := uint32(0); i < steps; i++ {
 		if i == steps-1 {
 			require.Equal(t, headId, n.id, "tail not reachable after total steps")
 			return
 		}
 
 		require.NotEqual(t, headId, n.id, "tail visited in less expected steps (potential inconsistency)", i, steps)
-		_, ok := seen[n.id]
+		_, ok := seen[*n.id]
 		require.False(t, ok, "duplicate identifiers found")
 
 		n = &backData.entities.entities[n.prev.sliceIndex()]

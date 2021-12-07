@@ -48,32 +48,45 @@ func newDoubleLinkedList() *doubleLinkedList {
 
 type cachedEntity struct {
 	doubleLinkedListNode
-	id     flow.Identifier
+	id     *flow.Identifier
 	owner  uint64
 	entity flow.Entity
 }
 
 type entityList struct {
-	total             uint64
+	total             uint32
 	freeEntities      *doubleLinkedList // keeps track of used entities in entities list
 	allocatedEntities *doubleLinkedList // keeps track of unused entities in entities list
 	entities          []cachedEntity
 	ejectionMode      EjectionMode
 }
 
-func newEntityList(limit uint64, ejectionMode EjectionMode) *entityList {
-	return &entityList{
+func newEntityList(limit uint32, ejectionMode EjectionMode) *entityList {
+	l := &entityList{
 		freeEntities:      newDoubleLinkedList(),
 		allocatedEntities: newDoubleLinkedList(),
 		entities:          make([]cachedEntity, limit),
 		ejectionMode:      ejectionMode,
+	}
+
+	l.initFreeEntities(limit)
+
+	return l
+}
+
+func (e *entityList) initFreeEntities(limit uint32) {
+	e.freeEntities.head.setPointer(0)
+	e.freeEntities.tail.setPointer(0)
+
+	for i := uint32(1); i < limit; i++ {
+		e.link(e.freeEntities.tail, i)
 	}
 }
 
 func (e *entityList) add(entityId flow.Identifier, entity flow.Entity, owner uint64) uint32 {
 	entityIndex, ejection := e.valueIndexForEntity()
 	e.entities[entityIndex].entity = entity
-	e.entities[entityIndex].id = entityId
+	e.entities[entityIndex].id = &entityId
 	e.entities[entityIndex].owner = owner
 	e.entities[entityIndex].next.setUndefined()
 	e.entities[entityIndex].prev.setUndefined()
@@ -98,14 +111,14 @@ func (e *entityList) add(entityId flow.Identifier, entity flow.Entity, owner uin
 }
 
 func (e entityList) get(entityIndex uint32) (flow.Identifier, flow.Entity, uint64) {
-	return e.entities[entityIndex].id, e.entities[entityIndex].entity, e.entities[entityIndex].owner
+	return *e.entities[entityIndex].id, e.entities[entityIndex].entity, e.entities[entityIndex].owner
 }
 
 func (e entityList) valueIndexForEntity() (uint32, bool) {
-	limit := uint64(len(e.entities))
+	limit := uint32(len(e.entities))
 	if e.total < limit {
 		// we are not over the limit yet.
-		return uint32(e.total), false
+		return e.total, false
 	} else {
 		// array back data is full
 		if e.ejectionMode == RandomEjection {
@@ -119,7 +132,7 @@ func (e entityList) valueIndexForEntity() (uint32, bool) {
 	}
 }
 
-func (e entityList) size() uint64 {
+func (e entityList) size() uint32 {
 	return e.total
 }
 
@@ -147,7 +160,7 @@ func (e *entityList) invalidateRandomEntity() uint32 {
 	var index = e.allocatedEntities.head.sliceIndex()
 
 	for i := 0; i < maximumRandomTrials; i++ {
-		candidate := uint32(rand.Uint64() % e.total)
+		candidate := rand.Uint32() % e.total
 		if !e.isInvalidated(candidate) {
 			// found an invalidated entity
 			index = candidate
@@ -191,7 +204,7 @@ func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 	}
 
 	// invalidates entity
-	e.entities[sliceIndex].id = flow.ZeroID
+	e.entities[sliceIndex].id = nil
 	e.entities[sliceIndex].next.setUndefined()
 	e.entities[sliceIndex].prev.setUndefined()
 
@@ -200,7 +213,7 @@ func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 }
 
 func (e entityList) isInvalidated(sliceIndex uint32) bool {
-	if e.entities[sliceIndex].id != flow.ZeroID {
+	if e.entities[sliceIndex].id != nil {
 		return false
 	}
 
