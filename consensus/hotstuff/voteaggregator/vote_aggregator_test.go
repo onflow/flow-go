@@ -23,16 +23,16 @@ import (
 
 var voteCollectorsFactoryError = errors.New("factory error")
 
-// TestVoteAggregatorV2 is a test suite for VoteAggregator. Tests happy and unhappy path scenarios
+// TestVoteAggregator is a test suite for VoteAggregator. Tests happy and unhappy path scenarios
 // for processing proposals, votes and also reporting slashing conditions when invalid proposal/vote was detected.
 // Vote aggregator has a queening mechanism, tests are split into separately testing event delivery and
 // event processing logic.
-func TestVoteAggregatorV2(t *testing.T) {
-	suite.Run(t, new(VoteAggregatorV2TestSuite))
+func TestVoteAggregator(t *testing.T) {
+	suite.Run(t, new(VoteAggregatorTestSuite))
 }
 
-// VoteAggregatorV2TestSuite is a test suite that holds needed mocked state for isolated testing of VoteAggregator.
-type VoteAggregatorV2TestSuite struct {
+// VoteAggregatorTestSuite is a test suite that holds needed mocked state for isolated testing of VoteAggregator.
+type VoteAggregatorTestSuite struct {
 	suite.Suite
 
 	mockedCollectors map[uint64]*mocks.VoteCollector
@@ -46,7 +46,7 @@ type VoteAggregatorV2TestSuite struct {
 	aggregator *VoteAggregator
 }
 
-func (s *VoteAggregatorV2TestSuite) SetupTest() {
+func (s *VoteAggregatorTestSuite) SetupTest() {
 	s.committee = &mocks.Committee{}
 	s.signer = &mocks.SignerVerifier{}
 	s.notifier = &mocks.Consumer{}
@@ -82,14 +82,14 @@ func (s *VoteAggregatorV2TestSuite) SetupTest() {
 	unittest.RequireCloseBefore(s.T(), s.aggregator.Ready(), 100*time.Millisecond, "aggregator not started")
 }
 
-func (s *VoteAggregatorV2TestSuite) TearDownTest() {
+func (s *VoteAggregatorTestSuite) TearDownTest() {
 	s.cancel()
 	unittest.RequireCloseBefore(s.T(), s.aggregator.Done(), 100*time.Millisecond, "aggregator not stopped")
 }
 
 // prepareMockedCollector prepares a mocked collector and stores it in map, later it will be used
 // to mock behavior of vote collectors.
-func (s *VoteAggregatorV2TestSuite) prepareMockedCollector(view uint64) *mocks.VoteCollector {
+func (s *VoteAggregatorTestSuite) prepareMockedCollector(view uint64) *mocks.VoteCollector {
 	collector := &mocks.VoteCollector{}
 	collector.On("View").Return(view).Maybe()
 	s.mockedCollectors[view] = collector
@@ -97,7 +97,7 @@ func (s *VoteAggregatorV2TestSuite) prepareMockedCollector(view uint64) *mocks.V
 }
 
 // TestAddVote_DeliveryOfQueuedVotes tests if votes are being delivered for processing by queueing logic
-func (s *VoteAggregatorV2TestSuite) TestAddVote_DeliveryOfQueuedVotes() {
+func (s *VoteAggregatorTestSuite) TestAddVote_DeliveryOfQueuedVotes() {
 	view := uint64(1000)
 	clr := s.prepareMockedCollector(view)
 	votes := make([]*model.Vote, 10)
@@ -120,12 +120,12 @@ func (s *VoteAggregatorV2TestSuite) TestAddVote_DeliveryOfQueuedVotes() {
 	clr.AssertExpectations(s.T())
 }
 
-// TestAddVote_StaleVote tests that stale votes(with view lower or equal to highest pruned view) are dropped
-// and not processed.
-func (s *VoteAggregatorV2TestSuite) TestAddVote_StaleVote() {
-	view := uint64(1000)
-	s.collectors.On("PruneUpToView", view).Return(nil).Once()
-	s.aggregator.PruneUpToView(view)
+// TestAddVote_StaleVote tests that stale votes (with view below the pruning threshold)
+// are dropped and not processed.
+func (s *VoteAggregatorTestSuite) TestAddVote_StaleVote() {
+	lowestView := uint64(1000) // lowest view for which VoteAggregator still accept inputs
+	s.collectors.On("PruneUpToView", lowestView).Return(nil).Once()
+	s.aggregator.PruneUpToView(lowestView)
 
 	lengthObserver := func(int) {
 		require.Fail(s.T(), "stale vote has to be dropped")
@@ -134,16 +134,15 @@ func (s *VoteAggregatorV2TestSuite) TestAddVote_StaleVote() {
 	s.aggregator.queuedVotes, err = fifoqueue.NewFifoQueue(fifoqueue.WithLengthObserver(lengthObserver))
 	require.NoError(s.T(), err)
 
-	// try adding votes with view lower than highest pruned
-	votes := uint64(10)
-	for i := uint64(0); i < votes; i++ {
-		vote := unittest.VoteFixture(unittest.WithVoteView(view - i))
+	// try adding votes with views below the pruning threshold
+	for i := uint64(1); i < 10; i++ {
+		vote := unittest.VoteFixture(unittest.WithVoteView(lowestView - i))
 		s.aggregator.AddVote(vote)
 	}
 }
 
 // TestAddBlock_ValidProposal tests that happy path processing of valid proposal finishes without errors
-func (s *VoteAggregatorV2TestSuite) TestAddBlock_ValidProposal() {
+func (s *VoteAggregatorTestSuite) TestAddBlock_ValidProposal() {
 	view := uint64(1000)
 	clr := s.prepareMockedCollector(view)
 	proposal := helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(view))))
@@ -154,7 +153,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddBlock_ValidProposal() {
 }
 
 // TestAddBlock_ProcessingErrors tests that all errors during block processing are correctly propagated to caller.
-func (s *VoteAggregatorV2TestSuite) TestAddBlock_ProcessingErrors() {
+func (s *VoteAggregatorTestSuite) TestAddBlock_ProcessingErrors() {
 	view := uint64(1000)
 	proposal := helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(view))))
 	// calling AddBlock without prepared collector will result in factory error
@@ -170,7 +169,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddBlock_ProcessingErrors() {
 
 // TestAddBlock_DecreasingPruningHeightError tests that adding proposal while pruning in parallel thread doesn't
 // trigger an error
-func (s *VoteAggregatorV2TestSuite) TestAddBlock_DecreasingPruningHeightError() {
+func (s *VoteAggregatorTestSuite) TestAddBlock_DecreasingPruningHeightError() {
 	staleView := uint64(1000)
 	staleProposal := helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(staleView))))
 	*s.collectors = mocks.VoteCollectors{}
@@ -181,14 +180,14 @@ func (s *VoteAggregatorV2TestSuite) TestAddBlock_DecreasingPruningHeightError() 
 	s.collectors.AssertExpectations(s.T())
 }
 
-// TestAddBlock_StaleProposal tests that stale proposal(with view lower or equal to highest pruned view) is dropped
-// and not processed.
-func (s *VoteAggregatorV2TestSuite) TestAddBlock_StaleProposal() {
-	view := uint64(1000)
-	s.collectors.On("PruneUpToView", view).Return(nil).Once()
-	s.aggregator.PruneUpToView(view)
+// TestAddBlock_StaleProposal tests that stale proposals (with view below the pruning threshold)
+// are dropped and not processed.
+func (s *VoteAggregatorTestSuite) TestAddBlock_StaleProposal() {
+	lowestView := uint64(1000) // lowest view for which VoteAggregator still accept inputs
+	s.collectors.On("PruneUpToView", lowestView).Return(nil).Once()
+	s.aggregator.PruneUpToView(lowestView)
 
-	proposal := helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(view))))
+	proposal := helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(lowestView - 1))))
 	err := s.aggregator.AddBlock(proposal)
 	require.Error(s.T(), err)
 	require.True(s.T(), mempool.IsDecreasingPruningHeightError(err))
@@ -197,7 +196,7 @@ func (s *VoteAggregatorV2TestSuite) TestAddBlock_StaleProposal() {
 
 // TestVoteProcessing_DoubleVoting tests that double voting during vote processing is handled internally
 // without being propagated to caller
-func (s *VoteAggregatorV2TestSuite) TestVoteProcessing_DoubleVoting() {
+func (s *VoteAggregatorTestSuite) TestVoteProcessing_DoubleVoting() {
 	view := uint64(1000)
 	clr := s.prepareMockedCollector(view)
 	firstVote := unittest.VoteFixture(unittest.WithVoteView(view))
@@ -213,7 +212,7 @@ func (s *VoteAggregatorV2TestSuite) TestVoteProcessing_DoubleVoting() {
 
 // TestVoteProcessing_DecreasingPruningHeightError tests that adding vote while pruning in parallel thread doesn't
 // trigger an error
-func (s *VoteAggregatorV2TestSuite) TestVoteProcessing_DecreasingPruningHeightError() {
+func (s *VoteAggregatorTestSuite) TestVoteProcessing_DecreasingPruningHeightError() {
 	staleView := uint64(1000)
 	*s.collectors = mocks.VoteCollectors{}
 	s.collectors.On("GetOrCreateCollector", staleView).Return(nil, false, mempool.NewDecreasingPruningHeightError(""))
@@ -223,7 +222,7 @@ func (s *VoteAggregatorV2TestSuite) TestVoteProcessing_DecreasingPruningHeightEr
 }
 
 // TestVoteProcessing_ProcessingExceptions tests that all unexpected errors are propagated to caller
-func (s *VoteAggregatorV2TestSuite) TestVoteProcessing_ProcessingExceptions() {
+func (s *VoteAggregatorTestSuite) TestVoteProcessing_ProcessingExceptions() {
 	vote := unittest.VoteFixture()
 	// failing to create collector is a critical error
 	err := s.aggregator.processQueuedVote(vote)
@@ -241,7 +240,7 @@ func (s *VoteAggregatorV2TestSuite) TestVoteProcessing_ProcessingExceptions() {
 
 // TestInvalidBlock tests that InvalidBlock reports all previously processed votes to hotstuff.Consumer
 // By definition only votes for invalid proposal has to be reported
-func (s *VoteAggregatorV2TestSuite) TestInvalidBlock() {
+func (s *VoteAggregatorTestSuite) TestInvalidBlock() {
 	view := uint64(1000)
 	byzProposal := helper.MakeProposal(helper.WithBlock(helper.MakeBlock(helper.WithBlockView(view))))
 
@@ -293,7 +292,7 @@ func (s *VoteAggregatorV2TestSuite) TestInvalidBlock() {
 }
 
 // TestPruneUpToView tests behavior of pruning logic, we expect that valid pruning call be delegated to VoteCollectors
-func (s *VoteAggregatorV2TestSuite) TestPruneUpToView() {
+func (s *VoteAggregatorTestSuite) TestPruneUpToView() {
 	// if we pass view which is higher than current highest pruned view then we should prune VoteCollectors
 	view := uint64(1000)
 	s.collectors.On("PruneUpToView", view).Return(nil).Once()
