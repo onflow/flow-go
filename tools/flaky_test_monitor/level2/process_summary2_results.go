@@ -132,6 +132,9 @@ func postProcessTestSummary2(testSummary2 helpers.TestSummary2) {
 	}
 }
 
+// level 2 flaky test summary processor
+// input: command line argument of directory where level 1 summary files exist
+// output: level 2 summary json file that will be used as input for level 3 summary processor
 func main() {
 	// need to pass in single argument of where level 1 summary files exist
 	if len(os.Args[1:]) != 1 {

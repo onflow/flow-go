@@ -204,6 +204,9 @@ func finalizeTestRun(packageResultMap map[string]*helpers.PackageResult) helpers
 	return testRun
 }
 
+// level 1 flaky test summary processor
+// input: json formatted test results from `go test -json` from console (not file)
+// output: level 1 summary json file that will be used as input for level 2 summary processor
 func main() {
 	resultReader := StdinResultReader{}
 
