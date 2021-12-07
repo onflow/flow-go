@@ -126,11 +126,11 @@ func (s *Suite) TestViewsProgress() {
 	}
 }
 
-// TestDynamicProtocolParticipants will stake a node by submitting all the transactions
+// TestEpochJoinAndLeave will stake a node by submitting all the transactions
 // that an node operator would submit, start a new container for that node, and remove
 // a container from the network of the same node type. After this orchestration assertions
 // specific to that node type are made to ensure the network is healthy.
-func (s *Suite) TestDynamicProtocolParticipants() {
+func (s *Suite) TestEpochJoinAndLeave() {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
