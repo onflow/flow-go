@@ -86,7 +86,7 @@ func (e *entityList) initFreeEntities(limit uint32) {
 }
 
 func (e *entityList) add(entityId flow.Identifier, entity flow.Entity, owner uint64) uint32 {
-	entityIndex, ejection := e.valueIndexForEntity()
+	entityIndex, ejection := e.sliceIndexForEntity()
 	e.entities[entityIndex].entity = entity
 	e.entities[entityIndex].id = &entityId
 	e.entities[entityIndex].owner = owner
@@ -116,34 +116,51 @@ func (e entityList) get(entityIndex uint32) (flow.Identifier, flow.Entity, uint6
 	return *e.entities[entityIndex].id, e.entities[entityIndex].entity, e.entities[entityIndex].owner
 }
 
-func (e entityList) valueIndexForEntity() (uint32, bool) {
-	limit := uint32(len(e.entities))
-	if e.total < limit {
-		// we are not over the limit yet.
-		return e.total, false
-	} else {
+func (e entityList) sliceIndexForEntity() (uint32, bool) {
+	if e.free.head.isUndefined() {
+		// we are at limit
 		// array back data is full
 		if e.ejectionMode == RandomEjection {
 			// ejecting a random entity
-
 			return e.invalidateRandomEntity(), true
 		} else {
 			// ejecting eldest entity
 			return e.invalidateHead(), true
 		}
 	}
+
+	return e.claimFreeHead(), false
 }
 
 func (e entityList) size() uint32 {
 	return e.total
 }
 
-func (e entityList) getHead() *cachedEntity {
-	return &e.entities[e.used.head.sliceIndex()]
+// used, free
+func (e entityList) getHeads() (*cachedEntity, *cachedEntity) {
+	var usedHead, freeHead *cachedEntity
+	if !e.used.head.isUndefined() {
+		usedHead = &e.entities[e.used.head.sliceIndex()]
+	}
+
+	if !e.free.head.isUndefined() {
+		freeHead = &e.entities[e.free.head.sliceIndex()]
+	}
+
+	return usedHead, freeHead
 }
 
-func (e entityList) getTail() *cachedEntity {
-	return &e.entities[e.used.tail.sliceIndex()]
+func (e entityList) getTails() (*cachedEntity, *cachedEntity) {
+	var usedTail, freeTail *cachedEntity
+	if !e.used.tail.isUndefined() {
+		usedTail = &e.entities[e.used.tail.sliceIndex()]
+	}
+
+	if !e.free.tail.isUndefined() {
+		freeTail = &e.entities[e.free.tail.sliceIndex()]
+	}
+
+	return usedTail, freeTail
 }
 
 func (e *entityList) link(prev doubleLinkedListPointer, next uint32) {
@@ -174,6 +191,20 @@ func (e *entityList) invalidateRandomEntity() uint32 {
 	return index
 }
 
+func (e *entityList) claimFreeHead() uint32 {
+	oldFreeHeadIndex := e.free.head.sliceIndex()
+	// moves head forward
+	e.free.head = e.entities[oldFreeHeadIndex].next
+	// new head should point head to an undefined prev,
+	// but we first check if list is not empty, i.e.,
+	// head itself is not undefined.
+	if !e.free.head.isUndefined() {
+		e.entities[e.free.head.sliceIndex()].prev.setUndefined()
+	}
+
+	return oldFreeHeadIndex
+}
+
 func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 	prev := e.entities[sliceIndex].prev
 	next := e.entities[sliceIndex].next
@@ -185,23 +216,27 @@ func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 
 	if sliceIndex == e.used.head.sliceIndex() {
 		// moves head forward
-		e.used.head = e.getHead().next
+		oldUsedHead, _ := e.getHeads()
+		e.used.head = oldUsedHead.next
 		// new head should point head to an undefined prev,
 		// but we first check if list is not empty, i.e.,
 		// head itself is not undefined.
 		if !e.used.head.isUndefined() {
-			e.getHead().prev.setUndefined()
+			usedHead, _ := e.getHeads()
+			usedHead.prev.setUndefined()
 		}
 	}
 
 	if sliceIndex == e.used.tail.sliceIndex() {
 		// moves tail backward
-		e.used.tail = e.getTail().prev
+		oldUsedTail, _ := e.getHeads()
+		e.used.tail = oldUsedTail.prev
 		// new head should point tail to an undefined next,
 		// but we first check if list is not empty, i.e.,
 		// tail itself is not undefined.
 		if !e.used.tail.isUndefined() {
-			e.getTail().next.setUndefined()
+			usedTail, _ := e.getTails()
+			usedTail.next.setUndefined()
 		}
 	}
 
