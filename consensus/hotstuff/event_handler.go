@@ -4,16 +4,16 @@ import (
 	"time"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/model/flow"
 )
 
-// EventHandler runs a state machine to process proposals, votes and local timeouts.
+// EventHandler runs a state machine to process proposals, QC and local timeouts.
 type EventHandler interface {
 
-	// OnReceiveVote processes a vote received from another HotStuff consensus
-	// participant.
-	OnReceiveVote(vote *model.Vote) error
+	// OnQCConstructed processes a valid qc constructed by internal vote aggregator.
+	OnQCConstructed(qc *flow.QuorumCertificate) error
 
-	// OnReceiveProposal processes a block proposal received fro another HotStuff
+	// OnReceiveProposal processes a block proposal received from another HotStuff
 	// consensus participant.
 	OnReceiveProposal(proposal *model.Proposal) error
 
@@ -23,6 +23,6 @@ type EventHandler interface {
 	// TimeoutChannel returs a channel that sends a signal on timeout.
 	TimeoutChannel() <-chan time.Time
 
-	// Start will start the event handler.
+	// Start starts the event handler.
 	Start() error
 }

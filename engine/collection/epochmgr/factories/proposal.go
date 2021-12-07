@@ -5,6 +5,7 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/engine/collection/compliance"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
@@ -50,10 +51,24 @@ func NewProposalEngineFactory(
 	return factory, nil
 }
 
-func (f *ProposalEngineFactory) Create(clusterState cluster.MutableState, headers storage.Headers, payloads storage.ClusterPayloads) (*compliance.Engine, error) {
+func (f *ProposalEngineFactory) Create(
+	clusterState cluster.MutableState,
+	headers storage.Headers,
+	payloads storage.ClusterPayloads,
+	voteAggregator hotstuff.VoteAggregator,
+) (*compliance.Engine, error) {
 
 	cache := buffer.NewPendingClusterBlocks()
-	core, err := compliance.NewCore(f.log, f.engMetrics, f.mempoolMetrics, f.colMetrics, headers, clusterState, cache)
+	core, err := compliance.NewCore(
+		f.log,
+		f.engMetrics,
+		f.mempoolMetrics,
+		f.colMetrics,
+		headers,
+		clusterState,
+		cache,
+		voteAggregator,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could create cluster compliance core: %w", err)
 	}

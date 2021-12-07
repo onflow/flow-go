@@ -49,7 +49,7 @@ type Instance struct {
 	builder      *module.Builder
 	finalizer    *module.Finalizer
 	persist      *mocks.Persister
-	signer       *mocks.SignerVerifier
+	signer       *mocks.Signer
 	verifier     *mocks.Verifier
 	communicator *mocks.Communicator
 
@@ -119,7 +119,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		committee:    &mocks.Committee{},
 		builder:      &module.Builder{},
 		persist:      &mocks.Persister{},
-		signer:       &mocks.SignerVerifier{},
+		signer:       &mocks.Signer{},
 		verifier:     &mocks.Verifier{},
 		communicator: &mocks.Communicator{},
 		finalizer:    &module.Finalizer{},
@@ -316,13 +316,14 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	in.validator = validator.New(in.committee, in.forks, in.verifier)
 
 	// initialize the vote aggregator
-	in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.committee, in.validator, in.signer)
+	// TODO: fix creating of vote aggregator when fixing tests
+	//in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.committee, in.validator, in.signer)
 
 	// initialize the voter
 	in.voter = voter.New(in.signer, in.forks, in.persist, in.committee, DefaultVoted())
 
 	// initialize the event handler
-	in.handler, err = eventhandler.New(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
+	in.handler, err = eventhandler.NewEventHandler(log, in.pacemaker, in.producer, in.forks, in.persist, in.communicator, in.committee, in.aggregator, in.voter, in.validator, notifier)
 	require.NoError(t, err)
 
 	return &in
@@ -374,10 +375,7 @@ func (in *Instance) Run() error {
 					return fmt.Errorf("could not process proposal: %w", err)
 				}
 			case *model.Vote:
-				err := in.handler.OnReceiveVote(m)
-				if err != nil {
-					return fmt.Errorf("could not process vote: %w", err)
-				}
+				in.aggregator.AddVote(m)
 			}
 		}
 

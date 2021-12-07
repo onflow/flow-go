@@ -247,10 +247,10 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
-		me, err := local.New(nil, stakingPriv)
+		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
 
-		signers[identity.NodeID] = verification.NewStakingSigner(me, identity.NodeID)
+		signers[identity.NodeID] = verification.NewStakingSigner(me)
 	})
 
 	leader := stakingSigners[0]
@@ -289,8 +289,8 @@ func TestStakingVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		qcCreated = true
 	}
 
-	voteProcessorFactory := NewStakingVoteProcessorFactory(unittest.Logger(), committee, onQCCreated)
-	voteProcessor, err := voteProcessorFactory.Create(proposal)
+	voteProcessorFactory := NewStakingVoteProcessorFactory(committee, onQCCreated)
+	voteProcessor, err := voteProcessorFactory.Create(unittest.Logger(), proposal)
 	require.NoError(t, err)
 
 	// process votes by new leader, this will result in producing new QC

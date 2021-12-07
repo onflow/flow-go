@@ -20,14 +20,12 @@ import (
 
 // GenerateClusterRootQC creates votes and generates a QC based on participant data
 func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
-
 	signers, err := createClusterSigners(participants)
 	if err != nil {
 		return nil, err
 	}
 
 	identities := bootstrap.ToIdentityList(participants)
-
 	committee, err := committees.NewStaticCommittee(identities, flow.Identifier{}, nil, nil)
 	if err != nil {
 		return nil, err
@@ -58,10 +56,10 @@ func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *clus
 
 	logger := zerolog.Logger{}
 	var createdQC *flow.QuorumCertificate
-	voteProcessorFactory := votecollector.NewBootstrapStakingVoteProcessorFactory(logger, committee, func(qc *flow.QuorumCertificate) {
+	voteProcessorFactory := votecollector.NewBootstrapStakingVoteProcessorFactory(committee, func(qc *flow.QuorumCertificate) {
 		createdQC = qc
 	})
-	processor, err := voteProcessorFactory.Create(model.ProposalFromFlow(clusterBlock.Header, 0))
+	processor, err := voteProcessorFactory.Create(logger, model.ProposalFromFlow(clusterBlock.Header, 0))
 	if err != nil {
 		return nil, fmt.Errorf("could not create cluster vote processor: %w", err)
 	}
@@ -72,6 +70,10 @@ func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *clus
 		if err != nil {
 			return nil, fmt.Errorf("could not process vote: %w", err)
 		}
+	}
+
+	if createdQC == nil {
+		return nil, fmt.Errorf("not enough votes to create qc for bootstrapping")
 	}
 
 	// validate QC
@@ -106,7 +108,7 @@ func createClusterSigners(participants []bootstrap.NodeInfo) ([]hotstuff.Signer,
 			return nil, err
 		}
 
-		signer := verification.NewStakingSigner(me, me.NodeID())
+		signer := verification.NewStakingSigner(me)
 		signers[i] = signer
 	}
 	return signers, nil

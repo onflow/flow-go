@@ -23,16 +23,14 @@ type StakingSigner struct {
 
 // NewStakingSigner creates a new combined signer with the given dependencies:
 // - the staking signer is used to create and verify aggregatable signatures for Hotstuff
-// - the signer ID is used as the identity when creating signatures;
 func NewStakingSigner(
 	staking module.Local,
-	signerID flow.Identifier,
 ) *StakingSigner {
 
 	sc := &StakingSigner{
 		staking:       staking,
 		stakingHasher: crypto.NewBLSKMAC(encoding.CollectorVoteTag),
-		signerID:      signerID,
+		signerID:      staking.NodeID(),
 	}
 	return sc
 }

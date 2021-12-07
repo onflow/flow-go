@@ -8,6 +8,8 @@ import (
 
 	"github.com/rs/zerolog"
 
+	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/cluster"
 	"github.com/onflow/flow-go/model/flow"
@@ -34,6 +36,7 @@ type Core struct {
 	pending           module.PendingClusterBlockBuffer // pending block cache
 	sync              module.BlockRequester
 	hotstuff          module.HotStuff
+	voteAggregator    hotstuff.VoteAggregator
 }
 
 // NewCore instantiates the business logic for the collector clusters' compliance engine.
@@ -45,6 +48,7 @@ func NewCore(
 	headers storage.Headers,
 	state clusterkv.MutableState,
 	pending module.PendingClusterBlockBuffer,
+	voteAggregator hotstuff.VoteAggregator,
 ) (*Core, error) {
 
 	c := &Core{
@@ -57,6 +61,7 @@ func NewCore(
 		pending:           pending,
 		sync:              nil, // use `WithSync`
 		hotstuff:          nil, // use `WithConsensus`
+		voteAggregator:    voteAggregator,
 	}
 
 	// log the mempool size off the bat
@@ -288,8 +293,12 @@ func (c *Core) OnBlockVote(originID flow.Identifier, vote *messages.ClusterBlock
 		Uint64("view", vote.View).
 		Msg("received vote")
 
-	// TODO: replace this with submitting logic to vote aggregator in V2
-	//c.hotstuff.SubmitVote(originID, vote.BlockID, vote.View, vote.SigData)
+	c.voteAggregator.AddVote(&model.Vote{
+		View:     vote.View,
+		BlockID:  vote.BlockID,
+		SignerID: originID,
+		SigData:  vote.SigData,
+	})
 	return nil
 }
 

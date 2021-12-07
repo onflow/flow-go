@@ -33,7 +33,7 @@ func createVoter(blockView uint64, lastVotedView uint64, isBlockSafe, isCommitte
 	persist := &mocks.Persister{}
 	persist.On("PutVoted", mock.Anything).Return(nil)
 
-	signer := &mocks.SignerVerifier{}
+	signer := &mocks.Signer{}
 	signer.On("CreateVote", mock.Anything).Return(expectVote, nil)
 
 	committee := &mocks.Committee{}

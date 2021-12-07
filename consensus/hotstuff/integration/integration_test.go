@@ -20,7 +20,7 @@ const safeTimeout = 2 * time.Second
 const safeDecreaseFactor = 0.85
 
 func TestSingleInstance(t *testing.T) {
-	t.Skip("to enable once replacing vote aggregator")
+	t.Skip("no eventhandler, fix later")
 
 	// set up a single instance to run
 	// NOTE: currently, the HotStuff logic will infinitely call back on itself
@@ -41,8 +41,7 @@ func TestSingleInstance(t *testing.T) {
 }
 
 func TestThreeInstances(t *testing.T) {
-	t.Skip("to enable once replacing vote aggregator")
-
+	t.Skip("no eventhandler, fix later")
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
 	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on

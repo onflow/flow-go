@@ -25,6 +25,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
@@ -118,6 +119,7 @@ func main() {
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
 		dkgKeyStore             *bstorage.DKGKeys
+		hotstuffModules         *consensus.HotstuffModules
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -519,63 +521,7 @@ func main() {
 
 			return ing, err
 		}).
-		Component("consensus components", func(nodebuilder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-
-			// TODO: we should probably find a way to initialize mutually dependent engines separately
-
-			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
-			// initialize the pending blocks cache
-			proposals := buffer.NewPendingBlocks()
-
-			core, err := compliance.NewCore(node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Metrics.Mempool,
-				node.Metrics.Compliance,
-				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
-				mutableState,
-				proposals,
-				syncCore)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
-			}
-
-			// initialize the compliance engine
-			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
-			}
-
-			// initialize the block builder
-			var build module.Builder
-			build, err = builder.NewBuilder(
-				node.Metrics.Mempool,
-				node.DB,
-				mutableState,
-				node.Storage.Headers,
-				node.Storage.Seals,
-				node.Storage.Index,
-				node.Storage.Blocks,
-				node.Storage.Results,
-				node.Storage.Receipts,
-				guarantees,
-				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
-				receipts,
-				node.Tracer,
-				builder.WithBlockTimer(blockTimer),
-				builder.WithMaxSealCount(maxSealPerBlock),
-				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialized block builder: %w", err)
-			}
-
-			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
-
+		Component("hotstuff vote aggregator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
 				node.DB,
@@ -625,11 +571,100 @@ func main() {
 			// initialize the persister
 			persist := persister.New(node.DB, node.RootChainID)
 
-			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			finalizedBlock, err := node.State.Final().Head()
 			if err != nil {
-				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
+				return nil, err
 			}
+
+			forks, err := consensus.NewForks(
+				finalizedBlock,
+				node.Storage.Headers,
+				finalize,
+				notifier,
+				node.RootBlock.Header,
+				node.RootQC,
+			)
+			if err != nil {
+				return nil, err
+			}
+
+			qcDistributor := pubsub.NewQCCreatedDistributor()
+			validator := consensus.NewValidator(mainMetrics, committee, forks)
+			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+			aggregator, err := consensus.NewVoteAggregator(node.Logger, finalizedBlock, notifier, voteProcessorFactory)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
+			}
+
+			hotstuffModules = &consensus.HotstuffModules{
+				Notifier:             notifier,
+				Committee:            committee,
+				Signer:               signer,
+				Persist:              persist,
+				QCCreatedDistributor: qcDistributor,
+				Forks:                forks,
+				Validator:            validator,
+				Aggregator:           aggregator,
+			}
+
+			return aggregator, nil
+		}).
+		Module("compliance engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			// initialize the entity database accessors
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+
+			// initialize the pending blocks cache
+			proposals := buffer.NewPendingBlocks()
+
+			core, err := compliance.NewCore(node.Logger,
+				node.Metrics.Engine,
+				node.Tracer,
+				node.Metrics.Mempool,
+				node.Metrics.Compliance,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				mutableState,
+				proposals,
+				syncCore,
+				hotstuffModules.Aggregator)
+			if err != nil {
+				return fmt.Errorf("could not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
+			if err != nil {
+				return fmt.Errorf("could not initialize compliance engine: %w", err)
+			}
+			return nil
+		}).
+		Component("hotstuff participant", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// initialize the block builder
+			var build module.Builder
+			build, err = builder.NewBuilder(
+				node.Metrics.Mempool,
+				node.DB,
+				mutableState,
+				node.Storage.Headers,
+				node.Storage.Seals,
+				node.Storage.Index,
+				node.Storage.Blocks,
+				node.Storage.Results,
+				node.Storage.Receipts,
+				guarantees,
+				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
+				receipts,
+				node.Tracer,
+				builder.WithBlockTimer(blockTimer),
+				builder.WithMaxSealCount(maxSealPerBlock),
+				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialized block builder: %w", err)
+			}
+
+			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
 
 			opts := []consensus.Option{
 				consensus.WithInitialTimeout(hotstuffTimeout),
@@ -644,22 +679,20 @@ func main() {
 				opts = append(opts, consensus.WithStartupTime(startupTime))
 			}
 
+			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			if err != nil {
+				return nil, err
+			}
+
 			// initialize hotstuff consensus algorithm
 			hot, err := consensus.NewParticipant(
 				node.Logger,
-				notifier,
 				mainMetrics,
-				node.Storage.Headers,
-				committee,
 				build,
-				finalize,
-				persist,
-				signer,
 				comp,
-				node.RootBlock.Header,
-				node.RootQC,
-				finalized,
+				finalizedBlock,
 				pending,
+				hotstuffModules,
 				opts...,
 			)
 			if err != nil {

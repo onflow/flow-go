@@ -3,6 +3,8 @@ package hotstuff
 import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
+
+	"github.com/rs/zerolog"
 )
 
 // VoteConsumer consumes all votes for one specific view. It is registered with
@@ -113,5 +115,5 @@ type VoteProcessorFactory interface {
 	// Caller can be sure that proposal vote was successfully verified and processed.
 	// Expected error returns during normal operations:
 	// * model.InvalidBlockError - proposal has invalid proposer vote
-	Create(proposal *model.Proposal) (VerifyingVoteProcessor, error)
+	Create(log zerolog.Logger, proposal *model.Proposal) (VerifyingVoteProcessor, error)
 }

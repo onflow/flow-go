@@ -57,10 +57,10 @@ func GenerateRootQC(block *flow.Block, votes []*model.Vote, participantData *Par
 
 	logger := zerolog.Logger{}
 	var createdQC *flow.QuorumCertificate
-	voteProcessorFactory := votecollector.NewBootstrapCombinedVoteProcessorFactory(logger, committee, func(qc *flow.QuorumCertificate) {
+	voteProcessorFactory := votecollector.NewBootstrapCombinedVoteProcessorFactory(committee, func(qc *flow.QuorumCertificate) {
 		createdQC = qc
 	})
-	processor, err := voteProcessorFactory.Create(model.ProposalFromFlow(block.Header, 0))
+	processor, err := voteProcessorFactory.Create(logger, model.ProposalFromFlow(block.Header, 0))
 	if err != nil {
 		return nil, err
 	}
