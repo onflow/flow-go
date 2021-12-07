@@ -110,7 +110,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 	aggregator, err := consensus.NewVoteAggregator(
 		f.log,
-		finalizedBlock,
+		finalizedBlock.View+1,
 		notifier,
 		voteProcessorFactory,
 	)
