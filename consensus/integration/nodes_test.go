@@ -169,11 +169,11 @@ func createNode(
 	}
 
 	// log with node index
-	notifier := notifications.NewLogConsumer(log)
-	dis := pubsub.NewDistributor()
-	dis.AddConsumer(stopConsumer)
-	dis.AddConsumer(counterConsumer)
-	dis.AddConsumer(notifier)
+	logConsumer := notifications.NewLogConsumer(log)
+	notifier := pubsub.NewDistributor()
+	notifier.AddConsumer(stopConsumer)
+	notifier.AddConsumer(counterConsumer)
+	notifier.AddConsumer(logConsumer)
 
 	cleaner := &storagemock.Cleaner{}
 	cleaner.On("RunGC")

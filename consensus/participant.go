@@ -103,7 +103,7 @@ func NewParticipant(
 	voter := voter.New(modules.Signer, modules.Forks, modules.Persist, modules.Committee, voted)
 
 	// initialize the event handler
-	_, err = eventhandler.New(
+	eventHandler, err := eventhandler.NewEventHandler(
 		log,
 		pacemaker,
 		producer,
@@ -121,8 +121,7 @@ func NewParticipant(
 	}
 
 	// initialize and return the event loop
-	// TODO: add proper event handler when it's replaced
-	loop, err := eventloop.NewEventLoop(log, metrics, nil, cfg.StartupTime)
+	loop, err := eventloop.NewEventLoop(log, metrics, eventHandler, cfg.StartupTime)
 	if err != nil {
 		return nil, fmt.Errorf("could not initialize event loop: %w", err)
 	}
