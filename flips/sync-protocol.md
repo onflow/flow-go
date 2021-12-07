@@ -107,5 +107,3 @@ type TargetFinalizedHeight interface {
 ```
 
 One possible approach is to maintain a sliding window of the most recent Sync Height Responses, and take the median of these values. This implies that the target finalized height will always lag slightly behind the true finalized height, which may or may not be a problem depending on the block finalization rate.
-
-
