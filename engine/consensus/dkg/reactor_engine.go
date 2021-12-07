@@ -281,6 +281,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to set dkg end state")
 		}
+		return
 	} else if err != nil {
 		log.Fatal().Err(err).Msg("checking beacon key consistency: could not retrieve beacon private key for next epoch")
 		return
