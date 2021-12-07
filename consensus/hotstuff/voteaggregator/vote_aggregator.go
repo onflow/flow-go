@@ -29,7 +29,7 @@ type VoteAggregator struct {
 	*component.ComponentManager
 	log                 zerolog.Logger
 	notifier            hotstuff.Consumer
-	lowestView          counters.StrictMonotonousCounter // lowest view that we process
+	lowestRetainedView  counters.StrictMonotonousCounter // lowest view, for which we still process votes
 	collectors          hotstuff.VoteCollectors
 	queuedVotesNotifier engine.Notifier
 	queuedVotes         *fifoqueue.FifoQueue
@@ -44,7 +44,7 @@ var _ component.Component = (*VoteAggregator)(nil)
 func NewVoteAggregator(
 	log zerolog.Logger,
 	notifier hotstuff.Consumer,
-	lowestView uint64,
+	lowestRetainedView uint64,
 	collectors hotstuff.VoteCollectors,
 ) (*VoteAggregator, error) {
 
@@ -56,7 +56,7 @@ func NewVoteAggregator(
 	aggregator := &VoteAggregator{
 		log:                 log,
 		notifier:            notifier,
-		lowestView:          counters.NewMonotonousCounter(lowestView),
+		lowestRetainedView:  counters.NewMonotonousCounter(lowestRetainedView),
 		collectors:          collectors,
 		queuedVotes:         queuedVotes,
 		queuedVotesNotifier: engine.NewNotifier(),
@@ -149,7 +149,7 @@ func (va *VoteAggregator) processQueuedVote(vote *model.Vote) error {
 // actual vote processing will be called in other dispatching goroutine.
 func (va *VoteAggregator) AddVote(vote *model.Vote) {
 	// drop stale votes
-	if vote.View < va.lowestView.Value() {
+	if vote.View < va.lowestRetainedView.Value() {
 		return
 	}
 
@@ -168,8 +168,8 @@ func (va *VoteAggregator) AddVote(vote *model.Vote) {
 // * mempool.DecreasingPruningHeightError if the block's view has already been pruned
 func (va *VoteAggregator) AddBlock(block *model.Proposal) error {
 	// check if the block is for a view that has already been pruned (and is thus stale)
-	if block.Block.View < va.lowestView.Value() {
-		return mempool.NewDecreasingPruningHeightErrorf("block proposal for view %d is stale, lowestView is %d", block.Block.View, va.lowestView.Value())
+	if block.Block.View < va.lowestRetainedView.Value() {
+		return mempool.NewDecreasingPruningHeightErrorf("block proposal for view %d is stale, lowestRetainedView is %d", block.Block.View, va.lowestRetainedView.Value())
 	}
 
 	collector, _, err := va.collectors.GetOrCreateCollector(block.Block.View)
@@ -211,11 +211,12 @@ func (va *VoteAggregator) InvalidBlock(proposal *model.Proposal) error {
 	return nil
 }
 
-// PruneUpToView deletes all votes _below_ to the given view, as well as related
-// indices. If `view` is smaller than the previous value, the previous value is
-// kept and the method call is a NoOp.
-func (va *VoteAggregator) PruneUpToView(view uint64) {
-	if va.lowestView.Set(view) {
-		va.collectors.PruneUpToView(view)
+// PruneUpToView deletes all votes _below_ to the given view, as well as
+// related indices. We only retain and process whose view is equal or larger
+// than `lowestRetainedView`. If `lowestRetainedView` is smaller than the
+// previous value, the previous value is kept and the method call is a NoOp.
+func (va *VoteAggregator) PruneUpToView(lowestRetainedView uint64) {
+	if va.lowestRetainedView.Set(lowestRetainedView) {
+		va.collectors.PruneUpToView(lowestRetainedView)
 	}
 }

@@ -604,7 +604,8 @@ func main() {
 			qcDistributor := pubsub.NewQCCreatedDistributor()
 			validator := consensus.NewValidator(mainMetrics, committee, forks, signer)
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
-			aggregator, err := consensus.NewVoteAggregator(node.Logger, finalizedBlock, notifier, voteProcessorFactory)
+			lowestViewForVoteProcessing := finalizedBlock.View + 1
+			aggregator, err := consensus.NewVoteAggregator(node.Logger, lowestViewForVoteProcessing, notifier, voteProcessorFactory)
 			if err != nil {
 				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
 			}

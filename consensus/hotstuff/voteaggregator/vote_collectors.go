@@ -19,16 +19,16 @@ type NewCollectorFactoryMethod = func(view uint64, workers hotstuff.Workers) (ho
 // This structure is concurrently safe.
 type VoteCollectors struct {
 	*component.ComponentManager
-	lock            sync.RWMutex
-	lowestView      uint64                            // lowest view that we have pruned up to
-	collectors      map[uint64]hotstuff.VoteCollector // view -> VoteCollector
-	workerPool      hotstuff.Workerpool               // for processing votes that are already cached in VoteCollectors and waiting for respective block
-	createCollector NewCollectorFactoryMethod         // factory method for creating collectors
+	lock               sync.RWMutex
+	lowestRetainedView uint64                            // lowest view, for which we still retain a VoteCollector and process votes
+	collectors         map[uint64]hotstuff.VoteCollector // view -> VoteCollector
+	workerPool         hotstuff.Workerpool               // for processing votes that are already cached in VoteCollectors and waiting for respective block
+	createCollector    NewCollectorFactoryMethod         // factory method for creating collectors
 }
 
 var _ hotstuff.VoteCollectors = (*VoteCollectors)(nil)
 
-func NewVoteCollectors(lowestView uint64, workerPool hotstuff.Workerpool, factoryMethod NewCollectorFactoryMethod) *VoteCollectors {
+func NewVoteCollectors(lowestRetainedView uint64, workerPool hotstuff.Workerpool, factoryMethod NewCollectorFactoryMethod) *VoteCollectors {
 	// Component manager for wrapped worker pool
 	componentBuilder := component.NewComponentManagerBuilder()
 	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
@@ -38,11 +38,11 @@ func NewVoteCollectors(lowestView uint64, workerPool hotstuff.Workerpool, factor
 	})
 
 	return &VoteCollectors{
-		ComponentManager: componentBuilder.Build(),
-		lowestView:       lowestView,
-		collectors:       make(map[uint64]hotstuff.VoteCollector),
-		workerPool:       workerPool,
-		createCollector:  factoryMethod,
+		ComponentManager:   componentBuilder.Build(),
+		lowestRetainedView: lowestRetainedView,
+		collectors:         make(map[uint64]hotstuff.VoteCollector),
+		workerPool:         workerPool,
+		createCollector:    factoryMethod,
 	}
 }
 
@@ -52,7 +52,7 @@ func NewVoteCollectors(lowestView uint64, workerPool hotstuff.Workerpool, factor
 //  -  (collector, false, nil) if the collector can be found by the block ID
 //  -  (nil, false, error) if running into any exception creating the vote collector state machine
 // Expected error returns during normal operations:
-//  * mempool.DecreasingPruningHeightError - in case view is lower than lowestView
+//  * mempool.DecreasingPruningHeightError - in case view is lower than lowestRetainedView
 func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollector, bool, error) {
 	cachedCollector, hasCachedCollector, err := v.getCollector(view)
 	if err != nil {
@@ -84,14 +84,14 @@ func (v *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollect
 }
 
 // getCollector retrieves hotstuff.VoteCollector from local cache in concurrent safe way.
-// Performs check for lowestView.
+// Performs check for lowestRetainedView.
 // Expected error returns during normal operations:
-//  * mempool.DecreasingPruningHeightError - in case view is lower than lowestView
+//  * mempool.DecreasingPruningHeightError - in case view is lower than lowestRetainedView
 func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, bool, error) {
 	v.lock.RLock()
 	defer v.lock.RUnlock()
-	if view < v.lowestView {
-		return nil, false, mempool.NewDecreasingPruningHeightErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, v.lowestView)
+	if view < v.lowestRetainedView {
+		return nil, false, mempool.NewDecreasingPruningHeightErrorf("cannot retrieve collector for pruned view %d (lowest retained view %d)", view, v.lowestRetainedView)
 	}
 
 	clr, found := v.collectors[view]
@@ -99,32 +99,35 @@ func (v *VoteCollectors) getCollector(view uint64) (hotstuff.VoteCollector, bool
 	return clr, found, nil
 }
 
-// PruneUpToView prunes all collectors below view, sets the lowest level to that value
-func (v *VoteCollectors) PruneUpToView(view uint64) {
+// PruneUpToView prunes the vote collectors with views _below_ the given value, i.e.
+// we only retain and process whose view is equal or larger than `lowestRetainedView`.
+// If `lowestRetainedView` is smaller than the previous value, the previous value is
+// kept and the method call is a NoOp.
+func (v *VoteCollectors) PruneUpToView(lowestRetainedView uint64) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
-	if v.lowestView >= view {
+	if v.lowestRetainedView >= lowestRetainedView {
 		return
 	}
 	if len(v.collectors) == 0 {
-		v.lowestView = view
+		v.lowestRetainedView = lowestRetainedView
 		return
 	}
 
 	// to optimize the pruning of large view-ranges, we compare:
 	//  * the number of views for which we have collectors: len(v.collectors)
-	//  * the number of views that need to be pruned: view-v.lowestView
+	//  * the number of views that need to be pruned: view-v.lowestRetainedView
 	// We iterate over the dimension which is smaller.
-	if uint64(len(v.collectors)) < view-v.lowestView {
+	if uint64(len(v.collectors)) < lowestRetainedView-v.lowestRetainedView {
 		for w := range v.collectors {
-			if w < view {
+			if w < lowestRetainedView {
 				delete(v.collectors, w)
 			}
 		}
 	} else {
-		for w := v.lowestView; w < view; w++ {
+		for w := v.lowestRetainedView; w < lowestRetainedView; w++ {
 			delete(v.collectors, w)
 		}
 	}
-	v.lowestView = view
+	v.lowestRetainedView = lowestRetainedView
 }
