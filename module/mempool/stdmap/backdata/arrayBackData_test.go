@@ -255,7 +255,7 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		// first insertion forward, head of backData should always point to
 		// first entity in the list.
 		usedHead, freeHead := backData.entities.getHeads()
-		usedTail, _ := backData.entities.getTails()
+		usedTail, freeTail := backData.entities.getTails()
 		//
 		require.Equal(t, entities[0], usedHead.entity)
 		require.True(t, usedHead.prev.isUndefined())
@@ -264,12 +264,23 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		require.Equal(t, entities[i], usedTail.entity)
 		require.True(t, usedTail.next.isUndefined())
 
-		//
-		if i != len(entities)-1 {
+		// free head
+		if i != int(backData.limit-1) {
 			require.Equal(t, uint32(i+1), backData.entities.free.head.sliceIndex())
 			require.True(t, freeHead.prev.isUndefined())
+		} else {
+			require.Nil(t, freeHead)
 		}
 
+		// free tail
+		if i != int(backData.limit-1) {
+			require.Equal(t, uint32(backData.limit-1), backData.entities.free.tail.sliceIndex())
+			require.True(t, freeTail.next.isUndefined())
+		} else {
+			require.Nil(t, freeTail)
+		}
+
+		// claimed entities list
 		tailAccessibleFromHead(t,
 			backData.entities.used.head.sliceIndex(),
 			backData.entities.used.tail.sliceIndex(),
@@ -280,11 +291,18 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 			backData.entities.used.tail.sliceIndex(),
 			backData,
 			uint32(i+1))
-		//tailAccessibleFromHead(t,
-		//	backData.entities.free.head.sliceIndex(),
-		//	backData.entities.free.tail.sliceIndex(),
-		//	backData,
-		//	uint32(len(entities)-i-1))
+
+		// free entities list
+		tailAccessibleFromHead(t,
+			backData.entities.free.head.sliceIndex(),
+			backData.entities.free.tail.sliceIndex(),
+			backData,
+			uint32(int(backData.limit)-i-1))
+		headAccessibleFromTail(t,
+			backData.entities.free.head.sliceIndex(),
+			backData.entities.free.tail.sliceIndex(),
+			backData,
+			uint32(int(backData.limit)-i-1))
 	}
 }
 
