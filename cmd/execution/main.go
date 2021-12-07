@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"io"
 	"os"
 	"path"
@@ -391,38 +392,50 @@ func main() {
 				return nil, err
 			}
 
-			// Get the epoch counter from the smart contract.
-			contractEpochCounter, err := getContractEpochCounter(vm, vmCtx, executionState)
+			// Get latest executed block and a view at that block
+			ctx := context.Background()
+			_, blockID, err := executionState.GetHighestExecutedBlockID(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("cannot get the latest executed block id: %w", err)
+			}
+			stateCommit, err := executionState.StateCommitmentByBlockID(ctx, blockID)
+			if err != nil {
+				return nil, fmt.Errorf("cannot get the state comitment at latest executed block id %s: %w", blockID.String(), err)
+			}
+			blockView := executionState.NewView(stateCommit)
+
+			// Get the epoch counter from the smart contract at the last executed block.
+			contractEpochCounter, err := getContractEpochCounter(vm, vmCtx, blockView)
 			// Failing to fetch the epoch counter from the smart contract is a fatal error.
 			if err != nil {
-				return nil, fmt.Errorf("cannot get epoch counter from the smart contract: %w", err)
+				return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
 			}
-			// Get the epoch counter form the protocol state.
+
+			// Get the epoch counter form the protocol state, at the same block.
 			protocolStateEpochCounter, err := node.State.
-				Final().
+				AtBlockID(blockID).
 				Epochs().
 				Current().
 				Counter()
 			// Failing to fetch the epoch counter from the protocol state is a fatal error.
 			if err != nil {
-				return nil, fmt.Errorf("cannot get epoch counter from the protocol state: %w", err)
+				return nil, fmt.Errorf("cannot get epoch counter from the protocol state at block %s: %w", blockID.String(), err)
 			}
+
+			l := node.Logger.With().
+				Str("component", "provider engine").
+				Uint64("contractEpochCounter", contractEpochCounter).
+				Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
+				Str("blockID", blockID.String()).
+				Logger()
 
 			if contractEpochCounter != protocolStateEpochCounter {
 				// Do not error, because immediately following a spork they will be mismatching,
 				// until the resetEpoch transaction is submitted.
-				node.Logger.
-					Warn().
-					Str("component", "provider engine").
-					Uint64("contractEpochCounter", contractEpochCounter).
-					Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
+				l.Warn().
 					Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state mismatch!")
 			} else {
-				node.Logger.
-					Log().
-					Str("component", "provider engine").
-					Uint64("contractEpochCounter", contractEpochCounter).
-					Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
+				l.Info().
 					Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state match.")
 			}
 
@@ -605,12 +618,12 @@ func main() {
 		}).Run()
 }
 
-// getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the latest executed block.
-func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, executionState state.ExecutionState) (uint64, error) {
+// getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.
+func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, view *delta.View) (uint64, error) {
 	// Get the address of the FlowEpoch smart contract
 	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not get system contracts: %w", err)
 	}
 	address := sc.Epoch.Address
 
@@ -620,38 +633,23 @@ func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, executio
 	})
 	script := fvm.Script(scriptCode)
 
-	// Get latest executed block and a view at that block
-	ctx := context.Background()
-	_, blockID, err := executionState.GetHighestExecutedBlockID(ctx)
-	if err != nil {
-		return 0, err
-	}
-	stateCommit, err := executionState.StateCommitmentByBlockID(ctx, blockID)
-	if err != nil {
-		return 0, err
-	}
-	blockView := executionState.NewView(stateCommit)
-
 	// Create empty programs cache
-	prog := programs.NewEmptyPrograms()
+	p := programs.NewEmptyPrograms()
 
 	// execute the script
-	err = vm.Run(vmCtx, script, blockView, prog)
+	err = vm.Run(vmCtx, script, view, p)
 	if err != nil {
-		return 0, err
+		return 0, fmt.Errorf("could not read epoch counter, script internal error: %w", script.Err)
 	}
-
-	// Return script results
-	if script.Err == nil && script.Value != nil {
-		epochCounter := script.Value.ToGoValue().(uint64)
-		return epochCounter, nil
-	}
-
 	if script.Err != nil {
-		return 0, script.Err
+		return 0, fmt.Errorf("could not read epoch counter, script error: %w", script.Err)
+	}
+	if script.Value == nil {
+		return 0, fmt.Errorf("could not read epoch counter, script returned no value")
 	}
 
-	return 0, fmt.Errorf("script returned no value")
+	epochCounter := script.Value.ToGoValue().(uint64)
+	return epochCounter, nil
 }
 
 // copy the checkpoint files from the bootstrap folder to the execution state folder
