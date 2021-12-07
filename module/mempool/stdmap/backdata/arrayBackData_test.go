@@ -254,12 +254,21 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		// linked-list sanity check
 		// first insertion forward, head of backData should always point to
 		// first entity in the list.
-		usedHead, _ := backData.entities.getHeads()
+		usedHead, freeHead := backData.entities.getHeads()
 		usedTail, _ := backData.entities.getTails()
+		//
 		require.Equal(t, entities[0], usedHead.entity)
 		require.True(t, usedHead.prev.isUndefined())
+
+		//
 		require.Equal(t, entities[i], usedTail.entity)
 		require.True(t, usedTail.next.isUndefined())
+
+		//
+		if i != len(entities)-1 {
+			require.Equal(t, uint32(i+1), backData.entities.free.head.sliceIndex())
+			require.True(t, freeHead.prev.isUndefined())
+		}
 
 		tailAccessibleFromHead(t,
 			backData.entities.used.head.sliceIndex(),
@@ -271,7 +280,6 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 			backData.entities.used.tail.sliceIndex(),
 			backData,
 			uint32(i+1))
-
 		//tailAccessibleFromHead(t,
 		//	backData.entities.free.head.sliceIndex(),
 		//	backData.entities.free.tail.sliceIndex(),
