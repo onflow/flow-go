@@ -88,6 +88,9 @@ func TestArrayBackDataStoreAndRetrievalWithoutEjection(t *testing.T) {
 func testArrayBackDataStoreAndRetrievalWithoutEjection(t *testing.T, limit uint32, overLimitFactor uint32, entityCount uint32, helpers ...func(*testing.T, *ArrayBackData, []*unittest.MockEntity)) {
 	h := []func(*testing.T, *ArrayBackData, []*unittest.MockEntity){
 		func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+			testInitialization(t, backData, entities)
+		},
+		func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
 			testAddingEntities(t, backData, entities)
 		},
 	}
@@ -193,12 +196,46 @@ func withTestScenario(t *testing.T,
 
 	bd := NewArrayBackData(size, overLimitFactor, LRUEjection)
 	// head on underlying linked list value should be uninitialized
-	require.True(t, bd.entities.allocatedEntities.head.isUndefined())
+	require.True(t, bd.entities.used.head.isUndefined())
 	require.Equal(t, bd.Size(), uint(0))
 	entities := unittest.EntityListFixture(uint(entityCount))
 
 	for _, helper := range helpers {
 		helper(t, bd, entities)
+	}
+}
+
+// testInitialization evaluates the state of an initialized cachedEntity list before adding any element
+// to it.
+func testInitialization(t *testing.T, backData *ArrayBackData, _ []*unittest.MockEntity) {
+	// head and tail of "used" linked-list must be undefined at initialization time.
+	require.True(t, backData.entities.used.head.isUndefined())
+	require.True(t, backData.entities.used.tail.isUndefined())
+
+	for i := 0; i < len(backData.entities.entities); i++ {
+		if i == 0 {
+			// head of embedded "free" linked-list should point to index 0 of entities slice.
+			require.Equal(t, uint32(i), backData.entities.free.head.sliceIndex())
+			// previous element of tail must be undefined.
+			require.True(t, backData.entities.entities[i].prev.isUndefined())
+		}
+
+		if i != 0 {
+			// except head, any element should point back to its previous index in slice.
+			require.Equal(t, uint32(i-1), backData.entities.entities[i].prev.sliceIndex())
+		}
+
+		if i != len(backData.entities.entities)-1 {
+			// except tail, any element should point forward to its next index in slice.
+			require.Equal(t, uint32(i+1), backData.entities.entities[i].next.sliceIndex())
+		}
+
+		if i == len(backData.entities.entities)-1 {
+			// tail of embedded "free" linked-list should point to the last index in entities slice.
+			require.Equal(t, uint32(i), backData.entities.free.tail.sliceIndex())
+			// next element of tail must be undefined.
+			require.True(t, backData.entities.entities[i].next.isUndefined())
+		}
 	}
 }
 
@@ -222,8 +259,19 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		require.True(t, backData.entities.getHead().prev.isUndefined())
 		require.Equal(t, entities[i], backData.entities.getTail().entity)
 		require.True(t, backData.entities.getTail().next.isUndefined())
-		tailAccessibleFromHead(t, backData, uint32(i+1))
+
+		tailAccessibleFromHead(t,
+			backData.entities.used.head.sliceIndex(),
+			backData.entities.used.tail.sliceIndex(),
+			backData,
+			uint32(i+1))
 		headAccessibleFromTail(t, backData, uint32(i+1))
+
+		//tailAccessibleFromHead(t,
+		//	backData.entities.free.head.sliceIndex(),
+		//	backData.entities.free.tail.sliceIndex(),
+		//	backData,
+		//	uint32(len(entities)-i-1))
 	}
 }
 
@@ -248,7 +296,17 @@ func testInvalidateAtRandom(t *testing.T, backData *ArrayBackData, entities []*u
 		// except when the list is empty, head and tail must be accessible after each invalidation
 		// i.e., the linked list remains connected despite invalidation.
 		if i != size-1 {
-			tailAccessibleFromHead(t, backData, backData.entities.size())
+			tailAccessibleFromHead(t,
+				backData.entities.used.head.sliceIndex(),
+				backData.entities.used.tail.sliceIndex(),
+				backData,
+				backData.entities.size())
+			//tailAccessibleFromHead(t,
+			//	backData.entities.free.head.sliceIndex(),
+			//	backData.entities.free.tail.sliceIndex(),
+			//	backData,
+			//	backData.entities.size())
+
 			headAccessibleFromTail(t, backData, backData.entities.size())
 		}
 	}
@@ -264,15 +322,19 @@ func testInvalidatingHead(t *testing.T, backData *ArrayBackData, entities []*uni
 
 		// size of list should be shrunk after each invalidation.
 		require.Equal(t, uint32(size-i-1), backData.entities.size())
-		// old head index must be invalidated
-		require.True(t, backData.entities.isInvalidated(headIndex))
+		// unclaimed head should be appended to free entities
+		require.Equal(t, backData.entities.free.tail.sliceIndex(), headIndex)
 
 		// except when the list is empty, head must be updated after invalidation,
 		// except when the list is empty, head and tail must be accessible after each invalidation
 		// i.e., the linked list remains connected despite invalidation.
 		if i != size-1 {
 			require.Equal(t, entities[i+1].ID(), backData.entities.getHead().id)
-			tailAccessibleFromHead(t, backData, backData.entities.size())
+			tailAccessibleFromHead(t,
+				backData.entities.used.head.sliceIndex(),
+				backData.entities.used.tail.sliceIndex(),
+				backData,
+				backData.entities.size())
 			headAccessibleFromTail(t, backData, backData.entities.size())
 		}
 	}
@@ -284,7 +346,7 @@ func testInvalidatingTail(t *testing.T, backData *ArrayBackData, entities []*uni
 	size := len(entities)
 	for i := 0; i < size; i++ {
 		// invalidates tail index
-		tail := backData.entities.allocatedEntities.tail.sliceIndex()
+		tail := backData.entities.used.tail.sliceIndex()
 		backData.entities.invalidateEntityAtIndex(tail)
 		// old head index must be invalidated
 		require.True(t, backData.entities.isInvalidated(tail))
@@ -297,28 +359,31 @@ func testInvalidatingTail(t *testing.T, backData *ArrayBackData, entities []*uni
 		// i.e., the linked list remains connected despite invalidation.
 		if i != size-1 {
 			require.Equal(t, entities[size-i-2].ID(), backData.entities.getTail().id)
-			tailAccessibleFromHead(t, backData, backData.entities.size())
+			tailAccessibleFromHead(t,
+				backData.entities.used.head.sliceIndex(),
+				backData.entities.used.tail.sliceIndex(),
+				backData,
+				backData.entities.size())
 			headAccessibleFromTail(t, backData, backData.entities.size())
 		}
 	}
 }
 
-func tailAccessibleFromHead(t *testing.T, backData *ArrayBackData, total uint32) {
-	seen := make(map[flow.Identifier]struct{})
-	tailId := backData.entities.getTail().id
+func tailAccessibleFromHead(t *testing.T, headSliceIndex uint32, tailSliceIndex uint32, backData *ArrayBackData, total uint32) {
+	seen := make(map[uint32]struct{})
 
-	n := backData.entities.getHead()
+	index := headSliceIndex
 	for i := uint32(0); i < total; i++ {
 		if i == total-1 {
-			require.Equal(t, tailId, n.id, "tail not reachable after total steps")
+			require.Equal(t, tailSliceIndex, index, "tail not reachable after total steps")
 			return
 		}
 
-		require.NotEqual(t, tailId, n.id, "tail visited in less expected steps (potential inconsistency)", i, total)
-		_, ok := seen[*n.id]
+		require.NotEqual(t, tailSliceIndex, index, "tail visited in less expected steps (potential inconsistency)", i, total)
+		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
 
-		n = &backData.entities.entities[n.next.sliceIndex()]
+		index = backData.entities.entities[index].next.sliceIndex()
 	}
 }
 
