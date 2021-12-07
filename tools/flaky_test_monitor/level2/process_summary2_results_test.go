@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"flaky-test-monitor/helpers"
+	"flaky-test-monitor/common"
 	"os"
 	"strings"
 	"testing"
@@ -55,7 +55,7 @@ func runProcessSummary2TestRun(t *testing.T, testDir string) {
 	// **************************************************************
 
 	// read in expected summary level 2
-	var expectedTestSummary2 helpers.TestSummary2
+	var expectedTestSummary2 common.TestSummary2
 	expectedTestSummary2JsonBytes, err := os.ReadFile(expectedOutputTestDataPath)
 	require.Nil(t, err)
 	require.NotEmpty(t, expectedTestSummary2JsonBytes)

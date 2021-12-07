@@ -1,4 +1,4 @@
-package helpers
+package common
 
 // models full level 2 summary of a test run from 1 or more level 1 test runs
 type TestSummary2 struct {

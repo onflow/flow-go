@@ -3,7 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
-	"flaky-test-monitor/helpers"
+	"flaky-test-monitor/common"
 	"fmt"
 	"os"
 	"sort"
@@ -35,7 +35,7 @@ func (stdinResultReader StdinResultReader) getResultsFileName() string {
 	return os.Args[1]
 }
 
-func processSummary1TestRun(resultReader ResultReader) helpers.TestRun {
+func processSummary1TestRun(resultReader ResultReader) common.TestRun {
 	reader := resultReader.getReader()
 	scanner := bufio.NewScanner(reader)
 
@@ -44,7 +44,7 @@ func processSummary1TestRun(resultReader ResultReader) helpers.TestRun {
 	packageResultMap := processTestRunLineByLine(scanner)
 
 	err := scanner.Err()
-	helpers.AssertNoError(err, "error returning EOF for scanner")
+	common.AssertNoError(err, "error returning EOF for scanner")
 
 	postProcessTestRun(packageResultMap)
 
@@ -60,22 +60,22 @@ func processSummary1TestRun(resultReader ResultReader) helpers.TestRun {
 // 3. pause (zero or once) - for tests using t.Parallel()
 // 4. cont (zero or once) - for tests using t.Parallel()
 // 5. pass OR fail OR skip (once)
-func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*helpers.PackageResult {
-	packageResultMap := make(map[string]*helpers.PackageResult)
+func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*common.PackageResult {
+	packageResultMap := make(map[string]*common.PackageResult)
 	// reuse the same package result over and over
 	for scanner.Scan() {
-		var rawTestStep helpers.RawTestStep
+		var rawTestStep common.RawTestStep
 		err := json.Unmarshal(scanner.Bytes(), &rawTestStep)
-		helpers.AssertNoError(err, "error unmarshalling raw test step")
+		common.AssertNoError(err, "error unmarshalling raw test step")
 
 		// check if package result exists to hold test results
 		packageResult, packageResultExists := packageResultMap[rawTestStep.Package]
 		if !packageResultExists {
-			packageResult = &helpers.PackageResult{
+			packageResult = &common.PackageResult{
 				Package: rawTestStep.Package,
 
 				// package result will hold map of test results
-				TestMap: make(map[string][]helpers.TestResult),
+				TestMap: make(map[string][]common.TestResult),
 
 				// store outputs as a slice of strings - that's how "go test -json" outputs each output string on a separate line
 				// there are usually 2 or more outputs for a package
@@ -89,7 +89,7 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*helpers.Packag
 
 			// "run" is the very first test step and it needs special treatment - to create all the data structures that will be used by subsequent test steps for the same test
 			if rawTestStep.Action == "run" {
-				var newTestResult helpers.TestResult
+				var newTestResult common.TestResult
 				newTestResult.Test = rawTestStep.Test
 				newTestResult.Package = rawTestStep.Package
 
@@ -146,7 +146,7 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*helpers.Packag
 	return packageResultMap
 }
 
-func postProcessTestRun(packageResultMap map[string]*helpers.PackageResult) {
+func postProcessTestRun(packageResultMap map[string]*common.PackageResult) {
 	// transfer each test result map in each package result to a test result slice
 	for packageName, packageResult := range packageResultMap {
 
@@ -174,19 +174,19 @@ func postProcessTestRun(packageResultMap map[string]*helpers.PackageResult) {
 	}
 }
 
-func finalizeTestRun(packageResultMap map[string]*helpers.PackageResult) helpers.TestRun {
+func finalizeTestRun(packageResultMap map[string]*common.PackageResult) common.TestRun {
 	commitSha := os.Getenv("COMMIT_SHA")
 	if commitSha == "" {
 		panic("COMMIT_SHA can't be empty")
 	}
 
 	commitDate, err := time.Parse(time.RFC3339, os.Getenv("COMMIT_DATE"))
-	helpers.AssertNoError(err, "error parsing COMMIT_DATE")
+	common.AssertNoError(err, "error parsing COMMIT_DATE")
 
 	jobStarted, err := time.Parse(time.RFC3339, os.Getenv("JOB_STARTED"))
-	helpers.AssertNoError(err, "error parsing JOB_STARTED")
+	common.AssertNoError(err, "error parsing JOB_STARTED")
 
-	var testRun helpers.TestRun
+	var testRun common.TestRun
 	testRun.CommitDate = commitDate.UTC()
 	testRun.CommitSha = commitSha
 	testRun.JobRunDate = jobStarted.UTC()
@@ -212,5 +212,5 @@ func main() {
 
 	testRun := processSummary1TestRun(resultReader)
 
-	helpers.SaveToFile(resultReader.getResultsFileName(), testRun)
+	common.SaveToFile(resultReader.getResultsFileName(), testRun)
 }
