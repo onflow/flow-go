@@ -408,8 +408,6 @@ func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 		}
 
 		privateShare, _, _ := e.controller.GetArtifacts()
-
-		// NOTE: this can happen iff IsDKGFailureError above is true
 		if privateShare != nil {
 			// we only store our key if one was computed
 			err = e.dkgState.InsertMyBeaconPrivateKey(nextEpochCounter, privateShare)
