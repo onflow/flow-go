@@ -20,23 +20,7 @@ import (
 
 // GenerateClusterRootQC creates votes and generates a QC based on participant data
 func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *cluster.Block) (*flow.QuorumCertificate, error) {
-	signers, err := createClusterSigners(participants)
-	if err != nil {
-		return nil, err
-	}
-
-	identities := bootstrap.ToIdentityList(participants)
-	committee, err := committees.NewStaticCommittee(identities, flow.Identifier{}, nil, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	hotstuffValidator, err := createClusterValidator(committee)
-	if err != nil {
-		return nil, fmt.Errorf("could not create cluster validator: %w", err)
-	}
-
-	hotBlock := model.Block{
+	clusterRootBlock := &model.Block{
 		BlockID:     clusterBlock.ID(),
 		View:        clusterBlock.Header.View,
 		ProposerID:  clusterBlock.Header.ProposerID,
@@ -45,39 +29,43 @@ func GenerateClusterRootQC(participants []bootstrap.NodeInfo, clusterBlock *clus
 		Timestamp:   clusterBlock.Header.Timestamp,
 	}
 
-	votes := make([]*model.Vote, 0, len(signers))
-	for _, signer := range signers {
-		vote, err := signer.CreateVote(&hotBlock)
-		if err != nil {
-			return nil, fmt.Errorf("could not create cluster vote: %w", err)
-		}
-		votes = append(votes, vote)
+	// STEP 1: create votes for cluster root block
+	votes, err := createRootBlockVotes(participants, clusterRootBlock)
+	if err != nil {
+		return nil, err
 	}
 
-	logger := zerolog.Logger{}
+	// STEP 2: create VoteProcessor
+	identities := bootstrap.ToIdentityList(participants)
+	committee, err := committees.NewStaticCommittee(identities, flow.Identifier{}, nil, nil)
+	if err != nil {
+		return nil, err
+	}
 	var createdQC *flow.QuorumCertificate
-	voteProcessorFactory := votecollector.NewBootstrapStakingVoteProcessorFactory(committee, func(qc *flow.QuorumCertificate) {
+	processor, err := votecollector.NewBootstrapStakingVoteProcessor(zerolog.Logger{}, committee, clusterRootBlock, func(qc *flow.QuorumCertificate) {
 		createdQC = qc
 	})
-	processor, err := voteProcessorFactory.Create(logger, model.ProposalFromFlow(clusterBlock.Header, 0))
 	if err != nil {
-		return nil, fmt.Errorf("could not create cluster vote processor: %w", err)
+		return nil, fmt.Errorf("could not create cluster's StakingVoteProcessor: %w", err)
 	}
 
-	// create the QC from the votes
+	// STEP 3: feed the votes into the vote processor to create QC
 	for _, vote := range votes {
 		err := processor.Process(vote)
 		if err != nil {
 			return nil, fmt.Errorf("could not process vote: %w", err)
 		}
 	}
-
 	if createdQC == nil {
 		return nil, fmt.Errorf("not enough votes to create qc for bootstrapping")
 	}
 
-	// validate QC
-	err = hotstuffValidator.ValidateQC(createdQC, &hotBlock)
+	// STEP 4: validate constructed QC
+	val, err := createClusterValidator(committee)
+	if err != nil {
+		return nil, fmt.Errorf("could not create cluster validator: %w", err)
+	}
+	err = val.ValidateQC(createdQC, clusterRootBlock)
 
 	return createdQC, err
 }
@@ -91,25 +79,26 @@ func createClusterValidator(committee hotstuff.Committee) (hotstuff.Validator, e
 	return hotstuffValidator, nil
 }
 
-// createClusterSigners create signers for cluster signers
-func createClusterSigners(participants []bootstrap.NodeInfo) ([]hotstuff.Signer, error) {
-	n := len(participants)
-	signers := make([]hotstuff.Signer, n)
-	for i, participant := range participants {
-		// get the participant keys
+// createRootBlockVotes generates a vote for the rootBlock from each participant
+func createRootBlockVotes(participants []bootstrap.NodeInfo, rootBlock *model.Block) ([]*model.Vote, error) {
+	votes := make([]*model.Vote, 0, len(participants))
+	for _, participant := range participants {
+		// create the participant's local identity
 		keys, err := participant.PrivateKeys()
 		if err != nil {
 			return nil, fmt.Errorf("could not retrieve private keys for participant: %w", err)
 		}
-
-		// create local module
 		me, err := local.New(participant.Identity(), keys.StakingKey)
 		if err != nil {
 			return nil, err
 		}
 
-		signer := verification.NewStakingSigner(me)
-		signers[i] = signer
+		// generate root block vote
+		vote, err := verification.NewStakingSigner(me).CreateVote(rootBlock)
+		if err != nil {
+			return nil, fmt.Errorf("could not create cluster vote for participant %v: %w", me.NodeID(), err)
+		}
+		votes = append(votes, vote)
 	}
-	return signers, nil
+	return votes, nil
 }
