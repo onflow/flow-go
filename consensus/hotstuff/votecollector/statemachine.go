@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
+	"github.com/onflow/flow-go/engine"
 )
 
 var (
@@ -117,6 +118,10 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 		if err != nil {
 			if model.IsInvalidVoteError(err) {
 				m.notifier.OnInvalidVoteDetected(vote)
+				return nil
+			}
+			if engine.IsDuplicatedEntryError(err) {
+				// TODO: check if we can do this, maybe this behavior can be slashed
 				return nil
 			}
 			return err
