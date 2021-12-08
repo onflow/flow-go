@@ -57,8 +57,8 @@ func TestGetResultByID(t *testing.T) {
 	t.Run("get by ID with events", func(t *testing.T) {
 		backend := &mock.API{}
 		id := unittest.IdentifierFixture()
-		result := unittest.ExecutionResultFixture(unittest.WIthServiceEvents(1))
-		
+		result := unittest.ExecutionResultFixture(unittest.WithServiceEvents(1))
+
 		backend.Mock.
 			On("GetExecutionResultByID", mocks.Anything, id).
 			Return(result, nil)
