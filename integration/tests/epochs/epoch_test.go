@@ -140,7 +140,7 @@ func (s *Suite) TestEpochJoinAndLeave() {
 
 	// grab the first container of this node role type, this is the container we will replace
 	containerToReplace := s.getContainerToReplace(role)
-	require.True(s.T(), containerToReplace != nil)
+	require.NotNil(s.T(), containerToReplace)
 
 	// staking our new node and add get the corresponding container for that node
 	info, testContainer := s.StakeNewNode(ctx, env, role)
@@ -164,9 +164,9 @@ func (s *Suite) TestEpochJoinAndLeave() {
 
 	// wait for new container to startup and start processing blocks
 	// wait for end of second phase of the DKG
-	dkgPhase2FinalView, err := snapshot.Epochs().Current().DKGPhase2FinalView()
+	dkgPhase1FinalView, err := snapshot.Epochs().Current().DKGPhase1FinalView()
 	require.NoError(s.T(), err)
-	s.BlockState.WaitForSealedView(s.T(), dkgPhase2FinalView)
+	s.BlockState.WaitForSealedView(s.T(), dkgPhase1FinalView)
 
 	// make sure the network is healthy after adding new AN
 	s.assertNetworkHealthyAfterANChange(ctx, env, snapshot, info)
