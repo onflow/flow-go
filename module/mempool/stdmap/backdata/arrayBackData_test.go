@@ -269,9 +269,9 @@ func testInitialization(t *testing.T, backData *ArrayBackData, _ []*unittest.Moc
 	}
 }
 
-func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
+func testAddingEntities(t *testing.T, backData *ArrayBackData, entitiesToBeAdded []*unittest.MockEntity) {
 	// adding elements
-	for i, e := range entities {
+	for i, e := range entitiesToBeAdded {
 		// adding each element must be successful.
 		require.True(t, backData.Add(e.ID(), e))
 
@@ -291,12 +291,16 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		usedTail, freeTail := backData.entities.getTails()
 
 		//
-		fmt.Println(i)
-		require.Equal(t, entities[i/int(backData.limit)], usedHead.entity)
+		expectedUsedHead := 0
+		if i >= int(backData.limit) {
+			expectedUsedHead = (i + 1) % int(backData.limit)
+		}
+		fmt.Println(i, expectedUsedHead, backData.entities.used.head.sliceIndex())
+		require.Equal(t, backData.entities.entities[expectedUsedHead].entity, usedHead.entity)
 		require.True(t, usedHead.prev.isUndefined())
 
 		//
-		require.Equal(t, entities[i], usedTail.entity)
+		require.Equal(t, entitiesToBeAdded[i], usedTail.entity)
 		require.True(t, usedTail.next.isUndefined())
 
 		// free head
@@ -317,7 +321,7 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 			require.Nil(t, freeTail)
 		}
 
-		// used entities list
+		// used entitiesToBeAdded list
 		// if we are still below limit, head to tail of used list
 		// must be reachable within i + 1 steps.
 		usedTraverseStep := uint32(i + 1)
@@ -338,7 +342,7 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 			backData,
 			usedTraverseStep)
 
-		// free entities list
+		// free entitiesToBeAdded list
 		// if we are still below limit, head to tail of used list
 		// must be reachable within limit - i - 1 steps. "limit - i" part is since
 		// when we have i elements in list, we have "limit - i" free slots, and -1 is
