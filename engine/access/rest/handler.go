@@ -2,12 +2,12 @@ package rest
 
 import (
 	"encoding/json"
+	"errors"
+	"google.golang.org/grpc/status"
 	"net/http"
 
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-
 	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
@@ -73,27 +73,28 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zerolog.Logger) {
 	// rest status type error should be returned with status and user message provided
-	if e, ok := err.(StatusError); ok {
-		h.errorResponse(w, e.Status(), e.UserMessage(), errorLogger)
+	var statusErr StatusError
+	if errors.As(err, &statusErr) {
+		h.errorResponse(w, statusErr.Status(), statusErr.UserMessage(), errorLogger)
 		return
 	}
 
 	// handle grpc status error returned from the backend calls, we are forwarding the message to the client
-	if se, ok := err.(interface {
-		GRPCStatus() *status.Status
-	}); ok {
-		if se.GRPCStatus().Code() == codes.NotFound {
-			h.errorResponse(w, http.StatusNotFound, se.GRPCStatus().Message(), errorLogger)
+	if se, ok := status.FromError(err); ok {
+		if se.Code() == codes.NotFound {
+			h.errorResponse(w, http.StatusNotFound, se.Message(), errorLogger)
 			return
 		}
-		if se.GRPCStatus().Code() == codes.InvalidArgument {
-			h.errorResponse(w, http.StatusBadRequest, se.GRPCStatus().Message(), errorLogger)
+		if se.Code() == codes.InvalidArgument {
+			h.errorResponse(w, http.StatusBadRequest, se.Message(), errorLogger)
 			return
 		}
 	}
 
 	// stop going further - catch all error
-	h.errorResponse(w, http.StatusInternalServerError, err.Error(), errorLogger)
+	msg := "internal server error"
+	errorLogger.Error().Err(err).Msg(msg)
+	h.errorResponse(w, http.StatusInternalServerError, msg, errorLogger)
 }
 
 // jsonResponse builds a JSON response and send it to the client
@@ -103,7 +104,7 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logg
 	// serialise response to JSON and handler errors
 	encodedResponse, encErr := json.MarshalIndent(response, "", "\t")
 	if encErr != nil {
-		h.logger.Error().Err(encErr).Msg("failed to encode response")
+		h.logger.Error().Err(encErr).Msgf("failed to encode response: %v", response)
 		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
 		return
 	}
@@ -111,7 +112,7 @@ func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logg
 	// write response to response stream
 	_, writeErr := w.Write(encodedResponse)
 	if writeErr != nil {
-		h.logger.Error().Err(encErr).Msg("failed to write response")
+		h.logger.Error().Err(encErr).Msgf("failed to write response: %v", encodedResponse)
 		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
 		return
 	}
@@ -127,6 +128,9 @@ func (h *Handler) errorResponse(
 	responseMessage string,
 	logger zerolog.Logger,
 ) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.WriteHeader(returnCode)
+
 	// create error response model
 	modelError := generated.ModelError{
 		Code:    int32(returnCode),
@@ -138,8 +142,6 @@ func (h *Handler) errorResponse(
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
-	w.WriteHeader(returnCode)
 	_, err = w.Write(encodedError)
 	if err != nil {
 		logger.Error().Err(err).Msg("failed to send error response")

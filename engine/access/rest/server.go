@@ -145,7 +145,7 @@ func routeDefinitions() []routeDefinition {
 		},
 		// Scripts
 		{
-			method:         "POST",
+			method:         http.MethodPost,
 			pattern:        "/scripts",
 			name:           executeScriptRoute,
 			apiHandlerFunc: executeScript,

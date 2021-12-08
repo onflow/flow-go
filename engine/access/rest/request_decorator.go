@@ -72,8 +72,7 @@ func (rd *requestDecorator) getQueryParams(name string) []string {
 	if len(param) == 0 {
 		return nil
 	}
-	params := strings.Split(param, ",")
-	return params
+	return strings.Split(param, ",")
 }
 
 func (rd *requestDecorator) bodyAs(dst interface{}) error {

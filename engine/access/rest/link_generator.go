@@ -7,7 +7,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-type LinkFun func(id flow.Identifier) (string, error)
+type LinkFunc func(id flow.Identifier) (string, error)
 
 // LinkGenerator generates the expandable value for the known endpoints
 // e.g. "/v1/blocks/c5e935bc75163db82e4a6cf9dc3b54656709d3e21c87385138300abd479c33b7"
@@ -60,7 +60,7 @@ func (generator *LinkGeneratorImpl) AccountLink(address string) (string, error) 
 // selfLink generates the _link key value pair for the response
 // e.g.
 // "_links": { "_self": "/v1/blocks/c5e935bc75163db82e4a6cf9dc3b54656709d3e21c87385138300abd479c33b7" sx}
-func selfLink(id flow.Identifier, linkFun LinkFun) (*generated.Links, error) {
+func selfLink(id flow.Identifier, linkFun LinkFunc) (*generated.Links, error) {
 	url, err := linkFun(id)
 	if err != nil {
 		return nil, err
