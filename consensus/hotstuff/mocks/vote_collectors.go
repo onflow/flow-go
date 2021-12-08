@@ -60,9 +60,9 @@ func (_m *VoteCollectors) GetOrCreateCollector(view uint64) (hotstuff.VoteCollec
 	return r0, r1, r2
 }
 
-// PruneUpToView provides a mock function with given fields: view
-func (_m *VoteCollectors) PruneUpToView(view uint64) {
-	_m.Called(view)
+// PruneUpToView provides a mock function with given fields: lowestRetainedView
+func (_m *VoteCollectors) PruneUpToView(lowestRetainedView uint64) {
+	_m.Called(lowestRetainedView)
 }
 
 // Ready provides a mock function with given fields:

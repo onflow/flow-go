@@ -20,13 +20,13 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestEventLoopV2 performs unit testing of event loop, checks if submitted events are propagated
+// TestEventLoop performs unit testing of event loop, checks if submitted events are propagated
 // to event handler as well as handling of timeouts.
-func TestEventLoopV2(t *testing.T) {
-	suite.Run(t, new(EventLoopV2TestSuite))
+func TestEventLoop(t *testing.T) {
+	suite.Run(t, new(EventLoopTestSuite))
 }
 
-type EventLoopV2TestSuite struct {
+type EventLoopTestSuite struct {
 	suite.Suite
 
 	eh     *mocks.EventHandlerV2
@@ -35,7 +35,7 @@ type EventLoopV2TestSuite struct {
 	eventLoop *EventLoop
 }
 
-func (s *EventLoopV2TestSuite) SetupTest() {
+func (s *EventLoopTestSuite) SetupTest() {
 	s.eh = &mocks.EventHandlerV2{}
 	s.eh.On("Start").Return(nil).Maybe()
 	s.eh.On("TimeoutChannel").Return(time.NewTimer(10 * time.Second).C).Maybe()
@@ -55,13 +55,13 @@ func (s *EventLoopV2TestSuite) SetupTest() {
 	unittest.RequireCloseBefore(s.T(), s.eventLoop.Ready(), 100*time.Millisecond, "event loop not started")
 }
 
-func (s *EventLoopV2TestSuite) TearDownTest() {
+func (s *EventLoopTestSuite) TearDownTest() {
 	s.cancel()
 	unittest.RequireCloseBefore(s.T(), s.eventLoop.Done(), 100*time.Millisecond, "event loop not stopped")
 }
 
 // TestReadyDone tests if event loop stops internal worker thread
-func (s *EventLoopV2TestSuite) TestReadyDone() {
+func (s *EventLoopTestSuite) TestReadyDone() {
 	time.Sleep(1 * time.Second)
 	go func() {
 		s.cancel()
@@ -71,7 +71,7 @@ func (s *EventLoopV2TestSuite) TestReadyDone() {
 }
 
 // Test_SubmitQC tests that submitted proposal is eventually sent to event handler for processing
-func (s *EventLoopV2TestSuite) Test_SubmitProposal() {
+func (s *EventLoopTestSuite) Test_SubmitProposal() {
 	proposal := unittest.BlockHeaderFixture()
 	expectedProposal := model.ProposalFromFlow(&proposal, proposal.View-1)
 	processed := atomic.NewBool(false)
@@ -84,7 +84,7 @@ func (s *EventLoopV2TestSuite) Test_SubmitProposal() {
 }
 
 // Test_SubmitQC tests that submitted QC is eventually sent to event handler for processing
-func (s *EventLoopV2TestSuite) Test_SubmitQC() {
+func (s *EventLoopTestSuite) Test_SubmitQC() {
 	qc := unittest.QuorumCertificateFixture()
 	processed := atomic.NewBool(false)
 	s.eh.On("OnQCConstructed", qc).Run(func(args mock.Arguments) {
@@ -95,8 +95,8 @@ func (s *EventLoopV2TestSuite) Test_SubmitQC() {
 	s.eh.AssertExpectations(s.T())
 }
 
-// TestEventLoopV2_Timeout tests that event loop delivers timeout events to event handler under pressure
-func TestEventLoopV2_Timeout(t *testing.T) {
+// TestEventLoop_Timeout tests that event loop delivers timeout events to event handler under pressure
+func TestEventLoop_Timeout(t *testing.T) {
 	eh := &mocks.EventHandlerV2{}
 	processed := atomic.NewBool(false)
 	eh.On("Start").Return(nil).Once()
