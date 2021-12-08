@@ -295,7 +295,6 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entitiesToBeAdded
 		if i >= int(backData.limit) {
 			expectedUsedHead = (i + 1) % int(backData.limit)
 		}
-		fmt.Println(i, expectedUsedHead, backData.entities.used.head.sliceIndex())
 		require.Equal(t, backData.entities.entities[expectedUsedHead].entity, usedHead.entity)
 		require.True(t, usedHead.prev.isUndefined())
 
