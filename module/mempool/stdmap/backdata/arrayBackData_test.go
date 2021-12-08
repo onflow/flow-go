@@ -242,29 +242,29 @@ func testInitialization(t *testing.T, backData *ArrayBackData, _ []*unittest.Moc
 	require.True(t, backData.entities.used.head.isUndefined())
 	require.True(t, backData.entities.used.tail.isUndefined())
 
-	for i := 0; i < len(backData.entities.entities); i++ {
+	for i := 0; i < len(backData.entities.values); i++ {
 		if i == 0 {
 			// head of embedded "free" linked-list should point to index 0 of entities slice.
 			require.Equal(t, uint32(i), backData.entities.free.head.sliceIndex())
 			// previous element of tail must be undefined.
-			require.True(t, backData.entities.entities[i].prev.isUndefined())
+			require.True(t, backData.entities.values[i].prev.isUndefined())
 		}
 
 		if i != 0 {
 			// except head, any element should point back to its previous index in slice.
-			require.Equal(t, uint32(i-1), backData.entities.entities[i].prev.sliceIndex())
+			require.Equal(t, uint32(i-1), backData.entities.values[i].prev.sliceIndex())
 		}
 
-		if i != len(backData.entities.entities)-1 {
+		if i != len(backData.entities.values)-1 {
 			// except tail, any element should point forward to its next index in slice.
-			require.Equal(t, uint32(i+1), backData.entities.entities[i].next.sliceIndex())
+			require.Equal(t, uint32(i+1), backData.entities.values[i].next.sliceIndex())
 		}
 
-		if i == len(backData.entities.entities)-1 {
+		if i == len(backData.entities.values)-1 {
 			// tail of embedded "free" linked-list should point to the last index in entities slice.
 			require.Equal(t, uint32(i), backData.entities.free.tail.sliceIndex())
 			// next element of tail must be undefined.
-			require.True(t, backData.entities.entities[i].next.isUndefined())
+			require.True(t, backData.entities.values[i].next.isUndefined())
 		}
 	}
 }
@@ -295,7 +295,7 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entitiesToBeAdded
 		if i >= int(backData.limit) {
 			expectedUsedHead = (i + 1) % int(backData.limit)
 		}
-		require.Equal(t, backData.entities.entities[expectedUsedHead].entity, usedHead.entity)
+		require.Equal(t, backData.entities.values[expectedUsedHead].entity, usedHead.entity)
 		require.True(t, usedHead.prev.isUndefined())
 
 		//
@@ -489,8 +489,8 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex uint32, tailSliceIndex 
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
 
-		require.False(t, backData.entities.entities[index].next.isUndefined(), "tail not found, and reached end of list")
-		index = backData.entities.entities[index].next.sliceIndex()
+		require.False(t, backData.entities.values[index].next.isUndefined(), "tail not found, and reached end of list")
+		index = backData.entities.values[index].next.sliceIndex()
 	}
 }
 
@@ -508,6 +508,6 @@ func headAccessibleFromTail(t *testing.T, headSliceIndex uint32, tailSliceIndex 
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
 
-		index = backData.entities.entities[index].prev.sliceIndex()
+		index = backData.entities.values[index].prev.sliceIndex()
 	}
 }
