@@ -312,7 +312,6 @@ func (c *Client) CreateAccount(
 		SetProposalKey(payer, 0, payerKey.SequenceNumber).
 		SetPayer(payer)
 
-	payerKey.SequenceNumber++
 	err := c.SignAndSendTransaction(ctx, tx)
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed to sign and send create account transaction %w", err)

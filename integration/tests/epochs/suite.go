@@ -195,7 +195,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
-	result = s.SetApprovedNodesScript(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
+	result = s.SubmitSetApprovedListTx(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
 	require.NoError(s.T(), result.Error)
 
 	s.checkStakingAuctionInProgress(ctx)
@@ -265,6 +265,7 @@ func (s *Suite) fundAccount(ctx context.Context, receiver sdk.Address, tokenAmou
 
 	result, err := s.client.WaitForSealed(ctx, transferTx.ID())
 	require.NoError(s.T(), err)
+	s.client.Account().Keys[0].SequenceNumber++
 
 	return result, nil
 }
@@ -307,6 +308,8 @@ func (s *Suite) createAccount(ctx context.Context,
 
 	addr, err := s.client.CreateAccount(ctx, accountKey, payerAccount, payer, sdk.Identifier(latestBlockID))
 	require.NoError(s.T(), err)
+
+	payerAccount.Keys[0].SequenceNumber++
 	return addr, nil
 }
 
@@ -331,6 +334,7 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 
 	result, err := s.client.WaitForSealed(ctx, createStakingCollectionTx.ID())
 	require.NoError(s.T(), err)
+	stakingAccount.Keys[0].SequenceNumber++
 
 	return result, nil
 }
@@ -376,6 +380,7 @@ func (s *Suite) SubmitStakingCollectionRegisterNodeTx(
 
 	result, err := s.client.WaitForSealed(ctx, registerNodeTx.ID())
 	require.NoError(s.T(), err)
+	stakingAccount.Keys[0].SequenceNumber++
 	return result, nil
 }
 
@@ -408,7 +413,7 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 
 	result, err := s.client.WaitForSealed(ctx, closeStakeTx.ID())
 	require.NoError(s.T(), err)
-
+	stakingAccount.Keys[0].SequenceNumber++
 	return result, nil
 }
 
@@ -434,7 +439,7 @@ func (s *Suite) SubmitAdminRemoveNodeTx(ctx context.Context,
 
 	result, err := s.client.WaitForSealed(ctx, closeStakeTx.ID())
 	require.NoError(s.T(), err)
-
+	s.client.Account().Keys[0].SequenceNumber++
 	return result, nil
 }
 
@@ -444,8 +449,8 @@ func (s *Suite) ExecuteGetProposedTableScript(ctx context.Context, env templates
 	return v
 }
 
-// SetApprovedNodesScript adds a node the the approved node list, this must be done when a node joins the protocol during the epoch staking phase
-func (s *Suite) SetApprovedNodesScript(ctx context.Context, env templates.Environment, identities ...flow.Identifier) *sdk.TransactionResult {
+// SubmitSetApprovedListTx adds a node the the approved node list, this must be done when a node joins the protocol during the epoch staking phase
+func (s *Suite) SubmitSetApprovedListTx(ctx context.Context, env templates.Environment, identities ...flow.Identifier) *sdk.TransactionResult {
 	ids := make([]cadence.Value, 0)
 	for _, id := range identities {
 		idCDC, err := cadence.NewString(id.String())
@@ -465,7 +470,6 @@ func (s *Suite) SetApprovedNodesScript(ctx context.Context, env templates.Enviro
 		SetProposalKey(s.client.SDKServiceAddress(), 0, s.client.Account().Keys[0].SequenceNumber).
 		SetPayer(s.client.SDKServiceAddress()).
 		AddAuthorizer(idTableAddress)
-	s.client.Account().Keys[0].SequenceNumber++
 	err = tx.AddArgument(cadence.NewArray(ids))
 	require.NoError(s.T(), err)
 
@@ -474,6 +478,7 @@ func (s *Suite) SetApprovedNodesScript(ctx context.Context, env templates.Enviro
 
 	result, err := s.client.WaitForSealed(ctx, tx.ID())
 	require.NoError(s.T(), err)
+	s.client.Account().Keys[0].SequenceNumber++
 
 	return result
 }
@@ -484,13 +489,6 @@ func (s *Suite) ExecuteReadApprovedNodesScript(ctx context.Context, env template
 	require.NoError(s.T(), err)
 
 	return v
-}
-
-// pauseContainer pauses the named container in the network
-func (s *Suite) pauseContainer(name string) {
-	container := s.net.ContainerByName(name)
-	err := container.Pause()
-	require.NoError(s.T(), err)
 }
 
 // getTestContainerName returns a name for a test container in the form of ${role}_${nodeID}_test

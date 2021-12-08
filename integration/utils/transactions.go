@@ -45,7 +45,6 @@ func MakeCreateStakingCollectionTx(
 		return nil, fmt.Errorf("could not sign payload: %w", err)
 	}
 
-	accountKey.SequenceNumber++
 	return tx, nil
 }
 
@@ -219,6 +218,5 @@ func MakeTransferTokenTx(env templates.Environment, receiver sdk.Address, sender
 	if err != nil {
 		return nil, fmt.Errorf("could not add argument to transaction :%w", err)
 	}
-	senderKey.SequenceNumber++
 	return tx, nil
 }
