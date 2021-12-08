@@ -31,7 +31,8 @@ export DOCKER_BUILDKIT := 1
 
 .PHONY: crypto/relic/build
 crypto/relic/build:
-	cd ./crypto &&	go generate
+# setup the crypto package under the GOPATH, needed to test packages importing flow-go/crypto
+	bash crypto_setup.sh
 
 # relic versions in script and submodule
 export LOCAL_VERSION := $(shell (cd ./crypto/relic/ && git rev-parse HEAD))
