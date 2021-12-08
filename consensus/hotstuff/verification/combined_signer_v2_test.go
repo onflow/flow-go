@@ -97,7 +97,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	require.Error(t, err)
 	block.BlockID[0]--
 
-	// vote with changed view should be invalid
+	// vote with a wrong view should be invalid
 	block.View++
 	_, err = verifier.VerifyVote(nodeID, vote.SigData, block)
 	require.Error(t, err)
