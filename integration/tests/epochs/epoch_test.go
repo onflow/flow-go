@@ -162,10 +162,10 @@ func (s *Suite) TestEpochJoinAndLeave() {
 	require.NoError(s.T(), err)
 
 	// wait for new container to startup and start processing blocks
-	// wait for end of epoch
-	epochFinalView, err := snapshot.Epochs().Current().FinalView()
+	// wait for end of second phase of the DKG
+	dkgPhase2FinalView, err := snapshot.Epochs().Current().DKGPhase2FinalView()
 	require.NoError(s.T(), err)
-	s.BlockState.WaitForSealedView(s.T(), epochFinalView)
+	s.BlockState.WaitForSealedView(s.T(), dkgPhase2FinalView)
 
 	// make sure the network is healthy after adding new AN
 	s.assertNetworkHealthyAfterANChange(ctx, env, snapshot, info)

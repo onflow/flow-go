@@ -512,7 +512,7 @@ func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates
 // newTestContainerOnNetwork configures a new container on the suites network
 func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
 	containerConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 		testnet.WithID(info.NodeID),
 	}
 
