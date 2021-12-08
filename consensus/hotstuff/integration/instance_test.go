@@ -49,7 +49,7 @@ type Instance struct {
 	builder      *module.Builder
 	finalizer    *module.Finalizer
 	persist      *mocks.Persister
-	signer       *mocks.SignerVerifier
+	signer       *mocks.Signer
 	verifier     *mocks.Verifier
 	communicator *mocks.Communicator
 
@@ -119,7 +119,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 		committee:    &mocks.Committee{},
 		builder:      &module.Builder{},
 		persist:      &mocks.Persister{},
-		signer:       &mocks.SignerVerifier{},
+		signer:       &mocks.Signer{},
 		verifier:     &mocks.Verifier{},
 		communicator: &mocks.Communicator{},
 		finalizer:    &module.Finalizer{},

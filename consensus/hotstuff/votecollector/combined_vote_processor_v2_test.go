@@ -13,12 +13,11 @@ import (
 	"go.uber.org/atomic"
 	"pgregory.net/rapid"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -756,11 +755,11 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
 	// all committee members run DKG
-	dkgData, err := run.RunFastKG(11, unittest.RandomBytes(32))
+	dkgData, err := bootstrapDKG.RunFastKG(11, unittest.RandomBytes(32))
 	require.NoError(t, err)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
-	signers := make(map[flow.Identifier]*verification.CombinedSignerV2)
+	signers := make(map[flow.Identifier]*verification.CombinedSigner)
 
 	// prepare staking signers, each signer has it's own private/public key pair
 	// stakingSigners sign only with staking key, meaning they have failed DKG
@@ -790,7 +789,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
 
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore)
+		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
 	for _, identity := range beaconSigners {
@@ -816,7 +815,7 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		me, err := local.New(identity, stakingPriv)
 		require.NoError(t, err)
 
-		signers[identity.NodeID] = verification.NewCombinedSignerV2(me, beaconSignerStore)
+		signers[identity.NodeID] = verification.NewCombinedSigner(me, beaconSignerStore)
 	}
 
 	leader := stakingSigners[0]
@@ -852,10 +851,10 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
-		packer := signature.NewConsensusSigDataPacker(committee)
+		packer := hsig.NewConsensusSigDataPacker(committee)
 
 		// create verifier that will do crypto checks of created QC
-		verifier := verification.NewCombinedVerifierV2(committee, packer)
+		verifier := verification.NewCombinedVerifier(committee, packer)
 		forks := &mockhotstuff.Forks{}
 		// create validator which will do compliance and crypto checked of created QC
 		validator := hotstuffvalidator.New(committee, forks, verifier)

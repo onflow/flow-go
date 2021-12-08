@@ -84,8 +84,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	committee = committees.NewMetricsWrapper(committee, metrics) // wrapper for measuring time spent determining consensus committee relations
 
 	// create a signing provider
-	var signer hotstuff.SignerVerifier
-	signer = verification.NewSingleSignerVerifier(committee, f.aggregator, f.me.NodeID())
+	var signer hotstuff.Signer = verification.NewStakingSigner(f.me)
 	signer = verification.NewMetricsWrapper(signer, metrics) // wrapper for measuring time spent with crypto-related operations
 
 	finalizedBlock, err := clusterState.Final().Head()
@@ -106,7 +105,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	}
 
 	qcDistributor := pubsub.NewQCCreatedDistributor()
-	validator := consensus.NewValidator(metrics, committee, forks, signer)
+	validator := consensus.NewValidator(metrics, committee, forks)
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 	aggregator, err := consensus.NewVoteAggregator(
 		f.log,

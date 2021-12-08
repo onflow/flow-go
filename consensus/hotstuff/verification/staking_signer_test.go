@@ -17,10 +17,12 @@ import (
 // that can be verified later using StakingVerifier.
 // Additionally, we check cases where errors during signing are happening.
 func TestStakingSigner_CreateProposal(t *testing.T) {
-	signerID := unittest.IdentifierFixture()
+	signer := unittest.IdentityFixture()
+	signerID := signer.NodeID
 	t.Run("invalid-signer-id", func(t *testing.T) {
 		me := &modulemock.Local{}
-		signer := NewStakingSigner(me, signerID)
+		me.On("NodeID").Return(signerID)
+		signer := NewStakingSigner(me)
 
 		block := helper.MakeBlock()
 		proposal, err := signer.CreateProposal(block)
@@ -30,8 +32,9 @@ func TestStakingSigner_CreateProposal(t *testing.T) {
 	t.Run("could-not-sign", func(t *testing.T) {
 		signException := errors.New("sign-exception")
 		me := &modulemock.Local{}
+		me.On("NodeID").Return(signerID)
 		me.On("Sign", mock.Anything, mock.Anything).Return(nil, signException).Once()
-		signer := NewStakingSigner(me, signerID)
+		signer := NewStakingSigner(me)
 
 		block := helper.MakeBlock()
 		proposal, err := signer.CreateProposal(block)
@@ -40,13 +43,13 @@ func TestStakingSigner_CreateProposal(t *testing.T) {
 	})
 	t.Run("created-proposal", func(t *testing.T) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
-		me, err := local.New(nil, stakingPriv)
+		me, err := local.New(signer, stakingPriv)
 		require.NoError(t, err)
 
 		signerIdentity := unittest.IdentityFixture(unittest.WithNodeID(signerID),
 			unittest.WithStakingPubKey(stakingPriv.PublicKey()))
 
-		signer := NewStakingSigner(me, signerID)
+		signer := NewStakingSigner(me)
 
 		block := helper.MakeBlock(helper.WithBlockProposer(signerID))
 		proposal, err := signer.CreateProposal(block)
@@ -64,12 +67,14 @@ func TestStakingSigner_CreateProposal(t *testing.T) {
 // that can be verified later using StakingVerifier.
 // Additionally, we check cases where errors during signing are happening.
 func TestStakingSigner_CreateVote(t *testing.T) {
-	signerID := unittest.IdentifierFixture()
+	signer := unittest.IdentityFixture()
+	signerID := signer.NodeID
 	t.Run("could-not-sign", func(t *testing.T) {
 		signException := errors.New("sign-exception")
 		me := &modulemock.Local{}
+		me.On("NodeID").Return(signerID)
 		me.On("Sign", mock.Anything, mock.Anything).Return(nil, signException).Once()
-		signer := NewStakingSigner(me, signerID)
+		signer := NewStakingSigner(me)
 
 		block := helper.MakeBlock()
 		proposal, err := signer.CreateProposal(block)
@@ -78,13 +83,13 @@ func TestStakingSigner_CreateVote(t *testing.T) {
 	})
 	t.Run("created-vote", func(t *testing.T) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
-		me, err := local.New(nil, stakingPriv)
+		me, err := local.New(signer, stakingPriv)
 		require.NoError(t, err)
 
 		signerIdentity := unittest.IdentityFixture(unittest.WithNodeID(signerID),
 			unittest.WithStakingPubKey(stakingPriv.PublicKey()))
 
-		signer := NewStakingSigner(me, signerID)
+		signer := NewStakingSigner(me)
 
 		block := helper.MakeBlock(helper.WithBlockProposer(signerID))
 		vote, err := signer.CreateVote(block)

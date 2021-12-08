@@ -13,12 +13,11 @@ import (
 	"go.uber.org/atomic"
 	"pgregory.net/rapid"
 
-	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -774,7 +773,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	view := uint64(20)
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
-	dkgData, err := run.RunFastKG(11, unittest.RandomBytes(32))
+	dkgData, err := bootstrapDKG.RunFastKG(11, unittest.RandomBytes(32))
 	require.NoError(t, err)
 
 	// signers hold objects that are created with private key and can sign votes and proposals
@@ -870,7 +869,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 
 	qcCreated := false
 	onQCCreated := func(qc *flow.QuorumCertificate) {
-		packer := signature.NewConsensusSigDataPacker(committee)
+		packer := hsig.NewConsensusSigDataPacker(committee)
 
 		// create verifier that will do crypto checks of created QC
 		verifier := verification.NewCombinedVerifierV3(committee, packer)
@@ -887,7 +886,7 @@ func TestCombinedVoteProcessorV3_BuildVerifyQC(t *testing.T) {
 	baseFactory := &combinedVoteProcessorFactoryBaseV3{
 		committee:   committee,
 		onQCCreated: onQCCreated,
-		packer:      signature.NewConsensusSigDataPacker(committee),
+		packer:      hsig.NewConsensusSigDataPacker(committee),
 	}
 	voteProcessorFactory := &VoteProcessorFactory{
 		baseFactory: baseFactory.Create,

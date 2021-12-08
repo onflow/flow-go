@@ -12,7 +12,7 @@ import (
 type HotstuffModules struct {
 	Notifier             hotstuff.Consumer            // observer for hotstuff events
 	Committee            hotstuff.Committee           // consensus committee
-	Signer               hotstuff.SignerVerifier      // signer of proposal & votes
+	Signer               hotstuff.Signer              // signer of proposal & votes
 	Persist              hotstuff.Persister           // last state of consensus participant
 	QCCreatedDistributor *pubsub.QCCreatedDistributor // observer for qc created event, used by leader
 	Forks                hotstuff.Forks               // information about multiple forks

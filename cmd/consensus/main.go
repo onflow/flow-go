@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
@@ -40,7 +41,6 @@ import (
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/dkg"
 	dkgmodel "github.com/onflow/flow-go/model/dkg"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
@@ -537,15 +537,6 @@ func main() {
 				)),
 			)
 
-			// initialize the aggregating signature module for staking signatures
-			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
-
-			// initialize the verifier used to verify threshold signatures
-			thresholdVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-
-			// initialize the simple merger to combine staking & beacon signatures
-			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-
 			// initialize Main consensus committee's state
 			var committee hotstuff.Committee
 			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
@@ -555,18 +546,13 @@ func main() {
 			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
 			epochLookup := epochs.NewEpochLookup(node.State)
-
-			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeyStore)
+			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, dkgKeyStore)
 
 			// initialize the combined signer for hotstuff
-			var signer hotstuff.SignerVerifier
+			var signer hotstuff.Signer
 			signer = verification.NewCombinedSigner(
-				committee,
-				staking,
-				thresholdVerifier,
-				merger,
-				thresholdSignerStore,
-				node.NodeID,
+				node.Me,
+				beaconKeyStore,
 			)
 			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
 
@@ -602,7 +588,7 @@ func main() {
 			}
 
 			qcDistributor := pubsub.NewQCCreatedDistributor()
-			validator := consensus.NewValidator(mainMetrics, committee, forks, signer)
+			validator := consensus.NewValidator(mainMetrics, committee, forks)
 			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 			lowestViewForVoteProcessing := finalizedBlock.View + 1
 			aggregator, err := consensus.NewVoteAggregator(node.Logger, lowestViewForVoteProcessing, notifier, voteProcessorFactory)

@@ -228,7 +228,7 @@ func createNode(
 	forks, err := consensus.NewForks(rootHeader, headersDB, final, notifier, rootHeader, rootQC)
 	require.NoError(t, err)
 
-	validator := consensus.NewValidator(metrics, committee, forks, signer)
+	validator := consensus.NewValidator(metrics, committee, forks)
 	require.NoError(t, err)
 
 	persist := persister.New(db, rootHeader.ChainID)

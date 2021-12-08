@@ -92,3 +92,30 @@ func NewCombinedVoteProcessorFactory(committee hotstuff.Committee, onQCCreated h
 		baseFactory: base.Create,
 	}
 }
+
+/* ***************************** VerifyingVoteProcessor constructors for bootstrapping ***************************** */
+
+// NewBootstrapCombinedVoteProcessor directly creates a CombinedVoteProcessorV2,
+// suitable for the collector's local cluster consensus.
+// Intended use: only for bootstrapping.
+// UNSAFE: the proposer vote for `block` is _not_ validated or included
+func NewBootstrapCombinedVoteProcessor(log zerolog.Logger, committee hotstuff.Committee, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
+	factory := &combinedVoteProcessorFactoryBaseV2{
+		committee:   committee,
+		onQCCreated: onQCCreated,
+		packer:      signature.NewConsensusSigDataPacker(committee),
+	}
+	return factory.Create(log, block)
+}
+
+// NewBootstrapStakingVoteProcessor directly creates a `StakingVoteProcessor`,
+// suitable for the collector's local cluster consensus.
+// Intended use: only for bootstrapping.
+// UNSAFE: the proposer vote for `block` is _not_ validated or included
+func NewBootstrapStakingVoteProcessor(log zerolog.Logger, committee hotstuff.Committee, block *model.Block, onQCCreated hotstuff.OnQCCreated) (hotstuff.VerifyingVoteProcessor, error) {
+	factory := &stakingVoteProcessorFactoryBase{
+		committee:   committee,
+		onQCCreated: onQCCreated,
+	}
+	return factory.Create(log, block)
+}

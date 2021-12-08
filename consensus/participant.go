@@ -16,7 +16,9 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	validatorImpl "github.com/onflow/flow-go/consensus/hotstuff/validator"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/voter"
 	"github.com/onflow/flow-go/consensus/recovery"
 	"github.com/onflow/flow-go/model/flow"
@@ -150,10 +152,12 @@ func NewForks(final *flow.Header, headers storage.Headers, updater module.Finali
 }
 
 // NewValidator creates new instance of hotstuff validator needed for votes & proposal validation
-// TODO: update signer to use new interface
-func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.Committee, forks hotstuff.ForksReader, signer hotstuff.SignerVerifier) hotstuff.Validator {
+func NewValidator(metrics module.HotstuffMetrics, committee hotstuff.Committee, forks hotstuff.ForksReader) hotstuff.Validator {
+	packer := signature.NewConsensusSigDataPacker(committee)
+	verifier := verification.NewCombinedVerifier(committee, packer)
+
 	// initialize the Validator
-	validator := validatorImpl.New(committee, forks, signer)
+	validator := validatorImpl.New(committee, forks, verifier)
 	return validatorImpl.NewMetricsWrapper(validator, metrics) // wrapper for measuring time spent in Validator component
 }
 

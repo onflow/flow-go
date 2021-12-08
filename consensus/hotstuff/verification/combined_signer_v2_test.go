@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	storagemock "github.com/onflow/flow-go/storage/mock"
@@ -20,8 +21,11 @@ import (
 // Test that when DKG key is available for a view, a signed block can pass the validation
 // the sig include both staking sig and random beacon sig.
 func TestCombinedSignWithDKGKey(t *testing.T) {
+	identities := unittest.IdentityListFixture(4, unittest.WithRole(flow.RoleConsensus))
+
 	// prepare data
 	dkgKey := unittest.DKGParticipantPriv()
+	dkgKey.NodeID = identities[0].NodeID
 	pk := dkgKey.RandomBeaconPrivKey.PublicKey()
 	signerID := dkgKey.NodeID
 	view := uint64(20)
@@ -48,7 +52,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 
 	me, err := local.New(nodeID, stakingPriv)
 	require.NoError(t, err)
-	signer := NewCombinedSignerV2(me, beaconKeyStore)
+	signer := NewCombinedSigner(me, beaconKeyStore)
 
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
@@ -57,7 +61,7 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	packer := signature.NewConsensusSigDataPacker(committee)
-	verifier := NewCombinedVerifierV2(committee, packer)
+	verifier := NewCombinedVerifier(committee, packer)
 
 	// check that a created proposal can be verified by a verifier
 	proposal, err := signer.CreateProposal(block)
@@ -78,6 +82,38 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 
 	expectedSig := signature.EncodeDoubleSig(stakingSig, beaconSig)
 	require.Equal(t, expectedSig, proposal.SigData)
+
+	// vote should be valid
+	vote, err = signer.CreateVote(block)
+	require.NoError(t, err)
+
+	voteValid, err := verifier.VerifyVote(nodeID, vote.SigData, block)
+	require.NoError(t, err)
+	require.Equal(t, true, voteValid)
+
+	// vote on different bock should be invalid
+	blockWrongID := *block
+	blockWrongID.BlockID[0]++
+	_, err = verifier.VerifyVote(nodeID, vote.SigData, &blockWrongID)
+	require.Error(t, err)
+
+	// vote with a wrong view should be invalid
+	blockWrongView := *block
+	blockWrongView.View++
+	_, err = verifier.VerifyVote(nodeID, vote.SigData, &blockWrongView)
+	require.Error(t, err)
+
+	// vote by different signer should be invalid
+	wrongVoter := identities[1]
+	wrongVoter.StakingPubKey = unittest.StakingPrivKeyFixture().PublicKey()
+	_, err = verifier.VerifyVote(wrongVoter, vote.SigData, block)
+	require.Error(t, err)
+
+	// vote with changed signature should be invalid
+	wrongSigData := *vote
+	wrongSigData.SigData[4]++
+	_, err = verifier.VerifyVote(nodeID, wrongSigData.SigData, block)
+	require.Error(t, err)
 }
 
 // Test that when DKG key is not available for a view, a signed block can pass the validation
@@ -111,7 +147,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 
 	me, err := local.New(nodeID, stakingPriv)
 	require.NoError(t, err)
-	signer := NewCombinedSignerV2(me, beaconKeyStore)
+	signer := NewCombinedSigner(me, beaconKeyStore)
 
 	dkg := &mocks.DKG{}
 	dkg.On("KeyShare", signerID).Return(pk, nil)
@@ -124,7 +160,7 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	committee.On("DKG", mock.Anything).Return(dkg, nil)
 
 	packer := signature.NewConsensusSigDataPacker(committee)
-	verifier := NewCombinedVerifierV2(committee, packer)
+	verifier := NewCombinedVerifier(committee, packer)
 
 	proposal, err := signer.CreateProposal(block)
 	require.NoError(t, err)
@@ -134,11 +170,12 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, true, valid)
 
-	// check that a created proposal's signature is a combined staking sig and random beacon sig
-	msg := MakeVoteMessage(block.View, block.BlockID)
-	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(encoding.ConsensusVoteTag))
+	// As the proposer does not have a Random Beacon Key, it should sign soley with its staking key.
+	// In this case, the SigData should be identical to the staking sig.
+	expectedStakingSig, err := stakingPriv.Sign(
+		MakeVoteMessage(block.View, block.BlockID),
+		crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+	)
 	require.NoError(t, err)
-
-	// check the signature only has staking sig
-	require.Equal(t, stakingSig, crypto.Signature(proposal.SigData))
+	require.Equal(t, expectedStakingSig, crypto.Signature(proposal.SigData))
 }

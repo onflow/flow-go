@@ -12,7 +12,7 @@ import (
 	"github.com/onflow/flow-go/module"
 )
 
-// CombinedSignerV2 creates votes for the main consensus.
+// CombinedSigner creates votes for the main consensus.
 // When a participant votes for a block, it _always_ provide the staking signature
 // as part of their vote. Furthermore, the participant can _optionally_
 // also provide a random beacon signature. Through their staking signature, a
@@ -22,23 +22,23 @@ import (
 // TODO: to be replaced by CombinedSignerV3 for mature V2 solution.
 // The difference between V2 and V3 is that V2 will sign 2 sigs, whereas
 // V3 only sign 1 sig.
-type CombinedSignerV2 struct {
+type CombinedSigner struct {
 	staking        module.Local
 	stakingHasher  hash.Hasher
 	beaconKeyStore module.RandomBeaconKeyStore
 	beaconHasher   hash.Hasher
 }
 
-// NewCombinedSignerV2 creates a new combined signer with the given dependencies:
+// NewCombinedSigner creates a new combined signer with the given dependencies:
 // - the staking signer is used to create and verify aggregatable signatures for Hotstuff
 // - the beaconKeyStore is used to get threshold-signers by epoch/view;
 // - the signer ID is used as the identity when creating signatures;
-func NewCombinedSignerV2(
+func NewCombinedSigner(
 	staking module.Local,
 	beaconKeyStore module.RandomBeaconKeyStore,
-) *CombinedSignerV2 {
+) *CombinedSigner {
 
-	sc := &CombinedSignerV2{
+	sc := &CombinedSigner{
 		staking:        staking,
 		stakingHasher:  crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
 		beaconKeyStore: beaconKeyStore,
@@ -48,7 +48,7 @@ func NewCombinedSignerV2(
 }
 
 // CreateProposal will create a proposal with a combined signature for the given block.
-func (c *CombinedSignerV2) CreateProposal(block *model.Block) (*model.Proposal, error) {
+func (c *CombinedSigner) CreateProposal(block *model.Block) (*model.Proposal, error) {
 
 	// check that the block is created by us
 	if block.ProposerID != c.staking.NodeID() {
@@ -71,7 +71,7 @@ func (c *CombinedSignerV2) CreateProposal(block *model.Block) (*model.Proposal, 
 }
 
 // CreateVote will create a vote with a combined signature for the given block.
-func (c *CombinedSignerV2) CreateVote(block *model.Block) (*model.Vote, error) {
+func (c *CombinedSigner) CreateVote(block *model.Block) (*model.Vote, error) {
 
 	// create the signature data
 	sigData, err := c.genSigData(block)
@@ -95,7 +95,7 @@ func (c *CombinedSignerV2) CreateVote(block *model.Block) (*model.Vote, error) {
 //  - (stakingSig, nil) if there is no random beacon private key.
 //  - (stakingSig+randomBeaconSig, nil) if there is a random beacon private key.
 //  - (nil, error) if there is any exception
-func (c *CombinedSignerV2) genSigData(block *model.Block) ([]byte, error) {
+func (c *CombinedSigner) genSigData(block *model.Block) ([]byte, error) {
 
 	// create the message to be signed and generate signatures
 	msg := MakeVoteMessage(block.View, block.BlockID)
