@@ -2,13 +2,13 @@ package dkg
 
 import (
 	"crypto/rand"
+	"errors"
 	"fmt"
 
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -41,7 +41,7 @@ type ReactorEngine struct {
 	log               zerolog.Logger
 	me                module.Local
 	State             protocol.State
-	keyStorage        storage.BeaconPrivateKeys
+	dkgState          storage.DKGState
 	controller        module.DKGController
 	controllerFactory module.DKGControllerFactory
 	viewEvents        events.Views
@@ -53,7 +53,7 @@ func NewReactorEngine(
 	log zerolog.Logger,
 	me module.Local,
 	state protocol.State,
-	keyStorage storage.BeaconPrivateKeys,
+	dkgState storage.DKGState,
 	controllerFactory module.DKGControllerFactory,
 	viewEvents events.Views,
 ) *ReactorEngine {
@@ -67,7 +67,7 @@ func NewReactorEngine(
 		log:               logger,
 		me:                me,
 		State:             state,
-		keyStorage:        keyStorage,
+		dkgState:          dkgState,
 		controllerFactory: controllerFactory,
 		viewEvents:        viewEvents,
 		pollStep:          DefaultPollStep,
@@ -78,7 +78,38 @@ func NewReactorEngine(
 // that will close when the engine has successfully
 // started.
 func (e *ReactorEngine) Ready() <-chan struct{} {
-	return e.unit.Ready()
+	return e.unit.Ready(func() {
+		// If we are starting up in the EpochSetup phase, try to start the DKG.
+		// If the DKG for this epoch has been started previously, we will exit
+		// and fail this epoch's DKG.
+		snap := e.State.Final()
+
+		phase, err := snap.Phase()
+		if err != nil {
+			// unexpected storage-level error
+			e.log.Fatal().Err(err).Msg("failed to check epoch phase when starting DKG reactor engine")
+			return
+		}
+		if phase != flow.EpochPhaseSetup {
+			// start up in a non-setup phase - this is the typical path
+			return
+		}
+
+		currentCounter, err := snap.Epochs().Current().Counter()
+		if err != nil {
+			// unexpected storage-level error
+			e.log.Fatal().Err(err).Msg("failed to retrieve current epoch counter when starting DKG reactor engine")
+			return
+		}
+		first, err := snap.Head()
+		if err != nil {
+			// unexpected storage-level error
+			e.log.Fatal().Err(err).Msg("failed to retrieve finalized header when starting DKG reactor engine")
+			return
+		}
+
+		e.startDKGForEpoch(currentCounter, first)
+	})
 }
 
 // Done implements the module ReadyDoneAware interface. It returns a channel
@@ -87,49 +118,86 @@ func (e *ReactorEngine) Done() <-chan struct{} {
 	return e.unit.Done()
 }
 
-// EpochSetupPhaseStarted handles the EpochSetupPhaseStared protocol event. It
-// starts a new controller for the epoch and registers the triggers to regularly
-// query the DKG smart-contract and transition between phases at the specified
-// views.
+// EpochSetupPhaseStarted handles the EpochSetupPhaseStarted protocol event by
+// starting the DKG process.
 func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
-	firstID := first.ID()
+	e.startDKGForEpoch(currentEpochCounter, first)
+}
 
-	lg := e.log.With().
-		Uint64("current_epoch", currentEpochCounter).
+// EpochCommittedPhaseStarted handles the EpochCommittedPhaseStarted protocol
+// event by checking the consistency of our locally computed key share.
+func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, _ *flow.Header) {
+	e.handleEpochCommittedPhaseStarted(currentEpochCounter)
+}
+
+// startDKGForEpoch starts the DKG instance for the given epoch, only if we have
+// never started the DKG during setup phase for the given epoch. This allows consensus nodes which
+// boot from a state snapshot within the EpochSetup phase to run the DKG.
+//
+// It starts a new controller for the epoch and registers the triggers to regularly
+// query the DKG smart-contract and transition between phases at the specified views.
+//
+func (e *ReactorEngine) startDKGForEpoch(currentEpochCounter uint64, first *flow.Header) {
+
+	firstID := first.ID()
+	nextEpochCounter := currentEpochCounter + 1
+	log := e.log.With().
+		Uint64("cur_epoch", currentEpochCounter). // the epoch we are in the middle of
+		Uint64("next_epoch", nextEpochCounter).   // the epoch we are running the DKG for
 		Uint64("view", first.View).
 		Hex("block", firstID[:]).
 		Logger()
 
+	// if we have started the dkg for this epoch already, exit
+	started, err := e.dkgState.GetDKGStarted(nextEpochCounter)
+	if err != nil {
+		// unexpected storage-level error
+		log.Fatal().Err(err).Msg("could not check whether DKG is started")
+	}
+	if started {
+		log.Warn().Msg("DKG started before, skipping starting the DKG for this epoch")
+		return
+	}
+
+	// flag that we are starting the dkg for this epoch
+	err = e.dkgState.SetDKGStarted(nextEpochCounter)
+	if err != nil {
+		// unexpected storage-level error
+		log.Fatal().Err(err).Msg("could not set dkg started")
+	}
+
 	curDKGInfo, err := e.getDKGInfo(firstID)
 	if err != nil {
-		lg.Fatal().Err(err).Msg("could not retrieve epoch info")
+		// unexpected storage-level error
+		log.Fatal().Err(err).Msg("could not retrieve epoch info")
 	}
 
 	committee := curDKGInfo.identities.Filter(filter.IsVotingConsensusCommitteeMember)
 
-	lg.Info().
+	log.Info().
 		Uint64("phase1", curDKGInfo.phase1FinalView).
 		Uint64("phase2", curDKGInfo.phase2FinalView).
 		Uint64("phase3", curDKGInfo.phase3FinalView).
 		Interface("members", committee.NodeIDs()).
 		Msg("epoch info")
 
-	nextEpochCounter := currentEpochCounter + 1
 	controller, err := e.controllerFactory.Create(
 		dkgmodule.CanonicalInstanceID(first.ChainID, nextEpochCounter),
 		committee,
 		curDKGInfo.seed,
 	)
 	if err != nil {
-		lg.Fatal().Err(err).Msg("could not create DKG controller")
+		// no expected errors in controller factory
+		log.Fatal().Err(err).Msg("could not create DKG controller")
 	}
 	e.controller = controller
 
 	e.unit.Launch(func() {
-		lg.Info().Msg("DKG Run")
+		log.Info().Msg("DKG Run")
 		err := e.controller.Run()
 		if err != nil {
-			lg.Fatal().Err(err).Msg("DKG Run error")
+			// TODO handle crypto sentinels and do not crash here
+			log.Fatal().Err(err).Msg("DKG Run error")
 		}
 	})
 
@@ -161,34 +229,67 @@ func (e *ReactorEngine) EpochSetupPhaseStarted(currentEpochCounter uint64, first
 	e.registerPhaseTransition(curDKGInfo.phase3FinalView, dkgmodule.Phase3, e.end(nextEpochCounter))
 }
 
-// EpochCommittedPhaseStarted handles the EpochCommittedPhaseStarted protocol event. It
-// compares the key vector locally produced by Consensus nodes against the FlowDKG smart contract
-// key vectors. If the keys don't match a log statement will be invoked. In the happy case the locally
-// produced key should match, if the keys do not match the node will have a invalid random beacon key.
-func (e *ReactorEngine) EpochCommittedPhaseStarted(currentEpochCounter uint64, first *flow.Header) {
+// handleEpochCommittedPhaseStarted checks that the local DKG completed and
+// that our locally computed key share is consistent with the canonical key vector.
+//
+// If our key is inconsistent, we log a warning message.
+// CAUTION: we will still sign using the inconsistent key, to be fixed with Crypto
+// v2 by falling back to staking signatures in this case.
+//
+func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uint64) {
+
+	// the epoch counter the DKG just completed is for
+	dkgEpochCounter := currentEpochCounter + 1
+
+	log := e.log.With().
+		Uint64("cur_epoch", currentEpochCounter). // the epoch we are in the middle of
+		Uint64("dkg_for_epoch", dkgEpochCounter). // the epoch the just-finished DKG was preparing for
+		Logger()
+
+	// TODO - first check whether we've already stored the dkg end state, since
+	// we need to handle multiple calls to this method
+
+	// TODO execute in transaction scope of protocol event emitter, need to use
+	// lower-level storage access here (since State doesn't allow tx injection)
 	nextDKG, err := e.State.Final().Epochs().Next().DKG()
 	if err != nil {
-		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve next DKG info")
+		// CAUTION: this should never happen, indicates a storage failure or corruption
+		log.Fatal().Err(err).Msg("checking beacon key consistency: could not retrieve next DKG info")
 		return
 	}
 
-	dkgPrivInfo, err := e.keyStorage.RetrieveMyBeaconPrivateKey(currentEpochCounter + 1)
-	if err != nil {
-		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG private info for next epoch")
+	myBeaconPrivKey, err := e.dkgState.RetrieveMyBeaconPrivateKey(currentEpochCounter + 1)
+	if errors.Is(err, storage.ErrNotFound) {
+		log.Warn().Msg("checking beacon key consistency: no key found")
+		err := e.dkgState.SetDKGEndState(dkgEpochCounter, flow.DKGEndStateNoKey)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to set dkg end state")
+		}
+	} else if err != nil {
+		log.Fatal().Err(err).Msg("checking beacon key consistency: could not retrieve beacon private key for next epoch")
 		return
 	}
 
 	nextDKGPubKey, err := nextDKG.KeyShare(e.me.NodeID())
 	if err != nil {
-		e.log.Err(err).Msg("checking DKG key consistency: could not retrieve DKG public key for next epoch")
+		log.Fatal().Err(err).Msg("checking beacon key consistency: could not retrieve my beacon public key for next epoch")
 		return
 	}
 
-	localPubKey := dkgPrivInfo.PublicKey()
+	localPubKey := myBeaconPrivKey.PublicKey()
 
 	if !nextDKGPubKey.Equals(localPubKey) {
-		e.log.Warn().Msg("checking DKG key consistency: locally computed dkg public key does not match dkg public key for next epoch")
+		log.Warn().
+			Hex("computed_beacon_pub_key", localPubKey.Encode()).
+			Hex("canonical_beacon_pub_key", nextDKGPubKey.Encode()).
+			Msg("checking beacon key consistency: locally computed beacon public key does not match beacon public key for next epoch")
+		err := e.dkgState.SetDKGEndState(dkgEpochCounter, flow.DKGEndStateInconsistentKey)
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to set dkg end state")
+		}
 	}
+
+	log.Info().Msgf("successfully ended DKG, my beacon pub key for epoch %d is %x", dkgEpochCounter, localPubKey.Encode())
 }
 
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
@@ -270,26 +371,37 @@ func (e *ReactorEngine) registerPhaseTransition(view uint64, fromState dkgmodule
 // end returns a callback that is used to end the DKG protocol, save the
 // resulting private key to storage, and publish the other results to the DKG
 // smart-contract.
-func (e *ReactorEngine) end(epochCounter uint64) func() error {
+func (e *ReactorEngine) end(nextEpochCounter uint64) func() error {
 	return func() error {
+
 		err := e.controller.End()
-		if err != nil {
-			if crypto.IsDKGFailureError(err) {
-				e.log.Warn().Msgf("node %s with index %d failed DKG locally: %s", e.me.NodeID(), e.controller.GetIndex(), err.Error())
-			} else {
-				return err
+		if crypto.IsDKGFailureError(err) {
+			e.log.Warn().Err(err).Msgf("node %s with index %d failed DKG locally", e.me.NodeID(), e.controller.GetIndex())
+			err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateDKGFailure)
+			if err != nil {
+				return fmt.Errorf("failed to set dkg end state following dkg end error: %w", err)
 			}
+		} else if err != nil {
+			return fmt.Errorf("unknown error ending the dkg: %w", err)
 		}
 
 		privateShare, _, _ := e.controller.GetArtifacts()
 
-		privKeyInfo := encodable.RandomBeaconPrivKey{
-			PrivateKey: privateShare,
+		if privateShare == nil {
+			// we failed to compute a private key - set the corresponding DKG failure state
+			e.log.Warn().Msg("computed nil private key share")
+			err = e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateNoKey)
+			if err != nil {
+				return fmt.Errorf("with nil key could not set dkg end state to %s: %w", flow.DKGEndStateNoKey, err)
+			}
+		} else {
+			// we only store our key if one was computed
+			err = e.dkgState.InsertMyBeaconPrivateKey(nextEpochCounter, privateShare)
+			if err != nil {
+				return fmt.Errorf("could not save beacon private key in db: %w", err)
+			}
 		}
-		err = e.keyStorage.InsertMyBeaconPrivateKey(epochCounter, &privKeyInfo)
-		if err != nil {
-			return fmt.Errorf("couldn't save DKG private key in db: %w", err)
-		}
+
 		err = e.controller.SubmitResult()
 		if err != nil {
 			return fmt.Errorf("couldn't publish DKG results: %w", err)
