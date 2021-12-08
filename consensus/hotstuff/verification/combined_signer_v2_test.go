@@ -170,11 +170,12 @@ func TestCombinedSignWithNoDKGKey(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, true, valid)
 
-	// check that a created proposal's signature is a combined staking sig and random beacon sig
-	msg := MakeVoteMessage(block.View, block.BlockID)
-	stakingSig, err := stakingPriv.Sign(msg, crypto.NewBLSKMAC(encoding.ConsensusVoteTag))
+	// As the proposer does not have a Random Beacon Key, it should sign soley with its staking key.
+	// In this case, the SigData should be identical to the staking sig.
+	expectedStakingSig, err := stakingPriv.Sign(
+		MakeVoteMessage(block.View, block.BlockID),
+		crypto.NewBLSKMAC(encoding.ConsensusVoteTag),
+	)
 	require.NoError(t, err)
-
-	// check the signature only has staking sig
-	require.Equal(t, stakingSig, crypto.Signature(proposal.SigData))
+	require.Equal(t, expectedStakingSig, crypto.Signature(proposal.SigData))
 }
