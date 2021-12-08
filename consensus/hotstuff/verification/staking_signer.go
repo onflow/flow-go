@@ -21,8 +21,8 @@ type StakingSigner struct {
 	signerID      flow.Identifier
 }
 
-// NewStakingSigner creates a new combined signer with the given dependencies:
-// - the staking signer is used to create and verify aggregatable signatures for Hotstuff
+// NewStakingSigner instantiates a StakingSigner, which signs votes and 
+// proposals with the staking key.  The generated signatures are aggregatable.
 func NewStakingSigner(
 	me module.Local,
 ) *StakingSigner {
