@@ -4,14 +4,11 @@ import (
 	"encoding/binary"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/arraylinkedlist"
 )
 
-type EjectionMode string
-
 const (
-	bucketSize     = uint64(16)
-	RandomEjection = EjectionMode("random-ejection")
-	LRUEjection    = EjectionMode("lru-ejection")
+	bucketSize = uint64(16)
 )
 
 type key struct {
@@ -30,10 +27,10 @@ type ArrayBackData struct {
 	keyCount  uint64 // total number of non-expired key-values
 	bucketNum uint64 // total number of buckets (i.e., total of buckets)
 	buckets   []keyBucket
-	entities  *entityList
+	entities  *arraylinkedlist.EntityDoubleLinkedList
 }
 
-func NewArrayBackData(limit uint32, oversizeFactor uint32, mode EjectionMode) *ArrayBackData {
+func NewArrayBackData(limit uint32, oversizeFactor uint32, mode arraylinkedlist.EjectionMode) *ArrayBackData {
 	// total buckets
 	bucketNum := uint64(limit*oversizeFactor) / bucketSize
 	if uint64(limit*oversizeFactor)%bucketSize != 0 {
@@ -45,7 +42,7 @@ func NewArrayBackData(limit uint32, oversizeFactor uint32, mode EjectionMode) *A
 		limit:     uint64(limit),
 		overLimit: uint64(limit * oversizeFactor),
 		buckets:   make([]keyBucket, bucketNum),
-		entities:  newEntityList(limit, mode),
+		entities:  arraylinkedlist.NewEntityList(limit, mode),
 	}
 
 	return bd
@@ -74,12 +71,12 @@ func (a *ArrayBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flo
 
 // ByID returns the given item from the pool.
 func (a *ArrayBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
-	return a.get(entityID)
+	return a.Get(entityID)
 }
 
 // Size will return the total of the backend.
 func (a ArrayBackData) Size() uint {
-	return uint(a.entities.size())
+	return uint(a.entities.Size())
 }
 
 // All returns all entities from the pool.
@@ -106,14 +103,14 @@ func (a *ArrayBackData) put(entityID flow.Identifier, entity flow.Entity) bool {
 	}
 
 	a.keyCount++
-	entityIndex := a.entities.add(entityID, entity, a.ownerIndexOf(bucketIndex, slotToUse))
+	entityIndex := a.entities.Add(entityID, entity, a.ownerIndexOf(bucketIndex, slotToUse))
 	a.buckets[bucketIndex][slotToUse].keyIndex = a.keyCount
 	a.buckets[bucketIndex][slotToUse].valueIndex = entityIndex
 	a.buckets[bucketIndex][slotToUse].idPrefix = idPrefix
 	return true
 }
 
-func (a ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bool) {
+func (a ArrayBackData) Get(entityID flow.Identifier) (flow.Entity, bool) {
 	idPrefix, bucketIndex := a.idPrefixAndBucketIndex(entityID)
 	for k := uint64(0); k < bucketSize; k++ {
 		if a.buckets[bucketIndex][k].idPrefix != idPrefix {
@@ -203,7 +200,7 @@ func (a ArrayBackData) ownerIndexOf(bucketIndex uint64, slotIndex uint64) uint64
 
 func (a *ArrayBackData) linkedEntityOf(bucketIndex uint64, slot uint64) (flow.Identifier, flow.Entity, bool) {
 	valueIndex := a.buckets[bucketIndex][slot].valueIndex
-	id, entity, owner := a.entities.get(valueIndex)
+	id, entity, owner := a.entities.Get(valueIndex)
 	if ((bucketIndex * bucketSize) + slot) != owner {
 		a.buckets[bucketIndex][slot].keyIndex = 0 // kvIndex / kvOwner no longer linked
 		return flow.Identifier{}, nil, false

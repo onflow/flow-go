@@ -1,9 +1,16 @@
-package backdata
+package arraylinkedlist
 
 import (
 	"math/rand"
 
 	"github.com/onflow/flow-go/model/flow"
+)
+
+type EjectionMode string
+
+const (
+	RandomEjection = EjectionMode("random-ejection")
+	LRUEjection    = EjectionMode("lru-ejection")
 )
 
 // number of entries we try to eject before giving up and ejecting LRU
@@ -53,7 +60,7 @@ type cachedEntity struct {
 	entity flow.Entity
 }
 
-type entityList struct {
+type EntityDoubleLinkedList struct {
 	total        uint32
 	free         *doubleLinkedList // keeps track of used entities in entities list
 	used         *doubleLinkedList // keeps track of unused entities in entities list
@@ -61,8 +68,8 @@ type entityList struct {
 	ejectionMode EjectionMode
 }
 
-func newEntityList(limit uint32, ejectionMode EjectionMode) *entityList {
-	l := &entityList{
+func NewEntityList(limit uint32, ejectionMode EjectionMode) *EntityDoubleLinkedList {
+	l := &EntityDoubleLinkedList{
 		free:         newDoubleLinkedList(),
 		used:         newDoubleLinkedList(),
 		values:       make([]cachedEntity, limit),
@@ -74,7 +81,7 @@ func newEntityList(limit uint32, ejectionMode EjectionMode) *entityList {
 	return l
 }
 
-func (e *entityList) initFreeEntities(limit uint32) {
+func (e *EntityDoubleLinkedList) initFreeEntities(limit uint32) {
 	e.free.head.setPointer(0)
 	e.free.tail.setPointer(0)
 
@@ -85,7 +92,7 @@ func (e *entityList) initFreeEntities(limit uint32) {
 
 }
 
-func (e *entityList) add(entityId flow.Identifier, entity flow.Entity, owner uint64) uint32 {
+func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) uint32 {
 	entityIndex, ejection := e.sliceIndexForEntity()
 	e.values[entityIndex].entity = entity
 	e.values[entityIndex].id = &entityId
@@ -112,11 +119,11 @@ func (e *entityList) add(entityId flow.Identifier, entity flow.Entity, owner uin
 	return entityIndex
 }
 
-func (e entityList) get(entityIndex uint32) (flow.Identifier, flow.Entity, uint64) {
+func (e EntityDoubleLinkedList) Get(entityIndex uint32) (flow.Identifier, flow.Entity, uint64) {
 	return *e.values[entityIndex].id, e.values[entityIndex].entity, e.values[entityIndex].owner
 }
 
-func (e entityList) sliceIndexForEntity() (uint32, bool) {
+func (e EntityDoubleLinkedList) sliceIndexForEntity() (uint32, bool) {
 	if e.free.head.isUndefined() {
 		// we are at limit
 		// array back data is full
@@ -132,12 +139,12 @@ func (e entityList) sliceIndexForEntity() (uint32, bool) {
 	return e.claimFreeHead(), false
 }
 
-func (e entityList) size() uint32 {
+func (e EntityDoubleLinkedList) Size() uint32 {
 	return e.total
 }
 
 // used, free
-func (e entityList) getHeads() (*cachedEntity, *cachedEntity) {
+func (e EntityDoubleLinkedList) getHeads() (*cachedEntity, *cachedEntity) {
 	var usedHead, freeHead *cachedEntity
 	if !e.used.head.isUndefined() {
 		usedHead = &e.values[e.used.head.sliceIndex()]
@@ -150,7 +157,7 @@ func (e entityList) getHeads() (*cachedEntity, *cachedEntity) {
 	return usedHead, freeHead
 }
 
-func (e entityList) getTails() (*cachedEntity, *cachedEntity) {
+func (e EntityDoubleLinkedList) getTails() (*cachedEntity, *cachedEntity) {
 	var usedTail, freeTail *cachedEntity
 	if !e.used.tail.isUndefined() {
 		usedTail = &e.values[e.used.tail.sliceIndex()]
@@ -163,19 +170,19 @@ func (e entityList) getTails() (*cachedEntity, *cachedEntity) {
 	return usedTail, freeTail
 }
 
-func (e *entityList) link(prev doubleLinkedListPointer, next uint32) {
+func (e *EntityDoubleLinkedList) link(prev doubleLinkedListPointer, next uint32) {
 	e.values[prev.sliceIndex()].next.setPointer(next)
 	e.values[next].prev = prev
 }
 
-func (e *entityList) invalidateHead() uint32 {
+func (e *EntityDoubleLinkedList) invalidateHead() uint32 {
 	headSliceIndex := e.used.head.sliceIndex()
 	e.invalidateEntityAtIndex(headSliceIndex)
 
 	return headSliceIndex
 }
 
-func (e *entityList) invalidateRandomEntity() uint32 {
+func (e *EntityDoubleLinkedList) invalidateRandomEntity() uint32 {
 	var index = e.used.head.sliceIndex()
 
 	for i := 0; i < maximumRandomTrials; i++ {
@@ -191,7 +198,7 @@ func (e *entityList) invalidateRandomEntity() uint32 {
 	return index
 }
 
-func (e *entityList) claimFreeHead() uint32 {
+func (e *EntityDoubleLinkedList) claimFreeHead() uint32 {
 	oldFreeHeadIndex := e.free.head.sliceIndex()
 	// moves head forward
 	e.free.head = e.values[oldFreeHeadIndex].next
@@ -215,7 +222,7 @@ func (e *entityList) claimFreeHead() uint32 {
 	return oldFreeHeadIndex
 }
 
-func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
+func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex uint32) {
 	prev := e.values[sliceIndex].prev
 	next := e.values[sliceIndex].next
 
@@ -252,11 +259,11 @@ func (e *entityList) invalidateEntityAtIndex(sliceIndex uint32) {
 
 	e.freeUpSliceIndex(sliceIndex)
 
-	// decrements size
+	// decrements Size
 	e.total--
 }
 
-func (e *entityList) freeUpSliceIndex(sliceIndex uint32) {
+func (e *EntityDoubleLinkedList) freeUpSliceIndex(sliceIndex uint32) {
 	// invalidates entity and adds it to free entities.
 	e.values[sliceIndex].id = nil
 	e.values[sliceIndex].next.setUndefined()
@@ -265,7 +272,7 @@ func (e *entityList) freeUpSliceIndex(sliceIndex uint32) {
 	e.appendToFreeList(sliceIndex)
 }
 
-func (e *entityList) appendToFreeList(sliceIndex uint32) {
+func (e *EntityDoubleLinkedList) appendToFreeList(sliceIndex uint32) {
 	if e.free.head.isUndefined() {
 		// free list is empty
 		e.free.head.setPointer(sliceIndex)
@@ -277,7 +284,7 @@ func (e *entityList) appendToFreeList(sliceIndex uint32) {
 	e.free.tail.setPointer(sliceIndex)
 }
 
-func (e entityList) isInvalidated(sliceIndex uint32) bool {
+func (e EntityDoubleLinkedList) isInvalidated(sliceIndex uint32) bool {
 	if e.values[sliceIndex].id != nil {
 		return false
 	}
