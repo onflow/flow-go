@@ -66,7 +66,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 
 	// cache results in included results
 	// they could be referenced in a future block in the segment
-	for _, result := range block.Payload.Results.Lookup() {
+	for _, result := range block.Payload.Results {
 		builder.includedResults[result.ID()] = struct{}{}
 	}
 
