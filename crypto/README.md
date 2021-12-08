@@ -6,14 +6,14 @@ Most of the primitives and protocols can be used in other projects and are not s
 Flow is an ongoing project, which means that new features will still be added and modifications will still be made to improve security and performance of the cryptography package.
 
 Notes:
-   - The package has not been fully audited for security yet.
-   - The package does not provide any security against side channel or fault attacks.
+   - The package has been audited for security in January 2021 on [this version](https://github.com/onflow/flow-go/tree/2707acdabb851138e298b2d186e73f47df8a14dd). The package had a few improvements since. 
+   - The package does not provide security against side channel or fault attacks.
 
 ## Package import
 
 Cloning Flow repository and following the [installation steps](https://github.com/onflow/flow-go) builds the necessary tools to use Flow cryptography.
 
-If you wish to only import the Flow cryptography package to your Go project, please follow the following steps:
+If you wish to only import the Flow cryptography package into your Go project, please follow the following steps:
 
 - Get Flow cryptography package 
 ```
@@ -37,13 +37,52 @@ fatal error: 'relic.h' file not found
 - From the Go package directory in `$GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@<version-tag>/`, build the package dependencies. `version-tag` is the imported package version. 
 For instance:
 ```
-cd $GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@v0.18.0/
+cd $GOPATH/pkg/mod/github.com/onflow/flow-go/crypto@v0.25.0/
 go generate
 ```
 
-When building your project and including any BLS functionality, adding a build tag to include the BLS files in the build is necessary. 
+Below is a bash script example to automate the above steps. The script can be copied into your Go project root directory.
+It extracts the imported pacakage version from your project's go.mod file and performs the remaining steps. 
+```bash
+#!/bin/bash
+
+# crypto package 
+PKG_NAME="github.com/onflow/flow-go/crypto"
+
+# go get the package
+go get ${PKG_NAME}
+
+# go.mod
+MOD_FILE="./go.mod"
+
+# the version of onflow/flow-go/crypto used in the project is read from the go.mod file
+if [ -f "${MOD_FILE}" ]
+then
+    # extract the version from the go.mod file
+    VERSION="$(grep ${PKG_NAME} < ${MOD_FILE} | cut -d' ' -f 2)"
+    # using the right version, get the package directory path
+    PKG_DIR="$(go env GOPATH)/pkg/mod/${PKG_NAME}@${VERSION}"
+else 
+   { echo "couldn't find go.mod file - make sure the script is in the project root directory"; exit 1; }
+fi
+
+# grant permissions if not existant
+if [[ ! -r ${PKG_DIR}  || ! -w ${PKG_DIR} || ! -x ${PKG_DIR} ]]; then
+   sudo chmod -R 755 "${PKG_DIR}"
+fi
+
+# get into the package directory and set up the external dependencies
+(
+    cd "${PKG_DIR}" || { echo "cd into the GOPATH package folder failed"; exit 1; }
+    go generate
+)
+``` 
+
+
+When building your project and including any BLS functionality, adding a build tag to include the BLS files in the build is required.
+The tag is not required when the package is used without BLS functions. It was introduced to avoid build errors when BLS (and therefore Relic) is not needed.
 ```
-go test -tags=relic
+go build -tags=relic
 ```
 
 
