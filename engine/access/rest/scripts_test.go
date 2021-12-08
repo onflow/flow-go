@@ -98,7 +98,7 @@ func TestScripts(t *testing.T) {
 			t,
 			req,
 			http.StatusInternalServerError,
-			`{"code":500, "message":"rpc error: code = Internal desc = internal server error"}`,
+			`{"code":500, "message":"internal server error"}`,
 			backend,
 		)
 	})
