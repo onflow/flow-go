@@ -37,22 +37,15 @@ func (_m *Verifier) VerifyQC(voters flow.IdentityList, sigData []byte, block *mo
 }
 
 // VerifyVote provides a mock function with given fields: voter, sigData, block
-func (_m *Verifier) VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
+func (_m *Verifier) VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) error {
 	ret := _m.Called(voter, sigData, block)
 
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(*flow.Identity, []byte, *model.Block) bool); ok {
+	var r0 error
+	if rf, ok := ret.Get(0).(func(*flow.Identity, []byte, *model.Block) error); ok {
 		r0 = rf(voter, sigData, block)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Error(0)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(*flow.Identity, []byte, *model.Block) error); ok {
-		r1 = rf(voter, sigData, block)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }

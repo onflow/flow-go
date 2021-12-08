@@ -29,8 +29,7 @@ func NewStakingVerifier() *StakingVerifier {
 // VerifyVote verifies the validity of a single signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
-// TODO: return error only, because when the sig is invalid, the returned bool
-func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
+func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) error {
 
 	// create the to-be-signed message
 	msg := MakeVoteMessage(block.View, block.BlockID)
@@ -38,13 +37,13 @@ func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, bloc
 	// verify each signature against the message
 	stakingValid, err := signer.StakingPubKey.Verify(sigData, msg, v.stakingHasher)
 	if err != nil {
-		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
+		return fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}
 	if !stakingValid {
-		return false, fmt.Errorf("invalid staking sig")
+		return fmt.Errorf("invalid sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 	}
 
-	return true, nil
+	return nil
 }
 
 // VerifyQC verifies the validity of a single signature on a quorum certificate.

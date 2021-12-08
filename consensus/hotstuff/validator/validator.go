@@ -144,19 +144,16 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	}
 
 	// check whether the signature data is valid for the vote in the hotstuff context
-	valid, err := v.verifier.VerifyVote(voter, vote.SigData, block)
+	err = v.verifier.VerifyVote(voter, vote.SigData, block)
 	if err != nil {
 		switch {
 		case errors.Is(err, signature.ErrInvalidFormat):
-			return nil, newInvalidVoteError(vote, err)
+		case errors.Is(err, model.ErrInvalidSignature):
 		case errors.Is(err, model.ErrInvalidSigner):
 			return nil, newInvalidVoteError(vote, err)
 		default:
 			return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)
 		}
-	}
-	if !valid {
-		return nil, newInvalidVoteError(vote, model.ErrInvalidSignature)
 	}
 
 	return voter, nil

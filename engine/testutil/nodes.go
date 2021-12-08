@@ -739,7 +739,7 @@ func createFollowerCore(t *testing.T, node *testmock.GenericNode, followerState 
 
 	// mock finalization updater
 	verifier := &mockhotstuff.Verifier{}
-	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	finalizer := confinalizer.NewFinalizer(node.PublicDB, node.Headers, followerState, trace.NewNoopTracer())

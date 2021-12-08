@@ -65,9 +65,8 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	require.NoError(t, err)
 
 	vote := proposal.ProposerVote()
-	valid, err := verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
 	require.NoError(t, err)
-	require.Equal(t, true, valid)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
@@ -129,9 +128,8 @@ func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 	require.NoError(t, err)
 
 	vote := proposal.ProposerVote()
-	valid, err := verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
+	err = verifier.VerifyVote(nodeID, vote.SigData, proposal.Block)
 	require.NoError(t, err)
-	require.Equal(t, true, valid)
 
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
