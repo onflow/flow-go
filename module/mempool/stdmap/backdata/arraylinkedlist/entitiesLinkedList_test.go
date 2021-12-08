@@ -106,6 +106,179 @@ func testArrayBackDataStoreAndRetrievalWitEjection(t *testing.T, limit uint32, e
 	)
 }
 
+func TestInvalidateEntity(t *testing.T) {
+	for _, tc := range []struct {
+		limit           uint32
+		overLimitFactor uint32
+		entityCount     uint32
+		helpers         []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
+	}{
+		{ // edge-case empty list
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     0,
+		},
+		{ // edge-case single element-list
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     1,
+		},
+		{ // two buckets, entities below limit.
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     10,
+		},
+		{ // two buckets, entities equal to limit.
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     30,
+		},
+		{ // multiple buckets, high limit, low entities.
+			limit:           100,
+			overLimitFactor: 16,
+			entityCount:     10,
+		},
+		{ // multiple buckets, entities equal to limit.
+			limit:           100,
+			overLimitFactor: 16,
+			entityCount:     100,
+		},
+	} {
+		// head invalidation test (LRU)
+		t.Run(fmt.Sprintf("head-invalidation-%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
+			testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+				testInvalidatingHead(t, list, entities)
+			})
+		})
+
+		// tail invalidation test
+		t.Run(fmt.Sprintf("tail-invalidation-%d-limit-%d-overlimit-%d-entities-", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
+			testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+				testInvalidatingTail(t, list, entities)
+			})
+		})
+
+		// random invalidation test
+		t.Run(fmt.Sprintf("random-invalidation-%d-limit-%d-overlimit-%d-entities-", tc.limit, tc.overLimitFactor, tc.entityCount),
+			func(t *testing.T) {
+				testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					testInvalidateAtRandom(t, list, entities)
+				})
+			})
+	}
+}
+
+func testInvalidateEntity(t *testing.T, limit uint32, overLimitFactor uint32, entityCount uint32, helpers ...func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)) {
+	h := append([]func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
+		func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+			testAddingEntities(t, backData, entities)
+		},
+	}, helpers...)
+
+	withTestScenario(t, limit, entityCount, h...)
+}
+
+// testInvalidatingHead keeps invalidating elements at random and evaluates whether double-linked list remains
+// connected on both head and tail.
+func testInvalidateAtRandom(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+	size := len(entities)
+	offset := len(list.values) - size
+
+	for i := 0; i < size; i++ {
+		list.invalidateRandomEntity()
+
+		// size of list should be shrunk after each invalidation.
+		require.Equal(t, uint32(size-i-1), list.Size())
+
+		// except when the list is empty, head and tail must be accessible after each invalidation
+		// i.e., the linked list remains connected despite invalidation.
+		if i != size-1 {
+			// used list
+			tailAccessibleFromHead(t,
+				list.used.head.sliceIndex(),
+				list.used.tail.sliceIndex(),
+				list,
+				list.Size())
+
+			headAccessibleFromTail(t,
+				list.used.head.sliceIndex(),
+				list.used.tail.sliceIndex(),
+				list,
+				list.Size())
+
+			// free list
+			headAccessibleFromTail(t,
+				list.free.head.sliceIndex(),
+				list.free.tail.sliceIndex(),
+				list,
+				uint32(i+1+offset))
+
+			tailAccessibleFromHead(t,
+				list.free.head.sliceIndex(),
+				list.free.tail.sliceIndex(),
+				list,
+				uint32(i+1+offset))
+		}
+	}
+}
+
+// testInvalidatingHead keeps invalidating the head and evaluates the linked-list keeps updating its head
+// and remains connected.
+func testInvalidatingHead(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+	size := len(entities)
+	for i := 0; i < size; i++ {
+		headIndex := list.invalidateHead()
+		require.Equal(t, uint32(i), headIndex)
+
+		// size of list should be shrunk after each invalidation.
+		require.Equal(t, uint32(size-i-1), list.Size())
+		// unclaimed head should be appended to free entities
+		require.Equal(t, list.free.tail.sliceIndex(), headIndex)
+
+		// except when the list is empty, head must be updated after invalidation,
+		// except when the list is empty, head and tail must be accessible after each invalidation
+		// i.e., the linked list remains connected despite invalidation.
+		if i != size-1 {
+			// require.Equal(t, entities[i+1].ID(), backData.entities.getHead().id)
+			tailAccessibleFromHead(t,
+				list.used.head.sliceIndex(),
+				list.used.tail.sliceIndex(),
+				list,
+				list.Size())
+			// headAccessibleFromTail(t, backData, backData.entities.size())
+		}
+	}
+}
+
+// testInvalidatingHead keeps invalidating the tail and evaluates the linked-list keeps updating its tail
+// and remains connected.
+func testInvalidatingTail(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+	size := len(entities)
+	for i := 0; i < size; i++ {
+		// invalidates tail index
+		tail := list.used.tail.sliceIndex()
+		list.invalidateEntityAtIndex(tail)
+		// old head index must be invalidated
+		require.True(t, list.isInvalidated(tail))
+
+		// size of list should be shrunk after each invalidation.
+		require.Equal(t, uint32(size-i-1), list.Size())
+
+		// except when the list is empty, tail must be updated after invalidation,
+		// and also head and tail must be accessible after each invalidation
+		// i.e., the linked list remains connected despite invalidation.
+		if i != size-1 {
+			// require.Equal(t, entities[size-i-2].ID(), backData.entities.getTail().id)
+			tailAccessibleFromHead(t,
+				list.used.head.sliceIndex(),
+				list.used.tail.sliceIndex(),
+				list,
+				list.Size())
+			// headAccessibleFromTail(t, backData, backData.entities.size())
+		}
+	}
+}
+
 // testInitialization evaluates the state of an initialized cachedEntity list before adding any element
 // to it.
 func testInitialization(t *testing.T, list *EntityDoubleLinkedList, _ []*unittest.MockEntity) {
