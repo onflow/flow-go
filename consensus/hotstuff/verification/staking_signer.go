@@ -21,7 +21,7 @@ type StakingSigner struct {
 	signerID      flow.Identifier
 }
 
-// NewStakingSigner instantiates a StakingSigner, which signs votes and 
+// NewStakingSigner instantiates a StakingSigner, which signs votes and
 // proposals with the staking key.  The generated signatures are aggregatable.
 func NewStakingSigner(
 	me module.Local,
