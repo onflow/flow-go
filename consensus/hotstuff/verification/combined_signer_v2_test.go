@@ -92,16 +92,16 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	require.Equal(t, true, voteValid)
 
 	// vote on different bock should be invalid
-	block.BlockID[0]++
-	_, err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	blockWrongID := *block
+	blockWrongID.BlockID[0]++
+	_, err = verifier.VerifyVote(nodeID, vote.SigData, &blockWrongID)
 	require.Error(t, err)
-	block.BlockID[0]--
 
 	// vote with a wrong view should be invalid
-	block.View++
-	_, err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	blockWrongView := *block
+	blockWrongView.View++
+	_, err = verifier.VerifyVote(nodeID, vote.SigData, &blockWrongView)
 	require.Error(t, err)
-	block.View--
 
 	// vote by different signer should be invalid
 	wrongVoter := identities[1]
@@ -110,10 +110,10 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	require.Error(t, err)
 
 	// vote with changed signature should be invalid
-	vote.SigData[4]++
-	_, err = verifier.VerifyVote(nodeID, vote.SigData, block)
+	wrongSigData := *vote
+	wrongSigData.SigData[4]++
+	_, err = verifier.VerifyVote(nodeID, wrongSigData.SigData, block)
 	require.Error(t, err)
-	vote.SigData[4]--
 }
 
 // Test that when DKG key is not available for a view, a signed block can pass the validation
