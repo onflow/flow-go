@@ -1,6 +1,10 @@
 package integration_test
 
 import (
+	"context"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
+	"github.com/onflow/flow-go/utils/unittest"
 	"sort"
 	"testing"
 	"time"
@@ -9,46 +13,63 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func runNodes(nodes []*Node) {
+func runNodes(signalerCtx irrecoverable.SignalerContext, nodes []*Node) {
 	for _, n := range nodes {
 		go func(n *Node) {
+			n.aggregator.Start(signalerCtx)
 			n.compliance.Ready()
 			n.sync.Ready()
 		}(n)
 	}
 }
 
+func stopNodes(t *testing.T, cancel context.CancelFunc, nodes []*Node) {
+	stoppingNodes := make([]<-chan struct{}, 0)
+	cancel()
+	for _, n := range nodes {
+		stoppingNodes = append(stoppingNodes, util.AllDone(n.aggregator, n.compliance, n.sync))
+	}
+	unittest.RequireCloseBefore(t, util.AllClosed(stoppingNodes...), time.Second, "requiring nodes to stop")
+}
+
 // happy path: with 3 nodes, they can reach consensus
 func Test3Nodes(t *testing.T) {
-	t.Skip("event loop needs an event handler, which will be replaced later in V2")
 	stopper := NewStopper(5, 0)
-	rootSnapshot := createRootSnapshot(t, 3)
-	nodes, hub := createNodes(t, stopper, rootSnapshot)
+	participantsData := createConsensusIdentities(t, 3)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub := createNodes(t, participantsData, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
-	runNodes(nodes)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	runNodes(signalerCtx, nodes)
 
 	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
 
 	allViews := allFinalizedViews(t, nodes)
 	assertSafety(t, allViews)
 
+	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
 // with 5 nodes, and one node completely blocked, the other 4 nodes can still reach consensus
 func Test5Nodes(t *testing.T) {
-	t.Skip("event loop needs an event handler, which will be replaced later in V2")
 	// 4 nodes should be able finalize at least 3 blocks.
 	stopper := NewStopper(2, 1)
-	rootSnapshot := createRootSnapshot(t, 5)
-	nodes, hub := createNodes(t, stopper, rootSnapshot)
+	participantsData := createConsensusIdentities(t, 5)
+	rootSnapshot := createRootSnapshot(t, participantsData)
+	nodes, hub := createNodes(t, participantsData, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNodes(nodes[0]))
-	runNodes(nodes)
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	runNodes(signalerCtx, nodes)
 
 	<-stopper.stopped
 
@@ -61,6 +82,7 @@ func Test5Nodes(t *testing.T) {
 	allViews := allFinalizedViews(t, nodes[1:])
 	assertSafety(t, allViews)
 
+	stopNodes(t, cancel, nodes)
 	cleanupNodes(nodes)
 }
 
