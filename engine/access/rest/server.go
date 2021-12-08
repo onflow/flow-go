@@ -4,12 +4,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rs/cors"
-
+	"github.com/gorilla/mux"
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/middleware"
-
-	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 	"github.com/rs/zerolog"
 )
 

@@ -2,7 +2,6 @@ package rest
 
 import (
 	"github.com/gorilla/mux"
-
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"github.com/onflow/flow-go/model/flow"
 )

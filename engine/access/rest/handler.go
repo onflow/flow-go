@@ -3,14 +3,13 @@ package rest
 import (
 	"encoding/json"
 	"errors"
-	"google.golang.org/grpc/status"
 	"net/http"
-
-	"github.com/rs/zerolog"
-	"google.golang.org/grpc/codes"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
+	"github.com/rs/zerolog"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // ApiHandlerFunc is a function that contains endpoint handling logic,
