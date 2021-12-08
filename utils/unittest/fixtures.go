@@ -683,7 +683,7 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 	}
 }
 
-func WIthServiceEvents(n int) func(result *flow.ExecutionResult) {
+func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
 	}
@@ -722,12 +722,6 @@ func ExecutionResultFixture(opts ...func(*flow.ExecutionResult)) *flow.Execution
 func WithApproverID(approverID flow.Identifier) func(*flow.ResultApproval) {
 	return func(ra *flow.ResultApproval) {
 		ra.Body.ApproverID = approverID
-	}
-}
-
-func WithAttestationBlock(block *flow.Block) func(*flow.ResultApproval) {
-	return func(ra *flow.ResultApproval) {
-		ra.Body.Attestation.BlockID = block.ID()
 	}
 }
 
