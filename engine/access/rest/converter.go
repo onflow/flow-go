@@ -400,7 +400,7 @@ func eventResponse(event flow.Event) generated.Event {
 		TransactionId:    event.TransactionID.String(),
 		TransactionIndex: fmt.Sprintf("%d", event.TransactionIndex),
 		EventIndex:       fmt.Sprintf("%d", event.EventIndex),
-		Payload:          string(event.Payload),
+		Payload:          toBase64(event.Payload),
 	}
 }
 
