@@ -1,6 +1,12 @@
 package integration_test
 
 import (
+	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
+	"github.com/onflow/flow-go/consensus/hotstuff/verification"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/flow/order"
 	"os"
 	"testing"
 	"time"
@@ -14,10 +20,10 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -73,44 +79,113 @@ func (n *Node) Shutdown() {
 // finalizedCount - the number of finalized blocks before stopping the tests
 // tolerate - the number of node to tolerate that don't need to reach the finalization count
 // 						before stopping the tests
-func createNodes(t *testing.T, stopper *Stopper, rootSnapshot protocol.Snapshot) ([]*Node, *Hub) {
-
-	consensus, err := rootSnapshot.Identities(filter.HasRole(flow.RoleConsensus))
-	require.NoError(t, err)
+func createNodes(t *testing.T, participantData *run.ParticipantData, rootSnapshot protocol.Snapshot, stopper *Stopper) ([]*Node, *Hub) {
+	consensus := participantData.Identities()
 
 	hub := NewNetworkHub()
 	nodes := make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
-		node := createNode(t, i, identity, rootSnapshot, hub, stopper)
+		node := createNode(t, &participantData.Participants[i], i, identity, rootSnapshot, hub, stopper)
 		nodes = append(nodes, node)
 	}
 
 	return nodes, hub
 }
 
-func createRootSnapshot(t *testing.T, n int) *inmem.Snapshot {
+func createRootQC(t *testing.T, root *flow.Block, participantData *run.ParticipantData) *flow.QuorumCertificate {
+	consensusCluster := participantData.Identities()
+	votes, err := run.GenerateRootBlockVotes(root, participantData)
+	require.NoError(t, err)
+	qc, err := run.GenerateRootQC(root, votes, participantData, consensusCluster)
+	require.NoError(t, err)
+	return qc
+}
 
-	// create n consensus node participants
-	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus))
+func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
+	root := unittest.GenesisFixture()
+	consensusParticipants := participantData.Identities()
+
 	// add other roles to create a complete identity list
-	participants := unittest.CompleteIdentitySet(consensus...)
+	participants := unittest.CompleteIdentitySet(consensusParticipants...)
 
-	root, result, seal := unittest.BootstrapFixture(participants)
-	rootQC := &flow.QuorumCertificate{
-		View:      root.Header.View,
-		BlockID:   root.ID(),
-		SignerIDs: consensus.NodeIDs(), // all participants sign root block
-		SigData:   unittest.CombinedSignatureFixture(2),
+	participants.Sort(order.ByNodeIDAsc)
+
+	dkgParticipantsKeys := make([]crypto.PublicKey, 0, len(consensusParticipants))
+	for _, participant := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
+		dkgParticipantsKeys = append(dkgParticipantsKeys, participantData.Lookup[participant.NodeID].KeyShare)
 	}
+
+	counter := uint64(1)
+	setup := unittest.EpochSetupFixture(
+		unittest.WithParticipants(participants),
+		unittest.SetupWithCounter(counter),
+		unittest.WithFirstView(root.Header.View),
+		unittest.WithFinalView(root.Header.View+1000),
+	)
+	commit := unittest.EpochCommitFixture(
+		unittest.CommitWithCounter(counter),
+		unittest.WithClusterQCsFromAssignments(setup.Assignments),
+		func(commit *flow.EpochCommit) {
+			commit.DKGGroupKey = participantData.GroupKey
+			commit.DKGParticipantKeys = dkgParticipantsKeys
+		},
+	)
+
+	result := unittest.BootstrapExecutionResultFixture(root, unittest.GenesisStateCommitment)
+	result.ServiceEvents = []flow.ServiceEvent{setup.ServiceEvent(), commit.ServiceEvent()}
+
+	seal := unittest.Seal.Fixture(unittest.Seal.WithResult(result))
+
+	return root, result, seal
+}
+
+func createConsensusIdentities(t *testing.T, n int) *run.ParticipantData {
+	// create n consensus node participants
+	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(order.ByNodeIDAsc)
+	dkgData, err := bootstrapDKG.RunFastKG(n, unittest.RandomBytes(32))
+	require.NoError(t, err)
+
+	participantData := &run.ParticipantData{
+		Participants: make([]run.Participant, 0, len(consensus)),
+		Lookup:       make(map[flow.Identifier]flow.DKGParticipant),
+		GroupKey:     dkgData.PubGroupKey,
+	}
+	for index, node := range consensus {
+		networkPrivKey := unittest.NetworkingPrivKeyFixture()
+		stakingPrivKey := unittest.StakingPrivKeyFixture()
+		participant := run.Participant{
+			NodeInfo: bootstrap.NewPrivateNodeInfo(
+				node.NodeID,
+				node.Role,
+				node.Address,
+				node.Stake,
+				networkPrivKey,
+				stakingPrivKey,
+			),
+			RandomBeaconPrivKey: dkgData.PrivKeyShares[index],
+		}
+		participantData.Participants = append(participantData.Participants, participant)
+		participantData.Lookup[node.NodeID] = flow.DKGParticipant{
+			Index:    uint(index),
+			KeyShare: dkgData.PubKeyShares[index],
+		}
+	}
+
+	return participantData
+}
+
+func createRootSnapshot(t *testing.T, participantData *run.ParticipantData) *inmem.Snapshot {
+	root, result, seal := createRootBlockData(participantData)
+	rootQC := createRootQC(t, root, participantData)
 
 	rootSnapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, rootQC)
 	require.NoError(t, err)
-
 	return rootSnapshot
 }
 
 func createNode(
 	t *testing.T,
+	participant *run.Participant,
 	index int,
 	identity *flow.Identity,
 	rootSnapshot protocol.Snapshot,
@@ -178,9 +253,12 @@ func createNode(
 	cleaner := &storagemock.Cleaner{}
 	cleaner.On("RunGC")
 
+	require.Equal(t, participant.NodeID, localID)
+	privateKeys, err := participant.PrivateKeys()
+	require.NoError(t, err)
+
 	// make local
-	priv := helper.MakeBLSKey(t)
-	me, err := local.New(identity, priv)
+	me, err := local.New(identity, privateKeys.StakingKey)
 	require.NoError(t, err)
 
 	// add a network for this node to the hub
@@ -198,8 +276,6 @@ func createNode(
 	build, err := builder.NewBuilder(metrics, db, fullState, headersDB, sealsDB, indexDB, blocksDB, resultsDB, receiptsDB,
 		guarantees, consensusMempools.NewIncorporatedResultSeals(seals, receiptsDB), receipts, tracer)
 	require.NoError(t, err)
-
-	signer := &Signer{identity.ID()}
 
 	// initialize the pending blocks cache
 	cache := buffer.NewPendingBlocks()
@@ -230,6 +306,9 @@ func createNode(
 
 	validator := consensus.NewValidator(metrics, committee, forks)
 	require.NoError(t, err)
+
+	beaconSignerStore := hsig.NewStaticRandomBeaconSignerStore(participant.RandomBeaconPrivKey)
+	signer := verification.NewCombinedSigner(me, beaconSignerStore)
 
 	persist := persister.New(db, rootHeader.ChainID)
 
