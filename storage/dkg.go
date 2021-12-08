@@ -2,14 +2,8 @@ package storage
 
 import (
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 )
-
-type BeaconPrivateKeys interface {
-	InsertMyBeaconPrivateKey(epochCounter uint64, key *encodable.RandomBeaconPrivKey) error
-	RetrieveMyBeaconPrivateKey(epochCounter uint64) (*encodable.RandomBeaconPrivKey, error)
-}
 
 // DKGState is the storage interface for storing all artifacts and state
 // related to the DKG process, including the latest state of a running or

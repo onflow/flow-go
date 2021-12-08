@@ -77,6 +77,9 @@ func (ds *DKGState) retrieveKeyTx(epochCounter uint64) func(tx *badger.Txn) (*en
 // canonical key vector and may not be valid for use in signing. Use SafeBeaconKeys
 // to guarantee only keys safe for signing are returned
 func (ds *DKGState) InsertMyBeaconPrivateKey(epochCounter uint64, key crypto.PrivateKey) error {
+	if key == nil {
+		return fmt.Errorf("will not store nil beacon key")
+	}
 	encodableKey := &encodable.RandomBeaconPrivKey{PrivateKey: key}
 	return operation.RetryOnConflictTx(ds.db, transaction.Update, ds.storeKeyTx(epochCounter, encodableKey))
 }
@@ -133,15 +136,6 @@ func NewSafeBeaconPrivateKeys(state *DKGState) *SafeBeaconPrivateKeys {
 func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint64) (key crypto.PrivateKey, safe bool, err error) {
 	err = keys.state.db.View(func(txn *badger.Txn) error {
 
-		// retrieve the key, error on any storage error
-		var encodableKey *encodable.RandomBeaconPrivKey
-		encodableKey, err = keys.state.retrieveKeyTx(epochCounter)(txn)
-		if err != nil {
-			key = nil
-			safe = false
-			return err
-		}
-
 		// retrieve the end state, error on any storage error (including not found)
 		var endState flow.DKGEndState
 		err = operation.RetrieveDKGEndStateForEpoch(epochCounter, &endState)(txn)
@@ -151,11 +145,20 @@ func (keys *SafeBeaconPrivateKeys) RetrieveMyBeaconPrivateKey(epochCounter uint6
 			return err
 		}
 
-		// for any end state besides success, return error
+		// for any end state besides success, the key is not safe
 		if endState != flow.DKGEndStateSuccess {
 			key = nil
 			safe = false
-			return fmt.Errorf("retrieving beacon for unsuccessful dkg run (dkg end state: %s)", endState)
+			return nil
+		}
+
+		// retrieve the key, error on any storage error
+		var encodableKey *encodable.RandomBeaconPrivKey
+		encodableKey, err = keys.state.retrieveKeyTx(epochCounter)(txn)
+		if err != nil {
+			key = nil
+			safe = false
+			return err
 		}
 
 		// return the key only for successful end state
