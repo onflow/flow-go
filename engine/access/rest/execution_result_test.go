@@ -53,6 +53,33 @@ func TestGetResultByID(t *testing.T) {
 		}`, result.ID(), result.BlockID, result.ID())
 		assertOKResponse(t, req, expected, backend)
 	})
+
+	t.Run("get by ID with events", func(t *testing.T) {
+		backend := &mock.API{}
+		id := unittest.IdentifierFixture()
+		result := unittest.ExecutionResultFixture(unittest.WIthServiceEvents(1))
+		
+		backend.Mock.
+			On("GetExecutionResultByID", mocks.Anything, id).
+			Return(result, nil)
+
+		req := getResultByIDReq(id.String(), nil)
+		expected := fmt.Sprintf(`{
+			"id": "%s",
+			"block_id": "%s",
+			"events": [{
+				"type": "%s",
+				"transaction_id": "",
+				"transaction_index": "0",
+				"event_index": "0",
+				"payload": "%s"
+			}],
+			"_links": {
+				"_self": "/v1/execution_results/%s"
+			}
+		}`, result.ID(), result.BlockID, result.ServiceEvents[0].Type, "", result.ID())
+		assertOKResponse(t, req, expected, backend)
+	})
 }
 
 func TestGetResultBlockID(t *testing.T) {
