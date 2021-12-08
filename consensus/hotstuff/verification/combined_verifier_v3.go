@@ -43,6 +43,11 @@ func NewCombinedVerifierV3(committee hotstuff.Committee, packer hotstuff.Packer)
 // VerifyVote verifies the validity of a combined signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
+// * signature.ErrInvalidFormat if the signature has an incompatible format.
+// * model.ErrInvalidSignature is the signature is invalid
+// * model.ErrInvalidSigner if the signer is invalid
+// * unexpected errors should be treated as symptoms of bugs or uncovered
+//   edge cases in the logic (i.e. as fatal)
 func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) error {
 
 	// create the to-be-signed message
