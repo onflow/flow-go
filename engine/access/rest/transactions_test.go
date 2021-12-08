@@ -223,6 +223,7 @@ func TestGetTransactionResult(t *testing.T) {
 			ErrorMessage: "",
 			BlockID:      bid,
 		}
+		txr.Events[0].Payload = []byte(`test payload`)
 
 		req := getTransactionResultReq(id.String())
 
@@ -241,13 +242,13 @@ func TestGetTransactionResult(t *testing.T) {
 					"transaction_id": "%s",
 					"transaction_index": "1",
 					"event_index": "0",
-					"payload": ""
+					"payload": "%s"
 				}
 			],
 			"_links": {
 				"_self": "/v1/transaction_results/%s"
 			}
-		}`, bid.String(), id.String(), id.String())
+		}`, bid.String(), id.String(), toBase64(txr.Events[0].Payload), id.String())
 		assertOKResponse(t, req, expected, backend)
 	})
 
