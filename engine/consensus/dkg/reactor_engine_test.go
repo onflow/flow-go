@@ -13,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine/consensus/dkg"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	module "github.com/onflow/flow-go/module/mock"
@@ -138,8 +137,8 @@ func (suite *ReactorSuite) SetupTest() {
 		func(args mock.Arguments) {
 			epochCounter := args.Get(0).(uint64)
 			require.Equal(suite.T(), suite.NextEpochCounter(), epochCounter)
-			dkgPriv := args.Get(1).(*encodable.RandomBeaconPrivKey)
-			require.Equal(suite.T(), suite.expectedPrivateKey, dkgPriv.PrivateKey)
+			dkgPriv := args.Get(1).(crypto.PrivateKey)
+			require.Equal(suite.T(), suite.expectedPrivateKey, dkgPriv)
 		}).
 		Return(nil).
 		Once()
