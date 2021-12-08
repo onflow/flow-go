@@ -883,6 +883,13 @@ func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 	if err != nil {
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
 	}
+	// root blocks and blocks below the root block are considered as "processed",
+	// so we don't want to trigger `BlockProcessable` event for them.
+	var rootHeight uint64
+	err = m.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return fmt.Errorf("could not retrieve root block's height: %w", err)
+	}
 
 	err = operation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
 		// insert block validity for this block
@@ -891,13 +898,6 @@ func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 			return fmt.Errorf("could not insert validity for block (id=%x, height=%d): %w", blockID, header.Height, err)
 		}
 
-		// root blocks and blocks below the root block are considered as "processed",
-		// so we don't want to trigger `BlockProcessable` event for them.
-		var rootHeight uint64
-		err = m.db.View(operation.RetrieveRootHeight(&rootHeight))
-		if err != nil {
-			return fmt.Errorf("could not retrieve root block's height: %w", err)
-		}
 		// trigger BlockProcessable for parent blocks above root height
 		if parent.Height > rootHeight {
 			// emit protocol event within the scope of the Badger transaction to
