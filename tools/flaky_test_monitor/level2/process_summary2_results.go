@@ -97,7 +97,7 @@ func saveFailureMessage(testResult common.TestResult) {
 
 	// there could already be previous failures for this test, so it's important to check if failed
 	// test folder exists
-	if !common.FolderExists(failuresDirFullPath) {
+	if !common.DirExists(failuresDirFullPath) {
 		err := os.Mkdir(failuresDirFullPath, 0755)
 		common.AssertNoError(err, "error creating sub-dir under failuresDir")
 	}
@@ -130,6 +130,14 @@ func postProcessTestSummary2(testSummary2 common.TestSummary2) {
 		// calculate failure rate for each test summary
 		testResultSummary.FailureRate = common.ConvertToNDecimalPlaces(2, testResultSummary.Failed, testResultSummary.Runs)
 	}
+
+	// check if there are no failures so can delete failures sub-directory
+	if common.IsDirEmpty(failuresDir) {
+		err := os.RemoveAll(failuresDir)
+		common.AssertNoError(err, "error removing failures directory")
+	}
+
+	// check if there are no nil tests (no results) so delete no-results sub-directory
 }
 
 // level 2 flaky test summary processor
@@ -141,7 +149,7 @@ func main() {
 		panic("wrong number of arguments - expected single argument with directory of level 1 files")
 	}
 
-	if !common.FolderExists(os.Args[1]) {
+	if !common.DirExists(os.Args[1]) {
 		panic("directory doesn't exist")
 	}
 

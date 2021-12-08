@@ -4,24 +4,28 @@ import (
 	"encoding/json"
 	"flaky-test-monitor/common"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 )
 
+type TestData struct {
+	directory   string
+	hasFailures bool
+}
+
 func TestProcessSummary2TestRun(t *testing.T) {
-	testDataMap := map[string]string{
-		"1 level 1 summary, 1 failure the rest pass":         "test1-1package-1failure",
-		"1 level 1 summary, 1 nil test, no other tests":      "test2-1nil-test",
-		"many level 1 summaries, many nil tests":             "test3-multi-nil-tests",
-		"many level 1 summaries, many failures, many passes": "test4-multi-failures",
+	testDataMap := map[string]TestData{
+		"1 level 1 summary, 1 failure the rest pass":         {"test1-1package-1failure", true},
+		"1 level 1 summary, 1 nil test, no other tests":      {"test2-1nil-test", false},
+		"many level 1 summaries, many nil tests":             {"test3-multi-nil-tests", false},
+		"many level 1 summaries, many failures, many passes": {"test4-multi-failures", true},
 	}
 
-	for k, testDir := range testDataMap {
+	for k, testData := range testDataMap {
 		t.Run(k, func(t *testing.T) {
 			setUp(t)
-			runProcessSummary2TestRun(t, testDir)
+			runProcessSummary2TestRun(t, testData.directory, testData.hasFailures)
 			tearDown(t)
 		})
 	}
@@ -45,7 +49,7 @@ func deleteFailuresDir(t *testing.T) {
 	require.Nil(t, err)
 }
 
-func runProcessSummary2TestRun(t *testing.T, testDir string) {
+func runProcessSummary2TestRun(t *testing.T, testDir string, hasFailures bool) {
 	inputTestDataPath := "../testdata/summary2/" + testDir + "/input/"
 	expectedOutputTestDataPath := "../testdata/summary2/" + testDir + "/expected-output/" + testDir + ".json"
 	expectedFailureMessagesPath := "../testdata/summary2/" + testDir + "/expected-output/failures/"
@@ -95,11 +99,14 @@ func runProcessSummary2TestRun(t *testing.T, testDir string) {
 	require.Equal(t, expectedTestSummary2, actualTestSummary2)
 
 	// check failure messages created
-	// there are 2 types of scenarios to test for
-	// 1. test summaries with no failures - these will have a `failures` sub-directory with a
-	//    `.keep` placeholder file (since empty folders can't be added to git)
+	// there are 2 types of scenarios:
+	// 1. test summaries with no failures - these will not have a `failures` sub-directory and no more checking is needed
 	// 2. test summaries with failures - these will have a `failures` sub-directory with failure messages saved
 	//    in text files (1 file/failure under separate sub-directory for each test that has failures)
+
+	if !hasFailures {
+		return
+	}
 
 	// count expected failure directories (1 directory/test)
 	expectedFailureDirEntries, err := os.ReadDir(expectedFailureMessagesPath)
@@ -108,14 +115,6 @@ func runProcessSummary2TestRun(t *testing.T, testDir string) {
 	// count actual failure directories
 	actualFailureDirEntries, err := os.ReadDir(actualFailureTestDataPath)
 	require.Nil(t, err)
-
-	// expected test summary `failures` directory only has placeholder file with no expected failures
-	if len(expectedFailureDirEntries) == 1 && strings.HasPrefix(expectedFailureDirEntries[0].Name(), ".") {
-		// all expected `failures` sub-directories with no expected failues will have a ".keep" file to force saving empty
-		// directory to git when there are no expected failures - we need to not count this placeholder file
-		require.Equal(t, 0, len(actualFailureDirEntries))
-		return
-	}
 
 	// expected test summary has at least 1 failure
 	require.Equal(t, len(expectedFailureDirEntries), len(actualFailureDirEntries))

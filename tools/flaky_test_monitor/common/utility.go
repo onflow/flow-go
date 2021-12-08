@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"strconv"
@@ -41,21 +42,36 @@ func convertToNDecimalPlacesInternal(n int, numerator, denominator float32) floa
 	return float32(ratioFloat)
 }
 
-func FolderExists(path string) bool {
+// from https://stackoverflow.com/a/30708914/5719544
+func IsDirEmpty(name string) bool {
+	f, err := os.Open(name)
+	AssertNoError(err, "error reading directory")
+
+	defer f.Close()
+
+	_, err = f.Readdirnames(1)
+	if err == io.EOF {
+		return true
+	}
+	AssertNoError(err, "error reading dir contents")
+	return false
+}
+
+func DirExists(path string) bool {
 	_, err := os.Stat(path)
 
-	// folder exists if there is no error
+	// directory exists if there is no error
 	if err == nil {
 		return true
 	}
 
-	// folder doesn't exist if error is of specific type
+	// directory doesn't exist if error is of specific type
 	if errors.Is(err, fs.ErrNotExist) {
 		return false
 	}
 
 	// should never get to here
-	panic("error checking if folder exists:" + err.Error())
+	panic("error checking if directory exists:" + err.Error())
 }
 
 // save test run/summary to local JSON file
