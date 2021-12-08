@@ -702,7 +702,7 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 	}
 }
 
-func WIthServiceEvents(n int) func(result *flow.ExecutionResult) {
+func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
 	}
@@ -765,12 +765,6 @@ func WithBlockID(id flow.Identifier) func(*flow.ResultApproval) {
 func WithChunk(chunkIdx uint64) func(*flow.ResultApproval) {
 	return func(approval *flow.ResultApproval) {
 		approval.Body.ChunkIndex = chunkIdx
-	}
-}
-
-func WithServiveEvents(events ...flow.ServiceEvent) func(*flow.ExecutionResult) {
-	return func(result *flow.ExecutionResult) {
-		result.ServiceEvents = events
 	}
 }
 
@@ -1643,8 +1637,8 @@ func EpochCommitFixture(opts ...func(*flow.EpochCommit)) *flow.EpochCommit {
 	commit := &flow.EpochCommit{
 		Counter:            uint64(rand.Uint32()),
 		ClusterQCs:         flow.ClusterQCVoteDatasFromQCs(QuorumCertificatesFixtures(1)),
-		DKGGroupKey:        KeyFixture(crypto.BLSBLS12381).PublicKey(),
-		DKGParticipantKeys: PublicKeysFixture(2, crypto.BLSBLS12381),
+		DKGGroupKey:        KeyFixture(crypto.ECDSAP256).PublicKey(),
+		DKGParticipantKeys: PublicKeysFixture(2, crypto.ECDSAP256),
 	}
 	for _, apply := range opts {
 		apply(commit)
@@ -1808,7 +1802,7 @@ func PrivateKeyFixtureByIdentifier(algo crypto.SigningAlgorithm, seedLength int,
 }
 
 func StakingPrivKeyByIdentifier(id flow.Identifier) crypto.PrivateKey {
-	return PrivateKeyFixtureByIdentifier(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381, id)
+	return PrivateKeyFixtureByIdentifier(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256, id)
 }
 
 // NetworkingPrivKeyFixture returns random ECDSAP256 private key
