@@ -139,7 +139,8 @@ func (s *Suite) TestEpochJoinAndLeave() {
 	role := flow.RoleAccess
 
 	// grab the first container of this node role type, this is the container we will replace
-	containerToReplace := s.net.ContainersByRole(role)[0]
+	containerToReplace := s.getContainerToReplace(role)
+	require.True(s.T(), containerToReplace != nil)
 
 	// staking our new node and add get the corresponding container for that node
 	info, testContainer := s.StakeNewNode(ctx, env, role)

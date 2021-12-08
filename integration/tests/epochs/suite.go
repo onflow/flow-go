@@ -541,6 +541,24 @@ func (s *Suite) StakeNewNode(ctx context.Context, env templates.Environment, rol
 	return info, testContainer
 }
 
+// getContainerToReplace return a container from the network, make sure the container is not a ghost
+func (s *Suite) getContainerToReplace(role flow.Role) *testnet.Container {
+	nodes := s.net.ContainersByRole(role)
+	require.True(s.T(), len(nodes) > 0)
+
+	if role != flow.RoleAccess {
+		return nodes[0]
+	}
+
+	for _, c := range nodes {
+		if !c.Config.Ghost {
+			return c
+		}
+	}
+
+	return nil
+}
+
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network
 // this func can be used to perform sanity.
 // NOTE: rootSnapshot must be the snapshot that the node (info) was bootstrapped with.
