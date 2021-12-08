@@ -16,7 +16,7 @@ import (
 // as part of their vote. StakingSigner is responsible for creating correctly
 // signed proposals and votes.
 type StakingSigner struct {
-	staking       module.Local
+	me            module.Local
 	stakingHasher hash.Hasher
 	signerID      flow.Identifier
 }
@@ -24,13 +24,13 @@ type StakingSigner struct {
 // NewStakingSigner creates a new combined signer with the given dependencies:
 // - the staking signer is used to create and verify aggregatable signatures for Hotstuff
 func NewStakingSigner(
-	staking module.Local,
+	me module.Local,
 ) *StakingSigner {
 
 	sc := &StakingSigner{
-		staking:       staking,
+		me:            me,
 		stakingHasher: crypto.NewBLSKMAC(encoding.CollectorVoteTag),
-		signerID:      staking.NodeID(),
+		signerID:      me.NodeID(),
 	}
 	return sc
 }
@@ -86,7 +86,7 @@ func (c *StakingSigner) genSigData(block *model.Block) ([]byte, error) {
 	// create the message to be signed and generate signatures
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	stakingSig, err := c.staking.Sign(msg, c.stakingHasher)
+	stakingSig, err := c.me.Sign(msg, c.stakingHasher)
 	if err != nil {
 		return nil, fmt.Errorf("could not generate staking signature for block (%v) at view %v: %w", block.BlockID, block.View, err)
 	}
