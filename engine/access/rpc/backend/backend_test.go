@@ -881,7 +881,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 	blockID := unittest.IdentifierFixture()
 	executionResult := unittest.ExecutionResultFixture(
 		unittest.WithExecutionResultBlockID(blockID),
-		unittest.WIthServiceEvents(2))
+		unittest.WithServiceEvents(2))
 
 	ctx := context.Background()
 
