@@ -124,8 +124,8 @@ func (e entityList) sliceIndexForEntity() (uint32, bool) {
 			// ejecting a random entity
 			return e.invalidateRandomEntity(), true
 		} else {
-			// ejecting eldest entity
-			return e.invalidateHead(), true
+			// turning used head to a free head.
+			e.invalidateHead()
 		}
 	}
 

@@ -97,9 +97,38 @@ func testArrayBackDataStoreAndRetrievalWithoutEjection(t *testing.T, limit uint3
 
 	withTestScenario(t, limit, overLimitFactor, entityCount,
 		append(h, func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
-			testRetrievingSavedEntities(t, backData, entities)
+			testRetrievingLastXSavedEntities(t, backData, entities, 0)
 		})...,
 	)
+}
+
+func TestArrayBackDataStoreAndRetrievalWithEjection(t *testing.T) {
+	for _, tc := range []struct {
+		limit           uint32
+		overLimitFactor uint32
+		entityCount     uint32
+		helpers         []func(*testing.T, *ArrayBackData, []*unittest.MockEntity)
+	}{
+		{
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     31,
+		},
+		{
+			limit:           30,
+			overLimitFactor: 2,
+			entityCount:     100,
+		},
+		{
+			limit:           1000,
+			overLimitFactor: 8,
+			entityCount:     2000,
+		},
+	} {
+		t.Run(fmt.Sprintf("%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
+			testArrayBackDataStoreAndRetrievalWitEjection(t, tc.limit, tc.overLimitFactor, tc.entityCount)
+		})
+	}
 }
 
 func testArrayBackDataStoreAndRetrievalWitEjection(t *testing.T, limit uint32, overLimitFactor uint32, entityCount uint32, helpers ...func(*testing.T, *ArrayBackData, []*unittest.MockEntity)) {
@@ -112,7 +141,7 @@ func testArrayBackDataStoreAndRetrievalWitEjection(t *testing.T, limit uint32, o
 
 	withTestScenario(t, limit, overLimitFactor, entityCount,
 		append(h, func(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
-			testRetrievingSavedEntities(t, backData, entities)
+			testRetrievingLastXSavedEntities(t, backData, entities, entityCount-limit)
 		})...,
 	)
 }
@@ -246,11 +275,13 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		// adding each element must be successful.
 		require.True(t, backData.Add(e.ID(), e))
 
-		// total of back data should be incremented by each addition.
-		require.Equal(t, backData.Size(), uint(i+1))
+		// in case of no over limit, total of back data should be incremented by each addition.
+		if i < int(backData.limit) {
+			require.Equal(t, backData.Size(), uint(i+1))
+		}
 
 		// entity should be placed at index i in back data
-		_, entity, _ := backData.entities.get(uint32(i))
+		_, entity, _ := backData.entities.get(uint32(i % int(backData.limit)))
 		require.Equal(t, e, entity)
 
 		// linked-list sanity check
@@ -258,8 +289,10 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		// first entity in the list.
 		usedHead, freeHead := backData.entities.getHeads()
 		usedTail, freeTail := backData.entities.getTails()
+
 		//
-		require.Equal(t, entities[0], usedHead.entity)
+		fmt.Println(i)
+		require.Equal(t, entities[i/int(backData.limit)], usedHead.entity)
 		require.True(t, usedHead.prev.isUndefined())
 
 		//
@@ -267,7 +300,9 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		require.True(t, usedTail.next.isUndefined())
 
 		// free head
-		if i != int(backData.limit-1) {
+		// as long as we are below limit, after adding i element, free head
+		// should move to i+1 element.
+		if i < int(backData.limit)-1 {
 			require.Equal(t, uint32(i+1), backData.entities.free.head.sliceIndex())
 			require.True(t, freeHead.prev.isUndefined())
 		} else {
@@ -275,44 +310,64 @@ func testAddingEntities(t *testing.T, backData *ArrayBackData, entities []*unitt
 		}
 
 		// free tail
-		if i != int(backData.limit-1) {
+		if i < int(backData.limit)-1 {
 			require.Equal(t, uint32(backData.limit-1), backData.entities.free.tail.sliceIndex())
 			require.True(t, freeTail.next.isUndefined())
 		} else {
 			require.Nil(t, freeTail)
 		}
 
-		// claimed entities list
+		// used entities list
+		// if we are still below limit, head to tail of used list
+		// must be reachable within i + 1 steps.
+		usedTraverseStep := uint32(i + 1)
+		if i >= int(backData.limit) {
+			// if we are above the limit, head to tail of used list
+			// must be reachable within as many steps as the actual capacity of
+			// list.
+			usedTraverseStep = uint32(backData.limit)
+		}
 		tailAccessibleFromHead(t,
 			backData.entities.used.head.sliceIndex(),
 			backData.entities.used.tail.sliceIndex(),
 			backData,
-			uint32(i+1))
+			usedTraverseStep)
 		headAccessibleFromTail(t,
 			backData.entities.used.head.sliceIndex(),
 			backData.entities.used.tail.sliceIndex(),
 			backData,
-			uint32(i+1))
+			usedTraverseStep)
 
 		// free entities list
+		// if we are still below limit, head to tail of used list
+		// must be reachable within limit - i - 1 steps. "limit - i" part is since
+		// when we have i elements in list, we have "limit - i" free slots, and -1 is
+		// since we start from index 0 not 1.
+		freeTraverseStep := uint32(int(backData.limit) - i - 1)
+		if i >= int(backData.limit) {
+			// if we are above the limit, within 0 steps.
+			// reason is list is full and adding new elements is done
+			// by ejecting existing ones, remaining no free slot.
+			freeTraverseStep = uint32(0)
+		}
 		tailAccessibleFromHead(t,
 			backData.entities.free.head.sliceIndex(),
 			backData.entities.free.tail.sliceIndex(),
 			backData,
-			uint32(int(backData.limit)-i-1))
+			freeTraverseStep)
 		headAccessibleFromTail(t,
 			backData.entities.free.head.sliceIndex(),
 			backData.entities.free.tail.sliceIndex(),
 			backData,
-			uint32(int(backData.limit)-i-1))
+			freeTraverseStep)
 	}
 }
 
-func testRetrievingSavedEntities(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity) {
-	for _, expected := range entities {
-		actual, ok := backData.ByID(expected.ID())
+func testRetrievingLastXSavedEntities(t *testing.T, backData *ArrayBackData, entities []*unittest.MockEntity, from uint32) {
+	for i := from; i < uint32(len(entities)); i++ {
+		actual, ok := backData.ByID(entities[i].ID())
 		require.True(t, ok)
-		require.Equal(t, expected, actual)
+		require.Equal(t, entities[i], actual)
 	}
 }
 
