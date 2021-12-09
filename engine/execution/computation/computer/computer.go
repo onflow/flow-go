@@ -26,9 +26,9 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
-const SystemChunkLedgerIntractionLimit = 500_000_000  // ~500MB
-const MaxTransactionErrorStringSize = 1000            // 1000 chars
+const SystemChunkEventCollectionMaxSize = 256_000_000  // ~256MB
+const SystemChunkLedgerIntractionLimit = 1_000_000_000 // ~1GB
+const MaxTransactionErrorStringSize = 1000             // 1000 chars
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
