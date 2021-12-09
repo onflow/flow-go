@@ -8,7 +8,7 @@ import (
 const resultExpandable = "result"
 
 // getTransactionByID gets a transaction by requested ID.
-func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
+func getTransactionByID(r *request, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := r.id()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -32,7 +32,7 @@ func getTransactionByID(r *requestDecorator, backend access.API, link LinkGenera
 }
 
 // getTransactionResultByID retrieves transaction result by the transaction ID.
-func getTransactionResultByID(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
+func getTransactionResultByID(r *request, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := r.id()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -47,7 +47,7 @@ func getTransactionResultByID(r *requestDecorator, backend access.API, link Link
 }
 
 // createTransaction creates a new transaction from provided payload.
-func createTransaction(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
+func createTransaction(r *request, backend access.API, link LinkGenerator) (interface{}, error) {
 	var txBody generated.TransactionsBody
 	err := r.bodyAs(&txBody)
 	if err != nil {

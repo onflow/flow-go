@@ -20,7 +20,7 @@ const (
 )
 
 // getBlocksByID gets blocks by provided ID or list of IDs.
-func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
+func getBlocksByIDs(r *request, backend access.API, link LinkGenerator) (interface{}, error) {
 
 	ids, err := r.ids()
 	if err != nil {
@@ -40,7 +40,7 @@ func getBlocksByIDs(r *requestDecorator, backend access.API, link LinkGenerator)
 	return blocks, nil
 }
 
-func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerator) (interface{}, error) {
+func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (interface{}, error) {
 	heights := r.getQueryParams(heightQueryParam)
 	startHeight := r.getQueryParam(startHeightQueryParam)
 	endHeight := r.getQueryParam(endHeightQueryParam)
@@ -125,7 +125,7 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 }
 
 // getBlockPayloadByID gets block payload by ID
-func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenerator) (interface{}, error) {
+func getBlockPayloadByID(req *request, backend access.API, _ LinkGenerator) (interface{}, error) {
 
 	id, err := req.id()
 	if err != nil {
@@ -144,11 +144,11 @@ func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenera
 	return payload, nil
 }
 
-func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.API, link LinkGenerator) (*generated.Block, error) {
+func getBlock(blkProvider *blockProvider, req *request, backend access.API, link LinkGenerator) (*generated.Block, error) {
 	// lookup block
-	blk, statusErr := blkProvider.getBlock(req.Context())
-	if statusErr != nil {
-		return nil, statusErr
+	blk, err := blkProvider.getBlock(req.Context())
+	if err != nil {
+		return nil, err
 	}
 
 	// lookup execution result

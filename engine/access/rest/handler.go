@@ -16,7 +16,7 @@ import (
 // ApiHandlerFunc is a function that contains endpoint handling logic,
 // it fetches necessary resources and returns an error or response model.
 type ApiHandlerFunc func(
-	r *requestDecorator,
+	r *request,
 	backend access.API,
 	generator LinkGenerator,
 ) (interface{}, error)
@@ -47,7 +47,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
 	// create request decorator with parsed values
-	decoratedRequest := newRequestDecorator(r)
+	decoratedRequest := decorateRequest(r)
 
 	// execute handler function and check for error
 	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)
@@ -150,7 +150,7 @@ func (h *Handler) errorResponse(
 
 // NotImplemented handler returns an error explaining the endpoint is not yet implemented
 func NotImplemented(
-	_ *requestDecorator,
+	_ *request,
 	_ access.API,
 	_ LinkGenerator,
 ) (interface{}, StatusError) {

@@ -15,14 +15,16 @@ import (
 )
 
 // a convenience wrapper around the http request to make it easy to read request query params
-type requestDecorator struct {
+type request struct {
 	*http.Request
 	expandFields map[string]bool
 	selectFields []string
 }
 
-func newRequestDecorator(r *http.Request) *requestDecorator {
-	decoratedReq := &requestDecorator{
+// decorateRequest takes http request and applies functions to produce our custom
+// request object decorated with values we need
+func decorateRequest(r *http.Request) *request {
+	decoratedReq := &request{
 		Request: r,
 	}
 
@@ -45,24 +47,24 @@ func sliceToMap(values []string) map[string]bool {
 	return valueMap
 }
 
-func (rd *requestDecorator) expands(field string) bool {
+func (rd *request) expands(field string) bool {
 	return rd.expandFields[field]
 }
 
-func (rd *requestDecorator) selects() []string {
+func (rd *request) selects() []string {
 	return rd.selectFields
 }
 
-func (rd *requestDecorator) getVar(name string) string {
+func (rd *request) getVar(name string) string {
 	vars := mux.Vars(rd.Request)
 	return vars[name] // todo(sideninja) consider returning err if non-existing
 }
 
-func (rd *requestDecorator) getQueryParam(name string) string {
+func (rd *request) getQueryParam(name string) string {
 	return rd.Request.URL.Query().Get(name) // todo(sideninja) consider returning err if non-existing
 }
 
-func (rd *requestDecorator) getQueryParams(name string) []string {
+func (rd *request) getQueryParams(name string) []string {
 	param := rd.Request.URL.Query().Get(name)
 	// currently, the swagger generated Go REST client is incorrectly doing a `fmt.Sprintf("%v", id)` for the id slice
 	// resulting in the client sending the ids in the format [id1 id2 id3...]. This is a temporary workaround to
@@ -79,7 +81,7 @@ func (rd *requestDecorator) getQueryParams(name string) []string {
 	return strings.Fields(param)
 }
 
-func (rd *requestDecorator) bodyAs(dst interface{}) error {
+func (rd *request) bodyAs(dst interface{}) error {
 	//todo(sideninja) validate size
 
 	dec := json.NewDecoder(rd.Body)
@@ -134,10 +136,10 @@ func (rd *requestDecorator) bodyAs(dst interface{}) error {
 	return nil
 }
 
-func (rd *requestDecorator) ids() ([]flow.Identifier, error) {
+func (rd *request) ids() ([]flow.Identifier, error) {
 	return toIDs(rd.getVar("id"))
 }
 
-func (rd *requestDecorator) id() (flow.Identifier, error) {
+func (rd *request) id() (flow.Identifier, error) {
 	return toID(rd.getVar("id"))
 }
