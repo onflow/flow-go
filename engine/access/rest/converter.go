@@ -375,7 +375,7 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 
 	self, _ := selfLink(tx.ID(), link.TransactionLink)
 
-	txResponse := &generated.Transaction{
+	return &generated.Transaction{
 		Id:                 tx.ID().String(),
 		Script:             toBase64(tx.Script),
 		Arguments:          args,
@@ -390,8 +390,6 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 		Links:              self,
 		Expandable:         expandable,
 	}
-
-	return txResponse
 }
 
 func eventResponse(event flow.Event) generated.Event {
