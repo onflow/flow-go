@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/onflow/atree"
 	"github.com/onflow/cadence"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/onflow/cadence/runtime"
@@ -245,11 +246,11 @@ func (e *TransactionEnv) ValueExists(owner, key []byte) (exists bool, err error)
 }
 
 // AllocateStorageIndex allocates new storage index under the owner accounts to store a new register
-func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (uint64, error) {
+func (e *TransactionEnv) AllocateStorageIndex(owner []byte) (atree.StorageIndex, error) {
 	e.computationHandler.AddUsed(1, "AllocateStorageIndex")
 	v, err := e.accounts.AllocateStorageIndex(flow.BytesToAddress(owner))
 	if err != nil {
-		return 0, fmt.Errorf("storage address allocation failed: %w", err)
+		return atree.StorageIndex{}, fmt.Errorf("storage address allocation failed: %w", err)
 	}
 	return v, nil
 }
@@ -709,6 +710,9 @@ func (e *TransactionEnv) CreateAccount(payer runtime.Address) (address runtime.A
 	}
 	e.computationHandler.AddUsed(1, "CreateAccount")
 
+	e.sth.DisableLimitEnforcement() // don't enforce limit during account creation
+	defer e.sth.EnableLimitEnforcement()
+
 	flowAddress, err := e.addressGenerator.NextAddress()
 	if err != nil {
 		return address, err
@@ -741,6 +745,8 @@ func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvAddAccountKey)
 		defer sp.Finish()
 	}
+	e.sth.DisableLimitEnforcement() // don't enforce limit during adding a key
+	defer e.sth.EnableLimitEnforcement()
 
 	err := e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {

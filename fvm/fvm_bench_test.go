@@ -332,10 +332,8 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 
 	longString := strings.Repeat("0", 1000)
 
-	templateTx := func(prepare string) func() string {
-
-		return func() string {
-			return fmt.Sprintf(`
+	templateTx := func(rep int, prepare string) string {
+		return fmt.Sprintf(`
 			import FungibleToken from 0x%s
 			import FlowToken from 0x%s
 			import TestContract from 0x%s
@@ -348,47 +346,46 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			%s
 					}
 				}
-			}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), "754aed9de6197641", rand.Intn(300)+1, prepare)
-		}
+			}`, fvm.FungibleTokenAddress(chain), fvm.FlowTokenAddress(chain), "754aed9de6197641", rep, prepare)
 	}
 
 	b.Run("reference tx", func(b *testing.B) {
-		benchTransaction(b, templateTx(""))
+		benchTransaction(b, templateTx(100, ""))
 	})
 	b.Run("convert int to string", func(b *testing.B) {
-		benchTransaction(b, templateTx(`i.toString()`))
+		benchTransaction(b, templateTx(100, `i.toString()`))
 	})
 	b.Run("convert int to string and concatenate it", func(b *testing.B) {
-		benchTransaction(b, templateTx(`"x".concat(i.toString())`))
+		benchTransaction(b, templateTx(100, `"x".concat(i.toString())`))
 	})
 	b.Run("get signer address", func(b *testing.B) {
-		benchTransaction(b, templateTx(`signer.address`))
+		benchTransaction(b, templateTx(100, `signer.address`))
 	})
 	b.Run("get public account", func(b *testing.B) {
-		benchTransaction(b, templateTx(`getAccount(signer.address)`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address)`))
 	})
 	b.Run("get account and get balance", func(b *testing.B) {
-		benchTransaction(b, templateTx(`getAccount(signer.address).balance`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).balance`))
 	})
 	b.Run("get account and get available balance", func(b *testing.B) {
-		benchTransaction(b, templateTx(`getAccount(signer.address).availableBalance`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).availableBalance`))
 	})
 	b.Run("get account and get storage used", func(b *testing.B) {
-		benchTransaction(b, templateTx(`getAccount(signer.address).storageUsed`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageUsed`))
 	})
 	b.Run("get account and get storage capacity", func(b *testing.B) {
-		benchTransaction(b, templateTx(`getAccount(signer.address).storageCapacity`))
+		benchTransaction(b, templateTx(100, `getAccount(signer.address).storageCapacity`))
 	})
 	b.Run("get signer vault", func(b *testing.B) {
-		benchTransaction(b, templateTx(`let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`))
+		benchTransaction(b, templateTx(100, `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`))
 	})
 	b.Run("get signer receiver", func(b *testing.B) {
-		benchTransaction(b, templateTx(`let receiverRef =  getAccount(signer.address)
+		benchTransaction(b, templateTx(100, `let receiverRef =  getAccount(signer.address)
 				.getCapability(/public/flowTokenReceiver)
 				.borrow<&{FungibleToken.Receiver}>()!`))
 	})
 	b.Run("transfer tokens", func(b *testing.B) {
-		benchTransaction(b, templateTx(`
+		benchTransaction(b, templateTx(100, `
 			let receiverRef =  getAccount(signer.address)
 				.getCapability(/public/flowTokenReceiver)
 				.borrow<&{FungibleToken.Receiver}>()!
@@ -399,25 +396,25 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			`))
 	})
 	b.Run("load and save empty string on signers address", func(b *testing.B) {
-		benchTransaction(b, templateTx(`
+		benchTransaction(b, templateTx(100, `
 				signer.load<String>(from: /storage/testpath)
 				signer.save("", to: /storage/testpath)
 			`))
 	})
 	b.Run("load and save long string on signers address", func(b *testing.B) {
-		benchTransaction(b, templateTx(fmt.Sprintf(`
+		benchTransaction(b, templateTx(100, fmt.Sprintf(`
 				signer.load<String>(from: /storage/testpath)
 				signer.save("%s", to: /storage/testpath)
 			`, longString)))
 	})
 	b.Run("create new account", func(b *testing.B) {
-		benchTransaction(b, templateTx(`let acct = AuthAccount(payer: signer)`))
+		benchTransaction(b, templateTx(50, `let acct = AuthAccount(payer: signer)`))
 	})
 	b.Run("call empty contract function", func(b *testing.B) {
-		benchTransaction(b, templateTx(`TestContract.empty()`))
+		benchTransaction(b, templateTx(100, `TestContract.empty()`))
 	})
 	b.Run("emit event", func(b *testing.B) {
-		benchTransaction(b, templateTx(`TestContract.emit()`))
+		benchTransaction(b, templateTx(100, `TestContract.emit()`))
 	})
 	var data [][]string
 	columns := []string{"tx"}

@@ -1,7 +1,12 @@
 package fvm
 
 import (
+	"fmt"
+	"runtime/debug"
+	"strings"
+
 	"github.com/onflow/flow-go/fvm/handler"
+
 	"github.com/opentracing/opentracing-go"
 
 	"github.com/onflow/flow-go/fvm/errors"
@@ -41,6 +46,19 @@ func (proc *TransactionProcedure) SetTraceSpan(traceSpan opentracing.Span) {
 }
 
 func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state.StateHolder, programs *programs.Programs) error {
+
+	defer func() {
+		if r := recover(); r != nil {
+
+			if strings.Contains(fmt.Sprintf("%v", r), "[Error Code: 1106]") {
+				ctx.Logger.Error().Str("trace", string(debug.Stack())).Msg("VM LedgerIntractionLimitExceeded panic")
+				proc.Err = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
+				return
+			}
+
+			panic(r)
+		}
+	}()
 
 	for _, p := range ctx.TransactionProcessors {
 		err := p.Process(vm, &ctx, proc, st, programs)

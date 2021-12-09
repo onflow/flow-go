@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 )
 
@@ -31,6 +32,18 @@ func createAggregationB(b *testing.B) (*AggregationProvider, crypto.PrivateKey) 
 	return agg, priv
 }
 
+// can't use the unittest.IdentityFixture due to circular import
+func IdentityFixture() *flow.Identity {
+	var id flow.Identifier
+	_, _ = rand.Read(id[:])
+	return &flow.Identity{
+		NodeID:  id,
+		Address: fmt.Sprintf("address-%v", id[0:7]),
+		Role:    flow.RoleConsensus,
+		Stake:   1000,
+	}
+}
+
 func createAggregation() (*AggregationProvider, crypto.PrivateKey, error) {
 	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
 	n, err := rand.Read(seed)
@@ -44,7 +57,11 @@ func createAggregation() (*AggregationProvider, crypto.PrivateKey, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	local, err := local.New(nil, priv)
+
+	node := IdentityFixture()
+	node.StakingPubKey = priv.PublicKey()
+
+	local, err := local.New(node, priv)
 	if err != nil {
 		return nil, nil, err
 	}

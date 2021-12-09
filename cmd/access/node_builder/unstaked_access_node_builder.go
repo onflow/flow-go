@@ -23,6 +23,7 @@ import (
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/keyutils"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 )
 
@@ -80,7 +81,7 @@ func (anb *UnstakedAccessNodeBuilder) InitIDProviders() {
 			return id.NewCustomIdentifierProvider(func() flow.IdentifierList {
 				var result flow.IdentifierList
 
-				pids := anb.LibP2PNode.GetPeersForProtocol(p2p.FlowProtocolID(anb.RootBlock.ID()))
+				pids := anb.LibP2PNode.GetPeersForProtocol(unicast.FlowProtocolID(anb.RootBlock.ID()))
 
 				for _, pid := range pids {
 					// exclude own Identifier
@@ -202,7 +203,7 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 	psOpts := append(p2p.DefaultPubsubOptions(p2p.DefaultMaxPubSubMsgSize),
 		func(_ context.Context, h host.Host) (pubsub.Option, error) {
 			return pubsub.WithSubscriptionFilter(p2p.NewRoleBasedFilter(
-				h.ID(), builder.RootBlock.ID(), builder.IdentityProvider,
+				h.ID(), builder.IdentityProvider,
 			)), nil
 		},
 		// Note: using the WithDirectPeers option will automatically store these addresses
@@ -212,12 +213,8 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 	)
 
 	return func(ctx context.Context) (*p2p.Node, error) {
-		streamFactory, err := p2p.LibP2PStreamCompressorFactoryFunc(builder.BaseConfig.LibP2PStreamCompression)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert stream factory: %w", err)
-		}
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, builder.BaseConfig.BindAddr, networkKey).
-			SetRootBlockID(builder.RootBlock.ID()).
+			SetSporkID(builder.SporkID).
 			SetConnectionManager(connManager).
 			// unlike the staked side of the network where currently all the node addresses are known upfront,
 			// for the unstaked side of the network, the  nodes need to discover each other using DHT Discovery.
@@ -225,7 +222,6 @@ func (builder *UnstakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifi
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
 			SetPubsubOptions(psOpts...).
-			SetStreamCompressor(streamFactory).
 			Build(ctx)
 		if err != nil {
 			return nil, err
@@ -249,7 +245,7 @@ func (anb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.NodeB
 			Address:       anb.BindAddr,
 		}
 
-		me, err := local.New(self, nil)
+		me, err := local.NewNoKey(self)
 		anb.MustNot(err).Msg("could not initialize local")
 		node.Me = me
 	}
@@ -341,11 +337,11 @@ func (anb *UnstakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
-		anb.RootBlock.ID(),
+		anb.SporkID,
 		p2p.DefaultUnicastTimeout,
-		false, // no connection gating for the unstaked nodes
 		anb.IDTranslator,
 		p2p.WithMessageValidators(validators...),
+		p2p.WithConnectionGating(false),
 		// no peer manager
 		// use default identifier provider
 	)

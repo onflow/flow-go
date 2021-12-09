@@ -17,6 +17,9 @@ import (
 	"github.com/onflow/flow-go/storage/badger/operation"
 )
 
+// an increased limit for bootstrapping
+const ledgerIntractionLimitNeededForBootstrapping = 1_000_000_000
+
 type Bootstrapper struct {
 	logger zerolog.Logger
 }
@@ -40,7 +43,7 @@ func (b *Bootstrapper) BootstrapLedger(
 	rt := fvm.NewInterpreterRuntime()
 	vm := fvm.NewVirtualMachine(rt)
 
-	ctx := fvm.NewContext(b.logger, fvm.WithChain(chain))
+	ctx := fvm.NewContext(b.logger, fvm.WithMaxStateInteractionSize(ledgerIntractionLimitNeededForBootstrapping), fvm.WithChain(chain))
 
 	bootstrap := fvm.Bootstrap(
 		servicePublicKey,

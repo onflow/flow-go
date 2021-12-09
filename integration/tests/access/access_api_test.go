@@ -43,7 +43,6 @@ func (suite *AccessSuite) TearDownTest() {
 func (suite *AccessSuite) SetupTest() {
 	nodeConfigs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
-		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.WarnLevel)),
 	}
 
 	// need one dummy execution node (unused ghost)
