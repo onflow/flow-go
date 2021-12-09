@@ -50,6 +50,8 @@ func TestArrayBackData_BelowLimit(t *testing.T) {
 	}
 }
 
+// TestArrayBackData_WriteHeavy evaluates correctness of backdata under the writing and retrieving
+// a heavy load of entities up to its limit.
 func TestArrayBackData_WriteHeavy(t *testing.T) {
 	limit := 100_000
 
@@ -60,12 +62,8 @@ func TestArrayBackData_WriteHeavy(t *testing.T) {
 	// adds all entities to backdata
 	testAddEntities(t, bd, entities)
 
-	// getting inserted elements
-	for _, expected := range entities {
-		actual, ok := bd.ByID(expected.ID())
-		require.True(t, ok)
-		require.Equal(t, expected, actual)
-	}
+	// retrieves all entities from backdata
+	testGetEntities(t, bd, entities)
 }
 
 // testAddEntities is a test helper that checks entities are added successfully to the backdata.
@@ -83,5 +81,15 @@ func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 		id, entity, _ := bd.entities.Get(uint32(i))
 		require.Equal(t, e.ID(), id)
 		require.Equal(t, e, entity)
+	}
+}
+
+// testGettingEntities is a test helper that checks entities are retrieveable from backdata.
+func testGetEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity) {
+	// getting inserted elements
+	for _, expected := range entities {
+		actual, ok := bd.ByID(expected.ID())
+		require.True(t, ok)
+		require.Equal(t, expected, actual)
 	}
 }
