@@ -38,8 +38,6 @@ func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) 
 		AllowedMethods: []string{
 			http.MethodGet,
 			http.MethodPost,
-			http.MethodPut,
-			http.MethodDelete,
 			http.MethodOptions,
 			http.MethodHead},
 	})
