@@ -226,6 +226,7 @@ func testInvalidateAtRandom(t *testing.T, list *EntityDoubleLinkedList, entities
 // and remains connected.
 func testInvalidatingHead(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
 	size := len(entities)
+	offset := len(list.values) - size
 	for i := 0; i < size; i++ {
 		headIndex := list.invalidateHead()
 		require.Equal(t, uint32(i), headIndex)
@@ -235,17 +236,69 @@ func testInvalidatingHead(t *testing.T, list *EntityDoubleLinkedList, entities [
 		// unclaimed head should be appended to free entities
 		require.Equal(t, list.free.tail.sliceIndex(), headIndex)
 
+		if offset != 0 {
+			// number of entities is below limit
+			// free must head keeps pointing to first empty index after
+			// adding all entities.
+			require.Equal(t, uint32(size), list.free.head.sliceIndex())
+		} else {
+			// number of entities is greater than or equal to limit
+			// free head must be updated to first element (i.e., index 0)
+			// and must be kept there for entire test (as we invalidate head not tail).
+			require.Equal(t, uint32(0), list.free.head.sliceIndex())
+		}
+
 		// except when the list is empty, head must be updated after invalidation,
 		// except when the list is empty, head and tail must be accessible after each invalidation
 		// i.e., the linked list remains connected despite invalidation.
 		if i != size-1 {
-			// require.Equal(t, entities[i+1].ID(), backData.entities.getHead().id)
 			tailAccessibleFromHead(t,
 				list.used.head.sliceIndex(),
 				list.used.tail.sliceIndex(),
 				list,
 				list.Size())
-			// headAccessibleFromTail(t, backData, backData.entities.size())
+
+			headAccessibleFromTail(t,
+				list.used.head.sliceIndex(),
+				list.used.tail.sliceIndex(),
+				list,
+				list.Size())
+
+			// free list
+			tailAccessibleFromHead(t,
+				list.free.head.sliceIndex(),
+				list.free.tail.sliceIndex(),
+				list,
+				uint32(i+1+offset))
+
+			headAccessibleFromTail(t,
+				list.free.head.sliceIndex(),
+				list.free.tail.sliceIndex(),
+				list,
+				uint32(i+1+offset))
+		}
+
+		usedTail, _ := list.getTails()
+		usedHead, _ := list.getHeads()
+		if i != size-1 {
+			// list is not empty yet
+			//
+			// used tail should point to the last element in list
+			require.Equal(t, entities[size-1].ID(), *usedTail.id)
+			require.Equal(t, uint32(size-1), list.used.tail.sliceIndex())
+
+			// used head must point to the next element in the list,
+			// i.e., invalidating head moves it forward.
+			require.Equal(t, entities[i+1].ID(), *usedHead.id)
+			require.Equal(t, uint32(i+1), list.used.head.sliceIndex())
+		} else {
+			// list is empty
+			// used head and tail must be nil and their corresponding
+			// pointer indices must be undefined.
+			require.Nil(t, usedHead)
+			require.Nil(t, usedTail)
+			require.True(t, list.used.tail.isUndefined())
+			require.True(t, list.used.head.isUndefined())
 		}
 	}
 }
@@ -254,12 +307,29 @@ func testInvalidatingHead(t *testing.T, list *EntityDoubleLinkedList, entities [
 // and remains connected.
 func testInvalidatingTail(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
 	size := len(entities)
+	offset := len(list.values) - size
 	for i := 0; i < size; i++ {
 		// invalidates tail index
-		tail := list.used.tail.sliceIndex()
-		list.invalidateEntityAtIndex(tail)
+		tailIndex := list.used.tail.sliceIndex()
+		require.Equal(t, uint32(size-1-i), tailIndex)
+
+		list.invalidateEntityAtIndex(tailIndex)
 		// old head index must be invalidated
-		require.True(t, list.isInvalidated(tail))
+		require.True(t, list.isInvalidated(tailIndex))
+		// unclaimed head should be appended to free entities
+		require.Equal(t, list.free.tail.sliceIndex(), tailIndex)
+
+		if offset != 0 {
+			// number of entities is below limit
+			// free must head keeps pointing to first empty index after
+			// adding all entities.
+			require.Equal(t, uint32(size), list.free.head.sliceIndex())
+		} else {
+			// number of entities is greater than or equal to limit
+			// free head must be updated to last element in the list (size - 1),
+			// and must be kept there for entire test (as we invalidate tail not head).
+			require.Equal(t, uint32(size-1), list.free.head.sliceIndex())
+		}
 
 		// size of list should be shrunk after each invalidation.
 		require.Equal(t, uint32(size-i-1), list.Size())
@@ -268,13 +338,54 @@ func testInvalidatingTail(t *testing.T, list *EntityDoubleLinkedList, entities [
 		// and also head and tail must be accessible after each invalidation
 		// i.e., the linked list remains connected despite invalidation.
 		if i != size-1 {
-			// require.Equal(t, entities[size-i-2].ID(), backData.entities.getTail().id)
+
+			// used list
 			tailAccessibleFromHead(t,
 				list.used.head.sliceIndex(),
 				list.used.tail.sliceIndex(),
 				list,
 				list.Size())
-			// headAccessibleFromTail(t, backData, backData.entities.size())
+
+			headAccessibleFromTail(t,
+				list.used.head.sliceIndex(),
+				list.used.tail.sliceIndex(),
+				list,
+				list.Size())
+
+			// free list
+			tailAccessibleFromHead(t,
+				list.free.head.sliceIndex(),
+				list.free.tail.sliceIndex(),
+				list,
+				uint32(i+1+offset))
+
+			headAccessibleFromTail(t,
+				list.free.head.sliceIndex(),
+				list.free.tail.sliceIndex(),
+				list,
+				uint32(i+1+offset))
+		}
+
+		usedTail, _ := list.getTails()
+		usedHead, _ := list.getHeads()
+		if i != size-1 {
+			// list is not empty yet
+			//
+			// used tail should move backward after each invalidation
+			require.Equal(t, entities[size-i-2].ID(), *usedTail.id)
+			require.Equal(t, uint32(size-i-2), list.used.tail.sliceIndex())
+
+			// used head must point to the first element in the list,
+			require.Equal(t, entities[0].ID(), *usedHead.id)
+			require.Equal(t, uint32(0), list.used.head.sliceIndex())
+		} else {
+			// list is empty
+			// used head and tail must be nil and their corresponding
+			// pointer indices must be undefined.
+			require.Nil(t, usedHead)
+			require.Nil(t, usedTail)
+			require.True(t, list.used.tail.isUndefined())
+			require.True(t, list.used.head.isUndefined())
 		}
 	}
 }
