@@ -8,6 +8,10 @@ import (
 // SelectFilter selects the specified keys from the given object. The keys are in the json dot notation and must refer
 // to leaf elements e.g. payload.collection_guarantees.signer_ids
 func SelectFilter(object interface{}, selectKeys []string) (interface{}, error) {
+	// avoid doing any work if no select keys provided
+	if len(selectKeys) == 0 {
+		return object, nil
+	}
 
 	marshalled, err := json.Marshal(object)
 	if err != nil {

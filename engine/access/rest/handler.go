@@ -56,13 +56,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// apply the select filter if any select fields have been specified
-	selectFields := decoratedRequest.selects()
-	if len(selectFields) > 0 {
-		response, err = SelectFilter(response, selectFields)
-		if err != nil {
-			h.errorHandler(w, err, errorLogger)
-			return
-		}
+	response, err = SelectFilter(response, decoratedRequest.selects())
+	if err != nil {
+		h.errorHandler(w, err, errorLogger)
+		return
 	}
 
 	// write response to response stream
