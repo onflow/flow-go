@@ -90,6 +90,29 @@ func TestDKGState_BeaconKeys(t *testing.T) {
 	})
 }
 
+func TestDKGState_EndState(t *testing.T) {
+	unittest.RunWithTypedBadgerDB(t, bstorage.InitSecret, func(db *badger.DB) {
+		metrics := metrics.NewNoopCollector()
+		store, err := bstorage.NewDKGState(metrics, db)
+		require.NoError(t, err)
+
+		rand.Seed(time.Now().UnixNano())
+		epochCounter := rand.Uint64()
+		endState := flow.DKGEndStateNoKey
+
+		t.Run("should be able to store an end state", func(t *testing.T) {
+			err = store.SetDKGEndState(epochCounter, endState)
+			require.NoError(t, err)
+		})
+
+		t.Run("should be able to read an end state", func(t *testing.T) {
+			readEndState, err := store.GetDKGEndState(epochCounter)
+			require.NoError(t, err)
+			assert.Equal(t, endState, readEndState)
+		})
+	})
+}
+
 func TestSafeBeaconPrivateKeys(t *testing.T) {
 	unittest.RunWithTypedBadgerDB(t, bstorage.InitSecret, func(db *badger.DB) {
 		metrics := metrics.NewNoopCollector()
