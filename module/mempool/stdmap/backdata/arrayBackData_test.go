@@ -10,11 +10,11 @@ import (
 )
 
 func TestArrayBackData_SingleBucket(t *testing.T) {
-	size := 10
+	limit := 10
 
-	bd := NewArrayBackData(uint32(size), 1, arraylinkedlist.LRUEjection)
+	bd := NewArrayBackData(uint32(limit), 1, arraylinkedlist.LRUEjection)
 
-	entities := unittest.EntityListFixture(uint(size))
+	entities := unittest.EntityListFixture(uint(limit))
 
 	// adds all entities to backdata
 	testAddEntities(t, bd, entities)
