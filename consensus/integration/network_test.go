@@ -101,7 +101,6 @@ func (n *Network) submit(event interface{}, channel network.Channel, targetIDs .
 	for _, targetID := range targetIDs {
 		if err := n.unicast(event, channel, targetID); err != nil {
 			sendErrors = multierror.Append(sendErrors, fmt.Errorf("could not unicast the event: %w", err))
-			return fmt.Errorf("could not unicast the event: %w", err)
 		}
 	}
 	return sendErrors.ErrorOrNil()
