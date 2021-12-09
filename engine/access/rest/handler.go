@@ -43,7 +43,6 @@ func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandle
 // ServerHTTP function acts as a wrapper to each request providing common handling functionality
 // such as logging, error handling, request decorators
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
 	// create request decorator with parsed values
@@ -59,7 +58,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// apply the select filter if any select fields have been specified
 	selectFields := decoratedRequest.selects()
 	if len(selectFields) > 0 {
-		var err error
 		response, err = SelectFilter(response, selectFields)
 		if err != nil {
 			h.errorHandler(w, err, errorLogger)
