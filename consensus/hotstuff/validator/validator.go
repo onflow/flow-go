@@ -149,7 +149,6 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 		switch {
 		case errors.Is(err, signature.ErrInvalidFormat):
 		case errors.Is(err, model.ErrInvalidSignature):
-		case errors.Is(err, model.ErrInvalidSigner):
 			return nil, newInvalidVoteError(vote, err)
 		default:
 			return nil, fmt.Errorf("cannot verify signature for vote (%x): %w", vote.ID(), err)
