@@ -491,39 +491,42 @@ func blockSealsResponse(flowSeals []*flow.Seal) ([]generated.BlockSeal, error) {
 	for i, seal := range flowSeals {
 		sealResp, err := blockSealResponse(seal)
 		if err != nil {
-			return []generated.BlockSeal{}, err
+			return nil, err
 		}
 		seals[i] = sealResp
 	}
 	return seals, nil
 }
 
-func blockSealResponse(flowSeal *flow.Seal) (generated.BlockSeal, error) {
+func aggregatedApprovalSignaturesResponse(signatures []flow.AggregatedSignature) []generated.AggregatedSignature {
+	response := make([]generated.AggregatedSignature, len(signatures))
+	for i, signature := range signatures {
 
-	var aggregatedApprovalSignatures []generated.AggregatedSignature
-	for _, signature := range flowSeal.AggregatedApprovalSigs {
-
-		var verifierSignatures []string
-		for _, verifierSignature := range signature.VerifierSignatures {
-			verifierSignatures = append(verifierSignatures, toBase64(verifierSignature.Bytes()))
-		}
-		var signerIDs []string
-		for _, signerID := range signature.SignerIDs {
-			signerIDs = append(signerIDs, signerID.String())
+		verifierSignatures := make([]string, len(signature.VerifierSignatures))
+		for y, verifierSignature := range signature.VerifierSignatures {
+			verifierSignatures[y] = toBase64(verifierSignature.Bytes())
 		}
 
-		aggregatedApprovalSignature := generated.AggregatedSignature{
+		signerIDs := make([]string, len(signature.SignerIDs))
+		for x, signerID := range signature.SignerIDs {
+			signerIDs[x] = signerID.String()
+		}
+
+		response[i] = generated.AggregatedSignature{
 			VerifierSignatures: verifierSignatures,
 			SignerIds:          signerIDs,
 		}
-		aggregatedApprovalSignatures = append(aggregatedApprovalSignatures, aggregatedApprovalSignature)
 	}
 
+	return response
+}
+
+func blockSealResponse(flowSeal *flow.Seal) (generated.BlockSeal, error) {
 	finalState := ""
-	if len(flowSeal.FinalState) > 0 {
+	if len(flowSeal.FinalState) > 0 { // todo(sideninja) this is always true?
 		finalStateBytes, err := flowSeal.FinalState.MarshalJSON()
 		if err != nil {
-			return generated.BlockSeal{}, nil
+			return generated.BlockSeal{}, err
 		}
 		finalState = string(finalStateBytes)
 	}
@@ -532,7 +535,7 @@ func blockSealResponse(flowSeal *flow.Seal) (generated.BlockSeal, error) {
 		BlockId:                      flowSeal.BlockID.String(),
 		ResultId:                     flowSeal.ResultID.String(),
 		FinalState:                   finalState,
-		AggregatedApprovalSignatures: aggregatedApprovalSignatures,
+		AggregatedApprovalSignatures: aggregatedApprovalSignaturesResponse(flowSeal.AggregatedApprovalSigs),
 	}, nil
 }
 
@@ -577,11 +580,7 @@ func serviceEventListResponse(eventList flow.ServiceEventList) []generated.Event
 	events := make([]generated.Event, len(eventList))
 	for i, e := range eventList {
 		events[i] = generated.Event{
-			Type_:            e.Type,
-			TransactionId:    "",
-			TransactionIndex: "0",
-			EventIndex:       "0",
-			Payload:          "", //e.Event,
+			Type_: e.Type,
 		}
 	}
 	return events
@@ -662,60 +661,52 @@ func accountResponse(flowAccount *flow.Account, link LinkGenerator, expand map[s
 }
 
 func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkGenerator, expand map[string]bool) (*generated.Block, error) {
-
 	var responseBlock = new(generated.Block)
 	responseBlock.Header = blockHeaderResponse(blk.Header)
 
-	expandable := &generated.BlockExpandable{
-		Payload:         ExpandableFieldPayload,
-		ExecutionResult: ExpandableExecutionResult,
-	}
+	// add the expandable
+	responseBlock.Expandable = &generated.BlockExpandable{}
 
 	id := blk.ID()
 
 	// add the payload to the response if it is specified as an expandable field
-	if expand[expandable.Payload] {
+	if expand[ExpandableFieldPayload] {
 		payloadResp, err := blockPayloadResponse(blk.Payload)
 		if err != nil {
 			return nil, err
 		}
 		responseBlock.Payload = payloadResp
-		expandable.Payload = ""
 	} else {
 		// else add the payload expandable link
 		payloadExpandable, err := link.PayloadLink(id)
 		if err != nil {
 			return nil, err
 		}
-		expandable.Payload = payloadExpandable
+		responseBlock.Expandable.Payload = payloadExpandable
 	}
 
 	// add the execution result to the response if it is specified as an expandable field
-	if expand[expandable.ExecutionResult] {
+	if expand[ExpandableExecutionResult] {
 		execResultResp, err := executionResultResponse(execResult, link)
 		if err != nil {
 			return nil, err
 		}
 		responseBlock.ExecutionResult = execResultResp
-		expandable.ExecutionResult = ""
 	} else {
 		// else add the execution result expandable link
 		executionResultExpandable, err := link.ExecutionResultLink(execResult.ID())
 		if err != nil {
 			return nil, err
 		}
-		expandable.ExecutionResult = executionResultExpandable
+		responseBlock.Expandable.ExecutionResult = executionResultExpandable
 	}
 
-	// add the expandable
-	responseBlock.Expandable = expandable
-
 	// add self link
-	selfLink, err := selfLink(id, link.BlockLink)
+	self, err := selfLink(id, link.BlockLink)
 	if err != nil {
 		return nil, err
 	}
-	responseBlock.Links = selfLink
+	responseBlock.Links = self
 
 	// ship it
 	return responseBlock, nil

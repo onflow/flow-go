@@ -11,11 +11,11 @@ package generated
 type Event struct {
 	Type_ string `json:"type"`
 
-	TransactionId string `json:"transaction_id"`
+	TransactionId string `json:"transaction_id,omitempty"`
 
-	TransactionIndex string `json:"transaction_index"`
+	TransactionIndex string `json:"transaction_index,omitempty"`
 
-	EventIndex string `json:"event_index"`
+	EventIndex string `json:"event_index,omitempty"`
 
-	Payload string `json:"payload"`
+	Payload string `json:"payload,omitempty"`
 }
