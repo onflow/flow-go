@@ -16,24 +16,17 @@ type Verifier struct {
 }
 
 // VerifyQC provides a mock function with given fields: voters, sigData, block
-func (_m *Verifier) VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
+func (_m *Verifier) VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) error {
 	ret := _m.Called(voters, sigData, block)
 
-	var r0 bool
-	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte, *model.Block) bool); ok {
+	var r0 error
+	if rf, ok := ret.Get(0).(func(flow.IdentityList, []byte, *model.Block) error); ok {
 		r0 = rf(voters, sigData, block)
 	} else {
-		r0 = ret.Get(0).(bool)
+		r0 = ret.Error(0)
 	}
 
-	var r1 error
-	if rf, ok := ret.Get(1).(func(flow.IdentityList, []byte, *model.Block) error); ok {
-		r1 = rf(voters, sigData, block)
-	} else {
-		r1 = ret.Error(1)
-	}
-
-	return r0, r1
+	return r0
 }
 
 // VerifyVote provides a mock function with given fields: voter, sigData, block
