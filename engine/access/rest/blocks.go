@@ -162,11 +162,11 @@ func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.
 }
 
 // blockProvider is a layer of abstraction on top of the backend access.API and provides a uniform way to
-// lookup a block or a block header either by ID or by height
+// look up a block or a block header either by ID or by height
 type blockProvider struct {
 	id      *flow.Identifier
 	height  uint64
-	final   bool
+	latest  bool
 	sealed  bool
 	backend access.API
 }
@@ -191,7 +191,7 @@ func forFinalized(queryParam string) blockProviderOption {
 			blkProvider.sealed = true
 			fallthrough
 		case finalHeightQueryParam:
-			blkProvider.final = true
+			blkProvider.latest = true
 		}
 	}
 }
@@ -216,7 +216,7 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, er
 		return blk, nil
 	}
 
-	if blkProvider.final {
+	if blkProvider.latest {
 		blk, err := blkProvider.backend.GetLatestBlock(ctx, blkProvider.sealed)
 		if err != nil {
 			return nil, err
