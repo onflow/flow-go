@@ -51,6 +51,12 @@ func (i *TransactionInvoker) Process(
 		defer span.Finish()
 	}
 
+	payerIsServiceAccount := proc.Transaction.Payer == ctx.Chain.ServiceAddress()
+	// if service account is the payer, disable interaction limit
+	if payerIsServiceAccount {
+		sth.DisableLimitEnforcement()
+	}
+
 	var blockHeight uint64
 	if ctx.BlockHeader != nil {
 		blockHeight = ctx.BlockHeader.Height
@@ -158,7 +164,9 @@ func (i *TransactionInvoker) Process(
 	if feesError != nil {
 		txError = feesError
 	}
-	sth.EnableLimitEnforcement()
+	if !payerIsServiceAccount {
+		sth.EnableLimitEnforcement()
+	}
 
 	// applying contract changes
 	// this writes back the contract contents to accounts
