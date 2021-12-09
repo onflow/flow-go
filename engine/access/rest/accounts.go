@@ -24,8 +24,9 @@ func getAccount(r *request, backend access.API, link LinkGenerator) (interface{}
 			return nil, err
 		}
 	case finalHeightQueryParam:
-		// GetAccountAtLatestBlock only lookup account at the latest sealed block, hence lookup finalized block using
-		// the GetLatestBlockHeader call first to find latest finalized height
+		// GetAccountAtLatestBlock only lookups account at the latest sealed block, to lookup account at the
+		// finalized block we need to first call GetLatestBlockHeader to get the latest finalized height,
+		// and then call GetAccountAtBlockHeight
 		finalizedBlkHeader, err := backend.GetLatestBlockHeader(r.Context(), false)
 		if err != nil {
 			return nil, err
@@ -34,7 +35,7 @@ func getAccount(r *request, backend access.API, link LinkGenerator) (interface{}
 		if err != nil {
 			return nil, err
 		}
-	default: // by default, we get an account at the latest block
+	default:
 		h, err := toHeight(height)
 		if err != nil {
 			return nil, NewBadRequestError(err)
