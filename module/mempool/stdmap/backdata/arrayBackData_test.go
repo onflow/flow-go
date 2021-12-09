@@ -51,6 +51,26 @@ func TestArrayBackData_WriteHeavy(t *testing.T) {
 	testRetrievable(t, bd, entities, 0)
 }
 
+// TestArrayBackData_WriteHeavy evaluates correctness of backdata under the writing and retrieving
+// a heavy load of entities up to its limit.
+func TestArrayBackData_LRU_Ejection(t *testing.T) {
+	// mempool has the limit of 100K, but we put 1M
+	// (10 time more than its capacity)
+	limit := 100_000
+	items := uint(1000_000)
+
+	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection)
+
+	entities := unittest.EntityListFixture(items)
+
+	// adds all entities to backdata
+	testAddEntities(t, bd, entities)
+
+	// only last 100K items must be retrievable, and
+	// the rest must be ejected.
+	testRetrievable(t, bd, entities, 900_000)
+}
+
 // testAddEntities is a test helper that checks entities are added successfully to the backdata.
 // and each entity is retrievable right after it is written to backdata.
 func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity) {
@@ -63,9 +83,9 @@ func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 		require.Equal(t, bd.Size(), uint(i+1))
 
 		// entity should be placed at index i in back data
-		id, entity, _ := bd.entities.Get(uint32(i))
-		require.Equal(t, e.ID(), id)
-		require.Equal(t, e, entity)
+		actual, ok := bd.ByID(e.ID())
+		require.True(t, ok)
+		require.Equal(t, e, actual)
 	}
 }
 
