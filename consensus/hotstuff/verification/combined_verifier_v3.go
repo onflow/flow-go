@@ -144,7 +144,9 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	for _, signerID := range blockSigData.RandomBeaconSigners {
 		keyShare, err := dkg.KeyShare(signerID)
 		if err != nil {
-			return fmt.Errorf("could not find key share for signer %v %v: %w", signerID, err, model.ErrInvalidSignature)
+			// the packer should have found the signer, otherwise the packer will return an ErrInvalidFormat
+			// and we won't reach it. So reaching here would be an exception
+			return fmt.Errorf("internal error could not find key share for signer %v: %w", signerID, err)
 		}
 		beaconPubKeys = append(beaconPubKeys, keyShare)
 	}
