@@ -14,6 +14,7 @@ import (
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
+	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/engine"
@@ -171,6 +172,10 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 	}
 }
 
+func (m *Middleware) RoutingSystem() routing.Routing {
+	return m.libP2PNode.routing
+}
+
 func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
 	identities, err := m.ov.Topology()
 	if err != nil {
@@ -325,8 +330,8 @@ func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) 
 	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
 	// connection creation is being attempted, and remove it from protected list once stream created.
 	tag := fmt.Sprintf("%v:%v", msg.ChannelID, msg.Type)
-	m.libP2PNode.connMgr.Protect(peerID, tag)
-	defer m.libP2PNode.connMgr.Unprotect(peerID, tag)
+	m.libP2PNode.host.ConnManager().Protect(peerID, tag)
+	defer m.libP2PNode.host.ConnManager().Unprotect(peerID, tag)
 
 	// create new stream
 	// (streams don't need to be reused and are fairly inexpensive to be created for each send.

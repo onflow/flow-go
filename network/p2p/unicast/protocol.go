@@ -17,6 +17,8 @@ const (
 	// ALL Flow libp2p protocols must start with this prefix.
 	FlowLibP2PProtocolCommonPrefix = "/flow"
 
+	FlowDHTProtocolIDPrefix = FlowLibP2PProtocolCommonPrefix + "/dht/"
+
 	// FlowLibP2POneToOneProtocolIDPrefix is a unique Libp2p protocol ID prefix for Flow (https://docs.libp2p.io/concepts/protocols/)
 	// All nodes communicate with each other using this protocol id suffixed with the id of the root block
 	FlowLibP2POneToOneProtocolIDPrefix = FlowLibP2PProtocolCommonPrefix + "/push/"
@@ -32,6 +34,14 @@ const (
 func IsFlowProtocolStream(s libp2pnet.Stream) bool {
 	p := string(s.Protocol())
 	return strings.HasPrefix(p, FlowLibP2PProtocolCommonPrefix)
+}
+
+func FlowDHTProtocolID(sporkId flow.Identifier) protocol.ID {
+	return protocol.ID(FlowDHTProtocolIDPrefix + sporkId.String())
+}
+
+func FlowPublicDHTProtocolID(sporkId flow.Identifier) protocol.ID {
+	return protocol.ID(FlowDHTProtocolIDPrefix + "public/" + sporkId.String())
 }
 
 func FlowProtocolID(sporkId flow.Identifier) protocol.ID {

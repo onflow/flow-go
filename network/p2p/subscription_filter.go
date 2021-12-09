@@ -13,42 +13,40 @@ import (
 // RoleBasedFilter implements a subscription filter that filters subscriptions based on a node's role.
 type RoleBasedFilter struct {
 	idProvider id.IdentityProvider
-	myPeerID   peer.ID
-	myRole     *flow.Role
+	myRole     flow.Role
 }
 
-func NewRoleBasedFilter(pid peer.ID, idProvider id.IdentityProvider) *RoleBasedFilter {
+func NewRoleBasedFilter(role flow.Role, idProvider id.IdentityProvider) *RoleBasedFilter {
 	filter := &RoleBasedFilter{
 		idProvider: idProvider,
-		myPeerID:   pid,
+		myRole:     role,
 	}
-	filter.myRole = filter.getRole(pid)
 
 	return filter
 }
 
-func (f *RoleBasedFilter) getRole(pid peer.ID) *flow.Role {
+func (f *RoleBasedFilter) getRole(pid peer.ID) flow.Role {
 	if id, ok := f.idProvider.ByPeerID(pid); ok {
-		return &id.Role
+		return id.Role
 	}
 
-	return nil
+	return 0
 }
 
-func (f *RoleBasedFilter) allowed(role *flow.Role, topic string) bool {
+func (f *RoleBasedFilter) allowed(role flow.Role, topic string) bool {
 	channel, ok := engine.ChannelFromTopic(network.Topic(topic))
 	if !ok {
 		return false
 	}
 
-	if role == nil {
+	if !role.Valid() {
 		// TODO: eventually we should have block proposals relayed on a separate
 		// channel on the public network. For now, we need to make sure that
 		// full observer nodes can subscribe to the block proposal channel.
 		return append(engine.PublicChannels(), engine.ReceiveBlocks).Contains(channel)
 	} else {
 		if roles, ok := engine.RolesByChannel(channel); ok {
-			return roles.Contains(*role)
+			return roles.Contains(role)
 		}
 
 		return false

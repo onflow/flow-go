@@ -17,7 +17,6 @@ import (
 	"github.com/rs/zerolog"
 
 	flownet "github.com/onflow/flow-go/network"
-	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
@@ -38,16 +37,14 @@ const (
 // Node is a wrapper around the LibP2P host.
 type Node struct {
 	sync.Mutex
-	unicastManager  *unicast.Manager
-	host            host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
-	pubSub          *pubsub.PubSub                         // reference to the libp2p PubSub component
-	logger          zerolog.Logger                         // used to provide logging
-	topics          map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
-	subs            map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
-	pingService     *PingService
-	routing         routing.Routing
-	topicValidation bool
-	pCache          *protocolPeerCache
+	unicastManager *unicast.Manager
+	host           host.Host                              // reference to the libp2p host (https://godoc.org/github.com/libp2p/go-libp2p-core/host)
+	pubSub         *pubsub.PubSub                         // reference to the libp2p PubSub component
+	logger         zerolog.Logger                         // used to provide logging
+	topics         map[flownet.Topic]*pubsub.Topic        // map of a topic string to an actual topic instance
+	subs           map[flownet.Topic]*pubsub.Subscription // map of a topic string to an actual subscription
+	routing        routing.Routing
+	pCache         *protocolPeerCache
 }
 
 // Stop terminates the libp2p node.
@@ -175,22 +172,18 @@ func (n *Node) Subscribe(topic flownet.Topic, validators ...validator.MessageVal
 	tp, found := n.topics[topic]
 	var err error
 	if !found {
-		if n.topicValidation {
-			topicValidator := validator.TopicValidator(validators...)
-			if err := n.pubSub.RegisterTopicValidator(
-				topic.String(), topicValidator, pubsub.WithValidatorInline(true),
-			); err != nil {
-				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
-				return nil, fmt.Errorf("failed to register topic validator: %w", err)
-			}
+		topicValidator := validator.TopicValidator(validators...)
+		if err := n.pubSub.RegisterTopicValidator(
+			topic.String(), topicValidator, pubsub.WithValidatorInline(true),
+		); err != nil {
+			n.logger.Err(err).Str("topic", topic.String()).Msg("failed to register topic validator, aborting subscription")
+			return nil, fmt.Errorf("failed to register topic validator: %w", err)
 		}
 
 		tp, err = n.pubSub.Join(topic.String())
 		if err != nil {
-			if n.topicValidation {
-				if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
-					n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
-				}
+			if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
+				n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
 			}
 
 			return nil, fmt.Errorf("could not join topic (%s): %w", topic, err)
@@ -231,10 +224,8 @@ func (n *Node) UnSubscribe(topic flownet.Topic) error {
 		return err
 	}
 
-	if n.topicValidation {
-		if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
-			n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
-		}
+	if err := n.pubSub.UnregisterTopicValidator(topic.String()); err != nil {
+		n.logger.Err(err).Str("topic", topic.String()).Msg("failed to unregister topic validator")
 	}
 
 	// attempt to close the topic
@@ -263,32 +254,6 @@ func (n *Node) Publish(ctx context.Context, topic flownet.Topic, data []byte) er
 		return fmt.Errorf("could not publish top topic (%s): %w", topic, err)
 	}
 	return nil
-}
-
-// Ping pings a remote node and returns the time it took to ping the remote node if successful or the error
-func (n *Node) Ping(ctx context.Context, peerID peer.ID) (message.PingResponse, time.Duration, error) {
-	pingError := func(err error) error {
-		return fmt.Errorf("failed to ping peer %s: %w", peerID, err)
-	}
-
-	targetInfo := peer.AddrInfo{ID: peerID}
-
-	n.host.ConnManager().Protect(targetInfo.ID, "ping")
-	defer n.host.ConnManager().Unprotect(targetInfo.ID, "ping")
-
-	// connect to the target node
-	err := n.host.Connect(ctx, targetInfo)
-	if err != nil {
-		return message.PingResponse{}, -1, pingError(err)
-	}
-
-	// ping the target
-	resp, rtt, err := n.pingService.Ping(ctx, targetInfo.ID)
-	if err != nil {
-		return message.PingResponse{}, -1, pingError(err)
-	}
-
-	return resp, rtt, nil
 }
 
 // Host returns pointer to host object of node.

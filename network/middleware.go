@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/libp2p/go-libp2p-core/peer"
+	"github.com/libp2p/go-libp2p-core/routing"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/component"
@@ -54,6 +55,8 @@ type Middleware interface {
 	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()
+
+	RoutingSystem() routing.Routing
 
 	IsConnected(nodeID flow.Identifier) (bool, error)
 }
