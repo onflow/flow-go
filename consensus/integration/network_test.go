@@ -3,6 +3,7 @@ package integration_test
 import (
 	"context"
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	"time"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -96,12 +97,14 @@ func (n *Network) unregister(channel network.Channel) error {
 // Engine attached to the same channel on another node or nodes.
 // This implementation uses unicast under the hood.
 func (n *Network) submit(event interface{}, channel network.Channel, targetIDs ...flow.Identifier) error {
+	var sendErrors *multierror.Error
 	for _, targetID := range targetIDs {
 		if err := n.unicast(event, channel, targetID); err != nil {
+			sendErrors = multierror.Append(sendErrors, fmt.Errorf("could not unicast the event: %w", err))
 			return fmt.Errorf("could not unicast the event: %w", err)
 		}
 	}
-	return nil
+	return sendErrors.ErrorOrNil()
 }
 
 // unicast is called when the attached Engine to the channel is sending an event to a single target
