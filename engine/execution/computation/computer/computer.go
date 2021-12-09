@@ -27,6 +27,7 @@ import (
 )
 
 const SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
+const SystemChunkLedgerIntractionLimit = 500_000_000  // ~500MB
 const MaxTransactionErrorStringSize = 1000            // 1000 chars
 
 // VirtualMachine runs procedures
@@ -62,6 +63,7 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithTransactionFeesEnabled(false),
 		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
+		fvm.WithMaxStateInteractionSize(SystemChunkLedgerIntractionLimit),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 	)
 }
