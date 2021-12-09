@@ -28,7 +28,7 @@ func getTransactionByID(r *request, backend access.API, link LinkGenerator) (int
 		}
 	}
 
-	return transactionResponse(tx, txr, link, r.expandFields), nil
+	return transactionResponse(tx, txr, link), nil
 }
 
 // getTransactionResultByID retrieves transaction result by the transaction ID.
@@ -64,5 +64,5 @@ func createTransaction(r *request, backend access.API, link LinkGenerator) (inte
 		return nil, err
 	}
 
-	return transactionResponse(&tx, nil, link, r.expandFields), nil
+	return transactionResponse(&tx, nil, link), nil
 }

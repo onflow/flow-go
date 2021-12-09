@@ -352,7 +352,7 @@ func transactionSignatureResponse(signatures []flow.TransactionSignature) []gene
 	return sigs
 }
 
-func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult, link LinkGenerator, expands map[string]bool) *generated.Transaction {
+func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult, link LinkGenerator) *generated.Transaction {
 	var args []string
 	for _, arg := range tx.Arguments {
 		args = append(args, toBase64(arg))
@@ -363,8 +363,8 @@ func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult
 		auths = append(auths, auth.String())
 	}
 
-	var expandable = new(generated.TransactionExpandable)
 	var result *generated.TransactionResult
+	expandable := new(generated.TransactionExpandable)
 	// if transaction result is provided then add that to the response, else add the result link to the expandable
 	if txr != nil {
 		result = transactionResultResponse(txr, tx.ID(), link)
@@ -556,7 +556,7 @@ func collectionResponse(
 	var transactions []generated.Transaction
 	if expand[transactionsExpandable] {
 		for _, t := range txs {
-			transactions = append(transactions, *transactionResponse(t, nil, link, nil))
+			transactions = append(transactions, *transactionResponse(t, nil, link))
 		}
 	} else {
 		expandable.Transactions = make([]string, len(collection.Transactions))

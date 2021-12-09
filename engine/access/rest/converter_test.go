@@ -32,7 +32,7 @@ func TestTransactions(t *testing.T) {
 
 	t.Run("response", func(t *testing.T) {
 		tx := unittest.TransactionFixture()
-		response := transactionResponse(&tx.TransactionBody, nil, linkFixture(), nil)
+		response := transactionResponse(&tx.TransactionBody, nil, linkFixture())
 
 		res, err := json.Marshal(response)
 		assert.NoError(t, err)
@@ -77,7 +77,7 @@ func TestTransactions(t *testing.T) {
 		tx.PayloadSignatures = []flow.TransactionSignature{unittest.TransactionSignatureFixture()} // add payload to fixture
 
 		response := responseToMap(
-			transactionResponse(&tx.TransactionBody, txr, linkFixture(), map[string]bool{"result": true}),
+			transactionResponse(&tx.TransactionBody, txr, linkFixture()),
 		)
 
 		assert.NotNilf(t, response["result"], "result shouldn't be nil")
