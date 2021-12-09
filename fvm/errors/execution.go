@@ -103,7 +103,7 @@ func NewStorageCapacityExceededError(address flow.Address, storageUsed, storageC
 }
 
 func (e StorageCapacityExceededError) Error() string {
-	return fmt.Sprintf("%s account with address (%s) uses %d bytes of storage which is over its capacity (%d bytes). Capacity can be increased by adding FLOW tokens to the account.", e.Code().String(), e.address, e.storageUsed, e.storageCapacity)
+	return fmt.Sprintf("%s The account with address (%s) uses %d bytes of storage which is over its capacity (%d bytes). Capacity can be increased by adding FLOW tokens to the account.", e.Code().String(), e.address, e.storageUsed, e.storageCapacity)
 }
 
 // Code returns the error code for this error
