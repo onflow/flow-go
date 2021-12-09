@@ -1,6 +1,7 @@
 package backdata
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -32,7 +33,7 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 	}
 
 	// getting inserted elements
-	testRetrievable(t, bd, entities, 0)
+	testRetrievableFrom(t, bd, entities, 0)
 }
 
 // TestArrayBackData_WriteHeavy evaluates correctness of backdata under the writing and retrieving
@@ -48,11 +49,9 @@ func TestArrayBackData_WriteHeavy(t *testing.T) {
 	testAddEntities(t, bd, entities)
 
 	// retrieves all entities from backdata
-	testRetrievable(t, bd, entities, 0)
+	testRetrievableFrom(t, bd, entities, 0)
 }
 
-// TestArrayBackData_WriteHeavy evaluates correctness of backdata under the writing and retrieving
-// a heavy load of entities up to its limit.
 func TestArrayBackData_LRU_Ejection(t *testing.T) {
 	// mempool has the limit of 100K, but we put 1M
 	// (10 time more than its capacity)
@@ -68,7 +67,25 @@ func TestArrayBackData_LRU_Ejection(t *testing.T) {
 
 	// only last 100K items must be retrievable, and
 	// the rest must be ejected.
-	testRetrievable(t, bd, entities, 900_000)
+	testRetrievableFrom(t, bd, entities, 900_000)
+}
+
+func TestArrayBackData_Random_Ejection(t *testing.T) {
+	// mempool has the limit of 100K, but we put 1M
+	// (10 time more than its capacity)
+	limit := 100_000
+	items := uint(1000_000)
+
+	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.RandomEjection)
+
+	entities := unittest.EntityListFixture(items)
+
+	// adds all entities to backdata
+	testAddEntities(t, bd, entities)
+
+	// only 100K (random) items must be retrievable, as the rest
+	// are randomly ejected to make room.
+	testRetrievableCount(t, bd, entities, 100_000)
 }
 
 // testAddEntities is a test helper that checks entities are added successfully to the backdata.
@@ -79,8 +96,16 @@ func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 		// adding each element must be successful.
 		require.True(t, bd.Add(e.ID(), e))
 
-		// total of back data should be incremented by each addition.
-		require.Equal(t, bd.Size(), uint(i+1))
+		if uint64(i) < bd.limit {
+			// when we are below limit the total of
+			// backdata should be incremented by each addition.
+			require.Equal(t, bd.Size(), uint(i+1))
+		} else {
+			// when we cross the limit, the ejection kicks in, and
+			// size must be steady at the limit.
+			fmt.Println(int(bd.Size()), int(bd.limit))
+			require.Equal(t, uint64(bd.Size()), bd.limit)
+		}
 
 		// entity should be placed at index i in back data
 		actual, ok := bd.ByID(e.ID())
@@ -90,17 +115,34 @@ func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 }
 
 // testGettingEntities is a test helper that checks entities are retrievable from backdata.
-func testRetrievable(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, from int) {
+func testRetrievableFrom(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, from int) {
 	for i := range entities {
 		expected := entities[i]
 		actual, ok := bd.ByID(expected.ID())
-
 		if i < from {
-			require.False(t, ok)
+			require.False(t, ok, i)
 			require.Nil(t, actual)
 		} else {
 			require.True(t, ok)
 			require.Equal(t, expected, actual)
 		}
 	}
+}
+
+// testRetrievableCount is a test helper that checks the number of retrievable entities from backdata exactly matches
+// the expectedCount.
+func testRetrievableCount(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, expectedCount uint64) {
+	actualCount := uint64(0)
+
+	for i := range entities {
+		expected := entities[i]
+		actual, ok := bd.ByID(expected.ID())
+		if !ok {
+			continue
+		}
+		require.Equal(t, expected, actual)
+		actualCount++
+	}
+
+	require.Equal(t, expectedCount, actualCount)
 }

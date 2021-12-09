@@ -93,16 +93,12 @@ func (e *EntityDoubleLinkedList) initFreeEntities(limit uint32) {
 }
 
 func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) uint32 {
-	entityIndex, ejection := e.sliceIndexForEntity()
+	entityIndex := e.sliceIndexForEntity()
 	e.values[entityIndex].entity = entity
 	e.values[entityIndex].id = &entityId
 	e.values[entityIndex].owner = owner
 	e.values[entityIndex].next.setUndefined()
 	e.values[entityIndex].prev.setUndefined()
-
-	if !ejection {
-		e.total++
-	}
 
 	if e.used.head.isUndefined() {
 		// sets head
@@ -116,6 +112,8 @@ func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entit
 	}
 
 	e.used.tail.setPointer(entityIndex)
+
+	e.total++
 	return entityIndex
 }
 
@@ -123,20 +121,20 @@ func (e EntityDoubleLinkedList) Get(entityIndex uint32) (flow.Identifier, flow.E
 	return *e.values[entityIndex].id, e.values[entityIndex].entity, e.values[entityIndex].owner
 }
 
-func (e EntityDoubleLinkedList) sliceIndexForEntity() (uint32, bool) {
+func (e *EntityDoubleLinkedList) sliceIndexForEntity() uint32 {
 	if e.free.head.isUndefined() {
 		// we are at limit
 		// array back data is full
 		if e.ejectionMode == RandomEjection {
 			// ejecting a random entity
-			return e.invalidateRandomEntity(), true
+			return e.invalidateRandomEntity()
 		} else {
 			// turning used head to a free head.
 			e.invalidateHead()
 		}
 	}
 
-	return e.claimFreeHead(), false
+	return e.claimFreeHead()
 }
 
 func (e EntityDoubleLinkedList) Size() uint32 {
@@ -220,6 +218,10 @@ func (e *EntityDoubleLinkedList) claimFreeHead() uint32 {
 	e.values[oldFreeHeadIndex].prev.setUndefined()
 
 	return oldFreeHeadIndex
+}
+
+func (e *EntityDoubleLinkedList) Rem(sliceIndex uint32) {
+	e.invalidateEntityAtIndex(sliceIndex)
 }
 
 func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex uint32) {

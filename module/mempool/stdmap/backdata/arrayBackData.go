@@ -22,6 +22,8 @@ type keyBucket [bucketSize]key
 
 // ArrayBackData implements an array-based generic memory pool backed by a fixed total array.
 type ArrayBackData struct {
+	// NOTE: as a BackData implementation, ArrayBackData must be non-blocking.
+	// Concurrency management is done by overlay Backend.
 	limit     uint64
 	overLimit uint64
 	keyCount  uint64 // total number of non-expired key-values
@@ -50,7 +52,8 @@ func NewArrayBackData(limit uint32, oversizeFactor uint32, mode arraylinkedlist.
 
 // Has checks if we already contain the item with the given hash.
 func (a *ArrayBackData) Has(entityID flow.Identifier) bool {
-	return false
+	_, ok := a.get(entityID)
+	return ok
 }
 
 // Add adds the given item to the pool.
@@ -66,12 +69,24 @@ func (a *ArrayBackData) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated as well as the updated value
 func (a *ArrayBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
+	//entity, ok := a.get(entityID)
+	//if !ok {
+	//	return nil, false
+	//}
+	//
+	//newEntity := f(entity)
+	//newEntityID := newEntity.ID()
+	//
+	//a.put(newEntityID, newEntity)
+	//
+	//return newEntity, true
+
 	return nil, false
 }
 
 // ByID returns the given item from the pool.
 func (a *ArrayBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
-	return a.Get(entityID)
+	return a.get(entityID)
 }
 
 // Size will return the total of the backend.
@@ -110,7 +125,7 @@ func (a *ArrayBackData) put(entityID flow.Identifier, entity flow.Entity) bool {
 	return true
 }
 
-func (a ArrayBackData) Get(entityID flow.Identifier) (flow.Entity, bool) {
+func (a ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bool) {
 	idPrefix, bucketIndex := a.idPrefixAndBucketIndex(entityID)
 	for k := uint64(0); k < bucketSize; k++ {
 		if a.buckets[bucketIndex][k].idPrefix != idPrefix {
@@ -202,6 +217,7 @@ func (a *ArrayBackData) linkedEntityOf(bucketIndex uint64, slot uint64) (flow.Id
 	valueIndex := a.buckets[bucketIndex][slot].valueIndex
 	id, entity, owner := a.entities.Get(valueIndex)
 	if ((bucketIndex * bucketSize) + slot) != owner {
+		// TODO invalidate bucket index
 		a.buckets[bucketIndex][slot].keyIndex = 0 // kvIndex / kvOwner no longer linked
 		return flow.Identifier{}, nil, false
 	}
