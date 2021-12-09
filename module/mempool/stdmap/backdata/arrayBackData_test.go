@@ -32,7 +32,7 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 	}
 
 	// getting inserted elements
-	testGetEntities(t, bd, entities)
+	testRetrievable(t, bd, entities, 0)
 }
 
 // TestArrayBackData_WriteHeavy evaluates correctness of backdata under the writing and retrieving
@@ -48,7 +48,7 @@ func TestArrayBackData_WriteHeavy(t *testing.T) {
 	testAddEntities(t, bd, entities)
 
 	// retrieves all entities from backdata
-	testGetEntities(t, bd, entities)
+	testRetrievable(t, bd, entities, 0)
 }
 
 // testAddEntities is a test helper that checks entities are added successfully to the backdata.
@@ -69,12 +69,18 @@ func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 	}
 }
 
-// testGettingEntities is a test helper that checks entities are retrieveable from backdata.
-func testGetEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity) {
-	// getting inserted elements
-	for _, expected := range entities {
+// testGettingEntities is a test helper that checks entities are retrievable from backdata.
+func testRetrievable(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, from int) {
+	for i := range entities {
+		expected := entities[i]
 		actual, ok := bd.ByID(expected.ID())
-		require.True(t, ok)
-		require.Equal(t, expected, actual)
+
+		if i < from {
+			require.False(t, ok)
+			require.Nil(t, actual)
+		} else {
+			require.True(t, ok)
+			require.Equal(t, expected, actual)
+		}
 	}
 }
