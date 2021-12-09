@@ -33,14 +33,30 @@ const (
 // the sealing segment is for a root snapshot, which contains only the root block.
 // The segment is in ascending height order.
 //
+// In addition to storing the blocks within the sealing segment, as defined above,
+// the SealingSegment structure also stores any resources which are referenced
+// by blocks in the segment, but not included in the payloads of blocks within
+// the segment. In particular:
+// - results referenced by receipts within segment payloads
+// - results referenced by seals within segment payloads
+// - seals which represent the latest state commitment as of a segment block
+//
 type SealingSegment struct {
-	// Blocks the chain segment blocks
+	// Blocks contains the chain segment blocks.
 	Blocks []*Block
 
-	// Due to decoupling of execution receipts it's possible that blocks from sealing segment will be referring
+	// ExecutionResults contains any results which are referenced by receipts
+	// or seals in the sealing segment, but not included in any segment block
+	// payloads.
+	//
+	// Due to decoupling of execution receipts from execution results,
+	// it's possible that blocks from the sealing segment will be referring to
 	// execution results incorporated in blocks that aren't part of the segment.
-	// ExecutionResults will contain those results.
 	ExecutionResults ExecutionResultList
+
+	// FirstSeal contains the latest seal as the first block in the segment,
+	// if the first block contains no seals. Otherwise it is empty.
+	FirstSeal *Seal
 }
 
 func (segment *SealingSegment) Highest() *Block {
@@ -52,44 +68,78 @@ func (segment *SealingSegment) Lowest() *Block {
 }
 
 var (
-	ErrSegmentMissingSeal        = fmt.Errorf("sealing segment failed sanity check: highest block in segment does not contain seal for lowest")
-	ErrSegmentBlocksWrongLen     = fmt.Errorf("sealing segment failed sanity check: must have atleast 2 blocks")
+	ErrSegmentMissingSeal        = fmt.Errorf("sealing segment failed sanity check: missing seal referenced by segment")
+	ErrSegmentBlocksWrongLen     = fmt.Errorf("sealing segment failed sanity check: non-root sealing segment must have at least 2 blocks")
 	ErrSegmentInvalidBlockHeight = fmt.Errorf("sealing segment failed sanity check: blocks must be in ascending order")
 	ErrSegmentResultLookup       = fmt.Errorf("failed to lookup execution result")
-	ErrInvalidRootSegmentView    = fmt.Errorf("invalid root sealing segment block view")
+	ErrSegmentInvalidRootView    = fmt.Errorf("invalid root sealing segment block view")
 )
 
+// SealingSegmentBuilder is a utility for incrementally building a sealing segment.
 type SealingSegmentBuilder struct {
-	resultLookup    func(resultID Identifier) (*ExecutionResult, error)
+	// access to storage to read referenced by not included resources
+	resultLookup        func(resultID Identifier) (*ExecutionResult, error)
+	sealByBLockIDLookup func(blockID Identifier) (*Seal, error)
+	// keep track of resources included in payloads
 	includedResults map[Identifier]struct{}
-	blocks          []*Block
-	results         []*ExecutionResult
+	// resources to include in the sealing segment
+	blocks    []*Block
+	results   []*ExecutionResult
+	firstSeal *Seal
 }
 
-// AddBlock appends block to blocks
+// AddBlock appends a block to the sealing segment under construction.
 func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
-	//sanity check: block should be 1 height higher than current highest
+	// sanity check: block should be 1 height higher than current highest
 	if !builder.isValidHeight(block) {
 		return fmt.Errorf("invalid block height (%d): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
 	}
 
-	// cache results in included results
+	// for the first (lowest) block, if it contains no seal, retrieve the latest seal
+	// incorporated prior to the first block
+	if len(builder.blocks) == 0 {
+		if len(block.Payload.Seals) > 0 {
+			// NOTE: seals are ordered by increasing height order of the sealed block
+			// so the latest seal is the last in the Seals list
+			builder.firstSeal = block.Payload.Seals[len(block.Payload.Seals)-1]
+		} else {
+			seal, err := builder.sealByBLockIDLookup(block.ID())
+			if err != nil {
+				return fmt.Errorf("could not get first seal") // TODO sentinel?
+			}
+			builder.firstSeal = seal
+		}
+	}
+
+	// cache included results
 	// they could be referenced in a future block in the segment
-	for _, result := range block.Payload.Results.Lookup() {
+	for _, result := range block.Payload.Results {
 		builder.includedResults[result.ID()] = struct{}{}
 	}
 
+	// construct a list of missing result IDs referenced by this block
+	var missingResultIDs IdentifierList
 	for _, receipt := range block.Payload.Receipts {
 		if _, ok := builder.includedResults[receipt.ResultID]; !ok {
-			result, err := builder.resultLookup(receipt.ResultID)
-			if err != nil {
-				return fmt.Errorf("%w: (%x) %v", ErrSegmentResultLookup, receipt.ResultID, err)
-			}
-
-			builder.addExecutionResult(result)
-			builder.includedResults[receipt.ResultID] = struct{}{}
+			missingResultIDs = append(missingResultIDs, receipt.ResultID)
 		}
 	}
+	for _, seal := range block.Payload.Seals {
+		if _, ok := builder.includedResults[seal.ResultID]; !ok {
+			missingResultIDs = append(missingResultIDs, seal.ResultID)
+		}
+	}
+
+	// add the missing results
+	for _, resultID := range missingResultIDs {
+		result, err := builder.resultLookup(resultID)
+		if err != nil {
+			return fmt.Errorf("%w: (%x) %v", ErrSegmentResultLookup, resultID, err)
+		}
+		builder.addExecutionResult(result)
+		builder.includedResults[resultID] = struct{}{}
+	}
+
 	builder.blocks = append(builder.blocks, block)
 	return nil
 }
@@ -105,7 +155,11 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 		return nil, fmt.Errorf("failed to validate sealing segment: %w", err)
 	}
 
-	return &SealingSegment{builder.blocks, builder.results}, nil
+	return &SealingSegment{
+		Blocks:           builder.blocks,
+		ExecutionResults: builder.results,
+		FirstSeal:        builder.firstSeal,
+	}, nil
 }
 
 // isValidHeight returns true block is exactly 1 height higher than the current highest block in the segment
@@ -159,7 +213,7 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 	// if root sealing segment skip seal sanity check
 	if len(builder.blocks) == 1 {
 		if !builder.isValidRootSegment() {
-			return fmt.Errorf("root sealing segment block has the wrong view got (%d) expected (%d): %w", builder.highest().Header.View, rootSegmentBlockView, ErrInvalidRootSegmentView)
+			return fmt.Errorf("root sealing segment block has the wrong view got (%d) expected (%d): %w", builder.highest().Header.View, rootSegmentBlockView, ErrSegmentInvalidRootView)
 		}
 
 		return nil

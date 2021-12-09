@@ -172,7 +172,7 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		require.Equal(t, segment.Lowest().ID(), block1.ID())
 	})
 
-	t.Run("should return ErrInvalidRootSegmentView for root sealing segment with a block view not equal to 0", func(t *testing.T) {
+	t.Run("should return ErrSegmentInvalidRootView for root sealing segment with a block view not equal to 0", func(t *testing.T) {
 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
 		builder := flow.NewSealingSegmentBuilder(resultLookup)
 
@@ -183,7 +183,7 @@ func TestSealingSegmentBuilder_SealingSegment(t *testing.T) {
 		require.NoError(t, err)
 
 		_, err = builder.SealingSegment()
-		require.ErrorIs(t, err, flow.ErrInvalidRootSegmentView)
+		require.ErrorIs(t, err, flow.ErrSegmentInvalidRootView)
 	})
 
 	t.Run("should return ErrSegmentMissingSeal if highest block contains seals but does not contain seal for lowest", func(t *testing.T) {

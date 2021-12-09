@@ -6,10 +6,12 @@ import (
 
 // Payload is the actual content of each block.
 type Payload struct {
+	// Guarantees are ordered in execution order.
 	Guarantees []*CollectionGuarantee
-	Seals      []*Seal
-	Receipts   ExecutionReceiptMetaList
-	Results    ExecutionResultList
+	// Seals are ordered in ascending height order of the sealed block.
+	Seals    []*Seal
+	Receipts ExecutionReceiptMetaList
+	Results  ExecutionResultList
 }
 
 // EmptyPayload returns an empty block payload.
