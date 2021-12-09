@@ -19,8 +19,7 @@ func runNodes(signalerCtx irrecoverable.SignalerContext, nodes []*Node) {
 	for _, n := range nodes {
 		go func(n *Node) {
 			n.aggregator.Start(signalerCtx)
-			n.compliance.Ready()
-			n.sync.Ready()
+			<-util.AllReady(n.aggregator, n.compliance, n.sync)
 		}(n)
 	}
 }
