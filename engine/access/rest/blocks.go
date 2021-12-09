@@ -3,12 +3,7 @@ package rest
 import (
 	"context"
 	"fmt"
-	"net/http"
-
 	"github.com/onflow/flow-go/model/flow"
-
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
@@ -169,25 +164,6 @@ func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.
 	return blockResponse(blk, executionResult, link, req.expandFields)
 }
 
-func idLookupError(id *flow.Identifier, entityType string, err error) StatusError {
-	msg := fmt.Sprintf("error looking up %s with ID %s", entityType, id.String())
-	// if error has GRPC code NotFound, then return HTTP NotFound error
-	if status.Code(err) == codes.NotFound {
-		return NewNotFoundError(msg, err)
-	}
-	return NewRestError(http.StatusInternalServerError, msg, err)
-}
-
-// todo(sideninja) refactor and merge
-func heightLookupError(height uint64, entityType string, err error) StatusError {
-	msg := fmt.Sprintf("error looking up %s at height %d", entityType, height)
-	// if error has GRPC code NotFound, then return HTTP NotFound error
-	if status.Code(err) == codes.NotFound {
-		return NewNotFoundError(msg, err)
-	}
-	return NewRestError(http.StatusInternalServerError, msg, err)
-}
-
 // blockProvider is a layer of abstraction on top of the backend access.API and provides a uniform way to
 // lookup a block or a block header either by ID or by height
 type blockProvider struct {
@@ -234,11 +210,11 @@ func NewBlockProvider(backend access.API, options ...blockProviderOption) *block
 	return blkProvider
 }
 
-func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, StatusError) {
+func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, error) {
 	if blkProvider.id != nil {
 		blk, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
 		if err != nil {
-			return nil, idLookupError(blkProvider.id, "block", err)
+			return nil, err
 		}
 		return blk, nil
 	}
@@ -246,15 +222,14 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, St
 	if blkProvider.final {
 		blk, err := blkProvider.backend.GetLatestBlock(ctx, blkProvider.sealed)
 		if err != nil {
-			// cannot be a 'not found' error since final and sealed block should always be found
-			return nil, NewRestError(http.StatusInternalServerError, "block lookup failed", err)
+			return nil, err
 		}
 		return blk, nil
 	}
 
 	blk, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
 	if err != nil {
-		return nil, heightLookupError(blkProvider.height, "block", err)
+		return nil, err
 	}
 	return blk, nil
 }
