@@ -46,7 +46,6 @@ func NewCombinedVerifier(committee hotstuff.Committee, packer hotstuff.Packer) *
 // the vote included in a block proposal.
 // * signature.ErrInvalidFormat if the signature has an incompatible format.
 // * model.ErrInvalidSignature is the signature is invalid
-// * model.ErrInvalidSigner if the signer is invalid
 // * unexpected errors should be treated as symptoms of bugs or uncovered
 //   edge cases in the logic (i.e. as fatal)
 func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) error {

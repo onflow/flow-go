@@ -29,6 +29,11 @@ func NewStakingVerifier() *StakingVerifier {
 // VerifyVote verifies the validity of a single signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
+// The implementation returns the following sentinel errors:
+// * signature.ErrInvalidFormat if the signature has an incompatible format.
+// * model.ErrInvalidSignature is the signature is invalid
+// * unexpected errors should be treated as symptoms of bugs or uncovered
+//   edge cases in the logic (i.e. as fatal)
 func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) error {
 
 	// create the to-be-signed message

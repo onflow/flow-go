@@ -27,7 +27,6 @@ type Verifier interface {
 	// The implementation returns the following sentinel errors:
 	// * signature.ErrInvalidFormat if the signature has an incompatible format.
 	// * model.ErrInvalidSignature is the signature is invalid
-	// * model.ErrInvalidSigner if the signer is invalid
 	// * unexpected errors should be treated as symptoms of bugs or uncovered
 	//   edge cases in the logic (i.e. as fatal)
 	VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) error
