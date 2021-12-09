@@ -98,22 +98,20 @@ func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zer
 }
 
 // jsonResponse builds a JSON response and send it to the client
-func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, logger zerolog.Logger) {
+func (h *Handler) jsonResponse(w http.ResponseWriter, response interface{}, errLogger zerolog.Logger) {
 	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
 
 	// serialise response to JSON and handler errors
-	encodedResponse, encErr := json.MarshalIndent(response, "", "\t")
-	if encErr != nil {
-		h.logger.Error().Err(encErr).Msgf("failed to encode response: %v", response)
-		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
+	encodedResponse, err := json.MarshalIndent(response, "", "\t")
+	if err != nil {
+		h.errorHandler(w, err, errLogger)
 		return
 	}
 
 	// write response to response stream
-	_, writeErr := w.Write(encodedResponse)
-	if writeErr != nil {
-		h.logger.Error().Err(encErr).Msgf("failed to write response: %v", encodedResponse)
-		h.errorResponse(w, http.StatusInternalServerError, "error generating response", logger)
+	_, err = w.Write(encodedResponse)
+	if err != nil {
+		h.errorHandler(w, err, errLogger)
 		return
 	}
 
@@ -138,12 +136,14 @@ func (h *Handler) errorResponse(
 	}
 	encodedError, err := json.Marshal(modelError)
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		logger.Error().Str("response_message", responseMessage).Msg("failed to json encode error message")
 		return
 	}
 
 	_, err = w.Write(encodedError)
 	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("failed to send error response")
 	}
 }
