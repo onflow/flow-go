@@ -140,7 +140,7 @@ func buildAccessNode(accessNodeOptions []access.Option) (*access.UnstakedAccessN
 type ConsensusFollowerImpl struct {
 	component.Component
 	*cmd.NodeConfig
-	Logger      zerolog.Logger
+	logger      zerolog.Logger
 	consumersMu sync.RWMutex
 	consumers   []pubsub.OnBlockFinalizedConsumer
 }
@@ -169,7 +169,7 @@ func NewConsensusFollower(
 		return nil, err
 	}
 
-	cf := &ConsensusFollowerImpl{Logger: anb.Logger}
+	cf := &ConsensusFollowerImpl{logger: anb.Logger}
 	anb.BaseConfig.NodeRole = "consensus_follower"
 	anb.FinalizationDistributor.AddOnBlockFinalizedConsumer(cf.onBlockFinalized)
 	cf.NodeConfig = anb.NodeConfig
@@ -219,20 +219,17 @@ func (cf *ConsensusFollowerImpl) Run(ctx context.Context) {
 		if err := util.WaitClosed(ctx, cf.Ready()); err != nil {
 			return
 		}
-		cf.Logger.Info().Msg("Consensus follower startup complete")
+		cf.logger.Info().Msg("Consensus follower startup complete")
 	}()
 
 	go func() {
 		<-ctx.Done()
-		cf.Logger.Info().Msg("Consensus follower shutting down")
+		cf.logger.Info().Msg("Consensus follower shutting down")
 	}()
 
-	// This context will be marked done when all components have stopped
-	doneCtx, _ := util.WithDone(context.Background(), cf.Done())
-
 	// Block here until all components have stopped or an irrecoverable error is received.
-	if err := util.WaitError(doneCtx, errChan); err != nil {
-		cf.Logger.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
+	if err := util.WaitError(errChan, cf.Done()); err != nil {
+		cf.logger.Fatal().Err(err).Msg("A fatal error was encountered in consensus follower")
 	}
-	cf.Logger.Info().Msg("Consensus follower shutdown complete")
+	cf.logger.Info().Msg("Consensus follower shutdown complete")
 }

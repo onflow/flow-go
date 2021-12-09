@@ -807,7 +807,7 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-
 		// Ready() will launch it.
 		var isComponent bool
 		if component, isComponent := readyAware.(component.Component); isComponent {
-			go component.Start(ctx)
+			component.Start(ctx)
 		}
 
 		// Wait until the component is ready
@@ -959,6 +959,7 @@ func FlowNode(role string, opts ...Option) *FlowNodeBuilder {
 		flags:                    pflag.CommandLine,
 		adminCommandBootstrapper: admin.NewCommandRunnerBootstrapper(),
 		adminCommands:            make(map[string]func(*NodeConfig) commands.AdminCommand),
+		componentBuilder:         component.NewComponentManagerBuilder(),
 	}
 	return builder
 }
@@ -1006,9 +1007,6 @@ func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 }
 
 func (fnb *FlowNodeBuilder) Build() (Node, error) {
-	// Initialize the builder so components can be added as workers
-	fnb.componentBuilder = component.NewComponentManagerBuilder()
-
 	// Run the prestart initialization. This includes anything that should be done before
 	// starting the components.
 	if err := fnb.onStart(); err != nil {
@@ -1020,6 +1018,7 @@ func (fnb *FlowNodeBuilder) Build() (Node, error) {
 		fnb.NodeConfig,
 		fnb.Logger,
 		fnb.postShutdown,
+		fnb.handleFatal,
 	), nil
 }
 
@@ -1086,6 +1085,11 @@ func (fnb *FlowNodeBuilder) postShutdown() error {
 		return fmt.Errorf("could not close database: %w", err)
 	}
 	return nil
+}
+
+// handleFatal handles irrecoverable errors by logging them and exiting the process.
+func (fnb *FlowNodeBuilder) handleFatal(err error) {
+	fnb.Logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
 }
 
 func (fnb *FlowNodeBuilder) handlePreInit(f BuilderFunc) error {

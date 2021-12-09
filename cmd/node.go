@@ -32,16 +32,16 @@ type FlowNodeImp struct {
 	*NodeConfig
 	logger       zerolog.Logger
 	postShutdown func() error
-	fatalHandler func(error, zerolog.Logger)
+	fatalHandler func(error)
 }
 
 // NewNode returns a new node instance
-func NewNode(component component.Component, cfg *NodeConfig, logger zerolog.Logger, f func() error) Node {
+func NewNode(component component.Component, cfg *NodeConfig, logger zerolog.Logger, cleanup func() error, handleFatal func(error)) Node {
 	return &FlowNodeImp{
 		Component:    component,
 		NodeConfig:   cfg,
 		logger:       logger,
-		postShutdown: f,
+		postShutdown: cleanup,
 		fatalHandler: handleFatal,
 	}
 }
@@ -56,7 +56,7 @@ func (node *FlowNodeImp) Run() {
 
 	// Any error received is considered fatal.
 	if err != nil {
-		node.fatalHandler(err, node.logger)
+		node.fatalHandler(err)
 		return
 	}
 
@@ -101,7 +101,7 @@ func (node *FlowNodeImp) run() error {
 
 	// 2: Run the node
 	// Block here until either a signal or irrecoverable error is received.
-	err := util.WaitError(sigCtx, errChan)
+	err := util.WaitError(errChan, sigCtx.Done())
 
 	// Stop relaying signals. Subsequent signals will be handled by the OS and will abort the
 	// process.
@@ -112,20 +112,11 @@ func (node *FlowNodeImp) run() error {
 		return err
 	}
 
+	// 3: Shut down
 	// Send shutdown signal to components
 	node.logger.Info().Msgf("%s node shutting down", node.BaseConfig.NodeRole)
 	cancel()
 
-	// 3: Shut down
-	// This context will be marked done when all components have stopped
-	doneCtx, _ := util.WithDone(context.Background(), node.Done())
-
 	// Block here until all components have stopped or an irrecoverable error is received.
-	return util.WaitError(doneCtx, errChan)
-}
-
-// handleFatal handles irrecoverable errors by logging them and exiting the process.
-// This allows for easier testing and is not intended to be overriden in production.
-func handleFatal(err error, logger zerolog.Logger) {
-	logger.Fatal().Err(err).Msg("unhandled irrecoverable error")
+	return util.WaitError(errChan, node.Done())
 }

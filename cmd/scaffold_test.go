@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
-	"sort"
 	"testing"
 	"time"
 
@@ -172,8 +171,7 @@ func TestComponentsRunSerially(t *testing.T) {
 
 	// components are stopped via context cancellation, so the specific order is random
 	doneLogs := logs[len(logs)-3:]
-	sort.Strings(doneLogs)
-	assert.Equal(t, []string{
+	assert.ElementsMatch(t, []string{
 		"component 1 done",
 		"component 2 done",
 		"component 3 done",
