@@ -35,6 +35,9 @@ func ConvertToNDecimalPlaces(n int, numerator, denominator int) float32 {
 }
 
 func convertToNDecimalPlacesInternal(n int, numerator, denominator float32) float32 {
+	if numerator == 0 || denominator == 0 {
+		return 0
+	}
 	formatSpecifier := "%." + fmt.Sprint(n) + "f"
 	ratioString := fmt.Sprintf(formatSpecifier, numerator/denominator)
 	ratioFloat, err := strconv.ParseFloat(ratioString, 32)

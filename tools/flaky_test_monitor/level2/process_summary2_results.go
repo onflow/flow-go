@@ -68,6 +68,11 @@ func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 					testResultSummary.Durations = testResultSummary.Durations[:len(testResultSummary.Durations)-1]
 				case "":
 					testResultSummary.NoResult++
+					// don't count no result as a run
+					testResultSummary.Runs--
+
+					// truncate last duration - don't count durations of no results
+					testResultSummary.Durations = testResultSummary.Durations[:len(testResultSummary.Durations)-1]
 				default:
 					panic(fmt.Sprintf("unexpected test result: %s", testResult.Result))
 				}
@@ -111,6 +116,7 @@ func saveFailureMessage(testResult common.TestResult) {
 	// many failure files already exist in the sub-directory before creating the next one
 	failureFile, err := os.Create(failuresDirFullPath + fmt.Sprintf("failure%d.txt", len(dirEntries)+1))
 	common.AssertNoError(err, "error creating failure file")
+	defer failureFile.Close()
 
 	for _, output := range testResult.Output {
 		_, err = failureFile.WriteString(output)
