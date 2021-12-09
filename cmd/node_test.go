@@ -21,7 +21,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 		testLogger.Log("running cleanup")
 		return nil
 	}
-	fatalHandler := func(err error, logger zerolog.Logger) {
+	fatalHandler := func(err error) {
 		testLogger.Logf("received fatal error: %s", err)
 	}
 
@@ -38,7 +38,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 				testLogger.Log("worker shutdown complete")
 			}).
 			Build()
-		node := NewNode(manager, nodeConfig, logger, postShutdown)
+		node := NewNode(manager, nodeConfig, logger, postShutdown, fatalHandler)
 
 		finished := make(chan struct{})
 		go func() {
@@ -77,7 +77,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 		node := NewNode(manager, nodeConfig, logger, func() error {
 			testLogger.Log("error during post shutdown")
 			return errors.New("error during post shutdown")
-		})
+		}, fatalHandler)
 
 		finished := make(chan struct{})
 		go func() {
@@ -117,8 +117,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 				testLogger.Log("worker shutdown complete")
 			}).
 			Build()
-		node := NewNode(manager, nodeConfig, logger, postShutdown)
-		node.(*FlowNodeImp).fatalHandler = fatalHandler
+		node := NewNode(manager, nodeConfig, logger, postShutdown, fatalHandler)
 
 		finished := make(chan struct{})
 		go func() {
@@ -150,11 +149,9 @@ func TestRunShutsDownCleanly(t *testing.T) {
 				testLogger.Log("worker shutdown complete")
 			}).
 			Build()
-		node := NewNode(manager, nodeConfig, logger, postShutdown)
-		node.(*FlowNodeImp).fatalHandler = func(err error, logger zerolog.Logger) {
-			logger.Info().Msg("handling fatal error")
+		node := NewNode(manager, nodeConfig, logger, postShutdown, func(err error) {
 			testLogger.Log("received fatal error: " + err.Error())
-		}
+		})
 
 		finished := make(chan struct{})
 		go func() {
@@ -188,8 +185,7 @@ func TestRunShutsDownCleanly(t *testing.T) {
 				testLogger.Log("worker shutdown complete")
 			}).
 			Build()
-		node := NewNode(manager, nodeConfig, logger, postShutdown)
-		node.(*FlowNodeImp).fatalHandler = fatalHandler
+		node := NewNode(manager, nodeConfig, logger, postShutdown, fatalHandler)
 
 		finished := make(chan struct{})
 		go func() {

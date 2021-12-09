@@ -124,19 +124,19 @@ func MergeChannels(channels interface{}) interface{} {
 	return out.Convert(reflect.ChanOf(reflect.RecvDir, elemType)).Interface()
 }
 
-// WaitError waits for either an error on the error channel, the provided context to be cancelled
+// WaitError waits for either an error on the error channel or the done channel to close
 // Returns an error if one is received on the error channel, otherwise it returns nil
 //
 // This handles a race condition where the done channel could have been closed as a result of an
 // irrecoverable error being thrown, so that when the scheduler yields control back to this
-// goroutine, both channels are available to read from. If the Done case happens to be chosen
+// goroutine, both channels are available to read from. If the done case happens to be chosen
 // at random to proceed instead of the error case, then we would return without error which could
 // result in unsafe continuation.
-func WaitError(ctx context.Context, errChan <-chan error) error {
+func WaitError(errChan <-chan error, done <-chan struct{}) error {
 	select {
 	case err := <-errChan:
 		return err
-	case <-ctx.Done():
+	case <-done:
 		select {
 		case err := <-errChan:
 			return err

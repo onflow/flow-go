@@ -194,8 +194,8 @@ func TestWaitClosed(t *testing.T) {
 
 	t.Run("both conditions triggered returns nil", func(t *testing.T) {
 		// both conditions are met when WaitClosed is called. Since one is randomly selected,
-		// statistically there is a 99.9% chance that each condition will be picked first at
-		// least once during this test.
+		// there is a 99.9% probability that each condition will be picked first at least once
+		// during this test.
 		for i := 0; i < 10; i++ {
 			testCtx, testCancel := context.WithCancel(ctx)
 			finished := make(chan struct{})
@@ -235,7 +235,7 @@ func TestWaitError(t *testing.T) {
 		ch := make(chan error)
 
 		go func() {
-			err := util.WaitError(ctx, ch)
+			err := util.WaitError(ch, ctx.Done())
 			assert.ErrorIs(t, err, testErr)
 			close(finished)
 		}()
@@ -253,7 +253,7 @@ func TestWaitError(t *testing.T) {
 		finished := make(chan struct{})
 		ch := make(chan error)
 		go func() {
-			err := util.WaitError(testCtx, ch)
+			err := util.WaitError(ch, testCtx.Done())
 			assert.NoError(t, err)
 			close(finished)
 		}()
@@ -268,18 +268,18 @@ func TestWaitError(t *testing.T) {
 
 	t.Run("both conditions triggered returns error", func(t *testing.T) {
 		// both conditions are met when WaitError is called. Since one is randomly selected,
-		// statistically there is a 99.9% chance that each condition will be picked first at
-		// least once during this test.
+		// there is a 99.9% probability that each condition will be picked first at least once
+		// during this test.
 		for i := 0; i < 10; i++ {
-			testCtx, testCancel := context.WithCancel(ctx)
 			finished := make(chan struct{})
 			ch := make(chan error, 1) // buffered so we can add before starting
+			done := make(chan struct{})
 
 			ch <- testErr
-			testCancel()
+			close(done)
 
 			go func() {
-				err := util.WaitError(testCtx, ch)
+				err := util.WaitError(ch, done)
 				assert.ErrorIs(t, err, testErr)
 				close(finished)
 			}()

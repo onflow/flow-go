@@ -95,8 +95,7 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			return err // failure to start
 		}
 
-		doneCtx, _ := util.WithDone(ctx, done)
-		if err := util.WaitError(doneCtx, irrecoverableErr); err != nil {
+		if err := util.WaitError(irrecoverableErr, done); err != nil {
 			// an irrecoverable error was encountered
 			stop()
 
@@ -109,7 +108,7 @@ func RunComponent(ctx context.Context, componentFactory ComponentFactory, handle
 			default:
 				panic(fmt.Sprintf("invalid error handling result: %v", result))
 			}
-		} else if util.CheckClosed(ctx.Done()) {
+		} else if ctx.Err() != nil {
 			// the parent context was cancelled
 			stop()
 			return ctx.Err()
@@ -212,8 +211,7 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	// launch goroutine to propagate irrecoverable error
 	go func() {
 		// wait until the done channel is closed or an irrecoverable error is encountered
-		doneCtx, _ := util.WithDone(context.Background(), c.done)
-		if err := util.WaitError(doneCtx, errChan); err != nil {
+		if err := util.WaitError(errChan, c.done); err != nil {
 			cancel() // shutdown all workers
 
 			// propagate the error directly to the parent because a failure in a worker routine
@@ -240,7 +238,8 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 			// This must be called last. It can't be called in a defer statement because thrown
 			// irrecoverable errors cause an os.Goexit to be called, which will call all defers.
 			// This creates a race condition where this component manager could be marked done
-			// before the parent reads the error off the channel resulting in unsafe continuation.
+			// before it propagates the fatal error to the parent. The parent would then see the
+			// done signal first resulting in unsafe continuation.
 			workersDone.Done()
 		}()
 	}
