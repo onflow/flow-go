@@ -16,14 +16,23 @@ const (
 // height) is this snapshot's reference block and the first (least height)
 // is the most recently sealed block as of this snapshot (ie. the block
 // referenced by LatestSeal).
-// In other words, the last block contains a seal for the first block.
-// For instance:
-//   A <- B <- C <- D <- E (seal_A)
+//
+// In other words, the most recently incorporated seal as of the highest block
+// references the lowest block. The highest block does not need to contain this
+// seal.
+//
+// Example 1 - E seals A:
+//   A <- B <- C <- D <- E(SA)
 // The above sealing segment's last block (E) has a seal for block A, which is
 // the first block of the sealing segment.
 //
-// It is guaranteed there are at least 2 blocks in a SealingSegment
+// Example 2 - E contains no seals, but latest seal prior to E seals A:
+//   A <- B <- C <- D(SA) <- E
+//
+// It is guaranteed there are at least 2 blocks in a SealingSegment, unless
+// the sealing segment is for a root snapshot, which contains only the root block.
 // The segment is in ascending height order.
+//
 type SealingSegment struct {
 	// Blocks the chain segment blocks
 	Blocks []*Block
@@ -108,7 +117,7 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 	return block.Header.Height == builder.highest().Header.Height+1
 }
 
-// hasValidSeal returns true if highest block in the segment contains a seal for the lowest block
+// hasValidSeal returns true if the latest seal as of highest is for lowest.
 func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 	lowestID := builder.lowest().ID()
 	highest := builder.highest()
