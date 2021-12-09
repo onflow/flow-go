@@ -145,9 +145,6 @@ func getBlockPayloadByID(req *requestDecorator, backend access.API, _ LinkGenera
 }
 
 func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.API, link LinkGenerator) (*generated.Block, error) {
-	var responseBlock = new(generated.Block)
-	responseBlock.Expandable = new(generated.BlockExpandable)
-
 	// lookup block
 	blk, statusErr := blkProvider.getBlock(req.Context())
 	if statusErr != nil {
