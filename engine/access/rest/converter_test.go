@@ -34,7 +34,8 @@ func TestTransactions(t *testing.T) {
 		tx := unittest.TransactionFixture()
 		response := transactionResponse(&tx.TransactionBody, nil, linkFixture(), nil)
 
-		res, _ := json.Marshal(response)
+		res, err := json.Marshal(response)
+		assert.NoError(t, err)
 		expected := fmt.Sprintf(`{
 		   "id":"%s",
 		   "script":"cHViIGZ1biBtYWluKCkge30=",
