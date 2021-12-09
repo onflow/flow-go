@@ -5,10 +5,11 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"github.com/rs/cors"
 	"github.com/rs/zerolog"
+
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/middleware"
 )
 
 // all route names

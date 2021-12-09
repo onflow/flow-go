@@ -247,7 +247,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		defer cancel()
 
 		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, []string{nonExistingBlockID.String()}, optionsForBlockByID())
-		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", nonExistingBlockID.String()))
+		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("error looking up block with ID %s", nonExistingBlockID.String()))
 	})
 
 	suite.Run("GetBlockByID with an invalid block ID", func() {
@@ -290,7 +290,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 
 		blockIDSlice := []string{strings.Join(blockIDs, ",")}
 		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, optionsForBlockByID())
-		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block with ID %s not found", blockIDs[invalidBlockIndex]))
+		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("error looking up block with ID %s", blockIDs[invalidBlockIndex]))
 	})
 
 	suite.Run("GetBlockByHeight by non-existing height", func() {
@@ -303,7 +303,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		suite.blocks.On("ByHeight", invalidHeight).Return(nil, storage.ErrNotFound).Once()
 
 		_, resp, err := client.BlocksApi.BlocksGet(ctx, optionsForBlockByHeights(reqHeights))
-		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("block at height %d not found", invalidHeight))
+		assertError(suite.T(), resp, err, http.StatusNotFound, fmt.Sprintf("error looking up block at height %d", invalidHeight))
 	})
 }
 

@@ -81,13 +81,14 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 		}
 
 		// if the query is /blocks/height=1000,1008,1049...
-		heights, err := toHeights(heights)
+		uintHeights, err := toHeights(heights)
 		if err != nil {
-			return nil, NewBadRequestError(err)
+			heightError := fmt.Errorf("invalid height specified: %v", err)
+			return nil, NewBadRequestError(heightError)
 		}
 
-		blocks = make([]*generated.Block, len(heights))
-		for i, h := range heights {
+		blocks = make([]*generated.Block, len(uintHeights))
+		for i, h := range uintHeights {
 			blkProvider := NewBlockProvider(backend, forHeight(h))
 			block, err := getBlock(blkProvider, r, backend, link)
 			if err != nil {
@@ -101,11 +102,13 @@ func getBlocksByHeight(r *requestDecorator, backend access.API, link LinkGenerat
 	// lookup block by start and end height range
 	start, err := toHeight(startHeight)
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		heightError := fmt.Errorf("invalid start height %s: %v", startHeight, err)
+		return nil, NewBadRequestError(heightError)
 	}
 	end, err := toHeight(endHeight)
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		heightError := fmt.Errorf("invalid end height %s: %v", endHeight, err)
+		return nil, NewBadRequestError(heightError)
 	}
 
 	if start > end {
@@ -167,7 +170,7 @@ func getBlock(blkProvider *blockProvider, req *requestDecorator, backend access.
 }
 
 func idLookupError(id *flow.Identifier, entityType string, err error) StatusError {
-	msg := fmt.Sprintf("%s with ID %s not found", entityType, id.String())
+	msg := fmt.Sprintf("error looking up %s with ID %s", entityType, id.String())
 	// if error has GRPC code NotFound, then return HTTP NotFound error
 	if status.Code(err) == codes.NotFound {
 		return NewNotFoundError(msg, err)
@@ -177,7 +180,7 @@ func idLookupError(id *flow.Identifier, entityType string, err error) StatusErro
 
 // todo(sideninja) refactor and merge
 func heightLookupError(height uint64, entityType string, err error) StatusError {
-	msg := fmt.Sprintf("%s at height %d not found", entityType, height)
+	msg := fmt.Sprintf("error looking up %s at height %d", entityType, height)
 	// if error has GRPC code NotFound, then return HTTP NotFound error
 	if status.Code(err) == codes.NotFound {
 		return NewNotFoundError(msg, err)

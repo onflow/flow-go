@@ -41,6 +41,9 @@ func TestGetBlocks(t *testing.T) {
 
 	invalidID := unittest.IdentifierFixture().String()
 	invalidHeight := fmt.Sprintf("%d", blkCnt+1)
+
+	maxIDs := flow.IdentifierList(unittest.IdentifierListFixture(MaxAllowedBlockIDs + 1))
+
 	testVectors := []testVector{
 		{
 			description:      "Get single expanded block by ID",
@@ -68,13 +71,13 @@ func TestGetBlocks(t *testing.T) {
 		},
 		{
 			description:      "Get single expanded block by height",
-			request:          getByHeightsExpandedURL(t, heights[:2]),
+			request:          getByHeightsExpandedURL(t, heights[:2]...),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: singleBlockExpandedResponse,
 		},
 		{
 			description:      "Get multiple expanded blocks by heights",
-			request:          getByHeightsExpandedURL(t, heights),
+			request:          getByHeightsExpandedURL(t, heights...),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: multipleBlockExpandedResponse,
 		},
@@ -88,13 +91,13 @@ func TestGetBlocks(t *testing.T) {
 			description:      "Get block by ID not found",
 			request:          getByIDsExpandedURL(t, []string{invalidID}),
 			expectedStatus:   http.StatusNotFound,
-			expectedResponse: fmt.Sprintf(`{"code":404, "message":"block with ID %s not found"}`, invalidID),
+			expectedResponse: fmt.Sprintf(`{"code":404, "message":"error looking up block with ID %s"}`, invalidID),
 		},
 		{
 			description:      "Get block by height not found",
-			request:          getByHeightsExpandedURL(t, []string{invalidHeight}),
+			request:          getByHeightsExpandedURL(t, invalidHeight),
 			expectedStatus:   http.StatusNotFound,
-			expectedResponse: fmt.Sprintf(`{"code":404, "message":"block at height %s not found"}`, invalidHeight),
+			expectedResponse: fmt.Sprintf(`{"code":404, "message":"error looking up block at height %s"}`, invalidHeight),
 		},
 		{
 			description:      "Get block by end height less than start height",
@@ -108,13 +111,31 @@ func TestGetBlocks(t *testing.T) {
 			expectedStatus:   http.StatusBadRequest,
 			expectedResponse: `{"code":400, "message": "can only provide either heights or start and end height range"}`,
 		},
+		{
+			description:      "Get block with missing height param",
+			request:          getByHeightsExpandedURL(t), // no height query param specified
+			expectedStatus:   http.StatusBadRequest,
+			expectedResponse: `{"code":400, "message": "must provide either heights or start and end height range"}`,
+		},
+		{
+			description:      "Get block with missing height values",
+			request:          getByHeightsExpandedURL(t, ""), // height query param specified with no value
+			expectedStatus:   http.StatusBadRequest,
+			expectedResponse: `{"code":400, "message": "must provide either heights or start and end height range"}`,
+		},
+		{
+			description:      "Get block by more than maximum permissible number of IDs",
+			request:          getByHeightsExpandedURL(t, maxIDs.Strings()...), // height query param specified with no value
+			expectedStatus:   http.StatusBadRequest,
+			expectedResponse: fmt.Sprintf(`{"code":400, "message": "invalid height specified: at most %d heights can be requested at a time"}`, MaxAllowedIDs),
+		},
 	}
 
 	for _, tv := range testVectors {
 		responseRec := executeRequest(tv.request, backend)
-		require.Equal(t, tv.expectedStatus, responseRec.Code, "Failed: %s", tv.description)
+		require.Equal(t, tv.expectedStatus, responseRec.Code, "failed test %s: incorrect response code", tv.description)
 		actualResp := responseRec.Body.String()
-		require.JSONEq(t, tv.expectedResponse, actualResp, "Failed: %s", tv.description)
+		require.JSONEq(t, tv.expectedResponse, actualResp, "failed test %s: incorrect response", tv.description)
 	}
 
 }
@@ -156,7 +177,7 @@ func getByIDsExpandedURL(t *testing.T, ids []string) *http.Request {
 	return requestURL(t, ids, "", "", true)
 }
 
-func getByHeightsExpandedURL(t *testing.T, heights []string) *http.Request {
+func getByHeightsExpandedURL(t *testing.T, heights ...string) *http.Request {
 	return requestURL(t, nil, "", "", true, heights...)
 }
 

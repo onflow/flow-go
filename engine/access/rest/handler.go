@@ -5,11 +5,12 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"github.com/rs/zerolog"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
 // ApiHandlerFunc is a function that contains endpoint handling logic,
