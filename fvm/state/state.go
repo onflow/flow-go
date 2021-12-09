@@ -29,6 +29,7 @@ type State struct {
 	view                  View
 	updatedAddresses      map[flow.Address]struct{}
 	updateSize            map[mapKey]uint64
+	readRegisters         map[mapKey]struct{}
 	maxKeySizeAllowed     uint64
 	maxValueSizeAllowed   uint64
 	maxInteractionAllowed uint64
@@ -43,6 +44,7 @@ func defaultState(view View) *State {
 		view:                  view,
 		updatedAddresses:      make(map[flow.Address]struct{}),
 		updateSize:            make(map[mapKey]uint64),
+		readRegisters:         make(map[mapKey]struct{}),
 		maxKeySizeAllowed:     DefaultMaxKeySize,
 		maxValueSizeAllowed:   DefaultMaxValueSize,
 		maxInteractionAllowed: DefaultMaxInteractionSize,
@@ -112,10 +114,16 @@ func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.Regi
 	}
 
 	// if not part of recent updates count them as read
-	if _, ok := s.updateSize[mapKey{owner, controller, key}]; !ok {
-		s.ReadCounter++
-		s.TotalBytesRead += uint64(len(owner) +
-			len(controller) + len(key) + len(value))
+	_, updated := s.updateSize[mapKey{owner, controller, key}]
+	if !updated {
+		// if already counted as read, do not count again
+		_, read := s.readRegisters[mapKey{owner, controller, key}]
+		if !read {
+			s.ReadCounter++
+			s.TotalBytesRead += uint64(len(owner) +
+				len(controller) + len(key) + len(value))
+			s.readRegisters[mapKey{owner, controller, key}] = struct{}{}
+		}
 	}
 
 	if enforceLimit {
@@ -197,6 +205,11 @@ func (s *State) MergeState(other *State, enforceLimit bool) error {
 	// apply update sizes
 	for k, v := range other.updateSize {
 		s.updateSize[k] = v
+	}
+
+	// apply read registers
+	for k, v := range other.readRegisters {
+		s.readRegisters[k] = v
 	}
 
 	// update ledger interactions
