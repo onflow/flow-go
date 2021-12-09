@@ -259,7 +259,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	// check previously.
 	endState, err := e.dkgState.GetDKGEndState(nextEpochCounter)
 	if err == nil {
-		log.Warn().Msgf("already set dkg end state when checking beacon key consistency: %s", endState.String())
+		log.Warn().Msgf("checking beacon key consistency: exiting because dkg end state was already set: %s", endState.String())
 		return
 	}
 
