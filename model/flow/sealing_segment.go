@@ -72,14 +72,22 @@ var (
 	ErrSegmentBlocksWrongLen     = fmt.Errorf("sealing segment failed sanity check: non-root sealing segment must have at least 2 blocks")
 	ErrSegmentInvalidBlockHeight = fmt.Errorf("sealing segment failed sanity check: blocks must be in ascending order")
 	ErrSegmentResultLookup       = fmt.Errorf("failed to lookup execution result")
+	ErrSegmentSealLookup         = fmt.Errorf("failed to lookup seal")
 	ErrSegmentInvalidRootView    = fmt.Errorf("invalid root sealing segment block view")
 )
+
+// GetResultFunc is a getter function for results by ID.
+type GetResultFunc func(resultID Identifier) (*ExecutionResult, error)
+
+// GetSealByBlockIDFunc is a getter function for seals by block ID, returning
+// the latest seals incorporated as of the given block.
+type GetSealByBlockIDFunc func(blockID Identifier) (*Seal, error)
 
 // SealingSegmentBuilder is a utility for incrementally building a sealing segment.
 type SealingSegmentBuilder struct {
 	// access to storage to read referenced by not included resources
-	resultLookup        func(resultID Identifier) (*ExecutionResult, error)
-	sealByBLockIDLookup func(blockID Identifier) (*Seal, error)
+	resultLookup        GetResultFunc
+	sealByBLockIDLookup GetSealByBlockIDFunc
 	// keep track of resources included in payloads
 	includedResults map[Identifier]struct{}
 	// resources to include in the sealing segment
@@ -105,7 +113,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 		} else {
 			seal, err := builder.sealByBLockIDLookup(block.ID())
 			if err != nil {
-				return fmt.Errorf("could not get first seal") // TODO sentinel?
+				return fmt.Errorf("%w: %v", ErrSegmentSealLookup, err)
 			}
 			builder.firstSeal = seal
 		}
@@ -198,12 +206,12 @@ func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 	return false
 }
 
-// isValidRootSegment will check that the block in the root segment has a view of 0
+// isValidRootSegment will check that the block in the root segment has a view of 0.
 func (builder *SealingSegmentBuilder) isValidRootSegment() bool {
 	return len(builder.blocks) == rootSegmentBlocksLen && builder.highest().Header.View == rootSegmentBlockView
 }
 
-// validateSegment will validate if builder satisfies conditions for a valid sealing segment
+// validateSegment will validate if builder satisfies conditions for a valid sealing segment.
 func (builder *SealingSegmentBuilder) validateSegment() error {
 	// sealing cannot be empty
 	if len(builder.blocks) < 1 {
@@ -226,7 +234,7 @@ func (builder *SealingSegmentBuilder) validateSegment() error {
 	return nil
 }
 
-// highest returns highest block in segment
+// highest returns the highest block in segment.
 func (builder *SealingSegmentBuilder) highest() *Block {
 	if len(builder.blocks) == 0 {
 		return nil
@@ -235,17 +243,18 @@ func (builder *SealingSegmentBuilder) highest() *Block {
 	return builder.blocks[len(builder.blocks)-1]
 }
 
-// lowest returns lowest block in segment
+// lowest returns the lowest block in segment.
 func (builder *SealingSegmentBuilder) lowest() *Block {
 	return builder.blocks[0]
 }
 
 // NewSealingSegmentBuilder returns *SealingSegmentBuilder
-func NewSealingSegmentBuilder(resultLookup func(resultID Identifier) (*ExecutionResult, error)) *SealingSegmentBuilder {
+func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBlockIDFunc) *SealingSegmentBuilder {
 	return &SealingSegmentBuilder{
-		resultLookup:    resultLookup,
-		includedResults: make(map[Identifier]struct{}),
-		blocks:          make([]*Block, 0),
-		results:         make(ExecutionResultList, 0),
+		resultLookup:        resultLookup,
+		sealByBLockIDLookup: sealLookup,
+		includedResults:     make(map[Identifier]struct{}),
+		blocks:              make([]*Block, 0),
+		results:             make(ExecutionResultList, 0),
 	}
 }
