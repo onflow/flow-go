@@ -9,26 +9,15 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestArrayBackData_BelowLimit(t *testing.T) {
+func TestArrayBackData_SingleBucket(t *testing.T) {
 	size := 10
 
 	bd := NewArrayBackData(uint32(size), 1, arraylinkedlist.LRUEjection)
 
 	entities := unittest.EntityListFixture(uint(size))
 
-	// adding elements
-	for i, e := range entities {
-		// adding each element must be successful.
-		require.True(t, bd.Add(e.ID(), e))
-
-		// total of back data should be incremented by each addition.
-		require.Equal(t, bd.Size(), uint(i+1))
-
-		// entity should be placed at index i in back data
-		id, entity, _ := bd.entities.Get(uint32(i))
-		require.Equal(t, e.ID(), id)
-		require.Equal(t, e, entity)
-	}
+	// adds all entities to backdata
+	testAddEntities(t, bd, entities)
 
 	// sanity checks
 	for i := range entities {
@@ -43,11 +32,7 @@ func TestArrayBackData_BelowLimit(t *testing.T) {
 	}
 
 	// getting inserted elements
-	for _, expected := range entities {
-		actual, ok := bd.ByID(expected.ID())
-		require.True(t, ok)
-		require.Equal(t, expected, actual)
-	}
+	testGetEntities(t, bd, entities)
 }
 
 // TestArrayBackData_WriteHeavy evaluates correctness of backdata under the writing and retrieving
