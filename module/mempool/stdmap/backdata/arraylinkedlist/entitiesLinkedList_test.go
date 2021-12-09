@@ -63,28 +63,24 @@ func testArrayBackDataStoreAndRetrievalWithoutEjection(t *testing.T, limit uint3
 
 func TestArrayBackDataStoreAndRetrievalWithEjection(t *testing.T) {
 	for _, tc := range []struct {
-		limit           uint32
-		overLimitFactor uint32
-		entityCount     uint32
-		helpers         []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
+		limit       uint32
+		entityCount uint32
+		helpers     []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
 	}{
 		{
-			limit:           30,
-			overLimitFactor: 2,
-			entityCount:     31,
+			limit:       30,
+			entityCount: 31,
 		},
 		{
-			limit:           30,
-			overLimitFactor: 2,
-			entityCount:     100,
+			limit:       30,
+			entityCount: 100,
 		},
 		{
-			limit:           1000,
-			overLimitFactor: 8,
-			entityCount:     2000,
+			limit:       1000,
+			entityCount: 2000,
 		},
 	} {
-		t.Run(fmt.Sprintf("%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
 			testArrayBackDataStoreAndRetrievalWitEjection(t, tc.limit, tc.entityCount)
 		})
 	}
@@ -108,67 +104,60 @@ func testArrayBackDataStoreAndRetrievalWitEjection(t *testing.T, limit uint32, e
 
 func TestInvalidateEntity(t *testing.T) {
 	for _, tc := range []struct {
-		limit           uint32
-		overLimitFactor uint32
-		entityCount     uint32
-		helpers         []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
+		limit       uint32
+		entityCount uint32
+		helpers     []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
 	}{
-		{ // edge-case empty list
-			limit:           30,
-			overLimitFactor: 2,
-			entityCount:     0,
+		{
+			limit:       30,
+			entityCount: 0,
 		},
-		{ // edge-case single element-list
-			limit:           30,
-			overLimitFactor: 2,
-			entityCount:     1,
+		{
+			limit:       30,
+			entityCount: 1,
 		},
-		{ // two buckets, entities below limit.
-			limit:           30,
-			overLimitFactor: 2,
-			entityCount:     10,
+		{
+			limit:       30,
+			entityCount: 10,
 		},
-		{ // two buckets, entities equal to limit.
-			limit:           30,
-			overLimitFactor: 2,
-			entityCount:     30,
+		{
+			limit:       30,
+			entityCount: 30,
 		},
-		{ // multiple buckets, high limit, low entities.
-			limit:           100,
-			overLimitFactor: 16,
-			entityCount:     10,
+		{
+			limit:       100,
+			entityCount: 10,
 		},
-		{ // multiple buckets, entities equal to limit.
-			limit:           100,
-			overLimitFactor: 16,
-			entityCount:     100,
+		{
+			limit:       100,
+			entityCount: 100,
 		},
 	} {
 		// head invalidation test (LRU)
-		t.Run(fmt.Sprintf("head-invalidation-%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
-			testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+		t.Run(fmt.Sprintf("head-invalidation-%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
+			testInvalidateEntity(t, tc.limit, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
 				testInvalidatingHead(t, list, entities)
 			})
 		})
 
 		// tail invalidation test
-		t.Run(fmt.Sprintf("tail-invalidation-%d-limit-%d-overlimit-%d-entities-", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
-			testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+		t.Run(fmt.Sprintf("tail-invalidation-%d-limit-%d-entities-", tc.limit, tc.entityCount), func(t *testing.T) {
+			testInvalidateEntity(t, tc.limit, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
 				testInvalidatingTail(t, list, entities)
 			})
 		})
 
 		// random invalidation test
-		t.Run(fmt.Sprintf("random-invalidation-%d-limit-%d-overlimit-%d-entities-", tc.limit, tc.overLimitFactor, tc.entityCount),
+		t.Run(fmt.Sprintf("random-invalidation-%d-limit-%d-entities-", tc.limit, tc.entityCount),
 			func(t *testing.T) {
-				testInvalidateEntity(t, tc.limit, tc.overLimitFactor, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+				testInvalidateEntity(t, tc.limit, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
 					testInvalidateAtRandom(t, list, entities)
 				})
 			})
 	}
 }
 
-func testInvalidateEntity(t *testing.T, limit uint32, overLimitFactor uint32, entityCount uint32, helpers ...func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)) {
+func testInvalidateEntity(t *testing.T, limit uint32, entityCount uint32, helpers ...func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)) {
 	h := append([]func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
 		func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
 			testAddingEntities(t, backData, entities)
