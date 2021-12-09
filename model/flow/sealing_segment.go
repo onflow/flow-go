@@ -120,35 +120,25 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 // hasValidSeal returns true if the latest seal as of highest is for lowest.
 func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 	lowestID := builder.lowest().ID()
-	highest := builder.highest()
 
-	// due to the fact that lowest is not always sealed
-	// by highest, if highest does not have any seals check
-	// that a valid ancestor does.
-	if len(highest.Payload.Seals) == 0 {
-		for i := len(builder.blocks) - 2; i >= 0; i-- {
-			// get first block that contains any seal
-			block := builder.blocks[i]
-			if len(block.Payload.Seals) == 0 {
-				continue
-			}
+	// due to the fact that lowest is not always sealed by highest,
+	// if highest does not have any seals check that a valid ancestor does.
+	for i := len(builder.blocks) - 1; i >= 0; i-- {
 
-			// check if block seals lowest
-			for _, seal := range block.Payload.Seals {
-				if seal.BlockID == lowestID {
-					return true
-				}
-			}
-
-			return false
+		// get first block that contains any seal
+		block := builder.blocks[i]
+		if len(block.Payload.Seals) == 0 {
+			continue
 		}
-	}
 
-	// highest contains seals check if seal for lowest exists
-	for _, seal := range highest.Payload.Seals {
-		if seal.BlockID == lowestID {
-			return true
+		// check if block seals lowest
+		for _, seal := range block.Payload.Seals {
+			if seal.BlockID == lowestID {
+				return true
+			}
 		}
+
+		return false
 	}
 
 	return false
