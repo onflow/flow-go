@@ -103,7 +103,7 @@ func NewStorageCapacityExceededError(address flow.Address, storageUsed, storageC
 }
 
 func (e StorageCapacityExceededError) Error() string {
-	return fmt.Sprintf("%s address %s storage %d is over capacity %d", e.Code().String(), e.address, e.storageUsed, e.storageCapacity)
+	return fmt.Sprintf("%s account with address (%s) uses %d bytes of storage which is over its capacity (%d bytes). Capacity can be increased by adding FLOW tokens to the account.", e.Code().String(), e.address, e.storageUsed, e.storageCapacity)
 }
 
 // Code returns the error code for this error
@@ -193,7 +193,7 @@ func NewLedgerIntractionLimitExceededError(used, limit uint64) *LedgerIntraction
 }
 
 func (e *LedgerIntractionLimitExceededError) Error() string {
-	return fmt.Sprintf("%s max interaction with storage has exceeded the limit (used: %d, limit %d)", e.Code().String(), e.used, e.limit)
+	return fmt.Sprintf("%s max interaction with storage has exceeded the limit (used: %d bytes, limit %d bytes)", e.Code().String(), e.used, e.limit)
 }
 
 // Code returns the error code for this error
