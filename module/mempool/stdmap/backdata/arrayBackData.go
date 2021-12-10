@@ -91,19 +91,17 @@ func (a *ArrayBackData) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 // Adjust will adjust the value item using the given function if the given key can be found.
 // Returns a bool which indicates whether the value was updated as well as the updated value
 func (a *ArrayBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.Entity) (flow.Entity, bool) {
-	//entity, ok := a.get(entityID)
-	//if !ok {
-	//	return nil, false
-	//}
-	//
-	//newEntity := f(entity)
-	//newEntityID := newEntity.ID()
-	//
-	//a.put(newEntityID, newEntity)
-	//
-	//return newEntity, true
+	entity, removed := a.Rem(entityID)
+	if !removed {
+		return nil, false
+	}
 
-	return nil, false
+	newEntity := f(entity)
+	newEntityID := newEntity.ID()
+
+	a.put(newEntityID, newEntity)
+
+	return newEntity, true
 }
 
 // ByID returns the given item from the pool.
