@@ -42,7 +42,7 @@ func TestGetBlocks(t *testing.T) {
 	invalidID := unittest.IdentifierFixture().String()
 	invalidHeight := fmt.Sprintf("%d", blkCnt+1)
 
-	maxIDs := flow.IdentifierList(unittest.IdentifierListFixture(MaxAllowedBlockIDs + 1))
+	maxIDs := flow.IdentifierList(unittest.IdentifierListFixture(MaxAllowedQueryIDs + 1))
 
 	testVectors := []testVector{
 		{

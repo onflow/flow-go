@@ -24,7 +24,7 @@ const maxAuthorizersCnt = 100
 const MaxAllowedIDs = 50 // todo(sideninja) discuss if we should restrict maximum on all IDs collection or is anywhere required more thant this
 const MaxAllowedHeights = 50
 
-var MaxAllowedBlockIDs = MaxAllowedIDs
+var MaxAllowedQueryIDs = MaxAllowedIDs
 
 // Converters section from request data to typed models
 // all methods names in this section are prefixed with 'to'
@@ -68,8 +68,8 @@ func toIDs(ids string) ([]flow.Identifier, error) {
 
 	reqIDs := strings.Split(ids, ",")
 
-	if len(reqIDs) > MaxAllowedBlockIDs {
-		return nil, fmt.Errorf("at most %d Block IDs can be requested at a time", MaxAllowedBlockIDs)
+	if len(reqIDs) > MaxAllowedQueryIDs {
+		return nil, fmt.Errorf("at most %d IDs can be requested at a time", MaxAllowedQueryIDs)
 	}
 
 	resIDs := make([]flow.Identifier, len(reqIDs))
