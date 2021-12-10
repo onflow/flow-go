@@ -98,9 +98,7 @@ func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 		if uint64(i) < bd.limit {
 			// when we are below limit the total of
 			// backdata should be incremented by each addition.
-			// fmt.Println(i, int(bd.limit))
 			require.Equal(t, bd.Size(), uint(i+1))
-			// testRetrievableCount(t, bd, entities[:i+1], uint64(i+1))
 		} else {
 			// when we cross the limit, the ejection kicks in, and
 			// size must be steady at the limit.
@@ -112,7 +110,6 @@ func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 		require.True(t, ok)
 		require.Equal(t, e, actual)
 	}
-	bd.printTelemetry()
 }
 
 // testGettingEntities is a test helper that checks entities are retrievable from backdata.
