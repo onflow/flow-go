@@ -258,9 +258,6 @@ func (r *Finalizer) getNextAncestryLevel(block *model.Block) (*forks.BlockQC, er
 		return nil, ErrPrunedAncestry
 	}
 
-	if block.QC.View < r.lastFinalized.Block.View {
-		return nil, ErrPrunedAncestry
-	}
 	parentVertex, parentBlockKnown := r.forest.GetVertex(block.QC.BlockID)
 	if !parentBlockKnown {
 		return nil, model.MissingBlockError{View: block.QC.View, BlockID: block.QC.BlockID}
