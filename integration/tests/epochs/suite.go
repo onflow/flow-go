@@ -34,6 +34,10 @@ const (
 	waitTimeout = 2 * time.Minute
 )
 
+// nodeUpdateValidation func that will be used to validate the network after some changes have been made
+// NOTE: rootSnapshot must be the snapshot that the node (info) was bootstrapped with.
+type nodeUpdateValidation func(ctx context.Context, env templates.Environment, rootSnapshot *inmem.Snapshot, info *StakedNodeOperationInfo)
+
 type Suite struct {
 	suite.Suite
 	common.TestnetStateTracker
@@ -512,7 +516,7 @@ func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates
 // newTestContainerOnNetwork configures a new container on the suites network
 func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
 	containerConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		testnet.WithID(info.NodeID),
 	}
 
@@ -557,7 +561,6 @@ func (s *Suite) getContainerToReplace(role flow.Role) *testnet.Container {
 
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network
 // this func can be used to perform sanity.
-// NOTE: rootSnapshot must be the snapshot that the node (info) was bootstrapped with.
 // 1. Check that there is no problem connecting directly to the AN provided and retrieve a protocol snapshot
 // 2. Check that the chain moved atleast 20 blocks from when the node was bootstrapped by comparing
 // head of the rootSnapshot with the head of the snapshot we retrieved directly from the AN
@@ -585,4 +588,21 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 	require.NoError(s.T(), err)
 	require.Contains(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected node ID to be present in proposed table returned by new AN.")
 
+}
+
+// assertNetworkHealthyAfterVNChange after an verification node is removed or added to the network
+// this func can be used to perform sanity.
+// 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
+func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo)  {
+	bootstrapHead, err := rootSnapshot.Head()
+	require.NoError(s.T(), err)
+
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+
+	head, err := snapshot.Head()
+	require.NoError(s.T(), err)
+
+	// head should now be at-least 20 blocks higher from when we started
+	require.True(s.T(), head.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height))
 }

@@ -126,17 +126,26 @@ func (s *Suite) TestViewsProgress() {
 	}
 }
 
-// TestEpochJoinAndLeave will stake a node by submitting all the transactions
+// the following Epoch join and Leave test will stake a node by submitting all the transactions
 // that an node operator would submit, start a new container for that node, and remove
 // a container from the network of the same node type. After this orchestration assertions
 // specific to that node type are made to ensure the network is healthy.
-func (s *Suite) TestEpochJoinAndLeave() {
+
+// TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions related to the node change
+func (s *Suite) TestEpochJoinAndLeaveAN() {
+	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
+}
+
+// TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions related to the node change
+func (s *Suite) TestEpochJoinAndLeaveVN() {
+	s.runTestEpochJoinAndLeave(flow.RoleVerification, s.assertNetworkHealthyAfterVNChange)
+}
+
+func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth nodeUpdateValidation) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
 	env := utils.LocalnetEnv()
-
-	role := flow.RoleAccess
 
 	// grab the first container of this node role type, this is the container we will replace
 	containerToReplace := s.getContainerToReplace(role)
@@ -159,17 +168,19 @@ func (s *Suite) TestEpochJoinAndLeave() {
 	testContainer.WriteRootSnapshot(snapshot)
 	testContainer.Container.Start(ctx)
 
+	currentEpochFinalView, err := snapshot.Epochs().Current().FinalView()
+	require.NoError(s.T(), err)
+
+	// wait for the first view of the next epoch pause our container to replace
+	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+20)
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
 
-	// wait for new container to startup and start processing blocks
-	// wait for end of second phase of the DKG
-	dkgPhase1FinalView, err := snapshot.Epochs().Current().DKGPhase1FinalView()
-	require.NoError(s.T(), err)
-	s.BlockState.WaitForSealedView(s.T(), dkgPhase1FinalView)
+	//wait until 50 views after the next epoch starts
+	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+71)
 
-	// make sure the network is healthy after adding new AN
-	s.assertNetworkHealthyAfterANChange(ctx, env, snapshot, info)
+	// make sure the network is healthy after adding new node
+	checkNetworkHealth(ctx, env, snapshot, info)
 
 	s.net.StopContainers()
 }
