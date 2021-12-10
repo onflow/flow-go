@@ -3,6 +3,8 @@ package backdata
 import (
 	"encoding/binary"
 
+	zlog "github.com/rs/zerolog/log"
+
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/arraylinkedlist"
 )
@@ -10,6 +12,12 @@ import (
 const (
 	bucketSize = uint64(16)
 )
+
+// bIndex is data type representing a bucket index.
+type bIndex uint64
+
+// sIndex is data type representing a slot index in a bucket.
+type sIndex uint64
 
 type key struct {
 	keyIndex   uint64 // slot age
@@ -30,6 +38,9 @@ type ArrayBackData struct {
 	bucketNum uint64 // total number of buckets (i.e., total of buckets)
 	buckets   []keyBucket
 	entities  *arraylinkedlist.EntityDoubleLinkedList
+
+	// temporary data structures for telemetry
+	availableSlotHistogram []uint64
 }
 
 func NewArrayBackData(limit uint32, oversizeFactor uint32, mode arraylinkedlist.EjectionMode) *ArrayBackData {
@@ -40,11 +51,12 @@ func NewArrayBackData(limit uint32, oversizeFactor uint32, mode arraylinkedlist.
 	}
 
 	bd := &ArrayBackData{
-		bucketNum: bucketNum,
-		limit:     uint64(limit),
-		overLimit: uint64(limit * oversizeFactor),
-		buckets:   make([]keyBucket, bucketNum),
-		entities:  arraylinkedlist.NewEntityList(limit, mode),
+		bucketNum:              bucketNum,
+		limit:                  uint64(limit),
+		overLimit:              uint64(limit * oversizeFactor),
+		buckets:                make([]keyBucket, bucketNum),
+		entities:               arraylinkedlist.NewEntityList(limit, mode),
+		availableSlotHistogram: make([]uint64, bucketSize+1),
 	}
 
 	return bd
@@ -52,7 +64,7 @@ func NewArrayBackData(limit uint32, oversizeFactor uint32, mode arraylinkedlist.
 
 // Has checks if we already contain the item with the given hash.
 func (a *ArrayBackData) Has(entityID flow.Identifier) bool {
-	_, ok := a.get(entityID)
+	_, _, _, ok := a.get(entityID)
 	return ok
 }
 
@@ -86,7 +98,8 @@ func (a *ArrayBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flo
 
 // ByID returns the given item from the pool.
 func (a *ArrayBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
-	return a.get(entityID)
+	entity, _, _, ok := a.get(entityID)
+	return entity, ok
 }
 
 // Size will return the total of the backend.
@@ -117,6 +130,12 @@ func (a *ArrayBackData) put(entityID flow.Identifier, entity flow.Entity) bool {
 		return false
 	}
 
+	if _, _, ok := a.linkedEntityOf(bucketIndex, slotToUse); ok {
+		// we are replacing an already linked key with a valid value, hence
+		// we should remove its value from underlying entities list.
+		a.entities.Rem(a.buckets[bucketIndex][slotToUse].valueIndex)
+	}
+
 	a.keyCount++
 	entityIndex := a.entities.Add(entityID, entity, a.ownerIndexOf(bucketIndex, slotToUse))
 	a.buckets[bucketIndex][slotToUse].keyIndex = a.keyCount
@@ -125,18 +144,18 @@ func (a *ArrayBackData) put(entityID flow.Identifier, entity flow.Entity) bool {
 	return true
 }
 
-func (a ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bool) {
+func (a *ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bIndex, sIndex, bool) {
 	idPrefix, bucketIndex := a.idPrefixAndBucketIndex(entityID)
 	for k := uint64(0); k < bucketSize; k++ {
 		if a.buckets[bucketIndex][k].idPrefix != idPrefix {
 			continue
 		}
 
-		id, entity, linked := a.linkedEntityOf(bucketIndex, k)
+		id, entity, linked := a.linkedEntityOf(bucketIndex, sIndex(k))
 		if !linked {
 			// valueIndex does not represent value entity for this key
 			// this happens upon an ejection on values
-			return nil, false
+			return nil, 0, 0, false
 		}
 
 		// come here to check remaining hash bits
@@ -144,20 +163,20 @@ func (a ArrayBackData) get(entityID flow.Identifier) (flow.Entity, bool) {
 			continue
 		}
 
-		return entity, true
+		return entity, bucketIndex, sIndex(k), true
 	}
 
-	return nil, false
+	return nil, 0, 0, false
 }
 
-func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (uint32, uint64) {
+func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (uint32, bIndex) {
 	// uint64(id[0:8]) used to compute bucket index for which this key (i.e., id) belongs to
 	bucketIndex := binary.LittleEndian.Uint64(id[0:8]) % a.bucketNum
 
 	// uint32(id[8:12]) used to compute a shorter key for this id to represent in memory.
 	idPrefix := binary.LittleEndian.Uint32(id[8:12])
 
-	return idPrefix, bucketIndex
+	return idPrefix, bIndex(bucketIndex)
 }
 
 func (a ArrayBackData) expiryThreshold() uint64 {
@@ -169,10 +188,10 @@ func (a ArrayBackData) expiryThreshold() uint64 {
 	return expiryThreshold
 }
 
-func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entityID flow.Identifier) (uint64, bool) {
+func (a *ArrayBackData) slotInBucket(bucketIndex bIndex, idPrefix uint32, entityID flow.Identifier) (sIndex, bool) {
 	slotToUse := uint64(0)
 	expiryThreshold := a.expiryThreshold()
-
+	availableSlotCount := uint64(0)
 	oldestKeyInBucket := a.keyCount + 1 // use oldest kvCount in bucket to help with random ejection mode
 	for k := uint64(0); k < bucketSize; k++ {
 		if a.buckets[bucketIndex][k].keyIndex < oldestKeyInBucket {
@@ -183,6 +202,7 @@ func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entity
 		if a.buckets[bucketIndex][k].keyIndex <= expiryThreshold {
 			// come here if slot technically expired or never assigned
 			// TODO: count it as an available slot
+			availableSlotCount++
 			continue
 		}
 
@@ -192,8 +212,10 @@ func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entity
 		}
 
 		// come here to check if kvIndex / kvOwner still linked
-		id, _, linked := a.linkedEntityOf(bucketIndex, k)
+		id, _, linked := a.linkedEntityOf(bucketIndex, sIndex(k))
 		if !linked {
+			availableSlotCount++
+			slotToUse = k
 			continue
 		}
 
@@ -203,23 +225,38 @@ func (a *ArrayBackData) slotInBucket(bucketIndex uint64, idPrefix uint32, entity
 		}
 
 		// entity ID already exists in the bucket
+		a.availableSlotHistogram[availableSlotCount]++
 		return 0, false
 	}
 
-	return slotToUse, true
+	a.availableSlotHistogram[availableSlotCount]++
+	return sIndex(slotToUse), true
 }
 
-func (a ArrayBackData) ownerIndexOf(bucketIndex uint64, slotIndex uint64) uint64 {
-	return (bucketIndex * bucketSize) + slotIndex
+func (a ArrayBackData) ownerIndexOf(bucketIndex bIndex, slotIndex sIndex) uint64 {
+	return (uint64(bucketIndex) * bucketSize) + uint64(slotIndex)
 }
 
-func (a *ArrayBackData) linkedEntityOf(bucketIndex uint64, slot uint64) (flow.Identifier, flow.Entity, bool) {
+func (a *ArrayBackData) linkedEntityOf(bucketIndex bIndex, slot sIndex) (flow.Identifier, flow.Entity, bool) {
+	if a.buckets[bucketIndex][slot].keyIndex == 0 {
+		// slot never used, or recently invalidated, hence
+		// does not have any linked entity
+		return flow.Identifier{}, nil, false
+	}
+
 	valueIndex := a.buckets[bucketIndex][slot].valueIndex
 	id, entity, owner := a.entities.Get(valueIndex)
-	if ((bucketIndex * bucketSize) + slot) != owner {
+	if a.ownerIndexOf(bucketIndex, slot) != owner {
 		// TODO invalidate bucket index
 		a.buckets[bucketIndex][slot].keyIndex = 0 // kvIndex / kvOwner no longer linked
 		return flow.Identifier{}, nil, false
 	}
+
 	return id, entity, true
+}
+
+func (a ArrayBackData) printTelemetry() {
+	for i := range a.availableSlotHistogram {
+		zlog.Info().Int("i", i).Uint64("slots", a.availableSlotHistogram[i]).Msg("available")
+	}
 }
