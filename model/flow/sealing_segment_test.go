@@ -89,7 +89,7 @@ func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.Block) {
 // Tests the case where a receipt in the segment references a result outside it.
 // The result should still be included in the sealing segment.
 //
-// B1(Receipt_prior,Seal_prior) <- B2(R1) <- B3 <- B4(S1)
+// B1(R*,S*) <- B2(R1) <- B4(S1)
 func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
 
 	// B1 contains a receipt (but no result) and seal for a prior block
@@ -97,20 +97,18 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
 	block1.SetPayload(unittest.PayloadFixture(unittest.WithReceiptsAndNoResults(suite.priorReceipt), unittest.WithSeals(suite.priorSeal)))
 
 	block2 := unittest.BlockWithParentFixture(block1.Header)
-	receipt, seal := unittest.ReceiptAndSealForBlock(&block1)
-	block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt)))
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+	block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
 
 	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
 
-	block4 := unittest.BlockWithParentFixture(block3.Header)
-	block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal)))
-
-	suite.AddBlocks(&block1, block2, block3, block4)
+	suite.AddBlocks(&block1, block2, block3)
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
 
-	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{&block1, block2, block3, block4}, segment.Blocks)
+	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{&block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
 	require.Equal(suite.T(), suite.priorReceipt.ExecutionResult.ID(), segment.ExecutionResults[0].ID())
 }
@@ -149,60 +147,60 @@ func (suite *SealingSegmentSuite) TestBuild_MissingFirstBlockSeal() {
 // Tests the case where a seal contained in a segment block payloads references
 // a missing result. The result should still be included in the segment.
 //
-// B1(S*,R*) <- B2(R1,S**) <- B4(S1)
+// B1(S*,R*) <- B2(R1,S**) <- B3(S1)
 func (suite *SealingSegmentSuite) TestBuild_MissingResultFromPayloadSeal() {
 
 	block1 := suite.FirstBlock()
 
+	// create a seal referencing some past receipt/block
+	pastResult := unittest.ExecutionResultFixture()
+	suite.addResult(pastResult)
+	pastSeal := unittest.Seal.Fixture()
+	pastSeal.ResultID = pastResult.ID()
+
 	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 	block2 := unittest.BlockWithParentFixture(block1.Header)
-	block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+	block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1), unittest.WithSeals(pastSeal)))
 
 	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
 
-	block4 := unittest.BlockWithParentFixture(block3.Header)
-	block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
-
-	suite.AddBlocks(&block1, block2, block3, block4)
+	suite.AddBlocks(block1, block2, block3)
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
 
-	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{&block1, block2, block3, block4}, segment.Blocks)
+	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
-	require.Equal(suite.T(), suite.priorReceipt.ExecutionResult.ID(), segment.ExecutionResults[0].ID())
-}
-
-// Tests the case where a seal included because the first block contains no seal
-// references a missing result. The result should still be included in the segment.
-//
-// B*(S*) <- B1 <- B2(R1) <- B4(S1)
-func (suite *SealingSegmentSuite) TestBuild_MissingResultFromFirstBlockSeal() {
-	// TODO
+	require.Equal(suite.T(), pastResult.ID(), segment.ExecutionResults[0].ID())
 }
 
 // TestBuild_RootSegment tests we can build a valid root sealing segment.
 func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 
-	block1 := unittest.GenesisFixture()
-	err := suite.builder.AddBlock(block1)
+	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5))
+	suite.sealsByBlockID[root.ID()] = seal
+	suite.addResult(result)
+	err := suite.builder.AddBlock(root)
 	require.NoError(suite.T(), err)
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
 
-	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{block1}, segment.Blocks)
-	require.Equal(suite.T(), segment.Highest().ID(), block1.ID())
-	require.Equal(suite.T(), segment.Lowest().ID(), block1.ID())
+	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{root}, segment.Blocks)
+	require.Equal(suite.T(), segment.Highest().ID(), root.ID())
+	require.Equal(suite.T(), segment.Lowest().ID(), root.ID())
 }
 
 // TestBuild_RootSegmentWrongView tests that we return ErrSegmentInvalidRootView for
 // a single-block sealing segment with a block view not equal to 0.
 func (suite *SealingSegmentSuite) TestBuild_RootSegmentWrongView() {
 
-	block1 := unittest.BlockFixture()
-	block1.Header.View = uint64(1)
-	err := suite.builder.AddBlock(&block1)
+	root, result, seal := unittest.BootstrapFixture(unittest.IdentityListFixture(5))
+	root.Header.View = 10 // invalid root block view
+	suite.sealsByBlockID[root.ID()] = seal
+	suite.addResult(result)
+	err := suite.builder.AddBlock(root)
 	require.NoError(suite.T(), err)
 
 	_, err = suite.builder.SealingSegment()
@@ -215,7 +213,23 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegmentWrongView() {
 //
 // B1(S*) <- B2(R1) <- B3(S1) <- B4
 func (suite *SealingSegmentSuite) TestBuild_HighestContainsNoSeals() {
+	block1 := suite.FirstBlock()
 
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
+
+	block4 := unittest.BlockWithParentFixture(block3.Header)
+
+	suite.AddBlocks(block1, block2, block3, block4)
+
+	segment, err := suite.builder.SealingSegment()
+	require.NoError(suite.T(), err)
+
+	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{block1, block2, block3, block4}, segment.Blocks)
 }
 
 // Test that we should return ErrSegmentMissingSeal if highest block contains
@@ -223,7 +237,24 @@ func (suite *SealingSegmentSuite) TestBuild_HighestContainsNoSeals() {
 //
 // B1(S*) <- B2(R1) <- B3(S1,R2) <- B4(S2)
 func (suite *SealingSegmentSuite) TestBuild_HighestContainsWrongSeal() {
+	block1 := suite.FirstBlock()
 
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+
+	receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal1)))
+
+	// highest block contains wrong seal - invalid
+	block4 := unittest.BlockWithParentFixture(block3.Header)
+	block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal2)))
+
+	suite.AddBlocks(block1, block2, block3, block4)
+
+	_, err := suite.builder.SealingSegment()
+	require.ErrorIs(suite.T(), err, flow.ErrSegmentMissingSeal)
 }
 
 // Test that we should return ErrSegmentMissingSeal if highest block contains
@@ -232,7 +263,26 @@ func (suite *SealingSegmentSuite) TestBuild_HighestContainsWrongSeal() {
 //
 // B1(S*) <- B2(R1) <- B3(S1,R2) <- B4(S2) <- B5
 func (suite *SealingSegmentSuite) TestBuild_HighestAncestorContainsWrongSeal() {
+	block1 := suite.FirstBlock()
 
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+
+	receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt2), unittest.WithSeals(seal1)))
+
+	// ancestor of highest block contains wrong seal - invalid
+	block4 := unittest.BlockWithParentFixture(block3.Header)
+	block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal2)))
+
+	block5 := unittest.BlockWithParentFixture(block4.Header)
+
+	suite.AddBlocks(block1, block2, block3, block4, block5)
+
+	_, err := suite.builder.SealingSegment()
+	require.ErrorIs(suite.T(), err, flow.ErrSegmentMissingSeal)
 }
 
 // Test that we should return ErrSegmentBlocksWrongLen if sealing segment is
@@ -241,6 +291,21 @@ func (suite *SealingSegmentSuite) TestBuild_NoBlocks() {
 	builder := flow.NewSealingSegmentBuilder(nil, nil)
 	_, err := builder.SealingSegment()
 	require.ErrorIs(suite.T(), err, flow.ErrSegmentBlocksWrongLen)
+}
+
+// should return ErrSegmentInvalidBlockHeight if block has invalid height
+func (suite *SealingSegmentSuite) TestAddBlock_InvalidHeight() {
+
+	block1 := suite.FirstBlock()
+	// block 2 has an invalid height
+	block2 := unittest.BlockFixture()
+	block2.Header.Height = block1.Header.Height + 2
+
+	err := suite.builder.AddBlock(block1)
+	require.NoError(suite.T(), err)
+
+	err = suite.builder.AddBlock(&block2)
+	require.ErrorIs(suite.T(), err, flow.ErrSegmentInvalidBlockHeight)
 }
 
 // TestAddBlock_StorageError tests that errors in the resource getters bubble up.
@@ -271,26 +336,6 @@ func TestAddBlock_StorageError(t *testing.T) {
 		builder := flow.NewSealingSegmentBuilder(nil, sealLookup)
 
 		err := builder.AddBlock(&block1)
-		require.ErrorIs(t, err, flow.ErrSegmentResultLookup) // TODO sentinel type
+		require.ErrorIs(t, err, flow.ErrSegmentSealLookup)
 	})
-}
-
-// should return ErrSegmentInvalidBlockHeight if block has invalid height
-func TestAddBlock_InvalidHeight(t *testing.T) {
-
-	block1 := unittest.BlockFixture()
-	// block 2 has an invalid height
-	block2 := unittest.BlockFixture()
-	block2.Header.Height = block1.Header.Height + 2
-
-	// ignore all lookups
-	resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, nil }
-	sealLookup := func(flow.Identifier) (*flow.Seal, error) { return nil, nil }
-	builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup)
-
-	err := builder.AddBlock(&block1)
-	require.NoError(t, err)
-
-	err = builder.AddBlock(&block2)
-	require.ErrorIs(t, err, flow.ErrSegmentInvalidBlockHeight)
 }

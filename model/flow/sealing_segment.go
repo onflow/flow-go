@@ -104,7 +104,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	}
 
 	// construct a list of missing result IDs referenced by this block
-	var missingResultIDs IdentifierList
+	missingResultIDs := make(map[Identifier]struct{})
 
 	// for the first (lowest) block, if it contains no seal, retrieve the latest
 	// seal incorporated prior to the first block
@@ -116,7 +116,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 			}
 			builder.firstSeal = seal
 			// add first seal result ID here, since it isn't in payload
-			missingResultIDs = append(missingResultIDs, seal.ResultID)
+			missingResultIDs[seal.ResultID] = struct{}{}
 		}
 	}
 
@@ -128,17 +128,17 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 
 	for _, receipt := range block.Payload.Receipts {
 		if _, ok := builder.includedResults[receipt.ResultID]; !ok {
-			missingResultIDs = append(missingResultIDs, receipt.ResultID)
+			missingResultIDs[receipt.ResultID] = struct{}{}
 		}
 	}
 	for _, seal := range block.Payload.Seals {
 		if _, ok := builder.includedResults[seal.ResultID]; !ok {
-			missingResultIDs = append(missingResultIDs, seal.ResultID)
+			missingResultIDs[seal.ResultID] = struct{}{}
 		}
 	}
 
 	// add the missing results
-	for _, resultID := range missingResultIDs {
+	for resultID := range missingResultIDs {
 		result, err := builder.resultLookup(resultID)
 		if err != nil {
 			return fmt.Errorf("%w: (%x) %v", ErrSegmentResultLookup, resultID, err)
