@@ -55,6 +55,34 @@ import (
 
 const hotstuffTimeout = 100 * time.Millisecond
 
+type ConsensusParticipants struct {
+	lookup map[flow.Identifier]run.Participant
+}
+
+func NewConsensusParticipants(data *run.ParticipantData) *ConsensusParticipants {
+	lookup := make(map[flow.Identifier]run.Participant)
+	for _, pariticpant := range data.Participants {
+		lookup[pariticpant.NodeID] = pariticpant
+	}
+	return &ConsensusParticipants{
+		lookup: lookup,
+	}
+}
+
+func (p *ConsensusParticipants) Lookup(nodeID flow.Identifier) *run.Participant {
+	participant, ok := p.lookup[nodeID]
+	if ok {
+		return &participant
+	}
+	return nil
+}
+
+func (p *ConsensusParticipants) AddParticipants(participants ...run.Participant) {
+	for _, participant := range participants {
+		p.lookup[participant.NodeID] = participant
+	}
+}
+
 type Node struct {
 	db         *badger.DB
 	dbDir      string
@@ -79,13 +107,16 @@ func (n *Node) Shutdown() {
 // finalizedCount - the number of finalized blocks before stopping the tests
 // tolerate - the number of node to tolerate that don't need to reach the finalization count
 // 						before stopping the tests
-func createNodes(t *testing.T, participantData *run.ParticipantData, rootSnapshot protocol.Snapshot, stopper *Stopper) ([]*Node, *Hub) {
-	consensus := participantData.Identities()
+func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot protocol.Snapshot, stopper *Stopper) ([]*Node, *Hub) {
+	consensus, err := rootSnapshot.Identities(filter.HasRole(flow.RoleConsensus))
+	require.NoError(t, err)
 
 	hub := NewNetworkHub()
 	nodes := make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
-		node := createNode(t, &participantData.Participants[i], i, identity, rootSnapshot, hub, stopper)
+		consensusParticipant := participants.Lookup(identity.NodeID)
+		require.NotNil(t, consensusParticipant)
+		node := createNode(t, consensusParticipant, i, identity, rootSnapshot, hub, stopper)
 		nodes = append(nodes, node)
 	}
 
@@ -107,7 +138,6 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 
 	// add other roles to create a complete identity list
 	participants := unittest.CompleteIdentitySet(consensusParticipants...)
-
 	participants.Sort(order.ByNodeIDAsc)
 
 	dkgParticipantsKeys := make([]crypto.PublicKey, 0, len(consensusParticipants))
@@ -139,29 +169,44 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 	return root, result, seal
 }
 
+func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
+	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(order.ByNodeIDAsc)
+	infos := make([]bootstrap.NodeInfo, 0, n)
+	for _, node := range consensus {
+		networkPrivKey := unittest.NetworkingPrivKeyFixture()
+		stakingPrivKey := unittest.StakingPrivKeyFixture()
+		nodeInfo := bootstrap.NewPrivateNodeInfo(
+			node.NodeID,
+			node.Role,
+			node.Address,
+			node.Stake,
+			networkPrivKey,
+			stakingPrivKey,
+		)
+		infos = append(infos, nodeInfo)
+	}
+	return infos
+}
+
 func createConsensusIdentities(t *testing.T, n int) *run.ParticipantData {
 	// create n consensus node participants
-	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(order.ByNodeIDAsc)
-	dkgData, err := bootstrapDKG.RunFastKG(n, unittest.RandomBytes(32))
+	consensus := createPrivateNodeIdentities(n)
+	return completeConsensusIdentities(t, consensus)
+}
+
+// completeConsensusIdentities runs KG process and fills nodeInfos with missing random beacon keys
+func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *run.ParticipantData {
+	dkgData, err := bootstrapDKG.RunFastKG(len(nodeInfos), unittest.RandomBytes(48))
 	require.NoError(t, err)
 
 	participantData := &run.ParticipantData{
-		Participants: make([]run.Participant, 0, len(consensus)),
+		Participants: make([]run.Participant, 0, len(nodeInfos)),
 		Lookup:       make(map[flow.Identifier]flow.DKGParticipant),
 		GroupKey:     dkgData.PubGroupKey,
 	}
-	for index, node := range consensus {
-		networkPrivKey := unittest.NetworkingPrivKeyFixture()
-		stakingPrivKey := unittest.StakingPrivKeyFixture()
+	for index, node := range nodeInfos {
 		participant := run.Participant{
-			NodeInfo: bootstrap.NewPrivateNodeInfo(
-				node.NodeID,
-				node.Role,
-				node.Address,
-				node.Stake,
-				networkPrivKey,
-				stakingPrivKey,
-			),
+			NodeInfo:            node,
 			RandomBeaconPrivKey: dkgData.PrivKeyShares[index],
 		}
 		participantData.Participants = append(participantData.Participants, participant)

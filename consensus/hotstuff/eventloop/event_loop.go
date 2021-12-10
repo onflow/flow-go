@@ -57,6 +57,7 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 			el.log.Info().Msgf("starting event loop")
 			err := el.loop(ctx)
 			if err != nil {
+				el.log.Error().Err(err).Msg("irrecoverable event loop error")
 				ctx.Throw(err)
 			}
 		}
