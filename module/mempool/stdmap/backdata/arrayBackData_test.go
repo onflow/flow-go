@@ -2,7 +2,9 @@ package backdata
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -109,7 +111,7 @@ func TestArrayBackData_AddDuplicate(t *testing.T) {
 }
 
 // TestArrayBackData_All_BelowLimit checks correctness of All method when mempool is not full yet.
-func TestArrayBackData_All_BelowLimit(t *testing.T) {
+func TestArrayBackData_All(t *testing.T) {
 	tt := []struct {
 		limit        uint32
 		items        uint32
@@ -161,6 +163,60 @@ func TestArrayBackData_All_BelowLimit(t *testing.T) {
 	}
 }
 
+// TestArrayBackData_Rem checks correctness of All method when mempool is not full yet.
+func TestArrayBackData_Rem(t *testing.T) {
+	tt := []struct {
+		limit uint32
+		items uint32
+		from  int // index start to be removed (set -1 to remove randomly)
+		count int // total elements to be removed
+	}{
+		{ // removing range from mempool with items below its limit
+			limit: 100_000,
+			items: 10_000,
+			from:  188,
+			count: 2012,
+		},
+		{ // removing range from full mempool
+			limit: 100_000,
+			items: 100_000,
+			from:  50_333,
+			count: 6667,
+		},
+		{ // removing random from mempool with items below its limit
+			limit: 100_000,
+			items: 10_000,
+			from:  -1,
+			count: 6888,
+		},
+		{ // removing random from full mempool
+			limit: 100_000,
+			items: 10_000,
+			from:  -1,
+			count: 7328,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(fmt.Sprintf("%d-limit-%d-items-%dfrom-%dcount", tc.limit, tc.items, tc.from, tc.count), func(t *testing.T) {
+			bd := NewArrayBackData(tc.limit, 8, arraylinkedlist.RandomEjection)
+			entities := unittest.EntityListFixture(uint(tc.items))
+
+			testAddEntities(t, bd, entities)
+
+			if tc.from == -1 {
+				// random removal
+				testRemoveAtRandom(t, bd, entities, tc.count)
+				// except removed ones, the rest must be retrievable
+				testRetrievableCount(t, bd, entities, uint64(int(tc.items)-tc.count))
+			} else {
+				testRemoveRange(t, bd, entities, tc.from, tc.from+tc.count)
+				testCheckRangeRemoved(t, bd, entities, tc.from, tc.from+tc.count)
+			}
+		})
+	}
+}
+
 // testAddEntities is a test helper that checks entities are added successfully to the backdata.
 // and each entity is retrievable right after it is written to backdata.
 func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity) {
@@ -198,6 +254,45 @@ func testRetrievableFrom(t *testing.T, bd *ArrayBackData, entities []*unittest.M
 			require.True(t, ok)
 			require.Equal(t, expected, actual)
 		}
+	}
+}
+
+func testRemoveAtRandom(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, count int) {
+	for removedCount := 0; removedCount < count; {
+		unittest.RequireReturnsBefore(t, func() {
+			index := rand.Int() % len(entities)
+			expected, removed := bd.Rem(entities[index].ID())
+			if !removed {
+				return
+			}
+			require.Equal(t, entities[index], expected)
+			removedCount++
+			// size sanity check after removal
+			require.Equal(t, bd.Size(), uint(len(entities)-removedCount))
+		}, 100*time.Millisecond, "could not find element to remove")
+	}
+}
+
+func testRemoveRange(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, from int, to int) {
+	for i := from; i < to; i++ {
+		expected, removed := bd.Rem(entities[i].ID())
+		require.True(t, removed)
+		require.Equal(t, entities[i], expected)
+		// size sanity check after removal
+		require.Equal(t, bd.Size(), uint(len(entities)-(i-from)-1))
+	}
+}
+
+func testCheckRangeRemoved(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, from int, to int) {
+	for i := from; i < to; i++ {
+		// bot removal and retrieval must fail
+		expected, removed := bd.Rem(entities[i].ID())
+		require.False(t, removed)
+		require.Nil(t, expected)
+
+		expected, exists := bd.ByID(entities[i].ID())
+		require.False(t, exists)
+		require.Nil(t, expected)
 	}
 }
 
