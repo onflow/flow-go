@@ -21,10 +21,8 @@ import (
 const maxAllowedScriptArgumentsCnt = 100
 const signatureLength = 64
 const maxAuthorizersCnt = 100
-const MaxAllowedIDs = 50 // todo(sideninja) discuss if we should restrict maximum on all IDs collection or is anywhere required more thant this
+const MaxAllowedIDs = 50
 const MaxAllowedHeights = 50
-
-var MaxAllowedQueryIDs = MaxAllowedIDs
 
 // Converters section from request data to typed models
 // all methods names in this section are prefixed with 'to'
@@ -68,8 +66,8 @@ func toIDs(ids string) ([]flow.Identifier, error) {
 
 	reqIDs := strings.Split(ids, ",")
 
-	if len(reqIDs) > MaxAllowedQueryIDs {
-		return nil, fmt.Errorf("at most %d IDs can be requested at a time", MaxAllowedQueryIDs)
+	if len(reqIDs) > MaxAllowedIDs {
+		return nil, fmt.Errorf("at most %d IDs can be requested at a time", MaxAllowedIDs)
 	}
 
 	resIDs := make([]flow.Identifier, len(reqIDs))
@@ -198,17 +196,18 @@ func toTransactionSignature(transactionSignature *generated.TransactionSignature
 }
 
 func toTransactionSignatures(sigs []generated.TransactionSignature) ([]flow.TransactionSignature, error) {
+	// transaction signatures can be empty in that case we shouldn't convert them
 	if len(sigs) == 0 {
 		return nil, nil
 	}
 	signatures := make([]flow.TransactionSignature, len(sigs))
-	for x, sig := range sigs {
+	for i, sig := range sigs {
 		signature, err := toTransactionSignature(&sig)
 		if err != nil {
 			return nil, err
 		}
 
-		signatures[x] = signature
+		signatures[i] = signature
 	}
 
 	return signatures, nil
@@ -232,25 +231,22 @@ func toTransaction(tx generated.TransactionsBody) (flow.TransactionBody, error) 
 	if len(tx.Authorizers) == 0 {
 		return flow.TransactionBody{}, fmt.Errorf("authorizers not provided")
 	}
+	if len(tx.Authorizers) > maxAuthorizersCnt {
+		return flow.TransactionBody{}, fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizersCnt)
+	}
 	if len(tx.EnvelopeSignatures) == 0 {
-		return flow.TransactionBody{}, fmt.Errorf("envelope sigantures not provided")
+		return flow.TransactionBody{}, fmt.Errorf("envelope signatures not provided")
 	}
 	if tx.ReferenceBlockId == "" {
 		return flow.TransactionBody{}, fmt.Errorf("reference block not provided")
 	}
-	if len(tx.Authorizers) > maxAuthorizersCnt {
-		return flow.TransactionBody{}, fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizersCnt)
-	}
-	//if len(tx.Script) > MaxScriptLength { todo(sideninja) define limit
-	//	return flow.TransactionBody{}, fmt.Errorf("script exceeding the size limit")
-	//}
 
 	// script arguments come in as a base64 encoded strings, decode base64 back to a string here
 	var args [][]byte
-	for _, arg := range tx.Arguments {
+	for i, arg := range tx.Arguments {
 		decodedArg, err := fromBase64(arg)
 		if err != nil {
-			return flow.TransactionBody{}, fmt.Errorf("invalid arguments encoding")
+			return flow.TransactionBody{}, fmt.Errorf("invalid argument encoding with index: %d", i)
 		}
 		args = append(args, decodedArg)
 	}
@@ -266,13 +262,13 @@ func toTransaction(tx generated.TransactionsBody) (flow.TransactionBody, error) 
 	}
 
 	auths := make([]flow.Address, len(tx.Authorizers))
-	for x, auth := range tx.Authorizers {
+	for i, auth := range tx.Authorizers {
 		a, err := toAddress(auth)
 		if err != nil {
 			return flow.TransactionBody{}, err
 		}
 
-		auths[x] = a
+		auths[i] = a
 	}
 
 	payloadSigs, err := toTransactionSignatures(tx.PayloadSignatures)
@@ -315,7 +311,6 @@ func toTransaction(tx generated.TransactionsBody) (flow.TransactionBody, error) 
 }
 
 func toScriptArgs(script generated.ScriptsBody) ([][]byte, error) {
-	// todo(sideninja) validate
 	args := make([][]byte, len(script.Arguments))
 	for i, a := range script.Arguments {
 		arg, err := fromBase64(a)
@@ -353,7 +348,7 @@ func transactionSignatureResponse(signatures []flow.TransactionSignature) []gene
 	for i, sig := range signatures {
 		sigs[i] = generated.TransactionSignature{
 			Address:     sig.Address.String(),
-			SignerIndex: fmt.Sprintf("%d", sig.SignerIndex),
+			SignerIndex: fromUint64(uint64(sig.SignerIndex)),
 			KeyIndex:    fromUint64(sig.KeyIndex),
 			Signature:   toBase64(sig.Signature),
 		}
@@ -363,14 +358,14 @@ func transactionSignatureResponse(signatures []flow.TransactionSignature) []gene
 }
 
 func transactionResponse(tx *flow.TransactionBody, txr *access.TransactionResult, link LinkGenerator) *generated.Transaction {
-	var args []string
-	for _, arg := range tx.Arguments {
-		args = append(args, toBase64(arg))
+	args := make([]string, len(tx.Arguments))
+	for i, arg := range tx.Arguments {
+		args[i] = toBase64(arg)
 	}
 
-	var auths []string
-	for _, auth := range tx.Authorizers {
-		auths = append(auths, auth.String())
+	auths := make([]string, len(tx.Authorizers))
+	for i, auth := range tx.Authorizers {
+		auths[i] = auth.String()
 	}
 
 	var result *generated.TransactionResult
@@ -406,8 +401,8 @@ func eventResponse(event flow.Event) generated.Event {
 	return generated.Event{
 		Type_:            string(event.Type),
 		TransactionId:    event.TransactionID.String(),
-		TransactionIndex: fmt.Sprintf("%d", event.TransactionIndex),
-		EventIndex:       fmt.Sprintf("%d", event.EventIndex),
+		TransactionIndex: fromUint64(uint64(event.TransactionIndex)),
+		EventIndex:       fromUint64(uint64(event.EventIndex)),
 		Payload:          toBase64(event.Payload),
 	}
 }
@@ -516,8 +511,8 @@ func aggregatedApprovalSignaturesResponse(signatures []flow.AggregatedSignature)
 		}
 
 		signerIDs := make([]string, len(signature.SignerIDs))
-		for x, signerID := range signature.SignerIDs {
-			signerIDs[x] = signerID.String()
+		for j, signerID := range signature.SignerIDs {
+			signerIDs[j] = signerID.String()
 		}
 
 		response[i] = generated.AggregatedSignature{
@@ -615,12 +610,12 @@ func accountKeysResponse(keys []flow.AccountPublicKey) []generated.AccountPublic
 		hashAlgo := generated.HashingAlgorithm(k.HashAlgo.String())
 
 		keysResponse[i] = generated.AccountPublicKey{
-			Index:            fmt.Sprintf("%d", k.Index),
+			Index:            fromUint64(uint64(k.Index)),
 			PublicKey:        k.PublicKey.String(),
 			SigningAlgorithm: &sigAlgo,
 			HashingAlgorithm: &hashAlgo,
-			SequenceNumber:   fmt.Sprintf("%d", k.SeqNumber),
-			Weight:           fmt.Sprintf("%d", k.Weight),
+			SequenceNumber:   fromUint64(k.SeqNumber),
+			Weight:           fromUint64(uint64(k.Weight)),
 			Revoked:          k.Revoked,
 		}
 	}
@@ -632,7 +627,7 @@ func accountResponse(flowAccount *flow.Account, link LinkGenerator, expand map[s
 
 	account := generated.Account{
 		Address: flowAccount.Address.String(),
-		Balance: fmt.Sprintf("%d", flowAccount.Balance),
+		Balance: fromUint64(flowAccount.Balance),
 	}
 
 	// TODO: change spec to include default values (so that this doesn't need to be done)

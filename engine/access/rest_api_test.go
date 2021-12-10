@@ -114,8 +114,8 @@ func TestRestAPI(t *testing.T) {
 
 func (suite *RestAPITestSuite) TestGetBlock() {
 
-	testBlockIDs := make([]string, rest.MaxAllowedQueryIDs)
-	testBlocks := make([]*flow.Block, rest.MaxAllowedQueryIDs)
+	testBlockIDs := make([]string, rest.MaxAllowedIDs)
+	testBlocks := make([]*flow.Block, rest.MaxAllowedIDs)
 	for i := range testBlockIDs {
 		collections := unittest.CollectionListFixture(1)
 		block := unittest.BlockWithGuaranteesFixture(
@@ -167,7 +167,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		actualBlocks, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, optionsForBlockByID())
 		require.NoError(suite.T(), err)
 		assert.Equal(suite.T(), http.StatusOK, resp.StatusCode)
-		assert.Len(suite.T(), actualBlocks, rest.MaxAllowedQueryIDs)
+		assert.Len(suite.T(), actualBlocks, rest.MaxAllowedIDs)
 		for i, b := range testBlocks {
 			assert.Equal(suite.T(), b.ID().String(), actualBlocks[i].Header.Id)
 		}
@@ -265,13 +265,13 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 		defer cancel()
 
-		blockIDs := make([]string, rest.MaxAllowedQueryIDs+1)
+		blockIDs := make([]string, rest.MaxAllowedIDs+1)
 		copy(blockIDs, testBlockIDs)
-		blockIDs[rest.MaxAllowedQueryIDs] = unittest.IdentifierFixture().String()
+		blockIDs[rest.MaxAllowedIDs] = unittest.IdentifierFixture().String()
 
 		blockIDSlice := []string{strings.Join(blockIDs, ",")}
 		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, optionsForBlockByID())
-		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", rest.MaxAllowedQueryIDs))
+		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", rest.MaxAllowedIDs))
 	})
 
 	suite.Run("GetBlockByID with one non-existing block ID", func() {
