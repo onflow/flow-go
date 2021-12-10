@@ -103,7 +103,7 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 	// lookup block by start and end height range
 	start, err := toHeight(startHeight)
 	if err != nil {
-		heightError := fmt.Errorf("invalid start height %s: %v", startHeight, err)
+		heightError := fmt.Errorf("invalid start height: %w", err)
 		return nil, NewBadRequestError(heightError)
 	}
 	end, err := toHeight(endHeight)
