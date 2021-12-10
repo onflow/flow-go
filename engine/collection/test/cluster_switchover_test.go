@@ -94,7 +94,6 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 
 // TestClusterSwitchover_Simple is the simplest switchover case with one single-node cluster.
 func TestClusterSwitchover_Simple(t *testing.T) {
-	t.Skip("event loop needs an event handler, which will be replaced later in V2")
 	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
 		clusters:   1,
 		collectors: 1,

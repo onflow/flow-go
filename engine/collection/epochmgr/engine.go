@@ -61,8 +61,7 @@ func NewEpochComponents(
 	builder := component.NewComponentManagerBuilder()
 	// start new worker that will start child components and wait for them to finish
 	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		// start hotstuff and aggregator
-		hotstuff.Start(ctx)
+		// start aggregator, hotstuff will be started by compliance engine
 		aggregator.Start(ctx)
 		// wait until all components start
 		<-util.AllReady(components.prop, components.sync, components.hotstuff, components.aggregator)
