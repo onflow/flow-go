@@ -93,6 +93,16 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 		return blocks, nil
 	}
 
+	// support providing end height as "sealed" or "final"
+	if endHeight == finalHeightQueryParam || endHeight == sealedHeightQueryParam {
+		latest, err := backend.GetLatestBlock(r.Context(), endHeight == sealedHeightQueryParam)
+		if err != nil {
+			return nil, err
+		}
+
+		endHeight = fmt.Sprintf("%d", latest.Header.Height)
+	}
+
 	// lookup block by start and end height range
 	start, err := toHeight(startHeight)
 	if err != nil {
