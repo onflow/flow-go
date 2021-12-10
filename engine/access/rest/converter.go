@@ -669,13 +669,15 @@ func accountResponse(flowAccount *flow.Account, link LinkGenerator, expand map[s
 }
 
 func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkGenerator, expand map[string]bool) (*generated.Block, error) {
-	var responseBlock = new(generated.Block)
-	responseBlock.Header = blockHeaderResponse(blk.Header)
+	self, err := selfLink(blk.ID(), link.BlockLink)
+	if err != nil {
+		return nil, err
+	}
 
-	// add the expandable
-	responseBlock.Expandable = &generated.BlockExpandable{}
-
-	id := blk.ID()
+	response := &generated.Block{
+		Header: blockHeaderResponse(blk.Header),
+		Links:  self,
+	}
 
 	// add the payload to the response if it is specified as an expandable field
 	if expand[ExpandableFieldPayload] {
@@ -683,39 +685,35 @@ func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkG
 		if err != nil {
 			return nil, err
 		}
-		responseBlock.Payload = payloadResp
+		response.Payload = payloadResp
 	} else {
 		// else add the payload expandable link
-		payloadExpandable, err := link.PayloadLink(id)
+		payloadExpandable, err := link.PayloadLink(blk.ID())
 		if err != nil {
 			return nil, err
 		}
-		responseBlock.Expandable.Payload = payloadExpandable
+		response.Expandable.Payload = payloadExpandable
 	}
 
-	// add the execution result to the response if it is specified as an expandable field
-	if expand[ExpandableExecutionResult] {
-		execResultResp, err := executionResultResponse(execResult, link)
-		if err != nil {
-			return nil, err
+	// execution result might not yet exist
+	if execResult != nil {
+		// add the execution result to the response if it is specified as an expandable field
+		if expand[ExpandableExecutionResult] {
+			execResultResp, err := executionResultResponse(execResult, link)
+			if err != nil {
+				return nil, err
+			}
+			response.ExecutionResult = execResultResp
+		} else {
+			// else add the execution result expandable link
+			executionResultExpandable, err := link.ExecutionResultLink(execResult.ID())
+			if err != nil {
+				return nil, err
+			}
+			response.Expandable.ExecutionResult = executionResultExpandable
 		}
-		responseBlock.ExecutionResult = execResultResp
-	} else {
-		// else add the execution result expandable link
-		executionResultExpandable, err := link.ExecutionResultLink(execResult.ID())
-		if err != nil {
-			return nil, err
-		}
-		responseBlock.Expandable.ExecutionResult = executionResultExpandable
 	}
-
-	// add self link
-	self, err := selfLink(id, link.BlockLink)
-	if err != nil {
-		return nil, err
-	}
-	responseBlock.Links = self
 
 	// ship it
-	return responseBlock, nil
+	return response, nil
 }
