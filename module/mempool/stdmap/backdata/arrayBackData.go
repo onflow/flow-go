@@ -75,7 +75,17 @@ func (a *ArrayBackData) Add(entityID flow.Identifier, entity flow.Entity) bool {
 
 // Rem will remove the item with the given hash.
 func (a *ArrayBackData) Rem(entityID flow.Identifier) (flow.Entity, bool) {
-	return nil, false
+	entity, bucketIndex, sliceIndex, exists := a.get(entityID)
+	if !exists {
+		return nil, false
+	}
+	// removes value from underlying list
+	a.invalidateEntity(bucketIndex, sliceIndex)
+
+	// frees up key
+	a.invalidateKey(bucketIndex, sliceIndex)
+
+	return entity, true
 }
 
 // Adjust will adjust the value item using the given function if the given key can be found.
@@ -146,7 +156,7 @@ func (a *ArrayBackData) put(entityID flow.Identifier, entity flow.Entity) bool {
 	if _, _, ok := a.linkedEntityOf(bucketIndex, slotToUse); ok {
 		// we are replacing an already linked key with a valid value, hence
 		// we should remove its value from underlying entities list.
-		a.entities.Rem(a.buckets[bucketIndex][slotToUse].valueIndex)
+		a.invalidateEntity(bucketIndex, slotToUse)
 	}
 
 	a.keyCount++
@@ -272,4 +282,12 @@ func (a ArrayBackData) printTelemetry() {
 	for i := range a.availableSlotHistogram {
 		zlog.Info().Int("i", i).Uint64("slots", a.availableSlotHistogram[i]).Msg("available")
 	}
+}
+
+func (a *ArrayBackData) invalidateKey(bucketIndex bIndex, sliceIndex sIndex) {
+	a.buckets[bucketIndex][sliceIndex].keyIndex = 0
+}
+
+func (a *ArrayBackData) invalidateEntity(bucketIndex bIndex, sliceIndex sIndex) {
+	a.entities.Rem(a.buckets[bucketIndex][sliceIndex].valueIndex)
 }
