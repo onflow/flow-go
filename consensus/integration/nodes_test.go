@@ -1,13 +1,18 @@
 package integration_test
 
 import (
+	"fmt"
 	bootstrapDKG "github.com/onflow/flow-go/cmd/bootstrap/dkg"
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/bootstrap"
+	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow/order"
+	mockmodule "github.com/onflow/flow-go/module/mock"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -55,21 +60,39 @@ import (
 
 const hotstuffTimeout = 100 * time.Millisecond
 
+type RandomBeaconNodeInfo struct {
+	RandomBeaconPrivKey crypto.PrivateKey
+	DKGParticipant      flow.DKGParticipant
+}
+
+type ConsensusParticipant struct {
+	nodeInfo       bootstrap.NodeInfo
+	dkgInfoByEpoch map[uint64]RandomBeaconNodeInfo
+}
+
 type ConsensusParticipants struct {
-	lookup map[flow.Identifier]run.Participant
+	lookup map[flow.Identifier]ConsensusParticipant
 }
 
 func NewConsensusParticipants(data *run.ParticipantData) *ConsensusParticipants {
-	lookup := make(map[flow.Identifier]run.Participant)
+	lookup := make(map[flow.Identifier]ConsensusParticipant)
 	for _, pariticpant := range data.Participants {
-		lookup[pariticpant.NodeID] = pariticpant
+		lookup[pariticpant.NodeID] = ConsensusParticipant{
+			nodeInfo: pariticpant.NodeInfo,
+			dkgInfoByEpoch: map[uint64]RandomBeaconNodeInfo{
+				1: {
+					RandomBeaconPrivKey: pariticpant.RandomBeaconPrivKey,
+					DKGParticipant:      data.Lookup[pariticpant.NodeID],
+				},
+			},
+		}
 	}
 	return &ConsensusParticipants{
 		lookup: lookup,
 	}
 }
 
-func (p *ConsensusParticipants) Lookup(nodeID flow.Identifier) *run.Participant {
+func (p *ConsensusParticipants) Lookup(nodeID flow.Identifier) *ConsensusParticipant {
 	participant, ok := p.lookup[nodeID]
 	if ok {
 		return &participant
@@ -77,9 +100,22 @@ func (p *ConsensusParticipants) Lookup(nodeID flow.Identifier) *run.Participant 
 	return nil
 }
 
-func (p *ConsensusParticipants) AddParticipants(participants ...run.Participant) {
-	for _, participant := range participants {
-		p.lookup[participant.NodeID] = participant
+func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.ParticipantData) {
+	for _, participant := range data.Participants {
+		dkgParticipant := data.Lookup[participant.NodeID]
+		entry, ok := p.lookup[participant.NodeID]
+		if !ok {
+			entry = ConsensusParticipant{
+				nodeInfo:       participant.NodeInfo,
+				dkgInfoByEpoch: map[uint64]RandomBeaconNodeInfo{},
+			}
+		}
+
+		entry.dkgInfoByEpoch[epochCounter] = RandomBeaconNodeInfo{
+			RandomBeaconPrivKey: participant.RandomBeaconPrivKey,
+			DKGParticipant:      dkgParticipant,
+		}
+		p.lookup[participant.NodeID] = entry
 	}
 }
 
@@ -103,20 +139,72 @@ func (n *Node) Shutdown() {
 	<-n.compliance.Done()
 }
 
+type epochInfo struct {
+	finalView uint64
+	counter   uint64
+}
+
+func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
+	infos := make([]epochInfo, 0)
+	for _, epoch := range epochs {
+		finalView, err := epoch.FinalView()
+		if err != nil {
+			continue
+		}
+		counter, err := epoch.Counter()
+		if err != nil {
+			continue
+		}
+		infos = append(infos, epochInfo{
+			finalView: finalView,
+			counter:   counter,
+		})
+	}
+	sort.Slice(infos, func(i, j int) bool {
+		return infos[i].finalView < infos[i].finalView
+	})
+	return infos
+}
+
 // n - the total number of nodes to be created
 // finalizedCount - the number of finalized blocks before stopping the tests
 // tolerate - the number of node to tolerate that don't need to reach the finalization count
 // 						before stopping the tests
-func createNodes(t *testing.T, participants *ConsensusParticipants, rootSnapshot protocol.Snapshot, stopper *Stopper) ([]*Node, *Hub) {
+func createNodes(
+	t *testing.T,
+	participants *ConsensusParticipants,
+	rootSnapshot protocol.Snapshot,
+	stopper *Stopper,
+) ([]*Node, *Hub) {
 	consensus, err := rootSnapshot.Identities(filter.HasRole(flow.RoleConsensus))
 	require.NoError(t, err)
+
+	epochViewLookup := buildEpochLookupList(rootSnapshot.Epochs().Current(),
+		rootSnapshot.Epochs().Next())
+
+	epochLookup := &mockmodule.EpochLookup{}
+	epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(
+		func(view uint64) uint64 {
+			for _, info := range epochViewLookup {
+				if view < info.finalView {
+					return info.counter
+				}
+			}
+			return 0
+		}, func(view uint64) error {
+			if view > epochViewLookup[len(epochViewLookup)-1].finalView {
+				return fmt.Errorf("unexpected epoch transition")
+			} else {
+				return nil
+			}
+		})
 
 	hub := NewNetworkHub()
 	nodes := make([]*Node, 0, len(consensus))
 	for i, identity := range consensus {
 		consensusParticipant := participants.Lookup(identity.NodeID)
 		require.NotNil(t, consensusParticipant)
-		node := createNode(t, consensusParticipant, i, identity, rootSnapshot, hub, stopper)
+		node := createNode(t, consensusParticipant, i, identity, rootSnapshot, hub, stopper, epochLookup)
 		nodes = append(nodes, node)
 	}
 
@@ -230,12 +318,13 @@ func createRootSnapshot(t *testing.T, participantData *run.ParticipantData) *inm
 
 func createNode(
 	t *testing.T,
-	participant *run.Participant,
+	participant *ConsensusParticipant,
 	index int,
 	identity *flow.Identity,
 	rootSnapshot protocol.Snapshot,
 	hub *Hub,
 	stopper *Stopper,
+	epochLookup module.EpochLookup,
 ) *Node {
 
 	db, dbDir := unittest.TempBadgerDB(t)
@@ -298,8 +387,8 @@ func createNode(
 	cleaner := &storagemock.Cleaner{}
 	cleaner.On("RunGC")
 
-	require.Equal(t, participant.NodeID, localID)
-	privateKeys, err := participant.PrivateKeys()
+	require.Equal(t, participant.nodeInfo.NodeID, localID)
+	privateKeys, err := participant.nodeInfo.PrivateKeys()
 	require.NoError(t, err)
 
 	// make local
@@ -352,8 +441,34 @@ func createNode(
 	validator := consensus.NewValidator(metrics, committee, forks)
 	require.NoError(t, err)
 
-	beaconSignerStore := hsig.NewStaticRandomBeaconSignerStore(participant.RandomBeaconPrivKey)
-	signer := verification.NewCombinedSigner(me, beaconSignerStore)
+	keys := &storagemock.DKGKeys{}
+	// there is DKG key for this epoch
+	keys.On("RetrieveMyDKGPrivateInfo", mock.Anything).Return(
+		func(epochCounter uint64) *dkg.DKGParticipantPriv {
+			dkgInfo, ok := participant.dkgInfoByEpoch[epochCounter]
+			if !ok {
+				return nil
+			}
+
+			return &dkg.DKGParticipantPriv{
+				NodeID: participant.nodeInfo.NodeID,
+				RandomBeaconPrivKey: encodable.RandomBeaconPrivKey{
+					PrivateKey: dkgInfo.RandomBeaconPrivKey,
+				},
+				GroupIndex: int(dkgInfo.DKGParticipant.Index),
+			}
+		},
+		func(epochCounter uint64) bool {
+			_, ok := participant.dkgInfoByEpoch[epochCounter]
+			return ok
+		},
+		func(epochCounter uint64) error {
+			return nil
+		})
+
+	beaconKeyStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
+
+	signer := verification.NewCombinedSigner(me, beaconKeyStore)
 
 	persist := persister.New(db, rootHeader.ChainID)
 

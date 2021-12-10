@@ -23,15 +23,18 @@ func TestUnweightedNode(t *testing.T) {
 	stopper := NewStopper(2, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
+	consensusParticipants := NewConsensusParticipants(participantsData)
 
 	// add a consensus node to next epoch (it will have 0 weight)
 	nextEpochParticipantsData := createConsensusIdentities(t, 1)
 	nextEpochIdentities := unittest.CompleteIdentitySet(nextEpochParticipantsData.Identities()...)
-	//participantsData.AddParticipant(nextEpochParticipantsData.data.Participants[0])
-	rootSnapshot = withNextEpoch(rootSnapshot, nextEpochIdentities, nextEpochParticipantsData, 10_000)
-
-	consensusParticipants := NewConsensusParticipants(participantsData)
-	consensusParticipants.AddParticipants(nextEpochParticipantsData.Participants...)
+	rootSnapshot = withNextEpoch(
+		rootSnapshot,
+		nextEpochIdentities,
+		nextEpochParticipantsData,
+		consensusParticipants,
+		10_000,
+	)
 
 	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
@@ -57,6 +60,7 @@ func TestStaticEpochTransition(t *testing.T) {
 	stopper := NewStopper(8, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
+	consensusParticipants := NewConsensusParticipants(participantsData)
 
 	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
 	require.NoError(t, err)
@@ -64,9 +68,15 @@ func TestStaticEpochTransition(t *testing.T) {
 	// set up next epoch beginning in 4 views, with same identities as first epoch
 	nextEpochIdentities, err := rootSnapshot.Identities(filter.Any)
 	require.NoError(t, err)
-	rootSnapshot = withNextEpoch(rootSnapshot, nextEpochIdentities, participantsData, 4)
+	rootSnapshot = withNextEpoch(
+		rootSnapshot,
+		nextEpochIdentities,
+		participantsData,
+		consensusParticipants,
+		4,
+	)
 
-	nodes, hub := createNodes(t, NewConsensusParticipants(participantsData), rootSnapshot, stopper)
+	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
 
 	hub.WithFilter(blockNothing)
 
@@ -95,9 +105,10 @@ func TestStaticEpochTransition(t *testing.T) {
 //func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 //	// must finalize 8 blocks, we specify the epoch transition after 4 views
 //	stopper := NewStopper(8, 0)
-//	consensusNodesPrivateInfos := createPrivateNodeIdentities(4)
-//	participantsData := completeConsensusIdentities(t, consensusNodesPrivateInfos)
-//	rootSnapshot := createRootSnapshot(t, participantsData)
+//	privateNodeInfos := createPrivateNodeIdentities(4)
+//	firstEpochConsensusParticipants := completeConsensusIdentities(t, privateNodeInfos[:3])
+//	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
+//	conensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
 //
 //	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
 //	require.NoError(t, err)
@@ -107,15 +118,18 @@ func TestStaticEpochTransition(t *testing.T) {
 //	firstEpochIdentities, err := rootSnapshot.Identities(filter.Any)
 //	require.NoError(t, err)
 //
-//	nextEpochPrivateNodes := append(consensusNodesPrivateInfos[1:], createPrivateNodeIdentities(1)...)
-//	nextParticipantData := completeConsensusIdentities(t, nextEpochPrivateNodes)
+//	removedIdentity := privateNodeInfos[0].Identity()
+//	newIdentity := privateNodeInfos[3].Identity()
 //	nextEpochIdentities := append(
 //		firstEpochIdentities.Filter(filter.Not(filter.HasNodeID(removedIdentity.NodeID))),
 //		newIdentity,
 //	)
-//	rootSnapshot = withNextEpoch(rootSnapshot, nextEpochIdentities, nextParticipantData, 4)
 //
-//	nodes, hub := createNodes(t, participantsData, rootSnapshot, stopper)
+//	nextEpochParticipantData := completeConsensusIdentities(t, privateNodeInfos[1:])
+//	//conensusParticipants.AddParticipants(nextEpochParticipantData.Participants...)
+//	rootSnapshot = withNextEpoch(rootSnapshot, nextEpochIdentities, nextEpochParticipantData, 4)
+//
+//	nodes, hub := createNodes(t, conensusParticipants, rootSnapshot, stopper)
 //
 //	hub.WithFilter(blockNothing)
 //
@@ -188,7 +202,13 @@ func TestStaticEpochTransition(t *testing.T) {
 // We make the first (current) epoch start in committed phase so we can transition
 // to the next epoch upon reaching the appropriate view without any further changes
 // to the protocol state.
-func withNextEpoch(snapshot *inmem.Snapshot, nextEpochIdentities flow.IdentityList, nextEpochParticipantData *run.ParticipantData, curEpochViews uint64) *inmem.Snapshot {
+func withNextEpoch(
+	snapshot *inmem.Snapshot,
+	nextEpochIdentities flow.IdentityList,
+	nextEpochParticipantData *run.ParticipantData,
+	participantsCache *ConsensusParticipants,
+	curEpochViews uint64,
+) *inmem.Snapshot {
 
 	// convert to encodable representation for simple modification
 	encodableSnapshot := snapshot.Encodable()
@@ -214,6 +234,8 @@ func withNextEpoch(snapshot *inmem.Snapshot, nextEpochIdentities flow.IdentityLi
 			Participants: nextEpochParticipantData.Lookup,
 		},
 	}
+
+	participantsCache.Update(encodableSnapshot.Epochs.Next.Counter, nextEpochParticipantData)
 
 	// we must start the current epoch in committed phase so we can transition to the next epoch
 	encodableSnapshot.Phase = flow.EpochPhaseCommitted
