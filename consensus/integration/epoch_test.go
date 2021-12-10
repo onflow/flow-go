@@ -159,48 +159,60 @@ func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-//
-//// test consensus across an epoch boundary, where the identity table in the new
-//// epoch is disjoint from the identity table in the first epoch.
-//func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
-//	t.Skip("event loop needs an event handler, which will be replaced later in V2")
-//	// must finalize 8 blocks, we specify the epoch transition after 4 views
-//	stopper := NewStopper(8, 0)
-//	rootSnapshot := createRootSnapshot(t, 3)
-//
-//	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
-//	require.NoError(t, err)
-//
-//	// prepare a next epoch with a completely different consensus committee
-//	// (no overlapping consensus nodes)
-//	firstEpochIdentities, err := rootSnapshot.Identities(filter.Any)
-//	require.NoError(t, err)
-//
-//	newIdentities := unittest.IdentityListFixture(3, unittest.WithRole(flow.RoleConsensus))
-//	nextEpochIdentities := append(
-//		firstEpochIdentities.Filter(filter.Not(filter.HasRole(flow.RoleConsensus))), // remove all consensus nodes
-//		newIdentities..., // add new consensus nodes
-//	)
-//	rootSnapshot = withNextEpoch(rootSnapshot, nextEpochIdentities, 4)
-//
-//	nodes, hub := createNodes(t, stopper, rootSnapshot)
-//
-//	hub.WithFilter(blockNothing)
-//	runNodes(nodes)
-//
-//	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
-//
-//	allViews := allFinalizedViews(t, nodes)
-//	assertSafety(t, allViews)
-//
-//	// confirm that we have transitioned to the new epoch
-//	pstate := nodes[0].state
-//	afterCounter, err := pstate.Final().Epochs().Current().Counter()
-//	require.NoError(t, err)
-//	assert.Equal(t, firstEpochCounter+1, afterCounter)
-//
-//	cleanupNodes(nodes)
-//}
+// test consensus across an epoch boundary, where the identity table in the new
+// epoch is disjoint from the identity table in the first epoch.
+func TestEpochTransition_IdentitiesDisjoint(t *testing.T) {
+	// must finalize 8 blocks, we specify the epoch transition after 4 views
+	stopper := NewStopper(8, 0)
+	firstEpochConsensusParticipants := createConsensusIdentities(t, 3)
+	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
+	consensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
+
+	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
+	require.NoError(t, err)
+
+	// prepare a next epoch with a completely different consensus committee
+	// (no overlapping consensus nodes)
+	firstEpochIdentities, err := rootSnapshot.Identities(filter.Any)
+	require.NoError(t, err)
+
+	nextEpochParticipantData := createConsensusIdentities(t, 3)
+	nextEpochIdentities := append(
+		firstEpochIdentities.Filter(filter.Not(filter.HasRole(flow.RoleConsensus))), // remove all consensus nodes
+		nextEpochParticipantData.Identities()...,                                    // add new consensus nodes
+	)
+
+	rootSnapshot = withNextEpoch(
+		rootSnapshot,
+		nextEpochIdentities,
+		nextEpochParticipantData,
+		consensusParticipants,
+		4,
+	)
+
+	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+
+	hub.WithFilter(blockNothing)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	runNodes(signalerCtx, nodes)
+
+	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
+
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+
+	// confirm that we have transitioned to the new epoch
+	pstate := nodes[0].state
+	afterCounter, err := pstate.Final().Epochs().Current().Counter()
+	require.NoError(t, err)
+	assert.Equal(t, firstEpochCounter+1, afterCounter)
+
+	stopNodes(t, cancel, nodes)
+	cleanupNodes(nodes)
+}
 
 // withNextEpoch adds a valid next epoch with the given identities to the input
 // snapshot. Also sets the length of the first (current) epoch to curEpochViews.
