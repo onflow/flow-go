@@ -132,7 +132,7 @@ func TestGetCollections(t *testing.T) {
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 
-	t.Run("get by ID Invalid", func(t *testing.T) {
+	t.Run("get by ID errors out", func(t *testing.T) {
 		testID := unittest.IdentifierFixture()
 		tests := []struct {
 			id        string
@@ -152,7 +152,15 @@ func TestGetCollections(t *testing.T) {
 			nil,
 			`{"code":400,"message":"invalid ID format"}`,
 			http.StatusBadRequest,
-		}}
+		},
+			{
+				unittest.IdentifierFixture().String(),
+				nil,
+				status.Errorf(codes.Internal, ""),
+				`{"code":500,"message":"internal server error"}`,
+				http.StatusInternalServerError,
+			},
+		}
 
 		for _, test := range tests {
 			id, err := flow.HexStringToIdentifier(test.id)
@@ -165,7 +173,5 @@ func TestGetCollections(t *testing.T) {
 			req := getCollectionReq(test.id, false)
 			assertResponse(t, req, test.status, test.response, backend)
 		}
-
 	})
-
 }
