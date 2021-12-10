@@ -20,15 +20,15 @@ func getCollectionByID(r *request, backend access.API, link LinkGenerator) (inte
 	}
 
 	// if we expand transactions in the query retrieve each transaction data
-	transactions := make([]*flow.TransactionBody, len(collection.Transactions))
+	transactions := make([]*flow.TransactionBody, 0)
 	if r.expands(transactionsExpandable) {
-		for i, tid := range collection.Transactions {
+		for _, tid := range collection.Transactions {
 			tx, err := backend.GetTransaction(r.Context(), tid)
 			if err != nil {
 				return nil, err
 			}
 
-			transactions[i] = tx
+			transactions = append(transactions, tx)
 		}
 	}
 
