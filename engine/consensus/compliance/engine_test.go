@@ -1,6 +1,7 @@
 package compliance
 
 import (
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"math/rand"
 	"sync"
 	"testing"
@@ -150,8 +151,6 @@ func (cs *ComplianceSuite) TestBroadcastProposalWithDelay() {
 // TestSubmittingMultipleVotes tests that we can send multiple votes and they
 // are queued and processed in expected way
 func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
-	cs.T().Skip("this test needs to be updated in V2 since vote processing will be part of" +
-		"vote aggregator")
 	// create a vote
 	originID := unittest.IdentifierFixture()
 	voteCount := 15
@@ -165,7 +164,12 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 				View:    rand.Uint64(),
 				SigData: unittest.SignatureFixture(),
 			}
-			cs.hotstuff.On("SubmitVote", originID, vote.BlockID, vote.View, vote.SigData).Return()
+			cs.voteAggregator.On("AddVote", &model.Vote{
+				View:     vote.View,
+				BlockID:  vote.BlockID,
+				SignerID: originID,
+				SigData:  vote.SigData,
+			}).Return().Once()
 			// execute the vote submission
 			_ = cs.engine.Process(engine.ConsensusCommittee, originID, &vote)
 		}
@@ -191,6 +195,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 
 	// check the submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
+	cs.voteAggregator.AssertExpectations(cs.T())
 }
 
 // TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
