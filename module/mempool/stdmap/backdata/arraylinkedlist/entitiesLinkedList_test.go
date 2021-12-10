@@ -49,12 +49,12 @@ func testArrayBackDataStoreAndRetrievalWithoutEjection(t *testing.T, limit uint3
 			testInitialization(t, list, entities)
 		},
 		func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testAddingEntities(t, list, entities)
+			testAddingEntities(t, list, entities, LRUEjection)
 		},
 	}
 	h = append(h, helpers...)
 
-	withTestScenario(t, limit, entityCount,
+	withTestScenario(t, limit, entityCount, LRUEjection,
 		append(h, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
 			testRetrievingLastXSavedEntities(t, list, entities, 0)
 		})...,
@@ -81,23 +81,60 @@ func TestArrayBackDataStoreAndRetrievalWithEjection(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			testArrayBackDataStoreAndRetrievalWitEjection(t, tc.limit, tc.entityCount)
+			testArrayBackDataStoreAndRetrievalWithLRUEjection(t, tc.limit, tc.entityCount)
 		})
 	}
 }
 
-func testArrayBackDataStoreAndRetrievalWitEjection(t *testing.T, limit uint32, entityCount uint32, helpers ...func(*testing.T, *EntityDoubleLinkedList,
+func testArrayBackDataStoreAndRetrievalWithLRUEjection(t *testing.T, limit uint32, entityCount uint32, helpers ...func(*testing.T, *EntityDoubleLinkedList,
 	[]*unittest.MockEntity)) {
 	h := []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
 		func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testAddingEntities(t, backData, entities)
+			testAddingEntities(t, backData, entities, LRUEjection)
 		},
 	}
 	h = append(h, helpers...)
 
-	withTestScenario(t, limit, entityCount,
+	withTestScenario(t, limit, entityCount, LRUEjection,
 		append(h, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
 			testRetrievingLastXSavedEntities(t, list, entities, entityCount-limit)
+		})...,
+	)
+}
+
+func TestArrayBackDataStoreAndRetrievalWithRandomEjection(t *testing.T) {
+	for _, tc := range []struct {
+		limit       uint32
+		entityCount uint32
+		helpers     []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
+	}{
+		{
+			limit:       30,
+			entityCount: 31,
+		},
+		{
+			limit:       30,
+			entityCount: 100,
+		},
+	} {
+		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
+			testArrayBackDataStoreAndRetrievalWithRandomEjection(t, tc.limit, tc.entityCount)
+		})
+	}
+}
+
+func testArrayBackDataStoreAndRetrievalWithRandomEjection(t *testing.T, limit uint32, entityCount uint32,
+	helpers ...func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)) {
+	h := []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
+		func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+			testAddingEntities(t, backData, entities, RandomEjection)
+		},
+	}
+	h = append(h, helpers...)
+
+	withTestScenario(t, limit, entityCount, RandomEjection,
+		append(h, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+			testRetrievingCount(t, list, entities, int(limit))
 		})...,
 	)
 }
@@ -160,11 +197,11 @@ func TestInvalidateEntity(t *testing.T) {
 func testInvalidateEntity(t *testing.T, limit uint32, entityCount uint32, helpers ...func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)) {
 	h := append([]func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
 		func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testAddingEntities(t, backData, entities)
+			testAddingEntities(t, backData, entities, LRUEjection)
 		},
 	}, helpers...)
 
-	withTestScenario(t, limit, entityCount, h...)
+	withTestScenario(t, limit, entityCount, LRUEjection, h...)
 }
 
 // testInvalidatingHead keeps invalidating elements at random and evaluates whether double-linked list remains
@@ -413,7 +450,7 @@ func testInitialization(t *testing.T, list *EntityDoubleLinkedList, _ []*unittes
 	}
 }
 
-func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBeAdded []*unittest.MockEntity) {
+func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
 	// adding elements
 	for i, e := range entitiesToBeAdded {
 		// adding each element must be successful.
@@ -424,9 +461,11 @@ func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBe
 			require.Equal(t, list.Size(), uint32(i+1))
 		}
 
-		// entity should be placed at index i in back data
-		_, entity, _ := list.Get(uint32(i % len(list.values)))
-		require.Equal(t, e, entity)
+		if ejectionMode == LRUEjection {
+			// entity should be placed at index i in back data
+			_, entity, _ := list.Get(uint32(i % len(list.values)))
+			require.Equal(t, e, entity)
+		}
 
 		// linked-list sanity check
 		// first insertion forward, head of backData should always point to
@@ -434,13 +473,15 @@ func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBe
 		usedHead, freeHead := list.getHeads()
 		usedTail, freeTail := list.getTails()
 
-		//
-		expectedUsedHead := 0
-		if i >= len(list.values) {
-			expectedUsedHead = (i + 1) % len(list.values)
+		if ejectionMode == LRUEjection {
+			//
+			expectedUsedHead := 0
+			if i >= len(list.values) {
+				expectedUsedHead = (i + 1) % len(list.values)
+			}
+			require.Equal(t, list.values[expectedUsedHead].entity, usedHead.entity)
+			require.True(t, usedHead.prev.isUndefined())
 		}
-		require.Equal(t, list.values[expectedUsedHead].entity, usedHead.entity)
-		require.True(t, usedHead.prev.isUndefined())
 
 		//
 		require.Equal(t, entitiesToBeAdded[i], usedTail.entity)
@@ -518,12 +559,28 @@ func testRetrievingLastXSavedEntities(t *testing.T, list *EntityDoubleLinkedList
 	}
 }
 
+func testRetrievingCount(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity, expected int) {
+	actualRetrievable := 0
+
+	for i := uint32(0); i < uint32(len(entities)); i++ {
+		for j := uint32(0); j < uint32(len(list.values)); j++ {
+			actualID, actual, _ := list.Get(j % uint32(len(list.values)))
+			if entities[i].ID() == actualID && entities[i] == actual {
+				actualRetrievable++
+			}
+		}
+	}
+
+	require.Equal(t, expected, actualRetrievable)
+}
+
 func withTestScenario(t *testing.T,
 	limit uint32,
 	entityCount uint32,
+	ejectionMode EjectionMode,
 	helpers ...func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)) {
 
-	list := NewEntityList(limit, LRUEjection)
+	list := NewEntityList(limit, ejectionMode)
 
 	// head on underlying linked list value should be uninitialized
 	require.True(t, list.used.head.isUndefined())

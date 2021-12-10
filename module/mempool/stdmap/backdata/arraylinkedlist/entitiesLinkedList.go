@@ -127,7 +127,7 @@ func (e *EntityDoubleLinkedList) sliceIndexForEntity() uint32 {
 		// array back data is full
 		if e.ejectionMode == RandomEjection {
 			// ejecting a random entity
-			return e.invalidateRandomEntity()
+			e.invalidateRandomEntity()
 		} else {
 			// turning used head to a free head.
 			e.invalidateHead()
