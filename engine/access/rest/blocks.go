@@ -118,7 +118,7 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 	}
 
 	if end-start > MaxAllowedHeights {
-		err := fmt.Errorf("height interval exceeding maximum interval of %d", MaxAllowedHeights)
+		err := fmt.Errorf("height range %d exceeds maximum allowed of %d", end-start, MaxAllowedHeights)
 		return nil, NewBadRequestError(err)
 	}
 
