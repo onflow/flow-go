@@ -41,11 +41,11 @@ func tearDown(t *testing.T) {
 
 // HELPERS - UTILITIES
 
-const actualFailureTestDataPath = "./failures/"
+const actualFailureMessagesPath = "./failures/"
 
 func deleteFailuresDir(t *testing.T) {
 	// delete failure test dir that stores failure messages
-	err := os.RemoveAll(actualFailureTestDataPath)
+	err := os.RemoveAll(actualFailureMessagesPath)
 	require.Nil(t, err)
 }
 
@@ -98,12 +98,15 @@ func runProcessSummary2TestRun(t *testing.T, testDir string, hasFailures bool) {
 	// make sure calculated summary level 2 is what we expected
 	require.Equal(t, expectedTestSummary2, actualTestSummary2)
 
-	// check failure messages created
-	// there are 2 types of scenarios:
-	// 1. test summaries with no failures - these will not have a `failures` sub-directory and no more checking is needed
-	// 2. test summaries with failures - these will have a `failures` sub-directory with failure messages saved
-	//    in text files (1 file/failure under separate sub-directory for each test that has failures)
+	checkFailureMessages(t, hasFailures, expectedFailureMessagesPath, actualFailureMessagesPath)
+}
 
+// check failure messages created
+// there are 2 types of scenarios:
+// 1. test summaries with no failures - these will not have a `failures` sub-directory and no more checking is needed
+// 2. test summaries with failures - these will have a `failures` sub-directory with failure messages saved
+//    in text files (1 file/failure under separate sub-directory for each test that has failures)
+func checkFailureMessages(t *testing.T, hasFailures bool, expectedFailureMessagesPath string, actualFailureMessagesPath string) {
 	if !hasFailures {
 		return
 	}
@@ -113,7 +116,7 @@ func runProcessSummary2TestRun(t *testing.T, testDir string, hasFailures bool) {
 	require.Nil(t, err)
 
 	// count actual failure directories
-	actualFailureDirEntries, err := os.ReadDir(actualFailureTestDataPath)
+	actualFailureDirEntries, err := os.ReadDir(actualFailureMessagesPath)
 	require.Nil(t, err)
 
 	// expected test summary has at least 1 failure
@@ -131,7 +134,7 @@ func runProcessSummary2TestRun(t *testing.T, testDir string, hasFailures bool) {
 		expectedTestFailuresDirEntries, err := os.ReadDir(expectedFailureMessagesPath + expectedDirEntry.Name())
 		require.Nil(t, err)
 
-		actualTestFailuresDirEntries, err := os.ReadDir(actualFailureTestDataPath + actualFailureDirEntries[dirEntryIndex].Name())
+		actualTestFailuresDirEntries, err := os.ReadDir(actualFailureMessagesPath + actualFailureDirEntries[dirEntryIndex].Name())
 		require.Nil(t, err)
 
 		// make sure there are the expected number of failed text files
@@ -148,7 +151,7 @@ func runProcessSummary2TestRun(t *testing.T, testDir string, hasFailures bool) {
 			expectedFailureFileBytes, err := os.ReadFile(expectedFailureFilePath)
 			require.Nil(t, err)
 
-			actualFailureFilePath := actualFailureTestDataPath + actualFailureDirEntries[dirEntryIndex].Name() + "/" + actualTestFailuresDirEntries[expectedFailureFileIndex].Name()
+			actualFailureFilePath := actualFailureMessagesPath + actualFailureDirEntries[dirEntryIndex].Name() + "/" + actualTestFailuresDirEntries[expectedFailureFileIndex].Name()
 			actualFailureFileBytes, err := os.ReadFile(actualFailureFilePath)
 			require.Nil(t, err)
 
