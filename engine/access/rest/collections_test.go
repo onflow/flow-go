@@ -68,7 +68,8 @@ func TestGetCollections(t *testing.T) {
 		for _, col := range inputs {
 			backend.Mock.
 				On("GetCollectionByID", mocks.Anything, col.ID()).
-				Return(&col, nil)
+				Return(&col, nil).
+				Once()
 
 			txs := make([]string, len(col.Transactions))
 			for i, tx := range col.Transactions {
@@ -88,6 +89,7 @@ func TestGetCollections(t *testing.T) {
 
 			req := getCollectionReq(col.ID().String(), false)
 			assertOKResponse(t, req, expected, backend)
+			mocks.AssertExpectationsForObjects(t, backend)
 		}
 	})
 
@@ -101,12 +103,14 @@ func TestGetCollections(t *testing.T) {
 
 			backend.Mock.
 				On("GetTransaction", mocks.Anything, transactions[i].ID()).
-				Return(&transactions[i], nil)
+				Return(&transactions[i], nil).
+				Once()
 		}
 
 		backend.Mock.
 			On("GetCollectionByID", mocks.Anything, col.ID()).
-			Return(&col, nil)
+			Return(&col, nil).
+			Once()
 
 		req := getCollectionReq(col.ID().String(), true)
 		rr := executeRequest(req, backend)
@@ -124,6 +128,8 @@ func TestGetCollections(t *testing.T) {
 			assert.Equal(t, transactions[i].ID().String(), c["id"])
 			assert.NotNil(t, c["envelope_signatures"])
 		}
+
+		mocks.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get by ID Invalid", func(t *testing.T) {

@@ -40,7 +40,8 @@ func TestGetResultByID(t *testing.T) {
 
 		backend.Mock.
 			On("GetExecutionResultByID", mocks.Anything, id).
-			Return(result, nil)
+			Return(result, nil).
+			Once()
 
 		req := getResultByIDReq(id.String(), nil)
 		expected := fmt.Sprintf(`{
@@ -52,6 +53,7 @@ func TestGetResultByID(t *testing.T) {
 			}
 		}`, result.ID(), result.BlockID, result.ID())
 		assertOKResponse(t, req, expected, backend)
+		mocks.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get by ID with events", func(t *testing.T) {
@@ -61,7 +63,8 @@ func TestGetResultByID(t *testing.T) {
 
 		backend.Mock.
 			On("GetExecutionResultByID", mocks.Anything, id).
-			Return(result, nil)
+			Return(result, nil).
+			Once()
 
 		req := getResultByIDReq(id.String(), nil)
 		expected := fmt.Sprintf(`{
@@ -79,6 +82,7 @@ func TestGetResultByID(t *testing.T) {
 			}
 		}`, result.ID(), result.BlockID, result.ServiceEvents[0].Type, "", result.ID())
 		assertOKResponse(t, req, expected, backend)
+		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }
 
@@ -90,7 +94,8 @@ func TestGetResultBlockID(t *testing.T) {
 
 		backend.Mock.
 			On("GetExecutionResultForBlockID", mocks.Anything, blockID).
-			Return(result, nil)
+			Return(result, nil).
+			Once()
 
 		req := getResultByIDReq("", []string{blockID.String()})
 		expected := fmt.Sprintf(`[{
@@ -102,5 +107,6 @@ func TestGetResultBlockID(t *testing.T) {
 			}
 		}]`, result.ID(), result.BlockID, result.ID())
 		assertOKResponse(t, req, expected, backend)
+		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }

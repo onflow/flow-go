@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	mock2 "github.com/stretchr/testify/mock"
+	mocktestify "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/access/mock"
@@ -43,13 +43,13 @@ func TestGetAccount(t *testing.T) {
 		req := getAccountRequest(t, account, sealedHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
 
 		backend.Mock.
-			On("GetAccountAtLatestBlock", mock2.Anything, account.Address).
+			On("GetAccountAtLatestBlock", mocktestify.Anything, account.Address).
 			Return(account, nil)
 
 		expected := expectedExpandedResponse(account)
 
 		assertOKResponse(t, req, expected, backend)
-
+		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get by address at latest finalized block", func(t *testing.T) {
@@ -60,15 +60,16 @@ func TestGetAccount(t *testing.T) {
 
 		req := getAccountRequest(t, account, finalHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
 		backend.Mock.
-			On("GetLatestBlockHeader", mock2.Anything, false).
+			On("GetLatestBlockHeader", mocktestify.Anything, false).
 			Return(&block, nil)
 		backend.Mock.
-			On("GetAccountAtBlockHeight", mock2.Anything, account.Address, height).
+			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
 			Return(account, nil)
 
 		expected := expectedExpandedResponse(account)
 
 		assertOKResponse(t, req, expected, backend)
+		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get by address at height", func(t *testing.T) {
@@ -77,12 +78,13 @@ func TestGetAccount(t *testing.T) {
 		req := getAccountRequest(t, account, fmt.Sprintf("%d", height), expandableFieldKeys, expandableFieldContracts)
 
 		backend.Mock.
-			On("GetAccountAtBlockHeight", mock2.Anything, account.Address, height).
+			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
 			Return(account, nil)
 
 		expected := expectedExpandedResponse(account)
 
 		assertOKResponse(t, req, expected, backend)
+		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get by address at height condensed", func(t *testing.T) {
@@ -91,12 +93,13 @@ func TestGetAccount(t *testing.T) {
 		req := getAccountRequest(t, account, fmt.Sprintf("%d", height))
 
 		backend.Mock.
-			On("GetAccountAtBlockHeight", mock2.Anything, account.Address, height).
+			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
 			Return(account, nil)
 
 		expected := expectedCondensedResponse(account)
 
 		assertOKResponse(t, req, expected, backend)
+		mocktestify.AssertExpectationsForObjects(t, backend)
 	})
 
 	t.Run("get invalid", func(t *testing.T) {

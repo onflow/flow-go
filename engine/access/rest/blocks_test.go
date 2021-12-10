@@ -137,7 +137,6 @@ func TestGetBlocks(t *testing.T) {
 		actualResp := responseRec.Body.String()
 		require.JSONEq(t, tv.expectedResponse, actualResp, "Failed: %s: incorrect response body", tv.description)
 	}
-
 }
 
 func requestURL(t *testing.T, ids []string, start string, end string, expandResponse bool, heights ...string) *http.Request {
