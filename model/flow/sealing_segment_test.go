@@ -77,6 +77,15 @@ func (suite *SealingSegmentSuite) FirstBlock() *flow.Block {
 	return &block
 }
 
+// AddBlocks is a short-hand for adding a sequence of blocks, in order.
+// No errors are expected.
+func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.Block) {
+	for _, block := range blocks {
+		err := suite.builder.AddBlock(block)
+		require.NoError(suite.T(), err)
+	}
+}
+
 // Tests the case where a receipt in the segment references a result outside it.
 // The result should still be included in the sealing segment.
 //
@@ -96,25 +105,12 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
 	block4 := unittest.BlockWithParentFixture(block3.Header)
 	block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal)))
 
-	err := suite.builder.AddBlock(&block1)
-	require.NoError(suite.T(), err)
-
-	err = suite.builder.AddBlock(block2)
-	require.NoError(suite.T(), err)
-
-	err = suite.builder.AddBlock(block3)
-	require.NoError(suite.T(), err)
-
-	err = suite.builder.AddBlock(block4)
-	require.NoError(suite.T(), err)
+	suite.AddBlocks(&block1, block2, block3, block4)
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
 
 	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{&block1, block2, block3, block4}, segment.Blocks)
-	require.Equal(suite.T(), block4.ID(), segment.Highest().ID())
-	require.Equal(suite.T(), block1.ID(), segment.Lowest().ID())
-
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
 	require.Equal(suite.T(), suite.priorReceipt.ExecutionResult.ID(), segment.ExecutionResults[0].ID())
 }
@@ -122,17 +118,59 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
 // Tests the case where the first block contains no seal.
 // The latest seal as of the first block should still be included in the segment.
 //
-// B1 <- B2(R1) <- B4(S1)
+// B1 <- B2(R1) <- B3(S1)
 func (suite *SealingSegmentSuite) TestBuild_MissingFirstBlockSeal() {
-	// TODO
+
+	// B1 contains an empty payload
+	block1 := unittest.BlockFixture()
+	// latest seal as of B1 is priorSeal
+	suite.sealsByBlockID[block1.ID()] = suite.priorSeal
+
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
+
+	suite.AddBlocks(&block1, block2, block3)
+
+	segment, err := suite.builder.SealingSegment()
+	require.NoError(suite.T(), err)
+
+	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{&block1, block2, block3}, segment.Blocks)
+	// should contain priorSeal as first seal
+	require.Equal(suite.T(), suite.priorSeal, segment.FirstSeal)
+	// should contain result referenced by first seal
+	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
+	require.Equal(suite.T(), suite.priorReceipt.ExecutionResult.ID(), segment.ExecutionResults[0].ID())
 }
 
 // Tests the case where a seal contained in a segment block payloads references
 // a missing result. The result should still be included in the segment.
 //
-// B1(S*) <- B2(R1) <- B4(S1)
+// B1(S*,R*) <- B2(R1,S**) <- B4(S1)
 func (suite *SealingSegmentSuite) TestBuild_MissingResultFromPayloadSeal() {
-	// TODO
+
+	block1 := suite.FirstBlock()
+
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+
+	block4 := unittest.BlockWithParentFixture(block3.Header)
+	block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1)))
+
+	suite.AddBlocks(&block1, block2, block3, block4)
+
+	segment, err := suite.builder.SealingSegment()
+	require.NoError(suite.T(), err)
+
+	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{&block1, block2, block3, block4}, segment.Blocks)
+	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
+	require.Equal(suite.T(), suite.priorReceipt.ExecutionResult.ID(), segment.ExecutionResults[0].ID())
 }
 
 // Tests the case where a seal included because the first block contains no seal

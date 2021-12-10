@@ -103,19 +103,20 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 		return fmt.Errorf("invalid block height (%d): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
 	}
 
-	// for the first (lowest) block, if it contains no seal, retrieve the latest seal
-	// incorporated prior to the first block
+	// construct a list of missing result IDs referenced by this block
+	var missingResultIDs IdentifierList
+
+	// for the first (lowest) block, if it contains no seal, retrieve the latest
+	// seal incorporated prior to the first block
 	if len(builder.blocks) == 0 {
-		if len(block.Payload.Seals) > 0 {
-			// NOTE: seals are ordered by increasing height order of the sealed block
-			// so the latest seal is the last in the Seals list
-			builder.firstSeal = block.Payload.Seals[len(block.Payload.Seals)-1]
-		} else {
+		if len(block.Payload.Seals) == 0 {
 			seal, err := builder.sealByBLockIDLookup(block.ID())
 			if err != nil {
 				return fmt.Errorf("%w: %v", ErrSegmentSealLookup, err)
 			}
 			builder.firstSeal = seal
+			// add first seal result ID here, since it isn't in payload
+			missingResultIDs = append(missingResultIDs, seal.ResultID)
 		}
 	}
 
@@ -125,8 +126,6 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 		builder.includedResults[result.ID()] = struct{}{}
 	}
 
-	// construct a list of missing result IDs referenced by this block
-	var missingResultIDs IdentifierList
 	for _, receipt := range block.Payload.Receipts {
 		if _, ok := builder.includedResults[receipt.ResultID]; !ok {
 			missingResultIDs = append(missingResultIDs, receipt.ResultID)
