@@ -74,7 +74,7 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 	if len(heights) > 0 {
 		uintHeights, err := toHeights(heights)
 		if err != nil {
-			heightError := fmt.Errorf("invalid height specified: %v", err)
+			heightError := fmt.Errorf("invalid height specified: %w", err)
 			return nil, NewBadRequestError(heightError)
 		}
 
