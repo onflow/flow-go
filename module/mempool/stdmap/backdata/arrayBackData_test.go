@@ -89,6 +89,25 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 	testRetrievableCount(t, bd, entities, 100_000)
 }
 
+func TestArrayBackData_AddDuplicate(t *testing.T) {
+	limit := 100
+
+	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection)
+
+	entities := unittest.EntityListFixture(uint(limit))
+
+	// adds all entities to backdata
+	testAddEntities(t, bd, entities)
+
+	// adding duplicate entity should fail
+	for _, entity := range entities {
+		require.False(t, bd.Add(entity.ID(), entity))
+	}
+
+	// still all mut be retrievable from backdata
+	testRetrievableFrom(t, bd, entities, 0)
+}
+
 // TestArrayBackData_All_BelowLimit checks correctness of All method when mempool is not full yet.
 func TestArrayBackData_All_BelowLimit(t *testing.T) {
 	tt := []struct {
@@ -150,14 +169,14 @@ func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 		// adding each element must be successful.
 		require.True(t, bd.Add(e.ID(), e))
 
-		if uint64(i) < bd.limit {
+		if uint32(i) < bd.limit {
 			// when we are below limit the total of
 			// backdata should be incremented by each addition.
 			require.Equal(t, bd.Size(), uint(i+1))
 		} else {
 			// when we cross the limit, the ejection kicks in, and
 			// size must be steady at the limit.
-			require.Equal(t, uint64(bd.Size()), bd.limit)
+			require.Equal(t, uint32(bd.Size()), bd.limit)
 		}
 
 		// entity should be immediately retrievable

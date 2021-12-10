@@ -32,12 +32,13 @@ type keyBucket [bucketSize]key
 type ArrayBackData struct {
 	// NOTE: as a BackData implementation, ArrayBackData must be non-blocking.
 	// Concurrency management is done by overlay Backend.
-	limit     uint64
-	overLimit uint64
-	keyCount  uint64 // total number of non-expired key-values
-	bucketNum uint64 // total number of buckets (i.e., total of buckets)
-	buckets   []keyBucket
-	entities  *arraylinkedlist.EntityDoubleLinkedList
+	limit        uint32
+	overLimit    uint64
+	keyCount     uint64 // total number of non-expired key-values
+	bucketNum    uint64 // total number of buckets (i.e., total of buckets)
+	ejectionMode arraylinkedlist.EjectionMode
+	buckets      []keyBucket
+	entities     *arraylinkedlist.EntityDoubleLinkedList
 
 	// temporary data structures for telemetry
 	availableSlotHistogram []uint64
@@ -52,9 +53,10 @@ func NewArrayBackData(limit uint32, oversizeFactor uint32, mode arraylinkedlist.
 
 	bd := &ArrayBackData{
 		bucketNum:              bucketNum,
-		limit:                  uint64(limit),
+		limit:                  limit,
 		overLimit:              uint64(limit * oversizeFactor),
 		buckets:                make([]keyBucket, bucketNum),
+		ejectionMode:           mode,
 		entities:               arraylinkedlist.NewEntityList(limit, mode),
 		availableSlotHistogram: make([]uint64, bucketSize+1),
 	}
@@ -135,7 +137,9 @@ func (a ArrayBackData) All() map[flow.Identifier]flow.Entity {
 
 // Clear removes all entities from the pool.
 func (a *ArrayBackData) Clear() {
-
+	a.buckets = make([]keyBucket, a.bucketNum)
+	a.entities = arraylinkedlist.NewEntityList(uint32(a.limit), a.ejectionMode)
+	a.availableSlotHistogram = make([]uint64, bucketSize+1)
 }
 
 // Hash will use a merkle root hash to hash all items.
@@ -202,8 +206,8 @@ func (a ArrayBackData) idPrefixAndBucketIndex(id flow.Identifier) (uint32, bInde
 
 func (a ArrayBackData) expiryThreshold() uint64 {
 	var expiryThreshold uint64 = 0 // keyIndex(es) below expiryThreshold are eligible for eviction
-	if a.keyCount > a.limit {
-		expiryThreshold = a.keyCount - a.limit
+	if a.keyCount > uint64(a.limit) {
+		expiryThreshold = a.keyCount - uint64(a.limit)
 	}
 
 	return expiryThreshold
