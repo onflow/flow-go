@@ -33,10 +33,10 @@ func TestGetBlocks(t *testing.T) {
 	blkCnt := 10
 	blockIDs, heights, blocks, executionResults := generateMocks(backend, blkCnt)
 
-	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:2], executionResults[:2], true)
+	singleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], true)
 	multipleBlockExpandedResponse := expectedBlockResponsesExpanded(blocks, executionResults, true)
 
-	singleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks[:2], executionResults[:2], false)
+	singleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks[:1], executionResults[:1], false)
 	multipleBlockCondensedResponse := expectedBlockResponsesExpanded(blocks, executionResults, false)
 
 	invalidID := unittest.IdentifierFixture().String()
@@ -47,7 +47,7 @@ func TestGetBlocks(t *testing.T) {
 	testVectors := []testVector{
 		{
 			description:      "Get single expanded block by ID",
-			request:          getByIDsExpandedURL(t, blockIDs[:2]),
+			request:          getByIDsExpandedURL(t, blockIDs[:1]),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: singleBlockExpandedResponse,
 		},
@@ -59,7 +59,7 @@ func TestGetBlocks(t *testing.T) {
 		},
 		{
 			description:      "Get single condensed block by ID",
-			request:          getByIDsCondensedURL(t, blockIDs[:2]),
+			request:          getByIDsCondensedURL(t, blockIDs[:1]),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: singleBlockCondensedResponse,
 		},
@@ -71,7 +71,7 @@ func TestGetBlocks(t *testing.T) {
 		},
 		{
 			description:      "Get single expanded block by height",
-			request:          getByHeightsExpandedURL(t, heights[:2]...),
+			request:          getByHeightsExpandedURL(t, heights[:1]...),
 			expectedStatus:   http.StatusOK,
 			expectedResponse: singleBlockExpandedResponse,
 		},

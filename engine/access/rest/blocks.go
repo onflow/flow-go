@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -229,7 +230,7 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, er
 	if blkProvider.id != nil {
 		blk, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
 		if err != nil {
-			return nil, err
+			return nil, idLookupError(blkProvider.id, "block", err)
 		}
 		return blk, nil
 	}
@@ -237,14 +238,35 @@ func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, er
 	if blkProvider.latest {
 		blk, err := blkProvider.backend.GetLatestBlock(ctx, blkProvider.sealed)
 		if err != nil {
-			return nil, err
+			// cannot be a 'not found' error since final and sealed block should always be found
+			return nil, NewRestError(http.StatusInternalServerError, "block lookup failed", err)
 		}
 		return blk, nil
 	}
 
 	blk, err := blkProvider.backend.GetBlockByHeight(ctx, blkProvider.height)
 	if err != nil {
-		return nil, err
+		return nil, heightLookupError(blkProvider.height, "block", err)
 	}
 	return blk, nil
+}
+
+// idLookupError adds ID to the error message
+func idLookupError(id *flow.Identifier, entityType string, err error) StatusError {
+	msg := fmt.Sprintf("error looking up %s with ID %s", entityType, id.String())
+	// if error has GRPC code NotFound, then return HTTP NotFound error
+	if status.Code(err) == codes.NotFound {
+		return NewNotFoundError(msg, err)
+	}
+	return NewRestError(http.StatusInternalServerError, msg, err)
+}
+
+// heightLookupError adds height to the error message
+func heightLookupError(height uint64, entityType string, err error) StatusError {
+	msg := fmt.Sprintf("error looking up %s at height %d", entityType, height)
+	// if error has GRPC code NotFound, then return HTTP NotFound error
+	if status.Code(err) == codes.NotFound {
+		return NewNotFoundError(msg, err)
+	}
+	return NewRestError(http.StatusInternalServerError, msg, err)
 }

@@ -665,8 +665,9 @@ func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkG
 	}
 
 	response := &generated.Block{
-		Header: blockHeaderResponse(blk.Header),
-		Links:  self,
+		Header:     blockHeaderResponse(blk.Header),
+		Links:      self,
+		Expandable: &generated.BlockExpandable{},
 	}
 
 	// add the payload to the response if it is specified as an expandable field
