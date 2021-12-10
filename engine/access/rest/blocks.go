@@ -59,21 +59,18 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 		return nil, NewBadRequestError(err)
 	}
 
+	// if the query is /blocks?height=final or /blocks?height=sealed, lookup the last finalized or the last sealed block
 	if len(heights) == 1 && (heights[0] == finalHeightQueryParam || heights[0] == sealedHeightQueryParam) {
-		// if the query is /blocks?height=final or /blocks?height=sealed, lookup the last finalized or the last sealed block
-		blocks := make([]*generated.Block, 1)
-
 		block, err := getBlock(forFinalized(heights[0]), r, backend, link)
 		if err != nil {
 			return nil, err
 		}
 
-		blocks[0] = block
-		return blocks, nil
+		return []*generated.Block{block}, nil
 	}
 
+	// if the query is /blocks/height=1000,1008,1049...
 	if len(heights) > 0 {
-		// if the query is /blocks/height=1000,1008,1049...
 		uintHeights, err := toHeights(heights)
 		if err != nil {
 			heightError := fmt.Errorf("invalid height specified: %v", err)
@@ -116,6 +113,11 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 
 	if start > end {
 		err := fmt.Errorf("start height must be less than or equal to end height")
+		return nil, NewBadRequestError(err)
+	}
+
+	if end-start > MaxAllowedHeights {
+		err := fmt.Errorf("height interval exceeding maximum interval of %d", MaxAllowedHeights)
 		return nil, NewBadRequestError(err)
 	}
 
