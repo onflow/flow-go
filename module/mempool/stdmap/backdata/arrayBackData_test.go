@@ -1,7 +1,6 @@
 package backdata
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -56,7 +55,7 @@ func TestArrayBackData_LRU_Ejection(t *testing.T) {
 	// mempool has the limit of 100K, but we put 1M
 	// (10 time more than its capacity)
 	limit := 100_000
-	items := uint(1000_000)
+	items := uint(1_000_000)
 
 	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection)
 
@@ -74,7 +73,7 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 	// mempool has the limit of 100K, but we put 1M
 	// (10 time more than its capacity)
 	limit := 100_000
-	items := uint(1000_000)
+	items := uint(1_000_000)
 
 	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.RandomEjection)
 
@@ -99,19 +98,21 @@ func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 		if uint64(i) < bd.limit {
 			// when we are below limit the total of
 			// backdata should be incremented by each addition.
+			// fmt.Println(i, int(bd.limit))
 			require.Equal(t, bd.Size(), uint(i+1))
+			// testRetrievableCount(t, bd, entities[:i+1], uint64(i+1))
 		} else {
 			// when we cross the limit, the ejection kicks in, and
 			// size must be steady at the limit.
-			fmt.Println(int(bd.Size()), int(bd.limit))
 			require.Equal(t, uint64(bd.Size()), bd.limit)
 		}
 
-		// entity should be placed at index i in back data
+		// entity should be immediately retrievable
 		actual, ok := bd.ByID(e.ID())
 		require.True(t, ok)
 		require.Equal(t, e, actual)
 	}
+	bd.printTelemetry()
 }
 
 // testGettingEntities is a test helper that checks entities are retrievable from backdata.
@@ -132,7 +133,7 @@ func testRetrievableFrom(t *testing.T, bd *ArrayBackData, entities []*unittest.M
 // testRetrievableCount is a test helper that checks the number of retrievable entities from backdata exactly matches
 // the expectedCount.
 func testRetrievableCount(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, expectedCount uint64) {
-	actualCount := uint64(0)
+	actualCount := 0
 
 	for i := range entities {
 		expected := entities[i]
@@ -144,5 +145,5 @@ func testRetrievableCount(t *testing.T, bd *ArrayBackData, entities []*unittest.
 		actualCount++
 	}
 
-	require.Equal(t, expectedCount, actualCount)
+	require.Equal(t, int(expectedCount), actualCount)
 }
