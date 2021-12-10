@@ -108,7 +108,7 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 	}
 	end, err := toHeight(endHeight)
 	if err != nil {
-		heightError := fmt.Errorf("invalid end height %s: %v", endHeight, err)
+		heightError := fmt.Errorf("invalid end height: %w", err)
 		return nil, NewBadRequestError(heightError)
 	}
 
@@ -227,11 +227,7 @@ func NewBlockProvider(backend access.API, options ...blockProviderOption) *block
 
 func (blkProvider *blockProvider) getBlock(ctx context.Context) (*flow.Block, error) {
 	if blkProvider.id != nil {
-		blk, err := blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
-		if err != nil {
-			return nil, err
-		}
-		return blk, nil
+		return blkProvider.backend.GetBlockByID(ctx, *blkProvider.id)
 	}
 
 	if blkProvider.latest {
