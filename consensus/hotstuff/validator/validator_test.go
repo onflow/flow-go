@@ -303,9 +303,9 @@ func (vs *VoteSuite) TestVoteMismatchingView() {
 
 func (vs *VoteSuite) TestVoteSignatureError() {
 
-	// make the verification fail on signature
+	// make the verification fail on exception
 	*vs.verifier = mocks.Verifier{}
-	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block).Return(fmt.Errorf("staking sig is invalid: %w", model.ErrInvalidSignature))
+	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block).Return(fmt.Errorf("some exception"))
 
 	// check that the vote is no longer validated
 	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
@@ -316,7 +316,7 @@ func (vs *VoteSuite) TestVoteSignatureInvalid() {
 
 	// make sure the signature is treated as invalid
 	*vs.verifier = mocks.Verifier{}
-	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block).Return(nil)
+	vs.verifier.On("VerifyVote", vs.signer, vs.vote.SigData, vs.block).Return(fmt.Errorf("staking sig is invalid: %w", model.ErrInvalidSignature))
 
 	// check that the vote is no longer validated
 	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
