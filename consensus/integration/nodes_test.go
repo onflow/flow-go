@@ -186,7 +186,7 @@ func createNodes(
 	epochLookup.On("EpochForViewWithFallback", mock.Anything).Return(
 		func(view uint64) uint64 {
 			for _, info := range epochViewLookup {
-				if view < info.finalView {
+				if view <= info.finalView {
 					return info.counter
 				}
 			}

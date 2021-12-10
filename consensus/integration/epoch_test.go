@@ -100,58 +100,64 @@ func TestStaticEpochTransition(t *testing.T) {
 	cleanupNodes(nodes)
 }
 
-//// test consensus across an epoch boundary, where the identity table changes
-//// but the new epoch overlaps with the previous epoch.
-//func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
-//	// must finalize 8 blocks, we specify the epoch transition after 4 views
-//	stopper := NewStopper(8, 0)
-//	privateNodeInfos := createPrivateNodeIdentities(4)
-//	firstEpochConsensusParticipants := completeConsensusIdentities(t, privateNodeInfos[:3])
-//	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
-//	conensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
-//
-//	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
-//	require.NoError(t, err)
-//
-//	// set up next epoch with 1 new consensus nodes and 2 consensus nodes from first epoch
-//	// 1 consensus node is removed after the first epoch
-//	firstEpochIdentities, err := rootSnapshot.Identities(filter.Any)
-//	require.NoError(t, err)
-//
-//	removedIdentity := privateNodeInfos[0].Identity()
-//	newIdentity := privateNodeInfos[3].Identity()
-//	nextEpochIdentities := append(
-//		firstEpochIdentities.Filter(filter.Not(filter.HasNodeID(removedIdentity.NodeID))),
-//		newIdentity,
-//	)
-//
-//	nextEpochParticipantData := completeConsensusIdentities(t, privateNodeInfos[1:])
-//	//conensusParticipants.AddParticipants(nextEpochParticipantData.Participants...)
-//	rootSnapshot = withNextEpoch(rootSnapshot, nextEpochIdentities, nextEpochParticipantData, 4)
-//
-//	nodes, hub := createNodes(t, conensusParticipants, rootSnapshot, stopper)
-//
-//	hub.WithFilter(blockNothing)
-//
-//	ctx, cancel := context.WithCancel(context.Background())
-//	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
-//
-//	runNodes(signalerCtx, nodes)
-//
-//	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
-//
-//	allViews := allFinalizedViews(t, nodes)
-//	assertSafety(t, allViews)
-//
-//	// confirm that we have transitioned to the new epoch
-//	pstate := nodes[0].state
-//	afterCounter, err := pstate.Final().Epochs().Current().Counter()
-//	require.NoError(t, err)
-//	assert.Equal(t, firstEpochCounter+1, afterCounter)
-//
-//	stopNodes(t, cancel, nodes)
-//	cleanupNodes(nodes)
-//}
+// test consensus across an epoch boundary, where the identity table changes
+// but the new epoch overlaps with the previous epoch.
+func TestEpochTransition_IdentitiesOverlap(t *testing.T) {
+	// must finalize 8 blocks, we specify the epoch transition after 4 views
+	stopper := NewStopper(8, 0)
+	privateNodeInfos := createPrivateNodeIdentities(4)
+	firstEpochConsensusParticipants := completeConsensusIdentities(t, privateNodeInfos[:3])
+	rootSnapshot := createRootSnapshot(t, firstEpochConsensusParticipants)
+	consensusParticipants := NewConsensusParticipants(firstEpochConsensusParticipants)
+
+	firstEpochCounter, err := rootSnapshot.Epochs().Current().Counter()
+	require.NoError(t, err)
+
+	// set up next epoch with 1 new consensus nodes and 2 consensus nodes from first epoch
+	// 1 consensus node is removed after the first epoch
+	firstEpochIdentities, err := rootSnapshot.Identities(filter.Any)
+	require.NoError(t, err)
+
+	removedIdentity := privateNodeInfos[0].Identity()
+	newIdentity := privateNodeInfos[3].Identity()
+	nextEpochIdentities := append(
+		firstEpochIdentities.Filter(filter.Not(filter.HasNodeID(removedIdentity.NodeID))),
+		newIdentity,
+	)
+
+	// generate new identities for next epoch, it will generate new DKG keys for random beacon participants
+	nextEpochParticipantData := completeConsensusIdentities(t, privateNodeInfos[1:])
+	rootSnapshot = withNextEpoch(
+		rootSnapshot,
+		nextEpochIdentities,
+		nextEpochParticipantData,
+		consensusParticipants,
+		4,
+	)
+
+	nodes, hub := createNodes(t, consensusParticipants, rootSnapshot, stopper)
+
+	hub.WithFilter(blockNothing)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+
+	runNodes(signalerCtx, nodes)
+
+	unittest.AssertClosesBefore(t, stopper.stopped, 30*time.Second)
+
+	allViews := allFinalizedViews(t, nodes)
+	assertSafety(t, allViews)
+
+	// confirm that we have transitioned to the new epoch
+	pstate := nodes[0].state
+	afterCounter, err := pstate.Final().Epochs().Current().Counter()
+	require.NoError(t, err)
+	assert.Equal(t, firstEpochCounter+1, afterCounter)
+
+	stopNodes(t, cancel, nodes)
+	cleanupNodes(nodes)
+}
 
 //
 //// test consensus across an epoch boundary, where the identity table in the new
