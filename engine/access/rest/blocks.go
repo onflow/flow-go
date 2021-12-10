@@ -32,8 +32,7 @@ func getBlocksByIDs(r *request, backend access.API, link LinkGenerator) (interfa
 
 	blocks := make([]*generated.Block, len(ids))
 	for i, id := range ids {
-		blkProvider := NewBlockProvider(backend, forID(&id))
-		block, err := getBlock(blkProvider, r, backend, link)
+		block, err := getBlock(forID(&id), r, backend, link)
 		if err != nil {
 			return nil, err
 		}
@@ -64,8 +63,7 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 		// if the query is /blocks?height=final or /blocks?height=sealed, lookup the last finalized or the last sealed block
 		blocks := make([]*generated.Block, 1)
 
-		blkProvider := NewBlockProvider(backend, forFinalized(heights[0]))
-		block, err := getBlock(blkProvider, r, backend, link)
+		block, err := getBlock(forFinalized(heights[0]), r, backend, link)
 		if err != nil {
 			return nil, err
 		}
@@ -84,8 +82,7 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 
 		blocks := make([]*generated.Block, len(uintHeights))
 		for i, h := range uintHeights {
-			blkProvider := NewBlockProvider(backend, forHeight(h))
-			block, err := getBlock(blkProvider, r, backend, link)
+			block, err := getBlock(forHeight(h), r, backend, link)
 			if err != nil {
 				return nil, err
 			}
@@ -125,8 +122,7 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 	blocks := make([]*generated.Block, 0)
 	// start and end height inclusive
 	for i := start; i <= end; i++ {
-		blkProvider := NewBlockProvider(backend, forHeight(i))
-		block, err := getBlock(blkProvider, r, backend, link)
+		block, err := getBlock(forHeight(i), r, backend, link)
 		if err != nil {
 			return nil, err
 		}
@@ -156,8 +152,9 @@ func getBlockPayloadByID(req *request, backend access.API, _ LinkGenerator) (int
 	return payload, nil
 }
 
-func getBlock(blkProvider *blockProvider, req *request, backend access.API, link LinkGenerator) (*generated.Block, error) {
+func getBlock(option blockProviderOption, req *request, backend access.API, link LinkGenerator) (*generated.Block, error) {
 	// lookup block
+	blkProvider := NewBlockProvider(backend, option)
 	blk, err := blkProvider.getBlock(req.Context())
 	if err != nil {
 		return nil, err
