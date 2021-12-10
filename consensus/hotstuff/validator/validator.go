@@ -148,6 +148,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	if err != nil {
 		switch {
 		case errors.Is(err, signature.ErrInvalidFormat):
+			return nil, newInvalidVoteError(vote, err)
 		case errors.Is(err, model.ErrInvalidSignature):
 			return nil, newInvalidVoteError(vote, err)
 		default:
