@@ -65,6 +65,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	if err != nil {
 		switch {
 		case errors.Is(err, signature.ErrInvalidFormat):
+			return newInvalidBlockError(block, fmt.Errorf("QC signature is invalid: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidBlockError(block, fmt.Errorf("QC signature is invalid: %w", err))
 		default:
