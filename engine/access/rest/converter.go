@@ -19,7 +19,7 @@ import (
 // Flow section - converting request data to flow models with validation.
 
 const maxAllowedScriptArgumentsCnt = 100
-const maxSignatureLength = 64
+const signatureLength = 64
 const maxAuthorizersCnt = 100
 const MaxAllowedIDs = 50 // todo(sideninja) discuss if we should restrict maximum on all IDs collection or is anywhere required more thant this
 const MaxAllowedHeights = 50
@@ -137,17 +137,17 @@ func toProposalKey(key *generated.ProposalKey) (flow.ProposalKey, error) {
 
 	address, err := toAddress(key.Address)
 	if err != nil {
-		return flow.ProposalKey{}, err
+		return flow.ProposalKey{}, fmt.Errorf("invalid proposal address: %v", err)
 	}
 
 	keyIndex, err := toUint64(key.KeyIndex)
 	if err != nil {
-		return flow.ProposalKey{}, err
+		return flow.ProposalKey{}, fmt.Errorf("invalid key index: %v", err)
 	}
 
 	keySeqNumber, err := toUint64(key.SequenceNumber)
 	if err != nil {
-		return flow.ProposalKey{}, err
+		return flow.ProposalKey{}, fmt.Errorf("invalid key sequence number: %v", err)
 	}
 
 	return flow.ProposalKey{
@@ -162,8 +162,8 @@ func toSignature(signature string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("invalid signature encoding")
 	}
-	if len(signatureBytes) > maxSignatureLength {
-		return nil, errors.New("signature length invalid")
+	if len(signatureBytes) != signatureLength {
+		return nil, errors.New("invalid signature length")
 	}
 	return signatureBytes, nil
 }
