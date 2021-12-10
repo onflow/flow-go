@@ -135,7 +135,7 @@ func TestGetBlocks(t *testing.T) {
 		responseRec := executeRequest(tv.request, backend)
 		require.Equal(t, tv.expectedStatus, responseRec.Code, "failed test %s: incorrect response code", tv.description)
 		actualResp := responseRec.Body.String()
-		require.JSONEq(t, tv.expectedResponse, actualResp, "failed test %s: incorrect response", tv.description)
+		require.JSONEq(t, tv.expectedResponse, actualResp, "Failed: %s: incorrect response body", tv.description)
 	}
 
 }
