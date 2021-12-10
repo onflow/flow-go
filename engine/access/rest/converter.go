@@ -97,23 +97,18 @@ func toHeights(rawHeights []string) ([]uint64, error) {
 		return nil, fmt.Errorf("at most %d heights can be requested at a time", MaxAllowedHeights)
 	}
 
+	seenHeight := make(map[uint64]bool)
 	heights := make([]uint64, len(rawHeights))
 	for i, h := range rawHeights {
 		conv, err := toHeight(h)
 		if err != nil {
 			return nil, fmt.Errorf("invalid height %s", h)
 		}
-		heights[i] = conv
-	}
-
-	// remove duplicates
-	unique := make([]uint64, 0)
-	x := make(map[uint64]bool)
-	for _, v := range heights {
-		x[v] = true
-	}
-	for k := range x {
-		unique = append(unique, k)
+		// dedup heights
+		if !seenHeight[conv] {
+			heights[i] = conv
+			seenHeight[conv] = true
+		}
 	}
 
 	return heights, nil
