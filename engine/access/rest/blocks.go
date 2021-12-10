@@ -58,24 +58,21 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 		return nil, NewBadRequestError(err)
 	}
 
-	var blocks []*generated.Block
-
-	if len(heights) > 0 {
-		// look up block by heights
-
-		blocks = make([]*generated.Block, len(heights))
-
+	if len(heights) == 1 && (heights[0] == finalHeightQueryParam || heights[0] == sealedHeightQueryParam) {
 		// if the query is /blocks?height=final or /blocks?height=sealed, lookup the last finalized or the last sealed block
-		if heights[0] == finalHeightQueryParam || heights[0] == sealedHeightQueryParam {
-			blkProvider := NewBlockProvider(backend, forFinalized(heights[0]))
-			block, err := getBlock(blkProvider, r, backend, link)
-			if err != nil {
-				return nil, err
-			}
-			blocks[0] = block
-			return blocks, nil
+		blocks := make([]*generated.Block, 1)
+
+		blkProvider := NewBlockProvider(backend, forFinalized(heights[0]))
+		block, err := getBlock(blkProvider, r, backend, link)
+		if err != nil {
+			return nil, err
 		}
 
+		blocks[0] = block
+		return blocks, nil
+	}
+
+	if len(heights) > 0 {
 		// if the query is /blocks/height=1000,1008,1049...
 		uintHeights, err := toHeights(heights)
 		if err != nil {
@@ -83,7 +80,7 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 			return nil, NewBadRequestError(heightError)
 		}
 
-		blocks = make([]*generated.Block, len(uintHeights))
+		blocks := make([]*generated.Block, len(uintHeights))
 		for i, h := range uintHeights {
 			blkProvider := NewBlockProvider(backend, forHeight(h))
 			block, err := getBlock(blkProvider, r, backend, link)
@@ -92,6 +89,7 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 			}
 			blocks[i] = block
 		}
+
 		return blocks, nil
 	}
 
@@ -112,6 +110,7 @@ func getBlocksByHeight(r *request, backend access.API, link LinkGenerator) (inte
 		return nil, NewBadRequestError(err)
 	}
 
+	blocks := make([]*generated.Block, 0)
 	// start and end height inclusive
 	for i := start; i <= end; i++ {
 		blkProvider := NewBlockProvider(backend, forHeight(i))
