@@ -3,6 +3,8 @@ package rest
 import (
 	"context"
 	"fmt"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
 
@@ -165,6 +167,12 @@ func getBlock(blkProvider *blockProvider, req *request, backend access.API, link
 	// (even if not specified as expandable, since we need the execution result ID to generate its expandable link)
 	executionResult, err := backend.GetExecutionResultForBlockID(req.Context(), blk.ID())
 	if err != nil {
+		// handle case where execution result is not yet available
+		if se, ok := status.FromError(err); ok {
+			if se.Code() == codes.NotFound {
+				return blockResponse(blk, nil, link, req.expandFields)
+			}
+		}
 		return nil, err
 	}
 
