@@ -108,6 +108,16 @@ func toHeights(rawHeights []string) ([]uint64, error) {
 		heights[i] = conv
 	}
 
+	// remove duplicates
+	unique := make([]uint64, 0)
+	x := make(map[uint64]bool)
+	for _, v := range heights {
+		x[v] = true
+	}
+	for k := range x {
+		unique = append(unique, k)
+	}
+
 	return heights, nil
 }
 
