@@ -1,10 +1,12 @@
 package backdata
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/arraylinkedlist"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -87,6 +89,59 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 	testRetrievableCount(t, bd, entities, 100_000)
 }
 
+// TestArrayBackData_All_BelowLimit checks correctness of All method when mempool is not full yet.
+func TestArrayBackData_All_BelowLimit(t *testing.T) {
+	tt := []struct {
+		limit        uint32
+		items        uint32
+		ejectionMode arraylinkedlist.EjectionMode
+	}{
+		{ // mempool has the limit of 100K, but we put 10K
+			limit:        100_000,
+			items:        10_000,
+			ejectionMode: arraylinkedlist.LRUEjection,
+		},
+		{ // mempool has the limit of 100K, and we put exactly 100K items
+			limit:        100_000,
+			items:        100_000,
+			ejectionMode: arraylinkedlist.LRUEjection,
+		},
+		{ // mempool has the limit of 100K, and we put 1M items with LRU ejection.
+			limit:        100_000,
+			items:        1_000_000,
+			ejectionMode: arraylinkedlist.LRUEjection,
+		},
+		{ // mempool has the limit of 100K, and we put 1M items with random ejection.
+			limit:        100_000,
+			items:        1_000_000,
+			ejectionMode: arraylinkedlist.RandomEjection,
+		},
+	}
+
+	for _, tc := range tt {
+		t.Run(fmt.Sprintf("%d-limit-%d-items-%s-ejection", tc.limit, tc.items, tc.ejectionMode), func(t *testing.T) {
+			bd := NewArrayBackData(tc.limit, 8, tc.ejectionMode)
+			entities := unittest.EntityListFixture(uint(tc.items))
+
+			testAddEntities(t, bd, entities)
+
+			if tc.ejectionMode == arraylinkedlist.RandomEjection {
+				// in random ejection mode we count total number of matched entities
+				// with All map.
+				testMapMatchCount(t, bd.All(), entities, int(tc.limit))
+			} else {
+				// in LRU ejection mode we match All items based on a from index (i.e., last "from" items).
+				from := int(tc.items) - int(tc.limit)
+				if from < 0 {
+					// we are below limit, hence we start matching from index 0
+					from = 0
+				}
+				testMapMatchFrom(t, bd.All(), entities, from)
+			}
+		})
+	}
+}
+
 // testAddEntities is a test helper that checks entities are added successfully to the backdata.
 // and each entity is retrievable right after it is written to backdata.
 func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity) {
@@ -123,6 +178,37 @@ func testRetrievableFrom(t *testing.T, bd *ArrayBackData, entities []*unittest.M
 		} else {
 			require.True(t, ok)
 			require.Equal(t, expected, actual)
+		}
+	}
+}
+
+// testMapMatchFrom is a test helper that checks entities are retrievable from entitiesMap.
+func testMapMatchFrom(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity, entities []*unittest.MockEntity, from int) {
+	require.Len(t, entitiesMap, len(entities)-from)
+
+	for i := range entities {
+		expected := entities[i]
+		actual, ok := entitiesMap[expected.ID()]
+		if i < from {
+			require.False(t, ok, i)
+			require.Nil(t, actual)
+		} else {
+			require.True(t, ok)
+			require.Equal(t, expected, actual)
+		}
+	}
+}
+
+// testMapMatchFrom is a test helper that checks entities are retrievable from entitiesMap.
+func testMapMatchCount(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity, entities []*unittest.MockEntity, count int) {
+	require.Len(t, entitiesMap, count)
+	actualCount := 0
+	for i := range entities {
+		expected := entities[i]
+		actual, ok := entitiesMap[expected.ID()]
+		if ok {
+			require.Equal(t, expected, actual)
+			actualCount++
 		}
 	}
 }
