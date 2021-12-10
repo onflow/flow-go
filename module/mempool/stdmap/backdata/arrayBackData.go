@@ -108,8 +108,21 @@ func (a ArrayBackData) Size() uint {
 }
 
 // All returns all entities from the pool.
-func (a *ArrayBackData) All() map[flow.Identifier]flow.Entity {
-	return nil
+func (a ArrayBackData) All() map[flow.Identifier]flow.Entity {
+	all := make(map[flow.Identifier]flow.Entity)
+	for bucketIndex, bucket := range a.buckets {
+		for slotIndex := range bucket {
+			id, entity, linked := a.linkedEntityOf(bIndex(bucketIndex), sIndex(slotIndex))
+			if !linked {
+				// slot may never be used, or recently invalidated
+				continue
+			}
+
+			all[id] = entity
+		}
+	}
+
+	return all
 }
 
 // Clear removes all entities from the pool.
