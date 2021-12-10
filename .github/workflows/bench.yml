@@ -77,8 +77,13 @@ jobs:
 
             Bench tests were run a total of ${{ steps.settings.outputs.benchmark_repetitions }} times on each branch.
 
-            ## Results
+            <details>
+            <summary>Collapsed results for better readability</summary>
+            <p>
 
             ${{ env.BENCHSTAT }}
+
+            </p>
+            </details>  
             
           edit-mode: replace
