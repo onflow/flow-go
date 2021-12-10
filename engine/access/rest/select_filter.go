@@ -31,9 +31,6 @@ func SelectFilter(object interface{}, selectKeys []string) (interface{}, error) 
 		filterSlice(itemAsType, "", filter)
 	case map[string]interface{}:
 		filterObject(itemAsType, "", filter)
-		if err != nil {
-			return nil, err
-		}
 	}
 	return *outputMap, nil
 }

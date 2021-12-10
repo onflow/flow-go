@@ -42,12 +42,7 @@ func executeScript(r *request, backend access.API, _ LinkGenerator) (interface{}
 			return nil, NewBadRequestError(err)
 		}
 
-		result, err := backend.ExecuteScriptAtBlockID(r.Context(), id, code, args)
-		if err != nil {
-			return nil, err
-		}
-
-		return result, nil
+		return backend.ExecuteScriptAtBlockID(r.Context(), id, code, args)
 	}
 
 	if blockHeight == sealedHeightQueryParam {
@@ -72,10 +67,5 @@ func executeScript(r *request, backend access.API, _ LinkGenerator) (interface{}
 		}
 	}
 
-	result, err := backend.ExecuteScriptAtBlockHeight(r.Context(), height, code, args)
-	if err != nil {
-		return nil, err
-	}
-
-	return result, nil
+	return backend.ExecuteScriptAtBlockHeight(r.Context(), height, code, args)
 }
