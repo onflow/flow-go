@@ -39,8 +39,12 @@ type chacha20s struct {
 }
 
 const (
+	// TODO: private?
 	KeySize   = chacha20.KeySize
 	NonceSize = chacha20.NonceSize
+	// public ?
+	Chacha20SeedLen  = KeySize
+	Chacha20MaxIDLen = NonceSize
 )
 
 // NewChacha20 returns a new PRG that is a set of ChaCha20 PRGs, seeded with
@@ -200,9 +204,15 @@ func Restore(stateBytes []byte) (*chacha20s, error) {
 	}
 	// set the counter
 	counter := binary.LittleEndian.Uint64(counterBytes)
-	chacha.SetCounter(uint32(counter))
 
-	// initialize the state index
+	// TODO : replace 8 by constants
+	full512Count := uint32(counter / 8)
+	remaining64Count := counter % 8
+	chacha.SetCounter(full512Count)
+	// query the remaining bits and discard the result to catch the stored chacha state
+	remainderStream := make([]byte, remaining64Count*8)
+	chacha.XORKeyStream(remainderStream, remainderStream)
+
 	rand := &chacha20s{
 		state:        *chacha,
 		counter:      counter,
