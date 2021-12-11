@@ -7,6 +7,8 @@ import (
 	"golang.org/x/crypto/chacha20"
 )
 
+// TODO: update description, RFC and lengths
+
 // We use Chacha20, to build a cryptographically secure random number generator
 // that uses the ChaCha algorithm.
 //
@@ -25,17 +27,14 @@ import (
 // [^2]: [eSTREAM: the ECRYPT Stream Cipher Project](
 //       http://www.ecrypt.eu.org/stream/)
 //
-// chacha20s is a set of chacha20 pseudo random number generators
-// each chacha20 has a 16 words (256 bits) of state (4 constant, 8 of seed, 1 of counter
+// a chacha20 has a 16 words (256 bits) of state (4 constant, 8 of seed, 1 of counter
 // -incremented after each block- and 3 of stream_id).
-//
-// Using a set of chacha20s allows initializing the set with a larger
-// seed than 32 bytes.
+
+// TODO: update
 type chacha20s struct {
-	states     []chacha20.Cipher
-	stateIndex int
+	state chacha20.Cipher
 	// Only used for State/Restore functionality
-	counters     []uint64
+	counter      uint64
 	initialBytes []byte
 }
 
@@ -53,31 +52,28 @@ const (
 // The length of the seed fixes the number of ChaCha20 instances to initialize:
 // each 32 bytes of the seed initialize a ChaCha20 instance. The seed length
 // has to be a multiple of 32 (the CSPRG state size).
-func NewChacha20(seed []byte, stream_id []byte) (*chacha20s, error) {
-	// safety check
-	if len(seed) == 0 || len(seed)%KeySize != 0 {
-		return nil, fmt.Errorf("new Rand seed length should be a non-zero multiple of %d", KeySize)
+func NewChacha20(seed []byte, streamID []byte) (*chacha20s, error) {
+
+	// check the key size
+	if len(seed) != KeySize {
+		return nil, fmt.Errorf("chacha20 seed length should be %d, got %d", KeySize, len(seed))
 	}
+
+	// TODO: update by adding a maximum length and padding
+	// check the nonce size
 	if len(stream_id) != NonceSize {
 		return nil, fmt.Errorf("new Rand stream_id should be %d bytes", NonceSize)
 	}
-	// create the Chacha20 instances
-	states := make([]chacha20.Cipher, 0, len(seed)/KeySize)
-	counters := make([]uint64, len(seed)/KeySize)
-	// initialize the Chacha20s with the seed
-	for i := 0; i < cap(states); i++ {
-		chacha, err := chacha20.NewUnauthenticatedCipher(seed[i*KeySize:(i+1)*KeySize], stream_id)
-		if err != nil {
-			return nil, fmt.Errorf("CSPRNG instance creation failed at index %d", i)
-		}
-		states = append(states, *chacha)
+
+	// create the Chacha20 state, initialized with the seed as a key, and the streamID as a nonce
+	chacha, err := chacha20.NewUnauthenticatedCipher(seed, streamID)
+	if err != nil {
+		return nil, fmt.Errorf("chacha20 instance creation failed: %w", err)
 	}
 
 	// init the chacha20s
 	rand := &chacha20s{
-		states:       states,
-		stateIndex:   0,
-		counters:     counters,
+		state:        chacha,
 		initialBytes: append(seed, stream_id...),
 	}
 	return rand, nil
