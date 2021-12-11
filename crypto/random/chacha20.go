@@ -28,13 +28,13 @@ import (
 //       http://www.ecrypt.eu.org/stream/)
 //
 // a chacha20 has a 16 words (256 bits) of state (4 constant, 8 of seed, 1 of counter
-// -incremented after each block- and 3 of stream_id).
+// -incremented after each block- and 3 of streamID).
 
 // TODO: update
 type chacha20s struct {
 	state chacha20.Cipher
 	// Only used for State/Restore functionality
-	counter      uint64
+	counter      uint64 // TODO: update to 32
 	initialBytes []byte
 }
 
@@ -61,8 +61,8 @@ func NewChacha20(seed []byte, streamID []byte) (*chacha20s, error) {
 
 	// TODO: update by adding a maximum length and padding
 	// check the nonce size
-	if len(stream_id) != NonceSize {
-		return nil, fmt.Errorf("new Rand stream_id should be %d bytes", NonceSize)
+	if len(streamID) != NonceSize {
+		return nil, fmt.Errorf("new Rand streamID should be %d bytes", NonceSize)
 	}
 
 	// create the Chacha20 state, initialized with the seed as a key, and the streamID as a nonce
@@ -73,24 +73,30 @@ func NewChacha20(seed []byte, streamID []byte) (*chacha20s, error) {
 
 	// init the chacha20s
 	rand := &chacha20s{
-		state:        chacha,
-		initialBytes: append(seed, stream_id...),
+		state:        *chacha,
+		initialBytes: append(seed, streamID...),
 	}
 	return rand, nil
 }
 
+// TODO : update GoDoc
+
 // UintN returns an uint64 pseudo-random number in [0,n-1]
-// using the chacha20 of the current index. The index is updated
-// to use another chacha20 at the next round
+// using the chacha20 state.
 func (x *chacha20s) UintN(n uint64) uint64 {
+	// empty message to encrypt
+	// TODO: use a single array per chacha  - precise concurrency assumptions in GoDoc
+	// TODO: optimization: encrypt the entire block (512 bits) instead of of 64 bits
 	bytes := make([]byte, 8)
-	x.states[x.stateIndex].XORKeyStream(bytes, bytes)
-	x.counters[x.stateIndex]++
-	res := binary.LittleEndian.Uint64(bytes) % n
-	// update the index
-	x.stateIndex = (x.stateIndex + 1) % len(x.states)
-	return res
+	x.state.XORKeyStream(bytes, bytes)
+	// increase the counter
+	x.counter++
+
+	random := binary.LittleEndian.Uint64(bytes)
+	return random % n
 }
+
+// TODO: move to a generic PRG struct?
 
 // Permutation returns a permutation of the set [0,n-1]
 // it implements Fisher-Yates Shuffle (inside-out variant) using (x) as a random source
@@ -110,6 +116,8 @@ func (x *chacha20s) Permutation(n int) ([]int, error) {
 	return items, nil
 }
 
+// TODO: move to a generic PRG struct?
+
 // SubPermutation returns the m first elements of a permutation of [0,n-1]
 // It implements Fisher-Yates Shuffle using x as a source of randoms
 // O(n) space and O(n) time
@@ -125,6 +133,8 @@ func (x *chacha20s) SubPermutation(n int, m int) ([]int, error) {
 	return items[:m], nil
 }
 
+// TODO: move to a generic PRG struct?
+
 // Shuffle permutes the given slice in place
 // It implements Fisher-Yates Shuffle using x as a source of randoms
 // O(1) space and O(n) time
@@ -138,6 +148,8 @@ func (x *chacha20s) Shuffle(n int, swap func(i, j int)) error {
 	}
 	return nil
 }
+
+// TODO: move to a generic PRG struct?
 
 // Samples picks randomly m elements out of n elemnts and places them
 // in random order at indices [0,m-1]. The swapping is done in place
@@ -157,75 +169,44 @@ func (x *chacha20s) Samples(n int, m int, swap func(i, j int)) error {
 	return nil
 }
 
-// State returns the internal state of the concatenated Chacha20s (this is used
-// for serde purposes)
+// State returns the internal state of the concatenated Chacha20s
+// (this is used for serde purposes)
+// TODO: update the name (serialize, encode, marshall ?)
 func (x *chacha20s) State() []byte {
-	bytes := x.initialBytes
-	for i := 0; i < len(x.counters); i++ {
-		b := make([]byte, 8)
-		binary.LittleEndian.PutUint64(b, x.counters[i])
-		bytes = append(bytes, b...)
-	}
-	idx := make([]byte, 4)
-	binary.LittleEndian.PutUint32(idx, uint32(x.stateIndex))
-	bytes = append(bytes, idx...)
-	length := make([]byte, 4)
-	binary.LittleEndian.PutUint32(length, uint32(len(x.states)))
-	bytes = append(bytes, length...)
+	counterBytes := make([]byte, 8)
+	binary.LittleEndian.PutUint64(counterBytes, x.counter)
+	bytes := append(x.initialBytes, counterBytes...)
+	// output is seed || streamID || counter
 	return bytes
 }
 
 func Restore(stateBytes []byte) (*chacha20s, error) {
-	// we expect k*32 bytes of seed, 12 bytes of stream_id, k*8 bytes of
-	// counters, 4 bytes of index, 4 bytes of length (== k)
-	n := len(stateBytes)
+	// inpout should be seed (32 bytes) || streamID (12 bytes) || counter (8 bytes)
+	const expectedLen = KeySize + NonceSize + 8
 
-	// safety check
-	// minimum (k==1) 46 bytes
-	if n < 46 {
-		return nil, fmt.Errorf("Rand state length should be of the form k * %d + %d + k * 8 + 8 bytes", KeySize, NonceSize)
-	}
-	k := binary.LittleEndian.Uint32(stateBytes[n-4:])
-	if uint32(n) != (k*KeySize + NonceSize + k*8 + 4 + 4) {
-		return nil, fmt.Errorf("Rand state length should be of the form k * %d + %d + k * 8 + 8 bytes", KeySize, NonceSize)
+	// check input length
+	if len(stateBytes) != expectedLen {
+		return nil, fmt.Errorf("Rand state length should be of %d bytes, got %d", expectedLen, len(stateBytes))
 	}
 
-	// create the Chacha20 instances
-	states := make([]chacha20.Cipher, 0, k)
-	counters := make([]uint64, 0, k)
+	seed := stateBytes[:KeySize]
+	streamID := stateBytes[KeySize : KeySize+NonceSize]
+	counterBytes := stateBytes[KeySize+NonceSize:]
 
-	// initialize the Chacha20s with the state, initialize the counters
-	stream_id := stateBytes[k*KeySize : k*KeySize+NonceSize]
-	postInitialBytesOffset := int(k*KeySize + NonceSize)
-	for i := 0; i < int(k); i++ {
-		chacha, err := chacha20.NewUnauthenticatedCipher(stateBytes[i*KeySize:(i+1)*KeySize], stream_id)
-		if err != nil {
-			return nil, fmt.Errorf("CSPRNG instance creation failed at index %d", i)
-		}
-		// retrieve and set the counter, both in the chacha20 instance and the
-		// secondary index
-		counter := binary.LittleEndian.Uint64(stateBytes[postInitialBytesOffset+8*i : postInitialBytesOffset+8*(i+1)])
-		counters = append(counters, counter)
-
-		// counters indicate the # of queried uint64s, i.e. they count in 8 bytes increments
-		// internal chacha counters count in 64 bytes increments, so we might have to
-		// query the remainder
-		fullCounts := uint32(counter / 8)
-		remainingInts := counter % 8
-		chacha.SetCounter(fullCounts)
-		// query the remaining bits and discard the result
-		remainderStream := make([]byte, 8*remainingInts)
-		chacha.XORKeyStream(remainderStream, remainderStream)
-
-		states = append(states, *chacha)
+	// create the Chacha20 instance with seed and streamID
+	chacha, err := chacha20.NewUnauthenticatedCipher(seed, streamID)
+	if err != nil {
+		return nil, fmt.Errorf("Chacha20 instance creation failed: %w", err)
 	}
+	// set the counter
+	counter := binary.LittleEndian.Uint64(counterBytes)
+	chacha.SetCounter(uint32(counter))
+
 	// initialize the state index
-	idx := int(binary.LittleEndian.Uint32(stateBytes[n-8 : n-4]))
 	rand := &chacha20s{
-		states:       states,
-		stateIndex:   idx,
-		counters:     counters,
-		initialBytes: stateBytes[:k*KeySize+NonceSize],
+		state:        *chacha,
+		counter:      counter,
+		initialBytes: stateBytes[:KeySize+NonceSize],
 	}
 	return rand, nil
 }

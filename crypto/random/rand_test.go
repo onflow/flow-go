@@ -16,16 +16,12 @@ import (
 // The only purpose of this function is unit testing. It also implements a very basic randomness test.
 // it doesn't evaluate randomness of the random function and doesn't perform advanced statistical tests
 // just making sure code works on edge cases
-func TestRandInt(t *testing.T) {
+func TestChacha20Int(t *testing.T) {
 	sampleSize := 64768
 	tolerance := 0.05
 	sampleSpace := uint64(16) // this should be a power of 2 for a more uniform distribution
 	distribution := make([]float64, sampleSpace)
 	seed := []uint8{
-		0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
-		0x6A, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x5C,
-		0x66, 0x53, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x51,
-		0xAA, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x50,
 		0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
 		0x6A, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x5C,
 		0x66, 0x53, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x51,
@@ -249,10 +245,14 @@ func TestEmptySamples(t *testing.T) {
 	assert.Equal(t, []float64{0, 1, 2, 3, 4, 5}, fullSlice)
 }
 
-// TestState tests the function State()
-func TestState(t *testing.T) {
+// TODO: use randomized data
+// TODO: use chacha20 constants
+
+// TestStateRestore tests the serilaization and deserialization functions
+// State and Restore
+func TestStateRestore(t *testing.T) {
 	// create a seed
-	len := 32 * 3 // 3 internal chacha20s
+	len := 32
 	seed := make([]byte, len)
 	for i := 0; i < len; i++ {
 		seed[i] = byte(rand.Intn(256))
