@@ -32,7 +32,7 @@ func TestRandInt(t *testing.T) {
 		0xAA, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x50,
 	}
 	stream_id := make([]byte, 12)
-	rng, err := NewRand(seed, stream_id)
+	rng, err := NewChacha20(seed, stream_id)
 	require.NoError(t, err)
 	for i := 0; i < sampleSize; i++ {
 		r := rng.UintN(sampleSpace)
@@ -52,11 +52,11 @@ func TestRandomPermutationSubset(t *testing.T) {
 	seed := make([]byte, 32)
 	stream_id := make([]byte, 12)
 	// test a zero seed
-	_, err := NewRand(seed, stream_id)
+	_, err := NewChacha20(seed, stream_id)
 	require.NoError(t, err)
 	// fix thee seed
 	seed[0] = 45
-	rng, err := NewRand(seed, stream_id)
+	rng, err := NewChacha20(seed, stream_id)
 	require.NoError(t, err)
 	// statictics parameters
 	sampleSize := 64768
@@ -103,7 +103,7 @@ func TestEmptyPermutationSubset(t *testing.T) {
 	seed[0] = 45
 	stream_id := make([]byte, 12)
 
-	rng, err := NewRand(seed, stream_id)
+	rng, err := NewChacha20(seed, stream_id)
 	require.NoError(t, err)
 
 	// verify that permuting an empty set returns an empty list
@@ -123,7 +123,7 @@ func TestRandomShuffle(t *testing.T) {
 	seed[0] = 45
 
 	stream_id := make([]byte, 12)
-	rng, err := NewRand(seed, stream_id)
+	rng, err := NewChacha20(seed, stream_id)
 	require.NoError(t, err)
 	// statictics parameters
 	sampleSize := 64768
@@ -164,7 +164,7 @@ func TestEmptyShuffle(t *testing.T) {
 	seed := make([]byte, 32)
 	seed[0] = 45
 	stream_id := make([]byte, 12)
-	rng, err := NewRand(seed, stream_id)
+	rng, err := NewChacha20(seed, stream_id)
 	require.NoError(t, err)
 	emptySlice := make([]float64, 0)
 	err = rng.Shuffle(len(emptySlice), func(i, j int) {
@@ -181,7 +181,7 @@ func TestRandomSamples(t *testing.T) {
 	seed[0] = 45
 	stream_id := make([]byte, 12)
 
-	rng, err := NewRand(seed, stream_id)
+	rng, err := NewChacha20(seed, stream_id)
 	require.NoError(t, err)
 	// statictics parameters
 	sampleSize := 100000
@@ -229,7 +229,7 @@ func TestEmptySamples(t *testing.T) {
 	seed := make([]byte, 32)
 	seed[0] = 45
 	stream_id := make([]byte, 12)
-	rng, err := NewRand(seed, stream_id)
+	rng, err := NewChacha20(seed, stream_id)
 	require.NoError(t, err)
 
 	// Sampling from an empty set
@@ -259,7 +259,7 @@ func TestState(t *testing.T) {
 	}
 	stream_id := make([]byte, 12)
 	// create an rng
-	rng, err := NewRand(seed, stream_id)
+	rng, err := NewChacha20(seed, stream_id)
 	require.NoError(t, err)
 
 	// evolve the internal state of the rng

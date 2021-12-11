@@ -40,11 +40,11 @@ type chacha20s struct {
 }
 
 const (
-	KeySize = chacha20.KeySize
+	KeySize   = chacha20.KeySize
 	NonceSize = chacha20.NonceSize
 )
 
-// NewRand returns a new PRG that is a set of ChaCha20 PRGs, seeded with
+// NewChacha20 returns a new PRG that is a set of ChaCha20 PRGs, seeded with
 // the input seed and a stream identifier (12 bytes).
 //
 // The input seed is the initial state of the PRG, it is recommended to sample the
@@ -53,7 +53,7 @@ const (
 // The length of the seed fixes the number of ChaCha20 instances to initialize:
 // each 32 bytes of the seed initialize a ChaCha20 instance. The seed length
 // has to be a multiple of 32 (the CSPRG state size).
-func NewRand(seed []byte, stream_id []byte) (*chacha20s, error) {
+func NewChacha20(seed []byte, stream_id []byte) (*chacha20s, error) {
 	// safety check
 	if len(seed) == 0 || len(seed)%KeySize != 0 {
 		return nil, fmt.Errorf("new Rand seed length should be a non-zero multiple of %d", KeySize)
@@ -200,7 +200,7 @@ func Restore(stateBytes []byte) (*chacha20s, error) {
 
 	// initialize the Chacha20s with the state, initialize the counters
 	stream_id := stateBytes[k*KeySize : k*KeySize+NonceSize]
-	postInitialBytesOffset := int(k*KeySize+NonceSize)
+	postInitialBytesOffset := int(k*KeySize + NonceSize)
 	for i := 0; i < int(k); i++ {
 		chacha, err := chacha20.NewUnauthenticatedCipher(stateBytes[i*KeySize:(i+1)*KeySize], stream_id)
 		if err != nil {
@@ -208,7 +208,7 @@ func Restore(stateBytes []byte) (*chacha20s, error) {
 		}
 		// retrieve and set the counter, both in the chacha20 instance and the
 		// secondary index
-		counter := binary.LittleEndian.Uint64(stateBytes[postInitialBytesOffset + 8*i : postInitialBytesOffset + 8 * (i+1)])
+		counter := binary.LittleEndian.Uint64(stateBytes[postInitialBytesOffset+8*i : postInitialBytesOffset+8*(i+1)])
 		counters = append(counters, counter)
 
 		// counters indicate the # of queried uint64s, i.e. they count in 8 bytes increments
@@ -218,7 +218,7 @@ func Restore(stateBytes []byte) (*chacha20s, error) {
 		remainingInts := counter % 8
 		chacha.SetCounter(fullCounts)
 		// query the remaining bits and discard the result
-		remainderStream := make([]byte, 8 * remainingInts)
+		remainderStream := make([]byte, 8*remainingInts)
 		chacha.XORKeyStream(remainderStream, remainderStream)
 
 		states = append(states, *chacha)

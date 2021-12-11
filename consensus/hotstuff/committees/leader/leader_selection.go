@@ -119,7 +119,7 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 // See https://en.wikipedia.org/wiki/Fitness_proportionate_selection
 func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16, error) {
 	// create random number generator from the seed
-	rng, err := random.NewRand(seed, []byte("leader_selec"))
+	rng, err := random.NewChacha20(seed, []byte("leader_selec"))
 	if err != nil {
 		return nil, fmt.Errorf("can not create rng: %w", err)
 	}
