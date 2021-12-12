@@ -73,7 +73,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 			return fmt.Errorf("could not get dkg: %w", err)
 		}
 
-		// if there is beacon share, there must be beacon public key
+		// if there is beacon share, there must be a beacon public key
 		beaconPubKey, err := dkg.KeyShare(signer.NodeID)
 		if err != nil {
 			return fmt.Errorf("could not get random beacon key share for %x at block %v: %w", signer.NodeID, block.BlockID, err)
@@ -83,7 +83,6 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 		if err != nil {
 			return fmt.Errorf("internal error while verifying beacon signature for block %v: %w", block.BlockID, err)
 		}
-
 		if !beaconValid {
 			return fmt.Errorf("invalid beacon sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 		}
