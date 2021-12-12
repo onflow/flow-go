@@ -217,7 +217,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	)
 
 	// program the hotstuff verifier behaviour
-	in.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	in.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	in.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	// program the hotstuff communicator behaviour

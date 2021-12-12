@@ -57,9 +57,8 @@ func TestStakingSigner_CreateProposal(t *testing.T) {
 		require.NotNil(t, proposal)
 
 		verifier := NewStakingVerifier()
-		valid, err := verifier.VerifyVote(signerIdentity, proposal.SigData, proposal.Block)
+		err = verifier.VerifyVote(signerIdentity, proposal.SigData, proposal.Block)
 		require.NoError(t, err)
-		require.True(t, valid)
 	})
 }
 
@@ -97,8 +96,7 @@ func TestStakingSigner_CreateVote(t *testing.T) {
 		require.NotNil(t, vote)
 
 		verifier := NewStakingVerifier()
-		valid, err := verifier.VerifyVote(signerIdentity, vote.SigData, block)
+		err = verifier.VerifyVote(signerIdentity, vote.SigData, block)
 		require.NoError(t, err)
-		require.True(t, valid)
 	})
 }
