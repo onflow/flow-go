@@ -5,7 +5,7 @@ import (
 	"github.com/onflow/flow-go/access"
 )
 
-const blockQueryParam = "block_id"
+const blockQueryParam = "block_ids"
 const eventTypeQuery = "type"
 
 // getEvents for the provided block range or list of block IDs filtered by type.
@@ -27,6 +27,11 @@ func getEvents(r *request, backend access.API, link LinkGenerator) (interface{},
 	// if neither height nor start and end height are provided
 	if len(blockIDs) == 0 && (startHeight == "" || endHeight == "") {
 		err := fmt.Errorf("must provide either block IDs or start and end height range")
+		return nil, NewBadRequestError(err)
+	}
+
+	if eventType == "" { // todo(sideninja) validate format with regex in the validation layer
+		err := fmt.Errorf("event type must be provided")
 		return nil, NewBadRequestError(err)
 	}
 
