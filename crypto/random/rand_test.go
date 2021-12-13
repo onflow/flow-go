@@ -260,7 +260,7 @@ func TestStateRestore(t *testing.T) {
 	_, err := crand.Read(seed)
 	require.NoError(t, err)
 
-	streamID := make([]byte, Chacha20MaxIDLen)
+	streamID := make([]byte, Chacha20CustomizerMaxLen)
 	_, err = crand.Read(streamID)
 	require.NoError(t, err)
 	t.Logf("seed is %x, stream_id is %x\n", seed, streamID)
@@ -294,3 +294,5 @@ func TestStateRestore(t *testing.T) {
 		require.Equal(t, rand1, rand2, "the 2 rngs are not identical on round %d", i)
 	}
 }
+
+// TODO : add test for chacha20 key size to be 256 bits

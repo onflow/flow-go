@@ -12,79 +12,78 @@ import (
 // We use Chacha20, to build a cryptographically secure random number generator
 // that uses the ChaCha algorithm.
 //
-// ChaCha is a stream cipher designed by Daniel J. Bernstein[^1], that we use as an RNG. It is
-// an improved variant of the Salsa20 cipher family, which was selected as one of the "stream
-// ciphers suitable for widespread adoption" by eSTREAM[^2].
+// ChaCha is a stream cipher designed by Daniel J. Bernstein[^1], that we use as an PRG. It is
+// an improved variant of the Salsa20 cipher family.
 //
-// We use a 64-bit counter and 64-bit stream identifier as in Bernstein's implementation[^1]
-// except that we use a stream identifier in place of a nonce. A 64-bit counter over 64-byte
-// (16 word) blocks allows 1 ZiB of output before cycling, and the stream identifier allows
-// 2<sup>64</sup> unique streams of output per seed.
+// We use Chacha20 with a 256-bit key, a 192-bit stream identifier and a 32-bit counter as
+// as specified in RFC 8439 [^2].
+// The encryption key is used as the PRG seed while the stream identifer is used as a nonce
+// to customize the PRG. The PRG outputs are the successive encryptions of a constant message.
+//
+// A 32-bit counter over 64-byte blocks allows 256 GiB of output before cycling,
+// and the stream identifier allows 2^192 unique streams of output per seed.
+// It is the caller's responsibility to avoid the PRG output cycling.
 //
 // [^1]: D. J. Bernstein, [*ChaCha, a variant of Salsa20*](
 //       https://cr.yp.to/chacha.html)
 //
-// [^2]: [eSTREAM: the ECRYPT Stream Cipher Project](
-//       http://www.ecrypt.eu.org/stream/)
-//
-// a chacha20 has a 16 words (256 bits) of state (4 constant, 8 of seed, 1 of counter
-// -incremented after each block- and 3 of streamID).
+// [^2]: [RFC 8439: ChaCha20 and Poly1305 for IETF Protocols](
+//       https://datatracker.ietf.org/doc/html/rfc8439)
 
-// TODO: update
-type chacha20s struct {
-	state chacha20.Cipher
+type state struct {
+	cipher chacha20.Cipher
 
 	// Only used for State/Restore functionality
 
-	// counter of bytes encrypted by the sream cipher
+	// Counter of bytes encrypted so far by the sream cipher.
 	// Note this is different than the internal counter of the chacha state
 	// that counts the encrypted blocks of 512 bits.
 	bytesCounter uint64
+	// TODO change to key and nonce.
 	initialBytes []byte
 }
 
 const (
-	// TODO: private?
-	KeySize   = chacha20.KeySize
-	NonceSize = chacha20.NonceSize
-	// public ?
-	Chacha20SeedLen  = KeySize
-	Chacha20MaxIDLen = NonceSize
+	keySize   = chacha20.KeySize
+	nonceSize = chacha20.NonceSize
+
+	// Chacha20SeedLen is the seed length of the Chacha based PRG, it is fixed to 32 bytes.
+	Chacha20SeedLen = keySize
+	// Chacha20CustomizerMaxLen is the maximum length of the nonce used as a PRG customizer, it is fixed to 24 bytes.
+	// Shorter customizers are padded by zeros to 24 bytes.
+	Chacha20CustomizerMaxLen = nonceSize
 )
 
-// NewChacha20 returns a new PRG that is a set of ChaCha20 PRGs, seeded with
-// the input seed and a stream identifier (12 bytes).
+// NewChacha20 returns a new Chacha20-based PRG, seeded with
+// the input seed (32 bytes) and a customizer (up to 12 bytes).
 //
-// The input seed is the initial state of the PRG, it is recommended to sample the
-// seed uniformly at random.
-//
-// The length of the seed fixes the number of ChaCha20 instances to initialize:
-// each 32 bytes of the seed initialize a ChaCha20 instance. The seed length
-// has to be a multiple of 32 (the CSPRG state size).
-func NewChacha20(seed []byte, streamID []byte) (*chacha20s, error) {
+// It is recommended to sample the seed uniformly at random.
+// The function errors if the the seed is different than 32 bytes,
+// or if the customizer is larger than 12 bytes.
+func NewChacha20(seed []byte, customizer []byte) (*state, error) {
 
 	// check the key size
-	if len(seed) != KeySize {
-		return nil, fmt.Errorf("chacha20 seed length should be %d, got %d", KeySize, len(seed))
+	if len(seed) != Chacha20SeedLen {
+		return nil, fmt.Errorf("chacha20 seed length should be %d, got %d", Chacha20SeedLen, len(seed))
 	}
 
 	// TODO: update by adding a maximum length and padding
 	// check the nonce size
-	if len(streamID) != NonceSize {
-		return nil, fmt.Errorf("new Rand streamID should be %d bytes", NonceSize)
+	if len(customizer) != Chacha20CustomizerMaxLen {
+		return nil, fmt.Errorf("new Rand streamID should be %d bytes", Chacha20CustomizerMaxLen)
 	}
 
-	// create the Chacha20 state, initialized with the seed as a key, and the streamID as a nonce
-	chacha, err := chacha20.NewUnauthenticatedCipher(seed, streamID)
+	// create the Chacha20 state, initialized with the seed as a key, and the customizer as a streamID.
+	chacha, err := chacha20.NewUnauthenticatedCipher(seed, customizer)
 	if err != nil {
 		return nil, fmt.Errorf("chacha20 instance creation failed: %w", err)
 	}
 
-	// init the chacha20s
-	rand := &chacha20s{
-		state:        *chacha,
+	// init the state
+	rand := &state{
+		cipher:       *chacha,
 		bytesCounter: 0,
-		initialBytes: append(seed, streamID...),
+		initialBytes: append(seed, customizer...),
 	}
 	return rand, nil
 }
@@ -92,14 +91,13 @@ func NewChacha20(seed []byte, streamID []byte) (*chacha20s, error) {
 // TODO : update GoDoc
 
 // UintN returns an uint64 pseudo-random number in [0,n-1]
-// using the chacha20 state.
-func (c *chacha20s) UintN(n uint64) uint64 {
+// using the chacha20-based PRG.
+func (c *state) UintN(n uint64) uint64 {
 	// empty message to encrypt
 	// TODO: use a single array per chacha  - precise concurrency assumptions in GoDoc
-	// TODO: optimization: encrypt the entire block (512 bits) instead of of 64 bits
 	// TODO: improve unioform distribution of UintN: for loop or higher sample
 	bytes := make([]byte, 8)
-	c.state.XORKeyStream(bytes, bytes)
+	c.cipher.XORKeyStream(bytes, bytes)
 	// increase the counter
 	c.bytesCounter += 8
 
@@ -114,7 +112,7 @@ func (c *chacha20s) UintN(n uint64) uint64 {
 // the output space grows very fast with (!n) so that input (n) and the seed length
 // (which fixes the internal state length of xorshifts ) should be chosen carefully
 // O(n) space and O(n) time
-func (c *chacha20s) Permutation(n int) ([]int, error) {
+func (c *state) Permutation(n int) ([]int, error) {
 	if n < 0 {
 		return nil, fmt.Errorf("population size cannot be negative")
 	}
@@ -132,7 +130,7 @@ func (c *chacha20s) Permutation(n int) ([]int, error) {
 // SubPermutation returns the m first elements of a permutation of [0,n-1]
 // It implements Fisher-Yates Shuffle using x as a source of randoms
 // O(n) space and O(n) time
-func (c *chacha20s) SubPermutation(n int, m int) ([]int, error) {
+func (c *state) SubPermutation(n int, m int) ([]int, error) {
 	if m < 0 {
 		return nil, fmt.Errorf("sample size cannot be negative")
 	}
@@ -149,7 +147,7 @@ func (c *chacha20s) SubPermutation(n int, m int) ([]int, error) {
 // Shuffle permutes the given slice in place
 // It implements Fisher-Yates Shuffle using x as a source of randoms
 // O(1) space and O(n) time
-func (c *chacha20s) Shuffle(n int, swap func(i, j int)) error {
+func (c *state) Shuffle(n int, swap func(i, j int)) error {
 	if n < 0 {
 		return fmt.Errorf("population size cannot be negative")
 	}
@@ -166,7 +164,7 @@ func (c *chacha20s) Shuffle(n int, swap func(i, j int)) error {
 // in random order at indices [0,m-1]. The swapping is done in place
 // It implements the first (m) elements of Fisher-Yates Shuffle using x as a source of randoms
 // O(1) space and O(m) time
-func (c *chacha20s) Samples(n int, m int, swap func(i, j int)) error {
+func (c *state) Samples(n int, m int, swap func(i, j int)) error {
 	if m < 0 {
 		return fmt.Errorf("inputs cannot be negative")
 	}
@@ -183,7 +181,7 @@ func (c *chacha20s) Samples(n int, m int, swap func(i, j int)) error {
 // State returns the internal state of the concatenated Chacha20s
 // (this is used for serde purposes)
 // TODO: update the name (serialize, encode, marshall ?)
-func (c *chacha20s) State() []byte {
+func (c *state) State() []byte {
 	counter := make([]byte, 8)
 	binary.LittleEndian.PutUint64(counter, c.bytesCounter)
 	bytes := append(c.initialBytes, counter...)
@@ -191,18 +189,18 @@ func (c *chacha20s) State() []byte {
 	return bytes
 }
 
-func Restore(stateBytes []byte) (*chacha20s, error) {
+func Restore(stateBytes []byte) (*state, error) {
 	// inpout should be seed (32 bytes) || streamID (12 bytes) || bytesCounter (8 bytes)
-	const expectedLen = KeySize + NonceSize + 8
+	const expectedLen = keySize + nonceSize + 8
 
 	// check input length
 	if len(stateBytes) != expectedLen {
 		return nil, fmt.Errorf("Rand state length should be of %d bytes, got %d", expectedLen, len(stateBytes))
 	}
 
-	seed := stateBytes[:KeySize]
-	streamID := stateBytes[KeySize : KeySize+NonceSize]
-	bytesCounter := binary.LittleEndian.Uint64(stateBytes[KeySize+NonceSize:])
+	seed := stateBytes[:keySize]
+	streamID := stateBytes[keySize : keySize+nonceSize]
+	bytesCounter := binary.LittleEndian.Uint64(stateBytes[keySize+nonceSize:])
 
 	// create the Chacha20 instance with seed and streamID
 	chacha, err := chacha20.NewUnauthenticatedCipher(seed, streamID)
@@ -212,7 +210,7 @@ func Restore(stateBytes []byte) (*chacha20s, error) {
 	// set the bytes counter
 
 	// each chacha internal block is 512 bits
-	const bytesPerBlock = 512 / 8
+	const bytesPerBlock = 512 >> 3
 	blockCount := uint32(bytesCounter / bytesPerBlock)
 	remainingBytes := bytesCounter % bytesPerBlock
 	chacha.SetCounter(blockCount)
@@ -220,10 +218,10 @@ func Restore(stateBytes []byte) (*chacha20s, error) {
 	remainderStream := make([]byte, remainingBytes)
 	chacha.XORKeyStream(remainderStream, remainderStream)
 
-	rand := &chacha20s{
-		state:        *chacha,
+	rand := &state{
+		cipher:       *chacha,
 		bytesCounter: bytesCounter,
-		initialBytes: stateBytes[:KeySize+NonceSize],
+		initialBytes: stateBytes[:keySize+nonceSize],
 	}
 	return rand, nil
 }
