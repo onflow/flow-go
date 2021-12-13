@@ -43,16 +43,18 @@ func NewCombinedVerifierV3(committee hotstuff.Committee, packer hotstuff.Packer)
 // VerifyVote verifies the validity of a combined signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
-// TODO: return error only, because when the sig is invalid, the returned bool
-// can't indicate whether it's staking sig was invalid, or beacon sig was invalid.
-func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
+// * signature.ErrInvalidFormat if the signature has an incompatible format.
+// * model.ErrInvalidSignature is the signature is invalid
+// * unexpected errors should be treated as symptoms of bugs or uncovered
+//   edge cases in the logic (i.e. as fatal)
+func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) error {
 
 	// create the to-be-signed message
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	sigType, sig, err := signature.DecodeSingleSig(sigData)
 	if err != nil {
-		return false, fmt.Errorf("could not decode signature for block %v: %w", block.BlockID, err)
+		return fmt.Errorf("could not decode signature for block %v: %w", block.BlockID, err)
 	}
 
 	switch sigType {
@@ -60,36 +62,35 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 		// verify each signature against the message
 		stakingValid, err := signer.StakingPubKey.Verify(sig, msg, c.stakingHasher)
 		if err != nil {
-			return false, fmt.Errorf("internal error while verifying staking signature for block %v: %w", block.BlockID, err)
+			return fmt.Errorf("internal error while verifying staking signature for block %v: %w", block.BlockID, err)
 		}
 		if !stakingValid {
-			return false, fmt.Errorf("invalid staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
+			return fmt.Errorf("invalid staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 		}
 	case hotstuff.SigTypeRandomBeacon:
 		dkg, err := c.committee.DKG(block.BlockID)
 		if err != nil {
-			return false, fmt.Errorf("could not get dkg: %w", err)
+			return fmt.Errorf("could not get dkg: %w", err)
 		}
 
-		// if there is beacon share, there must be beacon public key
+		// if there is beacon share, there must be a beacon public key
 		beaconPubKey, err := dkg.KeyShare(signer.NodeID)
 		if err != nil {
-			return false, fmt.Errorf("could not get random beacon key share for %x at block %v: %w", signer.NodeID, block.BlockID, err)
+			return fmt.Errorf("could not get random beacon key share for %x at block %v: %w", signer.NodeID, block.BlockID, err)
 		}
 
 		beaconValid, err := beaconPubKey.Verify(sig, msg, c.beaconHasher)
 		if err != nil {
-			return false, fmt.Errorf("internal error while verifying beacon signature for block %v: %w", block.BlockID, err)
+			return fmt.Errorf("internal error while verifying beacon signature for block %v: %w", block.BlockID, err)
 		}
-
 		if !beaconValid {
-			return false, fmt.Errorf("invalid beacon sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
+			return fmt.Errorf("invalid beacon sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 		}
 	default:
-		return false, fmt.Errorf("invalid signature type %d: %w", sigType, modulesig.ErrInvalidFormat)
+		return fmt.Errorf("invalid signature type %d: %w", sigType, modulesig.ErrInvalidFormat)
 	}
 
-	return true, nil
+	return nil
 }
 
 // VerifyQC verifies the validity of a combined signature on a quorum certificate.

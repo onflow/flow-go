@@ -44,9 +44,11 @@ func NewCombinedVerifier(committee hotstuff.Committee, packer hotstuff.Packer) *
 // VerifyVote verifies the validity of a combined signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
-// TODO: return error only, because when the sig is invalid, the returned bool
-// can't indicate whether it's staking sig was invalid, or beacon sig was invalid.
-func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) (bool, error) {
+// * signature.ErrInvalidFormat if the signature has an incompatible format.
+// * model.ErrInvalidSignature is the signature is invalid
+// * unexpected errors should be treated as symptoms of bugs or uncovered
+//   edge cases in the logic (i.e. as fatal)
+func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, block *model.Block) error {
 
 	// create the to-be-signed message
 	msg := MakeVoteMessage(block.View, block.BlockID)
@@ -55,44 +57,46 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 	// TODO: to be replaced by packer
 	stakingSig, beaconShare, err := signature.DecodeDoubleSig(sigData)
 	if err != nil {
-		return false, fmt.Errorf("could not split signature: %w", modulesig.ErrInvalidFormat)
+		return fmt.Errorf("could not split signature for block %v: %w", block.BlockID, err)
 	}
 
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
-		return false, fmt.Errorf("could not get dkg: %w", err)
+		return fmt.Errorf("could not get dkg: %w", err)
 	}
 
 	// verify each signature against the message
 	// TODO: check if using batch verification is faster (should be yes)
 	stakingValid, err := signer.StakingPubKey.Verify(stakingSig, msg, c.stakingHasher)
 	if err != nil {
-		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
+		return fmt.Errorf("internal error while verifying staking signature of node %x at block %v: %w",
+			signer.NodeID, block.BlockID, err)
 	}
 	if !stakingValid {
-		return false, fmt.Errorf("invalid staking sig")
+		return fmt.Errorf("invalid staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 	}
 
 	// there is no beacon share, no need to verify it
 	if beaconShare == nil {
-		return true, nil
+		return nil
 	}
 
 	// if there is beacon share, there must be beacon public key
 	beaconPubKey, err := dkg.KeyShare(signer.NodeID)
 	if err != nil {
-		return false, fmt.Errorf("could not get random beacon key share for %x: %w", signer.NodeID, err)
+		return fmt.Errorf("could not get random beacon key share of node %x at block %v: %w",
+			signer.NodeID, block.BlockID, err)
 	}
 
 	beaconValid, err := beaconPubKey.Verify(beaconShare, msg, c.beaconHasher)
 	if err != nil {
-		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
+		return fmt.Errorf("internal error while verifying beacon signature at block %v: %w",
+			block.BlockID, err)
 	}
-
 	if !beaconValid {
-		return false, fmt.Errorf("invalid beacon sig")
+		return fmt.Errorf("invalid beacon sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 	}
-	return true, nil
+	return nil
 }
 
 // VerifyQC verifies the validity of a combined signature on a quorum certificate.
