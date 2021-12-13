@@ -106,6 +106,9 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	})
 	require.False(t, ok)
 	require.Nil(t, entity)
+
+	// adjustment must be idempotent for size
+	require.Equal(t, bd.Size(), uint(limit))
 }
 
 // TestArrayBackData_WriteHeavy evaluates correctness of backdata under the writing and retrieving
