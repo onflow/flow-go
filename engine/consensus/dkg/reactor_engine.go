@@ -298,8 +298,8 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	// public key - therefore it is unsafe for use
 	if !nextDKGPubKey.Equals(localPubKey) {
 		log.Warn().
-			Hex("computed_beacon_pub_key", localPubKey.Encode()).
-			Hex("canonical_beacon_pub_key", nextDKGPubKey.Encode()).
+			Str("computed_beacon_pub_key", localPubKey.String()).
+			Str("canonical_beacon_pub_key", nextDKGPubKey.String()).
 			Msg("checking beacon key consistency: locally computed beacon public key does not match beacon public key for next epoch")
 		err := e.dkgState.SetDKGEndState(nextEpochCounter, flow.DKGEndStateInconsistentKey)
 		if err != nil {
@@ -312,7 +312,7 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 	if err != nil {
 		e.log.Fatal().Err(err).Msg("failed to set dkg")
 	}
-	log.Info().Msgf("successfully ended DKG, my beacon pub key for epoch %d is %x", nextEpochCounter, localPubKey.Encode())
+	log.Info().Msgf("successfully ended DKG, my beacon pub key for epoch %d is %s", nextEpochCounter, localPubKey.String())
 }
 
 func (e *ReactorEngine) getDKGInfo(firstBlockID flow.Identifier) (*dkgInfo, error) {
