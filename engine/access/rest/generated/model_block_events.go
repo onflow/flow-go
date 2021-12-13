@@ -15,7 +15,7 @@ import (
 type BlockEvents struct {
 	BlockId string `json:"block_id,omitempty"`
 
-	BlockHeight *BlockHeight `json:"block_height,omitempty"`
+	BlockHeight string `json:"block_height,omitempty"`
 
 	BlockTimestamp time.Time `json:"block_timestamp,omitempty"`
 
