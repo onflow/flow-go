@@ -55,7 +55,7 @@ func newDoubleLinkedList() *doubleLinkedList {
 
 type cachedEntity struct {
 	doubleLinkedListNode
-	id     *flow.Identifier
+	id     flow.Identifier
 	owner  uint64
 	entity flow.Entity
 }
@@ -95,7 +95,7 @@ func (e *EntityDoubleLinkedList) initFreeEntities(limit uint32) {
 func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) uint32 {
 	entityIndex := e.sliceIndexForEntity()
 	e.values[entityIndex].entity = entity
-	e.values[entityIndex].id = &entityId
+	e.values[entityIndex].id = entityId
 	e.values[entityIndex].owner = owner
 	e.values[entityIndex].next.setUndefined()
 	e.values[entityIndex].prev.setUndefined()
@@ -118,7 +118,7 @@ func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entit
 }
 
 func (e EntityDoubleLinkedList) Get(entityIndex uint32) (flow.Identifier, flow.Entity, uint64) {
-	return *e.values[entityIndex].id, e.values[entityIndex].entity, e.values[entityIndex].owner
+	return e.values[entityIndex].id, e.values[entityIndex].entity, e.values[entityIndex].owner
 }
 
 func (e *EntityDoubleLinkedList) sliceIndexForEntity() uint32 {
@@ -259,19 +259,16 @@ func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex uint32) {
 		}
 	}
 
-	e.freeUpSliceIndex(sliceIndex)
-
-	// decrements Size
-	e.total--
-}
-
-func (e *EntityDoubleLinkedList) freeUpSliceIndex(sliceIndex uint32) {
 	// invalidates entity and adds it to free entities.
-	e.values[sliceIndex].id = nil
+	e.values[sliceIndex].id = flow.ZeroID
+	e.values[sliceIndex].entity = nil
 	e.values[sliceIndex].next.setUndefined()
 	e.values[sliceIndex].prev.setUndefined()
 
 	e.appendToFreeList(sliceIndex)
+
+	// decrements Size
+	e.total--
 }
 
 func (e *EntityDoubleLinkedList) appendToFreeList(sliceIndex uint32) {
@@ -287,7 +284,11 @@ func (e *EntityDoubleLinkedList) appendToFreeList(sliceIndex uint32) {
 }
 
 func (e EntityDoubleLinkedList) isInvalidated(sliceIndex uint32) bool {
-	if e.values[sliceIndex].id != nil {
+	if e.values[sliceIndex].id != flow.ZeroID {
+		return false
+	}
+
+	if e.values[sliceIndex].entity != nil {
 		return false
 	}
 

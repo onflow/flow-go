@@ -39,6 +39,18 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 	testRetrievableFrom(t, bd, entities, 0)
 }
 
+func TestArrayBackData_Adjust(t *testing.T) {
+	limit := 100_000
+
+	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection)
+
+	entities := unittest.EntityListFixture(uint(limit))
+
+	// adds all entities to backdata
+	testAddEntities(t, bd, entities)
+
+}
+
 // TestArrayBackData_WriteHeavy evaluates correctness of backdata under the writing and retrieving
 // a heavy load of entities up to its limit.
 func TestArrayBackData_WriteHeavy(t *testing.T) {

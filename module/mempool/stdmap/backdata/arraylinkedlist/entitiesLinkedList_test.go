@@ -310,12 +310,12 @@ func testInvalidatingHead(t *testing.T, list *EntityDoubleLinkedList, entities [
 			// list is not empty yet
 			//
 			// used tail should point to the last element in list
-			require.Equal(t, entities[size-1].ID(), *usedTail.id)
+			require.Equal(t, entities[size-1].ID(), usedTail.id)
 			require.Equal(t, uint32(size-1), list.used.tail.sliceIndex())
 
 			// used head must point to the next element in the list,
 			// i.e., invalidating head moves it forward.
-			require.Equal(t, entities[i+1].ID(), *usedHead.id)
+			require.Equal(t, entities[i+1].ID(), usedHead.id)
 			require.Equal(t, uint32(i+1), list.used.head.sliceIndex())
 		} else {
 			// list is empty
@@ -398,11 +398,11 @@ func testInvalidatingTail(t *testing.T, list *EntityDoubleLinkedList, entities [
 			// list is not empty yet
 			//
 			// used tail should move backward after each invalidation
-			require.Equal(t, entities[size-i-2].ID(), *usedTail.id)
+			require.Equal(t, entities[size-i-2].ID(), usedTail.id)
 			require.Equal(t, uint32(size-i-2), list.used.tail.sliceIndex())
 
 			// used head must point to the first element in the list,
-			require.Equal(t, entities[0].ID(), *usedHead.id)
+			require.Equal(t, entities[0].ID(), usedHead.id)
 			require.Equal(t, uint32(0), list.used.head.sliceIndex())
 		} else {
 			// list is empty
