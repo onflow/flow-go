@@ -2,6 +2,9 @@ package integration
 
 import (
 	"fmt"
+	"github.com/gammazero/workerpool"
+	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"os"
 	"sync"
 	"time"
@@ -62,7 +65,8 @@ type Instance struct {
 	validator  *validator.Validator
 
 	// main logic
-	handler *eventhandler.EventHandler
+	handler              *eventhandler.EventHandler
+	qcCreatedDistributor *pubsub.QCCreatedDistributor
 }
 
 func NewInstance(t require.TestingT, options ...Option) *Instance {
@@ -315,9 +319,15 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// initialize the validator
 	in.validator = validator.New(in.committee, in.forks, in.verifier)
 
+	in.qcCreatedDistributor = pubsub.NewQCCreatedDistributor()
+	voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(in.committee, in.qcCreatedDistributor.OnQcConstructedFromVotes)
+
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	voteCollectors := voteaggregator.NewVoteCollectors(DefaultPruned(), workerpool.New(2), createCollectorFactoryMethod)
+
 	// initialize the vote aggregator
-	// TODO: fix creating of vote aggregator when fixing tests
-	//in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.committee, in.validator, in.signer)
+	in.aggregator, err = voteaggregator.NewVoteAggregator(log, notifier, DefaultPruned(), voteCollectors)
+	require.NoError(t, err)
 
 	// initialize the voter
 	in.voter = voter.New(in.signer, in.forks, in.persist, in.committee, DefaultVoted())
