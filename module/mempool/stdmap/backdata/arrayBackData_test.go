@@ -182,6 +182,31 @@ func TestArrayBackData_AddDuplicate(t *testing.T) {
 	testRetrievableFrom(t, bd, entities, 0)
 }
 
+// TestArrayBackData_Clear evaluates that calling Clear method removes all entities stored in BackData.
+func TestArrayBackData_Clear(t *testing.T) {
+	limit := 100
+
+	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection)
+
+	entities := unittest.EntityListFixture(uint(limit))
+
+	// adds all entities to backdata
+	testAddEntities(t, bd, entities)
+
+	// still all must be retrievable from backdata
+	testRetrievableFrom(t, bd, entities, 0)
+	require.Equal(t, bd.Size(), uint(limit))
+	require.Len(t, bd.All(), limit)
+
+	// calling clear must shrink size of BackData to zero
+	bd.Clear()
+	require.Equal(t, bd.Size(), uint(0))
+	require.Len(t, bd.All(), 0)
+
+	// none of stored elements must be retrievable any longer
+	testRetrievableCount(t, bd, entities, 0)
+}
+
 // TestArrayBackData_All_BelowLimit checks correctness of All method when mempool is not full yet.
 func TestArrayBackData_All(t *testing.T) {
 	tt := []struct {
