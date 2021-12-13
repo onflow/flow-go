@@ -17,10 +17,11 @@ type TestData struct {
 
 func TestProcessSummary2TestRun(t *testing.T) {
 	testDataMap := map[string]TestData{
-		"1 level 1 summary, 1 failure the rest pass":          {"test1-1package-1failure", true, false},
-		"1 level 1 summary, 1 no-result test, no other tests": {"test2-1-no-result-test", false, true},
-		"many level 1 summaries, many no-result tests":        {"test3-multi-no-result-tests", false, true},
-		"many level 1 summaries, many failures, many passes":  {"test4-multi-failures", true, false},
+		"1 level 1 summary, 1 failure the rest pass":                               {"test1-1package-1failure", true, false},
+		"1 level 1 summary, 1 no-result test, no other tests":                      {"test2-1-no-result-test", false, true},
+		"many level 1 summaries, many no-result tests":                             {"test3-multi-no-result-tests", false, true},
+		"many level 1 summaries, many failures, many passes":                       {"test4-multi-failures", true, false},
+		"many level 1 summaries, many failures, many passes, many no-result tests": {"test5-multi-failures-multi-no-result-tests", true, true},
 	}
 
 	for k, testData := range testDataMap {
