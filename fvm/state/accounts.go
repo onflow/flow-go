@@ -431,7 +431,7 @@ func (a *StatefulAccounts) SetValue(address flow.Address, key string, value flow
 func (a *StatefulAccounts) setValue(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
 	err := a.updateRegisterSizeChange(address, isController, key, value)
 	if err != nil {
-		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", key, address, err)
+		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", PrintableKey(key), address, err)
 	}
 
 	if isController {
@@ -468,7 +468,7 @@ func (a *StatefulAccounts) updateRegisterSizeChange(address flow.Address, isCont
 		absChange := uint64(-sizeChange)
 		if absChange > oldSize {
 			// should never happen
-			return fmt.Errorf("storage used by key %s on account %s would be negative", key, address.Hex())
+			return fmt.Errorf("storage used by key %s on account %s would be negative", PrintableKey(key), address.Hex())
 		}
 		newSize = oldSize - absChange
 	} else {
