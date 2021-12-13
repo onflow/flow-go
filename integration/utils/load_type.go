@@ -121,6 +121,7 @@ var (
 )
 
 // largeTxLoad is a load generator that sends large transactions
+// the transactions are just empty transactions with commented out text
 // the relative size is relative to the 95 percentile of transaction sizes seen on mainnet on 2021-12-13
 func largeTxLoad(relativeSize float64) *SimpleWorkLoad {
 	txSize95percentile := 3200.0 // 95th percentile of tx byte sizes from metrika on 2021-12-13
