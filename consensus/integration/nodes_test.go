@@ -60,18 +60,26 @@ import (
 
 const hotstuffTimeout = 100 * time.Millisecond
 
+// RandomBeaconNodeInfo stores information about participation in DKG process for consensus node
+// contains private + public keys and participant index
+// Each node has unique structure
 type RandomBeaconNodeInfo struct {
 	RandomBeaconPrivKey crypto.PrivateKey
 	DKGParticipant      flow.DKGParticipant
 }
 
+// ConsensusParticipant stores information about node which is fixed during epoch changes
+// like staking key, role, network key and random beacon info which changes every epoch
+// Contains a mapping of DKG info per epoch.
 type ConsensusParticipant struct {
 	nodeInfo       bootstrap.NodeInfo
 	dkgInfoByEpoch map[uint64]RandomBeaconNodeInfo
 }
 
+// ConsensusParticipants is a special cache which stores information about consensus participants across multiple epochs
+// This structure is used to launch nodes in our integration test setup
 type ConsensusParticipants struct {
-	lookup map[flow.Identifier]ConsensusParticipant
+	lookup map[flow.Identifier]ConsensusParticipant // nodeID -> ConsensusParticipant
 }
 
 func NewConsensusParticipants(data *run.ParticipantData) *ConsensusParticipants {
@@ -92,6 +100,7 @@ func NewConsensusParticipants(data *run.ParticipantData) *ConsensusParticipants 
 	}
 }
 
+// Lookup performs lookup of participant by nodeID
 func (p *ConsensusParticipants) Lookup(nodeID flow.Identifier) *ConsensusParticipant {
 	participant, ok := p.lookup[nodeID]
 	if ok {
@@ -100,6 +109,8 @@ func (p *ConsensusParticipants) Lookup(nodeID flow.Identifier) *ConsensusPartici
 	return nil
 }
 
+// Update stores information about consensus participants for some epoch
+// If this node was part of previous epoch it will get updated, if not created.
 func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.ParticipantData) {
 	for _, participant := range data.Participants {
 		dkgParticipant := data.Lookup[participant.NodeID]
@@ -139,11 +150,13 @@ func (n *Node) Shutdown() {
 	<-n.compliance.Done()
 }
 
+// epochInfo is a helper structure for storing epoch information such as counter and final view
 type epochInfo struct {
 	finalView uint64
 	counter   uint64
 }
 
+// buildEpochLookupList is a helper function which builds an auxiliary structure of epochs sorted by counter
 func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
 	infos := make([]epochInfo, 0)
 	for _, epoch := range epochs {
@@ -220,6 +233,8 @@ func createRootQC(t *testing.T, root *flow.Block, participantData *run.Participa
 	return qc
 }
 
+// createRootBlockData creates genesis block with first epoch and real data node identities.
+// This function requires all participants to pass DKG process.
 func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *flow.ExecutionResult, *flow.Seal) {
 	root := unittest.GenesisFixture()
 	consensusParticipants := participantData.Identities()
@@ -307,6 +322,8 @@ func completeConsensusIdentities(t *testing.T, nodeInfos []bootstrap.NodeInfo) *
 	return participantData
 }
 
+// createRootSnapshot creates root block, generates root QC and builds a root snapshot for
+// bootstrapping a node
 func createRootSnapshot(t *testing.T, participantData *run.ParticipantData) *inmem.Snapshot {
 	root, result, seal := createRootBlockData(participantData)
 	rootQC := createRootQC(t, root, participantData)
@@ -466,6 +483,7 @@ func createNode(
 			return nil
 		})
 
+	// use epoch aware store for testing scenarios where epoch changes
 	beaconKeyStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
 	signer := verification.NewCombinedSigner(me, beaconKeyStore)
