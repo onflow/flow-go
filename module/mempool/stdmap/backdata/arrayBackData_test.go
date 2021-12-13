@@ -39,6 +39,8 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 	testRetrievableFrom(t, bd, entities, 0)
 }
 
+// TestArrayBackData_Adjust evaluates that Adjust method correctly updates the value of
+// the desired entity while preserving the integrity of BackData.
 func TestArrayBackData_Adjust(t *testing.T) {
 	limit := 100_000
 
@@ -49,6 +51,61 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	// adds all entities to backdata
 	testAddEntities(t, bd, entities)
 
+	// picks a random entity from BackData and adjusts its identifier to a new one.
+	entityIndex := rand.Int() % limit
+	// checking integrity of retrieving entity
+	oldEntity, ok := bd.ByID(entities[entityIndex].ID())
+	oldEntityID := oldEntity.ID()
+	require.True(t, ok)
+	require.Equal(t, entities[entityIndex].ID(), oldEntityID)
+	require.Equal(t, entities[entityIndex], oldEntity)
+
+	// picks a new identifier for the entity and makes sure it is different than its current one.
+	newEntityID := unittest.IdentifierFixture()
+	require.NotEqual(t, oldEntityID, newEntityID)
+
+	// adjusts old entity to a new entity with a new identifier
+	newEntity, ok := bd.Adjust(oldEntity.ID(), func(entity flow.Entity) flow.Entity {
+		mockEntity, ok := entity.(*unittest.MockEntity)
+		require.True(t, ok)
+		require.Equal(t, oldEntityID, mockEntity.ID())
+		require.Equal(t, oldEntity, mockEntity)
+
+		return &unittest.MockEntity{Identifier: newEntityID}
+	})
+
+	// adjustment must be successful, and identifier must be updated.
+	require.True(t, ok)
+	require.Equal(t, newEntityID, newEntity.ID())
+	newMockEntity, ok := newEntity.(*unittest.MockEntity)
+	require.True(t, ok)
+
+	// replaces new entity in the original reference list and
+	// retrieves all.
+	entities[entityIndex] = newMockEntity
+	testRetrievableFrom(t, bd, entities, 0)
+
+	// re-adjusting old entity must fail, since its identifier must no longer exist
+	entity, ok := bd.Adjust(oldEntityID, func(entity flow.Entity) flow.Entity {
+		return entity
+	})
+	require.False(t, ok)
+	require.Nil(t, entity)
+
+	// similarly, retrieving old entity must fail
+	entity, ok = bd.ByID(oldEntityID)
+	require.False(t, ok)
+	require.Nil(t, entity)
+
+	ok = bd.Has(oldEntityID)
+	require.False(t, ok)
+
+	// adjusting any random non-existing identifier must fail
+	entity, ok = bd.Adjust(unittest.IdentifierFixture(), func(entity flow.Entity) flow.Entity {
+		return entity
+	})
+	require.False(t, ok)
+	require.Nil(t, entity)
 }
 
 // TestArrayBackData_WriteHeavy evaluates correctness of backdata under the writing and retrieving
