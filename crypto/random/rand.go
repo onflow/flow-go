@@ -6,6 +6,9 @@ import (
 )
 
 // Rand is a pseudo random number generator
+// All methods update the internal state of the PRG
+// which makes the PRGs implementing this interface
+// non concurrent-safe.
 type Rand interface {
 	// Read fills the input slice with random bytes.
 	Read([]byte)
@@ -62,17 +65,17 @@ type randCore interface {
 // All implementations of the Rand interface should embed the genericPRG struct.
 type genericPRG struct {
 	randCore
+	// buffer used by UintN function to avoid extra memory allocation
+	uintnBuffer [8]byte
 }
 
 // UintN returns an uint64 pseudo-random number in [0,n-1],
 // using `p` as an entropy source.
 func (p *genericPRG) UintN(n uint64) uint64 {
-	// TODO: use a single array per genericPRG  - precise concurrency assumptions in GoDoc
 	// TODO: improve uniform distribution of UintN: for loop or higher sample
-	bytes := make([]byte, 8)
-	p.Read(bytes)
+	p.Read(p.uintnBuffer[:])
 
-	random := binary.LittleEndian.Uint64(bytes)
+	random := binary.LittleEndian.Uint64(p.uintnBuffer[:])
 	return random % n
 }
 
