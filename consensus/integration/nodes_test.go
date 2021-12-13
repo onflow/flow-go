@@ -161,7 +161,7 @@ func buildEpochLookupList(epochs ...protocol.Epoch) []epochInfo {
 		})
 	}
 	sort.Slice(infos, func(i, j int) bool {
-		return infos[i].finalView < infos[i].finalView
+		return infos[i].finalView < infos[j].finalView
 	})
 	return infos
 }

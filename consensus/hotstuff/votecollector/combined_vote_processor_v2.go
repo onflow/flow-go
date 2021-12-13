@@ -114,6 +114,25 @@ type CombinedVoteProcessorV2 struct {
 
 var _ hotstuff.VoteProcessor = (*CombinedVoteProcessorV2)(nil)
 
+func NewCombinedVoteProcessor(log zerolog.Logger,
+	block *model.Block,
+	stakingSigAggtor hotstuff.WeightedSignatureAggregator,
+	rbRector hotstuff.RandomBeaconReconstructor,
+	onQCCreated hotstuff.OnQCCreated,
+	packer hotstuff.Packer,
+	minRequiredStake uint64) *CombinedVoteProcessorV2 {
+	return &CombinedVoteProcessorV2{
+		log:              log,
+		block:            block,
+		stakingSigAggtor: stakingSigAggtor,
+		rbRector:         rbRector,
+		onQCCreated:      onQCCreated,
+		packer:           packer,
+		minRequiredStake: minRequiredStake,
+		done:             *atomic.NewBool(false),
+	}
+}
+
 // Block returns block that is part of proposal that we are processing votes for.
 func (p *CombinedVoteProcessorV2) Block() *model.Block {
 	return p.block
