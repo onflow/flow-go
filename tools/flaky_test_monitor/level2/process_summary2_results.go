@@ -9,13 +9,20 @@ import (
 )
 
 const failuresDir = "./failures/"
+const noResultsDir = "./no-results/"
 
 // process level 1 summary files in a single directory and output level 2 summary
 func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 	dirEntries, err := os.ReadDir(level1Directory)
 	common.AssertNoError(err, "error reading level 1 directory")
+
+	// create directory to store failure messages
 	err = os.Mkdir(failuresDir, 0755)
 	common.AssertNoError(err, "error creating failures directory")
+
+	// create directory to store no-results messages
+	err = os.Mkdir(noResultsDir, 0755)
+	common.AssertNoError(err, "error creating no-results directory")
 
 	testSummary2 := common.TestSummary2{}
 	testSummary2.TestResults = make(map[string]*common.TestResultSummary)
@@ -50,7 +57,7 @@ func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 				// keep track of each duration so can later calculate average duration
 				testResultSummary.Durations = append(testResultSummary.Durations, testResult.Elapsed)
 
-				// increment # of passes, fails, skips or no results for this test
+				// increment # of passes, fails, skips or no-results for this test
 				testResultSummary.Runs++
 				switch testResult.Result {
 				case "pass":
@@ -71,8 +78,9 @@ func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 					// don't count no result as a run
 					testResultSummary.Runs--
 
-					// truncate last duration - don't count durations of no results
+					// truncate last duration - don't count durations of no-results
 					testResultSummary.Durations = testResultSummary.Durations[:len(testResultSummary.Durations)-1]
+					saveNoResultMessage(testResult)
 				default:
 					panic(fmt.Sprintf("unexpected test result: %s", testResult.Result))
 				}
@@ -87,40 +95,52 @@ func processSummary2TestRun(level1Directory string) common.TestSummary2 {
 	return testSummary2
 }
 
-// for each failed test, we want to save the raw failed message as a text file
-// there could be multiple failures of the same test so we want to save each failed message in a separate text file
-// each test with failures will have a uniquely named (based on test name and package) sub-directory where failed messages are saved
+func saveFailureMessage(testResult common.TestResult) {
+	saveMessageHelper(testResult, "fail", failuresDir, "failure")
+}
+
+func saveNoResultMessage(testResult common.TestResult) {
+	saveMessageHelper(testResult, "", noResultsDir, "no-result")
+}
+
+// for each failed / no-result test, we want to save the raw output message as a text file
+// there could be multiple failures / no-results of the same test so we want to save each failed / no-result message in a separate text file
+// each test with failures / no-results will have a uniquely named (based on test name and package) sub-directory where failed / no-result messages are saved
 // e.g. "failures/TestSanitySha3_256+github.com-onflow-flow-go-crypto-hash" will store failed messages text files
 // from test TestSanitySha3_256 from the "github.com/onflow/flow-go/crypto/hash" package
-func saveFailureMessage(testResult common.TestResult) {
-	if testResult.Result != "fail" {
+// failure and no-result messages are saved in a similar way so this helper function
+// handles saving both types of messages
+func saveMessageHelper(testResult common.TestResult, expectedResult string, messagesDir string, messageFileStem string) {
+	if testResult.Result != expectedResult {
 		panic(fmt.Sprintf("unexpected test result: " + testResult.Result))
 	}
 
-	// each sub directory corresponds to a failed test name and package name
-	failuresDirFullPath := failuresDir + testResult.Test + "+" + strings.ReplaceAll(testResult.Package, "/", "-") + "/"
+	// each sub directory corresponds to a failed / no-result test name and package name
+	messagesDirFullPath := messagesDir + testResult.Test + "+" + strings.ReplaceAll(testResult.Package, "/", "-") + "/"
 
-	// there could already be previous failures for this test, so it's important to check if failed
-	// test folder exists
-	if !common.DirExists(failuresDirFullPath) {
-		err := os.Mkdir(failuresDirFullPath, 0755)
-		common.AssertNoError(err, "error creating sub-dir under failuresDir")
+	// there could already be previous failures / no-results for this test, so it's important
+	// to check if failed test / no-result folder exists
+	if !common.DirExists(messagesDirFullPath) {
+		err := os.Mkdir(messagesDirFullPath, 0755)
+		common.AssertNoError(err, "error creating sub-dir under failures / no-results dir")
 	}
 
-	// under each sub-directory, there should be 1 or more text files (failure1.txt, failure2.txt, etc)
-	// that holds the raw failure message for that test
-	dirEntries, err := os.ReadDir(failuresDirFullPath)
-	common.AssertNoError(err, "error reading sub-dir entries under failuresDir")
+	// under each sub-directory, there should be 1 or more text files
+	// (failure1.txt / no-result1.txt, failure2.txt / no-result2.txt, etc)
+	// that holds the raw failure / no-result message for that test
+	dirEntries, err := os.ReadDir(messagesDirFullPath)
+	common.AssertNoError(err, "error reading sub-dir entries under failures / no-results dir")
 
-	// failure text files will be named "failure1.txt", "failure2.txt", etc so we want to know how
-	// many failure files already exist in the sub-directory before creating the next one
-	failureFile, err := os.Create(failuresDirFullPath + fmt.Sprintf("failure%d.txt", len(dirEntries)+1))
-	common.AssertNoError(err, "error creating failure file")
-	defer failureFile.Close()
+	// failure text files will be named "failure1.txt", "failure2.txt", etc
+	// no-result text files will be named "no-result1.txt", "no-result2.txt", etc
+	// need to know how many failure / no-result text files already exist in the sub-directory before creating the next one
+	messageFile, err := os.Create(messagesDirFullPath + fmt.Sprintf(messageFileStem+"%d.txt", len(dirEntries)+1))
+	common.AssertNoError(err, "error creating failure / no-result file")
+	defer messageFile.Close()
 
 	for _, output := range testResult.Output {
-		_, err = failureFile.WriteString(output)
-		common.AssertNoError(err, "error writing to failure file")
+		_, err = messageFile.WriteString(output)
+		common.AssertNoError(err, "error writing to failure / no-result file")
 	}
 }
 
@@ -143,7 +163,11 @@ func postProcessTestSummary2(testSummary2 common.TestSummary2) {
 		common.AssertNoError(err, "error removing failures directory")
 	}
 
-	// check if there are no nil tests (no results) so delete no-results sub-directory
+	// check if there are no no-result tests so can delete no-results sub-directory
+	if common.IsDirEmpty(noResultsDir) {
+		err := os.RemoveAll(noResultsDir)
+		common.AssertNoError(err, "error removing no-results directory")
+	}
 }
 
 // level 2 flaky test summary processor

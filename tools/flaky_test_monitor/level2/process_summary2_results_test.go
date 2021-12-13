@@ -18,8 +18,8 @@ type TestData struct {
 func TestProcessSummary2TestRun(t *testing.T) {
 	testDataMap := map[string]TestData{
 		"1 level 1 summary, 1 failure the rest pass":          {"test1-1package-1failure", true, false},
-		"1 level 1 summary, 1 no result test, no other tests": {"test2-1-no-result-test", false, true},
-		"many level 1 summaries, many no result tests":        {"test3-multi-no-result-tests", false, true},
+		"1 level 1 summary, 1 no-result test, no other tests": {"test2-1-no-result-test", false, true},
+		"many level 1 summaries, many no-result tests":        {"test3-multi-no-result-tests", false, true},
 		"many level 1 summaries, many failures, many passes":  {"test4-multi-failures", true, false},
 	}
 
@@ -33,22 +33,25 @@ func TestProcessSummary2TestRun(t *testing.T) {
 }
 
 func setUp(t *testing.T) {
-	deleteFailuresDir(t)
+	deleteMessagesDir(t)
 }
 
 func tearDown(t *testing.T) {
-	deleteFailuresDir(t)
+	deleteMessagesDir(t)
 }
 
 // HELPERS - UTILITIES
 
 const actualFailureMessagesPath = "./failures/"
+const actualNoResultMessagesPath = "./no-results/"
 
-// const actualNoResultMessagesPath = "./no-results/"
-
-func deleteFailuresDir(t *testing.T) {
+func deleteMessagesDir(t *testing.T) {
 	// delete failure test dir that stores failure messages
 	err := os.RemoveAll(actualFailureMessagesPath)
+	require.Nil(t, err)
+
+	// delete no-result test dir that stores no-result messages
+	err = os.RemoveAll(actualNoResultMessagesPath)
 	require.Nil(t, err)
 }
 
@@ -57,7 +60,7 @@ func runProcessSummary2TestRun(t *testing.T, testDir string, hasFailures bool, h
 
 	expectedOutputTestDataPath := "../testdata/summary2/" + testDir + "/expected-output/" + testDir + ".json"
 	expectedFailureMessagesPath := "../testdata/summary2/" + testDir + "/expected-output/failures/"
-	expectedNoResultMessagesPath := "../testdata/summary2" + testDir + "/expected-output/no-results/"
+	expectedNoResultMessagesPath := "../testdata/summary2/" + testDir + "/expected-output/no-results/"
 
 	// **************************************************************
 	actualTestSummary2 := processSummary2TestRun(inputTestDataPath)
@@ -119,16 +122,16 @@ func checkFailureMessages(t *testing.T, hasFailures bool, expectedFailureMessage
 	checkMessagesHelper(t, expectedFailureMessagesPath, actualFailureMessagesPath)
 }
 
-// check no result messages created - for tests that generated no pass / fail
+// check no-result messages created - for tests that generated no pass / fail
 // there are 2 types of scenarios:
-// 1. test summaries with no "no result" - these will not have a `no-result` sub-directory and no more checking is needed
-// 2. test summaries with no results - these will have a `no-result` sub-directory with output messages saved
-//    in text files (1 file/no result under separate sub-directory for each test that has no results)
+// 1. test summaries with no "no-result" - these will not have a `no-result` sub-directory and no more checking is needed
+// 2. test summaries with no-results - these will have a `no-result` sub-directory with output messages saved
+//    in text files (1 file/no-result under separate sub-directory for each test that has no-results)
 func checkNoResultMessages(t *testing.T, hasNoResultTests bool, expectedNoResultMessagesPath string) {
-	if hasNoResultTests {
+	if !hasNoResultTests {
 		return
 	}
-
+	checkMessagesHelper(t, expectedNoResultMessagesPath, actualNoResultMessagesPath)
 }
 
 // helps check for both failures and no-result messages since they are very similar, just under

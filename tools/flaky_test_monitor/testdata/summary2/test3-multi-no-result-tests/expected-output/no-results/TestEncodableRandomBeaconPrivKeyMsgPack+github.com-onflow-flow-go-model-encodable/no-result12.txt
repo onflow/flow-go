@@ -1,0 +1,2 @@
+=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack
+bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)
