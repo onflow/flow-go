@@ -30,7 +30,8 @@ import (
 // [^2]: [RFC 8439: ChaCha20 and Poly1305 for IETF Protocols](
 //       https://datatracker.ietf.org/doc/html/rfc8439)
 
-type state struct {
+// The PRG core, implements the randCore interface
+type chachaCore struct {
 	cipher chacha20.Cipher
 
 	// Only used for State/Restore functionality
@@ -43,6 +44,12 @@ type state struct {
 	seed []byte
 	// initial customizer
 	customizer []byte
+}
+
+// The main PRG, implements the Rand interface
+type chachaPRG struct {
+	genericPRG
+	core *chachaCore
 }
 
 const (
@@ -62,7 +69,7 @@ const (
 // It is recommended to sample the seed uniformly at random.
 // The function errors if the the seed is different than 32 bytes,
 // or if the customizer is larger than 12 bytes.
-func NewChacha20(seed []byte, customizer []byte) (*state, error) {
+func NewChacha20(seed []byte, customizer []byte) (*chachaPRG, error) {
 
 	// check the key size
 	if len(seed) != Chacha20SeedLen {
@@ -82,118 +89,47 @@ func NewChacha20(seed []byte, customizer []byte) (*state, error) {
 	}
 
 	// init the state
-	rand := &state{
+	core := &chachaCore{
 		cipher:       *chacha,
 		bytesCounter: 0,
 		seed:         seed,
 		customizer:   customizer,
 	}
-	return rand, nil
+	prg := &chachaPRG{
+		genericPRG: genericPRG{
+			randCore: core,
+		},
+		core: core,
+	}
+	return prg, nil
 }
 
 // TODO : update GoDoc
-
-// UintN returns an uint64 pseudo-random number in [0,n-1]
-// using the chacha20-based PRG.
-func (c *state) UintN(n uint64) uint64 {
-	// empty message to encrypt
-	// TODO: use a single array per chacha  - precise concurrency assumptions in GoDoc
-	// TODO: improve unioform distribution of UintN: for loop or higher sample
-	bytes := make([]byte, 8)
-	c.cipher.XORKeyStream(bytes, bytes)
+func (c *chachaCore) Read(buffer []byte) {
+	// encrypt an empty message
+	// TODO: optimize by using a constant empty buffer (check if less than 512)
+	for i := 0; i < len(buffer); i++ {
+		buffer[i] = 0
+	}
+	c.cipher.XORKeyStream(buffer, buffer)
 	// increase the counter
-	c.bytesCounter += 8
-
-	random := binary.LittleEndian.Uint64(bytes)
-	return random % n
-}
-
-// TODO: move to a generic PRG struct?
-
-// Permutation returns a permutation of the set [0,n-1]
-// it implements Fisher-Yates Shuffle (inside-out variant) using (x) as a random source
-// the output space grows very fast with (!n) so that input (n) and the seed length
-// (which fixes the internal state length of xorshifts ) should be chosen carefully
-// O(n) space and O(n) time
-func (c *state) Permutation(n int) ([]int, error) {
-	if n < 0 {
-		return nil, fmt.Errorf("population size cannot be negative")
-	}
-	items := make([]int, n)
-	for i := 0; i < n; i++ {
-		j := c.UintN(uint64(i + 1))
-		items[i] = items[j]
-		items[j] = i
-	}
-	return items, nil
-}
-
-// TODO: move to a generic PRG struct?
-
-// SubPermutation returns the m first elements of a permutation of [0,n-1]
-// It implements Fisher-Yates Shuffle using x as a source of randoms
-// O(n) space and O(n) time
-func (c *state) SubPermutation(n int, m int) ([]int, error) {
-	if m < 0 {
-		return nil, fmt.Errorf("sample size cannot be negative")
-	}
-	if n < m {
-		return nil, fmt.Errorf("sample size (%d) cannot be larger than entire population (%d)", m, n)
-	}
-	// condition n >= 0 is enforced by function Permutation(n)
-	items, _ := c.Permutation(n)
-	return items[:m], nil
-}
-
-// TODO: move to a generic PRG struct?
-
-// Shuffle permutes the given slice in place
-// It implements Fisher-Yates Shuffle using x as a source of randoms
-// O(1) space and O(n) time
-func (c *state) Shuffle(n int, swap func(i, j int)) error {
-	if n < 0 {
-		return fmt.Errorf("population size cannot be negative")
-	}
-	for i := n - 1; i > 0; i-- {
-		j := c.UintN(uint64(i + 1))
-		swap(i, int(j))
-	}
-	return nil
-}
-
-// TODO: move to a generic PRG struct?
-
-// Samples picks randomly m elements out of n elemnts and places them
-// in random order at indices [0,m-1]. The swapping is done in place
-// It implements the first (m) elements of Fisher-Yates Shuffle using x as a source of randoms
-// O(1) space and O(m) time
-func (c *state) Samples(n int, m int, swap func(i, j int)) error {
-	if m < 0 {
-		return fmt.Errorf("inputs cannot be negative")
-	}
-	if n < m {
-		return fmt.Errorf("sample size (%d) cannot be larger than entire population (%d)", m, n)
-	}
-	for i := 0; i < m; i++ {
-		j := c.UintN(uint64(n - i))
-		swap(i, i+int(j))
-	}
-	return nil
+	c.bytesCounter += uint64(len(buffer))
 }
 
 // State returns the internal state of the concatenated Chacha20s
 // (this is used for serde purposes)
 // TODO: update the name (serialize, encode, marshall ?)
-func (c *state) State() []byte {
-	bytes := append(c.seed, c.customizer...)
+func (c *chachaPRG) State() []byte {
+	bytes := append(c.core.seed, c.core.customizer...)
 	counter := make([]byte, 8)
-	binary.LittleEndian.PutUint64(counter, c.bytesCounter)
+	binary.LittleEndian.PutUint64(counter, c.core.bytesCounter)
 	bytes = append(bytes, counter...)
 	// output is seed || streamID || counter
 	return bytes
 }
 
-func Restore(stateBytes []byte) (*state, error) {
+// TODO: add go doc
+func Restore(stateBytes []byte) (*chachaPRG, error) {
 	// inpout should be seed (32 bytes) || streamID (12 bytes) || bytesCounter (8 bytes)
 	const expectedLen = keySize + nonceSize + 8
 
@@ -220,11 +156,18 @@ func Restore(stateBytes []byte) (*state, error) {
 	remainderStream := make([]byte, remainingBytes)
 	chacha.XORKeyStream(remainderStream, remainderStream)
 
-	rand := &state{
+	core := &chachaCore{
 		cipher:       *chacha,
 		bytesCounter: bytesCounter,
 		seed:         seed,
 		customizer:   streamID,
 	}
-	return rand, nil
+
+	prg := &chachaPRG{
+		genericPRG: genericPRG{
+			randCore: core,
+		},
+		core: core,
+	}
+	return prg, nil
 }
