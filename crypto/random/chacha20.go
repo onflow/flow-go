@@ -39,8 +39,10 @@ type state struct {
 	// Note this is different than the internal counter of the chacha state
 	// that counts the encrypted blocks of 512 bits.
 	bytesCounter uint64
-	// TODO change to key and nonce.
-	initialBytes []byte
+	// initial seed
+	seed []byte
+	// initial customizer
+	customizer []byte
 }
 
 const (
@@ -83,7 +85,8 @@ func NewChacha20(seed []byte, customizer []byte) (*state, error) {
 	rand := &state{
 		cipher:       *chacha,
 		bytesCounter: 0,
-		initialBytes: append(seed, customizer...),
+		seed:         seed,
+		customizer:   customizer,
 	}
 	return rand, nil
 }
@@ -182,9 +185,10 @@ func (c *state) Samples(n int, m int, swap func(i, j int)) error {
 // (this is used for serde purposes)
 // TODO: update the name (serialize, encode, marshall ?)
 func (c *state) State() []byte {
+	bytes := append(c.seed, c.customizer...)
 	counter := make([]byte, 8)
 	binary.LittleEndian.PutUint64(counter, c.bytesCounter)
-	bytes := append(c.initialBytes, counter...)
+	bytes = append(bytes, counter...)
 	// output is seed || streamID || counter
 	return bytes
 }
@@ -207,9 +211,7 @@ func Restore(stateBytes []byte) (*state, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Chacha20 instance creation failed: %w", err)
 	}
-	// set the bytes counter
-
-	// each chacha internal block is 512 bits
+	// set the block counter, each chacha internal block is 512 bits
 	const bytesPerBlock = 512 >> 3
 	blockCount := uint32(bytesCounter / bytesPerBlock)
 	remainingBytes := bytesCounter % bytesPerBlock
@@ -221,7 +223,8 @@ func Restore(stateBytes []byte) (*state, error) {
 	rand := &state{
 		cipher:       *chacha,
 		bytesCounter: bytesCounter,
-		initialBytes: stateBytes[:keySize+nonceSize],
+		seed:         seed,
+		customizer:   streamID,
 	}
 	return rand, nil
 }
