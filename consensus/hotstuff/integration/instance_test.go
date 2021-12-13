@@ -17,6 +17,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/forkchoice"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
@@ -27,7 +28,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/consensus/hotstuff/voter"
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
@@ -325,38 +325,12 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// initialize the validator
 	in.validator = validator.New(in.committee, in.forks, in.verifier)
 
-	stakingSigAggtor := &mocks.WeightedSignatureAggregator{}
-
-	totalWeight, stake := uint64(0), uint64(1000)
+	stake := uint64(1000)
+	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(stake)
 	stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
-	stakingSigAggtor.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		totalWeight += stake
-	}).Return(func(signerID flow.Identifier, sig crypto.Signature) uint64 {
-		return totalWeight
-	}, func(signerID flow.Identifier, sig crypto.Signature) error {
-		return nil
-	}).Maybe()
-	stakingSigAggtor.On("TotalWeight").Return(func() uint64 {
-		return totalWeight
-	}).Maybe()
-	stakingSigAggtor.On("Aggregate").Return(in.participants.NodeIDs(),
-		unittest.RandomBytes(48), nil).Maybe()
 
-	// setup rb reconstructor
-	rbRector := &mocks.RandomBeaconReconstructor{}
-	rbSharesTotal, minRequiredShares := 0, msig.RandomBeaconThreshold(int(in.participants.Count()))
+	rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
 	rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
-	rbRector.On("TrustedAdd", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
-		rbSharesTotal++
-	}).Return(func(signerID flow.Identifier, sig crypto.Signature) bool {
-		return rbSharesTotal >= minRequiredShares
-	}, func(signerID flow.Identifier, sig crypto.Signature) error {
-		return nil
-	}).Maybe()
-	rbRector.On("EnoughShares").Return(func() bool {
-		return rbSharesTotal >= minRequiredShares
-	}).Maybe()
-	rbRector.On("Reconstruct").Return(unittest.SignatureFixture(), nil).Maybe()
 
 	packer := &mocks.Packer{}
 	packer.On("Pack", mock.Anything, mock.Anything).Return(in.participants.NodeIDs(), unittest.RandomBytes(128), nil).Maybe()
