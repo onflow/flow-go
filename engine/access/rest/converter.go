@@ -57,21 +57,13 @@ func toID(id string) (flow.Identifier, error) {
 	return flowID, nil
 }
 
-func toIDs(ids string) ([]flow.Identifier, error) {
-	// currently, the swagger generated Go REST client is incorrectly doing a `fmt.Sprintf("%v", id)` for the id slice
-	// resulting in the client sending the ids in the format [id1 id2 id3...]. This is a temporary workaround to
-	// accommodate the client for now. Issue to to fix the client: https://github.com/onflow/flow/issues/698
-	ids = strings.TrimSuffix(ids, "]")
-	ids = strings.TrimPrefix(ids, "[")
-
-	reqIDs := strings.Split(ids, ",")
-
-	if len(reqIDs) > MaxAllowedIDs {
+func toIDs(ids []string) ([]flow.Identifier, error) {
+	if len(ids) > MaxAllowedIDs {
 		return nil, fmt.Errorf("at most %d IDs can be requested at a time", MaxAllowedIDs)
 	}
 
-	resIDs := make([]flow.Identifier, len(reqIDs))
-	for i, id := range reqIDs {
+	resIDs := make([]flow.Identifier, len(ids))
+	for i, id := range ids {
 		resID, err := toID(id)
 		if err != nil {
 			return nil, fmt.Errorf("invalid ID %s", id)
@@ -92,7 +84,6 @@ func toHeight(height string) (uint64, error) {
 }
 
 func toHeights(rawHeights []string) ([]uint64, error) {
-
 	if len(rawHeights) > MaxAllowedHeights {
 		return nil, fmt.Errorf("at most %d heights can be requested at a time", MaxAllowedHeights)
 	}
@@ -112,6 +103,31 @@ func toHeights(rawHeights []string) ([]uint64, error) {
 	}
 
 	return heights, nil
+}
+
+func toStringArray(in string) ([]string, error) {
+	in = strings.TrimSuffix(in, "]")
+	in = strings.TrimPrefix(in, "[")
+	out := make([]string, 0)
+
+	if len(in) == 0 {
+		return nil, fmt.Errorf("empty list content")
+	}
+
+	if strings.Contains(in, ",") {
+		out = strings.Split(in, ",")
+	} else {
+		out = strings.Fields(in)
+	}
+
+	// check for empty values
+	for i, v := range out {
+		if v == "" {
+			return nil, fmt.Errorf("value at index %d is empty", i)
+		}
+	}
+
+	return out, nil
 }
 
 func toAddress(address string) (flow.Address, error) {

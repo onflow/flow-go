@@ -11,12 +11,15 @@ const blockIDQueryParam = "block_id"
 
 // getExecutionResultByID gets Execution Result payload by block IDs.
 func getExecutionResultsByBlockIDs(req *request, backend access.API, link LinkGenerator) (interface{}, error) {
-	queryID := req.getQueryParam(blockIDQueryParam)
-	if len(queryID) == 0 {
-		return nil, NewBadRequestError(fmt.Errorf("no blocks IDs specified"))
+	ids, err := req.getQueryParams(blockIDQueryParam)
+	if err != nil {
+		return nil, NewBadRequestError(fmt.Errorf("invalid list of block IDs: %w", err))
+	}
+	if len(ids) == 0 {
+		return nil, NewBadRequestError(fmt.Errorf("empty list of block IDs"))
 	}
 
-	blockIDs, err := toIDs(queryID)
+	blockIDs, err := toIDs(ids)
 	if err != nil {
 		return nil, err
 	}
