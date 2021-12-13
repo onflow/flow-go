@@ -9,4 +9,5 @@
 package generated
 
 type Status struct {
+	ChainID string `json:"chain_id"`
 }
