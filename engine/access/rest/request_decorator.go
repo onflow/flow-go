@@ -64,21 +64,10 @@ func (rd *request) getQueryParam(name string) string {
 	return rd.Request.URL.Query().Get(name) // todo(sideninja) consider returning err if non-existing
 }
 
-func (rd *request) getQueryParams(name string) []string {
+func (rd *request) getQueryParams(name string) ([]string, error) {
 	param := rd.Request.URL.Query().Get(name)
-	// currently, the swagger generated Go REST client is incorrectly doing a `fmt.Sprintf("%v", id)` for the id slice
-	// resulting in the client sending the ids in the format [id1 id2 id3...]. This is a temporary workaround to
-	// accommodate the client for now by doing a strings.Fields if commas are not present.
-	// Issue to to fix the client: https://github.com/onflow/flow/issues/698
-	param = strings.TrimSuffix(param, "]")
-	param = strings.TrimPrefix(param, "[")
-	if len(param) == 0 {
-		return nil
-	}
-	if strings.Contains(param, ",") {
-		return strings.Split(param, ",")
-	}
-	return strings.Fields(param)
+
+	return toStringArray(param)
 }
 
 func (rd *request) bodyAs(dst interface{}) error {
@@ -133,7 +122,13 @@ func (rd *request) bodyAs(dst interface{}) error {
 }
 
 func (rd *request) ids() ([]flow.Identifier, error) {
-	return toIDs(rd.getVar("id"))
+	rawIDs := rd.getVar("id")
+	ids, err := toStringArray(rawIDs)
+	if err != nil {
+		return nil, err
+	}
+
+	return toIDs(ids)
 }
 
 func (rd *request) id() (flow.Identifier, error) {
