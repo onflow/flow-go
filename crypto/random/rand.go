@@ -71,12 +71,37 @@ type genericPRG struct {
 
 // UintN returns an uint64 pseudo-random number in [0,n-1],
 // using `p` as an entropy source.
+// The function panics if input `n` is zero.
 func (p *genericPRG) UintN(n uint64) uint64 {
-	// TODO: improve uniform distribution of UintN: for loop or higher sample
-	p.Read(p.uintnBuffer[:])
+	if n == 0 {
+		panic("input to UintN can't be 0")
+	}
+	// count the size of n in bytes
+	size := 0
+	for tmp := n; tmp != 0; tmp >>= 8 {
+		size++
+		p.uintnBuffer[8-size] = 0
+	}
+	// get the bit size of n
+	mask := uint64(0)
+	for n&mask != n {
+		mask = (mask << 1) | 1
+	}
 
-	random := binary.LittleEndian.Uint64(p.uintnBuffer[:])
-	return random % n
+	// For a better uniformity of the result, loop till a sample is less than `n`.
+	// This means the function might take longer time to output a random.
+	// Using the size of `n` in bits helps the loop end earlier.
+
+	// (a different approach would be to pull at least 128 bits from the random source
+	// and use big number modular reduction)
+	random := n
+	for random >= n {
+		p.Read(p.uintnBuffer[:size]) // adjust to the size of n in bytes
+		random = binary.LittleEndian.Uint64(p.uintnBuffer[:])
+		random &= mask // adjust to the size of n in bits
+	}
+
+	return random
 }
 
 // Permutation returns a permutation of the set [0,n-1].

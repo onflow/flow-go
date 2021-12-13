@@ -19,23 +19,21 @@ import (
 // The only purpose of this function is unit testing. It also implements a very basic randomness test.
 // it doesn't evaluate randomness of the random function and doesn't perform advanced statistical tests
 // just making sure code works on edge cases
-func TestInt(t *testing.T) {
+func TestUint(t *testing.T) {
 	sampleSize := 64768
 	tolerance := 0.05
 	sampleSpace := uint64(16) // this should be a power of 2 for a more uniform distribution
 	distribution := make([]float64, sampleSpace)
-	seed := []uint8{
-		0x6A, 0x23, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x59,
-		0x6A, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x5C,
-		0x66, 0x53, 0x41, 0xB7, 0x80, 0xE1, 0x64, 0x51,
-		0xAA, 0x53, 0x40, 0xB7, 0x80, 0xE4, 0x64, 0x50,
-	}
+
+	seed := make([]byte, 32)
+	crand.Read(seed)
 	streamID := make([]byte, 12)
 
 	rng, err := NewChacha20(seed, streamID)
 	require.NoError(t, err)
 	for i := 0; i < sampleSize; i++ {
 		r := rng.UintN(sampleSpace)
+		require.Less(t, r, sampleSpace)
 		distribution[r] += 1.0
 	}
 	stdev := stat.StdDev(distribution, nil)
