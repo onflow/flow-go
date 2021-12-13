@@ -1,16 +1,18 @@
 package rest
 
 import (
+	"net/http"
+	"net/url"
+	"testing"
+
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/model/flow"
+
 	mocks "github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"net/http"
-	"net/url"
-	"testing"
 )
 
 func statusReq(t *testing.T) *http.Request {

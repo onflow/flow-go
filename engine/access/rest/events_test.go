@@ -2,18 +2,20 @@ package rest
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/access/mock"
-	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/utils/unittest"
-	mocks "github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/onflow/flow-go/access/mock"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/utils/unittest"
+
+	mocks "github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestGetEvents(t *testing.T) {
