@@ -111,7 +111,7 @@ func toStringArray(in string) ([]string, error) {
 	out := make([]string, 0)
 
 	if len(in) == 0 {
-		return nil, fmt.Errorf("empty list content")
+		return []string{}, nil
 	}
 
 	if strings.Contains(in, ",") {
