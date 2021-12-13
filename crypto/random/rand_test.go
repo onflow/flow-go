@@ -29,7 +29,7 @@ func TestUint(t *testing.T) {
 	crand.Read(seed)
 	streamID := make([]byte, 12)
 
-	rng, err := NewChacha20(seed, streamID)
+	rng, err := NewChacha20PRG(seed, streamID)
 	require.NoError(t, err)
 	for i := 0; i < sampleSize; i++ {
 		r := rng.UintN(sampleSpace)
@@ -50,11 +50,11 @@ func TestRandomPermutationSubset(t *testing.T) {
 	seed := make([]byte, 32)
 	streamID := make([]byte, 12)
 	// test a zero seed
-	_, err := NewChacha20(seed, streamID)
+	_, err := NewChacha20PRG(seed, streamID)
 	require.NoError(t, err)
 	// fix thee seed
 	seed[0] = 45
-	rng, err := NewChacha20(seed, streamID)
+	rng, err := NewChacha20PRG(seed, streamID)
 	require.NoError(t, err)
 	// statictics parameters
 	sampleSize := 64768
@@ -101,7 +101,7 @@ func TestEmptyPermutationSubset(t *testing.T) {
 	seed[0] = 45
 	streamID := make([]byte, 12)
 
-	rng, err := NewChacha20(seed, streamID)
+	rng, err := NewChacha20PRG(seed, streamID)
 	require.NoError(t, err)
 
 	// verify that permuting an empty set returns an empty list
@@ -121,7 +121,7 @@ func TestRandomShuffle(t *testing.T) {
 	seed[0] = 45
 
 	streamID := make([]byte, 12)
-	rng, err := NewChacha20(seed, streamID)
+	rng, err := NewChacha20PRG(seed, streamID)
 	require.NoError(t, err)
 	// statictics parameters
 	sampleSize := 64768
@@ -162,7 +162,7 @@ func TestEmptyShuffle(t *testing.T) {
 	seed := make([]byte, 32)
 	seed[0] = 45
 	streamID := make([]byte, 12)
-	rng, err := NewChacha20(seed, streamID)
+	rng, err := NewChacha20PRG(seed, streamID)
 	require.NoError(t, err)
 	emptySlice := make([]float64, 0)
 	err = rng.Shuffle(len(emptySlice), func(i, j int) {
@@ -179,7 +179,7 @@ func TestRandomSamples(t *testing.T) {
 	seed[0] = 45
 	streamID := make([]byte, 12)
 
-	rng, err := NewChacha20(seed, streamID)
+	rng, err := NewChacha20PRG(seed, streamID)
 	require.NoError(t, err)
 	// statictics parameters
 	sampleSize := 100000
@@ -227,7 +227,7 @@ func TestEmptySamples(t *testing.T) {
 	seed := make([]byte, 32)
 	seed[0] = 45
 	streamID := make([]byte, 12)
-	rng, err := NewChacha20(seed, streamID)
+	rng, err := NewChacha20PRG(seed, streamID)
 	require.NoError(t, err)
 
 	// Sampling from an empty set
@@ -251,7 +251,7 @@ func TestEmptySamples(t *testing.T) {
 // TODO: use chacha20 constants
 
 // TestStateRestore tests the serilaization and deserialization functions
-// State and Restore
+// Store and Restore
 func TestStateRestore(t *testing.T) {
 	// generate a seed
 	seed := make([]byte, Chacha20SeedLen)
@@ -264,7 +264,7 @@ func TestStateRestore(t *testing.T) {
 	t.Logf("seed is %x, stream_id is %x\n", seed, streamID)
 
 	// create an rng
-	rng, err := NewChacha20(seed, streamID)
+	rng, err := NewChacha20PRG(seed, streamID)
 	require.NoError(t, err)
 
 	// evolve the internal state of the rng
@@ -273,16 +273,16 @@ func TestStateRestore(t *testing.T) {
 		_ = rng.UintN(1024)
 	}
 	// get the internal state of the rng
-	state := rng.State()
+	state := rng.Store()
 
 	// check the state is deterministic
-	state_clone := rng.State()
-	require.True(t, bytes.Equal(state, state_clone), "State is not deterministic")
+	state_clone := rng.Store()
+	require.True(t, bytes.Equal(state, state_clone), "Store is not deterministic")
 
-	// check State is the Restore reverse function
-	secondRng, err := Restore(state)
+	// check Store is the Restore reverse function
+	secondRng, err := RestoreChacha20PRG(state)
 	require.NoError(t, err)
-	require.True(t, bytes.Equal(state, secondRng.State()), "State o Restore is not identity")
+	require.True(t, bytes.Equal(state, secondRng.Store()), "Store o Restore is not identity")
 
 	// check the 2 PRGs are generating identical outputs
 	iterations = rand.Intn(1000)

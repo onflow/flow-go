@@ -64,13 +64,13 @@ const (
 	Chacha20CustomizerMaxLen = nonceSize
 )
 
-// NewChacha20 returns a new Chacha20-based PRG, seeded with
+// NewChacha20PRG returns a new Chacha20-based PRG, seeded with
 // the input seed (32 bytes) and a customizer (up to 12 bytes).
 //
 // It is recommended to sample the seed uniformly at random.
 // The function errors if the the seed is different than 32 bytes,
 // or if the customizer is larger than 12 bytes.
-func NewChacha20(seed []byte, customizer []byte) (*chachaPRG, error) {
+func NewChacha20PRG(seed []byte, customizer []byte) (*chachaPRG, error) {
 
 	// check the key size
 	if len(seed) != Chacha20SeedLen {
@@ -132,10 +132,9 @@ func (c *chachaCore) Read(buffer []byte) {
 	c.bytesCounter += uint64(len(buffer))
 }
 
-// State returns the internal state of the concatenated Chacha20s
-// (this is used for serde purposes)
-// TODO: update the name (serialize, encode, marshall ?)
-func (c *chachaPRG) State() []byte {
+// Store returns the internal state of the concatenated Chacha20s
+// This is used for serialization/deserialization purposes.
+func (c *chachaPRG) Store() []byte {
 	bytes := append(c.core.seed, c.core.customizer...)
 	counter := make([]byte, 8)
 	binary.LittleEndian.PutUint64(counter, c.core.bytesCounter)
@@ -144,8 +143,9 @@ func (c *chachaPRG) State() []byte {
 	return bytes
 }
 
-// TODO: add go doc
-func Restore(stateBytes []byte) (*chachaPRG, error) {
+// RestoreChacha20PRG creates a chacha20 base PRG based on a previously stored state.
+// The created PRG is restored at the same state where the previous PRG was stored.
+func RestoreChacha20PRG(stateBytes []byte) (*chachaPRG, error) {
 	// inpout should be seed (32 bytes) || streamID (12 bytes) || bytesCounter (8 bytes)
 	const expectedLen = keySize + nonceSize + 8
 

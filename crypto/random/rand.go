@@ -45,10 +45,10 @@ type Rand interface {
 	// The returned error is non-nil if any of the parameters is a negative integer.
 	Samples(n int, m int, swap func(i, j int)) error
 
-	// State returns the internal state of the random generator.
+	// Store returns the internal state of the random generator.
 	// The internal state can be used as a seed input for the function
 	// Restore to restore an identical PRG (with the same internal state)
-	State() []byte
+	Store() []byte
 }
 
 // randCore is PRG providing the core Read function of a PRG.
