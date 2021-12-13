@@ -24,9 +24,12 @@ const (
 	CompHeavyLoadType     LoadType = "computation-heavy"
 	EventHeavyLoadType    LoadType = "event-heavy"
 	LedgerHeavyLoadType   LoadType = "ledger-heavy"
+	TxSizeHeavyLoadType05 LoadType = "tx-size-heavy-05"
+	TxSizeHeavyLoadType1  LoadType = "tx-size-heavy-1"
+	TxSizeHeavyLoadType2  LoadType = "tx-size-heavy-2"
 )
 
-const accountCreationBatchSize = 100
+const accountCreationBatchSize = 50
 const tokensPerTransfer = 0.01 // flow testnets only have 10e6 total supply, so we choose a small amount here
 
 // ContLoadGenerator creates a continuous load of transactions to the network
@@ -74,7 +77,7 @@ func NewContLoadGenerator(
 
 	servAcc, err := loadServiceAccount(flowClient, serviceAccountAddress, servAccPrivKeyHex)
 	if err != nil {
-		return nil, fmt.Errorf("error loading service account %w", err)
+		return nil, fmt.Errorf("error loading service account: %w", err)
 	}
 
 	// TODO get these params hooked to the top level
@@ -178,12 +181,21 @@ func (lg *ContLoadGenerator) Start() {
 
 		switch lg.loadType {
 		case TokenTransferLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.sendTokenTransferTx)
+			worker = NewWorker(i, 1*time.Second, sendTokenTransferWorkload.Work(lg))
 		case TokenAddKeysLoadType:
-			worker = NewWorker(i, 1*time.Second, lg.sendAddKeyTx)
-		// other types
-		default:
-			worker = NewWorker(i, 1*time.Second, lg.sendFavContractTx)
+			worker = NewWorker(i, 1*time.Second, addKeysWorkload.Work(lg))
+		case CompHeavyLoadType:
+			worker = NewWorker(i, 1*time.Second, computationHeavyWorkload.Work(lg))
+		case EventHeavyLoadType:
+			worker = NewWorker(i, 1*time.Second, eventHeavyWorkload.Work(lg))
+		case LedgerHeavyLoadType:
+			worker = NewWorker(i, 1*time.Second, ledgerHeavyWorkload.Work(lg))
+		case TxSizeHeavyLoadType05:
+			worker = NewWorker(i, 1*time.Second, largeTxLoad(0.5).Work(lg))
+		case TxSizeHeavyLoadType1:
+			worker = NewWorker(i, 1*time.Second, largeTxLoad(1.0).Work(lg))
+		case TxSizeHeavyLoadType2:
+			worker = NewWorker(i, 1*time.Second, largeTxLoad(2.0).Work(lg))
 		}
 
 		worker.Start()
@@ -343,156 +355,6 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 	lg.log.Info().Msgf("created %d accounts", len(lg.accounts))
 
 	return nil
-}
-
-func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
-	// TODO move this as a configurable parameter
-	numberOfKeysToAdd := 40
-	blockRef, err := lg.blockRef.Get()
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("error getting reference block")
-		return
-	}
-
-	lg.log.Trace().Msgf("getting next available account")
-
-	acc := <-lg.availableAccounts
-	defer func() { lg.availableAccounts <- acc }()
-
-	lg.log.Trace().Msgf("creating add proposer key script")
-	cadenceKeys := make([]cadence.Value, numberOfKeysToAdd)
-	for i := 0; i < numberOfKeysToAdd; i++ {
-		cadenceKeys[i] = bytesToCadenceArray(lg.serviceAccount.accountKey.Encode())
-	}
-	cadenceKeysArray := cadence.NewArray(cadenceKeys)
-
-	addKeysScript, err := AddKeyToAccountScript()
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("error getting add key to account script")
-		return
-	}
-
-	addKeysTx := flowsdk.NewTransaction().
-		SetScript(addKeysScript).
-		AddAuthorizer(*acc.address).
-		SetReferenceBlockID(blockRef).
-		SetGasLimit(9999).
-		SetProposalKey(
-			*lg.serviceAccount.address,
-			lg.serviceAccount.accountKey.Index,
-			lg.serviceAccount.accountKey.SequenceNumber,
-		).
-		SetPayer(*lg.serviceAccount.address)
-
-	err = addKeysTx.AddArgument(cadenceKeysArray)
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("error constructing add keys to account transaction")
-		return
-	}
-
-	lg.log.Trace().Msgf("creating transaction")
-
-	addKeysTx.SetReferenceBlockID(blockRef).
-		SetProposalKey(*acc.address, 0, acc.seqNumber).
-		SetPayer(*acc.address).
-		AddAuthorizer(*acc.address)
-
-	lg.log.Trace().Msgf("signing transaction")
-	err = acc.signTx(addKeysTx, 0)
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("error signing transaction")
-		return
-	}
-
-	lg.sendTx(addKeysTx)
-}
-
-func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
-
-	blockRef, err := lg.blockRef.Get()
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("error getting reference block")
-		return
-	}
-
-	lg.log.Trace().Msgf("getting next available account")
-	acc := <-lg.availableAccounts
-	defer func() { lg.availableAccounts <- acc }()
-
-	lg.log.Trace().Msgf("getting next account")
-	nextAcc := lg.accounts[(acc.i+1)%len(lg.accounts)]
-
-	lg.log.Trace().Msgf("creating transfer script")
-	transferScript, err := TokenTransferScript(
-		lg.fungibleTokenAddress,
-		lg.flowTokenAddress,
-		nextAcc.address,
-		tokensPerTransfer)
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("error creating token transfer script")
-		return
-	}
-
-	lg.log.Trace().Msgf("creating token transfer transaction")
-	transferTx := flowsdk.NewTransaction().
-		SetReferenceBlockID(blockRef).
-		SetScript(transferScript).
-		SetGasLimit(9999).
-		SetProposalKey(*acc.address, 0, acc.seqNumber).
-		SetPayer(*acc.address).
-		AddAuthorizer(*acc.address)
-
-	lg.log.Trace().Msgf("signing transaction")
-	err = acc.signTx(transferTx, 0)
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("error signing transaction")
-		return
-	}
-
-	lg.sendTx(transferTx)
-}
-
-// TODO update this to include loadtype
-func (lg *ContLoadGenerator) sendFavContractTx(workerID int) {
-
-	blockRef, err := lg.blockRef.Get()
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("error getting reference block")
-		return
-	}
-
-	lg.log.Trace().Msgf("getting next available account")
-
-	acc := <-lg.availableAccounts
-	defer func() { lg.availableAccounts <- acc }()
-	var txScript []byte
-
-	switch lg.loadType {
-	case CompHeavyLoadType:
-		txScript = ComputationHeavyScript(*lg.favContractAddress)
-	case EventHeavyLoadType:
-		txScript = EventHeavyScript(*lg.favContractAddress)
-	case LedgerHeavyLoadType:
-		txScript = LedgerHeavyScript(*lg.favContractAddress)
-	}
-
-	lg.log.Trace().Msgf("creating transaction")
-	tx := flowsdk.NewTransaction().
-		SetReferenceBlockID(blockRef).
-		SetScript(txScript).
-		SetGasLimit(9999).
-		SetProposalKey(*acc.address, 0, acc.seqNumber).
-		SetPayer(*acc.address).
-		AddAuthorizer(*acc.address)
-
-	lg.log.Trace().Msgf("signing transaction")
-	err = acc.signTx(tx, 0)
-	if err != nil {
-		lg.log.Error().Err(err).Msgf("error signing transaction")
-		return
-	}
-
-	lg.sendTx(tx)
 }
 
 func (lg *ContLoadGenerator) sendTx(tx *flowsdk.Transaction) {
