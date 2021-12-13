@@ -28,3 +28,7 @@ func EntityListFixture(n uint) []*MockEntity {
 
 	return list
 }
+
+func MockEntityFixture() *MockEntity {
+	return &MockEntity{id: IdentifierFixture()}
+}
