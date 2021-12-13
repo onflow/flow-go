@@ -25,6 +25,8 @@ const (
 	getExecutionResultByBlockIDRoute = "getExecutionResultByBlockID"
 	getExecutionResultByIDRoute      = "getExecutionResultByID"
 	getAccountRoute                  = "getAccount"
+	getEventsRoute                   = "getEvents"
+	getStatusRoute                   = "getStatus"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
@@ -153,5 +155,20 @@ func routeDefinitions() []routeDefinition {
 			pattern:        "/accounts/{address}",
 			name:           getAccountRoute,
 			apiHandlerFunc: getAccount,
-		}}
+		},
+		// Events
+		{
+			method:         http.MethodGet,
+			pattern:        "/events",
+			name:           getEventsRoute,
+			apiHandlerFunc: getEvents,
+		},
+		// Status
+		{
+			method:         http.MethodGet,
+			pattern:        "/status",
+			name:           getStatusRoute,
+			apiHandlerFunc: getStatus,
+		},
+	}
 }

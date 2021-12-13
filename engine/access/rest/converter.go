@@ -4,13 +4,12 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"regexp"
-	"strconv"
-	"strings"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 	"github.com/onflow/flow-go/model/flow"
+	"regexp"
+	"strconv"
+	"strings"
 )
 
 // Converter provides functionality to convert from request models generated using
@@ -427,6 +426,25 @@ func eventsResponse(events []flow.Event) []generated.Event {
 	return eventsRes
 }
 
+func blockEventsResponse(block flow.BlockEvents) generated.BlockEvents {
+	return generated.BlockEvents{
+		BlockId:        block.BlockID.String(),
+		BlockHeight:    fromUint64(block.BlockHeight),
+		BlockTimestamp: block.BlockTimestamp,
+		Events:         eventsResponse(block.Events),
+		Links:          nil, // todo link
+	}
+}
+
+func blocksEventsResponse(blocks []flow.BlockEvents) []generated.BlockEvents {
+	events := make([]generated.BlockEvents, len(blocks))
+	for i, b := range blocks {
+		events[i] = blockEventsResponse(b)
+	}
+
+	return events
+}
+
 func statusResponse(status flow.TransactionStatus) generated.TransactionStatus {
 	switch status {
 	case flow.TransactionStatusExpired:
@@ -723,4 +741,10 @@ func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkG
 
 	// ship it
 	return response, nil
+}
+
+func networkStatusResponse(params access.NetworkParameters) generated.Status {
+	return generated.Status{
+		ChainID: params.ChainID.String(),
+	}
 }
