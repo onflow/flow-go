@@ -54,7 +54,7 @@ func getEventsForBlockIDs(
 		return nil, err
 	}
 
-	return eventsResponse(events), nil
+	return blocksEventsResponse(events), nil
 }
 
 // getEventsForRange helper gets block in the block height range.
@@ -101,5 +101,5 @@ func getEventsForRange(
 		return nil, err
 	}
 
-	return eventsResponse(events), nil
+	return blocksEventsResponse(events), nil
 }
