@@ -301,7 +301,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 	})
 
 	t.Run("fuzzy set", func(t *testing.T) {
-		rng, err := random.NewChacha20(someSeed, []byte("leader_selec"))
+		rng, err := random.NewChacha20PRG(someSeed, []byte("leader_selec"))
 		require.NoError(t, err)
 
 		for i := 0; i < 100; i++ {
@@ -338,7 +338,7 @@ func TestZeroStakedNodeWillNotBeSelected(t *testing.T) {
 		}
 
 		t.Run("if there is only 1 node has stake, then it will be always be the leader and the only leader", func(t *testing.T) {
-			rng, err := random.NewChacha20(someSeed, []byte("leader_selec"))
+			rng, err := random.NewChacha20PRG(someSeed, []byte("leader_selec"))
 			require.NoError(t, err)
 
 			for i := 0; i < 100; i++ {

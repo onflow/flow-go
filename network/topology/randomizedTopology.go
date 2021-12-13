@@ -38,7 +38,7 @@ func NewRandomizedTopology(nodeID flow.Identifier, logger zerolog.Logger, edgePr
 	if err != nil {
 		return nil, fmt.Errorf("could not generate seed from id:%w", err)
 	}
-	rng, err := random.NewChacha20(seed, []byte("net_topology"))
+	rng, err := random.NewChacha20PRG(seed, []byte("net_topology"))
 	if err != nil {
 		return nil, fmt.Errorf("could not generate random number generator: %w", err)
 	}

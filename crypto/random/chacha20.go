@@ -38,13 +38,13 @@ type chachaCore struct {
 	// Only used for State/Restore functionality
 
 	// Counter of bytes encrypted so far by the sream cipher.
-	// Note this is different than the internal counter of the chacha state
+	// Note this is different than the internal 32-bits counter of the chacha state
 	// that counts the encrypted blocks of 512 bits.
 	bytesCounter uint64
 	// initial seed
-	seed []byte
+	seed [keySize]byte
 	// initial customizer
-	customizer []byte
+	customizer [nonceSize]byte
 }
 
 // The main PRG, implements the Rand interface
@@ -79,7 +79,7 @@ func NewChacha20PRG(seed []byte, customizer []byte) (*chachaPRG, error) {
 
 	// TODO: update by adding a maximum length and padding
 	// check the nonce size
-	if len(customizer) != Chacha20CustomizerMaxLen {
+	if len(customizer) > Chacha20CustomizerMaxLen {
 		return nil, fmt.Errorf("new Rand streamID should be %d bytes", Chacha20CustomizerMaxLen)
 	}
 
@@ -93,9 +93,10 @@ func NewChacha20PRG(seed []byte, customizer []byte) (*chachaPRG, error) {
 	core := &chachaCore{
 		cipher:       *chacha,
 		bytesCounter: 0,
-		seed:         seed,
-		customizer:   customizer,
 	}
+	copy(core.seed[:], seed)
+	copy(core.customizer[:], customizer)
+
 	prg := &chachaPRG{
 		genericPRG: genericPRG{
 			randCore: core,
@@ -135,7 +136,7 @@ func (c *chachaCore) Read(buffer []byte) {
 // Store returns the internal state of the concatenated Chacha20s
 // This is used for serialization/deserialization purposes.
 func (c *chachaPRG) Store() []byte {
-	bytes := append(c.core.seed, c.core.customizer...)
+	bytes := append(c.core.seed[:], c.core.customizer[:]...)
 	counter := make([]byte, 8)
 	binary.LittleEndian.PutUint64(counter, c.core.bytesCounter)
 	bytes = append(bytes, counter...)
@@ -175,9 +176,9 @@ func RestoreChacha20PRG(stateBytes []byte) (*chachaPRG, error) {
 	core := &chachaCore{
 		cipher:       *chacha,
 		bytesCounter: bytesCounter,
-		seed:         seed,
-		customizer:   streamID,
 	}
+	copy(core.seed[:], seed)
+	copy(core.customizer[:], streamID)
 
 	prg := &chachaPRG{
 		genericPRG: genericPRG{
