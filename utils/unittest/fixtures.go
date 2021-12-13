@@ -369,6 +369,12 @@ func WithHeaderHeight(height uint64) func(header *flow.Header) {
 	}
 }
 
+func HeaderWithView(view uint64) func(*flow.Header) {
+	return func(header *flow.Header) {
+		header.View = view
+	}
+}
+
 func BlockHeaderFixture(opts ...func(header *flow.Header)) flow.Header {
 	height := uint64(rand.Uint32())
 	view := height + uint64(rand.Intn(1000))

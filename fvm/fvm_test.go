@@ -896,6 +896,43 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 		run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
 				ctx.MaxStateInteractionSize = 500_000
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				require.NoError(t, err)
+
+				txBody := testutil.CreateContractDeploymentTransaction(
+					"Container",
+					script,
+					accounts[0],
+					chain)
+
+				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+				txBody.SetPayer(accounts[0])
+
+				err = testutil.SignPayload(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+
+				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
+			}))
+
+	t.Run("Using to much interaction but not failing because of service account", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
+		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
+		run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+				ctx.MaxStateInteractionSize = 500_000
 				//ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
 				// Create an account private key.
@@ -925,8 +962,7 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
-
-				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
+				require.NoError(t, tx.Err)
 			}))
 
 	t.Run("Using to much interaction fails but does not panic", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
@@ -950,24 +986,22 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
 				require.NoError(t, err)
 
-				_, txBody := testutil.CreateMultiAccountCreationTransaction(t, chain, 100)
+				_, txBody := testutil.CreateMultiAccountCreationTransaction(t, chain, 40)
 
 				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-				txBody.SetPayer(chain.ServiceAddress())
+				txBody.SetPayer(accounts[0])
 
-				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+				err = testutil.SignPayload(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
 				tx := fvm.Transaction(txBody, 0)
 
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
-
 				require.Error(t, tx.Err)
-
 				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
 			}))
 }
