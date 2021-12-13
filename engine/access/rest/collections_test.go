@@ -42,7 +42,11 @@ func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBod
 	rr := executeRequest(req, backend)
 	require.Equal(t, status, rr.Code)
 	actualResponseBody := rr.Body.String()
-	require.JSONEq(t, expectedRespBody, actualResponseBody, fmt.Sprintf("failed for req: %s", req.URL))
+	require.JSONEq(t,
+		expectedRespBody,
+		actualResponseBody,
+		fmt.Sprintf("failed for req: %s,\ngot response:\n%s\nexpected response:%s\n", req.URL, actualResponseBody, expectedRespBody),
+	)
 }
 
 func getCollectionReq(id string, expandTransactions bool) *http.Request {
