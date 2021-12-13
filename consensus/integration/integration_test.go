@@ -2,9 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/util"
-	"github.com/onflow/flow-go/utils/unittest"
 	"sort"
 	"testing"
 	"time"
@@ -12,7 +9,10 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
+	"github.com/onflow/flow-go/module/util"
 	"github.com/onflow/flow-go/network"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func runNodes(signalerCtx irrecoverable.SignalerContext, nodes []*Node) {

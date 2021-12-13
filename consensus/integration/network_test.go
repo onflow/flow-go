@@ -3,8 +3,9 @@ package integration_test
 import (
 	"context"
 	"fmt"
-	"github.com/hashicorp/go-multierror"
 	"time"
+
+	"github.com/hashicorp/go-multierror"
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/network"
