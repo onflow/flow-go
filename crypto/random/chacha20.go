@@ -7,8 +7,6 @@ import (
 	"golang.org/x/crypto/chacha20"
 )
 
-// TODO: update description, RFC and lengths
-
 // We use Chacha20, to build a cryptographically secure random number generator
 // that uses the ChaCha algorithm.
 //
@@ -33,6 +31,9 @@ import (
 // The PRG core, implements the randCore interface
 type chachaCore struct {
 	cipher chacha20.Cipher
+
+	// empty message added to minimize allocations and buffer clearing
+	emptyMessage [lenEmptyMessage]byte
 
 	// Only used for State/Restore functionality
 
@@ -104,14 +105,29 @@ func NewChacha20(seed []byte, customizer []byte) (*chachaPRG, error) {
 	return prg, nil
 }
 
-// TODO : update GoDoc
+const lenEmptyMessage = 64
+
+// Read pulls random bytes from the pseudo-random source.
+// The randoms are copied into the input buffer, the number of bytes read
+// is equal to the buffer input length.
+//
+// The stream cipher encrypts a stream of a constant message (empty for simplicity).
 func (c *chachaCore) Read(buffer []byte) {
-	// encrypt an empty message
-	// TODO: optimize by using a constant empty buffer (check if less than 512)
-	for i := 0; i < len(buffer); i++ {
-		buffer[i] = 0
+	// message to encrypt
+	var message []byte
+
+	if len(buffer) <= lenEmptyMessage {
+		// use a constant message (used for most of the calls)
+		message = c.emptyMessage[:len(buffer)]
+	} else {
+		// when buffer is large, use is as the message to encrypt,
+		// but this requires clearing it first.
+		for i := 0; i < len(buffer); i++ {
+			buffer[i] = 0
+		}
+		message = buffer
 	}
-	c.cipher.XORKeyStream(buffer, buffer)
+	c.cipher.XORKeyStream(buffer, message)
 	// increase the counter
 	c.bytesCounter += uint64(len(buffer))
 }
