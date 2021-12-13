@@ -39,7 +39,7 @@ func TestTransactions(t *testing.T) {
 		expected := fmt.Sprintf(`{
 		   "id":"%s",
 		   "script":"cHViIGZ1biBtYWluKCkge30=",
-		   "arguments":null,
+		   "arguments":[],
 		   "reference_block_id":"%s",
 		   "gas_limit":"10",
 		   "payer":"8c5303eaa26202d6",
@@ -68,7 +68,7 @@ func TestTransactions(t *testing.T) {
 		   }
 		}`, tx.ID().String(), tx.ReferenceBlockID.String(), toBase64(tx.EnvelopeSignatures[0].Signature), tx.ID().String(), tx.ID().String())
 
-		assert.JSONEq(t, expected, string(res))
+		assert.JSONEq(t, expected, string(res), fmt.Sprintf("\ngot response:\n%s\nexpected response:%s\n", res, expected))
 	})
 
 	t.Run("response with result", func(t *testing.T) {

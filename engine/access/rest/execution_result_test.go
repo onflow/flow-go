@@ -71,16 +71,12 @@ func TestGetResultByID(t *testing.T) {
 			"id": "%s",
 			"block_id": "%s",
 			"events": [{
-				"type": "%s",
-				"transaction_id": "",
-				"transaction_index": "0",
-				"event_index": "0",
-				"payload": "%s"
+				"type": "%s"
 			}],
 			"_links": {
 				"_self": "/v1/execution_results/%s"
 			}
-		}`, result.ID(), result.BlockID, result.ServiceEvents[0].Type, "", result.ID())
+		}`, result.ID(), result.BlockID, result.ServiceEvents[0].Type, result.ID())
 		assertOKResponse(t, req, expected, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
