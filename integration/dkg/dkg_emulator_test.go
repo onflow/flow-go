@@ -150,7 +150,6 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	for i, n := range nodes {
 		priv, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(s.T(), err)
-		require.True(s.T(), hasDKGKey)
 
 		signer := signature.NewThresholdProvider("TAG", priv)
 		signers = append(signers, signer)
