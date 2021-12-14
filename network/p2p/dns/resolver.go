@@ -70,7 +70,6 @@ func NewResolver(collector module.ResolverMetrics, opts ...optFunc) *Resolver {
 
 // LookupIPAddr implements BasicResolver interface for libp2p for looking up ip addresses through resolver.
 func (r *Resolver) LookupIPAddr(ctx context.Context, domain string) ([]net.IPAddr, error) {
-	// TODO: run here
 	started := runtimeNano()
 
 	addr, err := r.lookupIPAddr(ctx, domain)
@@ -127,7 +126,6 @@ func (r *Resolver) lookupResolverForIPAddr(ctx context.Context, domain string) (
 // An expired txt on cache is still addressed through the cache, however, a request is fired up asynchronously
 // through the underlying basic resolver to resolve it from the network.
 func (r *Resolver) LookupTXT(ctx context.Context, txt string) ([]string, error) {
-	// TODO: run here
 
 	started := runtimeNano()
 
