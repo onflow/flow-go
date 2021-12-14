@@ -70,6 +70,7 @@ const (
 // It is recommended to sample the seed uniformly at random.
 // The function errors if the the seed is different than 32 bytes,
 // or if the customizer is larger than 12 bytes.
+// Shorter customizers than 12 bytes are padded by zero bytes.
 func NewChacha20PRG(seed []byte, customizer []byte) (*chachaPRG, error) {
 
 	// check the key size
@@ -77,7 +78,6 @@ func NewChacha20PRG(seed []byte, customizer []byte) (*chachaPRG, error) {
 		return nil, fmt.Errorf("chacha20 seed length should be %d, got %d", Chacha20SeedLen, len(seed))
 	}
 
-	// TODO: update by adding a maximum length and padding
 	// check the nonce size
 	if len(customizer) > Chacha20CustomizerMaxLen {
 		return nil, fmt.Errorf("new Rand streamID should be %d bytes", Chacha20CustomizerMaxLen)

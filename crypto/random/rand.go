@@ -19,20 +19,20 @@ type Rand interface {
 	// Permutation returns a permutation of the set [0,n-1]
 	// the theoretical output space grows very fast with (!n) so that input (n) should be chosen carefully
 	// to make sure the function output space covers a big chunk of the theoretical outputs.
-	// The returned error is non-nil if the parameter is a negative integer.
+	// The function errors if the parameter is a negative integer.
 	Permutation(n int) ([]int, error)
 
 	// SubPermutation returns the m first elements of a permutation of [0,n-1]
 	// the theoretical output space can be large (n!/(n-m)!) so that the inputs should be chosen carefully
 	// to make sure the function output space covers a big chunk of the theoretical outputs.
-	// The returned error is non-nil if the parameter is a negative integer.
+	// The function errors if the parameter is a negative integer.
 	SubPermutation(n int, m int) ([]int, error)
 
 	// Shuffle permutes an ordered data structure of an arbitrary type in place. The main use-case is
 	// permuting slice or array elements. (n) is the size of the data structure.
 	// the theoretical output space grows very fast with the slice size (n!) so that input (n) should be chosen carefully
 	// to make sure the function output space covers a big chunk of the theoretical outputs.
-	// The returned error is non-nil if any of the parameters is a negative integer.
+	// The function errors if any of the parameters is a negative integer.
 	Shuffle(n int, swap func(i, j int)) error
 
 	// Samples picks (m) random ordered elements of a data structure of an arbitrary type of total size (n). The (m) elements are placed
@@ -42,7 +42,7 @@ type Rand interface {
 	// The main use-case of the data structure is a slice or array.
 	// The theoretical output space grows very fast with the slice size (n!/(n-m)!) so that inputs should be chosen carefully
 	// to make sure the function output space covers a big chunk of the theoretical outputs.
-	// The returned error is non-nil if any of the parameters is a negative integer.
+	// The function errors if any of the parameters is a negative integer.
 	Samples(n int, m int, swap func(i, j int)) error
 
 	// Store returns the internal state of the random generator.
