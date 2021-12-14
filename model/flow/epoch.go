@@ -189,8 +189,8 @@ func commitFromEncodable(enc encodableCommit) EpochCommit {
 	}
 }
 
-func (commit *EpochCommit) MarshalJSON() ([]byte, error) {
-	return json.Marshal(encodableFromCommit(commit))
+func (commit EpochCommit) MarshalJSON() ([]byte, error) {
+	return json.Marshal(encodableFromCommit(&commit))
 }
 
 func (commit *EpochCommit) UnmarshalJSON(b []byte) error {
