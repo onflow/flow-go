@@ -62,7 +62,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 		return key, nil
 	}
 
-	privBeaconKeyData, safe, err := s.keys.RetrieveMyBeaconPrivateKey(epoch)
+	privKey, safe, err := s.keys.RetrieveMyBeaconPrivateKey(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve random beacon private key for epoch counter %v, at view %v, err: %w",
 			epoch, view, err)
@@ -79,8 +79,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 
 	// DKG succeeded and a random beacon key is available,
 	// create a random beacon signer that holds the private key and cache it for the epoch
-	key = privBeaconKeyData.RandomBeaconPrivKey
-	s.privateKeys[epoch] = key
+	s.privateKeys[epoch] = privKey
 
-	return key, nil
+	return privKey, nil
 }
