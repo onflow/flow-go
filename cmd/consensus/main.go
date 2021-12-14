@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
@@ -640,6 +641,69 @@ func main() {
 				return fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 			return nil
+		}).
+		Component("hotstuff participant", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			// initialize the block builder
+			var build module.Builder
+			build, err = builder.NewBuilder(
+				node.Metrics.Mempool,
+				node.DB,
+				mutableState,
+				node.Storage.Headers,
+				node.Storage.Seals,
+				node.Storage.Index,
+				node.Storage.Blocks,
+				node.Storage.Results,
+				node.Storage.Receipts,
+				guarantees,
+				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
+				receipts,
+				node.Tracer,
+				builder.WithBlockTimer(blockTimer),
+				builder.WithMaxSealCount(maxSealPerBlock),
+				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialized block builder: %w", err)
+			}
+
+			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
+
+			opts := []consensus.Option{
+				consensus.WithInitialTimeout(hotstuffTimeout),
+				consensus.WithMinTimeout(hotstuffMinTimeout),
+				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
+				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
+				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
+				consensus.WithBlockRateDelay(blockRateDelay),
+			}
+
+			if !startupTime.IsZero() {
+				opts = append(opts, consensus.WithStartupTime(startupTime))
+			}
+
+			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
+			if err != nil {
+				return nil, err
+			}
+
+			// initialize hotstuff consensus algorithm
+			hot, err := consensus.NewParticipant(
+				node.Logger,
+				mainMetrics,
+				build,
+				comp,
+				finalizedBlock,
+				pending,
+				hotstuffModules,
+				opts...,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
+			}
+
+			comp = comp.WithConsensus(hot)
+			return comp, nil
 		}).
 		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
