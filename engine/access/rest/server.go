@@ -1,6 +1,7 @@
 package rest
 
 import (
+	"github.com/onflow/flow-go/engine/access/rest/validators"
 	"net/http"
 	"time"
 
@@ -63,7 +64,7 @@ func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
 	var linkGenerator LinkGenerator = NewLinkGeneratorImpl(v1SubRouter)
 
 	for _, r := range routeDefinitions() {
-		h := NewHandler(logger, backend, r.apiHandlerFunc, linkGenerator)
+		h := NewHandler(logger, backend, r.handler, linkGenerator)
 		v1SubRouter.
 			Methods(r.method).
 			Path(r.pattern).
@@ -74,85 +75,86 @@ func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
 }
 
 type routeDefinition struct {
-	name           string
-	method         string
-	pattern        string
-	validators     []ApiValidatorFunc
-	apiHandlerFunc ApiHandlerFunc
+	name       string
+	method     string
+	pattern    string
+	validators []ApiValidatorFunc
+	handler    ApiHandlerFunc
 }
 
 func routeDefinitions() []routeDefinition {
 	return []routeDefinition{
 		// Transactions
 		{
-			method:         http.MethodGet,
-			pattern:        "/transactions/{id}",
-			name:           getTransactionByIDRoute,
-			apiHandlerFunc: getTransactionByID,
+			method:  http.MethodGet,
+			pattern: "/transactions/{id}",
+			name:    getTransactionByIDRoute,
+			handler: getTransactionByID,
 		}, {
-			method:         http.MethodPost,
-			pattern:        "/transactions",
-			name:           createTransactionRoute,
-			apiHandlerFunc: createTransaction,
+			method:  http.MethodPost,
+			pattern: "/transactions",
+			name:    createTransactionRoute,
+			handler: createTransaction,
 		},
 		// Transaction Results
 		{
-			method:         http.MethodGet,
-			pattern:        "/transaction_results/{id}",
-			name:           getTransactionResultByIDRoute,
-			apiHandlerFunc: getTransactionResultByID,
+			method:  http.MethodGet,
+			pattern: "/transaction_results/{id}",
+			name:    getTransactionResultByIDRoute,
+			handler: getTransactionResultByID,
 		},
 		// Blocks
 		{
-			method:         http.MethodGet,
-			pattern:        "/blocks/{id}",
-			name:           getBlocksByIDRoute,
-			apiHandlerFunc: getBlocksByIDs,
+			method:  http.MethodGet,
+			pattern: "/blocks/{id}",
+			name:    getBlocksByIDRoute,
+			handler: getBlocksByIDs,
 		}, {
-			method:         http.MethodGet,
-			pattern:        "/blocks",
-			name:           getBlocksByHeightRoute,
-			apiHandlerFunc: getBlocksByHeight,
+			method:  http.MethodGet,
+			pattern: "/blocks",
+			name:    getBlocksByHeightRoute,
+			handler: getBlocksByHeight,
 		},
 		// Block Payload
 		{
-			method:         http.MethodGet,
-			pattern:        "/blocks/{id}/payload",
-			name:           getBlockPayloadByIDRoute,
-			apiHandlerFunc: getBlockPayloadByID,
+			method:  http.MethodGet,
+			pattern: "/blocks/{id}/payload",
+			name:    getBlockPayloadByIDRoute,
+			handler: getBlockPayloadByID,
 		},
 		// Execution Result
 		{
-			method:         http.MethodGet,
-			pattern:        "/execution_results/{id}",
-			name:           getExecutionResultByIDRoute,
-			apiHandlerFunc: getExecutionResultByID,
+			method:  http.MethodGet,
+			pattern: "/execution_results/{id}",
+			name:    getExecutionResultByIDRoute,
+			handler: getExecutionResultByID,
 		},
 		{
-			method:         http.MethodGet,
-			pattern:        "/execution_results",
-			name:           getExecutionResultByBlockIDRoute,
-			apiHandlerFunc: getExecutionResultsByBlockIDs,
+			method:  http.MethodGet,
+			pattern: "/execution_results",
+			name:    getExecutionResultByBlockIDRoute,
+			handler: getExecutionResultsByBlockIDs,
 		},
 		// Collections
 		{
-			method:         http.MethodGet,
-			pattern:        "/collections/{id}",
-			name:           getCollectionByIDRoute,
-			apiHandlerFunc: getCollectionByID,
+			method:  http.MethodGet,
+			pattern: "/collections/{id}",
+			name:    getCollectionByIDRoute,
+			handler: getCollectionByID,
 		},
 		// Scripts
 		{
-			method:         http.MethodPost,
-			pattern:        "/scripts",
-			name:           executeScriptRoute,
-			apiHandlerFunc: executeScript,
+			method:  http.MethodPost,
+			pattern: "/scripts",
+			name:    executeScriptRoute,
+			handler: executeScript,
 		},
 		// Accounts
 		{
-			method:         http.MethodGet,
-			pattern:        "/accounts/{address}",
-			name:           getAccountRoute,
-			apiHandlerFunc: getAccount,
+			method:     http.MethodGet,
+			pattern:    "/accounts/{address}",
+			name:       getAccountRoute,
+			validators: []ApiValidatorFunc{validators.Height},
+			handler:    getAccount,
 		}}
 }
