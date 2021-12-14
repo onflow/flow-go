@@ -11,7 +11,7 @@ const blockIDQueryParam = "block_id"
 
 // getExecutionResultByID gets Execution Result payload by block IDs.
 func getExecutionResultsByBlockIDs(req *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	queryID := req.getQueryParam(blockIDQueryParam)
+	queryID := req.GetQueryParam(blockIDQueryParam)
 	if len(queryID) == 0 {
 		return nil, NewBadRequestError(fmt.Errorf("no blocks IDs specified"))
 	}

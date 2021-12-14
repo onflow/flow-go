@@ -9,8 +9,8 @@ import (
 
 // executeScript handler sends the script from the request to be executed.
 func executeScript(r *Request, backend access.API, _ LinkGenerator) (interface{}, error) {
-	blockID := r.getQueryParam("block_id")
-	blockHeight := r.getQueryParam("block_height")
+	blockID := r.GetQueryParam("block_id")
+	blockHeight := r.GetQueryParam("block_height")
 
 	// validate block ID and block height is provided
 	if blockID == "" && blockHeight == "" {

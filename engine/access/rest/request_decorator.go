@@ -55,16 +55,16 @@ func (rd *Request) selects() []string {
 	return rd.selectFields
 }
 
-func (rd *Request) getVar(name string) string {
+func (rd *Request) GetVar(name string) string {
 	vars := mux.Vars(rd.Request)
 	return vars[name] // todo(sideninja) consider returning err if non-existing
 }
 
-func (rd *Request) getQueryParam(name string) string {
+func (rd *Request) GetQueryParam(name string) string {
 	return rd.Request.URL.Query().Get(name) // todo(sideninja) consider returning err if non-existing
 }
 
-func (rd *Request) getQueryParams(name string) []string {
+func (rd *Request) GetQueryParams(name string) []string {
 	param := rd.Request.URL.Query().Get(name)
 	// currently, the swagger generated Go REST client is incorrectly doing a `fmt.Sprintf("%v", id)` for the id slice
 	// resulting in the client sending the ids in the format [id1 id2 id3...]. This is a temporary workaround to
@@ -133,9 +133,9 @@ func (rd *Request) bodyAs(dst interface{}) error {
 }
 
 func (rd *Request) ids() ([]flow.Identifier, error) {
-	return toIDs(rd.getVar("id"))
+	return toIDs(rd.GetVar("id"))
 }
 
 func (rd *Request) id() (flow.Identifier, error) {
-	return toID(rd.getVar("id"))
+	return toID(rd.GetVar("id"))
 }

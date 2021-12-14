@@ -9,14 +9,14 @@ const blockHeightQueryParam = "block_height"
 
 // getAccount handler retrieves account by address and returns the response
 func getAccount(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	address, err := toAddress(r.getVar("address"))
+	address, err := toAddress(r.GetVar("address"))
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
 	// retrieve account and decide based on provided query params which rpc method to envoke
 	var account *flow.Account
-	height := r.getQueryParam(blockHeightQueryParam)
+	height := r.GetQueryParam(blockHeightQueryParam)
 	switch height {
 	case sealedHeightQueryParam:
 		account, err = backend.GetAccountAtLatestBlock(r.Context(), address)

@@ -151,10 +151,13 @@ func routeDefinitions() []routeDefinition {
 		},
 		// Accounts
 		{
-			method:     http.MethodGet,
-			pattern:    "/accounts/{address}",
-			name:       getAccountRoute,
-			validators: []ApiValidatorFunc{validators.Height},
-			handler:    getAccount,
+			method:  http.MethodGet,
+			pattern: "/accounts/{address}",
+			name:    getAccountRoute,
+			validators: []ApiValidatorFunc{
+				validators.Height,
+				validators.Address,
+			},
+			handler: getAccount,
 		}}
 }

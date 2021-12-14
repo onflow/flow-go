@@ -45,9 +45,9 @@ func getBlocksByIDs(r *Request, backend access.API, link LinkGenerator) (interfa
 }
 
 func getBlocksByHeight(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	heights := r.getQueryParams(heightQueryParam)
-	startHeight := r.getQueryParam(startHeightQueryParam)
-	endHeight := r.getQueryParam(endHeightQueryParam)
+	heights := r.GetQueryParams(heightQueryParam)
+	startHeight := r.GetQueryParam(startHeightQueryParam)
+	endHeight := r.GetQueryParam(endHeightQueryParam)
 
 	// if both height and one or both of start and end height are provided
 	if len(heights) > 0 && (startHeight != "" || endHeight != "") {
