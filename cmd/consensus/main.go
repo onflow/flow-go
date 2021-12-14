@@ -564,7 +564,6 @@ func main() {
 				node.Logger,
 				mainMetrics,
 				node.Tracer,
-				node.Storage.Index,
 				node.RootChainID,
 			)
 
