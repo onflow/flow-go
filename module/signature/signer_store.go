@@ -40,15 +40,6 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 		return signer, nil
 	}
 
-	// TODO: to be enabled in V2
-	// 	privDKGData, hasBeaconKey, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
-	// 	if errors.Is(err, storage.ErrNotFound) {
-	// 		signer = NewThresholdProvider(encoding.RandomBeaconTag, nil)
-	// 	} else if err != nil {
-	// 		return nil, fmt.Errorf("could not retrieve DKG private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
-	// 	} else if !hasBeaconKey {
-	// 		return nil, fmt.Errorf("no random beacon private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
-
 	beaconPrivKey, safe, err := s.keys.RetrieveMyBeaconPrivateKey(epoch)
 	if err != nil {
 		// there are no expected errors here
@@ -72,6 +63,7 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+// TODO: to be removed in V2
 // SingleSignerStore implements the ThresholdSignerStore interface. It only
 // keeps one signer and is not epoch-aware. It is used only for the
 // bootstrapping process.

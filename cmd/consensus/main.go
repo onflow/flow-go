@@ -18,7 +18,6 @@ import (
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
-	"github.com/onflow/flow-go/consensus/hotstuff/blockproducer"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
@@ -26,7 +25,6 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
-	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -45,7 +43,6 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
-	builder "github.com/onflow/flow-go/module/builder/consensus"
 	chmodule "github.com/onflow/flow-go/module/chunks"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
@@ -552,7 +549,7 @@ func main() {
 			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
 			epochLookup := epochs.NewEpochLookup(node.State)
-			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, dkgKeyStore)
+			beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, safeBeaconKeys)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.Signer
@@ -644,136 +641,6 @@ func main() {
 				return fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 			return nil
-		}).
-		Component("hotstuff participant", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			// initialize the block builder
-			var build module.Builder
-			build, err = builder.NewBuilder(
-				node.Metrics.Mempool,
-				node.DB,
-				mutableState,
-				node.Storage.Headers,
-				node.Storage.Seals,
-				node.Storage.Index,
-				node.Storage.Blocks,
-				node.Storage.Results,
-				node.Storage.Receipts,
-				guarantees,
-				consensusMempools.NewIncorporatedResultSeals(seals, node.Storage.Receipts),
-				receipts,
-				node.Tracer,
-				builder.WithBlockTimer(blockTimer),
-				builder.WithMaxSealCount(maxSealPerBlock),
-				builder.WithMaxGuaranteeCount(maxGuaranteePerBlock),
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialized block builder: %w", err)
-			}
-
-			build = blockproducer.NewMetricsWrapper(build, mainMetrics) // wrapper for measuring time spent building block payload component
-
-			// initialize the block finalizer
-			finalize := finalizer.NewFinalizer(
-				node.DB,
-				node.Storage.Headers,
-				mutableState,
-				node.Tracer,
-				finalizer.WithCleanup(finalizer.CleanupMempools(
-					node.Metrics.Mempool,
-					conMetrics,
-					node.Storage.Payloads,
-					guarantees,
-					seals,
-				)),
-			)
-
-			// initialize the aggregating signature module for staking signatures
-			staking := signature.NewAggregationProvider(encoding.ConsensusVoteTag, node.Me)
-
-			// initialize the verifier used to verify threshold signatures
-			thresholdVerifier := signature.NewThresholdVerifier(encoding.RandomBeaconTag)
-
-			// initialize the simple merger to combine staking & beacon signatures
-			merger := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-
-			// initialize Main consensus committee's state
-			var committee hotstuff.Committee
-			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
-			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
-			}
-			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
-
-			epochLookup := epochs.NewEpochLookup(node.State)
-
-			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, safeBeaconKeys)
-
-			// initialize the combined signer for hotstuff
-			var signer hotstuff.SignerVerifier
-			signer = verification.NewCombinedSigner(
-				committee,
-				staking,
-				thresholdVerifier,
-				merger,
-				thresholdSignerStore,
-				node.NodeID,
-			)
-			signer = verification.NewMetricsWrapper(signer, mainMetrics) // wrapper for measuring time spent with crypto-related operations
-
-			// initialize a logging notifier for hotstuff
-			notifier := createNotifier(
-				node.Logger,
-				mainMetrics,
-				node.Tracer,
-				node.RootChainID,
-			)
-
-			notifier.AddConsumer(finalizationDistributor)
-
-			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
-
-			// query the last finalized block and pending blocks for recovery
-			finalized, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
-			if err != nil {
-				return nil, fmt.Errorf("could not find latest finalized block and pending blocks: %w", err)
-			}
-
-			opts := []consensus.Option{
-				consensus.WithInitialTimeout(hotstuffTimeout),
-				consensus.WithMinTimeout(hotstuffMinTimeout),
-				consensus.WithVoteAggregationTimeoutFraction(hotstuffTimeoutVoteAggregationFraction),
-				consensus.WithTimeoutIncreaseFactor(hotstuffTimeoutIncreaseFactor),
-				consensus.WithTimeoutDecreaseFactor(hotstuffTimeoutDecreaseFactor),
-				consensus.WithBlockRateDelay(blockRateDelay),
-			}
-
-			if !startupTime.IsZero() {
-				opts = append(opts, consensus.WithStartupTime(startupTime))
-			}
-
-			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
-			if err != nil {
-				return nil, err
-			}
-
-			// initialize hotstuff consensus algorithm
-			hot, err := consensus.NewParticipant(
-				node.Logger,
-				mainMetrics,
-				build,
-				comp,
-				finalizedBlock,
-				pending,
-				hotstuffModules,
-				opts...,
-			)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize hotstuff engine: %w", err)
-			}
-
-			comp = comp.WithConsensus(hot)
-			return comp, nil
 		}).
 		Component("finalized snapshot", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			finalizedHeader, err = synceng.NewFinalizedHeaderCache(node.Logger, node.State, finalizationDistributor)
