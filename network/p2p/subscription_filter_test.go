@@ -29,8 +29,20 @@ func TestFilterSubscribe(t *testing.T) {
 	identity2, privateKey2 := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleAccess))
 	ids := flow.IdentityList{identity1, identity2}
 
-	node1 := createNode(t, identity1.NodeID, privateKey1, sporkId, mockSubscriptionFilterPubsubOption(ids))
-	node2 := createNode(t, identity2.NodeID, privateKey2, sporkId, mockSubscriptionFilterPubsubOption(ids))
+	node1 := createNode(
+		t,
+		identity1.NodeID,
+		privateKey1,
+		sporkId,
+		withSubscriptionFilter(subscriptionFilter(identity1, ids)),
+	)
+	node2 := createNode(
+		t,
+		identity2.NodeID,
+		privateKey2,
+		sporkId,
+		withSubscriptionFilter(subscriptionFilter(identity2, ids)),
+	)
 
 	unstakedKey := unittest.NetworkingPrivKeyFixture()
 	unstakedNode := createNode(t, flow.ZeroID, unstakedKey, sporkId)
@@ -103,7 +115,13 @@ func TestCanSubscribe(t *testing.T) {
 	identity, privateKey := unittest.IdentityWithNetworkingKeyFixture(unittest.WithRole(flow.RoleCollection))
 	sporkId := unittest.IdentifierFixture()
 
-	collectionNode := createNode(t, identity.NodeID, privateKey, sporkId, mockSubscriptionFilterPubsubOption(flow.IdentityList{identity}))
+	collectionNode := createNode(
+		t,
+		identity.NodeID,
+		privateKey,
+		sporkId,
+		withSubscriptionFilter(subscriptionFilter(identity, flow.IdentityList{identity})),
+	)
 	defer func() {
 		done, err := collectionNode.Stop()
 		require.NoError(t, err)
@@ -133,9 +151,7 @@ func TestCanSubscribe(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func mockSubscriptionFilterPubsubOption(ids flow.IdentityList) PubsubOption {
+func subscriptionFilter(self *flow.Identity, ids flow.IdentityList) pubsub.SubscriptionFilter {
 	idProvider := id.NewFixedIdentityProvider(ids)
-	return func(_ context.Context, h host.Host) (pubsub.Option, error) {
-		return pubsub.WithSubscriptionFilter(NewRoleBasedFilter(h.ID(), idProvider)), nil
-	}
+	return NewRoleBasedFilter(self.Role, idProvider)
 }

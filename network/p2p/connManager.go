@@ -10,8 +10,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/network/p2p/keyutils"
 )
 
 // ConnManager provides an implementation of Libp2p's ConnManager interface (https://godoc.org/github.com/libp2p/go-libp2p-core/connmgr#ConnManager)
@@ -23,21 +21,11 @@ type ConnManager struct {
 	log                 zerolog.Logger        // logger to log connection, stream and other statistics about libp2p
 	metrics             module.NetworkMetrics // metrics to report connection statistics
 
-	idProvider id.IdentityProvider
-
 	plk       sync.RWMutex
 	protected map[peer.ID]map[string]struct{}
 }
 
-type ConnManagerOption func(*ConnManager)
-
-func TrackUnstakedConnections(idProvider id.IdentityProvider) ConnManagerOption {
-	return func(cm *ConnManager) {
-		cm.idProvider = idProvider
-	}
-}
-
-func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics, opts ...ConnManagerOption) *ConnManager {
+func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics) *ConnManager {
 	cn := &ConnManager{
 		log:         log,
 		NullConnMgr: connmgr.NullConnMgr{},
@@ -49,10 +37,6 @@ func NewConnManager(log zerolog.Logger, metrics module.NetworkMetrics, opts ...C
 		ConnectedF:    cn.Connected,
 		DisconnectedF: cn.Disconnected}
 	cn.n = n
-
-	for _, opt := range opts {
-		opt(cn)
-	}
 
 	return cn
 }
@@ -86,43 +70,20 @@ func (c *ConnManager) Disconnected(n network.Network, con network.Conn) {
 }
 
 func (c *ConnManager) updateConnectionMetric(n network.Network) {
-	var stakedInbound uint = 0
-	var stakedOutbound uint = 0
 	var totalInbound uint = 0
 	var totalOutbound uint = 0
 
-	stakedPeers := make(map[peer.ID]struct{})
-	if c.idProvider != nil {
-		for _, id := range c.idProvider.Identities(NotEjectedFilter) {
-			pid, err := keyutils.PeerIDFromFlowPublicKey(id.NetworkPubKey)
-			if err != nil {
-				c.log.Fatal().Err(err).Msg("failed to convert network public key of staked node to peer ID")
-			}
-			stakedPeers[pid] = struct{}{}
-		}
-	}
 	for _, conn := range n.Conns() {
-		_, isStaked := stakedPeers[conn.RemotePeer()]
 		switch conn.Stat().Direction {
 		case network.DirInbound:
 			totalInbound++
-			if isStaked {
-				stakedInbound++
-			}
 		case network.DirOutbound:
 			totalOutbound++
-			if isStaked {
-				stakedOutbound++
-			}
 		}
 	}
 
 	c.metrics.InboundConnections(totalInbound)
 	c.metrics.OutboundConnections(totalOutbound)
-	if c.idProvider != nil {
-		c.metrics.UnstakedInboundConnections(totalInbound - stakedInbound)
-		c.metrics.UnstakedOutboundConnections(totalOutbound - stakedOutbound)
-	}
 }
 
 func (c *ConnManager) logConnectionUpdate(n network.Network, con network.Conn, logMsg string) {

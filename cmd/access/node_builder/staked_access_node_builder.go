@@ -231,8 +231,8 @@ func (builder *StakedAccessNodeBuilder) enqueueUnstakedNetworkInit() {
 // 		Default Flow libp2p pubsub options
 func (builder *StakedAccessNodeBuilder) initLibP2PFactory(networkKey crypto.PrivateKey) p2p.LibP2PFactoryFunc {
 	return func(ctx context.Context) (*p2p.Node, error) {
-		connManager := p2p.NewConnManager(builder.Logger, builder.Metrics.Network, p2p.TrackUnstakedConnections(builder.IdentityProvider))
-		resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
+		connManager := p2p.NewConnManager(builder.Logger, builder.PublicNetworkConfig.Metrics)
+		resolver := dns.NewResolver(builder.PublicNetworkConfig.Metrics, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 
 		node, err := p2p.NewNodeBuilder(builder.Logger, builder.PublicNetworkConfig.BindAddress, networkKey, builder.SporkID).
 			SetBasicResolver(resolver).

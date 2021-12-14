@@ -8,7 +8,9 @@ import (
 	"time"
 
 	addrutil "github.com/libp2p/go-addr-util"
+	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
@@ -19,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network/mocknetwork"
-	"github.com/onflow/flow-go/network/p2p/dns"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -37,7 +38,6 @@ type nodeFixtureParameters struct {
 	unicasts    []unicast.ProtocolName
 	key         fcrypto.PrivateKey
 	address     string
-	allowList   bool
 	dhtEnabled  bool
 	dhtServer   bool
 }
@@ -47,12 +47,6 @@ type nodeFixtureParameterOption func(*nodeFixtureParameters)
 func withDefaultStreamHandler(handler network.StreamHandler) nodeFixtureParameterOption {
 	return func(p *nodeFixtureParameters) {
 		p.handlerFunc = handler
-	}
-}
-
-func withAllowListEnabled() nodeFixtureParameterOption {
-	return func(p *nodeFixtureParameters) {
-		p.allowList = true
 	}
 }
 
@@ -89,7 +83,6 @@ func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opt
 	// default parameters
 	parameters := &nodeFixtureParameters{
 		handlerFunc: func(network.Stream) {},
-		allowList:   false,
 		unicasts:    nil,
 		key:         generateNetworkingKey(t),
 		address:     defaultAddress,
@@ -105,30 +98,16 @@ func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opt
 		unittest.WithNetworkingKey(parameters.key.PublicKey()),
 		unittest.WithAddress(parameters.address))
 
-	pingInfoProvider, _, _, _ := mockPingInfoProvider()
-
-	// dns resolver
-	resolver := dns.NewResolver(metrics.NewNoopCollector())
-	unittest.RequireCloseBefore(t, resolver.Ready(), 10*time.Millisecond, "could not start resolver")
-
 	noopMetrics := metrics.NewNoopCollector()
 	connManager := NewConnManager(logger, noopMetrics)
 
-	builder := NewDefaultLibP2PNodeBuilder(identity.NodeID, parameters.address, parameters.key).
-		SetSporkID(sporkId).
-		SetConnectionManager(connManager).
-		SetPingInfoProvider(pingInfoProvider).
-		SetResolver(resolver).
-		SetTopicValidation(false).
-		SetLogger(logger)
-
-	if parameters.allowList {
-		connGater := NewConnGater(logger)
-		builder.SetConnectionGater(connGater)
-	}
+	builder := NewNodeBuilder(logger, parameters.address, parameters.key, sporkId).
+		SetConnectionManager(connManager)
 
 	if parameters.dhtEnabled {
-		builder.SetDHTOptions(AsServer(parameters.dhtServer))
+		builder.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
+			return NewDHT(c, h, unicast.FlowDHTProtocolIDPrefix+"test", AsServer(parameters.dhtServer))
+		})
 	}
 
 	n, err := builder.Build(ctx)
