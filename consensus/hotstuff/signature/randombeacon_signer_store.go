@@ -42,7 +42,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	}
 
 	// when DKG has completed,
-	// 1. if a node successfully generated the DKG key, the private key will be stored in database.
+	// 1. if a node successfully generated the DKG key, the valid private key will be stored in database.
 	// 2. if a node failed to generate the DKG key, we will save a record in database to indicate this
 	//       node has no private key for this epoch
 	// within the epoch, we can lookup my random beacon private key for the epoch. There are 3 cases:
@@ -69,7 +69,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	}
 
 	// if DKG failed, there will be no valid random beacon private key, since this fact
-	// never change, we can cache a nil signer for this epoch, so that we this function
+	// never change, we can cache a nil signer for this epoch, so that when this function
 	// is called again for the same epoch, we don't need to query database.
 	if !safe {
 		s.privateKeys[epoch] = nil
