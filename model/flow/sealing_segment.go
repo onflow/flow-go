@@ -54,6 +54,10 @@ type SealingSegment struct {
 	// execution results incorporated in blocks that aren't part of the segment.
 	ExecutionResults ExecutionResultList
 
+	// LatestSeals is a mapping from block ID to the ID of the latest seal
+	// incorporated as of that block.
+	LatestSeals map[Identifier]Identifier
+
 	// FirstSeal contains the latest seal as the first block in the segment,
 	// if the first block contains no seals. Otherwise it is empty.
 	FirstSeal *Seal
@@ -91,9 +95,10 @@ type SealingSegmentBuilder struct {
 	// keep track of resources included in payloads
 	includedResults map[Identifier]struct{}
 	// resources to include in the sealing segment
-	blocks    []*Block
-	results   []*ExecutionResult
-	firstSeal *Seal
+	blocks      []*Block
+	results     []*ExecutionResult
+	latestSeals map[Identifier]Identifier
+	firstSeal   *Seal
 }
 
 // AddBlock appends a block to the sealing segment under construction.
@@ -102,15 +107,16 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	if !builder.isValidHeight(block) {
 		return fmt.Errorf("invalid block height (%d): %w", block.Header.Height, ErrSegmentInvalidBlockHeight)
 	}
+	blockID := block.ID()
 
 	// construct a list of missing result IDs referenced by this block
 	missingResultIDs := make(map[Identifier]struct{})
 
-	// for the first (lowest) block, if it contains no seal, retrieve the latest
+	// for the first (lowest) block, if it contains no seal, store the latest
 	// seal incorporated prior to the first block
 	if len(builder.blocks) == 0 {
 		if len(block.Payload.Seals) == 0 {
-			seal, err := builder.sealByBLockIDLookup(block.ID())
+			seal, err := builder.sealByBLockIDLookup(blockID)
 			if err != nil {
 				return fmt.Errorf("%w: %v", ErrSegmentSealLookup, err)
 			}
@@ -120,7 +126,14 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 		}
 	}
 
-	// cache included results
+	// index the latest seal for this block
+	latestSeal, err := builder.sealByBLockIDLookup(blockID)
+	if err != nil {
+		return fmt.Errorf("%w: %v", ErrSegmentSealLookup, err)
+	}
+	builder.latestSeals[blockID] = latestSeal.ID()
+
+	// cache included results and seals
 	// they could be referenced in a future block in the segment
 	for _, result := range block.Payload.Results {
 		builder.includedResults[result.ID()] = struct{}{}
@@ -140,6 +153,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	// add the missing results
 	for resultID := range missingResultIDs {
 		result, err := builder.resultLookup(resultID)
+
 		if err != nil {
 			return fmt.Errorf("%w: (%x) %v", ErrSegmentResultLookup, resultID, err)
 		}
@@ -156,7 +170,8 @@ func (builder *SealingSegmentBuilder) addExecutionResult(result *ExecutionResult
 	builder.results = append(builder.results, result)
 }
 
-// SealingSegment will check if the highest block has a seal for the lowest block in the segment
+// SealingSegment completes building the sealing segment, validating the segment
+// constructed so far, and returning it as a SealingSegment if it is valid.
 func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) {
 	if err := builder.validateSegment(); err != nil {
 		return nil, fmt.Errorf("failed to validate sealing segment: %w", err)
@@ -165,6 +180,7 @@ func (builder *SealingSegmentBuilder) SealingSegment() (*SealingSegment, error) 
 	return &SealingSegment{
 		Blocks:           builder.blocks,
 		ExecutionResults: builder.results,
+		LatestSeals:      builder.latestSeals,
 		FirstSeal:        builder.firstSeal,
 	}, nil
 }
@@ -253,6 +269,7 @@ func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBl
 		resultLookup:        resultLookup,
 		sealByBLockIDLookup: sealLookup,
 		includedResults:     make(map[Identifier]struct{}),
+		latestSeals:         make(map[Identifier]Identifier),
 		blocks:              make([]*Block, 0),
 		results:             make(ExecutionResultList, 0),
 	}

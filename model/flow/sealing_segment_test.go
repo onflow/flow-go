@@ -34,6 +34,11 @@ func (suite *SealingSegmentSuite) addResult(result *flow.ExecutionResult) {
 	suite.results[result.ID()] = result
 }
 
+// addSeal adds the seal as being the latest w.r.t. the block ID.
+func (suite *SealingSegmentSuite) addSeal(blockID flow.Identifier, seal *flow.Seal) {
+	suite.sealsByBlockID[blockID] = seal
+}
+
 // GetResult gets a result by ID from the map in the suite.
 func (suite *SealingSegmentSuite) GetResult(resultID flow.Identifier) (*flow.ExecutionResult, error) {
 	result, ok := suite.results[resultID]
@@ -74,13 +79,20 @@ func (suite *SealingSegmentSuite) FirstBlock() *flow.Block {
 		unittest.WithSeals(suite.priorSeal),
 		unittest.WithReceipts(suite.priorReceipt),
 	))
+	suite.addSeal(block.ID(), suite.priorSeal)
 	return &block
 }
 
 // AddBlocks is a short-hand for adding a sequence of blocks, in order.
 // No errors are expected.
 func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.Block) {
+	latestSeal := suite.priorSeal
 	for _, block := range blocks {
+		// before adding block, ensure its latest seal is indexed in suite
+		for _, seal := range block.Payload.Seals {
+			latestSeal = seal
+		}
+		suite.addSeal(block.ID(), latestSeal)
 		err := suite.builder.AddBlock(block)
 		require.NoError(suite.T(), err)
 	}
@@ -312,12 +324,12 @@ func (suite *SealingSegmentSuite) TestAddBlock_InvalidHeight() {
 func TestAddBlock_StorageError(t *testing.T) {
 
 	t.Run("missing result", func(t *testing.T) {
-		// create a receipt to include in the first block, whose result is
-		// not in storage
+		// create a receipt to include in the first block, whose result is not in storage
 		missingReceipt := unittest.ExecutionReceiptFixture()
 		block1 := unittest.BlockFixture()
+		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return unittest.Seal.Fixture(), nil }
 		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return nil, fmt.Errorf("not found") }
-		builder := flow.NewSealingSegmentBuilder(resultLookup, nil)
+		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup)
 
 		block1.SetPayload(unittest.PayloadFixture(
 			unittest.WithReceiptsAndNoResults(missingReceipt),
@@ -330,10 +342,11 @@ func TestAddBlock_StorageError(t *testing.T) {
 
 	// create a first block which contains no seal, and the seal isn't in storage
 	t.Run("missing seal", func(t *testing.T) {
+		resultLookup := func(flow.Identifier) (*flow.ExecutionResult, error) { return unittest.ExecutionResultFixture(), nil }
 		sealLookup := func(flow.Identifier) (*flow.Seal, error) { return nil, fmt.Errorf("not found") }
 		block1 := unittest.BlockFixture()
 		block1.SetPayload(flow.EmptyPayload())
-		builder := flow.NewSealingSegmentBuilder(nil, sealLookup)
+		builder := flow.NewSealingSegmentBuilder(resultLookup, sealLookup)
 
 		err := builder.AddBlock(&block1)
 		require.ErrorIs(t, err, flow.ErrSegmentSealLookup)
