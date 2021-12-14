@@ -42,10 +42,15 @@ func TestCertificateGeneration(t *testing.T) {
 	// assert that the public key in the cert matches the test public key
 	require.True(t, expectedKey.Equals(pubKey))
 
-	// assert that the the cert is valid for at least an year starting from now
+	// assert that the cert is valid for at least an year starting from now
 	now := time.Now()
 	require.True(t, now.After(cert.NotBefore))
 	require.True(t, cert.NotAfter.After(now.Add(year)))
+
+	// assert that the cert's subject and issuer fields are set and match (self-signed)
+	require.NotEmpty(t, cert.Subject)
+	require.NotEmpty(t, cert.Issuer)
+	require.Equal(t, cert.Subject, cert.Issuer)
 }
 
 // TestPeerCertificateVerification tests that the verifyPeerCertificate function correctly verifies a server cert

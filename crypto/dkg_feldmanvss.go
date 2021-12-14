@@ -93,19 +93,23 @@ func (s *feldmanVSSstate) Start(seed []byte) error {
 	return nil
 }
 
-// End ends the protocol in the current participant
-// It returns the finalized public data and participant private key share.
+// End ends the protocol in the current node.
+// It returns the finalized public data and participants private key share.
 // - the group public key corresponding to the group secret key
 // - all the public key shares corresponding to the participants private
 // key shares.
 // - the finalized private key which is the current participant's own private key share
+// - the returned erorr is :
+//    - dkgFailureError if the private key and vector are inconsistent.
+//    - other error if Start() was not called.
+//    - nil otherwise.
 func (s *feldmanVSSstate) End() (PrivateKey, PublicKey, []PublicKey, error) {
 	if !s.running {
 		return nil, nil, nil, errors.New("dkg is not running")
 	}
 	s.running = false
 	if !s.validKey {
-		return nil, nil, nil, errors.New("keys are not correct")
+		return nil, nil, nil, dkgFailureErrorf("received private key is invalid")
 	}
 	// private key of the current participant
 	x := newPrKeyBLSBLS12381(&s.x)

@@ -4,6 +4,7 @@ package signature
 
 import (
 	"crypto/rand"
+	"fmt"
 	mrand "math/rand"
 	"sort"
 	"testing"
@@ -14,6 +15,8 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/local"
 )
 
 func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregatorSameMessage, []crypto.Signature) {
@@ -36,6 +39,58 @@ func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregato
 		sig, err := sk.Sign(msg, hasher)
 		require.NoError(t, err)
 		sigs = append(sigs, sig)
+	}
+	aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, keys)
+	require.NoError(t, err)
+	return aggregator, sigs
+}
+
+func createAggregationT(t *testing.T) (*AggregationProvider, crypto.PrivateKey) {
+	agg, priv, err := createAggregation()
+	require.NoError(t, err)
+	return agg, priv
+}
+
+func createAggregationB(b *testing.B) (*AggregationProvider, crypto.PrivateKey) {
+	agg, priv, err := createAggregation()
+	if err != nil {
+		b.Fatal(err)
+	}
+	return agg, priv
+}
+
+// can't use the unittest.IdentityFixture due to circular import
+func IdentityFixture() *flow.Identity {
+	var id flow.Identifier
+	_, _ = rand.Read(id[:])
+	return &flow.Identity{
+		NodeID:  id,
+		Address: fmt.Sprintf("address-%v", id[0:7]),
+		Role:    flow.RoleConsensus,
+		Stake:   1000,
+	}
+}
+
+func createAggregation() (*AggregationProvider, crypto.PrivateKey, error) {
+	seed := make([]byte, crypto.KeyGenSeedMinLenBLSBLS12381)
+	n, err := rand.Read(seed)
+	if err != nil {
+		return nil, nil, err
+	}
+	if n < len(seed) {
+		return nil, nil, fmt.Errorf("insufficient random bytes")
+	}
+	priv, err := crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	node := IdentityFixture()
+	node.StakingPubKey = priv.PublicKey()
+
+	local, err := local.New(node, priv)
+	if err != nil {
+		return nil, nil, err
 	}
 	aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, keys)
 	require.NoError(t, err)

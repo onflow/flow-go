@@ -14,6 +14,7 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestWithEmulator(t *testing.T) {
@@ -147,11 +148,11 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	signatures := []crypto.Signature{}
 	indices := []uint{}
 	for i, n := range nodes {
-		priv, hasDKGKey, err := n.keyStorage.RetrieveMyDKGPrivateInfo(nextEpochSetup.Counter)
+		priv, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
 		require.NoError(s.T(), err)
 		require.True(s.T(), hasDKGKey)
 
-		signer := signature.NewThresholdProvider("TAG", priv.RandomBeaconPrivKey.PrivateKey)
+		signer := signature.NewThresholdProvider("TAG", priv)
 		signers = append(signers, signer)
 
 		signature, err := signer.Sign(sigData)
@@ -202,6 +203,6 @@ func (s *DKGSuite) TestNodesDown() {
 // between consensus node and access node, as well as connection issues between
 // access node and execution node, or the execution node being down).
 func (s *DKGSuite) TestEmulatorProblems() {
-	s.T().Skip("flaky test - quarantined")
+	unittest.SkipUnless(s.T(), unittest.TEST_FLAKY, "flaky test")
 	s.runTest(numberOfNodes, true)
 }

@@ -36,6 +36,8 @@ export COMMIT_DATE=$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)
 make crypto/relic/build
 
 export JSON_OUTPUT=true
+export TEST_FLAKY=true
+export TEST_LONG_RUNNING=true
 
 # run tests and process results
 if [[ $TEST_CATEGORY =~ integration-(common|network|epochs|access|collection|consensus|execution|verification)$ ]]
