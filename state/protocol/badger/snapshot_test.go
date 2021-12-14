@@ -251,9 +251,8 @@ func TestSealingSegment(t *testing.T) {
 			actual, err := state.AtBlockID(head.ID()).SealingSegment()
 			require.NoError(t, err)
 
-			assert.Len(t, actual.ExecutionResults, 0)
+			assert.Len(t, actual.ExecutionResults, 1)
 			assert.Len(t, actual.Blocks, 1)
-			assert.Equal(t, len(expected.Blocks), len(actual.Blocks))
 			unittest.AssertEqualBlocksLenAndOrder(t, expected.Blocks, actual.Blocks)
 		})
 	})
@@ -281,7 +280,7 @@ func TestSealingSegment(t *testing.T) {
 			// sealing segment should contain B1 and B2
 			// B2 is reference of snapshot, B1 is latest sealed
 			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1, block2}, segment.Blocks)
-			assert.Len(t, segment.ExecutionResults, 0)
+			assert.Len(t, segment.ExecutionResults, 1)
 		})
 	})
 
@@ -316,7 +315,7 @@ func TestSealingSegment(t *testing.T) {
 			segment, err := state.AtBlockID(blockN.ID()).SealingSegment()
 			require.NoError(t, err)
 
-			assert.Len(t, segment.ExecutionResults, 0)
+			assert.Len(t, segment.ExecutionResults, 1)
 			// sealing segment should cover range [B1, BN]
 			assert.Len(t, segment.Blocks, 102)
 			// first and last blocks should be B1, BN
@@ -369,13 +368,13 @@ func TestSealingSegment(t *testing.T) {
 			require.Len(t, segment.Blocks, 5)
 			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5, block6}, segment.Blocks)
 
-			require.Len(t, segment.ExecutionResults, 0)
+			require.Len(t, segment.ExecutionResults, 1)
 		})
 	})
 
 	// test sealing segment where you have a chain that is 5 blocks long and the block 5 has a seal for block 2
 	// block 2 also contains a receipt but no result.
-	// root -> B1[Result_A, Receipt_A_1] -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3(Receipt_C, Result_C) -> B4 -> B5 (Seal_C)
+	// ROOT -> B1(Result_A, Receipt_A_1) -> B2(Result_B, Receipt_B, Receipt_A_2) -> B3(Receipt_C, Result_C) -> B4 -> B5(Seal_C)
 	// the segment for B5 should be `[B2,B3,B4,B5] + [Result_A]`
 	t.Run("sealing segment with 4 blocks and 1 execution result decoupled", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
@@ -420,15 +419,14 @@ func TestSealingSegment(t *testing.T) {
 
 			require.Len(t, segment.Blocks, 4)
 			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
-			_, found := segment.ExecutionResults.Lookup()[resultA.ID()]
-			require.True(t, found)
-			require.Len(t, segment.ExecutionResults, 1)
+			require.Contains(t, segment.ExecutionResults, resultA)
+			require.Len(t, segment.ExecutionResults, 2)
 		})
 	})
 
 	// test sealing segment where you have a chain that is 5 blocks long and the block 5 has a seal for block 2.
 	// even though block2 & block3 both reference ResultA it should be added to the segment execution results list once.
-	// block3 also references ResultB so it should exists in the segment execution results as well.
+	// block3 also references ResultB, so it should exist in the segment execution results as well.
 	// root -> B1[Result_A, Receipt_A_1] -> B2[Result_B, Receipt_B, Receipt_A_2] -> B3[Receipt_B_2, Receipt_for_seal, Receipt_A_3] -> B4 -> B5 (Seal_B2)
 	t.Run("sealing segment with 4 blocks and 2 execution result decoupled", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
@@ -481,12 +479,9 @@ func TestSealingSegment(t *testing.T) {
 
 			require.Len(t, segment.Blocks, 4)
 			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block2, block3, block4, block5}, segment.Blocks)
-
-			_, found := segment.ExecutionResults.Lookup()[resultA.ID()]
-			require.True(t, found)
-
+			require.Contains(t, segment.ExecutionResults, resultA)
 			// ResultA should only be added once even though it is referenced in 2 different blocks
-			require.Len(t, segment.ExecutionResults, 1)
+			require.Len(t, segment.ExecutionResults, 2)
 		})
 	})
 
@@ -524,11 +519,9 @@ func TestSealingSegment(t *testing.T) {
 			// sealing segment should contain B1 and B2
 			// B2 is reference of snapshot, B1 is latest sealed
 			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1, block2, block3, block4, block5}, segment.Blocks)
-			assert.Len(t, segment.ExecutionResults, 0)
-
+			assert.Len(t, segment.ExecutionResults, 1)
 		})
 	})
-
 }
 
 func TestLatestSealedResult(t *testing.T) {
