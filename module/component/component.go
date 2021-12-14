@@ -165,6 +165,7 @@ func (c *componentManagerBuilderImpl) Build() *ComponentManager {
 		started:        atomic.NewBool(false),
 		ready:          make(chan struct{}),
 		done:           make(chan struct{}),
+		workersDone:    make(chan struct{}),
 		shutdownSignal: make(chan struct{}),
 		workers:        c.workers,
 	}
@@ -187,6 +188,7 @@ type ComponentManager struct {
 	started        *atomic.Bool
 	ready          chan struct{}
 	done           chan struct{}
+	workersDone    chan struct{}
 	shutdownSignal chan struct{}
 
 	workers []ComponentWorker
@@ -203,15 +205,22 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 
 	ctx, cancel := context.WithCancel(parent)
 	signalerCtx, errChan := irrecoverable.WithSignaler(ctx)
-	go func() {
-		<-ctx.Done()
-		close(c.shutdownSignal)
-	}()
+
+	go c.waitForShutdownSignal(ctx.Done())
 
 	// launch goroutine to propagate irrecoverable error
 	go func() {
-		// wait until the done channel is closed or an irrecoverable error is encountered
-		if err := util.WaitError(errChan, c.done); err != nil {
+		// Closing the done channel here guarantees that any irrecoverable errors encountered will
+		// be propagated to the parent first. Otherwise, there's a race condition between when this
+		// goroutine and the parent's are scheduled. If the parent is scheduled first, any errors
+		// thrown within workers would not have propagated, and it would only receive the done signal
+		defer func() {
+			<-c.workersDone
+			close(c.done)
+		}()
+
+		// wait until the workersDone channel is closed or an irrecoverable error is encountered
+		if err := util.WaitError(errChan, c.workersDone); err != nil {
 			cancel() // shutdown all workers
 
 			// propagate the error directly to the parent because a failure in a worker routine
@@ -229,26 +238,26 @@ func (c *ComponentManager) Start(parent irrecoverable.SignalerContext) {
 	for _, worker := range c.workers {
 		worker := worker
 		go func() {
+			defer workersDone.Done()
 			var readyOnce sync.Once
 			worker(signalerCtx, func() {
 				readyOnce.Do(func() {
 					workersReady.Done()
 				})
 			})
-			// This must be called last. It can't be called in a defer statement because thrown
-			// irrecoverable errors cause an os.Goexit to be called, which will call all defers.
-			// This creates a race condition where this component manager could be marked done
-			// before it propagates the fatal error to the parent. The parent would then see the
-			// done signal first resulting in unsafe continuation.
-			workersDone.Done()
 		}()
 	}
 
 	// launch goroutine to close ready channel
 	go c.waitForReady(&workersReady)
 
-	// launch goroutine to close done channel
+	// launch goroutine to close workersDone channel
 	go c.waitForDone(&workersDone)
+}
+
+func (c *ComponentManager) waitForShutdownSignal(shutdownSignal <-chan struct{}) {
+	<-shutdownSignal
+	close(c.shutdownSignal)
 }
 
 func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
@@ -258,7 +267,7 @@ func (c *ComponentManager) waitForReady(workersReady *sync.WaitGroup) {
 
 func (c *ComponentManager) waitForDone(workersDone *sync.WaitGroup) {
 	workersDone.Wait()
-	close(c.done)
+	close(c.workersDone)
 }
 
 // Ready returns a channel which is closed once all the worker routines have been launched and are ready.
@@ -268,7 +277,7 @@ func (c *ComponentManager) Ready() <-chan struct{} {
 }
 
 // Done returns a channel which is closed once the ComponentManager has shut down.
-// This happens when all worker routines have shut down (either gracefully or by throwing an error).
+// This happens after all worker routines have shut down (either gracefully or by throwing an error).
 func (c *ComponentManager) Done() <-chan struct{} {
 	return c.done
 }
