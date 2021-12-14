@@ -171,7 +171,6 @@ func (suite *Suite) AssertEpochStarted(counter uint64) {
 func (suite *Suite) AssertEpochStopped(counter uint64) {
 	components, ok := suite.components[counter]
 	suite.Assert().True(ok, "asserting nonexistent epoch stopped", counter)
-	components.hotstuff.AssertCalled(suite.T(), "Done")
 	components.prop.AssertCalled(suite.T(), "Done")
 	components.sync.AssertCalled(suite.T(), "Done")
 }

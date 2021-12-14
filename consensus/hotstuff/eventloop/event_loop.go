@@ -33,7 +33,7 @@ var _ component.Component = (*EventLoop)(nil)
 // NewEventLoop creates an instance of EventLoop.
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
-	quorumCertificates := make(chan *flow.QuorumCertificate)
+	quorumCertificates := make(chan *flow.QuorumCertificate, 1)
 
 	el := &EventLoop{
 		log:                log,

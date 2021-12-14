@@ -8,9 +8,11 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/testutil"
 	testmock "github.com/onflow/flow-go/engine/testutil/mock"
+	model "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -52,9 +54,27 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		conf: conf,
 	}
 
-	tc.sentTransactions = make(map[uint64]map[uint]flow.IdentifierList)
-	collectors := unittest.IdentityListFixture(int(tc.conf.collectors), unittest.WithRole(flow.RoleCollection), unittest.WithRandomPublicKeys())
+	nodeInfos := unittest.PrivateNodeInfosFixture(int(conf.collectors), unittest.WithRole(flow.RoleCollection))
+	collectors := model.ToIdentityList(nodeInfos)
 	tc.identities = unittest.CompleteIdentitySet(collectors...)
+	assignment := unittest.ClusterAssignment(tc.conf.clusters, collectors)
+	clusters, err := flow.NewClusterList(assignment, collectors)
+	require.NoError(t, err)
+	rootClusterBlocks := run.GenerateRootClusterBlocks(1, clusters)
+	rootClusterQCs := make([]flow.ClusterQCVoteData, len(rootClusterBlocks))
+	for i, cluster := range clusters {
+		signers := make([]model.NodeInfo, 0)
+		for _, identity := range nodeInfos {
+			if _, inCluster := cluster.ByNodeID(identity.NodeID); inCluster {
+				signers = append(signers, identity)
+			}
+		}
+		qc, err := run.GenerateClusterRootQC(signers, rootClusterBlocks[i])
+		require.NoError(t, err)
+		rootClusterQCs[i] = flow.ClusterQCVoteDataFromQC(qc)
+	}
+
+	tc.sentTransactions = make(map[uint64]map[uint]flow.IdentifierList)
 	tc.hub = stub.NewNetworkHub()
 
 	// create a root snapshot with the given number of initial clusters
@@ -62,11 +82,13 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	encodable := root.Encodable()
 	setup := encodable.LatestResult.ServiceEvents[0].Event.(*flow.EpochSetup)
 	setup.Assignments = unittest.ClusterAssignment(tc.conf.clusters, tc.identities)
+	commit := encodable.LatestResult.ServiceEvents[1].Event.(*flow.EpochCommit)
+	commit.ClusterQCs = rootClusterQCs
 	encodable.LatestSeal.ResultID = encodable.LatestResult.ID()
 	tc.root = root
 
 	// create a mock node for each collector identity
-	for _, collector := range collectors {
+	for _, collector := range nodeInfos {
 		node := testutil.CollectionNode(tc.T(), tc.hub, collector, tc.root)
 		tc.nodes = append(tc.nodes, node)
 	}
@@ -79,7 +101,7 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 		tc.root,
 	)
 	tc.sn = new(mocknetwork.Engine)
-	_, err := consensus.Net.Register(engine.ReceiveGuarantees, tc.sn)
+	_, err = consensus.Net.Register(engine.ReceiveGuarantees, tc.sn)
 	require.NoError(tc.T(), err)
 
 	// create an epoch builder hooked to each collector's protocol state

@@ -68,7 +68,7 @@ func NewEpochComponents(
 		// signal that startup has finished and we are ready to go
 		ready()
 		// wait until parent context is cancelled and component stops
-		<-util.AllDone(components.hotstuff, components.aggregator)
+		<-util.AllDone(components.aggregator)
 		// once startable components are stopped we can stop our engines that don't support module.Startable
 		<-util.AllDone(components.prop, components.sync)
 	})
