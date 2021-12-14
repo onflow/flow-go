@@ -56,6 +56,8 @@ func TestUint(t *testing.T) {
 
 // Simple unit testing of SubPermutation using a very basic randomness test.
 // It doesn't evaluate randomness of the output and doesn't perform advanced statistical tests.
+//
+// SubPermutation tests cover Permutation as well.
 func TestSubPermutation(t *testing.T) {
 
 	seed := make([]byte, Chacha20SeedLen)
@@ -123,6 +125,20 @@ func TestSubPermutation(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, len(res) == 0)
 	})
+
+	t.Run("negative inputs", func(t *testing.T) {
+		res, err := rng.Permutation(-3)
+		require.Error(t, err)
+		assert.Nil(t, res)
+
+		res, err = rng.SubPermutation(5, -3)
+		require.Error(t, err)
+		assert.Nil(t, res)
+
+		res, err = rng.SubPermutation(-3, 5)
+		require.Error(t, err)
+		assert.Nil(t, res)
+	})
 }
 
 // Simple unit testing of Shuffle using a very basic randomness test.
@@ -181,6 +197,14 @@ func TestShuffle(t *testing.T) {
 		})
 		require.NoError(t, err)
 		assert.True(t, len(emptySlice) == 0)
+	})
+
+	t.Run("negative inputs", func(t *testing.T) {
+		emptySlice := make([]float64, 5)
+		err = rng.Shuffle(-3, func(i, j int) {
+			emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
+		})
+		require.Error(t, err)
 	})
 }
 
@@ -258,6 +282,19 @@ func TestSamples(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, constant, fullSlice)
 	})
+
+	t.Run("negative inputs", func(t *testing.T) {
+		emptySlice := make([]float64, 5)
+		err = rng.Samples(-3, 5, func(i, j int) {
+			emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
+		})
+		require.Error(t, err)
+
+		err = rng.Samples(-5, 3, func(i, j int) {
+			emptySlice[i], emptySlice[j] = emptySlice[j], emptySlice[i]
+		})
+		require.Error(t, err)
+	})
 }
 
 // TestStateRestore tests the serilaization and deserialization functions
@@ -308,4 +345,3 @@ func TestChacha20Constants(t *testing.T) {
 }
 
 // TODO: add test vectors
-// TODO: add test for negative inputs
