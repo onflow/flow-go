@@ -57,6 +57,18 @@ func TestChacha20Compliance(t *testing.T) {
 		assert.Equal(t, plaintext, ciphertext)
 
 	})
+
+	t.Run("invalid constructor inputs", func(t *testing.T) {
+		seed := make([]byte, Chacha20SeedLen+1)
+		customizer := make([]byte, Chacha20CustomizerMaxLen+1)
+
+		// long seed
+		_, err := NewChacha20PRG(seed, customizer[:Chacha20CustomizerMaxLen])
+		assert.Error(t, err)
+		// long nonce
+		_, err = NewChacha20PRG(seed[:Chacha20SeedLen], customizer)
+		assert.Error(t, err)
+	})
 }
 
 // The tests are targeting the PRG implementations in the package.
