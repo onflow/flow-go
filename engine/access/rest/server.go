@@ -77,6 +77,7 @@ type routeDefinition struct {
 	name           string
 	method         string
 	pattern        string
+	validators     []ApiValidatorFunc
 	apiHandlerFunc ApiHandlerFunc
 }
 

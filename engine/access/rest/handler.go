@@ -16,10 +16,12 @@ import (
 // ApiHandlerFunc is a function that contains endpoint handling logic,
 // it fetches necessary resources and returns an error or response model.
 type ApiHandlerFunc func(
-	r *request,
+	r *Request,
 	backend access.API,
 	generator LinkGenerator,
 ) (interface{}, error)
+
+type ApiValidatorFunc func(r *Request) error
 
 // Handler is custom http handler implementing custom handler function.
 // Handler function allows easier handling of errors and responses as it
@@ -145,7 +147,7 @@ func (h *Handler) errorResponse(
 
 // NotImplemented handler returns an error explaining the endpoint is not yet implemented
 func NotImplemented(
-	_ *request,
+	_ *Request,
 	_ access.API,
 	_ LinkGenerator,
 ) (interface{}, StatusError) {

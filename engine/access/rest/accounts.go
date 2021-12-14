@@ -8,7 +8,7 @@ import (
 const blockHeightQueryParam = "block_height"
 
 // getAccount handler retrieves account by address and returns the response
-func getAccount(r *request, backend access.API, link LinkGenerator) (interface{}, error) {
+func getAccount(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	address, err := toAddress(r.getVar("address"))
 	if err != nil {
 		return nil, NewBadRequestError(err)

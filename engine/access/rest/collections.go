@@ -8,7 +8,7 @@ import (
 const transactionsExpandable = "transactions"
 
 // getCollectionByID retrieves a collection by ID and builds a response
-func getCollectionByID(r *request, backend access.API, link LinkGenerator) (interface{}, error) {
+func getCollectionByID(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := r.id()
 	if err != nil {
 		return nil, NewBadRequestError(err)

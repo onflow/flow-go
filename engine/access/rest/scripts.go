@@ -8,7 +8,7 @@ import (
 )
 
 // executeScript handler sends the script from the request to be executed.
-func executeScript(r *request, backend access.API, _ LinkGenerator) (interface{}, error) {
+func executeScript(r *Request, backend access.API, _ LinkGenerator) (interface{}, error) {
 	blockID := r.getQueryParam("block_id")
 	blockHeight := r.getQueryParam("block_height")
 

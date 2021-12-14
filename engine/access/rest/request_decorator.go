@@ -15,7 +15,7 @@ import (
 )
 
 // a convenience wrapper around the http request to make it easy to read request query params
-type request struct {
+type Request struct {
 	*http.Request
 	expandFields map[string]bool
 	selectFields []string
@@ -23,8 +23,8 @@ type request struct {
 
 // decorateRequest takes http request and applies functions to produce our custom
 // request object decorated with values we need
-func decorateRequest(r *http.Request) *request {
-	decoratedReq := &request{
+func decorateRequest(r *http.Request) *Request {
+	decoratedReq := &Request{
 		Request: r,
 	}
 
@@ -47,24 +47,24 @@ func sliceToMap(values []string) map[string]bool {
 	return valueMap
 }
 
-func (rd *request) expands(field string) bool {
+func (rd *Request) expands(field string) bool {
 	return rd.expandFields[field]
 }
 
-func (rd *request) selects() []string {
+func (rd *Request) selects() []string {
 	return rd.selectFields
 }
 
-func (rd *request) getVar(name string) string {
+func (rd *Request) getVar(name string) string {
 	vars := mux.Vars(rd.Request)
 	return vars[name] // todo(sideninja) consider returning err if non-existing
 }
 
-func (rd *request) getQueryParam(name string) string {
+func (rd *Request) getQueryParam(name string) string {
 	return rd.Request.URL.Query().Get(name) // todo(sideninja) consider returning err if non-existing
 }
 
-func (rd *request) getQueryParams(name string) []string {
+func (rd *Request) getQueryParams(name string) []string {
 	param := rd.Request.URL.Query().Get(name)
 	// currently, the swagger generated Go REST client is incorrectly doing a `fmt.Sprintf("%v", id)` for the id slice
 	// resulting in the client sending the ids in the format [id1 id2 id3...]. This is a temporary workaround to
@@ -81,7 +81,7 @@ func (rd *request) getQueryParams(name string) []string {
 	return strings.Fields(param)
 }
 
-func (rd *request) bodyAs(dst interface{}) error {
+func (rd *Request) bodyAs(dst interface{}) error {
 	//todo(sideninja) validate size
 
 	dec := json.NewDecoder(rd.Body)
@@ -132,10 +132,10 @@ func (rd *request) bodyAs(dst interface{}) error {
 	return nil
 }
 
-func (rd *request) ids() ([]flow.Identifier, error) {
+func (rd *Request) ids() ([]flow.Identifier, error) {
 	return toIDs(rd.getVar("id"))
 }
 
-func (rd *request) id() (flow.Identifier, error) {
+func (rd *Request) id() (flow.Identifier, error) {
 	return toID(rd.getVar("id"))
 }

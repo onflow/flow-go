@@ -10,7 +10,7 @@ import (
 const blockIDQueryParam = "block_id"
 
 // getExecutionResultByID gets Execution Result payload by block IDs.
-func getExecutionResultsByBlockIDs(req *request, backend access.API, link LinkGenerator) (interface{}, error) {
+func getExecutionResultsByBlockIDs(req *Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	queryID := req.getQueryParam(blockIDQueryParam)
 	if len(queryID) == 0 {
 		return nil, NewBadRequestError(fmt.Errorf("no blocks IDs specified"))
@@ -38,7 +38,7 @@ func getExecutionResultsByBlockIDs(req *request, backend access.API, link LinkGe
 }
 
 // getExecutionResultByID gets execution result by the ID.
-func getExecutionResultByID(req *request, backend access.API, link LinkGenerator) (interface{}, error) {
+func getExecutionResultByID(req *Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	id, err := req.id()
 	if err != nil {
 		return nil, err
