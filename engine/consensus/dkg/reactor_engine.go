@@ -263,16 +263,6 @@ func (e *ReactorEngine) handleEpochCommittedPhaseStarted(currentEpochCounter uin
 		return
 	}
 
-	// TODO: to be enabled
-	// dkgPrivInfo, hasDKGKey, err := e.keyStorage.RetrieveMyDKGPrivateInfo(currentEpochCounter + 1)
-	// if err != nil {
-	// 	e.log.Err(err).Msgf("checking DKG key consistency: could not retrieve DKG private info for next epoch: %v", currentEpochCounter+1)
-	// 	return
-	// }
-	//
-	// if !hasDKGKey {
-	// 	e.log.Err(err).Msgf("checking DKG key consistency: no DKG private info for next epoch: %v", currentEpochCounter+1)
-
 	// Since epoch phase transitions are emitted when the first block of the new
 	// phase is finalized, the block's snapshot is guaranteed to already be
 	// accessible in the protocol state at this point (even though the Badger
