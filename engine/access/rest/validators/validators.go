@@ -24,3 +24,6 @@ func Address(r *rest.Request) error {
 
 	return nil
 }
+
+// explicit group validator would allow you to make sure only one of possible group is provided in request
+// func ExplicitGroup([]string{"ids"}, []string{"start_height", "end_height"}
