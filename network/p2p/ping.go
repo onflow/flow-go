@@ -151,14 +151,36 @@ func (ps *PingService) PingHandler(s network.Stream) {
 }
 
 // Ping sends a Ping request to the remote node and returns the response, rtt and error if any.
-func (ps *PingService) Ping(ctx context.Context, p peer.ID) (message.PingResponse, time.Duration, error) {
+func (ps *PingService) Ping(ctx context.Context, peerID peer.ID) (message.PingResponse, time.Duration, error) {
+	pingError := func(err error) error {
+		return fmt.Errorf("failed to ping peer %s: %w", peerID, err)
+	}
+
+	targetInfo := peer.AddrInfo{ID: peerID}
+
+	ps.host.ConnManager().Protect(targetInfo.ID, "ping")
+	defer ps.host.ConnManager().Unprotect(targetInfo.ID, "ping")
+
+	// connect to the target node
+	err := ps.host.Connect(ctx, targetInfo)
+	if err != nil {
+		return message.PingResponse{}, -1, pingError(err)
+	}
+
+	// ping the target
+	resp, rtt, err := ps.ping(ctx, targetInfo.ID)
+	if err != nil {
+		return message.PingResponse{}, -1, pingError(err)
+	}
+
+	return resp, rtt, nil
+}
+
+func (ps *PingService) ping(ctx context.Context, p peer.ID) (message.PingResponse, time.Duration, error) {
 
 	// create a done channel to indicate Ping request-response is done or an error has occurred
 	done := make(chan error, 1)
 	defer close(done)
-
-	timer := time.NewTimer(PingTimeout)
-	defer timer.Stop()
 
 	// create a new stream to the remote node
 	s, err := ps.host.NewStream(ctx, p, ps.pingProtocolID)
@@ -170,7 +192,7 @@ func (ps *PingService) Ping(ctx context.Context, p peer.ID) (message.PingRespons
 	go func() {
 		log := streamLogger(ps.logger, s)
 		select {
-		case <-timer.C:
+		case <-ctx.Done():
 			// time expired without a response, log an error and reset the stream
 			log.Error().Msg("context timed out on ping to remote node")
 			// reset the stream (to cause an error on the remote side as well)

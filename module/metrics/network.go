@@ -16,128 +16,148 @@ const (
 )
 
 type NetworkCollector struct {
-	outboundMessageSize             *prometheus.HistogramVec
-	inboundMessageSize              *prometheus.HistogramVec
-	duplicateMessagesDropped        *prometheus.CounterVec
-	queueSize                       *prometheus.GaugeVec
-	queueDuration                   *prometheus.HistogramVec
-	inboundProcessTime              *prometheus.CounterVec
-	outboundConnectionCount         prometheus.Gauge
-	inboundConnectionCount          prometheus.Gauge
-	dnsLookupDuration               prometheus.Histogram
-	dnsCacheMissCount               prometheus.Counter
-	dnsCacheHitCount                prometheus.Counter
-	dnsCacheInvalidationCount       prometheus.Counter
-	unstakedOutboundConnectionCount prometheus.Gauge
-	unstakedInboundConnectionCount  prometheus.Gauge
+	outboundMessageSize       *prometheus.HistogramVec
+	inboundMessageSize        *prometheus.HistogramVec
+	duplicateMessagesDropped  *prometheus.CounterVec
+	queueSize                 *prometheus.GaugeVec
+	queueDuration             *prometheus.HistogramVec
+	inboundProcessTime        *prometheus.CounterVec
+	outboundConnectionCount   prometheus.Gauge
+	inboundConnectionCount    prometheus.Gauge
+	dnsLookupDuration         prometheus.Histogram
+	dnsCacheMissCount         prometheus.Counter
+	dnsCacheHitCount          prometheus.Counter
+	dnsCacheInvalidationCount prometheus.Counter
+
+	prefix string
 }
 
-func NewNetworkCollector() *NetworkCollector {
+type NetworkCollectorOpt func(*NetworkCollector)
 
-	nc := &NetworkCollector{
+func WithNetworkPrefix(prefix string) NetworkCollectorOpt {
+	return func(nc *NetworkCollector) {
+		nc.prefix = prefix
+	}
+}
 
-		outboundMessageSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
+func NewNetworkCollector(opts ...NetworkCollectorOpt) *NetworkCollector {
+	nc := &NetworkCollector{}
+
+	for _, opt := range opts {
+		opt(nc)
+	}
+
+	nc.outboundMessageSize = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "outbound_message_size_bytes",
+			Name:      nc.prefix + "outbound_message_size_bytes",
 			Help:      "size of the outbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage}),
+		}, []string{LabelChannel, LabelMessage},
+	)
 
-		inboundMessageSize: promauto.NewHistogramVec(prometheus.HistogramOpts{
+	nc.inboundMessageSize = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "inbound_message_size_bytes",
+			Name:      nc.prefix + "inbound_message_size_bytes",
 			Help:      "size of the inbound network message",
 			Buckets:   []float64{KiB, 100 * KiB, 500 * KiB, 1 * MiB, 2 * MiB, 4 * MiB},
-		}, []string{LabelChannel, LabelMessage}),
+		}, []string{LabelChannel, LabelMessage},
+	)
 
-		duplicateMessagesDropped: promauto.NewCounterVec(prometheus.CounterOpts{
+	nc.duplicateMessagesDropped = promauto.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "duplicate_messages_dropped",
+			Name:      nc.prefix + "duplicate_messages_dropped",
 			Help:      "number of duplicate messages dropped",
-		}, []string{LabelChannel, LabelMessage}),
+		}, []string{LabelChannel, LabelMessage},
+	)
 
-		dnsLookupDuration: promauto.NewHistogram(prometheus.HistogramOpts{
+	nc.dnsLookupDuration = promauto.NewHistogram(
+		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "dns_lookup_duration_ms",
+			Name:      nc.prefix + "dns_lookup_duration_ms",
 			Buckets:   []float64{1, 10, 100, 500, 1000, 2000},
 			Help:      "the time spent on resolving a dns lookup (including cache hits)",
-		}),
+		},
+	)
 
-		dnsCacheMissCount: promauto.NewCounter(prometheus.CounterOpts{
+	nc.dnsCacheMissCount = promauto.NewCounter(
+		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "dns_cache_miss_total",
+			Name:      nc.prefix + "dns_cache_miss_total",
 			Help:      "the number of dns lookups that miss the cache and made through network",
-		}),
+		},
+	)
 
-		dnsCacheInvalidationCount: promauto.NewCounter(prometheus.CounterOpts{
+	nc.dnsCacheInvalidationCount = promauto.NewCounter(
+		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "dns_cache_invalidation_total",
+			Name:      nc.prefix + "dns_cache_invalidation_total",
 			Help:      "the number of times dns cache is invalidated for an entry",
-		}),
+		},
+	)
 
-		dnsCacheHitCount: promauto.NewCounter(prometheus.CounterOpts{
+	nc.dnsCacheHitCount = promauto.NewCounter(
+		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemGossip,
-			Name:      "dns_cache_hit_total",
+			Name:      nc.prefix + "dns_cache_hit_total",
 			Help:      "the number of dns cache hits",
-		}),
+		},
+	)
 
-		queueSize: promauto.NewGaugeVec(prometheus.GaugeOpts{
+	nc.queueSize = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "message_queue_size",
+			Name:      nc.prefix + "message_queue_size",
 			Help:      "the number of elements in the message receive queue",
-		}, []string{LabelPriority}),
+		}, []string{LabelPriority},
+	)
 
-		queueDuration: promauto.NewHistogramVec(prometheus.HistogramOpts{
+	nc.queueDuration = promauto.NewHistogramVec(
+		prometheus.HistogramOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "message_queue_duration_seconds",
+			Name:      nc.prefix + "message_queue_duration_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long a message spent in the queue before delivered to an engine.",
 			Buckets:   []float64{0.01, 0.1, 0.5, 1, 2, 5}, // 10ms, 100ms, 500ms, 1s, 2s, 5s
-		}, []string{LabelPriority}),
+		}, []string{LabelPriority},
+	)
 
-		inboundProcessTime: promauto.NewCounterVec(prometheus.CounterOpts{
+	nc.inboundProcessTime = promauto.NewCounterVec(
+		prometheus.CounterOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "engine_message_processing_time_seconds",
+			Name:      nc.prefix + "engine_message_processing_time_seconds",
 			Help:      "duration [seconds; measured with float64 precision] of how long a queue worker blocked for an engine processing message",
-		}, []string{LabelChannel}),
+		}, []string{LabelChannel},
+	)
 
-		outboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+	nc.outboundConnectionCount = promauto.NewGauge(
+		prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "outbound_connection_count",
+			Name:      nc.prefix + "outbound_connection_count",
 			Help:      "the number of outbound connections of this node",
-		}),
+		},
+	)
 
-		inboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
+	nc.inboundConnectionCount = promauto.NewGauge(
+		prometheus.GaugeOpts{
 			Namespace: namespaceNetwork,
 			Subsystem: subsystemQueue,
-			Name:      "inbound_connection_count",
+			Name:      nc.prefix + "inbound_connection_count",
 			Help:      "the number of inbound connections of this node",
-		}),
-
-		unstakedOutboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemQueue,
-			Name:      "unstaked_outbound_connection_count",
-			Help:      "the number of outbound connections to unstaked nodes",
-		}),
-
-		unstakedInboundConnectionCount: promauto.NewGauge(prometheus.GaugeOpts{
-			Namespace: namespaceNetwork,
-			Subsystem: subsystemQueue,
-			Name:      "unstaked_inbound_connection_count",
-			Help:      "the number of inbound connections from unstaked nodes",
-		}),
-	}
+		},
+	)
 
 	return nc
 }
@@ -205,12 +225,4 @@ func (nc *NetworkCollector) OnDNSCacheInvalidated() {
 // looking up the network.
 func (nc *NetworkCollector) OnDNSCacheHit() {
 	nc.dnsCacheHitCount.Inc()
-}
-
-func (nc *NetworkCollector) UnstakedOutboundConnections(connectionCount uint) {
-	nc.unstakedOutboundConnectionCount.Set(float64(connectionCount))
-}
-
-func (nc *NetworkCollector) UnstakedInboundConnections(connectionCount uint) {
-	nc.unstakedInboundConnectionCount.Set(float64(connectionCount))
 }

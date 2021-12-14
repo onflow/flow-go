@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/admin/commands/common"
 	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
-	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/flow"
@@ -146,7 +145,6 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 
 func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 	fnb.Component("network", func(builder NodeBuilder, node *NodeConfig) (module.ReadyDoneAware, error) {
-
 		codec := cborcodec.NewCodec()
 
 		myAddr := fnb.NodeConfig.Me.Address()
@@ -154,51 +152,13 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			myAddr = fnb.BaseConfig.BindAddr
 		}
 
-		// setup the Ping provider to return the software version and the sealed block height
-		pingProvider := p2p.PingInfoProviderImpl{
-			SoftwareVersionFun: func() string {
-				return build.Semver()
-			},
-			SealedBlockHeightFun: func() (uint64, error) {
-				head, err := fnb.State.Sealed().Head()
-				if err != nil {
-					return 0, err
-				}
-				return head.Height, nil
-			},
-			HotstuffViewFun: nil, // set in next code block, depending on role
-		}
-
-		// only consensus roles will need to report hotstuff view
-		if fnb.BaseConfig.NodeRole == flow.RoleConsensus.String() {
-			// initialize the persister
-			persist := persister.New(node.DB, node.RootChainID)
-
-			pingProvider.HotstuffViewFun = func() (uint64, error) {
-				curView, err := persist.GetStarted()
-				if err != nil {
-					return 0, err
-				}
-
-				return curView, nil
-			}
-		} else {
-			// non-consensus will not report any hotstuff view
-			pingProvider.HotstuffViewFun = func() (uint64, error) {
-				return 0, fmt.Errorf("non-consensus nodes do not report hotstuff view in ping")
-			}
-		}
-
 		libP2PNodeFactory := p2p.DefaultLibP2PNodeFactory(
 			fnb.Logger,
-			fnb.Me.NodeID(),
 			myAddr,
 			fnb.NetworkKey,
 			fnb.SporkID,
 			fnb.IdentityProvider,
-			p2p.DefaultMaxPubSubMsgSize,
 			fnb.Metrics.Network,
-			pingProvider,
 			fnb.BaseConfig.DNSCacheTTL,
 			fnb.BaseConfig.NodeRole,
 		)
@@ -255,10 +215,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		fnb.Network = net
 
-		idEvents := gadgets.NewIdentityDeltas(func() {
-			fnb.Middleware.UpdateNodeAddresses()
-			fnb.Middleware.UpdateAllowList()
-		})
+		idEvents := gadgets.NewIdentityDeltas(fnb.Middleware.UpdateNodeAddresses)
 		fnb.ProtocolEvents.AddConsumer(idEvents)
 
 		return net, nil

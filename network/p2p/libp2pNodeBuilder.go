@@ -38,14 +38,11 @@ type LibP2PFactoryFunc func(context.Context) (*Node, error)
 // default options for the host, the pubsub and the ping service.
 func DefaultLibP2PNodeFactory(
 	log zerolog.Logger,
-	me flow.Identifier,
 	address string,
 	flowKey fcrypto.PrivateKey,
 	sporkId flow.Identifier,
 	idProvider id.IdentityProvider,
-	maxPubSubMsgSize int,
 	metrics module.NetworkMetrics,
-	pingInfoProvider PingInfoProvider,
 	dnsResolverTTL time.Duration,
 	role string,
 ) LibP2PFactoryFunc {

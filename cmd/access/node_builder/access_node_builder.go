@@ -102,6 +102,16 @@ type AccessNodeConfig struct {
 	retryEnabled                 bool
 	rpcMetricsEnabled            bool
 	baseOptions                  []cmd.Option
+
+	PublicNetworkConfig PublicNetworkConfig
+}
+
+type PublicNetworkConfig struct {
+	// NetworkKey crypto.PublicKey // TODO: do we need a different key for the public network?
+	BindAddress string
+	Network     network.Network
+	Middleware  network.Middleware
+	Metrics     module.NetworkMetrics
 }
 
 // DefaultAccessNodeConfig defines all the default values for the AccessNodeConfig

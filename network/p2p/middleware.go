@@ -11,6 +11,7 @@ import (
 	"time"
 
 	ggio "github.com/gogo/protobuf/io"
+	"github.com/libp2p/go-libp2p-core/host"
 	libp2pnetwork "github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/libp2p/go-libp2p-core/peerstore"
@@ -174,6 +175,10 @@ func DefaultValidators(log zerolog.Logger, flowID flow.Identifier) []network.Mes
 
 func (m *Middleware) RoutingSystem() routing.Routing {
 	return m.libP2PNode.routing
+}
+
+func (m *Middleware) Host() host.Host {
+	return m.libP2PNode.host
 }
 
 func (m *Middleware) topologyPeers() (peer.IDSlice, error) {
@@ -511,16 +516,6 @@ func (m *Middleware) Publish(msg *message.Message, channel network.Channel) erro
 	m.metrics.NetworkMessageSent(len(data), string(channel), msg.Type)
 
 	return nil
-}
-
-// Ping pings the target node and returns the ping RTT or an error
-func (m *Middleware) Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error) {
-	peerID, err := m.idTranslator.GetPeerID(targetID)
-	if err != nil {
-		return message.PingResponse{}, -1, fmt.Errorf("could not find peer id for target id: %w", err)
-	}
-
-	return m.libP2PNode.Ping(m.ctx, peerID)
 }
 
 // IsConnected returns true if this node is connected to the node with id nodeID.
