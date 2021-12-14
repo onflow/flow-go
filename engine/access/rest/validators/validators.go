@@ -5,6 +5,8 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 )
 
+// todo think how to make possible to also provide value for what query param name is (it wont always be height, maybe it can be block_height)
+// maybe add a request builder to call something like Height(WithQuery("height"))
 func Height(r *rest.Request) error {
 	h := r.GetQueryParam("height")
 	if h == "" {
