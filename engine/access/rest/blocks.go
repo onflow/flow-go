@@ -75,24 +75,18 @@ func getBlocksByHeight(r *Request, backend access.API, link LinkGenerator) (inte
 	}
 
 	// support providing end height as "sealed" or "final"
-	var endHeight uint64
 	if req.EndHeight == models.FinalHeight || req.EndHeight == models.SealedHeight {
 		latest, err := backend.GetLatestBlock(r.Context(), req.EndHeight == models.SealedHeight)
 		if err != nil {
 			return nil, err
 		}
 
-		endHeight = latest.Header.Height
-	}
-
-	if end-start > MaxAllowedHeights {
-		err := fmt.Errorf("height range %d exceeds maximum allowed of %d", end-start, MaxAllowedHeights)
-		return nil, NewBadRequestError(err)
+		req.EndHeight = latest.Header.Height // overwrite special value height with fetched
 	}
 
 	blocks := make([]*generated.Block, 0)
 	// start and end height inclusive
-	for i := start; i <= end; i++ {
+	for i := req.StartHeight; i <= req.EndHeight; i++ {
 		block, err := getBlock(forHeight(i), r, backend, link)
 		if err != nil {
 			return nil, err
