@@ -33,7 +33,7 @@ import (
 type MeshEngineTestSuite struct {
 	suite.Suite
 	ConduitWrapper                   // used as a wrapper around conduit methods
-	nets           []*p2p.Network    // used to keep track of the networks
+	nets           []network.Network // used to keep track of the networks
 	ids            flow.IdentityList // used to keep track of the identifiers associated with networks
 	obs            chan string       // used to keep track of Protect events tagged by pubsub messages
 	cancel         context.CancelFunc
@@ -60,8 +60,11 @@ func (suite *MeshEngineTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	suite.ids, _, suite.nets, obs, suite.cancel = GenerateIDsMiddlewaresNetworks(
-		suite.T(), count, logger, 100, nil, !DryRun, []func(*flow.Identity){unittest.WithAllRoles()}, nil,
+	ctx, cancel := context.WithCancel(context.Background())
+	suite.cancel = cancel
+
+	suite.ids, _, suite.nets, obs = GenerateIDsMiddlewaresNetworks(
+		ctx, suite.T(), count, logger, 100, nil, WithIdentityOpts(unittest.WithAllRoles()),
 	)
 
 	for _, observableConnMgr := range obs {

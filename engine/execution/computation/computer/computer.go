@@ -26,8 +26,9 @@ import (
 	"github.com/onflow/flow-go/utils/logging"
 )
 
-const SystemChunkEventCollectionMaxSize = 256_000_000 // ~256MB
-const MaxTransactionErrorStringSize = 1000            // 1000 chars
+const SystemChunkEventCollectionMaxSize = 256_000_000  // ~256MB
+const SystemChunkLedgerIntractionLimit = 1_000_000_000 // ~1GB
+const MaxTransactionErrorStringSize = 1000             // 1000 chars
 
 // VirtualMachine runs procedures
 type VirtualMachine interface {
@@ -62,6 +63,7 @@ func SystemChunkContext(vmCtx fvm.Context, logger zerolog.Logger) fvm.Context {
 		fvm.WithTransactionFeesEnabled(false),
 		fvm.WithServiceEventCollectionEnabled(),
 		fvm.WithTransactionProcessors(fvm.NewTransactionInvoker(logger)),
+		fvm.WithMaxStateInteractionSize(SystemChunkLedgerIntractionLimit),
 		fvm.WithEventCollectionSizeLimit(SystemChunkEventCollectionMaxSize),
 	)
 }

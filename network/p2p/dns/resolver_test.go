@@ -43,7 +43,7 @@ func TestResolver_HappyPath(t *testing.T) {
 
 // TestResolver_CacheExpiry evaluates that cached dns entries get expired and underlying resolver gets called after their time-to-live is passed.
 func TestResolver_CacheExpiry(t *testing.T) {
-	t.Skip("flaky test - quarantined")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
 	basicResolver := mocknetwork.BasicResolver{}
 	resolver := NewResolver(
 		metrics.NewNoopCollector(),

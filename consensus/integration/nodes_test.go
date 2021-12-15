@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/consensus"
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/committees"
-	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
@@ -173,8 +172,7 @@ func createNode(
 	cleaner := &storagemock.Cleaner{}
 	cleaner.On("RunGC")
 
-	// make local
-	priv := helper.MakeBLSKey(t)
+	priv := unittest.StakingPrivKeyByIdentifier(identity.NodeID)
 	me, err := local.New(identity, priv)
 	require.NoError(t, err)
 
