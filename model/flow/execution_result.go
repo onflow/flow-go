@@ -3,8 +3,6 @@ package flow
 import (
 	"encoding/json"
 	"errors"
-
-	"github.com/ipfs/go-cid"
 )
 
 var ErrNoChunks = errors.New("execution result has no chunks")
@@ -16,7 +14,7 @@ type ExecutionResult struct {
 	BlockID          Identifier // commit of the current block
 	Chunks           ChunkList
 	ServiceEvents    ServiceEventList
-	ExecutionDataCID cid.Cid
+	ExecutionDataCID []byte
 }
 
 // ID returns the hash of the execution result body
