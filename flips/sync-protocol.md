@@ -56,7 +56,7 @@ Each time the Sync Engine receives a Block Response, it calls [`HandleBlock`](ht
 
 ## Proposal
 
-The `RequestBlock` API should be updated to accept a block height, which should be stored with the queued item in `BlockIDs`. This will allow items in `BlockIDs` to be pruned as soon as the local finalized height surpasses their associated block heights. This also allows the Sync Core to ignore calls to `RequestBlock` for block heights which exceed the local finalized height by more than a configurable threshold. This helps to reduce the amount of resources spent tracking and requesting blocks which which cannot immediately be finalized anyways.
+The `RequestBlock` API should be updated to accept a block height, which should be stored with the queued item in `BlockIDs`. This will allow items in `BlockIDs` to be pruned as soon as the local finalized height surpasses their associated block heights. This also allows the Sync Core to ignore calls to `RequestBlock` for block heights which exceed the local finalized height by more than a configurable threshold. This helps to reduce the amount of resources spent tracking and requesting blocks which cannot immediately be finalized anyways.
 
 Instead of pruning on every call to `ScanPending`, the Sync Core should keep track of the local finalized height from the latest call to `ScanPending`, and only trigger pruning if the height has actually changed. If necessary, it's possible to optimize the performance of pruning and avoid iterating through every item in `BlockIDs` by maintaining an additional mapping from block heights to the set of requestable block IDs at each height. 
 
