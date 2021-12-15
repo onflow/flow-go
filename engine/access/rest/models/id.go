@@ -27,3 +27,7 @@ func (i *ID) Parse(raw string) error {
 	*i = ID(flowID)
 	return nil
 }
+
+func (i ID) Flow() flow.Identifier {
+	return flow.Identifier(i)
+}
