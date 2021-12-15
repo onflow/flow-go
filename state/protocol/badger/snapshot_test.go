@@ -326,7 +326,7 @@ func TestSealingSegment(t *testing.T) {
 
 	// test sealing segment where the segment blocks contain seals for
 	// ancestor blocks prior to the sealing segment
-	// ROOT -> B1 -> B2(R1) -> B3 -> B4(R2, S1) -> B5 -> B6(S2)
+	// ROOT <- B1 <- B2(R1) <- B3 <- B4(R2, S1) <- B5 <- B6(S2)
 	// Expected sealing segment: [B2, B3, B4]
 	t.Run("overlapping sealing segment", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
@@ -485,6 +485,10 @@ func TestSealingSegment(t *testing.T) {
 		})
 	})
 
+	// Test the case where the reference block of the snapshot contains no seal.
+	// We should consider the latest seal in a prior block.
+	// ROOT <- B1 <- B2(R1) <- B3 <- B4(S1) <- B5
+	// Expected sealing segment: [B1, B2, B3, B4, B5]
 	t.Run("sealing segment where highest block in segment does not seal lowest", func(t *testing.T) {
 		util.RunWithFollowerProtocolState(t, rootSnapshot, func(db *badger.DB, state *bprotocol.FollowerState) {
 			// build a block to seal
@@ -516,8 +520,8 @@ func TestSealingSegment(t *testing.T) {
 
 			segment, err := s.SealingSegment()
 			require.NoError(t, err)
-			// sealing segment should contain B1 and B2
-			// B2 is reference of snapshot, B1 is latest sealed
+			// sealing segment should contain B1 and B5
+			// B5 is reference of snapshot, B1 is latest sealed
 			unittest.AssertEqualBlocksLenAndOrder(t, []*flow.Block{block1, block2, block3, block4, block5}, segment.Blocks)
 			assert.Len(t, segment.ExecutionResults, 1)
 		})
