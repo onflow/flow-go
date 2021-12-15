@@ -74,7 +74,6 @@ unittest-main:
 .PHONY: unittest
 unittest: unittest-main
 	$(MAKE) -C crypto test
-	$(MAKE) -C crypto cross-blst-test
 	$(MAKE) -C integration test
 
 .PHONY: test
