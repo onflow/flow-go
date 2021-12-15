@@ -353,10 +353,14 @@ func (a *ArrayBackData) logTelemetry() {
 	a.lastTelemetryDump = runtimeNano()
 }
 
-func (a *ArrayBackData) invalidateKey(bucketIndex bIndex, sliceIndex sIndex) {
-	a.buckets[bucketIndex][sliceIndex].keyIndex = 0
+// invalidateKey sets the key index of specified slot in the bucket to zero, so the key
+// is free to take.
+func (a *ArrayBackData) invalidateKey(bucketIndex bIndex, slotIndex sIndex) {
+	a.buckets[bucketIndex][slotIndex].keyIndex = 0
 }
 
-func (a *ArrayBackData) invalidateEntity(bucketIndex bIndex, sliceIndex sIndex) {
-	a.entities.Rem(a.buckets[bucketIndex][sliceIndex].valueIndex)
+// invalidateEntity removes the entity linked to the specified slot from the underlying entities
+// list. So that entity slot is made available to take if needed.
+func (a *ArrayBackData) invalidateEntity(bucketIndex bIndex, slotIndex sIndex) {
+	a.entities.Rem(a.buckets[bucketIndex][slotIndex].valueIndex)
 }
