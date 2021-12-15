@@ -4,6 +4,11 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
+// BackData represents the underlying data structure that is utilized by mempool.Backend, as the
+// core structure of maintaining data on memory-pools.
+// NOTE: BackData by default is not expected to provide concurrency-safe operations. As it is just the
+// model layer of the mempool, the safety against concurrent operations are guaranteed by the Backend that
+// is the control layer.
 type BackData interface {
 	// Has checks if we already contain the item with the given hash.
 	Has(entityID flow.Identifier) bool
