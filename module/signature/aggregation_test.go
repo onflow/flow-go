@@ -1,10 +1,10 @@
+//go:build relic
 // +build relic
 
 package signature
 
 import (
 	"crypto/rand"
-	"fmt"
 	mrand "math/rand"
 	"sort"
 	"testing"
@@ -15,7 +15,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/model/flow"
 )
 
 func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregatorSameMessage, []crypto.Signature) {
@@ -42,18 +41,6 @@ func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregato
 	aggregator, err := NewSignatureAggregatorSameMessage(msg, tag, keys)
 	require.NoError(t, err)
 	return aggregator, sigs
-}
-
-// can't use the unittest.IdentityFixture due to circular import
-func IdentityFixture() *flow.Identity {
-	var id flow.Identifier
-	_, _ = rand.Read(id[:])
-	return &flow.Identity{
-		NodeID:  id,
-		Address: fmt.Sprintf("address-%v", id[0:7]),
-		Role:    flow.RoleConsensus,
-		Stake:   1000,
-	}
 }
 
 func TestAggregatorSameMessage(t *testing.T) {

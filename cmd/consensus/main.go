@@ -13,7 +13,6 @@ import (
 
 	"github.com/onflow/flow-go-sdk/client"
 	"github.com/onflow/flow-go-sdk/crypto"
-
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/cmd/util/cmd/common"
 	"github.com/onflow/flow-go/consensus"
@@ -26,6 +25,7 @@ import (
 	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
+	recovery "github.com/onflow/flow-go/consensus/recovery/protocol"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/common/requester"
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
@@ -44,6 +44,7 @@ import (
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/buffer"
+	builder "github.com/onflow/flow-go/module/builder/consensus"
 	chmodule "github.com/onflow/flow-go/module/chunks"
 	dkgmodule "github.com/onflow/flow-go/module/dkg"
 	"github.com/onflow/flow-go/module/epochs"
