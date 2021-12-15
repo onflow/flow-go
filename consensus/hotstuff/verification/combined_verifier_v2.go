@@ -69,7 +69,7 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 	// TODO: check if using batch verification is faster (should be yes)
 	stakingValid, err := signer.StakingPubKey.Verify(stakingSig, msg, c.stakingHasher)
 	if err != nil {
-		return fmt.Errorf("internal error while verifying staking signature for %x: %w", signer.NodeID, err)
+		return fmt.Errorf("internal error while verifying staking signature from %x: %w", signer.NodeID, err)
 	}
 	if !stakingValid {
 		return fmt.Errorf("invalid staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
