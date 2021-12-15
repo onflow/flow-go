@@ -404,3 +404,38 @@ func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
 	err = state.MarkValid(block.ID())
 	require.NoError(t, err)
 }
+
+// assertSealingSegmentBlocksQueryable bootstraps the state with the given
+// snapshot, then verifies that all sealing segment blocks are queryable.
+func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot protocol.Snapshot) {
+	bootstrap(t, snapshot, func(state *bprotocol.State, err error) {
+		require.NoError(t, err)
+
+		segment, err := state.Final().SealingSegment()
+		assert.NoError(t, err)
+
+		// for each block in the sealing segment we should be able to query:
+		// * Head
+		// * SealedResult
+		// * Commit
+		for _, block := range segment.Blocks {
+			blockID := block.ID()
+			snap := state.AtBlockID(blockID)
+			header, err := snap.Head()
+			assert.NoError(t, err)
+			assert.Equal(t, blockID, header.ID())
+			_, seal, err := snap.SealedResult()
+			assert.NoError(t, err)
+			assert.Equal(t, segment.LatestSeals[blockID], seal.ID())
+			commit, err := snap.Commit()
+			assert.NoError(t, err)
+			assert.Equal(t, seal.FinalState, commit)
+		}
+		// for all blocks but the head, we should be unable to query SealingSegment:
+		for _, block := range segment.Blocks[:len(segment.Blocks)-1] {
+			snap := state.AtBlockID(block.ID())
+			_, err := snap.SealingSegment()
+			assert.ErrorIs(t, err, protocol.ErrSealingSegmentBelowRootBlock)
+		}
+	})
+}
