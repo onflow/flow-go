@@ -1095,7 +1095,7 @@ func (e *Engine) handleComputationResult(
 	}
 
 	finalState, err := receipt.ExecutionResult.FinalStateCommitment()
-	if errors.Is(err, flow.NoChunksError) {
+	if errors.Is(err, flow.ErrNoChunks) {
 		finalState = startState
 	} else if err != nil {
 		return flow.DummyStateCommitment, nil, fmt.Errorf("unexpected error accessing result's final state commitment: %w", err)
