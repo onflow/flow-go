@@ -36,6 +36,10 @@ func fromBase64(bytesStr string) ([]byte, error) {
 	return base64.StdEncoding.DecodeString(bytesStr)
 }
 
+func FromBase64(bytesStr string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(bytesStr)
+}
+
 func toUint64(uint64Str string) (uint64, error) {
 	return strconv.ParseUint(uint64Str, 10, 64)
 }

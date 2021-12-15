@@ -1,7 +1,6 @@
 package rest
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest/validators"
 	"net/http"
 	"time"
 
@@ -154,10 +153,6 @@ func routeDefinitions() []routeDefinition {
 			method:  http.MethodGet,
 			pattern: "/accounts/{address}",
 			name:    getAccountRoute,
-			validators: []ApiValidatorFunc{
-				validators.Height,
-				validators.Address,
-			},
 			handler: getAccount,
 		}}
 }
