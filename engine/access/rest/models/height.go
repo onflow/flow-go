@@ -38,3 +38,27 @@ func (h *Height) Parse(raw string) error {
 func (h Height) Flow() uint64 {
 	return uint64(h)
 }
+
+type Heights []Height
+
+func (h *Heights) Parse(raw []string) error {
+	var height Height
+	heights := make([]Height, len(raw))
+	for i, r := range raw {
+		err := height.Parse(r)
+		if err != nil {
+			return err
+		}
+
+		heights[i] = height
+	}
+	return nil
+}
+
+func (h Heights) Flow() []uint64 {
+	heights := make([]uint64, len(h))
+	for i, he := range h {
+		heights[i] = he.Flow()
+	}
+	return heights
+}
