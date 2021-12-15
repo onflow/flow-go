@@ -320,6 +320,32 @@ func TestBootstrap_DisconnectedSealingSegment(t *testing.T) {
 	})
 }
 
+func TestBootstrap_SealingSegmentMissingSeal(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	// convert to encodable to easily modify snapshot
+	encodable := rootSnapshot.Encodable()
+	// we are missing the required first seal
+	encodable.SealingSegment.FirstSeal = nil
+	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
+
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		assert.Error(t, err)
+	})
+}
+
+func TestBootstrap_SealingSegmentMissingResult(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	// convert to encodable to easily modify snapshot
+	encodable := rootSnapshot.Encodable()
+	// we are missing the result referenced by the root seal
+	encodable.SealingSegment.ExecutionResults = nil
+	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
+
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		assert.Error(t, err)
+	})
+}
+
 func TestBootstrap_InvalidQuorumCertificate(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
 	// convert to encodable to easily modify snapshot
