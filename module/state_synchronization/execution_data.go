@@ -9,7 +9,7 @@ import (
 type ExecutionData struct {
 	BlockID            flow.Identifier
 	Collections        []*flow.Collection
-	Events             []*flow.Event
+	Events             []flow.EventsList
 	TrieUpdates        []*ledger.TrieUpdate
-	TransactionResults []*flow.TransactionResult
+	TransactionResults []flow.TransactionResult
 }

@@ -3,6 +3,7 @@ package execution
 import (
 	"fmt"
 
+	"github.com/ipfs/go-cid"
 	"github.com/onflow/flow-go/model/convert"
 	"github.com/onflow/flow-go/model/flow"
 )
@@ -55,7 +56,7 @@ func GenerateExecutionResultAndChunkDataPacks(
 		startState = endState
 	}
 
-	executionResult, err = GenerateExecutionResultForBlock(prevResultId, block, chunks, result.ServiceEvents)
+	executionResult, err = GenerateExecutionResultForBlock(prevResultId, block, chunks, result.ServiceEvents, result.ExecutionDataCID)
 	if err != nil {
 		return flow.DummyStateCommitment, nil, nil, fmt.Errorf("could not generate execution result: %w", err)
 	}
@@ -70,6 +71,7 @@ func GenerateExecutionResultForBlock(
 	block *flow.Block,
 	chunks []*flow.Chunk,
 	serviceEvents []flow.Event,
+	executionDataCid cid.Cid,
 ) (*flow.ExecutionResult, error) {
 
 	// convert Cadence service event representation to flow-go representation
@@ -87,6 +89,7 @@ func GenerateExecutionResultForBlock(
 		BlockID:          block.ID(),
 		Chunks:           chunks,
 		ServiceEvents:    convertedServiceEvents,
+		ExecutionDataCID: executionDataCid,
 	}
 
 	return er, nil
