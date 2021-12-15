@@ -3,6 +3,7 @@ package rest
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"net/http"
 
 	"google.golang.org/grpc/codes"
@@ -45,25 +46,13 @@ func getBlocksByIDs(r *Request, backend access.API, link LinkGenerator) (interfa
 }
 
 func getBlocksByHeight(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	heights := r.GetQueryParams(heightQueryParam)
-	startHeight := r.GetQueryParam(startHeightQueryParam)
-	endHeight := r.GetQueryParam(endHeightQueryParam)
-
-	// if both height and one or both of start and end height are provided
-	if len(heights) > 0 && (startHeight != "" || endHeight != "") {
-		err := fmt.Errorf("can only provide either heights or start and end height range")
-		return nil, NewBadRequestError(err)
+	req, err := r.getBlockRequest()
+	if err != nil {
+		return nil, err
 	}
 
-	// if neither height nor start and end height are provided
-	if len(heights) == 0 && (startHeight == "" || endHeight == "") {
-		err := fmt.Errorf("must provide either heights or start and end height range")
-		return nil, NewBadRequestError(err)
-	}
-
-	// if the query is /blocks?height=final or /blocks?height=sealed, lookup the last finalized or the last sealed block
-	if len(heights) == 1 && (heights[0] == finalHeightQueryParam || heights[0] == sealedHeightQueryParam) {
-		block, err := getBlock(forFinalized(heights[0]), r, backend, link)
+	if req.FinalHeight || req.SealedHeight {
+		block, err := getBlock(forFinalized(req.Heights[0]), r, backend, link)
 		if err != nil {
 			return nil, err
 		}
@@ -72,15 +61,9 @@ func getBlocksByHeight(r *Request, backend access.API, link LinkGenerator) (inte
 	}
 
 	// if the query is /blocks/height=1000,1008,1049...
-	if len(heights) > 0 {
-		uintHeights, err := toHeights(heights)
-		if err != nil {
-			heightError := fmt.Errorf("invalid height specified: %w", err)
-			return nil, NewBadRequestError(heightError)
-		}
-
-		blocks := make([]*generated.Block, len(uintHeights))
-		for i, h := range uintHeights {
+	if req.HasHeights() {
+		blocks := make([]*generated.Block, len(req.Heights))
+		for i, h := range req.Heights {
 			block, err := getBlock(forHeight(h), r, backend, link)
 			if err != nil {
 				return nil, err
@@ -92,30 +75,14 @@ func getBlocksByHeight(r *Request, backend access.API, link LinkGenerator) (inte
 	}
 
 	// support providing end height as "sealed" or "final"
-	if endHeight == finalHeightQueryParam || endHeight == sealedHeightQueryParam {
-		latest, err := backend.GetLatestBlock(r.Context(), endHeight == sealedHeightQueryParam)
+	var endHeight uint64
+	if req.EndHeight == models.FinalHeight || req.EndHeight == models.SealedHeight {
+		latest, err := backend.GetLatestBlock(r.Context(), req.EndHeight == models.SealedHeight)
 		if err != nil {
 			return nil, err
 		}
 
-		endHeight = fmt.Sprintf("%d", latest.Header.Height)
-	}
-
-	// lookup block by start and end height range
-	start, err := toHeight(startHeight)
-	if err != nil {
-		heightError := fmt.Errorf("invalid start height: %w", err)
-		return nil, NewBadRequestError(heightError)
-	}
-	end, err := toHeight(endHeight)
-	if err != nil {
-		heightError := fmt.Errorf("invalid end height: %w", err)
-		return nil, NewBadRequestError(heightError)
-	}
-
-	if start > end {
-		err := fmt.Errorf("start height must be less than or equal to end height")
-		return nil, NewBadRequestError(err)
+		endHeight = latest.Header.Height
 	}
 
 	if end-start > MaxAllowedHeights {
@@ -203,13 +170,13 @@ func forHeight(height uint64) blockProviderOption {
 	}
 }
 
-func forFinalized(queryParam string) blockProviderOption {
+func forFinalized(queryParam uint64) blockProviderOption {
 	return func(blkProvider *blockProvider) {
 		switch queryParam {
-		case sealedHeightQueryParam:
+		case models.SealedHeight:
 			blkProvider.sealed = true
 			fallthrough
-		case finalHeightQueryParam:
+		case models.FinalHeight:
 			blkProvider.latest = true
 		}
 	}
