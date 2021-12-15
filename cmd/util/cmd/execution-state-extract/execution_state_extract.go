@@ -76,6 +76,10 @@ func extractExecutionState(
 		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
 
 		rs = []ledger.Reporter{
+			&reporters.EpochCounterReporter{
+				Log:   log,
+				Chain: chain,
+			},
 			&reporters.AccountReporter{
 				Log:   log,
 				Chain: chain,

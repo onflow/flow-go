@@ -95,14 +95,6 @@ func CheckMembership(t *testing.T, top flow.IdentityList, all flow.IdentityList)
 	}
 }
 
-// TODO: fix this test after we have fanout optimized.
-// CheckTopologySize evaluates that overall topology size of a node is bound by the fanout of system.
-func CheckTopologySize(t *testing.T, total int, top flow.IdentityList) {
-	t.Skip("this test requires optimizing the fanout per topic")
-	fanout := (total + 1) / 2
-	require.True(t, len(top) <= fanout)
-}
-
 // ClusterNum is a test helper determines the number of clusters of specific `size`.
 func ClusterNum(t *testing.T, ids flow.IdentityList, size int) int {
 	collectors := ids.Filter(filter.HasRole(flow.RoleCollection))
