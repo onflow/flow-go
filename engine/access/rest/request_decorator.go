@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 	"io"
 	"net/http"
 	"strings"
@@ -14,7 +15,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// a convenience wrapper around the http request to make it easy to read request query params
+// Request a convenience wrapper around the http request to make it easy to read request query params
 type Request struct {
 	*http.Request
 	expandFields map[string]bool
@@ -45,6 +46,13 @@ func sliceToMap(values []string) map[string]bool {
 		valueMap[v] = true
 	}
 	return valueMap
+}
+
+func (rd *Request) getScriptRequest() (models.GetScriptRequest, error) {
+	var getScriptRequest models.GetScriptRequest
+	err := getScriptRequest.Build(rd)
+
+	return getScriptRequest, err
 }
 
 func (rd *Request) expands(field string) bool {
