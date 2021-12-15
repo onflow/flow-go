@@ -55,6 +55,13 @@ func (rd *Request) getScriptRequest() (models.GetScriptRequest, error) {
 	return getScriptRequest, err
 }
 
+func (rd *Request) getBlockRequest() (models.GetBlockRequest, error) {
+	var getBlockRequest models.GetBlockRequest
+	err := getBlockRequest.Build(rd)
+
+	return getBlockRequest, err
+}
+
 func (rd *Request) expands(field string) bool {
 	return rd.expandFields[field]
 }
