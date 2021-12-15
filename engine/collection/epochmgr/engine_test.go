@@ -160,7 +160,6 @@ func (suite *Suite) AddEpoch(counter uint64) *protocol.Epoch {
 func (suite *Suite) AssertEpochStarted(counter uint64) {
 	components, ok := suite.components[counter]
 	suite.Assert().True(ok, "asserting nonexistent epoch started", counter)
-	components.hotstuff.AssertCalled(suite.T(), "Ready")
 	components.prop.AssertCalled(suite.T(), "Ready")
 	components.sync.AssertCalled(suite.T(), "Ready")
 	components.aggregator.AssertCalled(suite.T(), "Ready")
