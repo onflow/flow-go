@@ -7,6 +7,7 @@ package state
 // a state manager instead of a state itself.
 type StateHolder struct {
 	enforceInteractionLimits bool
+	payerIsServiceAccount    bool
 	startState               *State
 	activeState              *State
 }
@@ -28,6 +29,11 @@ func (s *StateHolder) State() *State {
 // SetActiveState sets active state
 func (s *StateHolder) SetActiveState(st *State) {
 	s.activeState = st
+}
+
+// SetActiveState sets active state
+func (s *StateHolder) SetPayerIsServiceAccount() {
+	s.payerIsServiceAccount = true
 }
 
 // EnableLimitEnforcement sets that the interaction limit should be enforced
@@ -52,5 +58,8 @@ func (s *StateHolder) NewChild() *State {
 
 // EnforceInteractionLimits returns if the interaction limits should be enforced or not
 func (s *StateHolder) EnforceInteractionLimits() bool {
+	if s.payerIsServiceAccount {
+		return false
+	}
 	return s.enforceInteractionLimits
 }
