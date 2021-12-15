@@ -144,8 +144,10 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	for _, signerID := range blockSigData.RandomBeaconSigners {
 		keyShare, err := dkg.KeyShare(signerID)
 		if err != nil {
-			// the packer should have found the signer, otherwise the packer will return an ErrInvalidFormat
-			// and we won't reach it. So reaching here would be an exception
+// We assume that every consensus member is also a random beacon participant. The 
+// Packer checks that only valid consensus participants are in the signers list. Otherwise,
+// the packer should return an ErrInvalidFormat. Consequently, we expect for every 
+// signer a DKG record. Reaching this failure case indicates a bug in the internal logic.
 			return fmt.Errorf("internal error could not find key share for signer %v: %w", signerID, err)
 		}
 		beaconPubKeys = append(beaconPubKeys, keyShare)
