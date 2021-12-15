@@ -14,7 +14,7 @@ import (
 //
 // CAUTION: This method stores confidential information and should only be
 // used in the context of the secrets database. This is enforced in the above
-// layer (see storage.DKGKeys).
+// layer (see storage.DKGState).
 func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
 	return insert(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
@@ -23,7 +23,7 @@ func InsertMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconP
 //
 // CAUTION: This method stores confidential information and should only be
 // used in the context of the secrets database. This is enforced in the above
-// layer (see storage.DKGKeys).
+// layer (see storage.DKGState).
 func RetrieveMyBeaconPrivateKey(epochCounter uint64, info *encodable.RandomBeaconPrivKey) func(*badger.Txn) error {
 	return retrieve(makePrefix(codeBeaconPrivateKey, epochCounter), info)
 }
