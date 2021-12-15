@@ -14,6 +14,8 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/arraylinkedlist"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -39,27 +41,24 @@ func BenchmarkBaselineLRU(b *testing.B) {
 	printHeapInfo()         // heap info after running garbage collection
 }
 
-func TestLRU(t *testing.T) {
+// BenchmarkArrayBackDataLRU benchmarks heap allocation performance of
+// ArrayBackData-based cache (aka heroCache) with 50K capacity against writing 100M entities,
+// with Garbage Collection (GC) disabled.
+func BenchmarkArrayBackDataLRU(b *testing.B) {
 	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
-
 	limit := uint(50_000)
-	b := stdmap.NewBackendWithBackData(
-		newBaselineLRU(int(limit)),
+
+	backData := stdmap.NewBackendWithBackData(
+		backdata.NewArrayBackData(uint32(limit),
+			8, arraylinkedlist.LRUEjection),
 		stdmap.WithLimit(limit))
 
-	// b := stdmap.NewBackend(stdmap.WithLimit(limit))
-
-	//b := stdmap.NewBackendWithBackData(
-	//	backdata.NewArrayBackData(uint32(limit),
-	//		8, arraylinkedlist.LRUEjection),
-	//	stdmap.WithLimit(limit))
-
 	entities := unittest.EntityListFixture(uint(100_000_000))
-	testAddEntities(t, limit, b, entities)
+	testAddEntities(b, limit, backData, entities)
 
-	printHeapInfo()
-	gcAndWriteHeapProfile()
-	printHeapInfo()
+	printHeapInfo()         // heap info after writing 100M entities
+	gcAndWriteHeapProfile() // runs garbage collection
+	printHeapInfo()         // heap info after running garbage collection
 }
 
 func printHeapInfo() {
@@ -67,10 +66,20 @@ func printHeapInfo() {
 	runtime.ReadMemStats(&m)
 	zlog.Info().
 		Uint64(".Alloc", m.Alloc).
-		Uint64(".Alloc Objects", m.HeapObjects).
+		Uint64(".AllocObjects", m.HeapObjects).
 		Uint64(".TotalAlloc", m.TotalAlloc).
 		Uint32(".NumGC", m.NumGC).
 		Msg("printHeapInfo()")
+}
+
+func gcAndWriteHeapProfile() {
+	// see <https://pkg.go.dev/runtime/pprof>
+	t1 := time.Now()
+	runtime.GC() // get up-to-date statistics
+	elapsed := time.Since(t1).Seconds()
+	zlog.Info().
+		Float64("gc-elapsed-time", elapsed).
+		Msg("garbage collection done")
 }
 
 // testAddEntities is a test helper that checks entities are added successfully to the backdata.
@@ -78,20 +87,20 @@ func printHeapInfo() {
 func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend, entities []*unittest.MockEntity) {
 	// adding elements
 	t1 := time.Now()
-	for _, e := range entities {
+	for i, e := range entities {
 		require.False(t, b.Has(e.ID()))
 		// adding each element must be successful.
 		require.True(t, b.Add(*e))
 
-		//if uint(i) < limit {
-		//	// when we are below limit the total of
-		//	// backdata should be incremented by each addition.
-		//	require.Equal(t, b.Size(), uint(i+1))
-		//} else {
-		//	// when we cross the limit, the ejection kicks in, and
-		//	// size must be steady at the limit.
-		//	require.Equal(t, uint(b.Size()), limit)
-		//}
+		if uint(i) < limit {
+			// when we are below limit the total of
+			// backdata should be incremented by each addition.
+			require.Equal(t, b.Size(), uint(i+1))
+		} else {
+			// when we cross the limit, the ejection kicks in, and
+			// size must be steady at the limit.
+			require.Equal(t, uint(b.Size()), limit)
+		}
 
 		// entity should be immediately retrievable
 		actual, ok := b.ByID(e.ID())
@@ -102,19 +111,10 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend, entities []*un
 	zlog.Info().Dur("interaction_time", elapsed).Msg("adding elements done")
 }
 
-func gcAndWriteHeapProfile() {
-	// see <https://pkg.go.dev/runtime/pprof>
-	t1 := time.Now()
-	runtime.GC() // get up-to-date statistics
-	elapsed := time.Since(t1).Seconds()
-	zlog.Info().Float64("elapsed", elapsed).Msg("runtime.GC()")
-	time.Sleep(2 * time.Second) // presumably GC takes less than 2 seconds?
-	zlog.Info().Msg("writing heap profile")
-	//if err := pprof.WriteHeapProfile(os.Stdout); err != nil {
-	//	panic(err)
-	//}
-}
-
+// baseLineLRU implements a BackData wrapper around hashicorp lru, which makes
+// it compliant to be used as BackData component in mempool.Backend. Note that
+// this is used only as an experimental baseline, and hence is not exported for
+// production.
 type baselineLRU struct {
 	c     *lru.Cache // used to incorporate an LRU cache
 	limit int
