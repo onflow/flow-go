@@ -3,7 +3,8 @@ package stdmap_test
 import (
 	"os"
 	"runtime"
-	"runtime/pprof"
+	"runtime/debug"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,11 +17,44 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-func TestLRU(t *testing.T) {
-	limit := uint(10_000_000)
-	b := stdmap.NewBackend(stdmap.WithLimit(limit))
+// BenchmarkBaselineLRU benchmarks heap allocation performance of
+// hashicorp LRU cache with 50K capacity against writing 100M entities,
+// with Garbage Collection (GC) disabled.
+func BenchmarkBaselineLRU(b *testing.B) {
+	if !experiment() {
+		b.Skip("skips benchmarking baseline LRU, set environment variable to enable")
+	}
+	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
 
-	entities := unittest.EntityListFixture(limit)
+	limit := uint(50_000)
+	backData := stdmap.NewBackendWithBackData(
+		newBaselineLRU(int(limit)),
+		stdmap.WithLimit(limit))
+
+	entities := unittest.EntityListFixture(uint(100_000_000))
+	testAddEntities(b, limit, backData, entities)
+
+	printHeapInfo()         // heap info after writing 100M entities
+	gcAndWriteHeapProfile() // runs garbage collection
+	printHeapInfo()         // heap info after running garbage collection
+}
+
+func TestLRU(t *testing.T) {
+	defer debug.SetGCPercent(debug.SetGCPercent(-1)) // disable GC
+
+	limit := uint(50_000)
+	b := stdmap.NewBackendWithBackData(
+		newBaselineLRU(int(limit)),
+		stdmap.WithLimit(limit))
+
+	// b := stdmap.NewBackend(stdmap.WithLimit(limit))
+
+	//b := stdmap.NewBackendWithBackData(
+	//	backdata.NewArrayBackData(uint32(limit),
+	//		8, arraylinkedlist.LRUEjection),
+	//	stdmap.WithLimit(limit))
+
+	entities := unittest.EntityListFixture(uint(100_000_000))
 	testAddEntities(t, limit, b, entities)
 
 	printHeapInfo()
@@ -33,6 +67,7 @@ func printHeapInfo() {
 	runtime.ReadMemStats(&m)
 	zlog.Info().
 		Uint64(".Alloc", m.Alloc).
+		Uint64(".Alloc Objects", m.HeapObjects).
 		Uint64(".TotalAlloc", m.TotalAlloc).
 		Uint32(".NumGC", m.NumGC).
 		Msg("printHeapInfo()")
@@ -40,27 +75,31 @@ func printHeapInfo() {
 
 // testAddEntities is a test helper that checks entities are added successfully to the backdata.
 // and each entity is retrievable right after it is written to backdata.
-func testAddEntities(t *testing.T, limit uint, b *stdmap.Backend, entities []*unittest.MockEntity) {
+func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend, entities []*unittest.MockEntity) {
 	// adding elements
-	for i, e := range entities {
+	t1 := time.Now()
+	for _, e := range entities {
+		require.False(t, b.Has(e.ID()))
 		// adding each element must be successful.
-		require.True(t, b.Add(e))
+		require.True(t, b.Add(*e))
 
-		if uint(i) < limit {
-			// when we are below limit the total of
-			// backdata should be incremented by each addition.
-			require.Equal(t, b.Size(), uint(i+1))
-		} else {
-			// when we cross the limit, the ejection kicks in, and
-			// size must be steady at the limit.
-			require.Equal(t, uint(b.Size()), limit)
-		}
+		//if uint(i) < limit {
+		//	// when we are below limit the total of
+		//	// backdata should be incremented by each addition.
+		//	require.Equal(t, b.Size(), uint(i+1))
+		//} else {
+		//	// when we cross the limit, the ejection kicks in, and
+		//	// size must be steady at the limit.
+		//	require.Equal(t, uint(b.Size()), limit)
+		//}
 
 		// entity should be immediately retrievable
 		actual, ok := b.ByID(e.ID())
 		require.True(t, ok)
-		require.Equal(t, e, actual)
+		require.Equal(t, *e, actual)
 	}
+	elapsed := time.Since(t1)
+	zlog.Info().Dur("interaction_time", elapsed).Msg("adding elements done")
 }
 
 func gcAndWriteHeapProfile() {
@@ -71,14 +110,27 @@ func gcAndWriteHeapProfile() {
 	zlog.Info().Float64("elapsed", elapsed).Msg("runtime.GC()")
 	time.Sleep(2 * time.Second) // presumably GC takes less than 2 seconds?
 	zlog.Info().Msg("writing heap profile")
-	if err := pprof.WriteHeapProfile(os.Stdout); err != nil {
-		panic(err)
-	}
+	//if err := pprof.WriteHeapProfile(os.Stdout); err != nil {
+	//	panic(err)
+	//}
 }
 
 type baselineLRU struct {
 	c     *lru.Cache // used to incorporate an LRU cache
 	limit int
+}
+
+func newBaselineLRU(limit int) *baselineLRU {
+	var err error
+	c, err := lru.New(limit)
+	if err != nil {
+		panic(err)
+	}
+
+	return &baselineLRU{
+		c:     c,
+		limit: limit,
+	}
 }
 
 // Has checks if we already contain the item with the given hash.
@@ -89,7 +141,8 @@ func (b *baselineLRU) Has(entityID flow.Identifier) bool {
 
 // Add adds the given item to the pool.
 func (b *baselineLRU) Add(entityID flow.Identifier, entity flow.Entity) bool {
-	return b.c.Add(entityID, entity)
+	b.c.Add(entityID, entity)
+	return true
 }
 
 // Rem will remove the item with the given hash.
@@ -172,4 +225,13 @@ func (b *baselineLRU) Clear() {
 // Hash will use a merkle root hash to hash all items.
 func (b *baselineLRU) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(b.All())...)
+}
+
+// experiment looks up environment variable to enable/disable benchmarking experiments.
+func experiment() bool {
+	val, found := os.LookupEnv("experiment")
+	if !found {
+		return false
+	}
+	return strings.ToLower(strings.Trim(val, "")) == "on"
 }
