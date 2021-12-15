@@ -1,4 +1,4 @@
-package stdmap
+package backdata
 
 import (
 	"github.com/onflow/flow-go/model/flow"
