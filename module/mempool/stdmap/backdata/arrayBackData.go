@@ -20,9 +20,9 @@ type bIndex uint64
 type sIndex uint64
 
 type key struct {
-	keyIndex   uint64 // slot age
-	valueIndex uint32 // link to key value pair
-	idPrefix   uint32 // 32bits of key sha256
+	keyIndex   uint64                 // slot age
+	valueIndex arraylinkedlist.VIndex // link to key value pair
+	idPrefix   uint32                 // 32bits of key sha256
 }
 
 // keyBucket represents a bucket of keys.
