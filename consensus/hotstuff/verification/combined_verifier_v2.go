@@ -108,7 +108,7 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	// unpack sig data using packer
 	blockSigData, err := c.packer.Unpack(block.BlockID, signers.NodeIDs(), sigData)
 	if err != nil {
-		return fmt.Errorf("could not split signature: %w", modulesig.ErrInvalidFormat)
+		return fmt.Errorf("could not split signature: %w", err)
 	}
 
 	msg := MakeVoteMessage(block.View, block.BlockID)

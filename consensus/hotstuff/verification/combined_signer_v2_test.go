@@ -1,7 +1,6 @@
 package verification
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/mock"
@@ -94,29 +93,25 @@ func TestCombinedSignWithDKGKey(t *testing.T) {
 	blockWrongID := *block
 	blockWrongID.BlockID[0]++
 	err = verifier.VerifyVote(nodeID, vote.SigData, &blockWrongID)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, model.ErrInvalidSignature))
+	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// vote with a wrong view should be invalid
 	blockWrongView := *block
 	blockWrongView.View++
 	err = verifier.VerifyVote(nodeID, vote.SigData, &blockWrongView)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, model.ErrInvalidSignature))
+	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// vote by different signer should be invalid
 	wrongVoter := identities[1]
 	wrongVoter.StakingPubKey = unittest.StakingPrivKeyFixture().PublicKey()
 	err = verifier.VerifyVote(wrongVoter, vote.SigData, block)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, model.ErrInvalidSignature))
+	require.ErrorIs(t, err, model.ErrInvalidSignature)
 
 	// vote with changed signature should be invalid
 	wrongSigData := *vote
 	wrongSigData.SigData[4]++
 	err = verifier.VerifyVote(nodeID, wrongSigData.SigData, block)
-	require.Error(t, err)
-	require.True(t, errors.Is(err, model.ErrInvalidSignature))
+	require.ErrorIs(t, err, model.ErrInvalidSignature)
 }
 
 // Test that when DKG key is not available for a view, a signed block can pass the validation

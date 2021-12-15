@@ -311,6 +311,7 @@ func (vs *VoteSuite) TestVoteSignatureError() {
 	// check that the vote is no longer validated
 	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
 	assert.Error(vs.T(), err, "a vote with error on signature validation should be rejected")
+	assert.False(vs.T(), model.IsInvalidVoteError(err), "an unexpected exception should not be interpreted as an invalid vote")
 }
 
 func (vs *VoteSuite) TestVoteSignatureInvalid() {
@@ -322,6 +323,7 @@ func (vs *VoteSuite) TestVoteSignatureInvalid() {
 	// check that the vote is no longer validated
 	_, err := vs.validator.ValidateVote(vs.vote, vs.block)
 	assert.Error(vs.T(), err, "a vote with an invalid signature should be rejected")
+	assert.True(vs.T(), model.IsInvalidVoteError(err), "vote with invalid signature should generate an invalid vote error")
 }
 
 func TestValidateQC(t *testing.T) {

@@ -105,7 +105,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	// unpack sig data using packer
 	blockSigData, err := c.packer.Unpack(block.BlockID, signers.NodeIDs(), sigData)
 	if err != nil {
-		return fmt.Errorf("could not split signature: %w", signature.ErrInvalidFormat)
+		return fmt.Errorf("could not split signature: %w", err)
 	}
 
 	msg := MakeVoteMessage(block.View, block.BlockID)
@@ -164,7 +164,7 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	for _, signerID := range blockSigData.StakingSigners {
 		identity, ok := signerIdentities[signerID]
 		if !ok {
-			return fmt.Errorf("invalid signer identity %v: %w", signerID, model.ErrInvalidSignature)
+			return fmt.Errorf("internal error, signer identity not found %v", signerID)
 		}
 		stakingPubKeys = append(stakingPubKeys, identity.StakingPubKey)
 	}
