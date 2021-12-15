@@ -1,6 +1,7 @@
 package test
 
 import (
+	"github.com/onflow/flow-go/state/protocol/inmem"
 	"sync"
 	"testing"
 	"time"
@@ -78,14 +79,17 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	tc.hub = stub.NewNetworkHub()
 
 	// create a root snapshot with the given number of initial clusters
-	root := unittest.RootSnapshotFixture(tc.identities)
-	encodable := root.Encodable()
-	setup := encodable.LatestResult.ServiceEvents[0].Event.(*flow.EpochSetup)
+	root, result, seal := unittest.BootstrapFixture(tc.identities)
+	qc := unittest.QuorumCertificateFixture(unittest.QCWithBlockID(root.ID()))
+	setup := result.ServiceEvents[0].Event.(*flow.EpochSetup)
+	commit := result.ServiceEvents[1].Event.(*flow.EpochCommit)
+
 	setup.Assignments = unittest.ClusterAssignment(tc.conf.clusters, tc.identities)
-	commit := encodable.LatestResult.ServiceEvents[1].Event.(*flow.EpochCommit)
 	commit.ClusterQCs = rootClusterQCs
-	encodable.LatestSeal.ResultID = encodable.LatestResult.ID()
-	tc.root = root
+
+	seal.ResultID = result.ID()
+	tc.root, err = inmem.SnapshotFromBootstrapState(root, result, seal, qc)
+	require.NoError(t, err)
 
 	// create a mock node for each collector identity
 	for _, collector := range nodeInfos {
@@ -109,7 +113,31 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	for _, node := range tc.nodes {
 		states = append(states, node.State)
 	}
-	tc.builder = unittest.NewEpochBuilder(tc.T(), states...)
+	// when building new epoch we would like to replace fixture cluster QCs with real ones, for that we need
+	// to generate them using node infos
+	tc.builder = unittest.NewEpochBuilder(tc.T(), states...).UsingCommitOpts(func(commit *flow.EpochCommit) {
+		// build a lookup table for node infos
+		nodeInfoLookup := make(map[flow.Identifier]model.NodeInfo)
+		for _, nodeInfo := range nodeInfos {
+			nodeInfoLookup[nodeInfo.NodeID] = nodeInfo
+		}
+
+		// replace cluster QCs, with real data
+		for i, clusterQC := range commit.ClusterQCs {
+			clusterParticipants := flow.IdentifierList(clusterQC.VoterIDs).Lookup()
+			signers := make([]model.NodeInfo, 0, len(clusterParticipants))
+			for _, signerID := range clusterQC.VoterIDs {
+				signer := nodeInfoLookup[signerID]
+				signers = append(signers, signer)
+			}
+			// generate root cluster block
+			rootClusterBlock := cluster.CanonicalRootBlock(commit.Counter, model.ToIdentityList(signers))
+			// generate cluster root qc
+			qc, err := run.GenerateClusterRootQC(signers, rootClusterBlock)
+			require.NoError(t, err)
+			commit.ClusterQCs[i] = flow.ClusterQCVoteDataFromQC(qc)
+		}
+	})
 
 	return tc
 }
@@ -125,7 +153,6 @@ func TestClusterSwitchover_Simple(t *testing.T) {
 // TestClusterSwitchover_MultiCollectorCluster tests switchover with a cluster
 // containing more than one collector.
 func TestClusterSwitchover_MultiCollectorCluster(t *testing.T) {
-	t.Skip("event loop needs an event handler, which will be replaced later in V2")
 	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
 		clusters:   1,
 		collectors: 2,
@@ -134,7 +161,6 @@ func TestClusterSwitchover_MultiCollectorCluster(t *testing.T) {
 
 // TestClusterSwitchover_MultiCluster tests cluster switchover with two clusters.
 func TestClusterSwitchover_MultiCluster(t *testing.T) {
-	t.Skip("event loop needs an event handler, which will be replaced later in V2")
 	RunTestCase(NewClusterSwitchoverTestCase(t, ClusterSwitchoverTestConf{
 		clusters:   2,
 		collectors: 2,

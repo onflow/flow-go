@@ -61,7 +61,6 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 				ctx.Throw(err)
 			}
 		}
-
 	})
 	el.ComponentManager = componentBuilder.Build()
 
