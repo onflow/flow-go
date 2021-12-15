@@ -1,6 +1,7 @@
 package models
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -58,4 +59,12 @@ func parseBody(raw io.Reader, dst interface{}) error {
 	}
 
 	return nil
+}
+
+func fromUint64(number uint64) string {
+	return fmt.Sprintf("%d", number)
+}
+
+func toBase64(byteValue []byte) string {
+	return base64.StdEncoding.EncodeToString(byteValue)
 }
