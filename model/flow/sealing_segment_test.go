@@ -119,6 +119,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromReceipt() {
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
+	require.NoError(suite.T(), segment.Validate())
 
 	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{&block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
@@ -147,6 +148,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingFirstBlockSeal() {
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
+	require.NoError(suite.T(), segment.Validate())
 
 	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{&block1, block2, block3}, segment.Blocks)
 	// should contain priorSeal as first seal
@@ -181,6 +183,7 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromPayloadSeal() {
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
+	require.NoError(suite.T(), segment.Validate())
 
 	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
@@ -198,6 +201,7 @@ func (suite *SealingSegmentSuite) TestBuild_RootSegment() {
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
+	require.NoError(suite.T(), segment.Validate())
 
 	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{root}, segment.Blocks)
 	require.Equal(suite.T(), segment.Highest().ID(), root.ID())
@@ -240,6 +244,7 @@ func (suite *SealingSegmentSuite) TestBuild_HighestContainsNoSeals() {
 
 	segment, err := suite.builder.SealingSegment()
 	require.NoError(suite.T(), err)
+	require.NoError(suite.T(), segment.Validate())
 
 	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{block1, block2, block3, block4}, segment.Blocks)
 }

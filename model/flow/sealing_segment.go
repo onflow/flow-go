@@ -71,6 +71,63 @@ func (segment *SealingSegment) Lowest() *Block {
 	return segment.Blocks[0]
 }
 
+// Validate validates the sealing segment structure and returns an error if
+// the segment isn't valid. This is done by re-building the segment from scratch,
+// re-using the validation logic already present in the SealingSegmentBuilder.
+func (segment *SealingSegment) Validate() error {
+
+	// populate lookup of seals and results in the segment to satisfy builder
+	seals := make(map[Identifier]*Seal)
+	results := make(map[Identifier]*ExecutionResult)
+
+	if segment.FirstSeal != nil {
+		seals[segment.FirstSeal.ID()] = segment.FirstSeal
+	}
+	for _, result := range segment.ExecutionResults {
+		results[result.ID()] = result
+	}
+	for _, block := range segment.Blocks {
+		for _, result := range block.Payload.Results {
+			results[result.ID()] = result
+		}
+		for _, seal := range block.Payload.Seals {
+			seals[seal.ID()] = seal
+		}
+	}
+
+	getResult := func(resultID Identifier) (*ExecutionResult, error) {
+		result, ok := results[resultID]
+		if !ok {
+			return nil, fmt.Errorf("result (id=%x) not found in segment", resultID)
+		}
+		return result, nil
+	}
+	getSeal := func(blockID Identifier) (*Seal, error) {
+		sealID, ok := segment.LatestSeals[blockID]
+		if !ok {
+			return nil, fmt.Errorf("seal for block (id=%x) not found in segment", blockID)
+		}
+		seal, ok := seals[sealID]
+		if !ok {
+			return nil, fmt.Errorf("seal (id=%x) not found in segment", sealID)
+		}
+		return seal, nil
+	}
+
+	builder := NewSealingSegmentBuilder(getResult, getSeal)
+	for _, block := range segment.Blocks {
+		err := builder.AddBlock(block)
+		if err != nil {
+			return fmt.Errorf("invalid segment: %w", err)
+		}
+	}
+	_, err := builder.SealingSegment()
+	if err != nil {
+		return fmt.Errorf("invalid segment: %w", err)
+	}
+	return nil
+}
+
 var (
 	ErrSegmentMissingSeal        = fmt.Errorf("sealing segment failed sanity check: missing seal referenced by segment")
 	ErrSegmentBlocksWrongLen     = fmt.Errorf("sealing segment failed sanity check: non-root sealing segment must have at least 2 blocks")

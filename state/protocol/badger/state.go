@@ -95,7 +95,6 @@ func Bootstrap(
 		lowest := segment.Lowest()   // last sealed block
 
 		// 1) bootstrap the sealing segment
-		// TODO insert first seal
 		err = state.bootstrapSealingSegment(segment, highest)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
