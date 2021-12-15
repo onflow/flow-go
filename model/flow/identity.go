@@ -489,13 +489,14 @@ func (il IdentityList) SamplePct(pct float64) IdentityList {
 // where duplicates are identities with the same node ID.
 // The returned IdentityList is sorted
 func (il IdentityList) Union(other IdentityList) IdentityList {
+	lenUnion := len(il) + len(other)
 	// stores the output, the union of the two lists
-	if (len(il) + len(other)) == 0 {
+	if lenUnion == 0 {
 		return IdentityList{}
 	}
 
 	// add all identities together
-	union := make(IdentityList, 0, len(il)+len(other))
+	union := make(IdentityList, 0, lenUnion)
 	union = append(union, il[:]...)
 	union = append(union, other[:]...)
 
@@ -520,32 +521,30 @@ func (il IdentityList) Union(other IdentityList) IdentityList {
 			}
 		}
 	})
+	// At this point, 'union' has a sorted slice of identities, potentially with duplicates.
+	// We know that len(union) ≥ 1.
 
-	// at this point, 'union' has a sorted slice of identities, with duplicates
-	lenUnion := len(union)
-
-	// check for duplicates, there can only be duplicates if lenUnion > 1
+	// Deduplicate elements by scanning over union; we keep two index values:
+	// * lastUnique: largest index of the already de-duplicated portion of the slice
+	// * i: index of the element that we are inspecting whether it is a duplicate
+	// Example:
+	//   [▓,▓,▓,▓,▓,☐,☐,☐,☐,░ ,░,░,░,░]
+	//            ↑           ↑
+	//        lastUnique      i
+	//   ▓ deduplicated elements in ascending order
+	//   ☐ duplicated
+	//   ░ elements to be inspected
+	// We start with lastUnique=0 and i=1. Throughout the algorithm, we always
+	// have lastUnique < i. Whenever we find that union[lastUnique] != union[i],
+	// we have found the next unique element and move it at index union[lastUnique+1].
+	lastUnique := 0
 	for i := 1; i < lenUnion; i++ {
-		// detect a duplicate, only allocate 'retval' if necessary
-		if union[i].NodeID == union[i-1].NodeID {
-			retval := make(IdentityList, 0, len(il)+len(other))
-			retval = append(retval, union[0:i]...)
-
-			i++
-
-			// loop over the rest of the slice, appending non-duplicates
-			for ; i < lenUnion; i++ {
-				if union[i].NodeID == union[i-1].NodeID {
-					continue
-				}
-				retval = append(retval, union[i])
-			}
-			// time to return
-			return retval
+		if union[lastUnique].NodeID != union[i].NodeID {
+			lastUnique++
+			union[lastUnique] = union[i]
 		}
 	}
-
-	return union
+	return union[:lastUnique+1]
 }
 
 // EqualTo checks if the other list if the same, that it contains the same elements
