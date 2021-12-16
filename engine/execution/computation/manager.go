@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ipfs/go-cid"
 	jsoncdc "github.com/onflow/cadence/encoding/json"
 	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
@@ -231,7 +230,7 @@ func (e *Manager) ComputeBlock(
 	e.programsCache.Set(block.ID(), toInsert)
 
 	g, uploadCtx := errgroup.WithContext(ctx)
-	var rootCid cid.Cid
+	var rootID flow.Identifier
 
 	g.Go(func() error {
 		var collections []*flow.Collection
@@ -250,7 +249,7 @@ func (e *Manager) ComputeBlock(
 		}
 
 		var err error
-		rootCid, err = e.eds.Add(uploadCtx, ed)
+		rootID, err = e.eds.Add(uploadCtx, ed)
 		return err
 	})
 
@@ -272,7 +271,7 @@ func (e *Manager) ComputeBlock(
 		Hex("block_id", logging.Entity(result.ExecutableBlock.Block)).
 		Msg("computed block result")
 
-	result.ExecutionDataCID = rootCid
+	result.ExecutionDataID = rootID
 
 	return result, nil
 }

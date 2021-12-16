@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/blobs"
 	"github.com/onflow/flow-go/network"
@@ -27,10 +28,10 @@ var ErrBlobTreeDepthExceeded = errors.New("blob tree depth exceeded")
 type ExecutionDataService interface {
 	// Add constructs a blob tree for the given ExecutionData and
 	// adds it to the blobservice, and then returns the root CID.
-	Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error)
+	Add(ctx context.Context, sd *ExecutionData) (flow.Identifier, error)
 
 	// Get gets the ExecutionData for the given root CID from the blobservice.
-	Get(ctx context.Context, rootCid cid.Cid) (*ExecutionData, error)
+	Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error)
 }
 
 type executionDataServiceImpl struct {
@@ -40,6 +41,8 @@ type executionDataServiceImpl struct {
 	metrics     module.ExecutionDataServiceMetrics
 	logger      zerolog.Logger
 }
+
+var _ ExecutionDataService = (*executionDataServiceImpl)(nil)
 
 func NewExecutionDataService(
 	codec encoding.Codec,
@@ -174,7 +177,7 @@ func (s *executionDataServiceImpl) addBlobs(ctx context.Context, v interface{}, 
 }
 
 // Add constructs a blob tree for the given ExecutionData and adds it to the blobservice, and then returns the root CID.
-func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (cid.Cid, error) {
+func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (flow.Identifier, error) {
 	logger := s.logger.With().Str("block_id", sd.BlockID.String()).Logger()
 	logger.Debug().Msg("adding execution data")
 
@@ -186,7 +189,7 @@ func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (
 	if err != nil {
 		s.metrics.ExecutionDataAddFinished(time.Since(start), false, 0)
 
-		return cid.Undef, fmt.Errorf("failed to add execution data blobs: %w", err)
+		return flow.ZeroID, fmt.Errorf("failed to add execution data blobs: %w", err)
 	}
 
 	var blobTreeNodes int
@@ -205,13 +208,13 @@ func (s *executionDataServiceImpl) Add(ctx context.Context, sd *ExecutionData) (
 		if len(cids) == 1 {
 			s.metrics.ExecutionDataAddFinished(time.Since(start), true, blobTreeNodes)
 
-			return cids[0], nil
+			return flow.CidToFlowID(cids[0])
 		}
 
 		if cids, err = s.addBlobs(ctx, cids, logger); err != nil {
 			s.metrics.ExecutionDataAddFinished(time.Since(start), false, blobTreeNodes)
 
-			return cid.Undef, fmt.Errorf("failed to add cid blobs: %w", err)
+			return flow.ZeroID, fmt.Errorf("failed to add cid blobs: %w", err)
 		}
 	}
 }
@@ -345,7 +348,9 @@ func (s *executionDataServiceImpl) getBlobs(ctx context.Context, cids []cid.Cid,
 // - MalformedDataError if some level of the blob tree cannot be properly deserialized
 // - BlobSizeLimitExceededError if any blob in the blob tree exceeds the maximum blob size
 // - BlobNotFoundError if some CID in the blob tree could not be found from the blobservice
-func (s *executionDataServiceImpl) Get(ctx context.Context, rootCid cid.Cid) (*ExecutionData, error) {
+func (s *executionDataServiceImpl) Get(ctx context.Context, rootID flow.Identifier) (*ExecutionData, error) {
+	rootCid := flow.FlowIDToCid(rootID)
+
 	logger := s.logger.With().Str("cid", rootCid.String()).Logger()
 	logger.Debug().Msg("getting execution data")
 

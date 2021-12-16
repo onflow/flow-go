@@ -9,6 +9,9 @@ import (
 	"math/rand"
 	"reflect"
 
+	"github.com/ipfs/go-cid"
+	mh "github.com/multiformats/go-multihash"
+
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/fingerprint"
@@ -187,4 +190,27 @@ func Sample(size uint, ids ...Identifier) []Identifier {
 		dup[i], dup[j+i] = dup[j+i], dup[i]
 	}
 	return dup[:size]
+}
+
+func CidToFlowID(c cid.Cid) (Identifier, error) {
+	decoded, err := mh.Decode(c.Hash())
+
+	if err != nil {
+		return ZeroID, fmt.Errorf("failed to decode CID: %w", err)
+	}
+
+	if decoded.Code != mh.SHA2_256 {
+		return ZeroID, fmt.Errorf("unsupported CID hash function: %v", decoded.Name)
+	}
+
+	if decoded.Length != IdentifierLen {
+		return ZeroID, fmt.Errorf("invalid CID length: %d", decoded.Length)
+	}
+
+	return HashToID(decoded.Digest), nil
+}
+
+func FlowIDToCid(f Identifier) cid.Cid {
+	hash, _ := mh.Encode(f[:], mh.SHA2_256)
+	return cid.NewCidV0(hash)
 }

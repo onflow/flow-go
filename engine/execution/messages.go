@@ -1,8 +1,6 @@
 package execution
 
 import (
-	"github.com/ipfs/go-cid"
-
 	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/model/flow"
@@ -30,7 +28,7 @@ type ComputationResult struct {
 	ComputationUsed    uint64
 	StateReads         uint64
 	TrieUpdates        []*ledger.TrieUpdate
-	ExecutionDataCID   cid.Cid
+	ExecutionDataID    flow.Identifier
 }
 
 func (cr *ComputationResult) AddEvents(chunkIndex int, inp []flow.Event) {
