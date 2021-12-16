@@ -13,7 +13,7 @@ type GetExecutionResultByBlockIDs struct {
 	BlockIDs []flow.Identifier
 }
 
-func (g *GetExecutionResultByBlockIDs) Build(r *rest.Request) error {
+func (g *GetExecutionResultByBlockIDs) Build(r *Request) error {
 	return g.Parse(
 		r.GetQueryParams(blockIDQuery),
 	)
@@ -38,7 +38,7 @@ type GetExecutionResult struct {
 	ID flow.Identifier
 }
 
-func (g *GetExecutionResult) Build(r *rest.Request) error {
+func (g *GetExecutionResult) Build(r *Request) error {
 	err := g.Parse(
 		r.GetQueryParam(idQuery),
 	)

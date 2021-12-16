@@ -2,7 +2,6 @@ package request
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/model/flow"
 	"io"
 )
@@ -15,7 +14,7 @@ type GetScript struct {
 	Script      Script
 }
 
-func (g *GetScript) Build(r *rest.Request) error {
+func (g *GetScript) Build(r *Request) error {
 	return g.Parse(
 		r.GetQueryParam(blockHeightQuery),
 		r.GetQueryParam(blockIDQuery),

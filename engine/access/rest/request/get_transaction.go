@@ -1,9 +1,5 @@
 package request
 
-import (
-	"github.com/onflow/flow-go/engine/access/rest"
-)
-
 const resultExpandable = "result"
 
 type GetTransaction struct {
@@ -11,7 +7,7 @@ type GetTransaction struct {
 	ExpandsResult bool
 }
 
-func (g *GetTransaction) Build(r *rest.Request) error {
+func (g *GetTransaction) Build(r *Request) error {
 	err := g.GetByIDRequest.Build(r)
 	g.ExpandsResult = r.Expands(resultExpandable)
 

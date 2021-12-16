@@ -2,7 +2,6 @@ package request
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest"
 )
 
 const heightQuery = "height"
@@ -24,7 +23,7 @@ type GetBlock struct {
 	SealedHeight bool
 }
 
-func (g *GetBlock) Build(r *rest.Request) error {
+func (g *GetBlock) Build(r *Request) error {
 	return g.Parse(
 		r.GetQueryParams(heightQuery),
 		r.GetQueryParam(startHeightQuery),

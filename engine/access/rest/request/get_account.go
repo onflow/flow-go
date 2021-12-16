@@ -1,7 +1,6 @@
 package request
 
 import (
-	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -13,7 +12,7 @@ type GetAccount struct {
 	Height  uint64
 }
 
-func (g *GetAccount) Build(r *rest.Request) error {
+func (g *GetAccount) Build(r *Request) error {
 	return g.Parse(
 		r.GetVar(addressVar),
 		r.GetQueryParam(blockHeightQuery),
