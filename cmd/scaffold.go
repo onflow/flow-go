@@ -805,15 +805,15 @@ func (fnb *FlowNodeBuilder) handleComponent(v namedComponentFunc, parentReady <-
 
 		// if this is a Component, use the Startable interface to start the component, otherwise
 		// Ready() will launch it.
-		var isComponent bool
-		if component, isComponent := readyAware.(component.Component); isComponent {
+		component, isComponent := readyAware.(component.Component)
+		if isComponent {
 			component.Start(ctx)
 		}
 
 		// Wait until the component is ready
 		if err := util.WaitClosed(ctx, readyAware.Ready()); err != nil {
 			// The context was cancelled. Continue to on to shutdown logic.
-			logger.Info().Msg("component startup aborted")
+			logger.Warn().Msg("component startup aborted")
 
 			// Non-idempotent ReadyDoneAware components trigger shutdown by calling Done(). Don't
 			// do that here since it may not be safe if the component is not Ready().
