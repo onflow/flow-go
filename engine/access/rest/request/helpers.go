@@ -1,6 +1,7 @@
 package request
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -80,4 +81,12 @@ func (g *GetByIDRequest) Parse(rawID string) error {
 	g.ID = id.Flow()
 
 	return nil
+}
+
+func fromBase64(bytesStr string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(bytesStr)
+}
+
+func fromUint64(number uint64) string {
+	return fmt.Sprintf("%d", number)
 }
