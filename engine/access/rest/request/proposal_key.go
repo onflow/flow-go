@@ -10,19 +10,19 @@ type proposalKeyBody struct {
 
 type ProposalKey flow.ProposalKey
 
-func (p *ProposalKey) Parse(rawAddress string, rawIndex string, rawSeq string) error {
+func (p *ProposalKey) Parse(raw proposalKeyBody) error {
 	var address Address
-	err := address.Parse(rawAddress)
+	err := address.Parse(raw.Address)
 	if err != nil {
 		return err
 	}
 
-	keyIndex, err := toUint64(rawIndex)
+	keyIndex, err := toUint64(raw.KeyIndex)
 	if err != nil {
 		return err
 	}
 
-	seqNumber, err := toUint64(rawSeq)
+	seqNumber, err := toUint64(raw.SequenceNumber)
 	if err != nil {
 		return err
 	}
