@@ -1,4 +1,4 @@
-package request
+package response
 
 import (
 	"github.com/onflow/flow-go/engine/access/rest"
