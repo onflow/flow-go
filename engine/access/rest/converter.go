@@ -4,12 +4,13 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
-	"github.com/onflow/flow-go/model/flow"
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/generated"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 // Converter provides functionality to convert from request models generated using
