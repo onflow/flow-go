@@ -16,8 +16,8 @@ const (
 // number of entries we try to eject before giving up and ejecting LRU
 const maximumRandomTrials = 10
 
-// VIndex is data type representing an entity index in EntityDoubleLinkedList.
-type VIndex uint32
+// EIndex is data type representing an entity index in EntityDoubleLinkedList.
+type EIndex uint32
 
 // doubleLinkedListPointer represents a slice-based linked list pointer. Instead of pointing
 // to a memory address, this pointer points to a slice index.
@@ -42,13 +42,13 @@ func (d *doubleLinkedListPointer) setUndefined() {
 }
 
 // sliceIndex returns the slice-index equivalent of the pointer.
-func (d doubleLinkedListPointer) sliceIndex() VIndex {
-	return VIndex(d.pointerValue) - 1
+func (d doubleLinkedListPointer) sliceIndex() EIndex {
+	return EIndex(d.pointerValue) - 1
 }
 
 // setPointer converts the input slice-based index into a slice-based pointer and
 // sets the underlying pointer.
-func (d *doubleLinkedListPointer) setPointer(sliceIndex VIndex) {
+func (d *doubleLinkedListPointer) setPointer(sliceIndex EIndex) {
 	d.pointerValue = uint32(sliceIndex + 1)
 }
 
@@ -109,13 +109,13 @@ func (e *EntityDoubleLinkedList) initFreeEntities(limit uint32) {
 
 	for i := uint32(1); i < limit; i++ {
 		// appends slice index i to tail of free linked list
-		e.link(e.free.tail, VIndex(i))
+		e.link(e.free.tail, EIndex(i))
 		// and updates its tail
-		e.free.tail.setPointer(VIndex(i))
+		e.free.tail.setPointer(EIndex(i))
 	}
 }
 
-func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) VIndex {
+func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) EIndex {
 	entityIndex := e.sliceIndexForEntity()
 	e.values[entityIndex].entity = entity
 	e.values[entityIndex].id = entityId
@@ -140,11 +140,11 @@ func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entit
 	return entityIndex
 }
 
-func (e EntityDoubleLinkedList) Get(entityIndex VIndex) (flow.Identifier, flow.Entity, uint64) {
+func (e EntityDoubleLinkedList) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
 	return e.values[entityIndex].id, e.values[entityIndex].entity, e.values[entityIndex].owner
 }
 
-func (e *EntityDoubleLinkedList) sliceIndexForEntity() VIndex {
+func (e *EntityDoubleLinkedList) sliceIndexForEntity() EIndex {
 	if e.free.head.isUndefined() {
 		// we are at limit
 		// array back data is full
@@ -191,23 +191,23 @@ func (e EntityDoubleLinkedList) getTails() (*cachedEntity, *cachedEntity) {
 	return usedTail, freeTail
 }
 
-func (e *EntityDoubleLinkedList) link(prev doubleLinkedListPointer, next VIndex) {
+func (e *EntityDoubleLinkedList) link(prev doubleLinkedListPointer, next EIndex) {
 	e.values[prev.sliceIndex()].node.next.setPointer(next)
 	e.values[next].node.prev = prev
 }
 
-func (e *EntityDoubleLinkedList) invalidateHead() VIndex {
+func (e *EntityDoubleLinkedList) invalidateHead() EIndex {
 	headSliceIndex := e.used.head.sliceIndex()
 	e.invalidateEntityAtIndex(headSliceIndex)
 
 	return headSliceIndex
 }
 
-func (e *EntityDoubleLinkedList) invalidateRandomEntity() VIndex {
+func (e *EntityDoubleLinkedList) invalidateRandomEntity() EIndex {
 	var index = e.used.head.sliceIndex()
 
 	for i := 0; i < maximumRandomTrials; i++ {
-		candidate := VIndex(rand.Uint32() % e.total)
+		candidate := EIndex(rand.Uint32() % e.total)
 		if !e.isInvalidated(candidate) {
 			// found an invalidated entity
 			index = candidate
@@ -219,7 +219,7 @@ func (e *EntityDoubleLinkedList) invalidateRandomEntity() VIndex {
 	return index
 }
 
-func (e *EntityDoubleLinkedList) claimFreeHead() VIndex {
+func (e *EntityDoubleLinkedList) claimFreeHead() EIndex {
 	oldFreeHeadIndex := e.free.head.sliceIndex()
 	// moves head forward
 	e.free.head = e.values[oldFreeHeadIndex].node.next
@@ -243,11 +243,11 @@ func (e *EntityDoubleLinkedList) claimFreeHead() VIndex {
 	return oldFreeHeadIndex
 }
 
-func (e *EntityDoubleLinkedList) Rem(sliceIndex VIndex) {
+func (e *EntityDoubleLinkedList) Rem(sliceIndex EIndex) {
 	e.invalidateEntityAtIndex(sliceIndex)
 }
 
-func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex VIndex) {
+func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex EIndex) {
 	prev := e.values[sliceIndex].node.prev
 	next := e.values[sliceIndex].node.next
 
@@ -294,7 +294,7 @@ func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex VIndex) {
 	e.total--
 }
 
-func (e *EntityDoubleLinkedList) appendToFreeList(sliceIndex VIndex) {
+func (e *EntityDoubleLinkedList) appendToFreeList(sliceIndex EIndex) {
 	if e.free.head.isUndefined() {
 		// free list is empty
 		e.free.head.setPointer(sliceIndex)
@@ -306,7 +306,7 @@ func (e *EntityDoubleLinkedList) appendToFreeList(sliceIndex VIndex) {
 	e.free.tail.setPointer(sliceIndex)
 }
 
-func (e EntityDoubleLinkedList) isInvalidated(sliceIndex VIndex) bool {
+func (e EntityDoubleLinkedList) isInvalidated(sliceIndex EIndex) bool {
 	if e.values[sliceIndex].id != flow.ZeroID {
 		return false
 	}

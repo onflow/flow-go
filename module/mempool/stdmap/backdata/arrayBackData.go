@@ -40,9 +40,9 @@ type sIndex uint64
 type idPrefix uint32
 
 type key struct {
-	keyIndex   uint64                 // slot age
-	valueIndex arraylinkedlist.VIndex // link to key value pair
-	idPref     idPrefix               // 32bits of key sha256
+	keyIndex    uint64                 // slot age.
+	entityIndex arraylinkedlist.EIndex // link to actual entity.
+	idPref      idPrefix               // 32-bits prefix of entity identifier.
 }
 
 // keyBucket represents a bucket of keys.
@@ -224,7 +224,7 @@ func (a *ArrayBackData) put(entityId flow.Identifier, entity flow.Entity) bool {
 	a.keyCount++
 	entityIndex := a.entities.Add(entityId, entity, a.ownerIndexOf(bucketIndex, slotToUse))
 	a.buckets[bucketIndex][slotToUse].keyIndex = a.keyCount
-	a.buckets[bucketIndex][slotToUse].valueIndex = entityIndex
+	a.buckets[bucketIndex][slotToUse].entityIndex = entityIndex
 	a.buckets[bucketIndex][slotToUse].idPref = idPref
 	return true
 }
@@ -347,7 +347,7 @@ func (a *ArrayBackData) linkedEntityOf(bucketIndex bIndex, slotIndex sIndex) (fl
 	}
 
 	// retrieving entity index in the underlying entities linked-list
-	valueIndex := a.buckets[bucketIndex][slotIndex].valueIndex
+	valueIndex := a.buckets[bucketIndex][slotIndex].entityIndex
 	id, entity, owner := a.entities.Get(valueIndex)
 	if a.ownerIndexOf(bucketIndex, slotIndex) != owner {
 		// entity is not linked to this (bucketIndex, slotIndex)
@@ -396,5 +396,5 @@ func (a *ArrayBackData) invalidateKey(bucketIndex bIndex, slotIndex sIndex) {
 // invalidateEntity removes the entity linked to the specified slot from the underlying entities
 // list. So that entity slot is made available to take if needed.
 func (a *ArrayBackData) invalidateEntity(bucketIndex bIndex, slotIndex sIndex) {
-	a.entities.Rem(a.buckets[bucketIndex][slotIndex].valueIndex)
+	a.entities.Rem(a.buckets[bucketIndex][slotIndex].entityIndex)
 }

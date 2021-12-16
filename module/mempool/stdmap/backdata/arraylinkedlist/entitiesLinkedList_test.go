@@ -97,7 +97,7 @@ func testArrayBackDataStoreAndRetrievalWithLRUEjection(t *testing.T, limit uint3
 
 	withTestScenario(t, limit, entityCount, LRUEjection,
 		append(h, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testRetrievingLastXSavedEntities(t, list, entities, VIndex(entityCount-limit))
+			testRetrievingLastXSavedEntities(t, list, entities, EIndex(entityCount-limit))
 		})...,
 	)
 }
@@ -255,7 +255,7 @@ func testInvalidatingHead(t *testing.T, list *EntityDoubleLinkedList, entities [
 	offset := len(list.values) - size
 	for i := 0; i < size; i++ {
 		headIndex := list.invalidateHead()
-		require.Equal(t, VIndex(i), headIndex)
+		require.Equal(t, EIndex(i), headIndex)
 
 		// size of list should be shrunk after each invalidation.
 		require.Equal(t, uint32(size-i-1), list.Size())
@@ -266,12 +266,12 @@ func testInvalidatingHead(t *testing.T, list *EntityDoubleLinkedList, entities [
 			// number of entities is below limit
 			// free must head keeps pointing to first empty index after
 			// adding all entities.
-			require.Equal(t, VIndex(size), list.free.head.sliceIndex())
+			require.Equal(t, EIndex(size), list.free.head.sliceIndex())
 		} else {
 			// number of entities is greater than or equal to limit
 			// free head must be updated to first element (i.e., index 0)
 			// and must be kept there for entire test (as we invalidate head not tail).
-			require.Equal(t, VIndex(0), list.free.head.sliceIndex())
+			require.Equal(t, EIndex(0), list.free.head.sliceIndex())
 		}
 
 		// except when the list is empty, head must be updated after invalidation,
@@ -311,12 +311,12 @@ func testInvalidatingHead(t *testing.T, list *EntityDoubleLinkedList, entities [
 			//
 			// used tail should point to the last element in list
 			require.Equal(t, entities[size-1].ID(), usedTail.id)
-			require.Equal(t, VIndex(size-1), list.used.tail.sliceIndex())
+			require.Equal(t, EIndex(size-1), list.used.tail.sliceIndex())
 
 			// used head must point to the next element in the list,
 			// i.e., invalidating head moves it forward.
 			require.Equal(t, entities[i+1].ID(), usedHead.id)
-			require.Equal(t, VIndex(i+1), list.used.head.sliceIndex())
+			require.Equal(t, EIndex(i+1), list.used.head.sliceIndex())
 		} else {
 			// list is empty
 			// used head and tail must be nil and their corresponding
@@ -337,7 +337,7 @@ func testInvalidatingTail(t *testing.T, list *EntityDoubleLinkedList, entities [
 	for i := 0; i < size; i++ {
 		// invalidates tail index
 		tailIndex := list.used.tail.sliceIndex()
-		require.Equal(t, VIndex(size-1-i), tailIndex)
+		require.Equal(t, EIndex(size-1-i), tailIndex)
 
 		list.invalidateEntityAtIndex(tailIndex)
 		// old head index must be invalidated
@@ -349,12 +349,12 @@ func testInvalidatingTail(t *testing.T, list *EntityDoubleLinkedList, entities [
 			// number of entities is below limit
 			// free must head keeps pointing to first empty index after
 			// adding all entities.
-			require.Equal(t, VIndex(size), list.free.head.sliceIndex())
+			require.Equal(t, EIndex(size), list.free.head.sliceIndex())
 		} else {
 			// number of entities is greater than or equal to limit
 			// free head must be updated to last element in the list (size - 1),
 			// and must be kept there for entire test (as we invalidate tail not head).
-			require.Equal(t, VIndex(size-1), list.free.head.sliceIndex())
+			require.Equal(t, EIndex(size-1), list.free.head.sliceIndex())
 		}
 
 		// size of list should be shrunk after each invalidation.
@@ -399,11 +399,11 @@ func testInvalidatingTail(t *testing.T, list *EntityDoubleLinkedList, entities [
 			//
 			// used tail should move backward after each invalidation
 			require.Equal(t, entities[size-i-2].ID(), usedTail.id)
-			require.Equal(t, VIndex(size-i-2), list.used.tail.sliceIndex())
+			require.Equal(t, EIndex(size-i-2), list.used.tail.sliceIndex())
 
 			// used head must point to the first element in the list,
 			require.Equal(t, entities[0].ID(), usedHead.id)
-			require.Equal(t, VIndex(0), list.used.head.sliceIndex())
+			require.Equal(t, EIndex(0), list.used.head.sliceIndex())
 		} else {
 			// list is empty
 			// used head and tail must be nil and their corresponding
@@ -426,24 +426,24 @@ func testInitialization(t *testing.T, list *EntityDoubleLinkedList, _ []*unittes
 	for i := 0; i < len(list.values); i++ {
 		if i == 0 {
 			// head of embedded "free" linked-list should point to index 0 of entities slice.
-			require.Equal(t, VIndex(i), list.free.head.sliceIndex())
+			require.Equal(t, EIndex(i), list.free.head.sliceIndex())
 			// previous element of tail must be undefined.
 			require.True(t, list.values[i].node.prev.isUndefined())
 		}
 
 		if i != 0 {
 			// except head, any element should point back to its previous index in slice.
-			require.Equal(t, VIndex(i-1), list.values[i].node.prev.sliceIndex())
+			require.Equal(t, EIndex(i-1), list.values[i].node.prev.sliceIndex())
 		}
 
 		if i != len(list.values)-1 {
 			// except tail, any element should point forward to its next index in slice.
-			require.Equal(t, VIndex(i+1), list.values[i].node.next.sliceIndex())
+			require.Equal(t, EIndex(i+1), list.values[i].node.next.sliceIndex())
 		}
 
 		if i == len(list.values)-1 {
 			// tail of embedded "free" linked-list should point to the last index in entities slice.
-			require.Equal(t, VIndex(i), list.free.tail.sliceIndex())
+			require.Equal(t, EIndex(i), list.free.tail.sliceIndex())
 			// next element of tail must be undefined.
 			require.True(t, list.values[i].node.next.isUndefined())
 		}
@@ -463,7 +463,7 @@ func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBe
 
 		if ejectionMode == LRUEjection {
 			// entity should be placed at index i in back data
-			_, entity, _ := list.Get(VIndex(i % len(list.values)))
+			_, entity, _ := list.Get(EIndex(i % len(list.values)))
 			require.Equal(t, e, entity)
 		}
 
@@ -491,7 +491,7 @@ func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBe
 		// as long as we are below limit, after adding i element, free head
 		// should move to i+1 element.
 		if i < len(list.values)-1 {
-			require.Equal(t, VIndex(i+1), list.free.head.sliceIndex())
+			require.Equal(t, EIndex(i+1), list.free.head.sliceIndex())
 			require.True(t, freeHead.node.prev.isUndefined())
 		} else {
 			require.Nil(t, freeHead)
@@ -499,7 +499,7 @@ func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBe
 
 		// free tail
 		if i < len(list.values)-1 {
-			require.Equal(t, VIndex(len(list.values)-1), list.free.tail.sliceIndex())
+			require.Equal(t, EIndex(len(list.values)-1), list.free.tail.sliceIndex())
 			require.True(t, freeTail.node.next.isUndefined())
 		} else {
 			require.Nil(t, freeTail)
@@ -551,9 +551,9 @@ func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBe
 	}
 }
 
-func testRetrievingLastXSavedEntities(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity, from VIndex) {
-	for i := from; i < VIndex(len(entities)); i++ {
-		actualID, actual, _ := list.Get(i % VIndex(len(list.values)))
+func testRetrievingLastXSavedEntities(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity, from EIndex) {
+	for i := from; i < EIndex(len(entities)); i++ {
+		actualID, actual, _ := list.Get(i % EIndex(len(list.values)))
 		require.Equal(t, entities[i].ID(), actualID)
 		require.Equal(t, entities[i], actual)
 	}
@@ -562,9 +562,9 @@ func testRetrievingLastXSavedEntities(t *testing.T, list *EntityDoubleLinkedList
 func testRetrievingCount(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity, expected int) {
 	actualRetrievable := 0
 
-	for i := VIndex(0); i < VIndex(len(entities)); i++ {
-		for j := VIndex(0); j < VIndex(len(list.values)); j++ {
-			actualID, actual, _ := list.Get(j % VIndex(len(list.values)))
+	for i := EIndex(0); i < EIndex(len(entities)); i++ {
+		for j := EIndex(0); j < EIndex(len(list.values)); j++ {
+			actualID, actual, _ := list.Get(j % EIndex(len(list.values)))
 			if entities[i].ID() == actualID && entities[i] == actual {
 				actualRetrievable++
 			}
@@ -593,8 +593,8 @@ func withTestScenario(t *testing.T,
 	}
 }
 
-func tailAccessibleFromHead(t *testing.T, headSliceIndex VIndex, tailSliceIndex VIndex, list *EntityDoubleLinkedList, total uint32) {
-	seen := make(map[VIndex]struct{})
+func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, list *EntityDoubleLinkedList, total uint32) {
+	seen := make(map[EIndex]struct{})
 
 	index := headSliceIndex
 	for i := uint32(0); i < total; i++ {
@@ -612,8 +612,8 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex VIndex, tailSliceIndex 
 	}
 }
 
-func headAccessibleFromTail(t *testing.T, headSliceIndex VIndex, tailSliceIndex VIndex, list *EntityDoubleLinkedList, total uint32) {
-	seen := make(map[VIndex]struct{})
+func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, list *EntityDoubleLinkedList, total uint32) {
+	seen := make(map[EIndex]struct{})
 
 	index := tailSliceIndex
 	for i := uint32(0); i < total; i++ {

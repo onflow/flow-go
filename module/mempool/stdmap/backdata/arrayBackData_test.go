@@ -24,13 +24,13 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 	testAddEntities(t, bd, entities)
 
 	// sanity checks
-	for i := arraylinkedlist.VIndex(0); i < arraylinkedlist.VIndex(len(entities)); i++ {
+	for i := arraylinkedlist.EIndex(0); i < arraylinkedlist.EIndex(len(entities)); i++ {
 		// since we are below limit, elements should be added sequentially at bucket 0.
 		// first added element has a key index of 1, since 0 means unused key index in implementation.
 		require.Equal(t, bd.buckets[0][i].keyIndex, uint64(i+1))
-		// also, since we have not yet over-limited, entities are received valueIndex in the same order they
+		// also, since we have not yet over-limited, entities are received entityIndex in the same order they
 		// are added.
-		require.Equal(t, bd.buckets[0][i].valueIndex, i)
+		require.Equal(t, bd.buckets[0][i].entityIndex, i)
 		_, _, owner := bd.entities.Get(i)
 		require.Equal(t, owner, uint64(i))
 	}
