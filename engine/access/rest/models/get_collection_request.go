@@ -5,7 +5,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-const id = "id"
 const expandsTransactions = "transactions"
 
 type GetCollectionRequest struct {

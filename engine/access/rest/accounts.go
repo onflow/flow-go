@@ -2,48 +2,30 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/engine/access/rest/models"
 )
 
 const blockHeightQueryParam = "block_height"
 
 // getAccount handler retrieves account by address and returns the response
 func getAccount(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	address, err := toAddress(r.GetVar("address"))
+	req, err := r.getAccountRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, err
 	}
 
-	// retrieve account and decide based on provided query params which rpc method to envoke
-	var account *flow.Account
-	height := r.GetQueryParam(blockHeightQueryParam)
-	switch height {
-	case sealedHeightQueryParam:
-		account, err = backend.GetAccountAtLatestBlock(r.Context(), address)
+	// in case we provide special height values 'final' and 'sealed' fetch that height and overwrite request wtih it
+	if req.Height == models.FinalHeight || req.Height == models.SealedHeight {
+		header, err := backend.GetLatestBlockHeader(r.Context(), req.Height == models.SealedHeight)
 		if err != nil {
 			return nil, err
 		}
-	case finalHeightQueryParam:
-		// GetAccountAtLatestBlock only lookups account at the latest sealed block, to lookup account at the
-		// finalized block we need to first call GetLatestBlockHeader to get the latest finalized height,
-		// and then call GetAccountAtBlockHeight
-		finalizedBlkHeader, err := backend.GetLatestBlockHeader(r.Context(), false)
-		if err != nil {
-			return nil, err
-		}
-		account, err = backend.GetAccountAtBlockHeight(r.Context(), address, finalizedBlkHeader.Height)
-		if err != nil {
-			return nil, err
-		}
-	default:
-		h, err := toHeight(height)
-		if err != nil {
-			return nil, NewBadRequestError(err)
-		}
-		account, err = backend.GetAccountAtBlockHeight(r.Context(), address, h)
-		if err != nil {
-			return nil, err
-		}
+		req.Height = header.Height
+	}
+
+	account, err := backend.GetAccountAtBlockHeight(r.Context(), req.Address, req.Height)
+	if err != nil {
+		return nil, err
 	}
 
 	return accountResponse(account, link, r.expandFields)

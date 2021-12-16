@@ -66,6 +66,12 @@ func (rd *Request) getCollectionRequest() (models.GetCollectionRequest, error) {
 	return getCollectionRequest, err
 }
 
+func (rd *Request) getAccountRequest() (models.GetAccountRequest, error) {
+	var getAccountRequest models.GetAccountRequest
+	err := getAccountRequest.Build(rd)
+	return getAccountRequest, err
+}
+
 func (rd *Request) Expands(field string) bool {
 	return rd.expandFields[field]
 }
