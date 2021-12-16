@@ -16,7 +16,7 @@ import (
 func TestArrayBackData_SingleBucket(t *testing.T) {
 	limit := 10
 
-	bd := NewArrayBackData(uint32(limit), 1, arraylinkedlist.LRUEjection)
+	bd := NewArrayBackData(uint32(limit), 1, arraylinkedlist.LRUEjection, unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -44,7 +44,7 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 func TestArrayBackData_Adjust(t *testing.T) {
 	limit := 100_000
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection)
+	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection, unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -116,7 +116,7 @@ func TestArrayBackData_Adjust(t *testing.T) {
 func TestArrayBackData_WriteHeavy(t *testing.T) {
 	limit := 100_000
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection)
+	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection, unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -133,7 +133,7 @@ func TestArrayBackData_LRU_Ejection(t *testing.T) {
 	limit := 100_000
 	items := uint(1_000_000)
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection)
+	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection, unittest.Logger())
 
 	entities := unittest.EntityListFixture(items)
 
@@ -151,7 +151,7 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 	limit := 100_000
 	items := uint(1_000_000)
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.RandomEjection)
+	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.RandomEjection, unittest.Logger())
 
 	entities := unittest.EntityListFixture(items)
 
@@ -166,7 +166,7 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 func TestArrayBackData_AddDuplicate(t *testing.T) {
 	limit := 100
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection)
+	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection, unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -186,7 +186,7 @@ func TestArrayBackData_AddDuplicate(t *testing.T) {
 func TestArrayBackData_Clear(t *testing.T) {
 	limit := 100
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection)
+	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection, unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -238,7 +238,7 @@ func TestArrayBackData_All(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d-limit-%d-items-%s-ejection", tc.limit, tc.items, tc.ejectionMode), func(t *testing.T) {
-			bd := NewArrayBackData(tc.limit, 8, tc.ejectionMode)
+			bd := NewArrayBackData(tc.limit, 8, tc.ejectionMode, unittest.Logger())
 			entities := unittest.EntityListFixture(uint(tc.items))
 
 			testAddEntities(t, bd, entities)
@@ -296,7 +296,7 @@ func TestArrayBackData_Rem(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d-limit-%d-items-%dfrom-%dcount", tc.limit, tc.items, tc.from, tc.count), func(t *testing.T) {
-			bd := NewArrayBackData(tc.limit, 8, arraylinkedlist.RandomEjection)
+			bd := NewArrayBackData(tc.limit, 8, arraylinkedlist.RandomEjection, unittest.Logger())
 			entities := unittest.EntityListFixture(uint(tc.items))
 
 			testAddEntities(t, bd, entities)

@@ -49,8 +49,7 @@ func BenchmarkArrayBackDataLRU(b *testing.B) {
 	limit := uint(50_000)
 
 	backData := stdmap.NewBackendWithBackData(
-		backdata.NewArrayBackData(uint32(limit),
-			8, arraylinkedlist.LRUEjection),
+		backdata.NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection, unittest.Logger()),
 		stdmap.WithLimit(limit))
 
 	entities := unittest.EntityListFixture(uint(100_000_000))
