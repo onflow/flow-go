@@ -1,11 +1,11 @@
 package common
 
-// models full level 2 summary of a test run from 1 or more level 1 test runs
+// TestSummary2 models full level 2 summary of a test run from 1 or more level 1 test runs.
 type TestSummary2 struct {
 	TestResults map[string]*TestResultSummary `json:"tests"`
 }
 
-// models all results from a specific test over many (level 1) test runs
+// TestResultSummary models all results from a specific test over many (level 1) test runs.
 type TestResultSummary struct {
 	Test            string    `json:"test"`
 	Package         string    `json:"package"`
