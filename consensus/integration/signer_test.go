@@ -43,6 +43,6 @@ func (*Signer) VerifyVote(voterID *flow.Identity, sigData []byte, block *model.B
 	return nil
 }
 
-func (*Signer) VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
-	return true, nil
+func (*Signer) VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) error {
+	return nil
 }

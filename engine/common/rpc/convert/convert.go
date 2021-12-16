@@ -388,7 +388,7 @@ func BytesToInmemSnapshot(bytes []byte) (*inmem.Snapshot, error) {
 	var encodable inmem.EncodableSnapshot
 	err := json.Unmarshal(bytes, &encodable)
 	if err != nil {
-		return nil, fmt.Errorf("could not unmarshal snapshot data retreived from access node: %w", err)
+		return nil, fmt.Errorf("could not unmarshal decoded snapshot: %w", err)
 	}
 
 	return inmem.SnapshotFromEncodable(encodable), nil

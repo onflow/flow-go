@@ -13,7 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/spf13/pflag"
 
-	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
+	"github.com/onflow/flow-core-contracts/lib/go/templates"
 
 	"github.com/onflow/flow-go/cmd"
 	"github.com/onflow/flow-go/consensus"
@@ -30,13 +30,17 @@ import (
 	"github.com/onflow/flow-go/engine/execution/checker"
 	"github.com/onflow/flow-go/engine/execution/computation"
 	"github.com/onflow/flow-go/engine/execution/computation/committer"
+	"github.com/onflow/flow-go/engine/execution/computation/computer/uploader"
 	"github.com/onflow/flow-go/engine/execution/ingestion"
 	exeprovider "github.com/onflow/flow-go/engine/execution/provider"
 	"github.com/onflow/flow-go/engine/execution/rpc"
 	"github.com/onflow/flow-go/engine/execution/state"
 	"github.com/onflow/flow-go/engine/execution/state/bootstrap"
+	"github.com/onflow/flow-go/engine/execution/state/delta"
 	"github.com/onflow/flow-go/fvm"
 	"github.com/onflow/flow-go/fvm/extralog"
+	"github.com/onflow/flow-go/fvm/programs"
+	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	ledger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
@@ -179,7 +183,7 @@ func main() {
 		}).
 		Module("execution receipts storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			results = storage.NewExecutionResults(node.Metrics.Cache, node.DB)
-			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts)
+			myReceipts = storage.NewMyExecutionReceipts(node.Metrics.Cache, node.DB, node.Storage.Receipts.(*storage.ExecutionReceipts))
 			return nil
 		}).
 		Module("pending block cache", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -382,8 +386,58 @@ func main() {
 				chdpQueryTimeout,
 				chdpDeliveryTimeout,
 			)
+			if err != nil {
+				return nil, err
+			}
 
-			return providerEngine, err
+			// Get latest executed block and a view at that block
+			ctx := context.Background()
+			_, blockID, err := executionState.GetHighestExecutedBlockID(ctx)
+			if err != nil {
+				return nil, fmt.Errorf("cannot get the latest executed block id: %w", err)
+			}
+			stateCommit, err := executionState.StateCommitmentByBlockID(ctx, blockID)
+			if err != nil {
+				return nil, fmt.Errorf("cannot get the state comitment at latest executed block id %s: %w", blockID.String(), err)
+			}
+			blockView := executionState.NewView(stateCommit)
+
+			// Get the epoch counter from the smart contract at the last executed block.
+			contractEpochCounter, err := getContractEpochCounter(vm, vmCtx, blockView)
+			// Failing to fetch the epoch counter from the smart contract is a fatal error.
+			if err != nil {
+				return nil, fmt.Errorf("cannot get epoch counter from the smart contract at block %s: %w", blockID.String(), err)
+			}
+
+			// Get the epoch counter form the protocol state, at the same block.
+			protocolStateEpochCounter, err := node.State.
+				AtBlockID(blockID).
+				Epochs().
+				Current().
+				Counter()
+			// Failing to fetch the epoch counter from the protocol state is a fatal error.
+			if err != nil {
+				return nil, fmt.Errorf("cannot get epoch counter from the protocol state at block %s: %w", blockID.String(), err)
+			}
+
+			l := node.Logger.With().
+				Str("component", "provider engine").
+				Uint64("contractEpochCounter", contractEpochCounter).
+				Uint64("protocolStateEpochCounter", protocolStateEpochCounter).
+				Str("blockID", blockID.String()).
+				Logger()
+
+			if contractEpochCounter != protocolStateEpochCounter {
+				// Do not error, because immediately following a spork they will be mismatching,
+				// until the resetEpoch transaction is submitted.
+				l.Warn().
+					Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state mismatch!")
+			} else {
+				l.Info().
+					Msg("Epoch counter from the FlowEpoch smart contract and from the protocol state match.")
+			}
+
+			return providerEngine, nil
 		}).
 		Component("checker engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			checkerEng = checker.New(
@@ -556,6 +610,40 @@ func main() {
 			rpcEng := rpc.New(node.Logger, rpcConf, ingestionEng, node.Storage.Blocks, node.Storage.Headers, node.State, events, results, txResults, node.RootChainID)
 			return rpcEng, nil
 		}).Run()
+}
+
+// getContractEpochCounter Gets the epoch counters from the FlowEpoch smart contract from the view provided.
+func getContractEpochCounter(vm *fvm.VirtualMachine, vmCtx fvm.Context, view *delta.View) (uint64, error) {
+	// Get the address of the FlowEpoch smart contract
+	sc, err := systemcontracts.SystemContractsForChain(vmCtx.Chain.ChainID())
+	if err != nil {
+		return 0, fmt.Errorf("could not get system contracts: %w", err)
+	}
+	address := sc.Epoch.Address
+
+	// Generate the script to get the epoch counter from the FlowEpoch smart contract
+	scriptCode := templates.GenerateGetCurrentEpochCounterScript(templates.Environment{
+		EpochAddress: address.Hex(),
+	})
+	script := fvm.Script(scriptCode)
+
+	// Create empty programs cache
+	p := programs.NewEmptyPrograms()
+
+	// execute the script
+	err = vm.Run(vmCtx, script, view, p)
+	if err != nil {
+		return 0, fmt.Errorf("could not read epoch counter, script internal error: %w", script.Err)
+	}
+	if script.Err != nil {
+		return 0, fmt.Errorf("could not read epoch counter, script error: %w", script.Err)
+	}
+	if script.Value == nil {
+		return 0, fmt.Errorf("could not read epoch counter, script returned no value")
+	}
+
+	epochCounter := script.Value.ToGoValue().(uint64)
+	return epochCounter, nil
 }
 
 // copy the checkpoint files from the bootstrap folder to the execution state folder

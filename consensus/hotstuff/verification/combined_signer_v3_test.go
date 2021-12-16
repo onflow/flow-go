@@ -22,23 +22,22 @@ import (
 // the sig is a random beacon sig.
 func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	// prepare data
-	dkgKey := unittest.DKGParticipantPriv()
-	pk := dkgKey.RandomBeaconPrivKey.PublicKey()
-	signerID := dkgKey.NodeID
+	dkgKey := unittest.RandomBeaconPriv()
+	pk := dkgKey.PublicKey()
 	view := uint64(20)
 
 	fblock := unittest.BlockFixture()
-	fblock.Header.ProposerID = signerID
 	fblock.Header.View = view
 	block := model.BlockFromFlow(fblock.Header, 10)
+	signerID := fblock.Header.ProposerID
 
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
-	keys := &storagemock.DKGKeys{}
+	keys := &storagemock.SafeBeaconKeys{}
 	// there is DKG key for this epoch
-	keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
+	keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
 
 	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
@@ -71,7 +70,7 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 	// check that a created proposal's signature is a combined staking sig and random beacon sig
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	beaconSig, err := dkgKey.RandomBeaconPrivKey.Sign(msg, crypto.NewBLSKMAC(encoding.RandomBeaconTag))
+	beaconSig, err := dkgKey.Sign(msg, crypto.NewBLSKMAC(encoding.RandomBeaconTag))
 	require.NoError(t, err)
 
 	expectedSig := signature.EncodeSingleSig(hotstuff.SigTypeRandomBeacon, beaconSig)
@@ -82,23 +81,22 @@ func TestCombinedSignWithDKGKeyV3(t *testing.T) {
 // the sig is a staking sig
 func TestCombinedSignWithNoDKGKeyV3(t *testing.T) {
 	// prepare data
-	dkgKey := unittest.DKGParticipantPriv()
-	pk := dkgKey.RandomBeaconPrivKey.PublicKey()
-	signerID := dkgKey.NodeID
+	dkgKey := unittest.RandomBeaconPriv()
+	pk := dkgKey.PublicKey()
 	view := uint64(20)
 
 	fblock := unittest.BlockFixture()
-	fblock.Header.ProposerID = signerID
 	fblock.Header.View = view
 	block := model.BlockFromFlow(fblock.Header, 10)
+	signerID := fblock.Header.ProposerID
 
 	epochCounter := uint64(3)
 	epochLookup := &modulemock.EpochLookup{}
 	epochLookup.On("EpochForViewWithFallback", view).Return(epochCounter, nil)
 
-	keys := &storagemock.DKGKeys{}
+	keys := &storagemock.SafeBeaconKeys{}
 	// there is no DKG key for this epoch
-	keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
+	keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(nil, false, nil)
 
 	beaconKeyStore := signature.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
