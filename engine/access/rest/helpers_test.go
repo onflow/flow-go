@@ -39,6 +39,7 @@ func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, 
 func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {
 	rr := executeRequest(req, backend)
 	require.Equal(t, status, rr.Code)
+
 	actualResponseBody := rr.Body.String()
 	require.JSONEq(t, expectedRespBody, actualResponseBody, fmt.Sprintf("failed for req: %s", req.URL))
 }

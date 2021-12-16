@@ -21,9 +21,11 @@ func (h *Height) Parse(raw string) error {
 
 	if raw == sealed {
 		*h = SealedHeight
+		return nil
 	}
 	if raw == final {
 		*h = FinalHeight
+		return nil
 	}
 
 	height, err := strconv.ParseUint(raw, 0, 64)

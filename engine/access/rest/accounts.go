@@ -5,8 +5,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
 )
 
-const blockHeightQueryParam = "block_height"
-
 // getAccount handler retrieves account by address and returns the response
 func getAccount(r *request.Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	req, err := r.GetAccountRequest()

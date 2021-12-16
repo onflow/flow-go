@@ -38,10 +38,17 @@ func TestGetAccount(t *testing.T) {
 
 	t.Run("get by address at latest sealed block", func(t *testing.T) {
 		account := accountFixture(t)
+		var height uint64 = 100
+		block := unittest.BlockHeaderFixture(unittest.WithHeaderHeight(height))
+
 		req := getAccountRequest(t, account, sealedHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
 
 		backend.Mock.
-			On("GetAccountAtLatestBlock", mocktestify.Anything, account.Address).
+			On("GetLatestBlockHeader", mocktestify.Anything, true).
+			Return(&block, nil)
+
+		backend.Mock.
+			On("GetAccountAtBlockHeight", mocktestify.Anything, account.Address, height).
 			Return(account, nil)
 
 		expected := expectedExpandedResponse(account)
