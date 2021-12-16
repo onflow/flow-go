@@ -9,8 +9,8 @@ const addressVar = "address"
 const blockHeightQuery = "block_height"
 
 type GetAccountRequest struct {
-	address flow.Address
-	height  uint64
+	Address flow.Address
+	Height  uint64
 }
 
 func (g *GetAccountRequest) Build(r *rest.Request) error {
@@ -33,8 +33,8 @@ func (g *GetAccountRequest) Parse(rawAddress string, rawHeight string) error {
 		return err
 	}
 
-	g.address = address.Flow()
-	g.height = height.Flow()
+	g.Address = address.Flow()
+	g.Height = height.Flow()
 
 	return nil
 }
