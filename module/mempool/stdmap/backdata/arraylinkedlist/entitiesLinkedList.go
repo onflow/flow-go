@@ -19,34 +19,50 @@ const maximumRandomTrials = 10
 // VIndex is data type representing an entity index in EntityDoubleLinkedList.
 type VIndex uint32
 
+// doubleLinkedListPointer represents a slice-based linked list pointer. Instead of pointing
+// to a memory address, this pointer points to a slice index.
+//
+// Note: an "undefined" (i.e., nil) notion for this doubleLinkedListPointer corresponds to the
+// value of uint32(0). Hence, legit "pointer" values start from uint32(1).
+// doubleLinkedListPointer also furnished with methods to convert a "pointer" value to
+// a slice index, and reverse.
 type doubleLinkedListPointer struct {
 	pointerValue uint32
 }
 
+// isUndefined returns true if this pointer is set to its zero value. An undefined
+// slice-based pointer is equivalent to a nil address-based one.
 func (d doubleLinkedListPointer) isUndefined() bool {
 	return d.pointerValue == uint32(0)
 }
 
+// setUndefined sets sliced-based pointer to its undefined (i.e., nil equivalent) value.
 func (d *doubleLinkedListPointer) setUndefined() {
 	d.pointerValue = uint32(0)
 }
 
+// sliceIndex returns the slice-index equivalent of the pointer.
 func (d doubleLinkedListPointer) sliceIndex() VIndex {
 	return VIndex(d.pointerValue) - 1
 }
 
+// setPointer converts the input slice-based index into a slice-based pointer and
+// sets the underlying pointer.
 func (d *doubleLinkedListPointer) setPointer(sliceIndex VIndex) {
 	d.pointerValue = uint32(sliceIndex + 1)
 }
 
+// doubleLinkedListNode represents a slice-based double linked list node that
+// consists of a next and previous pointer.
 type doubleLinkedListNode struct {
 	next doubleLinkedListPointer
 	prev doubleLinkedListPointer
 }
 
+// doubleLinkedList represents a double linked list by its head and tail pointers.
 type doubleLinkedList struct {
-	head doubleLinkedListPointer // index of the head of linked list in entities slice.
-	tail doubleLinkedListPointer // index of the tail of linked list in entities slice.
+	head doubleLinkedListPointer
+	tail doubleLinkedListPointer
 }
 
 func newDoubleLinkedList() *doubleLinkedList {
@@ -56,17 +72,18 @@ func newDoubleLinkedList() *doubleLinkedList {
 	}
 }
 
+// cachedEntity represents a cached entity that is maintained as a double linked list node.
 type cachedEntity struct {
+	owner  uint64
 	node   doubleLinkedListNode
 	id     flow.Identifier
-	owner  uint64
 	entity flow.Entity
 }
 
 type EntityDoubleLinkedList struct {
 	total        uint32
-	free         *doubleLinkedList // keeps track of used entities in entities list
-	used         *doubleLinkedList // keeps track of unused entities in entities list
+	free         *doubleLinkedList // keeps track of free slots.
+	used         *doubleLinkedList // keeps track of allocated slots to cachedEntities.
 	values       []cachedEntity
 	ejectionMode EjectionMode
 }
@@ -84,15 +101,18 @@ func NewEntityList(limit uint32, ejectionMode EjectionMode) *EntityDoubleLinkedL
 	return l
 }
 
+// initFreeEntities initializes the free double linked-list with all slice indices in the range of
+// [0, limit). In other words, all slice indices in cachedEntity are marked as free indices.
 func (e *EntityDoubleLinkedList) initFreeEntities(limit uint32) {
 	e.free.head.setPointer(0)
 	e.free.tail.setPointer(0)
 
 	for i := uint32(1); i < limit; i++ {
+		// appends slice index i to tail of free linked list
 		e.link(e.free.tail, VIndex(i))
+		// and updates its tail
 		e.free.tail.setPointer(VIndex(i))
 	}
-
 }
 
 func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) VIndex {
