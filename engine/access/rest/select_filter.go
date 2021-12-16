@@ -114,3 +114,11 @@ func jsonPath(prefix string, key string) string {
 	}
 	return fmt.Sprintf("%s.%s", prefix, key)
 }
+
+func sliceToMap(values []string) map[string]bool {
+	valueMap := make(map[string]bool, len(values))
+	for _, v := range values {
+		valueMap[v] = true
+	}
+	return valueMap
+}

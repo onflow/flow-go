@@ -23,7 +23,7 @@ func getTransactionReq(id string, expandResult bool) *http.Request {
 	if expandResult {
 		q := u.Query()
 		// by default expand all since we test expanding with converters
-		q.Add("expand", resultExpandable)
+		q.Add("expand", "result")
 		u.RawQuery = q.Encode()
 	}
 
