@@ -254,7 +254,7 @@ func testInvalidatingHead(t *testing.T, list *EntityDoubleLinkedList, entities [
 	size := len(entities)
 	offset := len(list.values) - size
 	for i := 0; i < size; i++ {
-		headIndex := list.invalidateHead()
+		headIndex := list.invalidateUsedHead()
 		require.Equal(t, EIndex(i), headIndex)
 
 		// size of list should be shrunk after each invalidation.

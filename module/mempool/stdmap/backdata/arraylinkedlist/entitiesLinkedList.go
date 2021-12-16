@@ -115,6 +115,8 @@ func (e *EntityDoubleLinkedList) initFreeEntities(limit uint32) {
 	}
 }
 
+// Add writes given entity into a cachedEntity on the underlying entities linked-list. Return value is
+// the index at which given entity is written on entities linked-list so that it can be accessed directly later.
 func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) EIndex {
 	entityIndex := e.sliceIndexForEntity()
 	e.values[entityIndex].entity = entity
@@ -124,7 +126,7 @@ func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entit
 	e.values[entityIndex].node.prev.setUndefined()
 
 	if e.used.head.isUndefined() {
-		// sets head
+		// used list is empty, hence setting head of used list to current entityIndex.
 		e.used.head.setPointer(entityIndex)
 		e.values[e.used.head.sliceIndex()].node.prev.setUndefined()
 	}
@@ -134,37 +136,44 @@ func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entit
 		e.link(e.used.tail, entityIndex)
 	}
 
+	// since we are appending to the used list, entityIndex also acts as tail of the list.
 	e.used.tail.setPointer(entityIndex)
 
 	e.total++
 	return entityIndex
 }
 
+// Get returns entity corresponding to the entity index from the underlying list.
 func (e EntityDoubleLinkedList) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
 	return e.values[entityIndex].id, e.values[entityIndex].entity, e.values[entityIndex].owner
 }
 
+// sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
 func (e *EntityDoubleLinkedList) sliceIndexForEntity() EIndex {
 	if e.free.head.isUndefined() {
-		// we are at limit
-		// array back data is full
+		// free list is empty, hence, we are out of space, we
+		// need to eject.
 		if e.ejectionMode == RandomEjection {
-			// ejecting a random entity
+			// turning a random entity into a free head.
 			e.invalidateRandomEntity()
 		} else {
-			// turning used head to a free head.
-			e.invalidateHead()
+			// LRU ejection
+			// used head is the oldest entity, hence,
+			// turning the used head to a free head.
+			e.invalidateUsedHead()
 		}
 	}
 
+	// claiming the head of free list as the slice index for the next entity to be added
 	return e.claimFreeHead()
 }
 
+// Size returns total number of entities that this list maintains.
 func (e EntityDoubleLinkedList) Size() uint32 {
 	return e.total
 }
 
-// used, free
+// getHeads returns entities corresponding to the used and free heads.
 func (e EntityDoubleLinkedList) getHeads() (*cachedEntity, *cachedEntity) {
 	var usedHead, freeHead *cachedEntity
 	if !e.used.head.isUndefined() {
@@ -178,6 +187,7 @@ func (e EntityDoubleLinkedList) getHeads() (*cachedEntity, *cachedEntity) {
 	return usedHead, freeHead
 }
 
+// getTails returns entities corresponding to the used and free tails.
 func (e EntityDoubleLinkedList) getTails() (*cachedEntity, *cachedEntity) {
 	var usedTail, freeTail *cachedEntity
 	if !e.used.tail.isUndefined() {
@@ -191,25 +201,33 @@ func (e EntityDoubleLinkedList) getTails() (*cachedEntity, *cachedEntity) {
 	return usedTail, freeTail
 }
 
+// link connects the prev and next nodes as the adjacent nodes in the double-linked list.
 func (e *EntityDoubleLinkedList) link(prev doubleLinkedListPointer, next EIndex) {
 	e.values[prev.sliceIndex()].node.next.setPointer(next)
 	e.values[next].node.prev = prev
 }
 
-func (e *EntityDoubleLinkedList) invalidateHead() EIndex {
+// invalidateUsedHead moves current used head forward by one node. It
+// also removes the entity invalidated head is presenting, and appends the
+// node representing by used head to the tail of free list.
+func (e *EntityDoubleLinkedList) invalidateUsedHead() EIndex {
 	headSliceIndex := e.used.head.sliceIndex()
 	e.invalidateEntityAtIndex(headSliceIndex)
 
 	return headSliceIndex
 }
 
+// invalidateRandomEntity invalidates a random node from used linked list, and appends
+// it to the tail of free list. It also removes the entity that invalidated node is presenting,
 func (e *EntityDoubleLinkedList) invalidateRandomEntity() EIndex {
+	// inorder not to keep failing on finding a random valid node to invalidate,
+	// we only try a limited number of times, and if we fail all, we invalidate the used head.
 	var index = e.used.head.sliceIndex()
 
 	for i := 0; i < maximumRandomTrials; i++ {
 		candidate := EIndex(rand.Uint32() % e.total)
 		if !e.isInvalidated(candidate) {
-			// found an invalidated entity
+			// found a valid entity to invalidate
 			index = candidate
 			break
 		}
@@ -219,19 +237,22 @@ func (e *EntityDoubleLinkedList) invalidateRandomEntity() EIndex {
 	return index
 }
 
+// claimFreeHead moves the free head forward, and returns the slice index of the
+// old free head to host a new entity.
 func (e *EntityDoubleLinkedList) claimFreeHead() EIndex {
 	oldFreeHeadIndex := e.free.head.sliceIndex()
 	// moves head forward
 	e.free.head = e.values[oldFreeHeadIndex].node.next
-	// new head should point head to an undefined prev,
+	// new head should point to an undefined prev,
 	// but we first check if list is not empty, i.e.,
 	// head itself is not undefined.
 	if !e.free.head.isUndefined() {
 		e.values[e.free.head.sliceIndex()].node.prev.setUndefined()
 	}
 
-	// also we check if old head and tail aligned so to update
-	// tail as well
+	// also, we check if old head and tail aligned so to update
+	// tail as well. This happens when we claim the only existing
+	// node of free list.
 	if e.free.tail.sliceIndex() == oldFreeHeadIndex {
 		e.free.tail.setUndefined()
 	}
@@ -243,10 +264,14 @@ func (e *EntityDoubleLinkedList) claimFreeHead() EIndex {
 	return oldFreeHeadIndex
 }
 
+// Rem removes entity corresponding to given sliceIndex from the list.
 func (e *EntityDoubleLinkedList) Rem(sliceIndex EIndex) {
 	e.invalidateEntityAtIndex(sliceIndex)
 }
 
+// invalidateRandomEntity invalidates the given sliceIndex in the linked list by
+// removing its corresponding linked-list node from used linked list, and appending
+// it to the tail of free list. It also removes the entity that invalidated node is presenting,
 func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex EIndex) {
 	prev := e.values[sliceIndex].node.prev
 	next := e.values[sliceIndex].node.next
@@ -257,10 +282,11 @@ func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex EIndex) {
 	}
 
 	if sliceIndex == e.used.head.sliceIndex() {
+		// invalidating used head
 		// moves head forward
 		oldUsedHead, _ := e.getHeads()
 		e.used.head = oldUsedHead.node.next
-		// new head should point head to an undefined prev,
+		// new head should point to an undefined prev,
 		// but we first check if list is not empty, i.e.,
 		// head itself is not undefined.
 		if !e.used.head.isUndefined() {
@@ -270,6 +296,7 @@ func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex EIndex) {
 	}
 
 	if sliceIndex == e.used.tail.sliceIndex() {
+		// invalidating used tail
 		// moves tail backward
 		oldUsedTail, _ := e.getTails()
 		e.used.tail = oldUsedTail.node.prev
@@ -294,6 +321,7 @@ func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex EIndex) {
 	e.total--
 }
 
+// appendToFreeList appends linked-list node represented by sliceIndex to tail of free list.
 func (e *EntityDoubleLinkedList) appendToFreeList(sliceIndex EIndex) {
 	if e.free.head.isUndefined() {
 		// free list is empty
@@ -302,10 +330,13 @@ func (e *EntityDoubleLinkedList) appendToFreeList(sliceIndex EIndex) {
 		return
 	}
 
+	// appends to the tail, and updates the tail
 	e.link(e.free.tail, sliceIndex)
 	e.free.tail.setPointer(sliceIndex)
 }
 
+// isInvalidate returns true if linked-list node represented by sliceIndex does not contain
+// a valid entity.
 func (e EntityDoubleLinkedList) isInvalidated(sliceIndex EIndex) bool {
 	if e.values[sliceIndex].id != flow.ZeroID {
 		return false
