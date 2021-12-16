@@ -11,7 +11,7 @@ const blockIDQueryParam = "block_id"
 func getExecutionResultsByBlockIDs(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	req, err := r.getExecutionResultByBlockIDsRequest()
 	if err != nil {
-		return nil, err
+		return nil, NewBadRequestError(err)
 	}
 
 	// for each block ID we retrieve execution result
@@ -34,7 +34,7 @@ func getExecutionResultsByBlockIDs(r *Request, backend access.API, link LinkGene
 func getExecutionResultByID(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	req, err := r.getExecutionResultRequest()
 	if err != nil {
-		return nil, err
+		return nil, NewBadRequestError(err)
 	}
 
 	res, err := backend.GetExecutionResultByID(r.Context(), req.ID)

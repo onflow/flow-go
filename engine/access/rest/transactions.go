@@ -9,20 +9,20 @@ const resultExpandable = "result"
 
 // getTransactionByID gets a transaction by requested ID.
 func getTransactionByID(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	id, err := r.id()
+	req, err := r.getTransactionRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
-	tx, err := backend.GetTransaction(r.Context(), id)
+	tx, err := backend.GetTransaction(r.Context(), req.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	var txr *access.TransactionResult
 	// only lookup result if transaction result is to be expanded
-	if r.Expands(resultExpandable) {
-		txr, err = backend.GetTransactionResult(r.Context(), id)
+	if req.ExpandsResult {
+		txr, err = backend.GetTransactionResult(r.Context(), req.ID)
 		if err != nil {
 			return nil, err
 		}
@@ -33,17 +33,17 @@ func getTransactionByID(r *Request, backend access.API, link LinkGenerator) (int
 
 // getTransactionResultByID retrieves transaction result by the transaction ID.
 func getTransactionResultByID(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	id, err := r.id()
+	req, err := r.getTransactionResultRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
-	txr, err := backend.GetTransactionResult(r.Context(), id)
+	txr, err := backend.GetTransactionResult(r.Context(), req.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	return transactionResultResponse(txr, id, link), nil
+	return transactionResultResponse(txr, req.ID, link), nil
 }
 
 // createTransaction creates a new transaction from provided payload.

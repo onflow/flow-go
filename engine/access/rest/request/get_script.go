@@ -16,17 +16,11 @@ type GetScript struct {
 }
 
 func (g *GetScript) Build(r *rest.Request) error {
-	err := g.Parse(
+	return g.Parse(
 		r.GetQueryParam(blockHeightQuery),
 		r.GetQueryParam(blockIDQuery),
 		r.Body,
 	)
-
-	if err != nil {
-		return rest.NewBadRequestError(err)
-	}
-
-	return nil
 }
 
 func (g *GetScript) Parse(rawHeight string, rawID string, rawScript io.Reader) error {

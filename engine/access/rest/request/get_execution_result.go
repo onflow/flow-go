@@ -14,14 +14,9 @@ type GetExecutionResultByBlockIDs struct {
 }
 
 func (g *GetExecutionResultByBlockIDs) Build(r *rest.Request) error {
-	err := g.Parse(
+	return g.Parse(
 		r.GetQueryParams(blockIDQuery),
 	)
-	if err != nil {
-		return rest.NewBadRequestError(err)
-	}
-
-	return nil
 }
 
 func (g *GetExecutionResultByBlockIDs) Parse(rawIDs []string) error {

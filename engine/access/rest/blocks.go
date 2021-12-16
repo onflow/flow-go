@@ -27,7 +27,6 @@ const (
 
 // getBlocksByID gets blocks by provided ID or list of IDs.
 func getBlocksByIDs(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-
 	ids, err := r.ids()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -48,7 +47,7 @@ func getBlocksByIDs(r *Request, backend access.API, link LinkGenerator) (interfa
 func getBlocksByHeight(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	req, err := r.getBlockRequest()
 	if err != nil {
-		return nil, err
+		return nil, NewBadRequestError(err)
 	}
 
 	if req.FinalHeight || req.SealedHeight {

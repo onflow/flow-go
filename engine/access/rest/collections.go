@@ -11,7 +11,7 @@ const transactionsExpandable = "transactions"
 func getCollectionByID(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	req, err := r.getCollectionRequest()
 	if err != nil {
-		return nil, err
+		return nil, NewBadRequestError(err)
 	}
 
 	collection, err := backend.GetCollectionByID(r.Context(), req.ID)

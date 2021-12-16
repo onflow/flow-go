@@ -11,7 +11,7 @@ const blockHeightQueryParam = "block_height"
 func getAccount(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	req, err := r.getAccountRequest()
 	if err != nil {
-		return nil, err
+		return nil, NewBadRequestError(err)
 	}
 
 	// in case we provide special height values 'final' and 'sealed' fetch that height and overwrite request wtih it

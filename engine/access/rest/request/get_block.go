@@ -25,17 +25,11 @@ type GetBlock struct {
 }
 
 func (g *GetBlock) Build(r *rest.Request) error {
-	err := g.Parse(
+	return g.Parse(
 		r.GetQueryParams(heightQuery),
 		r.GetQueryParam(startHeightQuery),
 		r.GetQueryParam(endHeightQuery),
 	)
-
-	if err != nil {
-		return rest.NewBadRequestError(err)
-	}
-
-	return nil
 }
 
 func (g *GetBlock) HasHeights() bool {

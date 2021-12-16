@@ -10,7 +10,7 @@ import (
 func executeScript(r *Request, backend access.API, _ LinkGenerator) (interface{}, error) {
 	req, err := r.getScriptRequest()
 	if err != nil {
-		return nil, err
+		return nil, NewBadRequestError(err)
 	}
 
 	if len(req.BlockID) > 0 {

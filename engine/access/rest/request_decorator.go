@@ -49,39 +49,51 @@ func sliceToMap(values []string) map[string]bool {
 }
 
 func (rd *Request) getScriptRequest() (request.GetScript, error) {
-	var request request.GetScript
-	err := request.Build(rd)
-	return request, err
+	var req request.GetScript
+	err := req.Build(rd)
+	return req, err
 }
 
 func (rd *Request) getBlockRequest() (request.GetBlock, error) {
-	var request request.GetBlock
-	err := request.Build(rd)
-	return request, err
+	var req request.GetBlock
+	err := req.Build(rd)
+	return req, err
 }
 
 func (rd *Request) getCollectionRequest() (request.GetCollection, error) {
-	var request request.GetCollection
-	err := request.Build(rd)
-	return request, err
+	var req request.GetCollection
+	err := req.Build(rd)
+	return req, err
 }
 
 func (rd *Request) getAccountRequest() (request.GetAccount, error) {
-	var request request.GetAccount
-	err := request.Build(rd)
-	return request, err
+	var req request.GetAccount
+	err := req.Build(rd)
+	return req, err
 }
 
 func (rd *Request) getExecutionResultByBlockIDsRequest() (request.GetExecutionResultByBlockIDs, error) {
-	var request request.GetExecutionResultByBlockIDs
-	err := request.Build(rd)
-	return request, err
+	var req request.GetExecutionResultByBlockIDs
+	err := req.Build(rd)
+	return req, err
 }
 
 func (rd *Request) getExecutionResultRequest() (request.GetExecutionResult, error) {
-	var request request.GetExecutionResult
-	err := request.Build(rd)
-	return request, err
+	var req request.GetExecutionResult
+	err := req.Build(rd)
+	return req, err
+}
+
+func (rd *Request) getTransactionRequest() (request.GetTransaction, error) {
+	var req request.GetTransaction
+	err := req.Build(rd)
+	return req, err
+}
+
+func (rd *Request) getTransactionResultRequest() (request.GetTransactionResult, error) {
+	var req request.GetTransactionResult
+	err := req.Build(rd)
+	return req, err
 }
 
 func (rd *Request) Expands(field string) bool {

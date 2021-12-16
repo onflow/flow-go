@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/onflow/flow-go/engine/access/rest"
+	"github.com/onflow/flow-go/model/flow"
 	"io"
 	"strings"
 )
@@ -67,4 +68,25 @@ func fromUint64(number uint64) string {
 
 func toBase64(byteValue []byte) string {
 	return base64.StdEncoding.EncodeToString(byteValue)
+}
+
+type GetByIDRequest struct {
+	ID flow.Identifier
+}
+
+func (g *GetByIDRequest) Build(r *rest.Request) error {
+	return g.Parse(
+		r.GetQueryParam(idQuery),
+	)
+}
+
+func (g *GetByIDRequest) Parse(rawID string) error {
+	var id ID
+	err := id.Parse(rawID)
+	if err != nil {
+		return err
+	}
+	g.ID = id.Flow()
+
+	return nil
 }
