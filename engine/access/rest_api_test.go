@@ -271,7 +271,7 @@ func (suite *RestAPITestSuite) TestGetBlock() {
 
 		blockIDSlice := []string{strings.Join(blockIDs, ",")}
 		_, resp, err := client.BlocksApi.BlocksIdGet(ctx, blockIDSlice, optionsForBlockByID())
-		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d Block IDs can be requested at a time", rest.MaxAllowedIDs))
+		assertError(suite.T(), resp, err, http.StatusBadRequest, fmt.Sprintf("at most %d IDs can be requested at a time", rest.MaxAllowedIDs))
 	})
 
 	suite.Run("GetBlockByID with one non-existing block ID", func() {

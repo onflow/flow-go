@@ -107,7 +107,7 @@ func toHeights(rawHeights []string) ([]uint64, error) {
 func toStringArray(in string) ([]string, error) {
 	in = strings.TrimSuffix(in, "]")
 	in = strings.TrimPrefix(in, "[")
-	out := make([]string, 0)
+	var out []string
 
 	if len(in) == 0 {
 		return []string{}, nil

@@ -103,10 +103,6 @@ func (rd *request) bodyAs(dst interface{}) error {
 			err := fmt.Errorf("request body must not be empty")
 			return NewBadRequestError(err)
 
-		case err.Error() == "http: request body too large":
-			err := fmt.Errorf("request body must not be larger than 1MB")
-			return NewRestError(http.StatusRequestEntityTooLarge, err.Error(), err)
-
 		default:
 			return err
 		}
