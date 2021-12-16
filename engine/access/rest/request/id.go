@@ -7,6 +7,8 @@ import (
 	"regexp"
 )
 
+const maxIDsLength = 50
+
 type ID flow.Identifier
 
 func (i *ID) Parse(raw string) error {
@@ -35,6 +37,10 @@ func (i ID) Flow() flow.Identifier {
 type IDs []ID
 
 func (i *IDs) Parse(raw []string) error {
+	if len(raw) > maxIDsLength {
+		return fmt.Errorf("at most %d IDs can be requested at a time", maxIDsLength)
+	}
+
 	id := make([]ID, len(raw))
 	for i, r := range raw {
 		err := id[i].Parse(r)
