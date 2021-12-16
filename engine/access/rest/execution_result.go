@@ -1,8 +1,6 @@
 package rest
 
 import (
-	"fmt"
-
 	"github.com/onflow/flow-go/access"
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
@@ -10,21 +8,16 @@ import (
 const blockIDQueryParam = "block_id"
 
 // getExecutionResultByID gets Execution Result payload by block IDs.
-func getExecutionResultsByBlockIDs(req *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	queryID := req.GetQueryParam(blockIDQueryParam)
-	if len(queryID) == 0 {
-		return nil, NewBadRequestError(fmt.Errorf("no blocks IDs specified"))
-	}
-
-	blockIDs, err := toIDs(queryID)
+func getExecutionResultsByBlockIDs(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
+	req, err := r.getExecutionResultByBlockIDsRequest()
 	if err != nil {
 		return nil, err
 	}
 
 	// for each block ID we retrieve execution result
-	results := make([]*generated.ExecutionResult, len(blockIDs))
-	for i, id := range blockIDs {
-		res, err := backend.GetExecutionResultForBlockID(req.Context(), id)
+	results := make([]*generated.ExecutionResult, len(req.BlockIDs))
+	for i, id := range req.BlockIDs {
+		res, err := backend.GetExecutionResultForBlockID(r.Context(), id)
 		if err != nil {
 			return nil, err
 		}
@@ -38,13 +31,13 @@ func getExecutionResultsByBlockIDs(req *Request, backend access.API, link LinkGe
 }
 
 // getExecutionResultByID gets execution result by the ID.
-func getExecutionResultByID(req *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	id, err := req.id()
+func getExecutionResultByID(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
+	req, err := r.getExecutionResultRequest()
 	if err != nil {
 		return nil, err
 	}
 
-	res, err := backend.GetExecutionResultByID(req.Context(), id)
+	res, err := backend.GetExecutionResultByID(r.Context(), req.ID)
 	if err != nil {
 		return nil, err
 	}

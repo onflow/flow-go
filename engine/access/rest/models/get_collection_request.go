@@ -14,7 +14,7 @@ type GetCollectionRequest struct {
 
 func (g *GetCollectionRequest) Build(r *rest.Request) error {
 	err := g.Parse(
-		r.GetVar("id"),
+		r.GetVar(idQuery),
 	)
 	if err != nil {
 		return rest.NewBadRequestError(err)
