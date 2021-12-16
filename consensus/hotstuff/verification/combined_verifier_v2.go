@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
@@ -52,7 +53,7 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// split the two signatures from the vote
-	stakingSig, beaconShare, err := signature.eecodeDoubleSig(sigData)
+	stakingSig, beaconShare, err := signature.DecodeDoubleSig(sigData)
 	if err != nil {
 		return fmt.Errorf("could not split signature for block %v: %w", block.BlockID, err)
 	}
