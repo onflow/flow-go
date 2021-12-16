@@ -85,23 +85,7 @@ func runProcessSummary2TestRun(t *testing.T, testDir string, hasFailures bool, h
 		require.True(t, isFoundExpected)
 		require.True(t, isFoundActual)
 
-		require.Equal(t, expectedTestSummary.Package, actualTestSummary.Package)
-		require.Equal(t, expectedTestSummary.Test, actualTestSummary.Test)
-
-		require.Equal(t, expectedTestSummary.Runs, actualTestSummary.Runs)
-		require.Equal(t, expectedTestSummary.Passed, actualTestSummary.Passed)
-		require.Equal(t, expectedTestSummary.Failed, actualTestSummary.Failed)
-		require.Equal(t, expectedTestSummary.Skipped, actualTestSummary.Skipped)
-		require.Equal(t, expectedTestSummary.NoResult, actualTestSummary.NoResult)
-
-		require.Equal(t, expectedTestSummary.FailureRate, actualTestSummary.FailureRate)
-
-		// check all durations
-		require.Equal(t, len(expectedTestSummary.Durations), len(actualTestSummary.Durations))
-		for i := range expectedTestSummary.Durations {
-			require.Equal(t, expectedTestSummary.Durations[i], actualTestSummary.Durations[i])
-		}
-		require.Equal(t, expectedTestSummary.AverageDuration, actualTestSummary.AverageDuration)
+		common.AssertTestSummariesEqual(t, *expectedTestSummary, *actualTestSummary)
 	}
 
 	// make sure calculated summary level 2 is what we expected
