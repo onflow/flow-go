@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	cloud.google.com/go/storage v1.16.0
+	github.com/antihax/optional v1.0.0
 	github.com/aws/aws-sdk-go-v2/config v1.8.0
 	github.com/aws/aws-sdk-go-v2/feature/s3/manager v1.5.1
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.15.0
@@ -58,7 +59,7 @@ require (
 	github.com/multiformats/go-multiaddr-dns v0.3.1
 	github.com/onflow/atree v0.1.1
 	github.com/onflow/cadence v0.20.2
-	github.com/onflow/flow v0.2.3-0.20211103155021-9254a66368d5
+	github.com/onflow/flow v0.2.3-0.20211203180137-d6c902ccc3a7
 	github.com/onflow/flow-core-contracts/lib/go/contracts v0.7.9
 	github.com/onflow/flow-core-contracts/lib/go/templates v0.7.9
 	github.com/onflow/flow-emulator v0.20.3
@@ -71,6 +72,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/psiemens/sconfig v0.1.0 // indirect
+	github.com/rs/cors v1.8.0
 	github.com/rs/zerolog v1.19.0
 	github.com/schollz/progressbar/v3 v3.8.3
 	github.com/sethvargo/go-retry v0.1.0

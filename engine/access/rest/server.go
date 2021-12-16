@@ -2,20 +2,56 @@ package rest
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/onflow/flow-go/engine/access/rest/middleware"
-
 	"github.com/gorilla/mux"
+	"github.com/rs/cors"
 	"github.com/rs/zerolog"
 
-	"github.com/onflow/flow-go/engine/access/rest/generated"
+	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/middleware"
+)
+
+// all route names
+const (
+	getTransactionByIDRoute          = "getTransactionByID"
+	getTransactionResultByIDRoute    = "getTransactionResultByID"
+	createTransactionRoute           = "createTransaction"
+	getBlocksByIDRoute               = "getBlocksByIDs"
+	getBlocksByHeightRoute           = "getBlocksByHeight"
+	getCollectionByIDRoute           = "getCollectionByID"
+	executeScriptRoute               = "executeScript"
+	getBlockPayloadByIDRoute         = "getBlockPayloadByID"
+	getExecutionResultByBlockIDRoute = "getExecutionResultByBlockID"
+	getExecutionResultByIDRoute      = "getExecutionResultByID"
+	getAccountRoute                  = "getAccount"
 )
 
 // NewServer returns an HTTP server initialized with the REST API handler
-func NewServer(handlers *Handlers, listenAddress string, logger zerolog.Logger) *http.Server {
+func NewServer(backend access.API, listenAddress string, logger zerolog.Logger) *http.Server {
 
+	router := initRouter(backend, logger)
+
+	c := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedHeaders: []string{"*"},
+		AllowedMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodOptions,
+			http.MethodHead},
+	})
+
+	return &http.Server{
+		Addr:         listenAddress,
+		Handler:      c.Handler(router),
+		WriteTimeout: time.Second * 15,
+		ReadTimeout:  time.Second * 15,
+		IdleTimeout:  time.Second * 60,
+	}
+}
+
+func initRouter(backend access.API, logger zerolog.Logger) *mux.Router {
 	router := mux.NewRouter().StrictSlash(true)
 	v1SubRouter := router.PathPrefix("/v1").Subrouter()
 
@@ -24,95 +60,98 @@ func NewServer(handlers *Handlers, listenAddress string, logger zerolog.Logger) 
 	v1SubRouter.Use(middleware.QueryExpandable())
 	v1SubRouter.Use(middleware.QuerySelect())
 
-	for _, route := range apiRoutes(handlers) {
-		v1SubRouter.
-			Methods(route.Method).
-			Path(route.Pattern).
-			Name(route.Name).
-			Handler(route.HandlerFunc)
-	}
+	var linkGenerator LinkGenerator = NewLinkGeneratorImpl(v1SubRouter)
 
-	return &http.Server{
-		Addr:         listenAddress,
-		Handler:      router,
-		WriteTimeout: time.Second * 15,
-		ReadTimeout:  time.Second * 15,
-		IdleTimeout:  time.Second * 60,
+	for _, r := range routeDefinitions() {
+		h := NewHandler(logger, backend, r.apiHandlerFunc, linkGenerator)
+		v1SubRouter.
+			Methods(r.method).
+			Path(r.pattern).
+			Name(r.name).
+			Handler(h)
 	}
+	return router
 }
 
-// apiRoutes returns the Gorilla Mux routes for each of the API defined in the rest definition
-// currently, it only supports BlocksIdGet
-func apiRoutes(handlers *Handlers) generated.Routes {
-	return generated.Routes{
-		generated.Route{
-			Name:        "AccountsAddressGet",
-			Method:      strings.ToUpper("Get"),
-			Pattern:     "/accounts/{address}",
-			HandlerFunc: handlers.NotImplemented,
-		},
+type routeDefinition struct {
+	name           string
+	method         string
+	pattern        string
+	apiHandlerFunc ApiHandlerFunc
+}
 
-		generated.Route{
-			Name:        "BlocksGet",
-			Method:      strings.ToUpper("Get"),
-			Pattern:     "/blocks",
-			HandlerFunc: handlers.NotImplemented,
+func routeDefinitions() []routeDefinition {
+	return []routeDefinition{
+		// Transactions
+		{
+			method:         http.MethodGet,
+			pattern:        "/transactions/{id}",
+			name:           getTransactionByIDRoute,
+			apiHandlerFunc: getTransactionByID,
+		}, {
+			method:         http.MethodPost,
+			pattern:        "/transactions",
+			name:           createTransactionRoute,
+			apiHandlerFunc: createTransaction,
 		},
-
-		generated.Route{
-			Name:        "BlocksIdGet",
-			Method:      strings.ToUpper("Get"),
-			Pattern:     "/blocks/{id}",
-			HandlerFunc: handlers.BlocksIdGet,
+		// Transaction Results
+		{
+			method:         http.MethodGet,
+			pattern:        "/transaction_results/{id}",
+			name:           getTransactionResultByIDRoute,
+			apiHandlerFunc: getTransactionResultByID,
 		},
-
-		generated.Route{
-			Name:        "CollectionsIdGet",
-			Method:      strings.ToUpper("Get"),
-			Pattern:     "/collections/{id}",
-			HandlerFunc: handlers.NotImplemented,
+		// Blocks
+		{
+			method:         http.MethodGet,
+			pattern:        "/blocks/{id}",
+			name:           getBlocksByIDRoute,
+			apiHandlerFunc: getBlocksByIDs,
+		}, {
+			method:         http.MethodGet,
+			pattern:        "/blocks",
+			name:           getBlocksByHeightRoute,
+			apiHandlerFunc: getBlocksByHeight,
 		},
-
-		generated.Route{
-			Name:        "ExecutionResultsGet",
-			Method:      strings.ToUpper("Get"),
-			Pattern:     "/execution_results",
-			HandlerFunc: handlers.NotImplemented,
+		// Block Payload
+		{
+			method:         http.MethodGet,
+			pattern:        "/blocks/{id}/payload",
+			name:           getBlockPayloadByIDRoute,
+			apiHandlerFunc: getBlockPayloadByID,
 		},
-
-		generated.Route{
-			Name:        "ExecutionResultsIdGet",
-			Method:      strings.ToUpper("Get"),
-			Pattern:     "/execution_results/{id}",
-			HandlerFunc: handlers.NotImplemented,
+		// Execution Result
+		{
+			method:         http.MethodGet,
+			pattern:        "/execution_results/{id}",
+			name:           getExecutionResultByIDRoute,
+			apiHandlerFunc: getExecutionResultByID,
 		},
-
-		generated.Route{
-			Name:        "ScriptsPost",
-			Method:      strings.ToUpper("Post"),
-			Pattern:     "/scripts",
-			HandlerFunc: handlers.NotImplemented,
+		{
+			method:         http.MethodGet,
+			pattern:        "/execution_results",
+			name:           getExecutionResultByBlockIDRoute,
+			apiHandlerFunc: getExecutionResultsByBlockIDs,
 		},
-
-		generated.Route{
-			Name:        "TransactionResultsTransactionIdGet",
-			Method:      strings.ToUpper("Get"),
-			Pattern:     "/transaction_results/{transaction_id}",
-			HandlerFunc: handlers.NotImplemented,
+		// Collections
+		{
+			method:         http.MethodGet,
+			pattern:        "/collections/{id}",
+			name:           getCollectionByIDRoute,
+			apiHandlerFunc: getCollectionByID,
 		},
-
-		generated.Route{
-			Name:        "TransactionsIdGet",
-			Method:      strings.ToUpper("Get"),
-			Pattern:     "/transactions/{id}",
-			HandlerFunc: handlers.NotImplemented,
+		// Scripts
+		{
+			method:         http.MethodPost,
+			pattern:        "/scripts",
+			name:           executeScriptRoute,
+			apiHandlerFunc: executeScript,
 		},
-
-		generated.Route{
-			Name:        "TransactionsPost",
-			Method:      strings.ToUpper("Post"),
-			Pattern:     "/transactions",
-			HandlerFunc: handlers.NotImplemented,
-		},
-	}
+		// Accounts
+		{
+			method:         http.MethodGet,
+			pattern:        "/accounts/{address}",
+			name:           getAccountRoute,
+			apiHandlerFunc: getAccount,
+		}}
 }
