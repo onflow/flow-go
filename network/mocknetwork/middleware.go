@@ -36,6 +36,27 @@ func (_m *Middleware) Done() <-chan struct{} {
 	return r0
 }
 
+// IsConnected provides a mock function with given fields: nodeID
+func (_m *Middleware) IsConnected(nodeID flow.Identifier) (bool, error) {
+	ret := _m.Called(nodeID)
+
+	var r0 bool
+	if rf, ok := ret.Get(0).(func(flow.Identifier) bool); ok {
+		r0 = rf(nodeID)
+	} else {
+		r0 = ret.Get(0).(bool)
+	}
+
+	var r1 error
+	if rf, ok := ret.Get(1).(func(flow.Identifier) error); ok {
+		r1 = rf(nodeID)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // Ping provides a mock function with given fields: targetID
 func (_m *Middleware) Ping(targetID flow.Identifier) (message.PingResponse, time.Duration, error) {
 	ret := _m.Called(targetID)

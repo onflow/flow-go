@@ -12,14 +12,14 @@ test:
 cross-blst-test:
 	# test all packages with Relic library enabled
 ifeq ($(ADX_SUPPORT), 1)
-	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic,blst -run BLST -v ./...
+	GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(TEST_LONG),,-short) $(if $(JSON_OUTPUT),-json,) --tags relic,blst -run BLST -v ./...
 else
-	CGO_CFLAGS="-D__BLST_PORTABLE__" GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(JSON_OUTPUT),-json,) --tags relic,blst -run BLST -v ./...
+	CGO_CFLAGS="-D__BLST_PORTABLE__" GO111MODULE=on go test -coverprofile=$(COVER_PROFILE) $(if $(TEST_LONG),,-short) $(if $(JSON_OUTPUT),-json,) --tags relic,blst -run BLST -v ./...
 endif
 
 .PHONY: docker-build
 docker-build:
-	docker build --ssh default -t gcr.io/dl-flow/golang-cmake:latest -t gcr.io/dl-flow/golang-cmake:$(IMAGE_TAG) .
+	docker build -t gcr.io/dl-flow/golang-cmake:latest -t gcr.io/dl-flow/golang-cmake:$(IMAGE_TAG) .
 
 .PHONY: docker-push
 docker-push:

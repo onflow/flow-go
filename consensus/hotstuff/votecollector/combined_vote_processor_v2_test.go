@@ -22,7 +22,6 @@ import (
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/dkg"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
@@ -780,9 +779,9 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 		stakingPriv := unittest.StakingPrivKeyFixture()
 		identity.StakingPubKey = stakingPriv.PublicKey()
 
-		keys := &storagemock.DKGKeys{}
+		keys := &storagemock.SafeBeaconKeys{}
 		// there is no DKG key for this epoch
-		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(nil, false, nil)
+		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(nil, false, nil)
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 
@@ -798,17 +797,13 @@ func TestCombinedVoteProcessorV2_BuildVerifyQC(t *testing.T) {
 
 		participantData := dkgParticipants[identity.NodeID]
 
-		dkgKey := &dkg.DKGParticipantPriv{
-			NodeID: identity.NodeID,
-			RandomBeaconPrivKey: encodable.RandomBeaconPrivKey{
-				PrivateKey: dkgData.PrivKeyShares[participantData.Index],
-			},
-			GroupIndex: int(participantData.Index),
+		dkgKey := encodable.RandomBeaconPrivKey{
+			PrivateKey: dkgData.PrivKeyShares[participantData.Index],
 		}
 
-		keys := &storagemock.DKGKeys{}
+		keys := &storagemock.SafeBeaconKeys{}
 		// there is DKG key for this epoch
-		keys.On("RetrieveMyDKGPrivateInfo", epochCounter).Return(dkgKey, true, nil)
+		keys.On("RetrieveMyBeaconPrivateKey", epochCounter).Return(dkgKey, true, nil)
 
 		beaconSignerStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
 

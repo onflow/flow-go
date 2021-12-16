@@ -101,7 +101,6 @@ func (c *computationMeteringHandler) Limit() uint64 {
 }
 
 func (c *computationMeteringHandler) AddUsed(used uint64) error {
-	used = c.computation.Used() + used
 	return c.computation.AddUsed(used)
 }
 

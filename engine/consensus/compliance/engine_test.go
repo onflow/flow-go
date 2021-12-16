@@ -176,7 +176,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 		// create a proposal that directly descends from the latest finalized header
 		originID := cs.participants[1].NodeID
 		block := unittest.BlockWithParentFixture(cs.head)
-		proposal := unittest.ProposalFromBlock(&block)
+		proposal := unittest.ProposalFromBlock(block)
 
 		// store the data for retrieval
 		cs.headerDB[block.Header.ParentID] = cs.head

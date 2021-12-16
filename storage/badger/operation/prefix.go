@@ -64,9 +64,11 @@ const (
 	codeIndexBlockByChunkID = 60 // index mapping chunk ID to block ID
 
 	// codes related to epoch information
-	codeEpochSetup     = 61 // EpochSetup service event, keyed by ID
-	codeEpochCommit    = 62 // EpochCommit service event, keyed by ID
-	codeDKGPrivateInfo = 63 // DKGPrivateInfo, keyed by epoch counter
+	codeEpochSetup       = 61 // EpochSetup service event, keyed by ID
+	codeEpochCommit      = 62 // EpochCommit service event, keyed by ID
+	codeBeaconPrivateKey = 63 // BeaconPrivateKey, keyed by epoch counter
+	codeDKGStarted       = 64 // flag that the DKG for an epoch has been started
+	codeDKGEnded         = 65 // flag that the DKG for an epoch has ended (stores end state)
 
 	// job queue consumers and producers
 	codeJobConsumerProcessed = 70
