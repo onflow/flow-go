@@ -3,6 +3,7 @@ package rest
 import (
 	"encoding/json"
 	"errors"
+	"github.com/onflow/flow-go/engine/access/rest/request"
 	"net/http"
 
 	"github.com/rs/zerolog"
@@ -16,12 +17,12 @@ import (
 // ApiHandlerFunc is a function that contains endpoint handling logic,
 // it fetches necessary resources and returns an error or response model.
 type ApiHandlerFunc func(
-	r *Request,
+	r *request.Request,
 	backend access.API,
 	generator LinkGenerator,
 ) (interface{}, error)
 
-type ApiValidatorFunc func(r *Request) error
+type ApiValidatorFunc func(r *request.Request) error
 
 // Handler is custom http handler implementing custom handler function.
 // Handler function allows easier handling of errors and responses as it
@@ -58,7 +59,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// apply the select filter if any select fields have been specified
-	response, err = SelectFilter(response, decoratedRequest.selects())
+	response, err = SelectFilter(response, decoratedRequest.Selects())
 	if err != nil {
 		h.errorHandler(w, err, errorLogger)
 		return
@@ -143,13 +144,4 @@ func (h *Handler) errorResponse(
 		w.WriteHeader(http.StatusInternalServerError)
 		logger.Error().Err(err).Msg("failed to send error response")
 	}
-}
-
-// NotImplemented handler returns an error explaining the endpoint is not yet implemented
-func NotImplemented(
-	_ *Request,
-	_ access.API,
-	_ LinkGenerator,
-) (interface{}, StatusError) {
-	return nil, NewRestError(http.StatusNotImplemented, "endpoint not implemented", nil)
 }

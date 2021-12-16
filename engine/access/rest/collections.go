@@ -2,14 +2,15 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/access"
+	"github.com/onflow/flow-go/engine/access/rest/request"
 	"github.com/onflow/flow-go/model/flow"
 )
 
 const transactionsExpandable = "transactions"
 
 // getCollectionByID retrieves a collection by ID and builds a response
-func getCollectionByID(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	req, err := r.getCollectionRequest()
+func getCollectionByID(r *request.Request, backend access.API, link LinkGenerator) (interface{}, error) {
+	req, err := r.GetCollectionRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
@@ -32,5 +33,5 @@ func getCollectionByID(r *Request, backend access.API, link LinkGenerator) (inte
 		}
 	}
 
-	return collectionResponse(collection, transactions, link, r.expandFields)
+	return collectionResponse(collection, transactions, link, r.ExpandFields)
 }

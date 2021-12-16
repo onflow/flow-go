@@ -7,8 +7,8 @@ import (
 )
 
 // executeScript handler sends the script from the request to be executed.
-func executeScript(r *Request, backend access.API, _ LinkGenerator) (interface{}, error) {
-	req, err := r.getScriptRequest()
+func executeScript(r *request.Request, backend access.API, _ LinkGenerator) (interface{}, error) {
+	req, err := r.GetScriptRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}

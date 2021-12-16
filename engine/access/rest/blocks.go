@@ -26,7 +26,7 @@ const (
 )
 
 // getBlocksByID gets blocks by provided ID or list of IDs.
-func getBlocksByIDs(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
+func getBlocksByIDs(r *request.Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	ids, err := r.ids()
 	if err != nil {
 		return nil, NewBadRequestError(err)
@@ -44,8 +44,8 @@ func getBlocksByIDs(r *Request, backend access.API, link LinkGenerator) (interfa
 	return blocks, nil
 }
 
-func getBlocksByHeight(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	req, err := r.getBlockRequest()
+func getBlocksByHeight(r *request.Request, backend access.API, link LinkGenerator) (interface{}, error) {
+	req, err := r.GetBlockRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
@@ -97,7 +97,7 @@ func getBlocksByHeight(r *Request, backend access.API, link LinkGenerator) (inte
 }
 
 // getBlockPayloadByID gets block payload by ID
-func getBlockPayloadByID(req *Request, backend access.API, _ LinkGenerator) (interface{}, error) {
+func getBlockPayloadByID(req *request.Request, backend access.API, _ LinkGenerator) (interface{}, error) {
 
 	id, err := req.id()
 	if err != nil {
@@ -116,7 +116,7 @@ func getBlockPayloadByID(req *Request, backend access.API, _ LinkGenerator) (int
 	return payload, nil
 }
 
-func getBlock(option blockProviderOption, req *Request, backend access.API, link LinkGenerator) (*generated.Block, error) {
+func getBlock(option blockProviderOption, req *request.Request, backend access.API, link LinkGenerator) (*generated.Block, error) {
 	// lookup block
 	blkProvider := NewBlockProvider(backend, option)
 	blk, err := blkProvider.getBlock(req.Context())
@@ -131,13 +131,13 @@ func getBlock(option blockProviderOption, req *Request, backend access.API, link
 		// handle case where execution result is not yet available
 		if se, ok := status.FromError(err); ok {
 			if se.Code() == codes.NotFound {
-				return blockResponse(blk, nil, link, req.expandFields)
+				return blockResponse(blk, nil, link, req.ExpandFields)
 			}
 		}
 		return nil, err
 	}
 
-	return blockResponse(blk, executionResult, link, req.expandFields)
+	return blockResponse(blk, executionResult, link, req.ExpandFields)
 }
 
 // blockProvider is a layer of abstraction on top of the backend access.API and provides a uniform way to
