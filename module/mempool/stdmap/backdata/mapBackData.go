@@ -4,25 +4,27 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 )
 
-// MapBackData implements a map-based generic memory pool backed by a Go map.
+// MapBackData implements a map-based generic memory BackData backed by a Go map.
 type MapBackData struct {
+	// NOTE: as a BackData implementation, MapBackData must be non-blocking.
+	// Concurrency management is done by overlay Backend.
 	entities map[flow.Identifier]flow.Entity
 }
 
-func NewMapBackData() MapBackData {
-	bd := MapBackData{
+func NewMapBackData() *MapBackData {
+	bd := &MapBackData{
 		entities: make(map[flow.Identifier]flow.Entity),
 	}
 	return bd
 }
 
-// Has checks if we already contain the item with the given hash.
-func (b *MapBackData) Has(entityID flow.Identifier) bool {
+// Has checks if we already contain the item with the given identifier.
+func (b MapBackData) Has(entityID flow.Identifier) bool {
 	_, exists := b.entities[entityID]
 	return exists
 }
 
-// Add adds the given item to the pool.
+// Add adds the given entity to the BackData.
 func (b *MapBackData) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	_, exists := b.entities[entityID]
 	if exists {
@@ -32,7 +34,7 @@ func (b *MapBackData) Add(entityID flow.Identifier, entity flow.Entity) bool {
 	return true
 }
 
-// Rem will remove the item with the given hash.
+// Rem will remove the entity with the given identifier.
 func (b *MapBackData) Rem(entityID flow.Identifier) (flow.Entity, bool) {
 	entity, exists := b.entities[entityID]
 	if !exists {
@@ -57,8 +59,8 @@ func (b *MapBackData) Adjust(entityID flow.Identifier, f func(flow.Entity) flow.
 	return newentity, true
 }
 
-// ByID returns the given item from the pool.
-func (b *MapBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
+// ByID returns the given item from the BackData.
+func (b MapBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	entity, exists := b.entities[entityID]
 	if !exists {
 		return nil, false
@@ -66,13 +68,13 @@ func (b *MapBackData) ByID(entityID flow.Identifier) (flow.Entity, bool) {
 	return entity, true
 }
 
-// Size will return the size of the backend.
-func (b *MapBackData) Size() uint {
+// Size will return the size of the BackData.
+func (b MapBackData) Size() uint {
 	return uint(len(b.entities))
 }
 
-// All returns all entities from the pool.
-func (b *MapBackData) All() map[flow.Identifier]flow.Entity {
+// All returns all entities from the BackData.
+func (b MapBackData) All() map[flow.Identifier]flow.Entity {
 	entities := make(map[flow.Identifier]flow.Entity)
 	for entityID, entity := range b.entities {
 		entities[entityID] = entity
@@ -80,12 +82,12 @@ func (b *MapBackData) All() map[flow.Identifier]flow.Entity {
 	return entities
 }
 
-// Clear removes all entities from the pool.
+// Clear removes all entities from the BackData.
 func (b *MapBackData) Clear() {
 	b.entities = make(map[flow.Identifier]flow.Entity)
 }
 
-// Hash will use a merkle root hash to hash all items.
+// Hash will use a merkle root hash to hash all entities.
 func (b *MapBackData) Hash() flow.Identifier {
 	return flow.MerkleRoot(flow.GetIDs(b.All())...)
 }
