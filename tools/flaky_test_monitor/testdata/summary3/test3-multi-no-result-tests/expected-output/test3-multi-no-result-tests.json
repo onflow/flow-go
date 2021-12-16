@@ -1,0 +1,22 @@
+{
+  "no_results": [
+    {
+      "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
+      "package": "github.com/onflow/flow-go/model/encodable",
+      "runs": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 13,
+      "failure_rate": 0,
+      "average_duration": 0,
+      "durations": [
+        0
+      ]
+    }
+  ],
+
+  "most_failures": [],
+
+  "longest_running": []
+}
