@@ -34,21 +34,5 @@ func (g *GetExecutionResultByBlockIDs) Parse(rawIDs []string) error {
 }
 
 type GetExecutionResult struct {
-	ID flow.Identifier
-}
-
-func (g *GetExecutionResult) Build(r *Request) error {
-	return g.Parse(
-		r.GetQueryParam(idQuery),
-	)
-}
-
-func (g *GetExecutionResult) Parse(rawID string) error {
-	var id ID
-	err := id.Parse(rawID)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	GetByIDRequest
 }
