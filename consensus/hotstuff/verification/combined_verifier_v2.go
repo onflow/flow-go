@@ -8,12 +8,10 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	modulesig "github.com/onflow/flow-go/module/signature"
 )
 
 // CombinedVerifier is a verifier capable of verifying two signatures, one for each
@@ -55,9 +53,9 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 
 	// split the two signatures from the vote
 	// TODO: to be replaced by packer
-	stakingSig, beaconShare, err := signature.DecodeDoubleSig(sigData)
+	stakingSig, beaconShare, err := signature.eecodeDoubleSig(sigData)
 	if err != nil {
-		return fmt.Errorf("could not split signature: %w", modulesig.ErrInvalidFormat)
+		return fmt.Errorf("could not split signature for block %v: %w", block.BlockID, err)
 	}
 
 	dkg, err := c.committee.DKG(block.BlockID)
@@ -69,7 +67,8 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 	// TODO: check if using batch verification is faster (should be yes)
 	stakingValid, err := signer.StakingPubKey.Verify(stakingSig, msg, c.stakingHasher)
 	if err != nil {
-		return fmt.Errorf("internal error while verifying staking signature from %x: %w", signer.NodeID, err)
+		return fmt.Errorf("internal error while verifying staking signature of node %x at block %v: %w",
+			signer.NodeID, block.BlockID, err)
 	}
 	if !stakingValid {
 		return fmt.Errorf("invalid staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
@@ -83,14 +82,15 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 	// if there is beacon share, there must be beacon public key
 	beaconPubKey, err := dkg.KeyShare(signer.NodeID)
 	if err != nil {
-		return fmt.Errorf("could not get random beacon key share for %x: %w", signer.NodeID, err)
+		return fmt.Errorf("could not get random beacon key share of node %x at block %v: %w",
+			signer.NodeID, block.BlockID, err)
 	}
 
 	beaconValid, err := beaconPubKey.Verify(beaconShare, msg, c.beaconHasher)
 	if err != nil {
-		return fmt.Errorf("internal error while verifying beacon signature: %w", err)
+		return fmt.Errorf("internal error while verifying beacon signature at block %v: %w",
+			block.BlockID, err)
 	}
-
 	if !beaconValid {
 		return fmt.Errorf("invalid beacon sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 	}

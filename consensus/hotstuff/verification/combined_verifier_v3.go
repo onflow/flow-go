@@ -73,7 +73,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 			return fmt.Errorf("could not get dkg: %w", err)
 		}
 
-		// if there is beacon share, there must be beacon public key
+		// if there is beacon share, there must be a beacon public key
 		beaconPubKey, err := dkg.KeyShare(signer.NodeID)
 		if err != nil {
 			return fmt.Errorf("could not get random beacon key share for %x at block %v: %w", signer.NodeID, block.BlockID, err)
@@ -83,7 +83,6 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 		if err != nil {
 			return fmt.Errorf("internal error while verifying beacon signature for block %v: %w", block.BlockID, err)
 		}
-
 		if !beaconValid {
 			return fmt.Errorf("invalid beacon sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 		}
@@ -144,10 +143,10 @@ func (c *CombinedVerifierV3) VerifyQC(signers flow.IdentityList, sigData []byte,
 	for _, signerID := range blockSigData.RandomBeaconSigners {
 		keyShare, err := dkg.KeyShare(signerID)
 		if err != nil {
-// We assume that every consensus member is also a random beacon participant. The 
-// Packer checks that only valid consensus participants are in the signers list. Otherwise,
-// the packer should return an ErrInvalidFormat. Consequently, we expect for every 
-// signer a DKG record. Reaching this failure case indicates a bug in the internal logic.
+			// We assume that every consensus member is also a random beacon participant. The
+			// Packer checks that only valid consensus participants are in the signers list. Otherwise,
+			// the packer should return an ErrInvalidFormat. Consequently, we expect for every
+			// signer a DKG record. Reaching this failure case indicates a bug in the internal logic.
 			return fmt.Errorf("internal error could not find key share for signer %v: %w", signerID, err)
 		}
 		beaconPubKeys = append(beaconPubKeys, keyShare)

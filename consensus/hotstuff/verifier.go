@@ -39,7 +39,6 @@ type Verifier interface {
 	// only contains authorized nodes (without duplicates).
 	// The implementation returns the following sentinel errors:
 	// * signature.ErrInvalidFormat if the signature has an incompatible format.
-	// * model.ErrInvalidSignature is the signature is invalid
 	// * unexpected errors should be treated as symptoms of bugs or uncovered
 	//   edge cases in the logic (i.e. as fatal)
 	VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) error
