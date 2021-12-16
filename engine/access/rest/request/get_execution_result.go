@@ -9,11 +9,11 @@ import (
 const idQuery = "id"
 const noBlockIdsErr = "no block IDs provided"
 
-type GetExecutionResultByBlockIDsRequest struct {
+type GetExecutionResultByBlockIDs struct {
 	BlockIDs []flow.Identifier
 }
 
-func (g *GetExecutionResultByBlockIDsRequest) Build(r *rest.Request) error {
+func (g *GetExecutionResultByBlockIDs) Build(r *rest.Request) error {
 	err := g.Parse(
 		r.GetQueryParams(blockIDQuery),
 	)
@@ -24,7 +24,7 @@ func (g *GetExecutionResultByBlockIDsRequest) Build(r *rest.Request) error {
 	return nil
 }
 
-func (g *GetExecutionResultByBlockIDsRequest) Parse(rawIDs []string) error {
+func (g *GetExecutionResultByBlockIDs) Parse(rawIDs []string) error {
 	var ids IDs
 	err := ids.Parse(rawIDs)
 	if err != nil {
@@ -39,11 +39,11 @@ func (g *GetExecutionResultByBlockIDsRequest) Parse(rawIDs []string) error {
 	return nil
 }
 
-type GetExecutionResultRequest struct {
+type GetExecutionResult struct {
 	ID flow.Identifier
 }
 
-func (g *GetExecutionResultRequest) Build(r *rest.Request) error {
+func (g *GetExecutionResult) Build(r *rest.Request) error {
 	err := g.Parse(
 		r.GetQueryParam(idQuery),
 	)
@@ -54,7 +54,7 @@ func (g *GetExecutionResultRequest) Build(r *rest.Request) error {
 	return nil
 }
 
-func (g *GetExecutionResultRequest) Parse(rawID string) error {
+func (g *GetExecutionResult) Parse(rawID string) error {
 	var id ID
 	err := id.Parse(rawID)
 	if err != nil {

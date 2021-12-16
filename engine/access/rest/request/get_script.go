@@ -9,13 +9,13 @@ import (
 
 const blockIDQuery = "block_id"
 
-type GetScriptRequest struct {
+type GetScript struct {
 	BlockID     flow.Identifier
 	BlockHeight uint64
 	Script      Script
 }
 
-func (g *GetScriptRequest) Build(r *rest.Request) error {
+func (g *GetScript) Build(r *rest.Request) error {
 	err := g.Parse(
 		r.GetQueryParam(blockHeightQuery),
 		r.GetQueryParam(blockIDQuery),
@@ -29,7 +29,7 @@ func (g *GetScriptRequest) Build(r *rest.Request) error {
 	return nil
 }
 
-func (g *GetScriptRequest) Parse(rawHeight string, rawID string, rawScript io.Reader) error {
+func (g *GetScript) Parse(rawHeight string, rawID string, rawScript io.Reader) error {
 	var height Height
 	err := height.Parse(rawHeight)
 	if err != nil {

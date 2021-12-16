@@ -48,38 +48,38 @@ func sliceToMap(values []string) map[string]bool {
 	return valueMap
 }
 
-func (rd *Request) getScriptRequest() (request.GetScriptRequest, error) {
-	var request request.GetScriptRequest
+func (rd *Request) getScriptRequest() (request.GetScript, error) {
+	var request request.GetScript
 	err := request.Build(rd)
 	return request, err
 }
 
-func (rd *Request) getBlockRequest() (request.GetBlockRequest, error) {
-	var request request.GetBlockRequest
+func (rd *Request) getBlockRequest() (request.GetBlock, error) {
+	var request request.GetBlock
 	err := request.Build(rd)
 	return request, err
 }
 
-func (rd *Request) getCollectionRequest() (request.GetCollectionRequest, error) {
-	var request request.GetCollectionRequest
+func (rd *Request) getCollectionRequest() (request.GetCollection, error) {
+	var request request.GetCollection
 	err := request.Build(rd)
 	return request, err
 }
 
-func (rd *Request) getAccountRequest() (request.GetAccountRequest, error) {
-	var request request.GetAccountRequest
+func (rd *Request) getAccountRequest() (request.GetAccount, error) {
+	var request request.GetAccount
 	err := request.Build(rd)
 	return request, err
 }
 
-func (rd *Request) getExecutionResultByBlockIDsRequest() (request.GetExecutionResultByBlockIDsRequest, error) {
-	var request request.GetExecutionResultByBlockIDsRequest
+func (rd *Request) getExecutionResultByBlockIDsRequest() (request.GetExecutionResultByBlockIDs, error) {
+	var request request.GetExecutionResultByBlockIDs
 	err := request.Build(rd)
 	return request, err
 }
 
-func (rd *Request) getExecutionResultRequest() (request.GetExecutionResultRequest, error) {
-	var request request.GetExecutionResultRequest
+func (rd *Request) getExecutionResultRequest() (request.GetExecutionResult, error) {
+	var request request.GetExecutionResult
 	err := request.Build(rd)
 	return request, err
 }

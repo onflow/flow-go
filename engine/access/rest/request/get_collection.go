@@ -7,12 +7,12 @@ import (
 
 const expandsTransactions = "transactions"
 
-type GetCollectionRequest struct {
+type GetCollection struct {
 	ID                  flow.Identifier
 	ExpandsTransactions bool
 }
 
-func (g *GetCollectionRequest) Build(r *rest.Request) error {
+func (g *GetCollection) Build(r *rest.Request) error {
 	err := g.Parse(
 		r.GetVar(idQuery),
 	)
@@ -25,7 +25,7 @@ func (g *GetCollectionRequest) Build(r *rest.Request) error {
 	return nil
 }
 
-func (g *GetCollectionRequest) Parse(rawID string) error {
+func (g *GetCollection) Parse(rawID string) error {
 	var id ID
 	err := id.Parse(rawID)
 	if err != nil {

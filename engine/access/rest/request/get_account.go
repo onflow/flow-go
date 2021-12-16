@@ -8,19 +8,19 @@ import (
 const addressVar = "address"
 const blockHeightQuery = "block_height"
 
-type GetAccountRequest struct {
+type GetAccount struct {
 	Address flow.Address
 	Height  uint64
 }
 
-func (g *GetAccountRequest) Build(r *rest.Request) error {
+func (g *GetAccount) Build(r *rest.Request) error {
 	return g.Parse(
 		r.GetVar(addressVar),
 		r.GetQueryParam(blockHeightQuery),
 	)
 }
 
-func (g *GetAccountRequest) Parse(rawAddress string, rawHeight string) error {
+func (g *GetAccount) Parse(rawAddress string, rawHeight string) error {
 	var address Address
 	err := address.Parse(rawAddress)
 	if err != nil {

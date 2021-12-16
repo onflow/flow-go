@@ -16,7 +16,7 @@ const startHeightBiggerThanEndErr = "start height must be less than or equal to 
 const heightRangeExceedMaxErr = "height range %d exceeds maximum allowed of %d"
 const cantMixValuesWithHeightErr = "can not provide '%s' or '%s' values with other height values"
 
-type GetBlockRequest struct {
+type GetBlock struct {
 	Heights      []uint64
 	StartHeight  uint64
 	EndHeight    uint64
@@ -24,7 +24,7 @@ type GetBlockRequest struct {
 	SealedHeight bool
 }
 
-func (g *GetBlockRequest) Build(r *rest.Request) error {
+func (g *GetBlock) Build(r *rest.Request) error {
 	err := g.Parse(
 		r.GetQueryParams(heightQuery),
 		r.GetQueryParam(startHeightQuery),
@@ -38,11 +38,11 @@ func (g *GetBlockRequest) Build(r *rest.Request) error {
 	return nil
 }
 
-func (g *GetBlockRequest) HasHeights() bool {
+func (g *GetBlock) HasHeights() bool {
 	return len(g.Heights) > 0
 }
 
-func (g *GetBlockRequest) Parse(rawHeights []string, rawStart string, rawEnd string) error {
+func (g *GetBlock) Parse(rawHeights []string, rawStart string, rawEnd string) error {
 	var height Height
 	err := height.Parse(rawStart)
 	if err != nil {
