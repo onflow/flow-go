@@ -52,7 +52,6 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// split the two signatures from the vote
-	// TODO: to be replaced by packer
 	stakingSig, beaconShare, err := signature.eecodeDoubleSig(sigData)
 	if err != nil {
 		return fmt.Errorf("could not split signature for block %v: %w", block.BlockID, err)
