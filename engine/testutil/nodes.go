@@ -284,21 +284,13 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	)
 	require.NoError(t, err)
 
-	// create an aggregated signature provider which produces fake signatures and
-	// considers all verification inputs as valid
-	aggregator := new(mockmodule.AggregatingSigner)
-	aggregator.On("Sign", mock.Anything).Return(unittest.SignatureFixture(), nil)
-	aggregator.On("Aggregate", mock.Anything).Return(unittest.SignatureFixture(), nil)
-	aggregator.On("VerifyMany", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-	aggregator.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
-
 	createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
 		return metrics.NewNoopCollector()
 	}
 	hotstuffFactory, err := factories.NewHotStuffFactory(
 		node.Log,
 		node.Me,
-		aggregator,
+		// aggregator,
 		node.PublicDB,
 		node.State,
 		createMetrics,

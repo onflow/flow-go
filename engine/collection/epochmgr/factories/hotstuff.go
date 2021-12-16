@@ -29,7 +29,6 @@ type HotStuffMetricsFunc func(chainID flow.ChainID) module.HotstuffMetrics
 type HotStuffFactory struct {
 	log           zerolog.Logger
 	me            module.Local
-	aggregator    module.AggregatingSigner
 	db            *badger.DB
 	protoState    protocol.State
 	createMetrics HotStuffMetricsFunc
@@ -39,7 +38,6 @@ type HotStuffFactory struct {
 func NewHotStuffFactory(
 	log zerolog.Logger,
 	me module.Local,
-	aggregator module.AggregatingSigner,
 	db *badger.DB,
 	protoState protocol.State,
 	createMetrics HotStuffMetricsFunc,
@@ -49,7 +47,6 @@ func NewHotStuffFactory(
 	factory := &HotStuffFactory{
 		log:           log,
 		me:            me,
-		aggregator:    aggregator,
 		db:            db,
 		protoState:    protoState,
 		createMetrics: createMetrics,
