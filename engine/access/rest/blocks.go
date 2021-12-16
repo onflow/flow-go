@@ -27,13 +27,13 @@ const (
 
 // getBlocksByID gets blocks by provided ID or list of IDs.
 func getBlocksByIDs(r *request.Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	ids, err := r.ids()
+	req, err := r.GetBlockByIDsRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
-	blocks := make([]*generated.Block, len(ids))
-	for i, id := range ids {
+	blocks := make([]*generated.Block, len(req.IDs))
+	for i, id := range req.IDs {
 		block, err := getBlock(forID(&id), r, backend, link)
 		if err != nil {
 			return nil, err
@@ -97,15 +97,14 @@ func getBlocksByHeight(r *request.Request, backend access.API, link LinkGenerato
 }
 
 // getBlockPayloadByID gets block payload by ID
-func getBlockPayloadByID(req *request.Request, backend access.API, _ LinkGenerator) (interface{}, error) {
-
-	id, err := req.id()
+func getBlockPayloadByID(r *request.Request, backend access.API, _ LinkGenerator) (interface{}, error) {
+	req, err := r.GetBlockPayloadRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
-	blkProvider := NewBlockProvider(backend, forID(&id))
-	blk, statusErr := blkProvider.getBlock(req.Context())
+	blkProvider := NewBlockProvider(backend, forID(&req.ID))
+	blk, statusErr := blkProvider.getBlock(r.Context())
 	if statusErr != nil {
 		return nil, statusErr
 	}
