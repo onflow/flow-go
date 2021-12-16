@@ -290,7 +290,6 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, rootSn
 	hotstuffFactory, err := factories.NewHotStuffFactory(
 		node.Log,
 		node.Me,
-		// aggregator,
 		node.PublicDB,
 		node.State,
 		createMetrics,

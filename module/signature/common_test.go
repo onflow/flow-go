@@ -14,14 +14,6 @@ func randomByteSliceT(t *testing.T, len uint) []byte {
 	return msg
 }
 
-func randomByteSliceB(b *testing.B) []byte {
-	msg, err := randomByteSlice(128)
-	if err != nil {
-		b.Fatal(err)
-	}
-	return msg
-}
-
 func randomByteSlice(len uint) ([]byte, error) {
 	msg := make([]byte, len)
 	n, err := rand.Read(msg)
