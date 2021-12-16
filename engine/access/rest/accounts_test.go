@@ -37,9 +37,7 @@ func TestGetAccount(t *testing.T) {
 	backend := &mock.API{}
 
 	t.Run("get by address at latest sealed block", func(t *testing.T) {
-
 		account := accountFixture(t)
-
 		req := getAccountRequest(t, account, sealedHeightQueryParam, expandableFieldKeys, expandableFieldContracts)
 
 		backend.Mock.

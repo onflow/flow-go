@@ -15,16 +15,6 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
-const (
-	ExpandableFieldPayload    = "payload"
-	ExpandableExecutionResult = "execution_result"
-	sealedHeightQueryParam    = "sealed"
-	finalHeightQueryParam     = "final"
-	startHeightQueryParam     = "start_height"
-	endHeightQueryParam       = "end_height"
-	heightQueryParam          = "height"
-)
-
 // getBlocksByID gets blocks by provided ID or list of IDs.
 func getBlocksByIDs(r *request.Request, backend access.API, link LinkGenerator) (interface{}, error) {
 	req, err := r.GetBlockByIDsRequest()

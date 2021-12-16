@@ -1,49 +1,23 @@
 package rest
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 
-	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/model/flow"
 
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	mocks "github.com/stretchr/testify/mock"
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
-
-func executeRequest(req *http.Request, backend *mock.API) *httptest.ResponseRecorder {
-	var b bytes.Buffer
-	logger := zerolog.New(&b)
-	router := initRouter(backend, logger)
-
-	rr := httptest.NewRecorder()
-	router.ServeHTTP(rr, req)
-
-	return rr
-}
-
-func assertOKResponse(t *testing.T, req *http.Request, expectedRespBody string, backend *mock.API) {
-	assertResponse(t, req, http.StatusOK, expectedRespBody, backend)
-}
-
-func assertResponse(t *testing.T, req *http.Request, status int, expectedRespBody string, backend *mock.API) {
-	rr := executeRequest(req, backend)
-	require.Equal(t, status, rr.Code)
-	actualResponseBody := rr.Body.String()
-	require.JSONEq(t, expectedRespBody, actualResponseBody, fmt.Sprintf("failed for req: %s", req.URL))
-}
 
 func getCollectionReq(id string, expandTransactions bool) *http.Request {
 	url := fmt.Sprintf("/v1/collections/%s", id)
