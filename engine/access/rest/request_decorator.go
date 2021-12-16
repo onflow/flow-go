@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/request"
 	"io"
 	"net/http"
 	"strings"
@@ -48,38 +48,38 @@ func sliceToMap(values []string) map[string]bool {
 	return valueMap
 }
 
-func (rd *Request) getScriptRequest() (models.GetScriptRequest, error) {
-	var request models.GetScriptRequest
+func (rd *Request) getScriptRequest() (request.GetScriptRequest, error) {
+	var request request.GetScriptRequest
 	err := request.Build(rd)
 	return request, err
 }
 
-func (rd *Request) getBlockRequest() (models.GetBlockRequest, error) {
-	var request models.GetBlockRequest
+func (rd *Request) getBlockRequest() (request.GetBlockRequest, error) {
+	var request request.GetBlockRequest
 	err := request.Build(rd)
 	return request, err
 }
 
-func (rd *Request) getCollectionRequest() (models.GetCollectionRequest, error) {
-	var request models.GetCollectionRequest
+func (rd *Request) getCollectionRequest() (request.GetCollectionRequest, error) {
+	var request request.GetCollectionRequest
 	err := request.Build(rd)
 	return request, err
 }
 
-func (rd *Request) getAccountRequest() (models.GetAccountRequest, error) {
-	var request models.GetAccountRequest
+func (rd *Request) getAccountRequest() (request.GetAccountRequest, error) {
+	var request request.GetAccountRequest
 	err := request.Build(rd)
 	return request, err
 }
 
-func (rd *Request) getExecutionResultByBlockIDsRequest() (models.GetExecutionResultByBlockIDsRequest, error) {
-	var request models.GetExecutionResultByBlockIDsRequest
+func (rd *Request) getExecutionResultByBlockIDsRequest() (request.GetExecutionResultByBlockIDsRequest, error) {
+	var request request.GetExecutionResultByBlockIDsRequest
 	err := request.Build(rd)
 	return request, err
 }
 
-func (rd *Request) getExecutionResultRequest() (models.GetExecutionResultRequest, error) {
-	var request models.GetExecutionResultRequest
+func (rd *Request) getExecutionResultRequest() (request.GetExecutionResultRequest, error) {
+	var request request.GetExecutionResultRequest
 	err := request.Build(rd)
 	return request, err
 }

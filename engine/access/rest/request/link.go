@@ -1,4 +1,4 @@
-package models
+package request
 
 type LinkResponse struct {
 	Self string `json:"_self,omitempty"`

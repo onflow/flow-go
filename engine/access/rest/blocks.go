@@ -3,7 +3,7 @@ package rest
 import (
 	"context"
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/request"
 	"net/http"
 
 	"google.golang.org/grpc/codes"
@@ -75,8 +75,8 @@ func getBlocksByHeight(r *Request, backend access.API, link LinkGenerator) (inte
 	}
 
 	// support providing end height as "sealed" or "final"
-	if req.EndHeight == models.FinalHeight || req.EndHeight == models.SealedHeight {
-		latest, err := backend.GetLatestBlock(r.Context(), req.EndHeight == models.SealedHeight)
+	if req.EndHeight == request.FinalHeight || req.EndHeight == request.SealedHeight {
+		latest, err := backend.GetLatestBlock(r.Context(), req.EndHeight == request.SealedHeight)
 		if err != nil {
 			return nil, err
 		}
@@ -167,10 +167,10 @@ func forHeight(height uint64) blockProviderOption {
 func forFinalized(queryParam uint64) blockProviderOption {
 	return func(blkProvider *blockProvider) {
 		switch queryParam {
-		case models.SealedHeight:
+		case request.SealedHeight:
 			blkProvider.sealed = true
 			fallthrough
-		case models.FinalHeight:
+		case request.FinalHeight:
 			blkProvider.latest = true
 		}
 	}

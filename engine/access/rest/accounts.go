@@ -2,7 +2,7 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/models"
+	"github.com/onflow/flow-go/engine/access/rest/request"
 )
 
 const blockHeightQueryParam = "block_height"
@@ -15,8 +15,8 @@ func getAccount(r *Request, backend access.API, link LinkGenerator) (interface{}
 	}
 
 	// in case we provide special height values 'final' and 'sealed' fetch that height and overwrite request wtih it
-	if req.Height == models.FinalHeight || req.Height == models.SealedHeight {
-		header, err := backend.GetLatestBlockHeader(r.Context(), req.Height == models.SealedHeight)
+	if req.Height == request.FinalHeight || req.Height == request.SealedHeight {
+		header, err := backend.GetLatestBlockHeader(r.Context(), req.Height == request.SealedHeight)
 		if err != nil {
 			return nil, err
 		}
