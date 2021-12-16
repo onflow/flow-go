@@ -31,3 +31,25 @@ func (i *ID) Parse(raw string) error {
 func (i ID) Flow() flow.Identifier {
 	return flow.Identifier(i)
 }
+
+type IDs []ID
+
+func (i *IDs) Parse(raw []string) error {
+	id := make([]ID, len(raw))
+	for i, r := range raw {
+		err := id[i].Parse(r)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (i IDs) Flow() []flow.Identifier {
+	ids := make([]flow.Identifier, len(i))
+	for j, id := range i {
+		ids[j] = id.Flow()
+	}
+	return ids
+}
