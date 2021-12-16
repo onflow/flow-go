@@ -51,18 +51,22 @@ func sliceToMap(values []string) map[string]bool {
 func (rd *Request) getScriptRequest() (models.GetScriptRequest, error) {
 	var getScriptRequest models.GetScriptRequest
 	err := getScriptRequest.Build(rd)
-
 	return getScriptRequest, err
 }
 
 func (rd *Request) getBlockRequest() (models.GetBlockRequest, error) {
 	var getBlockRequest models.GetBlockRequest
 	err := getBlockRequest.Build(rd)
-
 	return getBlockRequest, err
 }
 
-func (rd *Request) expands(field string) bool {
+func (rd *Request) getCollectionRequest() (models.GetCollectionRequest, error) {
+	var getCollectionRequest models.GetCollectionRequest
+	err := getCollectionRequest.Build(rd)
+	return getCollectionRequest, err
+}
+
+func (rd *Request) Expands(field string) bool {
 	return rd.expandFields[field]
 }
 

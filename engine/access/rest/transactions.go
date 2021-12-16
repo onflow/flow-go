@@ -21,7 +21,7 @@ func getTransactionByID(r *Request, backend access.API, link LinkGenerator) (int
 
 	var txr *access.TransactionResult
 	// only lookup result if transaction result is to be expanded
-	if r.expands(resultExpandable) {
+	if r.Expands(resultExpandable) {
 		txr, err = backend.GetTransactionResult(r.Context(), id)
 		if err != nil {
 			return nil, err
