@@ -8,6 +8,7 @@ import (
 
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/mempool"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata"
 	_ "github.com/onflow/flow-go/utils/binstat"
 )
 
@@ -24,7 +25,7 @@ type Backend struct {
 // NewBackend creates a new memory pool backend.
 // This is using EjectTrueRandomFast()
 func NewBackend(options ...OptionFunc) *Backend {
-	backData := NewMapBackData()
+	backData := backdata.NewMapBackData()
 	return NewBackendWithBackData(&backData, options...)
 }
 

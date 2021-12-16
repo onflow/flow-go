@@ -3,6 +3,7 @@ package backdata
 import (
 	"encoding/binary"
 	"time"
+	_ "unsafe" // for linking runtimeNano
 
 	"github.com/rs/zerolog"
 
