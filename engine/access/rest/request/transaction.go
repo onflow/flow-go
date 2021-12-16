@@ -21,19 +21,6 @@ type transactionBody struct {
 	EnvelopeSignatures []transactionSignatureBody `json:"envelope_signatures"`
 }
 
-type proposalKeyBody struct {
-	Address        string `json:"address"`
-	KeyIndex       string `json:"key_index"`
-	SequenceNumber string `json:"sequence_number"`
-}
-
-type transactionSignatureBody struct {
-	Address     string `json:"address"`
-	SignerIndex string `json:"signer_index"`
-	KeyIndex    string `json:"key_index"`
-	Signature   string `json:"signature"`
-}
-
 type Transaction flow.TransactionBody
 
 func (t *Transaction) Parse(raw io.Reader) error {
@@ -97,17 +84,20 @@ func (t *Transaction) Parse(raw io.Reader) error {
 		auths[i] = a.Flow()
 	}
 
-	proposal, err := toProposalKey(tx.ProposalKey)
+	var proposal ProposalKey
+	err = proposal.Parse(*tx.ProposalKey)
 	if err != nil {
 		return err
 	}
 
-	payloadSigs, err := toTransactionSignatures(tx.PayloadSignatures)
+	var payloadSigs TransactionSignatures
+	err = payloadSigs.Parse(tx.PayloadSignatures)
 	if err != nil {
 		return err
 	}
 
-	envelopeSigs, err := toTransactionSignatures(tx.EnvelopeSignatures)
+	var envelopeSigs TransactionSignatures
+	err = envelopeSigs.Parse(tx.EnvelopeSignatures)
 	if err != nil {
 		return err
 	}
@@ -134,11 +124,11 @@ func (t *Transaction) Parse(raw io.Reader) error {
 		Script:             script,
 		Arguments:          args.Flow(),
 		GasLimit:           gasLimit,
-		ProposalKey:        proposal,
+		ProposalKey:        proposal.Flow(),
 		Payer:              payer.Flow(),
 		Authorizers:        auths,
-		PayloadSignatures:  payloadSigs,
-		EnvelopeSignatures: envelopeSigs,
+		PayloadSignatures:  payloadSigs.Flow(),
+		EnvelopeSignatures: envelopeSigs.Flow(),
 	})
 
 	return nil
