@@ -428,24 +428,24 @@ func testInitialization(t *testing.T, list *EntityDoubleLinkedList, _ []*unittes
 			// head of embedded "free" linked-list should point to index 0 of entities slice.
 			require.Equal(t, VIndex(i), list.free.head.sliceIndex())
 			// previous element of tail must be undefined.
-			require.True(t, list.values[i].prev.isUndefined())
+			require.True(t, list.values[i].node.prev.isUndefined())
 		}
 
 		if i != 0 {
 			// except head, any element should point back to its previous index in slice.
-			require.Equal(t, VIndex(i-1), list.values[i].prev.sliceIndex())
+			require.Equal(t, VIndex(i-1), list.values[i].node.prev.sliceIndex())
 		}
 
 		if i != len(list.values)-1 {
 			// except tail, any element should point forward to its next index in slice.
-			require.Equal(t, VIndex(i+1), list.values[i].next.sliceIndex())
+			require.Equal(t, VIndex(i+1), list.values[i].node.next.sliceIndex())
 		}
 
 		if i == len(list.values)-1 {
 			// tail of embedded "free" linked-list should point to the last index in entities slice.
 			require.Equal(t, VIndex(i), list.free.tail.sliceIndex())
 			// next element of tail must be undefined.
-			require.True(t, list.values[i].next.isUndefined())
+			require.True(t, list.values[i].node.next.isUndefined())
 		}
 	}
 }
@@ -480,19 +480,19 @@ func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBe
 				expectedUsedHead = (i + 1) % len(list.values)
 			}
 			require.Equal(t, list.values[expectedUsedHead].entity, usedHead.entity)
-			require.True(t, usedHead.prev.isUndefined())
+			require.True(t, usedHead.node.prev.isUndefined())
 		}
 
 		//
 		require.Equal(t, entitiesToBeAdded[i], usedTail.entity)
-		require.True(t, usedTail.next.isUndefined())
+		require.True(t, usedTail.node.next.isUndefined())
 
 		// free head
 		// as long as we are below limit, after adding i element, free head
 		// should move to i+1 element.
 		if i < len(list.values)-1 {
 			require.Equal(t, VIndex(i+1), list.free.head.sliceIndex())
-			require.True(t, freeHead.prev.isUndefined())
+			require.True(t, freeHead.node.prev.isUndefined())
 		} else {
 			require.Nil(t, freeHead)
 		}
@@ -500,7 +500,7 @@ func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBe
 		// free tail
 		if i < len(list.values)-1 {
 			require.Equal(t, VIndex(len(list.values)-1), list.free.tail.sliceIndex())
-			require.True(t, freeTail.next.isUndefined())
+			require.True(t, freeTail.node.next.isUndefined())
 		} else {
 			require.Nil(t, freeTail)
 		}
@@ -607,8 +607,8 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex VIndex, tailSliceIndex 
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
 
-		require.False(t, list.values[index].next.isUndefined(), "tail not found, and reached end of list")
-		index = list.values[index].next.sliceIndex()
+		require.False(t, list.values[index].node.next.isUndefined(), "tail not found, and reached end of list")
+		index = list.values[index].node.next.sliceIndex()
 	}
 }
 
@@ -626,6 +626,6 @@ func headAccessibleFromTail(t *testing.T, headSliceIndex VIndex, tailSliceIndex 
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
 
-		index = list.values[index].prev.sliceIndex()
+		index = list.values[index].node.prev.sliceIndex()
 	}
 }

@@ -57,7 +57,7 @@ func newDoubleLinkedList() *doubleLinkedList {
 }
 
 type cachedEntity struct {
-	doubleLinkedListNode
+	node   doubleLinkedListNode
 	id     flow.Identifier
 	owner  uint64
 	entity flow.Entity
@@ -100,13 +100,13 @@ func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entit
 	e.values[entityIndex].entity = entity
 	e.values[entityIndex].id = entityId
 	e.values[entityIndex].owner = owner
-	e.values[entityIndex].next.setUndefined()
-	e.values[entityIndex].prev.setUndefined()
+	e.values[entityIndex].node.next.setUndefined()
+	e.values[entityIndex].node.prev.setUndefined()
 
 	if e.used.head.isUndefined() {
 		// sets head
 		e.used.head.setPointer(entityIndex)
-		e.values[e.used.head.sliceIndex()].prev.setUndefined()
+		e.values[e.used.head.sliceIndex()].node.prev.setUndefined()
 	}
 
 	if !e.used.tail.isUndefined() {
@@ -172,8 +172,8 @@ func (e EntityDoubleLinkedList) getTails() (*cachedEntity, *cachedEntity) {
 }
 
 func (e *EntityDoubleLinkedList) link(prev doubleLinkedListPointer, next VIndex) {
-	e.values[prev.sliceIndex()].next.setPointer(next)
-	e.values[next].prev = prev
+	e.values[prev.sliceIndex()].node.next.setPointer(next)
+	e.values[next].node.prev = prev
 }
 
 func (e *EntityDoubleLinkedList) invalidateHead() VIndex {
@@ -202,12 +202,12 @@ func (e *EntityDoubleLinkedList) invalidateRandomEntity() VIndex {
 func (e *EntityDoubleLinkedList) claimFreeHead() VIndex {
 	oldFreeHeadIndex := e.free.head.sliceIndex()
 	// moves head forward
-	e.free.head = e.values[oldFreeHeadIndex].next
+	e.free.head = e.values[oldFreeHeadIndex].node.next
 	// new head should point head to an undefined prev,
 	// but we first check if list is not empty, i.e.,
 	// head itself is not undefined.
 	if !e.free.head.isUndefined() {
-		e.values[e.free.head.sliceIndex()].prev.setUndefined()
+		e.values[e.free.head.sliceIndex()].node.prev.setUndefined()
 	}
 
 	// also we check if old head and tail aligned so to update
@@ -217,8 +217,8 @@ func (e *EntityDoubleLinkedList) claimFreeHead() VIndex {
 	}
 
 	// clears pointers of claimed head
-	e.values[oldFreeHeadIndex].next.setUndefined()
-	e.values[oldFreeHeadIndex].prev.setUndefined()
+	e.values[oldFreeHeadIndex].node.next.setUndefined()
+	e.values[oldFreeHeadIndex].node.prev.setUndefined()
 
 	return oldFreeHeadIndex
 }
@@ -228,8 +228,8 @@ func (e *EntityDoubleLinkedList) Rem(sliceIndex VIndex) {
 }
 
 func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex VIndex) {
-	prev := e.values[sliceIndex].prev
-	next := e.values[sliceIndex].next
+	prev := e.values[sliceIndex].node.prev
+	next := e.values[sliceIndex].node.next
 
 	if sliceIndex != e.used.head.sliceIndex() && sliceIndex != e.used.tail.sliceIndex() {
 		// links next and prev elements for non-head and non-tail element
@@ -239,34 +239,34 @@ func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex VIndex) {
 	if sliceIndex == e.used.head.sliceIndex() {
 		// moves head forward
 		oldUsedHead, _ := e.getHeads()
-		e.used.head = oldUsedHead.next
+		e.used.head = oldUsedHead.node.next
 		// new head should point head to an undefined prev,
 		// but we first check if list is not empty, i.e.,
 		// head itself is not undefined.
 		if !e.used.head.isUndefined() {
 			usedHead, _ := e.getHeads()
-			usedHead.prev.setUndefined()
+			usedHead.node.prev.setUndefined()
 		}
 	}
 
 	if sliceIndex == e.used.tail.sliceIndex() {
 		// moves tail backward
 		oldUsedTail, _ := e.getTails()
-		e.used.tail = oldUsedTail.prev
+		e.used.tail = oldUsedTail.node.prev
 		// new head should point tail to an undefined next,
 		// but we first check if list is not empty, i.e.,
 		// tail itself is not undefined.
 		if !e.used.tail.isUndefined() {
 			usedTail, _ := e.getTails()
-			usedTail.next.setUndefined()
+			usedTail.node.next.setUndefined()
 		}
 	}
 
 	// invalidates entity and adds it to free entities.
 	e.values[sliceIndex].id = flow.ZeroID
 	e.values[sliceIndex].entity = nil
-	e.values[sliceIndex].next.setUndefined()
-	e.values[sliceIndex].prev.setUndefined()
+	e.values[sliceIndex].node.next.setUndefined()
+	e.values[sliceIndex].node.prev.setUndefined()
 
 	e.appendToFreeList(sliceIndex)
 
