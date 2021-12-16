@@ -1,6 +1,6 @@
 package request
 
-type Transactions struct {
+type transactionBody struct {
 	Script             string                 `json:"script"`
 	Arguments          []string               `json:"arguments"`
 	ReferenceBlockId   string                 `json:"reference_block_id"`
