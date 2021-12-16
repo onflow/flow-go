@@ -13,7 +13,6 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	modulesig "github.com/onflow/flow-go/module/signature"
 )
 
 // CombinedVerifier is a verifier capable of verifying two signatures, one for each
@@ -54,7 +53,6 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
 	// split the two signatures from the vote
-	// TODO: to be replaced by packer
 	stakingSig, beaconShare, err := signature.DecodeDoubleSig(sigData)
 	if err != nil {
 		return fmt.Errorf("could not split signature for block %v: %w", block.BlockID, err)
@@ -100,17 +98,17 @@ func (c *CombinedVerifier) VerifyVote(signer *flow.Identity, sigData []byte, blo
 }
 
 // VerifyQC verifies the validity of a combined signature on a quorum certificate.
-func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
+func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
 
 	dkg, err := c.committee.DKG(block.BlockID)
 	if err != nil {
-		return false, fmt.Errorf("could not get dkg data: %w", err)
+		return fmt.Errorf("could not get dkg data: %w", err)
 	}
 
 	// unpack sig data using packer
 	blockSigData, err := c.packer.Unpack(block.BlockID, signers.NodeIDs(), sigData)
 	if err != nil {
-		return false, fmt.Errorf("could not split signature: %w", modulesig.ErrInvalidFormat)
+		return fmt.Errorf("could not split signature: %w", err)
 	}
 
 	msg := MakeVoteMessage(block.View, block.BlockID)
@@ -118,10 +116,10 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	// verify the beacon signature first since it is faster to verify (no public key aggregation needed)
 	beaconValid, err := dkg.GroupKey().Verify(blockSigData.ReconstructedRandomBeaconSig, msg, c.beaconHasher)
 	if err != nil {
-		return false, fmt.Errorf("internal error while verifying beacon signature: %w", err)
+		return fmt.Errorf("internal error while verifying beacon signature: %w", err)
 	}
 	if !beaconValid {
-		return false, nil
+		return fmt.Errorf("invalid reconstructed random beacon sig for block (%x): %w", block.BlockID, model.ErrInvalidSignature)
 	}
 
 	pks := make([]crypto.PublicKey, 0, len(signers))
@@ -133,11 +131,17 @@ func (c *CombinedVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, b
 	// TODO: update to use module/signature.PublicKeyAggregator
 	aggregatedKey, err := crypto.AggregateBLSPublicKeys(pks)
 	if err != nil {
-		return false, fmt.Errorf("could not compute aggregated key: %w", err)
+		return fmt.Errorf("could not compute aggregated key for block %x: %w", block.BlockID, err)
 	}
+
 	stakingValid, err := aggregatedKey.Verify(blockSigData.AggregatedStakingSig, msg, c.stakingHasher)
 	if err != nil {
-		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
+		return fmt.Errorf("internal error while verifying staking signature for block %x: %w", block.BlockID, err)
 	}
-	return stakingValid, nil
+
+	if !stakingValid {
+		return fmt.Errorf("invalid aggregated staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
+	}
+
+	return nil
 }
