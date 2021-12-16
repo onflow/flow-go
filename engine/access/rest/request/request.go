@@ -25,6 +25,18 @@ func (rd *Request) GetBlockRequest() (GetBlock, error) {
 	return req, err
 }
 
+func (rd *Request) GetBlockByIDsRequest() (GetBlockByIDs, error) {
+	var req GetBlockByIDs
+	err := req.Build(rd)
+	return req, err
+}
+
+func (rd *Request) GetBlockPayloadRequest() (GetBlockPayload, error) {
+	var req GetBlockPayload
+	err := req.Build(rd)
+	return req, err
+}
+
 func (rd *Request) GetCollectionRequest() (GetCollection, error) {
 	var req GetCollection
 	err := req.Build(rd)

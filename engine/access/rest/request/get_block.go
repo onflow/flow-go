@@ -2,12 +2,14 @@ package request
 
 import (
 	"fmt"
+	"github.com/onflow/flow-go/model/flow"
 )
 
 const heightQuery = "height"
 const startHeightQuery = "start_height"
 const endHeightQuery = "end_height"
 const maxAllowedHeights = 50
+const idsQuery = "ids"
 
 const mustProvideHeightOrRangeErr = "must provide either heights or start and end height range"
 const onlyProvideHeightOrRangeErr = "can only provide either heights or start and end height range"
@@ -87,4 +89,29 @@ func (g *GetBlock) Parse(rawHeights []string, rawStart string, rawEnd string) er
 	g.SealedHeight = heights[0] == SealedHeight
 
 	return nil
+}
+
+type GetBlockByIDs struct {
+	IDs []flow.Identifier
+}
+
+func (g *GetBlockByIDs) Build(r *Request) error {
+	return g.Parse(
+		r.GetQueryParams(idsQuery),
+	)
+}
+
+func (g *GetBlockByIDs) Parse(rawIds []string) error {
+	var ids IDs
+	err := ids.Parse(rawIds)
+	if err != nil {
+		return err
+	}
+	g.IDs = ids.Flow()
+
+	return nil
+}
+
+type GetBlockPayload struct {
+	GetByIDRequest
 }
