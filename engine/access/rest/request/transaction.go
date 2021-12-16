@@ -6,6 +6,9 @@ import (
 	"io"
 )
 
+const maxAuthorizers = 100
+const maxAllowedScriptArguments = 100
+
 type transactionBody struct {
 	Script             string                     `json:"script"`
 	Arguments          []string                   `json:"arguments"`
@@ -40,101 +43,107 @@ func (t *Transaction) Parse(raw io.Reader) error {
 		return err
 	}
 
-}
-
-func toTransaction(tx transactionBody) (flow.TransactionBody, error) {
-	//argLen := len(tx.Arguments)
-	//if argLen > maxAllowedScriptArgumentsCnt {
-	//	return flow.TransactionBody{}, fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArgumentsCnt)
-	//}
-
 	if tx.ProposalKey == nil {
-		return flow.TransactionBody{}, fmt.Errorf("proposal key not provided")
+		return fmt.Errorf("proposal key not provided")
 	}
 	if tx.Script == "" {
-		return flow.TransactionBody{}, fmt.Errorf("script not provided")
+		return fmt.Errorf("script not provided")
 	}
 	if tx.Payer == "" {
-		return flow.TransactionBody{}, fmt.Errorf("payer not provided")
+		return fmt.Errorf("payer not provided")
 	}
 	if len(tx.Authorizers) == 0 {
-		return flow.TransactionBody{}, fmt.Errorf("authorizers not provided")
+		return fmt.Errorf("authorizers not provided")
 	}
-	//if len(tx.Authorizers) > maxAuthorizersCnt {
-	//	return flow.TransactionBody{}, fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizersCnt)
-	//}
+	if len(tx.Authorizers) > maxAuthorizers {
+		return fmt.Errorf("too many authorizers. Maximum authorizers allowed: %d", maxAuthorizers)
+	}
+	if len(tx.Arguments) > maxAllowedScriptArguments {
+		return fmt.Errorf("too many arguments. Maximum arguments allowed: %d", maxAllowedScriptArguments)
+	}
 	if len(tx.EnvelopeSignatures) == 0 {
-		return flow.TransactionBody{}, fmt.Errorf("envelope signatures not provided")
+		return fmt.Errorf("envelope signatures not provided")
 	}
 	if tx.ReferenceBlockId == "" {
-		return flow.TransactionBody{}, fmt.Errorf("reference block not provided")
+		return fmt.Errorf("reference block not provided")
+	}
+	if len(tx.EnvelopeSignatures) == 0 {
+		return fmt.Errorf("envelope signatures not provided")
+	}
+	if tx.ReferenceBlockId == "" {
+		return fmt.Errorf("reference block not provided")
 	}
 
-	// script arguments come in as a base64 encoded strings, decode base64 back to a string here
-	var args [][]byte
-	for i, arg := range tx.Arguments {
-		decodedArg, err := fromBase64(arg)
-		if err != nil {
-			return flow.TransactionBody{}, fmt.Errorf("invalid argument encoding with index: %d", i)
-		}
-		args = append(args, decodedArg)
-	}
-
-	proposal, err := toProposalKey(tx.ProposalKey)
+	var args Arguments
+	err = args.Parse(tx.Arguments)
 	if err != nil {
-		return flow.TransactionBody{}, err
+		return err
 	}
 
-	payer, err := toAddress(tx.Payer)
+	var payer Address
+	err = payer.Parse(tx.Payer)
 	if err != nil {
-		return flow.TransactionBody{}, err
+		return err
 	}
 
 	auths := make([]flow.Address, len(tx.Authorizers))
 	for i, auth := range tx.Authorizers {
-		a, err := toAddress(auth)
+		var a Address
+		err := a.Parse(auth)
 		if err != nil {
-			return flow.TransactionBody{}, err
+			return err
 		}
 
-		auths[i] = a
+		auths[i] = a.Flow()
+	}
+
+	proposal, err := toProposalKey(tx.ProposalKey)
+	if err != nil {
+		return err
 	}
 
 	payloadSigs, err := toTransactionSignatures(tx.PayloadSignatures)
 	if err != nil {
-		return flow.TransactionBody{}, err
+		return err
 	}
 
 	envelopeSigs, err := toTransactionSignatures(tx.EnvelopeSignatures)
 	if err != nil {
-		return flow.TransactionBody{}, err
+		return err
 	}
 
 	// script comes in as a base64 encoded string, decode base64 back to a string here
 	script, err := fromBase64(tx.Script)
 	if err != nil {
-		return flow.TransactionBody{}, fmt.Errorf("invalid transaction script encoding")
+		return fmt.Errorf("invalid transaction script encoding")
 	}
 
-	blockID, err := toID(tx.ReferenceBlockId)
+	var blockID ID
+	err = blockID.Parse(tx.ReferenceBlockId)
 	if err != nil {
-		return flow.TransactionBody{}, err
+		return err
 	}
 
 	gasLimit, err := toUint64(tx.GasLimit)
 	if err != nil {
-		return flow.TransactionBody{}, fmt.Errorf("invalid value for gas limit")
+		return fmt.Errorf("invalid value for gas limit")
 	}
 
-	return flow.TransactionBody{
-		ReferenceBlockID:   blockID,
+	*t = Transaction(flow.TransactionBody{
+		ReferenceBlockID:   blockID.Flow(),
 		Script:             script,
-		Arguments:          args,
+		Arguments:          args.Flow(),
 		GasLimit:           gasLimit,
 		ProposalKey:        proposal,
-		Payer:              payer,
+		Payer:              payer.Flow(),
 		Authorizers:        auths,
 		PayloadSignatures:  payloadSigs,
 		EnvelopeSignatures: envelopeSigs,
-	}, nil
+	})
+
+	return nil
+}
+
+func (t Transaction) Flow() flow.TransactionBody {
+	return flow.TransactionBody(t)
 }
