@@ -2,7 +2,6 @@ package request
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -39,14 +38,9 @@ type GetExecutionResult struct {
 }
 
 func (g *GetExecutionResult) Build(r *Request) error {
-	err := g.Parse(
+	return g.Parse(
 		r.GetQueryParam(idQuery),
 	)
-	if err != nil {
-		return rest.NewBadRequestError(err)
-	}
-
-	return nil
 }
 
 func (g *GetExecutionResult) Parse(rawID string) error {

@@ -2,7 +2,6 @@ package request
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest"
 	"io"
 )
 
@@ -23,7 +22,7 @@ func (s *Script) Parse(raw io.Reader) error {
 		return err
 	}
 
-	source, err := rest.FromBase64(body.Script)
+	source, err := fromBase64(body.Script)
 	if err != nil {
 		return fmt.Errorf("invalid script source encoding")
 	}

@@ -2,7 +2,6 @@ package request
 
 import (
 	"fmt"
-	"github.com/onflow/flow-go/engine/access/rest"
 )
 
 const maxArgumentsLength = 100
@@ -12,7 +11,7 @@ type Arguments [][]byte
 func (a *Arguments) Parse(raw []string) error {
 	args := make([][]byte, len(raw))
 	for i, a := range raw {
-		arg, err := rest.FromBase64(a)
+		arg, err := fromBase64(a)
 		if err != nil {
 			return fmt.Errorf("invalid script encoding")
 		}
