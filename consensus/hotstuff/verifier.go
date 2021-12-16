@@ -32,14 +32,12 @@ type Verifier interface {
 	VerifyVote(voter *flow.Identity, sigData []byte, block *model.Block) error
 
 	// VerifyQC checks the validity of a QC for the given block.
-	// The first return value indicates whether `sigData` is a valid signature
-	// from the provided voter identity. It is the responsibility of the
-	// calling code to ensure that `voter` is authorized to vote.
-	// It is the responsibility of the calling code to ensure that `voters`
-	// only contains authorized nodes (without duplicates).
-	// The implementation returns the following sentinel errors:
-	// * signature.ErrInvalidFormat if the signature has an incompatible format.
-	// * unexpected errors should be treated as symptoms of bugs or uncovered
-	//   edge cases in the logic (i.e. as fatal)
+	// It returns:
+	//  - `nil` to indicate the given `sigData` is a valid signature from the
+	//          provided voter identity. It is the responsibility of the
+	//          calling code to ensure that `voter` is authorized to vote,
+	//          and the `voters` only contains authorized nodes (without duplicates).
+	//  - `signature.ErrInvalidFormat` if the signature has an incompatible format.
+	//  - error if running into any unexpected exception (i.e. fatal error)
 	VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) error
 }
