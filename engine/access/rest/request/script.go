@@ -12,7 +12,7 @@ type scriptBody struct {
 }
 
 type Script struct {
-	Args   [][]byte
+	Args   Arguments
 	Source []byte
 }
 
@@ -28,13 +28,10 @@ func (s *Script) Parse(raw io.Reader) error {
 		return fmt.Errorf("invalid script source encoding")
 	}
 
-	args := make([][]byte, len(body.Arguments))
-	for i, a := range body.Arguments {
-		arg, err := rest.FromBase64(a)
-		if err != nil {
-			return fmt.Errorf("invalid script encoding")
-		}
-		args[i] = arg
+	var args Arguments
+	err = args.Parse(body.Arguments)
+	if err != nil {
+		return err
 	}
 
 	s.Source = source
