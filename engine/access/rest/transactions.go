@@ -2,7 +2,6 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/access"
-	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
 const resultExpandable = "result"
@@ -48,21 +47,15 @@ func getTransactionResultByID(r *Request, backend access.API, link LinkGenerator
 
 // createTransaction creates a new transaction from provided payload.
 func createTransaction(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	var txBody generated.TransactionsBody
-	err := r.bodyAs(&txBody)
-	if err != nil {
-		return nil, err
-	}
-
-	tx, err := toTransaction(txBody)
+	req, err := r.createTransactionRequest()
 	if err != nil {
 		return nil, NewBadRequestError(err)
 	}
 
-	err = backend.SendTransaction(r.Context(), &tx)
+	err = backend.SendTransaction(r.Context(), &req.Transaction)
 	if err != nil {
 		return nil, err
 	}
 
-	return transactionResponse(&tx, nil, link), nil
+	return transactionResponse(&req.Transaction, nil, link), nil
 }

@@ -96,6 +96,12 @@ func (rd *Request) getTransactionResultRequest() (request.GetTransactionResult, 
 	return req, err
 }
 
+func (rd *Request) createTransactionRequest() (request.CreateTransaction, error) {
+	var req request.CreateTransaction
+	err := req.Build(rd)
+	return req, err
+}
+
 func (rd *Request) Expands(field string) bool {
 	return rd.expandFields[field]
 }
