@@ -9,10 +9,6 @@ import (
 type Address flow.Address
 
 func (a *Address) Parse(raw string) error {
-	if raw == "" { // allow empty
-		return nil
-	}
-
 	valid, _ := regexp.MatchString(`^[0-9a-fA-F]{16}$`, raw)
 	if !valid {
 		return fmt.Errorf("invalid address")
