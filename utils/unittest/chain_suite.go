@@ -94,10 +94,10 @@ func (bc *BaseChainSuite) SetupChain() {
 	// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ SETUP BLOCKS ~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 	// RootBlock <- LatestSealedBlock <- LatestFinalizedBlock <- UnfinalizedBlock
 	bc.RootBlock = BlockFixture()
-	bc.LatestSealedBlock = BlockWithParentFixture(bc.RootBlock.Header)
+	bc.LatestSealedBlock = *BlockWithParentFixture(bc.RootBlock.Header)
 	latestFinalizedBlock := BlockWithParentFixture(bc.LatestSealedBlock.Header)
-	bc.LatestFinalizedBlock = &latestFinalizedBlock
-	bc.UnfinalizedBlock = BlockWithParentFixture(bc.LatestFinalizedBlock.Header)
+	bc.LatestFinalizedBlock = latestFinalizedBlock
+	bc.UnfinalizedBlock = *BlockWithParentFixture(bc.LatestFinalizedBlock.Header)
 
 	bc.Blocks = make(map[flow.Identifier]*flow.Block)
 	bc.Blocks[bc.RootBlock.ID()] = &bc.RootBlock
@@ -488,7 +488,7 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	// RESULTS for Blocks:
 	previousResult := ExecutionResultFixture(WithBlock(&parentBlock))
 	result := ExecutionResultFixture(
-		WithBlock(&block),
+		WithBlock(block),
 		WithPreviousResult(*previousResult),
 	)
 
@@ -512,7 +512,7 @@ func (bc *BaseChainSuite) ValidSubgraphFixture() subgraphFixture {
 	}
 
 	return subgraphFixture{
-		Block:              &block,
+		Block:              block,
 		ParentBlock:        &parentBlock,
 		Result:             result,
 		PreviousResult:     previousResult,

@@ -2,8 +2,11 @@ package state_test
 
 import (
 	"testing"
+	"unicode/utf8"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/atree"
 
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/fvm/utils"
@@ -207,4 +210,19 @@ func TestState_IsFVMStateKey(t *testing.T) {
 	require.True(t, state.IsFVMStateKey("Address", "", state.KeyAccountFrozen))
 
 	require.False(t, state.IsFVMStateKey("Address", "", "anything else"))
+}
+
+func TestAccounts_PrintableKey(t *testing.T) {
+	// slab with 189 should result in \\xbd
+	slabIndex := atree.StorageIndex([8]byte{0, 0, 0, 0, 0, 0, 0, 189})
+	key := string(atree.SlabIndexToLedgerKey(slabIndex))
+	require.False(t, utf8.ValidString(key))
+	printable := state.PrintableKey(key)
+	require.True(t, utf8.ValidString(printable))
+
+	// non slab invalid utf-8
+	key = "a\xc5z"
+	require.False(t, utf8.ValidString(key))
+	printable = state.PrintableKey(key)
+	require.True(t, utf8.ValidString(printable))
 }

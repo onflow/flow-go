@@ -69,8 +69,10 @@ func (c *Compactor) Done() <-chan struct{} {
 
 func (c *Compactor) start() {
 	for {
-		//TODO Log error
-		_ = c.Run()
+		err := c.Run()
+		if err != nil {
+			c.logger.Error().Err(err).Msg("error running compactor")
+		}
 
 		select {
 		case <-c.stopc:

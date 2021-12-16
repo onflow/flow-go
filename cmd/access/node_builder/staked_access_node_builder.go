@@ -209,10 +209,6 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier
 	resolver := dns.NewResolver(builder.Metrics.Network, dns.WithTTL(builder.BaseConfig.DNSCacheTTL))
 
 	return func(ctx context.Context) (*p2p.Node, error) {
-		streamFactory, err := p2p.LibP2PStreamCompressorFactoryFunc(builder.BaseConfig.LibP2PStreamCompression)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert stream factory: %w", err)
-		}
 		libp2pNode, err := p2p.NewDefaultLibP2PNodeBuilder(nodeID, myAddr, networkKey).
 			SetSporkID(builder.SporkID).
 			// no connection gater
@@ -222,7 +218,6 @@ func (builder *StakedAccessNodeBuilder) initLibP2PFactory(nodeID flow.Identifier
 			SetPubsubOptions(psOpts...).
 			SetLogger(builder.Logger).
 			SetResolver(resolver).
-			SetStreamCompressor(streamFactory).
 			Build(ctx)
 		if err != nil {
 			return nil, err
@@ -247,12 +242,12 @@ func (builder *StakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		factoryFunc,
 		nodeID,
 		networkMetrics,
-		builder.RootBlock.ID(),
+		builder.SporkID,
 		p2p.DefaultUnicastTimeout,
-		false, // no connection gating to allow unstaked nodes to connect
 		builder.IDTranslator,
 		p2p.WithMessageValidators(validators...),
 		p2p.WithPeerManager(peerManagerFactory),
+		p2p.WithConnectionGating(false),
 		// use default identifier provider
 	)
 

@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
 	"github.com/onflow/flow-go/admin/commands/common"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/cmd/build"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
 	"github.com/onflow/flow-go/fvm"
@@ -41,6 +42,7 @@ import (
 	"github.com/onflow/flow-go/network"
 	cborcodec "github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/network/topology"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/events"
@@ -64,22 +66,7 @@ type Metrics struct {
 	CleanCollector module.CleanerMetrics
 }
 
-type Storage struct {
-	Headers      storage.Headers
-	Index        storage.Index
-	Identities   storage.Identities
-	Guarantees   storage.Guarantees
-	Receipts     *bstorage.ExecutionReceipts
-	Results      storage.ExecutionResults
-	Seals        storage.Seals
-	Payloads     storage.Payloads
-	Blocks       storage.Blocks
-	Transactions storage.Transactions
-	Collections  storage.Collections
-	Setups       storage.EpochSetups
-	Commits      storage.EpochCommits
-	Statuses     storage.EpochStatuses
-}
+type Storage = storage.All
 
 type namedModuleFunc struct {
 	fn   func(builder NodeBuilder, nodeConfig *NodeConfig) error
@@ -150,8 +137,7 @@ func (fnb *FlowNodeBuilder) BaseFlags() {
 	fnb.flags.StringVar(&fnb.BaseConfig.AdminClientCAs, "admin-client-certs", defaultConfig.AdminClientCAs, "admin client certs (for mutual TLS)")
 
 	fnb.flags.DurationVar(&fnb.BaseConfig.DNSCacheTTL, "dns-cache-ttl", defaultConfig.DNSCacheTTL, "time-to-live for dns cache")
-	fnb.flags.StringVar(&fnb.BaseConfig.LibP2PStreamCompression, "stream-compression", p2p.NoCompression,
-		"networking stream compression mechanism")
+	fnb.flags.StringSliceVar(&fnb.BaseConfig.PreferredUnicastProtocols, "preferred-unicast-protocols", nil, "preferred unicast protocols in ascending order of preference")
 	fnb.flags.IntVar(&fnb.BaseConfig.NetworkReceivedMessageCacheSize, "networking-receive-cache-size", p2p.DefaultCacheSize,
 		"incoming message cache size at networking layer")
 	fnb.flags.UintVar(&fnb.BaseConfig.guaranteesCacheSize, "guarantees-cache-size", bstorage.DefaultCacheSize, "collection guarantees cache size")
@@ -203,11 +189,6 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			}
 		}
 
-		streamFactory, err := p2p.LibP2PStreamCompressorFactoryFunc(fnb.BaseConfig.LibP2PStreamCompression)
-		if err != nil {
-			return nil, fmt.Errorf("could not convert stream factory: %w", err)
-		}
-
 		libP2PNodeFactory, err := p2p.DefaultLibP2PNodeFactory(
 			fnb.Logger,
 			fnb.Me.NodeID(),
@@ -219,8 +200,7 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 			fnb.Metrics.Network,
 			pingProvider,
 			fnb.BaseConfig.DNSCacheTTL,
-			fnb.BaseConfig.NodeRole,
-			streamFactory)
+			fnb.BaseConfig.NodeRole)
 
 		if err != nil {
 			return nil, fmt.Errorf("could not generate libp2p node factory: %w", err)
@@ -233,16 +213,18 @@ func (fnb *FlowNodeBuilder) EnqueueNetworkInit() {
 
 		// run peer manager with the specified interval and let is also prune connections
 		peerManagerFactory := p2p.PeerManagerFactory([]p2p.Option{p2p.WithInterval(fnb.PeerUpdateInterval)})
-		mwOpts = append(mwOpts, p2p.WithPeerManager(peerManagerFactory))
+		mwOpts = append(mwOpts,
+			p2p.WithPeerManager(peerManagerFactory),
+			p2p.WithConnectionGating(true),
+			p2p.WithPreferredUnicastProtocols(unicast.ToProtocolNames(fnb.PreferredUnicastProtocols)))
 
 		fnb.Middleware = p2p.NewMiddleware(
 			fnb.Logger,
 			libP2PNodeFactory,
 			fnb.Me.NodeID(),
 			fnb.Metrics.Network,
-			fnb.RootBlock.ID(),
+			fnb.SporkID,
 			fnb.BaseConfig.UnicastMessageTimeout,
-			true,
 			fnb.IDTranslator,
 			mwOpts...,
 		)
@@ -574,7 +556,7 @@ func (fnb *FlowNodeBuilder) initStorage() {
 		Transactions: transactions,
 		Collections:  collections,
 		Setups:       setups,
-		Commits:      commits,
+		EpochCommits: commits,
 		Statuses:     statuses,
 	}
 }
@@ -634,7 +616,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Results,
 			fnb.Storage.Blocks,
 			fnb.Storage.Setups,
-			fnb.Storage.Commits,
+			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
 		)
 		fnb.MustNot(err).Msg("could not open flow state")
@@ -672,7 +654,7 @@ func (fnb *FlowNodeBuilder) initState() {
 			fnb.Storage.Results,
 			fnb.Storage.Blocks,
 			fnb.Storage.Setups,
-			fnb.Storage.Commits,
+			fnb.Storage.EpochCommits,
 			fnb.Storage.Statuses,
 			rootSnapshot,
 			options...,
@@ -969,8 +951,12 @@ func (fnb *FlowNodeBuilder) Initialize() error {
 func (fnb *FlowNodeBuilder) RegisterDefaultAdminCommands() {
 	fnb.AdminCommand("set-log-level", func(config *NodeConfig) commands.AdminCommand {
 		return &common.SetLogLevelCommand{}
-	}).AdminCommand("read-protocol-state-blocks", func(config *NodeConfig) commands.AdminCommand {
-		return common.NewReadProtocolStateBlocksCommand(config.State, config.Storage.Blocks)
+	}).AdminCommand("read-blocks", func(config *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadBlocksCommand(config.State, config.Storage.Blocks)
+	}).AdminCommand("read-results", func(config *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadResultsCommand(config.State, config.Storage.Results)
+	}).AdminCommand("read-seals", func(config *NodeConfig) commands.AdminCommand {
+		return storageCommands.NewReadSealsCommand(config.State, config.Storage.Seals, config.Storage.Index)
 	})
 }
 

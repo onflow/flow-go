@@ -1,7 +1,6 @@
 package signature
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/onflow/flow-go/model/encoding"
@@ -12,15 +11,15 @@ import (
 // TODO: to be replaced with EpochAwareRandomBeaconKeyStore
 // EpochAwareSignerStore implements the SignerStore interface. It is epoch
 // aware, and provides the appropriate threshold signers on a per-view basis,
-// using the database to retrieve the relevant DKG keys.
+// using the database to retrieve the relevant beacon keys.
 type EpochAwareSignerStore struct {
 	epochLookup module.EpochLookup                // used to fetch epoch counter by view
-	keys        storage.DKGKeys                   // used to fetch DKG private key by epoch
+	keys        storage.SafeBeaconKeys            // used to fetch beacon private key by epoch
 	signers     map[uint64]module.ThresholdSigner // cache of signers by epoch
 }
 
 // NewEpochAwareSignerStore instantiates a new EpochAwareSignerStore
-func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.DKGKeys) *EpochAwareSignerStore {
+func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.SafeBeaconKeys) *EpochAwareSignerStore {
 	return &EpochAwareSignerStore{
 		epochLookup: epochLookup,
 		keys:        keys,
@@ -29,7 +28,7 @@ func NewEpochAwareSignerStore(epochLookup module.EpochLookup, keys storage.DKGKe
 }
 
 // GetThresholdSigner returns the threshold-signer for signing objects at a
-// given view. The view determines the epoch, which determines the DKG private
+// given view. The view determines the epoch, which determines the beacon private
 // key underlying the signer.
 func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.ThresholdSigner, error) {
 	epoch, err := s.epochLookup.EpochForViewWithFallback(view)
@@ -41,23 +40,30 @@ func (s *EpochAwareSignerStore) GetThresholdSigner(view uint64) (module.Threshol
 		return signer, nil
 	}
 
-	privDKGData, hasBeaconKey, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
-	if errors.Is(err, storage.ErrNotFound) {
-		signer = NewThresholdProvider(encoding.RandomBeaconTag, nil)
-	} else if err != nil {
-		return nil, fmt.Errorf("could not retrieve DKG private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
-	} else if !hasBeaconKey {
-		return nil, fmt.Errorf("no random beacon private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
-	} else {
-		signer = NewThresholdProvider(encoding.RandomBeaconTag, privDKGData.RandomBeaconPrivKey)
+	beaconPrivKey, safe, err := s.keys.RetrieveMyBeaconPrivateKey(epoch)
+	if err != nil {
+		// there are no expected errors here
+		return nil, fmt.Errorf("could not retrieve beacon private key for epoch counter: %v, at view: %v, err: %w", epoch, view, err)
 	}
-	s.signers[epoch] = signer
 
+	if !safe {
+		// we do not have a consistent beacon key which is safe for signing
+		// CAUTION: for now, we produce explicitly invalid signatures
+		// TODO: in Crypto V2, we will fallback to using staking signatures
+		signer = NewThresholdProvider(encoding.RandomBeaconTag, nil)
+	} else {
+		// we have a beacon key which has been explicitly marked safe for use
+		// by the DKG process
+		signer = NewThresholdProvider(encoding.RandomBeaconTag, beaconPrivKey)
+	}
+
+	s.signers[epoch] = signer
 	return signer, nil
 }
 
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
+// TODO: to be removed in V2
 // SingleSignerStore implements the ThresholdSignerStore interface. It only
 // keeps one signer and is not epoch-aware. It is used only for the
 // bootstrapping process.
