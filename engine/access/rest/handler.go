@@ -49,7 +49,7 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
 
 	// create request decorator with parsed values
-	decoratedRequest := decorateRequest(r)
+	decoratedRequest := request.Decorate(r)
 
 	// execute handler function and check for error
 	response, err := h.apiHandlerFunc(decoratedRequest, h.backend, h.linkGenerator)

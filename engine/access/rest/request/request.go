@@ -2,6 +2,7 @@ package request
 
 import (
 	"github.com/gorilla/mux"
+	"github.com/onflow/flow-go/engine/access/rest/middleware"
 	"net/http"
 	"strings"
 )
@@ -111,4 +112,30 @@ func (rd *Request) GetQueryParams(name string) []string {
 		return strings.Split(param, ",")
 	}
 	return strings.Fields(param)
+}
+
+// Decorate takes http request and applies functions to produce our custom
+// request object decorated with values we need
+func Decorate(r *http.Request) *Request {
+	decoratedReq := &Request{
+		Request: r,
+	}
+
+	if expandFields, found := middleware.GetFieldsToExpand(r); found {
+		decoratedReq.ExpandFields = sliceToMap(expandFields)
+	}
+
+	if selectFields, found := middleware.GetFieldsToSelect(r); found {
+		decoratedReq.selectFields = selectFields
+	}
+
+	return decoratedReq
+}
+
+func sliceToMap(values []string) map[string]bool {
+	valueMap := make(map[string]bool, len(values))
+	for _, v := range values {
+		valueMap[v] = true
+	}
+	return valueMap
 }
