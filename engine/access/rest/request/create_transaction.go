@@ -11,11 +11,10 @@ type CreateTransaction struct {
 }
 
 func (c *CreateTransaction) Build(r *rest.Request) error {
-
+	return c.Parse(r.Body)
 }
 
 func (c *CreateTransaction) Parse(rawTransaction io.Reader) error {
-
 	var tx Transaction
 	err := tx.Parse(rawTransaction)
 	if err != nil {
@@ -23,4 +22,5 @@ func (c *CreateTransaction) Parse(rawTransaction io.Reader) error {
 	}
 
 	c.Transaction = tx.Flow()
+	return nil
 }
