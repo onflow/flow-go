@@ -56,7 +56,7 @@ require (
 	github.com/m4ksio/wal v1.0.0
 	github.com/multiformats/go-multiaddr v0.4.1
 	github.com/multiformats/go-multiaddr-dns v0.3.1
-	github.com/multiformats/go-multihash v0.1.0 // indirect
+	github.com/multiformats/go-multihash v0.1.0
 	github.com/onflow/atree v0.1.1
 	github.com/onflow/cadence v0.20.2
 	github.com/onflow/flow v0.2.3-0.20211103155021-9254a66368d5
