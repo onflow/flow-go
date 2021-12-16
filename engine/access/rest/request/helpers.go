@@ -57,7 +57,7 @@ type GetByIDRequest struct {
 
 func (g *GetByIDRequest) Build(r *Request) error {
 	return g.Parse(
-		r.GetQueryParam(idQuery),
+		r.GetVar(idQuery),
 	)
 }
 
