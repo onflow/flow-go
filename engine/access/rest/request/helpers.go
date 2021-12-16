@@ -8,6 +8,7 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest"
 	"github.com/onflow/flow-go/model/flow"
 	"io"
+	"strconv"
 	"strings"
 )
 
@@ -89,4 +90,8 @@ func fromBase64(bytesStr string) ([]byte, error) {
 
 func fromUint64(number uint64) string {
 	return fmt.Sprintf("%d", number)
+}
+
+func toUint64(uint64Str string) (uint64, error) {
+	return strconv.ParseUint(uint64Str, 10, 64)
 }
