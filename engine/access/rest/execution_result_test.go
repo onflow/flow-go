@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	mocks "github.com/stretchr/testify/mock"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	"github.com/onflow/flow-go/access/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -80,6 +82,19 @@ func TestGetResultByID(t *testing.T) {
 		assertOKResponse(t, req, expected, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
+
+	t.Run("get by ID not found", func(t *testing.T) {
+		backend := &mock.API{}
+		id := unittest.IdentifierFixture()
+		backend.Mock.
+			On("GetExecutionResultByID", mocks.Anything, id).
+			Return(nil, status.Error(codes.NotFound, "not found")).
+			Once()
+
+		req := getResultByIDReq(id.String(), nil)
+		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"not found"}`, backend)
+		mocks.AssertExpectationsForObjects(t, backend)
+	})
 }
 
 func TestGetResultBlockID(t *testing.T) {
@@ -103,6 +118,19 @@ func TestGetResultBlockID(t *testing.T) {
 			}
 		}]`, result.ID(), result.BlockID, result.ID())
 		assertOKResponse(t, req, expected, backend)
+		mocks.AssertExpectationsForObjects(t, backend)
+	})
+
+	t.Run("get by block ID not found", func(t *testing.T) {
+		backend := &mock.API{}
+		blockID := unittest.IdentifierFixture()
+		backend.Mock.
+			On("GetExecutionResultForBlockID", mocks.Anything, blockID).
+			Return(nil, status.Error(codes.NotFound, "not found")).
+			Once()
+
+		req := getResultByIDReq("", []string{blockID.String()})
+		assertResponse(t, req, http.StatusNotFound, `{"code":404,"message":"not found"}`, backend)
 		mocks.AssertExpectationsForObjects(t, backend)
 	})
 }
