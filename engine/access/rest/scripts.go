@@ -2,6 +2,7 @@ package rest
 
 import (
 	"github.com/onflow/flow-go/engine/access/rest/request"
+	"github.com/onflow/flow-go/model/flow"
 
 	"github.com/onflow/flow-go/access"
 )
@@ -13,7 +14,7 @@ func executeScript(r *request.Request, backend access.API, _ LinkGenerator) (int
 		return nil, NewBadRequestError(err)
 	}
 
-	if len(req.BlockID) > 0 {
+	if req.BlockID != flow.ZeroID {
 		return backend.ExecuteScriptAtBlockID(r.Context(), req.BlockID, req.Script.Source, req.Script.Args)
 	}
 
@@ -25,14 +26,13 @@ func executeScript(r *request.Request, backend access.API, _ LinkGenerator) (int
 		return result, nil
 	}
 
-	var height uint64
 	if req.BlockHeight == request.FinalHeight {
 		finalBlock, err := backend.GetLatestBlockHeader(r.Context(), false)
 		if err != nil {
 			return nil, err
 		}
-		height = finalBlock.Height
+		req.BlockHeight = finalBlock.Height
 	}
 
-	return backend.ExecuteScriptAtBlockHeight(r.Context(), height, req.Script.Source, req.Script.Args)
+	return backend.ExecuteScriptAtBlockHeight(r.Context(), req.BlockHeight, req.Script.Source, req.Script.Args)
 }
