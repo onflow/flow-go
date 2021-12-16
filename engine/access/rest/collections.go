@@ -9,19 +9,19 @@ const transactionsExpandable = "transactions"
 
 // getCollectionByID retrieves a collection by ID and builds a response
 func getCollectionByID(r *Request, backend access.API, link LinkGenerator) (interface{}, error) {
-	id, err := r.id()
+	req, err := r.getCollectionRequest()
 	if err != nil {
-		return nil, NewBadRequestError(err)
+		return nil, err
 	}
 
-	collection, err := backend.GetCollectionByID(r.Context(), id)
+	collection, err := backend.GetCollectionByID(r.Context(), req.ID)
 	if err != nil {
 		return nil, err
 	}
 
 	// if we expand transactions in the query retrieve each transaction data
 	transactions := make([]*flow.TransactionBody, 0)
-	if r.expands(transactionsExpandable) {
+	if req.ExpandsTransactions {
 		for _, tid := range collection.Transactions {
 			tx, err := backend.GetTransaction(r.Context(), tid)
 			if err != nil {
