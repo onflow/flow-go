@@ -575,6 +575,7 @@ func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBe
 	}
 }
 
+// testRetrievingEntitiesFrom evaluates that all entities starting from given index are retrievable from list.
 func testRetrievingEntitiesFrom(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity, from EIndex) {
 	for i := from; i < EIndex(len(entities)); i++ {
 		actualID, actual, _ := list.Get(i % EIndex(len(list.values)))
@@ -583,6 +584,7 @@ func testRetrievingEntitiesFrom(t *testing.T, list *EntityDoubleLinkedList, enti
 	}
 }
 
+// testRetrievingCount evaluates that exactly expected number of entities are retrievable from underlying list.
 func testRetrievingCount(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity, expected int) {
 	actualRetrievable := 0
 
@@ -598,6 +600,8 @@ func testRetrievingCount(t *testing.T, list *EntityDoubleLinkedList, entities []
 	require.Equal(t, expected, actualRetrievable)
 }
 
+// withTestScenario creates a new entity list, and then runs helpers
+// on the entity list sequentially.
 func withTestScenario(t *testing.T,
 	limit uint32,
 	entityCount uint32,
@@ -617,17 +621,18 @@ func withTestScenario(t *testing.T,
 	}
 }
 
-func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, list *EntityDoubleLinkedList, total uint32) {
+// tailAccessibleFromHead checks tail of given entities linked list is reachable from its head by traversing expected number of steps.
+func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, list *EntityDoubleLinkedList, steps uint32) {
 	seen := make(map[EIndex]struct{})
 
 	index := headSliceIndex
-	for i := uint32(0); i < total; i++ {
-		if i == total-1 {
-			require.Equal(t, tailSliceIndex, index, "tail not reachable after total steps")
+	for i := uint32(0); i < steps; i++ {
+		if i == steps-1 {
+			require.Equal(t, tailSliceIndex, index, "tail not reachable after steps steps")
 			return
 		}
 
-		require.NotEqual(t, tailSliceIndex, index, "tail visited in less expected steps (potential inconsistency)", i, total)
+		require.NotEqual(t, tailSliceIndex, index, "tail visited in less expected steps (potential inconsistency)", i, steps)
 		_, ok := seen[index]
 		require.False(t, ok, "duplicate identifiers found")
 
@@ -636,6 +641,7 @@ func tailAccessibleFromHead(t *testing.T, headSliceIndex EIndex, tailSliceIndex 
 	}
 }
 
+//  headAccessibleFromTail checks head of given entities linked list is reachable from its tail by traversing expected number of steps.
 func headAccessibleFromTail(t *testing.T, headSliceIndex EIndex, tailSliceIndex EIndex, list *EntityDoubleLinkedList, total uint32) {
 	seen := make(map[EIndex]struct{})
 
