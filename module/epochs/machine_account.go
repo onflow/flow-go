@@ -41,7 +41,7 @@ func init() {
 	if err != nil {
 		panic(fmt.Errorf("could not convert soft min balance for LN: %w", err))
 	}
-	HardMinBalanceLN, err = cadence.NewUFix64("0.001")
+	HardMinBalanceLN, err = cadence.NewUFix64("0.002")
 	if err != nil {
 		panic(fmt.Errorf("could not convert hard min balance for LN: %w", err))
 	}
@@ -113,7 +113,7 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 	}
 	backoff := retry.WithJitterPercent(
 		5, // 5% jitter
-		retry.WithMaxDuration(checkMachineAccountRetryMax, expRetry),
+		retry.WithCappedDuration(checkMachineAccountRetryMax, expRetry),
 	)
 
 	err = retry.Do(ctx, backoff, func(ctx context.Context) error {

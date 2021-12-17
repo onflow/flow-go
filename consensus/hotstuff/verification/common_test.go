@@ -13,9 +13,11 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/local"
 	module_mock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 const epochCounter = uint64(42)
@@ -45,8 +47,15 @@ func MakeSigners(t *testing.T,
 	return signers
 }
 
+func makeLocalWithSignerAndKey(signerID flow.Identifier, sk crypto.PrivateKey) (module.Local, error) {
+	nodeID := unittest.IdentityFixture()
+	nodeID.NodeID = signerID
+	nodeID.StakingPubKey = sk.PublicKey()
+	return local.New(nodeID, sk)
+}
+
 func MakeStakingSigner(t *testing.T, committee hotstuff.Committee, signerID flow.Identifier, priv crypto.PrivateKey) *SingleSignerVerifier {
-	local, err := local.New(nil, priv)
+	local, err := makeLocalWithSignerAndKey(signerID, priv)
 	require.NoError(t, err)
 	staking := signature.NewAggregationProvider("test_staking", local)
 	signer := NewSingleSignerVerifier(committee, staking, signerID)
@@ -59,7 +68,7 @@ func MakeBeaconSigner(t *testing.T,
 	stakingPriv crypto.PrivateKey,
 	beaconPriv crypto.PrivateKey) *CombinedSigner {
 
-	local, err := local.New(nil, stakingPriv)
+	local, err := makeLocalWithSignerAndKey(signerID, stakingPriv)
 	require.NoError(t, err)
 
 	combiner := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)

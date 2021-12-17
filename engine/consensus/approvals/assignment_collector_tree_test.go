@@ -227,7 +227,7 @@ func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_CollectorParentI
 func (s *AssignmentCollectorTreeSuite) TestGetOrCreateCollector_AddingSealedCollector() {
 	block := unittest.BlockWithParentFixture(&s.ParentBlock)
 	s.Blocks[block.ID()] = block.Header
-	result := unittest.ExecutionResultFixture(unittest.WithBlock(&block))
+	result := unittest.ExecutionResultFixture(unittest.WithBlock(block))
 	s.prepareMockedCollector(result)
 
 	// generate a few sealed blocks

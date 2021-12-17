@@ -3,11 +3,8 @@
 package network
 
 import (
-	"context"
 	"time"
 
-	blocks "github.com/ipfs/go-block-format"
-	"github.com/ipfs/go-cid"
 	"github.com/libp2p/go-libp2p-core/peer"
 
 	"github.com/onflow/flow-go/model/flow"
@@ -61,45 +58,8 @@ type Middleware interface {
 	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()
-}
 
-// BlockExchange represents a block exchange, which is an abstraction over an underlying
-// Bitswap network.
-type BlockExchange interface {
-	// BlockExchange embeds the BlockExchangeFetcher for convenience.
-	// Each call to GetBlocks creates a new session under the hood.
-	BlockExchangeFetcher
-
-	// GetSession returns a session for requesting related blocks
-	GetSession(ctx context.Context) BlockExchangeFetcher
-
-	// HasBlock notifies the BlockExchange about the existence of a new block.
-	// This may notify peers on the Bitswap network.
-	HasBlock(block blocks.Block) error
-
-	// Close closes the BlockExchange
-	Close()
-}
-
-// BlockExchangeFetcher is an interface for requesting blocks from a BlockExchange.
-type BlockExchangeFetcher interface {
-	GetBlocks(cids ...cid.Cid) BlocksPromise
-}
-
-// Example
-//
-//  done, err := bex.GetBlocks(blocksToGet...).ForEach(func(b blocks.Block) {
-//    // [...]
-//  }).Send(ctx)
-type BlocksPromise interface {
-	// ForEach is used to register a callback to handle received blocks
-	ForEach(cb func(blocks.Block)) BlocksRequest
-}
-
-// BlocksRequest represents a request for blocks on the Bitswap network.
-type BlocksRequest interface {
-	// Send initiates the request
-	Send(ctx context.Context) (<-chan struct{}, error)
+	IsConnected(nodeID flow.Identifier) (bool, error)
 }
 
 // Overlay represents the interface that middleware uses to interact with the
