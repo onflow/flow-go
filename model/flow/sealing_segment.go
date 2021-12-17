@@ -58,8 +58,10 @@ type SealingSegment struct {
 	// incorporated as of that block.
 	LatestSeals map[Identifier]Identifier
 
-	// FirstSeal contains the latest seal as the first block in the segment,
-	// if the first block contains no seals. Otherwise it is empty.
+	// FirstSeal contains the latest seal as of the first block in the segment.
+	// It is needed for the `Commit` method of protocol snapshot to return the
+	// sealed state, when the first block contains no seal. 
+	// If the first block in the segment contains seal, then this field is `nil`
 	FirstSeal *Seal
 }
 
@@ -109,7 +111,7 @@ func (segment *SealingSegment) Validate() error {
 		}
 		seal, ok := seals[sealID]
 		if !ok {
-			return nil, fmt.Errorf("seal (id=%x) not found in segment", sealID)
+			return nil, fmt.Errorf("seal (id=%x) not found in segment at block %x", sealID, blockID)
 		}
 		return seal, nil
 	}
@@ -166,7 +168,10 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	}
 	blockID := block.ID()
 
-	// construct a list of missing result IDs referenced by this block
+	// a block might contain receipts or seals that refer to results that are included in blocks
+	// whose height is below the first block of the segment.
+	// In order to include those missing results into the segment, we construct a list of those
+	// missing result IDs referenced by this block
 	missingResultIDs := make(map[Identifier]struct{})
 
 	// for the first (lowest) block, if it contains no seal, store the latest
