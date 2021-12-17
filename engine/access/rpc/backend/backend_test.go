@@ -864,6 +864,88 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	suite.assertAllExpectations()
 }
+
+func (suite *Suite) TestGetExecutionResultByID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	validExecutorIdentities := flow.IdentityList{}
+	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+
+	nonexistingID := unittest.IdentifierFixture()
+	blockID := unittest.IdentifierFixture()
+	executionResult := unittest.ExecutionResultFixture(
+		unittest.WithExecutionResultBlockID(blockID))
+
+	ctx := context.Background()
+
+	results := new(storagemock.ExecutionResults)
+	results.
+		On("ByID", nonexistingID).
+		Return(nil, storage.ErrNotFound)
+
+	results.
+		On("ByID", executionResult.ID()).
+		Return(executionResult, nil)
+
+	suite.Run("nonexisting execution result for id", func() {
+
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, nil,
+			nil,
+			suite.headers, nil, nil,
+			suite.receipts,
+			results,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
+			suite.log,
+		)
+
+		// execute request
+		_, err := backend.GetExecutionResultByID(ctx, nonexistingID)
+
+		assert.Error(suite.T(), err)
+	})
+
+	suite.Run("existing execution result id", func() {
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, nil,
+			nil,
+			suite.headers, nil, nil,
+			nil,
+			results,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			validENIDs.Strings(),
+			suite.log,
+		)
+
+		// execute request
+		er, err := backend.GetExecutionResultByID(ctx, executionResult.ID())
+		suite.checkResponse(er, err)
+
+		require.Equal(suite.T(), executionResult, er)
+	})
+
+	results.AssertExpectations(suite.T())
+	suite.assertAllExpectations()
+}
+
 func (suite *Suite) TestGetExecutionResultByBlockID() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
@@ -876,7 +958,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 	blockID := unittest.IdentifierFixture()
 	executionResult := unittest.ExecutionResultFixture(
 		unittest.WithExecutionResultBlockID(blockID),
-		unittest.WIthServiceEvents(2))
+		unittest.WithServiceEvents(2))
 
 	ctx := context.Background()
 

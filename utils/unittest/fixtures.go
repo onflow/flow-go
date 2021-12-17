@@ -127,6 +127,25 @@ func AccountKeyFixture(
 	}, nil
 }
 
+// AccountFixture returns a randomly generated account.
+func AccountFixture() (*flow.Account, error) {
+	key, err := AccountKeyFixture(128, crypto.ECDSAP256, hash.SHA3_256)
+	if err != nil {
+		return nil, err
+	}
+
+	contracts := make(map[string][]byte, 2)
+	contracts["contract1"] = []byte("contract1")
+	contracts["contract2"] = []byte("contract2")
+
+	return &flow.Account{
+		Address:   RandomAddressFixture(),
+		Balance:   100,
+		Keys:      []flow.AccountPublicKey{key.PublicKey(1000)},
+		Contracts: contracts,
+	}, nil
+}
+
 func BlockFixture() flow.Block {
 	header := BlockHeaderFixture()
 	return *BlockWithParentFixture(&header)
@@ -683,7 +702,7 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 	}
 }
 
-func WIthServiceEvents(n int) func(result *flow.ExecutionResult) {
+func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
 	}
@@ -746,12 +765,6 @@ func WithBlockID(id flow.Identifier) func(*flow.ResultApproval) {
 func WithChunk(chunkIdx uint64) func(*flow.ResultApproval) {
 	return func(approval *flow.ResultApproval) {
 		approval.Body.ChunkIndex = chunkIdx
-	}
-}
-
-func WithServiveEvents(events ...flow.ServiceEvent) func(*flow.ExecutionResult) {
-	return func(result *flow.ExecutionResult) {
-		result.ServiceEvents = events
 	}
 }
 

@@ -15,11 +15,9 @@ type TransactionResult struct {
 
 	ErrorMessage string `json:"error_message"`
 
-	ComputationUsed int32 `json:"computation_used"`
+	ComputationUsed string `json:"computation_used"`
 
-	Events []Event `json:"events,omitempty"`
-
-	Expandable *TransactionResultExpandable `json:"_expandable,omitempty"`
+	Events []Event `json:"events"`
 
 	Links *Links `json:"_links,omitempty"`
 }
