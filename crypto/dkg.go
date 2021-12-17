@@ -73,7 +73,7 @@ func dkgFailureErrorf(msg string, args ...interface{}) error {
 	}
 }
 
-// IsInvalidInputsError checks if the input error is of a dkgFailureError type.
+// IsDKGFailureError checks if the input error is of a dkgFailureError type.
 // dkgFailureError is an error returned when a participant
 // detects a failure in the protocol and is not able to compute output keys.
 func IsDKGFailureError(err error) bool {

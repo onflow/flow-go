@@ -158,6 +158,7 @@ func (i *TransactionInvoker) Process(
 	if feesError != nil {
 		txError = feesError
 	}
+
 	sth.EnableLimitEnforcement()
 
 	// applying contract changes
