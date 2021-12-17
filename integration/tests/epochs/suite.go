@@ -514,16 +514,16 @@ func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates
 	require.Containsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in proposed table: %x", info.NodeID)
 }
 
-// assertNodeNotApprovedAndProposed executes the read approved nodes list and get proposed table scripts
+// assertNodeNotApprovedOrProposed executes the read approved nodes list and get proposed table scripts
 // and checks that the info.NodeID is in
-func (s *Suite) assertNodeNotApprovedAndProposed(ctx context.Context, env templates.Environment, nodeID flow.Identifier) {
+func (s *Suite) assertNodeNotApprovedOrProposed(ctx context.Context, env templates.Environment, nodeID flow.Identifier) {
 	// ensure node ID not in approved list
 	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
-	require.Containsf(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(nodeID.String()), "expected new node to not be in approved nodes list: %x", nodeID)
+	require.NotContainsf(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(nodeID.String()), "expected new node to not be in approved nodes list: %x", nodeID)
 
 	// check if node is not in proposed table
 	proposedTable := s.ExecuteGetProposedTableScript(ctx, env, nodeID)
-	require.Containsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(nodeID.String()), "expected new node to not be in proposed table: %x", nodeID)
+	require.NotContainsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(nodeID.String()), "expected new node to not be in proposed table: %x", nodeID)
 }
 
 // newTestContainerOnNetwork configures a new container on the suites network
