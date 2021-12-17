@@ -38,27 +38,20 @@ func TestStoreAndRetrievalWithoutEjection(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
-			testArrayBackDataStoreAndRetrievalWithoutEjection(t, tc.limit, tc.entityCount)
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
+				func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					testInitialization(t, list, entities)
+				},
+				func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					testAddingEntities(t, list, entities, LRUEjection)
+				},
+				func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					testRetrievingEntitiesFrom(t, list, entities, 0)
+				},
+			}...,
+			)
 		})
 	}
-}
-
-func testArrayBackDataStoreAndRetrievalWithoutEjection(t *testing.T, limit uint32, entityCount uint32, helpers ...func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)) {
-	h := []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
-		func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testInitialization(t, list, entities)
-		},
-		func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testAddingEntities(t, list, entities, LRUEjection)
-		},
-	}
-	h = append(h, helpers...)
-
-	withTestScenario(t, limit, entityCount, LRUEjection,
-		append(h, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testRetrievingLastXSavedEntities(t, list, entities, 0)
-		})...,
-	)
 }
 
 func TestArrayBackDataStoreAndRetrievalWithEjection(t *testing.T) {
@@ -97,7 +90,7 @@ func testArrayBackDataStoreAndRetrievalWithLRUEjection(t *testing.T, limit uint3
 
 	withTestScenario(t, limit, entityCount, LRUEjection,
 		append(h, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testRetrievingLastXSavedEntities(t, list, entities, EIndex(entityCount-limit))
+			testRetrievingEntitiesFrom(t, list, entities, EIndex(entityCount-limit))
 		})...,
 	)
 }
@@ -551,7 +544,7 @@ func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBe
 	}
 }
 
-func testRetrievingLastXSavedEntities(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity, from EIndex) {
+func testRetrievingEntitiesFrom(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity, from EIndex) {
 	for i := from; i < EIndex(len(entities)); i++ {
 		actualID, actual, _ := list.Get(i % EIndex(len(list.values)))
 		require.Equal(t, entities[i].ID(), actualID)
