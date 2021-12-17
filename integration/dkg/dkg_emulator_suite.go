@@ -199,7 +199,7 @@ func (s *DKGSuite) createAndFundAccount(netID *flow.Identity) *nodeAccount {
 				fmt.Sprintf(`
 				import FungibleToken from 0x%s
 				import FlowToken from 0x%s
-	
+
 				transaction(amount: UFix64, recipient: Address) {
 				  let sentVault: @FungibleToken.Vault
 				  prepare(signer: AuthAccount) {
@@ -468,6 +468,7 @@ func (s *DKGSuite) initEngines(node *node, ids flow.IdentityList) {
 	node.GenericNode = core
 	node.messagingEngine = messagingEngine
 	node.dkgState = dkgState
+	node.safeBeaconKeys = badger.NewSafeBeaconPrivateKeys(dkgState)
 	node.reactorEngine = reactorEngine
 }
 

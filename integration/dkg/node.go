@@ -59,12 +59,17 @@ func (n *node) setEpochs(t *testing.T, currentSetup flow.EpochSetup, nextSetup f
 	currentEpoch.On("DKGPhase1FinalView").Return(currentSetup.DKGPhase1FinalView, nil)
 	currentEpoch.On("DKGPhase2FinalView").Return(currentSetup.DKGPhase2FinalView, nil)
 	currentEpoch.On("DKGPhase3FinalView").Return(currentSetup.DKGPhase3FinalView, nil)
+	currentEpoch.On("FinalView").Return(currentSetup.FinalView, nil)
+	currentEpoch.On("FirstView").Return(currentSetup.FirstView, nil)
 	currentEpoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(nextSetup.RandomSource, nil)
 
 	nextEpoch := new(protocolmock.Epoch)
 	nextEpoch.On("Counter").Return(nextSetup.Counter, nil)
 	nextEpoch.On("InitialIdentities").Return(nextSetup.Participants, nil)
 	nextEpoch.On("Seed", mock.Anything, mock.Anything, mock.Anything).Return(nextSetup.RandomSource, nil)
+	nextEpoch.On("DKG").Return(nil, nil) // no error means didn't run into EECC
+	nextEpoch.On("FirstView").Return(nextSetup.FirstView, nil)
+	nextEpoch.On("FinalView").Return(nextSetup.FinalView, nil)
 
 	epochQuery := mocks.NewEpochQuery(t, currentSetup.Counter)
 	epochQuery.Add(currentEpoch)

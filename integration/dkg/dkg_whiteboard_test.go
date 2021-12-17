@@ -13,13 +13,12 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
-	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/dkg"
-	"github.com/onflow/flow-go/module/epochs"
+	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -288,9 +287,12 @@ func TestWithWhiteboard(t *testing.T) {
 	indices := []int{}
 	for i, n := range nodes {
 
-		epochLookup := epochs.NewEpochLookup(n.State)
-		beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, n.safeBeaconKeys)
-		beaconKey, err := beaconKeyStore.ByView(nextEpochSetup.FirstView)
+		// TODO: to replace with safeBeaconKeys
+		beaconKey, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+		require.NoError(t, err)
+		// epochLookup := epochs.NewEpochLookup(n.State)
+		// beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, n.safeBeaconKeys)
+		// beaconKey, err := beaconKeyStore.ByView(nextEpochSetup.FirstView)
 		beaconKeys = append(beaconKeys, beaconKey)
 
 		signature, err := beaconKey.Sign(sigData, hasher)
@@ -309,7 +311,7 @@ func TestWithWhiteboard(t *testing.T) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	threshold := (len(nodes) - 1) / 2
+	threshold := signature.RandomBeaconThreshold(len(nodes))
 	groupSignature, err := crypto.ReconstructThresholdSignature(len(nodes), threshold, signatures, indices)
 	require.NoError(t, err)
 

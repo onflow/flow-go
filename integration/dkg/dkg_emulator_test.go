@@ -11,10 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
-	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -47,6 +45,7 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 
 	currentEpochSetup := flow.EpochSetup{
 		Counter:            currentCounter,
+		FirstView:          0,
 		DKGPhase1FinalView: 150,
 		DKGPhase2FinalView: 200,
 		DKGPhase3FinalView: 250,
@@ -61,6 +60,8 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		Counter:      currentCounter + 1,
 		Participants: s.netIDs,
 		RandomSource: []byte("random bytes for seed"),
+		FirstView:    301,
+		FinalView:    600,
 	}
 
 	firstBlock := &flow.Header{View: 100}
@@ -152,9 +153,12 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	signatures := []crypto.Signature{}
 	indices := []int{}
 	for i, n := range nodes {
-		epochLookup := epochs.NewEpochLookup(n.State)
-		beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, n.safeBeaconKeys)
-		beaconKey, err := beaconKeyStore.ByView(nextEpochSetup.FirstView)
+		// TODO: to replace with safeBeaconKeys
+		beaconKey, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
+		require.NoError(s.T(), err)
+		// epochLookup := epochs.NewEpochLookup(n.State)
+		// beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, n.safeBeaconKeys)
+		// beaconKey, err := beaconKeyStore.ByView(nextEpochSetup.FirstView)
 		beaconKeys = append(beaconKeys, beaconKey)
 
 		signature, err := beaconKey.Sign(sigData, hasher)
@@ -177,7 +181,7 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	threshold := (len(nodes) - 1) / 2
+	threshold := signature.RandomBeaconThreshold(len(nodes))
 	groupSignature, err := crypto.ReconstructThresholdSignature(len(nodes), threshold, signatures, indices)
 	require.NoError(s.T(), err)
 
