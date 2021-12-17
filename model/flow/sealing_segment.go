@@ -150,7 +150,7 @@ type GetSealByBlockIDFunc func(blockID Identifier) (*Seal, error)
 type SealingSegmentBuilder struct {
 	// access to storage to read referenced by not included resources
 	resultLookup        GetResultFunc
-	sealByBLockIDLookup GetSealByBlockIDFunc
+	sealByBlockIDLookup GetSealByBlockIDFunc
 	// keep track of resources included in payloads
 	includedResults map[Identifier]struct{}
 	// resources to include in the sealing segment
@@ -178,7 +178,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	// seal incorporated prior to the first block
 	if len(builder.blocks) == 0 {
 		if len(block.Payload.Seals) == 0 {
-			seal, err := builder.sealByBLockIDLookup(blockID)
+			seal, err := builder.sealByBlockIDLookup(blockID)
 			if err != nil {
 				return fmt.Errorf("%w: %v", ErrSegmentSealLookup, err)
 			}
@@ -189,7 +189,7 @@ func (builder *SealingSegmentBuilder) AddBlock(block *Block) error {
 	}
 
 	// index the latest seal for this block
-	latestSeal, err := builder.sealByBLockIDLookup(blockID)
+	latestSeal, err := builder.sealByBlockIDLookup(blockID)
 	if err != nil {
 		return fmt.Errorf("%w: %v", ErrSegmentSealLookup, err)
 	}
@@ -326,7 +326,7 @@ func (builder *SealingSegmentBuilder) lowest() *Block {
 func NewSealingSegmentBuilder(resultLookup GetResultFunc, sealLookup GetSealByBlockIDFunc) *SealingSegmentBuilder {
 	return &SealingSegmentBuilder{
 		resultLookup:        resultLookup,
-		sealByBLockIDLookup: sealLookup,
+		sealByBlockIDLookup: sealLookup,
 		includedResults:     make(map[Identifier]struct{}),
 		latestSeals:         make(map[Identifier]Identifier),
 		blocks:              make([]*Block, 0),
