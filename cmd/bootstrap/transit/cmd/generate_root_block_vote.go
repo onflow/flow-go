@@ -12,7 +12,7 @@ import (
 	hotstuffSig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/dkg"
+	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/utils/io"
@@ -53,13 +53,12 @@ func generateVote(c *cobra.Command, args []string) {
 		log.Fatal().Err(err).Msg("could not read DKG private key file")
 	}
 
-	var priv dkg.DKGParticipantPriv
-	err = json.Unmarshal(data, &priv)
+	var randomBeaconPrivKey encodable.RandomBeaconPrivKey
+	err = json.Unmarshal(data, &randomBeaconPrivKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("could not unmarshal DKG private key data")
 	}
 
-	randomBeaconPrivKey := priv.RandomBeaconPrivKey.PrivateKey
 	stakingPrivKey := nodeInfo.StakingPrivKey.PrivateKey
 	identity := &flow.Identity{
 		NodeID:        nodeID,

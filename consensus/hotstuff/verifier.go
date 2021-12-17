@@ -41,5 +41,5 @@ type Verifier interface {
 	// * signature.ErrInvalidFormat if the signature has an incompatible format.
 	// * unexpected errors should be treated as symptoms of bugs or uncovered
 	//   edge cases in the logic (i.e. as fatal)
-	VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) (bool, error)
+	VerifyQC(voters flow.IdentityList, sigData []byte, block *model.Block) error
 }

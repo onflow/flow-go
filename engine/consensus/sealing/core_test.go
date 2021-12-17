@@ -509,7 +509,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRequestPendingApprovals() {
 		block := unittest.BlockWithParentFixture(parentBlock)
 		s.Blocks[block.ID()] = block.Header
 		s.IdentitiesCache[block.ID()] = s.AuthorizedVerifiers
-		unsealedFinalizedBlocks = append(unsealedFinalizedBlocks, block)
+		unsealedFinalizedBlocks = append(unsealedFinalizedBlocks, *block)
 		parentBlock = block.Header
 	}
 

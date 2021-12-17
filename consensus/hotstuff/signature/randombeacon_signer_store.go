@@ -12,13 +12,13 @@ import (
 // for a given view.
 // Internally it indexes and caches the private keys by epoch.
 type EpochAwareRandomBeaconKeyStore struct {
-	epochLookup module.EpochLookup // used to fetch epoch counter by view
-	keys        storage.DKGKeys    // used to fetch DKG private key by epoch
+	epochLookup module.EpochLookup     // used to fetch epoch counter by view
+	keys        storage.SafeBeaconKeys // used to fetch DKG private key by epoch
 
 	privateKeys map[uint64]crypto.PrivateKey // cache of privateKeys by epoch
 }
 
-func NewEpochAwareRandomBeaconKeyStore(epochLookup module.EpochLookup, keys storage.DKGKeys) *EpochAwareRandomBeaconKeyStore {
+func NewEpochAwareRandomBeaconKeyStore(epochLookup module.EpochLookup, keys storage.SafeBeaconKeys) *EpochAwareRandomBeaconKeyStore {
 	return &EpochAwareRandomBeaconKeyStore{
 		epochLookup: epochLookup,
 		keys:        keys,
@@ -42,7 +42,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 	}
 
 	// when DKG has completed,
-	// 1. if a node successfully generated the DKG key, the private key will be stored in database.
+	// 1. if a node successfully generated the DKG key, the valid private key will be stored in database.
 	// 2. if a node failed to generate the DKG key, we will save a record in database to indicate this
 	//       node has no private key for this epoch
 	// within the epoch, we can lookup my random beacon private key for the epoch. There are 3 cases:
@@ -62,16 +62,16 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 		return key, nil
 	}
 
-	privBeaconKeyData, hasRandomBeaconKey, err := s.keys.RetrieveMyDKGPrivateInfo(epoch)
+	privKey, safe, err := s.keys.RetrieveMyBeaconPrivateKey(epoch)
 	if err != nil {
 		return nil, fmt.Errorf("could not retrieve random beacon private key for epoch counter %v, at view %v, err: %w",
 			epoch, view, err)
 	}
 
-	// if DKG failed, there will be no random beacon private key, since this fact
-	// never change, we can cache a nil signer for this epoch, so that we this function
+	// if DKG failed, there will be no valid random beacon private key, since this fact
+	// never change, we can cache a nil signer for this epoch, so that when this function
 	// is called again for the same epoch, we don't need to query database.
-	if !hasRandomBeaconKey {
+	if !safe {
 		s.privateKeys[epoch] = nil
 		return nil, fmt.Errorf("DKG for epoch %v failed, at view %v: %w",
 			epoch, view, module.DKGFailError)
@@ -79,8 +79,7 @@ func (s *EpochAwareRandomBeaconKeyStore) ByView(view uint64) (crypto.PrivateKey,
 
 	// DKG succeeded and a random beacon key is available,
 	// create a random beacon signer that holds the private key and cache it for the epoch
-	key = privBeaconKeyData.RandomBeaconPrivKey
-	s.privateKeys[epoch] = key
+	s.privateKeys[epoch] = privKey
 
-	return key, nil
+	return privKey, nil
 }

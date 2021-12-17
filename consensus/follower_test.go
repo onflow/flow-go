@@ -91,7 +91,7 @@ func (s *HotStuffFollowerSuite) SetupTest() {
 	// mock finalization updater
 	s.verifier = &mockhotstuff.Verifier{}
 	s.verifier.On("VerifyVote", mock.Anything, mock.Anything, mock.Anything).Return(nil)
-	s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.verifier.On("VerifyQC", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	// mock consumer for finalization notifications
 	s.notifier = &mockhotstuff.FinalizationConsumer{}

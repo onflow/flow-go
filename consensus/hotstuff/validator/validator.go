@@ -61,15 +61,16 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	}
 
 	// verify whether the signature bytes are valid for the QC in the context of the protocol state
-	valid, err := v.verifier.VerifyQC(signers, qc.SigData, block)
-	if errors.Is(err, signature.ErrInvalidFormat) {
-		return newInvalidBlockError(block, fmt.Errorf("QC signature has bad format: %w", err))
-	}
+	err = v.verifier.VerifyQC(signers, qc.SigData, block)
 	if err != nil {
-		return fmt.Errorf("cannot verify qc's aggregated signature (qc.BlockID: %x): %w", qc.BlockID, err)
-	}
-	if !valid {
-		return newInvalidBlockError(block, fmt.Errorf("invalid qc: %w", model.ErrInvalidSignature))
+		switch {
+		case errors.Is(err, signature.ErrInvalidFormat):
+			return newInvalidBlockError(block, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
+		case errors.Is(err, model.ErrInvalidSignature):
+			return newInvalidBlockError(block, fmt.Errorf("QC contains invalid signature(s): %w", err))
+		default:
+			return fmt.Errorf("cannot verify qc's aggregated signature (qc.BlockID: %x): %w", qc.BlockID, err)
+		}
 	}
 
 	return nil

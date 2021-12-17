@@ -54,7 +54,7 @@ func (v *StakingVerifier) VerifyVote(signer *flow.Identity, sigData []byte, bloc
 // VerifyQC verifies the validity of a single signature on a quorum certificate.
 //
 // In the single verification case, `sigData` represents a single signature (`crypto.Signature`).
-func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) (bool, error) {
+func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, block *model.Block) error {
 	// verify the aggregated staking signature
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
@@ -66,11 +66,15 @@ func (v *StakingVerifier) VerifyQC(signers flow.IdentityList, sigData []byte, bl
 	// TODO: to be replaced by module/signature.PublicKeyAggregator in V2
 	aggregatedKey, err := crypto.AggregateBLSPublicKeys(pks)
 	if err != nil {
-		return false, fmt.Errorf("could not compute aggregated key: %w", err)
+		return fmt.Errorf("could not compute aggregated key: %w", err)
 	}
 	stakingValid, err := aggregatedKey.Verify(sigData, msg, v.stakingHasher)
 	if err != nil {
-		return false, fmt.Errorf("internal error while verifying staking signature: %w", err)
+		return fmt.Errorf("internal error while verifying staking signature: %w", err)
 	}
-	return stakingValid, nil
+
+	if !stakingValid {
+		return fmt.Errorf("invalid aggregated staking sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
+	}
+	return nil
 }
