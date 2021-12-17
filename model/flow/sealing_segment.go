@@ -29,8 +29,8 @@ const (
 // Example 2 - E contains no seals, but latest seal prior to E seals A:
 //   A <- B <- C <- D(SA) <- E
 //
-// It is guaranteed there are at least 2 blocks in a SealingSegment, unless
-// the sealing segment is for a root snapshot, which contains only the root block.
+// Root sealing segments contain only one self-sealing block. All other sealing
+// segments contain multiple blocks.
 // The segment is in ascending height order.
 //
 // In addition to storing the blocks within the sealing segment, as defined above,
