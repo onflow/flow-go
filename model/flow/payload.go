@@ -6,6 +6,7 @@ import (
 
 // Payload is the actual content of each block.
 type Payload struct {
+	// Guarantees are ordered in execution order.
 	Guarantees []*CollectionGuarantee
 	Seals      []*Seal
 	Receipts   ExecutionReceiptMetaList
