@@ -21,12 +21,14 @@ import (
 
 // should be able to reach consensus when identity table contains nodes with 0 weight.
 func TestUnweightedNode(t *testing.T) {
+	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
+	// epoch) identities, but don't cross an epoch boundary
 	stopper := NewStopper(2, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
 	consensusParticipants := NewConsensusParticipants(participantsData)
 
-	// add a consensus node to next epoch (it will have 0 weight)
+	// add a consensus node to next epoch (it will have 0 weight in the current epoch)
 	nextEpochParticipantsData := createConsensusIdentities(t, 1)
 	nextEpochIdentities := unittest.CompleteIdentitySet(nextEpochParticipantsData.Identities()...)
 	rootSnapshot = withNextEpoch(

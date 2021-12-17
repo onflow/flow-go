@@ -73,7 +73,7 @@ type RandomBeaconNodeInfo struct {
 // Contains a mapping of DKG info per epoch.
 type ConsensusParticipant struct {
 	nodeInfo       bootstrap.NodeInfo
-	dkgInfoByEpoch map[uint64]RandomBeaconNodeInfo
+	beaconInfoByEpoch map[uint64]RandomBeaconNodeInfo
 }
 
 // ConsensusParticipants is a special cache which stores information about consensus participants across multiple epochs
@@ -84,7 +84,7 @@ type ConsensusParticipants struct {
 
 func NewConsensusParticipants(data *run.ParticipantData) *ConsensusParticipants {
 	lookup := make(map[flow.Identifier]ConsensusParticipant)
-	for _, pariticpant := range data.Participants {
+	for _, participant := range data.Participants {
 		lookup[pariticpant.NodeID] = ConsensusParticipant{
 			nodeInfo: pariticpant.NodeInfo,
 			dkgInfoByEpoch: map[uint64]RandomBeaconNodeInfo{
@@ -241,7 +241,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 
 	// add other roles to create a complete identity list
 	participants := unittest.CompleteIdentitySet(consensusParticipants...)
-	participants.Sort(order.ByNodeIDAsc)
+	participants.Sort(order.Canonical)
 
 	dkgParticipantsKeys := make([]crypto.PublicKey, 0, len(consensusParticipants))
 	for _, participant := range participants.Filter(filter.HasRole(flow.RoleConsensus)) {
@@ -273,7 +273,7 @@ func createRootBlockData(participantData *run.ParticipantData) (*flow.Block, *fl
 }
 
 func createPrivateNodeIdentities(n int) []bootstrap.NodeInfo {
-	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(order.ByNodeIDAsc)
+	consensus := unittest.IdentityListFixture(n, unittest.WithRole(flow.RoleConsensus)).Sort(order.Canonical)
 	infos := make([]bootstrap.NodeInfo, 0, n)
 	for _, node := range consensus {
 		networkPrivKey := unittest.NetworkingPrivKeyFixture()
