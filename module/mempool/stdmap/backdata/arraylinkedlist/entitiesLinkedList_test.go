@@ -9,16 +9,15 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
-// TestStoreAndRetrievalWithoutEjection checks health of entity linked list for storing and retrieval scenarios that
+// TestStoreAndRetrieval_Without_Ejection checks health of entity linked list for storing and retrieval scenarios that
 // do not involve ejection.
 // The test involves cases for testing the list below its limit, and also up to its limit. However, it never gets beyond
 // the limit of list, so no ejection will kick-in.
-func TestStoreAndRetrievalWithoutEjection(t *testing.T) {
+func TestStoreAndRetrieval_Without_Ejection(t *testing.T) {
 	for _, tc := range []struct {
-		limit           uint32
-		overLimitFactor uint32
-		entityCount     uint32
-		helpers         []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
+		limit       uint32 // capacity of entity list
+		entityCount uint32 // total entities to be stored
+		helpers     []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
 	}{
 		{
 			limit:       30,
@@ -37,7 +36,7 @@ func TestStoreAndRetrievalWithoutEjection(t *testing.T) {
 			entityCount: 1000,
 		},
 	} {
-		t.Run(fmt.Sprintf("%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
+		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
 			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
 				func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
 					testInitialization(t, list, entities)
@@ -54,10 +53,13 @@ func TestStoreAndRetrievalWithoutEjection(t *testing.T) {
 	}
 }
 
-func TestArrayBackDataStoreAndRetrievalWithEjection(t *testing.T) {
+// TestStoreAndRetrieval_With_LRU_Ejection checks health of entity linked list for storing and retrieval scenarios that
+// involves the LRU ejection.
+// The test involves cases for testing the list beyond its limit, so the LRU ejection will kick-in.
+func TestStoreAndRetrieval_With_LRU_Ejection(t *testing.T) {
 	for _, tc := range []struct {
-		limit       uint32
-		entityCount uint32
+		limit       uint32 // capacity of entity list
+		entityCount uint32 // total entities to be stored
 		helpers     []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
 	}{
 		{
@@ -74,25 +76,21 @@ func TestArrayBackDataStoreAndRetrievalWithEjection(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			testArrayBackDataStoreAndRetrievalWithLRUEjection(t, tc.limit, tc.entityCount)
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
+				func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					testAddingEntities(t, backData, entities, LRUEjection)
+				},
+				func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					// with a limit of tc.limit, storing a total of tc.entityCount (> tc.limit) entities, results
+					// in ejection of the first tc.entityCount - tc.limit entities.
+					// Hence, we check retrieval of the last tc.limit entities, which start from index
+					// tc.entityCount - tc.limit entities.
+					testRetrievingEntitiesFrom(t, list, entities, EIndex(tc.entityCount-tc.limit))
+				},
+			}...,
+			)
 		})
 	}
-}
-
-func testArrayBackDataStoreAndRetrievalWithLRUEjection(t *testing.T, limit uint32, entityCount uint32, helpers ...func(*testing.T, *EntityDoubleLinkedList,
-	[]*unittest.MockEntity)) {
-	h := []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
-		func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testAddingEntities(t, backData, entities, LRUEjection)
-		},
-	}
-	h = append(h, helpers...)
-
-	withTestScenario(t, limit, entityCount, LRUEjection,
-		append(h, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testRetrievingEntitiesFrom(t, list, entities, EIndex(entityCount-limit))
-		})...,
-	)
 }
 
 func TestArrayBackDataStoreAndRetrievalWithRandomEjection(t *testing.T) {
