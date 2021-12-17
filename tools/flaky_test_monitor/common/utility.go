@@ -1,3 +1,4 @@
+// Package common has helper / utility functions used by all levels of flaky test monitor.
 package common
 
 import (
@@ -11,14 +12,18 @@ import (
 	"strings"
 )
 
+// AssertNoError checks that the passed in error is nil and panics
+// with the supplied message if that's not the case.
+// Useful helper to eliminate the need to keep checking for errors.
 func AssertNoError(err error, panicMessage string) {
 	if err != nil {
 		panic(panicMessage + ": " + err.Error())
 	}
 }
 
-// if doesn't have trailing slash, append one
-// if has trailing slash, doesn't change it
+// AddTrailingSlash adds a trailing slash to the supplied string, if required.
+// If path doesn't have trailing slash, appends one.
+// If path has trailing slash, doesn't change it.
 func AddTrailingSlash(path string) string {
 	if strings.HasSuffix(path, "/") {
 		return path
@@ -26,10 +31,15 @@ func AddTrailingSlash(path string) string {
 	return path + "/"
 }
 
+// ConvertToNDecimalPlaces2 converts the supplied numerator and denominator fraction into
+// a decimal with n decimla places. Works the same way as ConvertToNDecimalPlaces()
+// but has a float for the numerator.
 func ConvertToNDecimalPlaces2(n int, numerator float32, denominator int) float32 {
 	return convertToNDecimalPlacesInternal(n, numerator, float32(denominator))
 }
 
+// ConvertToNDecimalPlaces converts the supplied numerator and denominator fraction into
+// a decimal with n decimal places.
 func ConvertToNDecimalPlaces(n int, numerator, denominator int) float32 {
 	return convertToNDecimalPlacesInternal(n, float32(numerator), float32(denominator))
 }
@@ -45,7 +55,10 @@ func convertToNDecimalPlacesInternal(n int, numerator, denominator float32) floa
 	return float32(ratioFloat)
 }
 
-// from https://stackoverflow.com/a/30708914/5719544
+// IsDirEmpty checks if directory is empty (has no files) and return true if it's empty, false otherwise.
+// Useful for determining whether to delete the failures / no-results directories
+// for cases when there were no failures / no-results.
+// From https://stackoverflow.com/a/30708914/5719544.
 func IsDirEmpty(name string) bool {
 	f, err := os.Open(name)
 	AssertNoError(err, "error reading directory")
@@ -60,6 +73,7 @@ func IsDirEmpty(name string) bool {
 	return false
 }
 
+// DirExists checks if directory exists and return true if it does, false otherwise.
 func DirExists(path string) bool {
 	_, err := os.Stat(path)
 
@@ -77,7 +91,7 @@ func DirExists(path string) bool {
 	panic("error checking if directory exists:" + err.Error())
 }
 
-// save test run/summary to local JSON file
+// SaveToFile save test run/summary to local JSON file.
 func SaveToFile(fileName string, testSummary interface{}) {
 	testSummaryBytes, err := json.MarshalIndent(testSummary, "", "  ")
 	AssertNoError(err, "error marshalling json")
