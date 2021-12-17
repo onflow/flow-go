@@ -370,7 +370,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 }
 
 func (in *Instance) Run() error {
-	ctx, cancel := context.WithCancel(context.TODO())
+	ctx, cancel := context.WithCancel(context.Background())
 	defer func() {
 		cancel()
 		<-in.aggregator.Done()

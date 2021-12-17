@@ -72,7 +72,7 @@ type RandomBeaconNodeInfo struct {
 // like staking key, role, network key and random beacon info which changes every epoch
 // Contains a mapping of DKG info per epoch.
 type ConsensusParticipant struct {
-	nodeInfo       bootstrap.NodeInfo
+	nodeInfo          bootstrap.NodeInfo
 	beaconInfoByEpoch map[uint64]RandomBeaconNodeInfo
 }
 
@@ -85,12 +85,12 @@ type ConsensusParticipants struct {
 func NewConsensusParticipants(data *run.ParticipantData) *ConsensusParticipants {
 	lookup := make(map[flow.Identifier]ConsensusParticipant)
 	for _, participant := range data.Participants {
-		lookup[pariticpant.NodeID] = ConsensusParticipant{
-			nodeInfo: pariticpant.NodeInfo,
-			dkgInfoByEpoch: map[uint64]RandomBeaconNodeInfo{
+		lookup[participant.NodeID] = ConsensusParticipant{
+			nodeInfo: participant.NodeInfo,
+			beaconInfoByEpoch: map[uint64]RandomBeaconNodeInfo{
 				1: {
-					RandomBeaconPrivKey: pariticpant.RandomBeaconPrivKey,
-					DKGParticipant:      data.Lookup[pariticpant.NodeID],
+					RandomBeaconPrivKey: participant.RandomBeaconPrivKey,
+					DKGParticipant:      data.Lookup[participant.NodeID],
 				},
 			},
 		}
@@ -117,12 +117,12 @@ func (p *ConsensusParticipants) Update(epochCounter uint64, data *run.Participan
 		entry, ok := p.lookup[participant.NodeID]
 		if !ok {
 			entry = ConsensusParticipant{
-				nodeInfo:       participant.NodeInfo,
-				dkgInfoByEpoch: map[uint64]RandomBeaconNodeInfo{},
+				nodeInfo:          participant.NodeInfo,
+				beaconInfoByEpoch: map[uint64]RandomBeaconNodeInfo{},
 			}
 		}
 
-		entry.dkgInfoByEpoch[epochCounter] = RandomBeaconNodeInfo{
+		entry.beaconInfoByEpoch[epochCounter] = RandomBeaconNodeInfo{
 			RandomBeaconPrivKey: participant.RandomBeaconPrivKey,
 			DKGParticipant:      dkgParticipant,
 		}
@@ -462,7 +462,7 @@ func createNode(
 	// there is DKG key for this epoch
 	keys.On("RetrieveMyDKGPrivateInfo", mock.Anything).Return(
 		func(epochCounter uint64) *dkg.DKGParticipantPriv {
-			dkgInfo, ok := participant.dkgInfoByEpoch[epochCounter]
+			dkgInfo, ok := participant.beaconInfoByEpoch[epochCounter]
 			if !ok {
 				return nil
 			}
@@ -476,7 +476,7 @@ func createNode(
 			}
 		},
 		func(epochCounter uint64) bool {
-			_, ok := participant.dkgInfoByEpoch[epochCounter]
+			_, ok := participant.beaconInfoByEpoch[epochCounter]
 			return ok
 		},
 		func(epochCounter uint64) error {
