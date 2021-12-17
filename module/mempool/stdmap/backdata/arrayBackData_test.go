@@ -13,10 +13,15 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestArrayBackData_SingleBucket evaluates health of state transition for storing 10 entities in an ArrayBackData with only
+// a single bucket (of 16). It also evaluates all stored items are retrievable.
 func TestArrayBackData_SingleBucket(t *testing.T) {
 	limit := 10
 
-	bd := NewArrayBackData(uint32(limit), 1, arraylinkedlist.LRUEjection, unittest.Logger())
+	bd := NewArrayBackData(uint32(limit),
+		1,
+		arraylinkedlist.LRUEjection,
+		unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -26,16 +31,17 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 	// sanity checks
 	for i := arraylinkedlist.EIndex(0); i < arraylinkedlist.EIndex(len(entities)); i++ {
 		// since we are below limit, elements should be added sequentially at bucket 0.
-		// first added element has a key index of 1, since 0 means unused key index in implementation.
+		// the ith added element has a key index of i+1,
+		// since 0 means unused key index in implementation.
 		require.Equal(t, bd.buckets[0][i].keyIndex, uint64(i+1))
-		// also, since we have not yet over-limited, entities are received entityIndex in the same order they
-		// are added.
+		// also, since we have not yet over-limited,
+		// entities are assigned their entityIndex in the same order they are added.
 		require.Equal(t, bd.buckets[0][i].entityIndex, i)
 		_, _, owner := bd.entities.Get(i)
 		require.Equal(t, owner, uint64(i))
 	}
 
-	// getting inserted elements
+	// all stored items must be retrievable
 	testRetrievableFrom(t, bd, entities, 0)
 }
 
