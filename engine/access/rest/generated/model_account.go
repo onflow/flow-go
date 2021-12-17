@@ -11,13 +11,13 @@ package generated
 type Account struct {
 	Address string `json:"address"`
 
-	Balance int32 `json:"balance"`
+	Balance string `json:"balance"`
 
 	Keys []AccountPublicKey `json:"keys,omitempty"`
 
 	Contracts map[string]string `json:"contracts,omitempty"`
 
-	Expandable *AccountExpandable `json:"_expandable,omitempty"`
+	Expandable *AccountExpandable `json:"_expandable"`
 
 	Links *Links `json:"_links,omitempty"`
 }
