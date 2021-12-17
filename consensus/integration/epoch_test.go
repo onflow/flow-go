@@ -23,6 +23,8 @@ import (
 func TestUnweightedNode(t *testing.T) {
 	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
 	// epoch) identities, but don't cross an epoch boundary
+	// stop after building 2 blocks to ensure we can tolerate 0-weight (joining next
+	// epoch) identities, but don't cross an epoch boundary
 	stopper := NewStopper(2, 0)
 	participantsData := createConsensusIdentities(t, 3)
 	rootSnapshot := createRootSnapshot(t, participantsData)
