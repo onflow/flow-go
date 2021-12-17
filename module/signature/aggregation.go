@@ -354,20 +354,6 @@ func (av *AggregationVerifier) Verify(msg []byte, sig crypto.Signature, key cryp
 }
 
 // TODO : to delete in V2
-// VerifyMany will verify the given aggregated signature against the given message and the
-// provided public keys.
-func (av *AggregationVerifier) VerifyMany(msg []byte, sig crypto.Signature, keys []crypto.PublicKey) (bool, error) {
-
-	// bls multi-signature verification with a single message
-	valid, err := crypto.VerifyBLSSignatureOneMessage(keys, sig, msg, av.hasher)
-	if err != nil {
-		return false, fmt.Errorf("could not verify aggregated signature: %w", err)
-	}
-
-	return valid, nil
-}
-
-// TODO : to delete in V2
 // AggregationProvider is an aggregating signer and verifier that can create/verify
 // signatures, as well as aggregating & verifying aggregated signatures.
 // *Important*: the aggregation verifier can only verify signatures in the context
