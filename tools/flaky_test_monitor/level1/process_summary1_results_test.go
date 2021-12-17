@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"flaky-test-monitor/common"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"sort"
@@ -15,7 +15,7 @@ import (
 )
 
 // data driven table test
-func TestProcessTestRun(t *testing.T) {
+func TestProcessSummary1TestRun(t *testing.T) {
 	testDataMap := map[string]string{
 		"1 count all pass":                "test-result-crypto-hash-1-count-pass.json",
 		"1 count 1 fail the rest pass":    "test-result-crypto-hash-1-count-fail.json",
@@ -27,38 +27,41 @@ func TestProcessTestRun(t *testing.T) {
 		"10 count all pass":         "test-result-crypto-hash-10-count-pass.json",
 		"10 count some failures":    "test-result-crypto-hash-10-count-fail.json",
 
+		// nil tests - tests below don't generate pass/fail result due to `go test` bug
+		// with using `fmt.printf("log message")` without newline `\n`
+
 		// raw results generated with: go test -v -tags relic -count=1 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
 		// this is a single unit test that produces a nil test result
-		// "1 count single nil test": "test-result-nil-test-single-1-count-pass.json",
+		"1 count single nil test": "test-result-nil-test-single-1-count-pass.json",
 
 		//raw results generated with: go test -v -tags relic -count=5 -json ./model/encodable/. -test.run TestEncodableRandomBeaconPrivKeyMsgPack
-		//for testing that re-slicing logic works when there are multiple nil tests in a row
-		// "5 nil tests in a row": "test-result-nil-test-single-5-count-pass.json",
+		//multiple nil tests in a row
+		"5 nil tests in a row": "test-result-nil-test-single-5-count-pass.json",
 
-		//for testing that re-slicing logic works when there is a normal test at the of a test run with multiple nil tests in front of it
-		// "4 nil tests in a row, 1 normal test": "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
+		//normal test at the end of a test run with multiple nil tests in front of it
+		"4 nil tests in a row, 1 normal test": "test-result-nil-test-single-5-count-4-nil-1-normal-pass.json",
 
 		// raw results generated with: go test -v -tags relic -count=3 -json ./model/encodable/.
-		// this is a group of unit tests with a single nil test result
-		// "3 count nil test with normal tests": "test-result-nil-test-others-normal-3-count-pass.json",
+		// group of unit tests with a single nil test result
+		"3 count nil test with normal tests": "test-result-nil-test-others-normal-3-count-pass.json",
 	}
 
 	for k, testJsonData := range testDataMap {
 		t.Run(k, func(t *testing.T) {
-			runProcessTestRun(t, testJsonData)
+			runProcessSummary1TestRun(t, testJsonData)
 		})
 	}
 }
 
 // HELPERS - UTILITIES
 
-func runProcessTestRun(t *testing.T, jsonExpectedActualFile string) {
-	const expectedJsonFilePath = "./testdata/expected/"
-	const rawJsonFilePath = "./testdata/raw/"
+func runProcessSummary1TestRun(t *testing.T, jsonExpectedActualFile string) {
+	const expectedJsonFilePath = "../testdata/summary1/expected/"
+	const rawJsonFilePath = "../testdata/summary1/raw/"
 
-	var expectedTestRun TestRun
+	var expectedTestRun common.TestRun
 	// read in expected JSON from file
-	expectedJsonBytes, err := ioutil.ReadFile(expectedJsonFilePath + jsonExpectedActualFile)
+	expectedJsonBytes, err := os.ReadFile(expectedJsonFilePath + jsonExpectedActualFile)
 	require.Nil(t, err)
 	require.NotEmpty(t, expectedJsonBytes)
 
@@ -82,7 +85,7 @@ func runProcessTestRun(t *testing.T, jsonExpectedActualFile string) {
 		})
 
 		// init TestMap to empty - otherwise get comparison failure because would be nil
-		expectedTestRun.PackageResults[k].TestMap = make(map[string][]TestResult)
+		expectedTestRun.PackageResults[k].TestMap = make(map[string][]common.TestResult)
 	}
 
 	// these hard coded values simulate a real test run that would obtain these environment variables dynamically
@@ -96,12 +99,12 @@ func runProcessTestRun(t *testing.T, jsonExpectedActualFile string) {
 	resultReader := FileResultReader{
 		rawJsonFile: rawJsonFilePath + jsonExpectedActualFile,
 	}
-	actualTestRun := processTestRun(&resultReader)
+	actualTestRun := processSummary1TestRun(&resultReader)
 
 	checkTestRuns(t, expectedTestRun, actualTestRun)
 }
 
-func checkTestRuns(t *testing.T, expectedTestRun TestRun, actualTestRun TestRun) {
+func checkTestRuns(t *testing.T, expectedTestRun common.TestRun, actualTestRun common.TestRun) {
 	// it's difficult to determine why 2 test runs aren't equal, so we will check the different sub components of them to see where a potential discrepancy exists
 	require.Equal(t, expectedTestRun.CommitDate, actualTestRun.CommitDate)
 	require.Equal(t, expectedTestRun.CommitSha, actualTestRun.CommitSha)
@@ -124,15 +127,14 @@ func checkTestRuns(t *testing.T, expectedTestRun TestRun, actualTestRun TestRun)
 			require.Equal(t, expectedPackageResults.Output[packageOutputIndex], actualPackageResults.Output[packageOutputIndex])
 		}
 
-		// check all regular and nil tests results of each package
+		// check tests results of each package
 		checkTestResults(t, expectedPackageResults.Tests, actualPackageResults.Tests)
 	}
 	// finally, compare the entire actual test run against what's expected - if there were any discrepancies they should have been caught by now
 	require.Equal(t, expectedTestRun, actualTestRun)
 }
 
-// checks regular and nil test results
-func checkTestResults(t *testing.T, expectedTestResults []TestResult, actualTestResults []TestResult) {
+func checkTestResults(t *testing.T, expectedTestResults []common.TestResult, actualTestResults []common.TestResult) {
 	require.Equal(t, len(expectedTestResults), len(actualTestResults))
 	for testResultIndex := range expectedTestResults {
 
