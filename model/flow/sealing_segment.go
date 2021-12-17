@@ -275,6 +275,13 @@ func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 				return seal.BlockID == lowestID
 			}
 		}
+		
+		// the latest seal must be found in a block that has Seal when traversing blocks 
+		// backwards from higher height to lower height. 
+		// otherwise, the sealing segment is invalid
+		if len(block.Payload.Seals) > 0 {
+			return false
+		}		
 	}
 	return false
 }
