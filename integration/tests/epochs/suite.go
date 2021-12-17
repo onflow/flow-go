@@ -202,7 +202,10 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	result = s.SubmitSetApprovedListTx(ctx, env, append(s.net.Identities().NodeIDs(), nodeID)...)
 	require.NoError(s.T(), result.Error)
 
-	s.checkStakingAuctionInProgress(ctx)
+	// ensure we are still in staking auction
+	currView := s.assertInPhase(ctx, flow.EpochPhaseStaking)
+	require.True(s.T(), stakingAuctionViews > currView, "expected all staking transactions to be completed in the epoch staking phase")
+
 	return &StakedNodeOperationInfo{
 		NodeID:                  nodeID,
 		Role:                    role,
@@ -215,19 +218,6 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		MachineAccountPublicKey: machineAccountPubKey,
 		ContainerName:           containerName,
 	}
-}
-
-// checkStakingAuctionInProgress util func that asserts we are the staking auction phase
-func (s *Suite) checkStakingAuctionInProgress(ctx context.Context) {
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-	phase, err := snapshot.Phase()
-	require.NoError(s.T(), err)
-	head, err := snapshot.Head()
-	require.NoError(s.T(), err)
-
-	require.Equal(s.T(), flow.EpochPhaseStaking, phase)
-	require.True(s.T(), stakingAuctionViews > head.View)
 }
 
 // WaitForPhase waits for epoch phase and will timeout after 2 minutes
@@ -421,8 +411,19 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	return result, nil
 }
 
-// SubmitAdminRemoveNodeTx will submit the admin remove node transaction
-func (s *Suite) SubmitAdminRemoveNodeTx(ctx context.Context,
+
+func (s *Suite) removeNodeFromProtocol(ctx context.Context, env templates.Environment, nodeID flow.Identifier)  {
+	result, err := s.submitAdminRemoveNodeTx(ctx, env, nodeID)
+	require.NoError(s.T(), err)
+	require.NoError(s.T(), result.Error)
+
+	// ensure we submit transaction while in epoch setup phase
+	currView := s.assertInPhase(ctx, flow.EpochPhaseStaking)
+	require.True(s.T(), stakingAuctionViews > currView, "expected remove node transaction to be completed in the epoch staking phase")
+}
+
+// submitAdminRemoveNodeTx will submit the admin remove node transaction
+func (s *Suite) submitAdminRemoveNodeTx(ctx context.Context,
 	env templates.Environment,
 	nodeID flow.Identifier,
 ) (*sdk.TransactionResult, error) {
@@ -513,6 +514,18 @@ func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates
 	require.Containsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(info.NodeID.String()), "expected new node to be in proposed table: %x", info.NodeID)
 }
 
+// assertNodeNotApprovedAndProposed executes the read approved nodes list and get proposed table scripts
+// and checks that the info.NodeID is in
+func (s *Suite) assertNodeNotApprovedAndProposed(ctx context.Context, env templates.Environment, nodeID flow.Identifier) {
+	// ensure node ID not in approved list
+	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
+	require.Containsf(s.T(), approvedNodes.(cadence.Array).Values, cadence.String(nodeID.String()), "expected new node to not be in approved nodes list: %x", nodeID)
+
+	// check if node is not in proposed table
+	proposedTable := s.ExecuteGetProposedTableScript(ctx, env, nodeID)
+	require.Containsf(s.T(), proposedTable.(cadence.Array).Values, cadence.String(nodeID.String()), "expected new node to not be in proposed table: %x", nodeID)
+}
+
 // newTestContainerOnNetwork configures a new container on the suites network
 func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
 	containerConfigs := []func(config *testnet.NodeConfig){
@@ -557,6 +570,21 @@ func (s *Suite) getContainerToReplace(role flow.Role) *testnet.Container {
 	}
 
 	return nil
+}
+
+// assertInPhase checks if we are in the phase provided and returns the current view
+func (s *Suite) assertInPhase(ctx context.Context, expectedPhase flow.EpochPhase) uint64 {
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	actualPhase, err := snapshot.Phase()
+	require.NoError(s.T(), err)
+	head, err := snapshot.Head()
+	require.NoError(s.T(), err)
+
+	require.Equal(s.T(), expectedPhase, actualPhase)
+
+
+	return head.View
 }
 
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network

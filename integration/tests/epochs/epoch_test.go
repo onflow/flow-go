@@ -151,9 +151,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	info, testContainer := s.StakeNewNode(ctx, env, role)
 
 	// use admin transaction to remove node, this simulates a node leaving the network
-	result, err := s.SubmitAdminRemoveNodeTx(ctx, env, containerToReplace.Config.NodeID)
-	require.NoError(s.T(), err)
-	require.NoError(s.T(), result.Error)
+	s.removeNodeFromProtocol(ctx, env, containerToReplace.Config.NodeID)
 
 	// wait for epoch setup phase before we start our container and pause the old container
 	s.WaitForPhase(ctx, flow.EpochPhaseSetup)
@@ -164,16 +162,17 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	testContainer.WriteRootSnapshot(snapshot)
 	testContainer.Container.Start(ctx)
 
-	currentEpochFinalView, err := snapshot.Epochs().Next().FinalView()
+	currentEpochFinalView, err := snapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
 	// wait for the first view of the next epoch pause our container to replace
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+20)
+	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+1)
+	s.assertNodeNotApprovedAndProposed(ctx, env, containerToReplace.Config.NodeID)
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
 
-	//wait until 50 views after the next epoch starts
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+71)
+	//wait for the 75th view after the next epoch starts
+	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+75)
 
 	// make sure the network is healthy after adding new node
 	checkNetworkHealth(ctx, env, snapshot, info)
