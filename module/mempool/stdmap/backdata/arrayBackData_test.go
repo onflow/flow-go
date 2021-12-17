@@ -190,10 +190,15 @@ func TestArrayBackData_Random_Ejection(t *testing.T) {
 	testRetrievableCount(t, bd, entities, 100_000)
 }
 
+// TestArrayBackData_AddDuplicate evaluates that adding duplicate entity to ArrayBackData will fail without
+// altering the internal state of it.
 func TestArrayBackData_AddDuplicate(t *testing.T) {
 	limit := 100
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection, unittest.Logger())
+	bd := NewArrayBackData(uint32(limit),
+		8,
+		arraylinkedlist.LRUEjection,
+		unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -205,7 +210,7 @@ func TestArrayBackData_AddDuplicate(t *testing.T) {
 		require.False(t, bd.Add(entity.ID(), entity))
 	}
 
-	// still all mut be retrievable from backdata
+	// still all entities must be retrievable from ArrayBackData.
 	testRetrievableFrom(t, bd, entities, 0)
 }
 
