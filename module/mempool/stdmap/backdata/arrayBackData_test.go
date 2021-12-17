@@ -50,7 +50,10 @@ func TestArrayBackData_SingleBucket(t *testing.T) {
 func TestArrayBackData_Adjust(t *testing.T) {
 	limit := 100_000
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection, unittest.Logger())
+	bd := NewArrayBackData(uint32(limit),
+		8,
+		arraylinkedlist.LRUEjection,
+		unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -61,8 +64,8 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	entityIndex := rand.Int() % limit
 	// checking integrity of retrieving entity
 	oldEntity, ok := bd.ByID(entities[entityIndex].ID())
-	oldEntityID := oldEntity.ID()
 	require.True(t, ok)
+	oldEntityID := oldEntity.ID()
 	require.Equal(t, entities[entityIndex].ID(), oldEntityID)
 	require.Equal(t, entities[entityIndex], oldEntity)
 
@@ -74,6 +77,7 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	newEntity, ok := bd.Adjust(oldEntity.ID(), func(entity flow.Entity) flow.Entity {
 		mockEntity, ok := entity.(*unittest.MockEntity)
 		require.True(t, ok)
+		// oldEntity must be passed to func parameter of adjust.
 		require.Equal(t, oldEntityID, mockEntity.ID())
 		require.Equal(t, oldEntity, mockEntity)
 
@@ -93,6 +97,7 @@ func TestArrayBackData_Adjust(t *testing.T) {
 
 	// re-adjusting old entity must fail, since its identifier must no longer exist
 	entity, ok := bd.Adjust(oldEntityID, func(entity flow.Entity) flow.Entity {
+		require.Fail(t, "function must not be invoked on a non-existing entity")
 		return entity
 	})
 	require.False(t, ok)
@@ -108,6 +113,7 @@ func TestArrayBackData_Adjust(t *testing.T) {
 
 	// adjusting any random non-existing identifier must fail
 	entity, ok = bd.Adjust(unittest.IdentifierFixture(), func(entity flow.Entity) flow.Entity {
+		require.Fail(t, "function must not be invoked on a non-existing entity")
 		return entity
 	})
 	require.False(t, ok)
