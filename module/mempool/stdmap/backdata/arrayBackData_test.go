@@ -123,12 +123,15 @@ func TestArrayBackData_Adjust(t *testing.T) {
 	require.Equal(t, bd.Size(), uint(limit))
 }
 
-// TestArrayBackData_WriteHeavy evaluates correctness of backdata under the writing and retrieving
-// a heavy load of entities up to its limit.
+// TestArrayBackData_WriteHeavy evaluates correctness of ArrayBackData under the writing and retrieving
+// a heavy load of entities up to its limit. All data must be written successfully and then retrievable.
 func TestArrayBackData_WriteHeavy(t *testing.T) {
 	limit := 100_000
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection, unittest.Logger())
+	bd := NewArrayBackData(uint32(limit),
+		8,
+		arraylinkedlist.LRUEjection,
+		unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
