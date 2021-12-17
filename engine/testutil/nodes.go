@@ -343,24 +343,6 @@ func CollectionNode(t *testing.T, hub *stub.Hub, identity bootstrap.NodeInfo, ro
 	}
 }
 
-//// CollectionNodes returns n collection nodes connected to the given hub.
-//func CollectionNodes(t *testing.T, hub *stub.Hub, nNodes int) []testmock.CollectionNode {
-//
-//	colIdentities := unittest.IdentityListFixture(nNodes, unittest.WithRole(flow.RoleCollection))
-//	// add some extra dummy identities so we have one of each role
-//	others := unittest.IdentityListFixture(5, unittest.WithAllRolesExcept(flow.RoleCollection))
-//
-//	identities := append(colIdentities, others...)
-//	root := unittest.RootSnapshotFixture(identities)
-//
-//	nodes := make([]testmock.CollectionNode, 0, len(colIdentities))
-//	for _, identity := range colIdentities {
-//		nodes = append(nodes, CollectionNode(t, hub, identity, root))
-//	}
-//
-//	return nodes
-//}
-
 func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identities []*flow.Identity, chainID flow.ChainID) testmock.ConsensusNode {
 
 	node := GenericNodeFromParticipants(t, hub, identity, identities, chainID)
