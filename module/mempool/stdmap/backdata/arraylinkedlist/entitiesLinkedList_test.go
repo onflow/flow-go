@@ -17,7 +17,6 @@ func TestStoreAndRetrieval_Without_Ejection(t *testing.T) {
 	for _, tc := range []struct {
 		limit       uint32 // capacity of entity list
 		entityCount uint32 // total entities to be stored
-		helpers     []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
 	}{
 		{
 			limit:       30,
@@ -60,7 +59,6 @@ func TestStoreAndRetrieval_With_LRU_Ejection(t *testing.T) {
 	for _, tc := range []struct {
 		limit       uint32 // capacity of entity list
 		entityCount uint32 // total entities to be stored
-		helpers     []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
 	}{
 		{
 			limit:       30,
@@ -93,11 +91,12 @@ func TestStoreAndRetrieval_With_LRU_Ejection(t *testing.T) {
 	}
 }
 
-func TestArrayBackDataStoreAndRetrievalWithRandomEjection(t *testing.T) {
+// TestStoreAndRetrieval_With_Random_Ejection checks health of entity linked list for storing and retrieval scenarios that
+// involves the LRU ejection.
+func TestStoreAndRetrieval_With_Random_Ejection(t *testing.T) {
 	for _, tc := range []struct {
-		limit       uint32
-		entityCount uint32
-		helpers     []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
+		limit       uint32 // capacity of entity list
+		entityCount uint32 // total entities to be stored
 	}{
 		{
 			limit:       30,
@@ -109,32 +108,28 @@ func TestArrayBackDataStoreAndRetrievalWithRandomEjection(t *testing.T) {
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			testArrayBackDataStoreAndRetrievalWithRandomEjection(t, tc.limit, tc.entityCount)
+			withTestScenario(t, tc.limit, tc.entityCount, RandomEjection, []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
+				func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					testAddingEntities(t, backData, entities, RandomEjection)
+				},
+				func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					// with a limit of tc.limit, storing a total of tc.entityCount (> tc.limit) entities, results
+					// in ejection of "tc.entityCount - tc.limit" entities at random.
+					// Hence, we check retrieval any successful total of "tc.limit" entities.
+					testRetrievingCount(t, list, entities, int(tc.limit))
+				},
+			}...,
+			)
 		})
 	}
 }
 
-func testArrayBackDataStoreAndRetrievalWithRandomEjection(t *testing.T, limit uint32, entityCount uint32,
-	helpers ...func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)) {
-	h := []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
-		func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testAddingEntities(t, backData, entities, RandomEjection)
-		},
-	}
-	h = append(h, helpers...)
-
-	withTestScenario(t, limit, entityCount, RandomEjection,
-		append(h, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testRetrievingCount(t, list, entities, int(limit))
-		})...,
-	)
-}
-
+// TestInvalidateEntity checks the health of entity linked list for invalidating entities under random, LRU, and LIFO scenarios.
+// Invalidating an entity removes it from the linked list and moves its node from used list to free list.
 func TestInvalidateEntity(t *testing.T) {
 	for _, tc := range []struct {
-		limit       uint32
-		entityCount uint32
-		helpers     []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
+		limit       uint32 // capacity of entity list
+		entityCount uint32 // total entities to be stored
 	}{
 		{
 			limit:       30,
@@ -163,53 +158,61 @@ func TestInvalidateEntity(t *testing.T) {
 	} {
 		// head invalidation test (LRU)
 		t.Run(fmt.Sprintf("head-invalidation-%d-limit-%d-entities", tc.limit, tc.entityCount), func(t *testing.T) {
-			testInvalidateEntity(t, tc.limit, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-				testInvalidatingHead(t, list, entities)
-			})
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
+				func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					testAddingEntities(t, backData, entities, LRUEjection)
+				},
+				func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					testInvalidatingHead(t, list, entities)
+				},
+			}...)
 		})
 
-		// tail invalidation test
+		// tail invalidation test (LIFO)
 		t.Run(fmt.Sprintf("tail-invalidation-%d-limit-%d-entities-", tc.limit, tc.entityCount), func(t *testing.T) {
-			testInvalidateEntity(t, tc.limit, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-				testInvalidatingTail(t, list, entities)
-			})
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
+				func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					testAddingEntities(t, backData, entities, LRUEjection)
+				},
+				func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					testInvalidatingTail(t, list, entities)
+				},
+			}...)
 		})
 
 		// random invalidation test
-		t.Run(fmt.Sprintf("random-invalidation-%d-limit-%d-entities-", tc.limit, tc.entityCount),
-			func(t *testing.T) {
-				testInvalidateEntity(t, tc.limit, tc.entityCount, func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+		t.Run(fmt.Sprintf("random-invalidation-%d-limit-%d-entities-", tc.limit, tc.entityCount), func(t *testing.T) {
+			withTestScenario(t, tc.limit, tc.entityCount, LRUEjection, []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
+				func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
+					testAddingEntities(t, backData, entities, LRUEjection)
+				},
+				func(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
 					testInvalidateAtRandom(t, list, entities)
-				})
-			})
+				},
+			}...)
+		})
 	}
 }
 
-func testInvalidateEntity(t *testing.T, limit uint32, entityCount uint32, helpers ...func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)) {
-	h := append([]func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity){
-		func(t *testing.T, backData *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-			testAddingEntities(t, backData, entities, LRUEjection)
-		},
-	}, helpers...)
-
-	withTestScenario(t, limit, entityCount, LRUEjection, h...)
-}
-
-// testInvalidatingHead keeps invalidating elements at random and evaluates whether double-linked list remains
-// connected on both head and tail.
+// testInvalidatingHead keeps invalidating elements at random and evaluates whether the entities double linked-list remains
+// connected from head to tail and reverse.
 func testInvalidateAtRandom(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-	size := len(entities)
-	offset := len(list.values) - size
+	// total number of entities to store
+	totalEntitiesStored := len(entities)
+	// freeListInitialSize is total number of empty nodes after
+	// storing all items in the list
+	freeListInitialSize := len(list.values) - totalEntitiesStored
 
-	for i := 0; i < size; i++ {
+	// (i+1) keeps total invalidated (head) entities.
+	for i := 0; i < totalEntitiesStored; i++ {
 		list.invalidateRandomEntity()
 
-		// size of list should be shrunk after each invalidation.
-		require.Equal(t, uint32(size-i-1), list.Size())
+		// size of list should be decremented after each invalidation.
+		require.Equal(t, uint32(totalEntitiesStored-i-1), list.Size())
 
 		// except when the list is empty, head and tail must be accessible after each invalidation
 		// i.e., the linked list remains connected despite invalidation.
-		if i != size-1 {
+		if i != totalEntitiesStored-1 {
 			// used list
 			tailAccessibleFromHead(t,
 				list.used.head.sliceIndex(),
@@ -224,17 +227,19 @@ func testInvalidateAtRandom(t *testing.T, list *EntityDoubleLinkedList, entities
 				list.Size())
 
 			// free list
+			//
+			// after invalidating each item, size of free list is incremented by one.
 			headAccessibleFromTail(t,
 				list.free.head.sliceIndex(),
 				list.free.tail.sliceIndex(),
 				list,
-				uint32(i+1+offset))
+				uint32(i+freeListInitialSize+1))
 
 			tailAccessibleFromHead(t,
 				list.free.head.sliceIndex(),
 				list.free.tail.sliceIndex(),
 				list,
-				uint32(i+1+offset))
+				uint32(i+freeListInitialSize+1))
 		}
 	}
 }
@@ -242,33 +247,38 @@ func testInvalidateAtRandom(t *testing.T, list *EntityDoubleLinkedList, entities
 // testInvalidatingHead keeps invalidating the head and evaluates the linked-list keeps updating its head
 // and remains connected.
 func testInvalidatingHead(t *testing.T, list *EntityDoubleLinkedList, entities []*unittest.MockEntity) {
-	size := len(entities)
-	offset := len(list.values) - size
-	for i := 0; i < size; i++ {
-		headIndex := list.invalidateUsedHead()
-		require.Equal(t, EIndex(i), headIndex)
+	// total number of entities to store
+	totalEntitiesStored := len(entities)
+	// freeListInitialSize is total number of empty nodes after
+	// storing all items in the list
+	freeListInitialSize := len(list.values) - totalEntitiesStored
 
-		// size of list should be shrunk after each invalidation.
-		require.Equal(t, uint32(size-i-1), list.Size())
-		// unclaimed head should be appended to free entities
+	// (i+1) keeps total invalidated (head) entities.
+	for i := 0; i < totalEntitiesStored; i++ {
+		headIndex := list.invalidateUsedHead()
+		// head index should be moved to the next index after each head invalidation.
+		require.Equal(t, EIndex(i), headIndex)
+		// size of list should be decremented after each invalidation.
+		require.Equal(t, uint32(totalEntitiesStored-i-1), list.Size())
+		// invalidated head should be appended to free entities
 		require.Equal(t, list.free.tail.sliceIndex(), headIndex)
 
-		if offset != 0 {
-			// number of entities is below limit
-			// free must head keeps pointing to first empty index after
-			// adding all entities.
-			require.Equal(t, EIndex(size), list.free.head.sliceIndex())
+		if freeListInitialSize != 0 {
+			// number of entities is below limit, hence free list is not empty.
+			// invalidating used head must not change the free head.
+			require.Equal(t, EIndex(totalEntitiesStored), list.free.head.sliceIndex())
 		} else {
-			// number of entities is greater than or equal to limit
-			// free head must be updated to first element (i.e., index 0)
+			// number of entities is greater than or equal to limit, hence free list is empty.
+			// free head must be updated to the first invalidated head (index 0),
 			// and must be kept there for entire test (as we invalidate head not tail).
 			require.Equal(t, EIndex(0), list.free.head.sliceIndex())
 		}
 
 		// except when the list is empty, head must be updated after invalidation,
-		// except when the list is empty, head and tail must be accessible after each invalidation
+		// except when the list is empty, head and tail must be accessible after each invalidation`
 		// i.e., the linked list remains connected despite invalidation.
-		if i != size-1 {
+		if i != totalEntitiesStored-1 {
+			// used linked list
 			tailAccessibleFromHead(t,
 				list.used.head.sliceIndex(),
 				list.used.tail.sliceIndex(),
@@ -282,27 +292,32 @@ func testInvalidatingHead(t *testing.T, list *EntityDoubleLinkedList, entities [
 				list.Size())
 
 			// free list
+			//
+			// after invalidating each item, size of free list is incremented by one.
 			tailAccessibleFromHead(t,
 				list.free.head.sliceIndex(),
 				list.free.tail.sliceIndex(),
 				list,
-				uint32(i+1+offset))
+				uint32(i+1+freeListInitialSize))
 
 			headAccessibleFromTail(t,
 				list.free.head.sliceIndex(),
 				list.free.tail.sliceIndex(),
 				list,
-				uint32(i+1+offset))
+				uint32(i+1+freeListInitialSize))
 		}
 
+		// checking the status of head and tail in used list after each
+		// head invalidation.
 		usedTail, _ := list.getTails()
 		usedHead, _ := list.getHeads()
-		if i != size-1 {
-			// list is not empty yet
+		if i != totalEntitiesStored-1 {
+			// list is not empty yet, we still have entities to invalidate.
 			//
-			// used tail should point to the last element in list
-			require.Equal(t, entities[size-1].ID(), usedTail.id)
-			require.Equal(t, EIndex(size-1), list.used.tail.sliceIndex())
+			// used tail should point to the last element in list, since we are
+			// invalidating head.
+			require.Equal(t, entities[totalEntitiesStored-1].ID(), usedTail.id)
+			require.Equal(t, EIndex(totalEntitiesStored-1), list.used.tail.sliceIndex())
 
 			// used head must point to the next element in the list,
 			// i.e., invalidating head moves it forward.
@@ -410,15 +425,16 @@ func testInvalidatingTail(t *testing.T, list *EntityDoubleLinkedList, entities [
 // testInitialization evaluates the state of an initialized cachedEntity list before adding any element
 // to it.
 func testInitialization(t *testing.T, list *EntityDoubleLinkedList, _ []*unittest.MockEntity) {
-	// head and tail of "used" linked-list must be undefined at initialization time.
+	// head and tail of "used" linked-list must be undefined at initialization time, since
+	// we have no elements in the list.
 	require.True(t, list.used.head.isUndefined())
 	require.True(t, list.used.tail.isUndefined())
 
 	for i := 0; i < len(list.values); i++ {
 		if i == 0 {
-			// head of embedded "free" linked-list should point to index 0 of entities slice.
+			// head of "free" linked-list should point to index 0 of entities slice.
 			require.Equal(t, EIndex(i), list.free.head.sliceIndex())
-			// previous element of tail must be undefined.
+			// previous element of head must be undefined (linked-list head feature).
 			require.True(t, list.values[i].node.prev.isUndefined())
 		}
 
@@ -433,7 +449,7 @@ func testInitialization(t *testing.T, list *EntityDoubleLinkedList, _ []*unittes
 		}
 
 		if i == len(list.values)-1 {
-			// tail of embedded "free" linked-list should point to the last index in entities slice.
+			// tail of "free" linked-list should point to the last index in entities slice.
 			require.Equal(t, EIndex(i), list.free.tail.sliceIndex())
 			// next element of tail must be undefined.
 			require.True(t, list.values[i].node.next.isUndefined())
@@ -441,64 +457,80 @@ func testInitialization(t *testing.T, list *EntityDoubleLinkedList, _ []*unittes
 	}
 }
 
+// testAddingEntities evaluates health of entities linked list for storing new elements.
 func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBeAdded []*unittest.MockEntity, ejectionMode EjectionMode) {
 	// adding elements
 	for i, e := range entitiesToBeAdded {
 		// adding each element must be successful.
 		list.Add(e.ID(), e, uint64(i))
 
-		// in case of no over limit, total of back data should be incremented by each addition.
 		if i < len(list.values) {
+			// in case of no over limit, size of entities linked list should be incremented by each addition.
 			require.Equal(t, list.Size(), uint32(i+1))
 		}
 
 		if ejectionMode == LRUEjection {
-			// entity should be placed at index i in back data
+			// under LRU ejection mode, new entity should be placed at index i in back data
 			_, entity, _ := list.Get(EIndex(i % len(list.values)))
 			require.Equal(t, e, entity)
 		}
 
 		// linked-list sanity check
-		// first insertion forward, head of backData should always point to
+		// first insertion forward, head of used list should always point to
 		// first entity in the list.
 		usedHead, freeHead := list.getHeads()
 		usedTail, freeTail := list.getTails()
 
 		if ejectionMode == LRUEjection {
-			//
 			expectedUsedHead := 0
 			if i >= len(list.values) {
+				// we are beyond limit, so LRU ejection must happen and used head must
+				// be moved.
 				expectedUsedHead = (i + 1) % len(list.values)
 			}
 			require.Equal(t, list.values[expectedUsedHead].entity, usedHead.entity)
+			// head must be healthy and point back to undefined.
 			require.True(t, usedHead.node.prev.isUndefined())
 		}
 
-		//
+		// new entity must be successfully added to tail of used list
 		require.Equal(t, entitiesToBeAdded[i], usedTail.entity)
+		// used tail must be healthy and point back to undefined.
 		require.True(t, usedTail.node.next.isUndefined())
 
 		// free head
-		// as long as we are below limit, after adding i element, free head
-		// should move to i+1 element.
 		if i < len(list.values)-1 {
+			// as long as we are below limit, after adding i element, free head
+			// should move to i+1 element.
 			require.Equal(t, EIndex(i+1), list.free.head.sliceIndex())
+			// head must be healthy and point back to undefined.
 			require.True(t, freeHead.node.prev.isUndefined())
 		} else {
+			// once we go beyond limit,
+			// we run out of free slots,
+			// and free head must be kept at undefined.
 			require.Nil(t, freeHead)
 		}
 
 		// free tail
 		if i < len(list.values)-1 {
+			// as long as we are below limit, after adding i element, free tail
+			// must keep pointing to last index of the array-based linked list. In other
+			// words, adding element must not change free tail (since only free head is
+			// updated).
 			require.Equal(t, EIndex(len(list.values)-1), list.free.tail.sliceIndex())
+			// head tail be healthy and point next to undefined.
 			require.True(t, freeTail.node.next.isUndefined())
 		} else {
+			// once we go beyond limit, we run out of free slots, and
+			// free tail must be kept at undefined.
 			require.Nil(t, freeTail)
 		}
 
-		// used entitiesToBeAdded list
+		// used list
 		// if we are still below limit, head to tail of used list
 		// must be reachable within i + 1 steps.
+		// +1 is since we start from index 0 not 1.
 		usedTraverseStep := uint32(i + 1)
 		if i >= len(list.values) {
 			// if we are above the limit, head to tail of used list
@@ -517,15 +549,16 @@ func testAddingEntities(t *testing.T, list *EntityDoubleLinkedList, entitiesToBe
 			list,
 			usedTraverseStep)
 
-		// free entitiesToBeAdded list
+		// free list
 		// if we are still below limit, head to tail of used list
-		// must be reachable within limit - i - 1 steps. "limit - i" part is since
+		// must be reachable within "limit - i - 1" steps. "limit - i" part is since
 		// when we have i elements in list, we have "limit - i" free slots, and -1 is
 		// since we start from index 0 not 1.
 		freeTraverseStep := uint32(len(list.values) - i - 1)
 		if i >= len(list.values) {
-			// if we are above the limit, within 0 steps.
-			// reason is list is full and adding new elements is done
+			// if we are above the limit, head and tail of free list must be reachable
+			// within 0 steps.
+			// The reason is list is full and adding new elements is done
 			// by ejecting existing ones, remaining no free slot.
 			freeTraverseStep = uint32(0)
 		}
