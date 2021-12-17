@@ -9,6 +9,10 @@ import (
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
+// TestStoreAndRetrievalWithoutEjection checks health of entity linked list for storing and retrieval scenarios that
+// do not involve ejection.
+// The test involves cases for testing the list below its limit, and also up to its limit. However, it never gets beyond
+// the limit of list, so no ejection will kick-in.
 func TestStoreAndRetrievalWithoutEjection(t *testing.T) {
 	for _, tc := range []struct {
 		limit           uint32
@@ -16,25 +20,21 @@ func TestStoreAndRetrievalWithoutEjection(t *testing.T) {
 		entityCount     uint32
 		helpers         []func(*testing.T, *EntityDoubleLinkedList, []*unittest.MockEntity)
 	}{
-		{ // two buckets, entities below limit.
-			limit:           30,
-			overLimitFactor: 2,
-			entityCount:     10,
+		{
+			limit:       30,
+			entityCount: 10,
 		},
-		{ // two buckets, entities equal to limit.
-			limit:           30,
-			overLimitFactor: 2,
-			entityCount:     30,
+		{
+			limit:       30,
+			entityCount: 30,
 		},
-		{ // multiple buckets, high limit, low entities.
-			limit:           2000,
-			overLimitFactor: 16,
-			entityCount:     1000,
+		{
+			limit:       2000,
+			entityCount: 1000,
 		},
-		{ // multiple buckets, entities equal to limit.
-			limit:           1000,
-			overLimitFactor: 16,
-			entityCount:     1000,
+		{
+			limit:       1000,
+			entityCount: 1000,
 		},
 	} {
 		t.Run(fmt.Sprintf("%d-limit-%d-overlimit-%d-entities", tc.limit, tc.overLimitFactor, tc.entityCount), func(t *testing.T) {
