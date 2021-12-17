@@ -89,6 +89,7 @@ func (suite *SealingSegmentSuite) AddBlocks(blocks ...*flow.Block) {
 	latestSeal := suite.priorSeal
 	for _, block := range blocks {
 		// before adding block, ensure its latest seal is indexed in suite
+		// convention for this test: seals are ordered by height of the sealed block
 		for _, seal := range block.Payload.Seals {
 			latestSeal = seal
 		}
@@ -188,6 +189,31 @@ func (suite *SealingSegmentSuite) TestBuild_MissingResultFromPayloadSeal() {
 	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
 	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
 	require.Equal(suite.T(), pastResult.ID(), segment.ExecutionResults[0].ID())
+}
+
+// Tests the case where the final block in the segment contains both a seal
+// for lowest, and a seal for a block above lowest. This should be considered
+// an invalid segment.
+//
+// B1(S*,R*) <- B2 <- B3(R1,R2) <- B4(S1,S2)
+func (suite *SealingSegmentSuite) TestBuild_WrongLatestSeal() {
+
+	block1 := suite.FirstBlock()
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
+	receipt2, seal2 := unittest.ReceiptAndSealForBlock(block2)
+
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1, receipt2)))
+
+	block4 := unittest.BlockWithParentFixture(block3.Header)
+	block4.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1, seal2)))
+
+	suite.AddBlocks(block1, block2, block3, block4)
+
+	_, err := suite.builder.SealingSegment()
+	require.ErrorIs(suite.T(), err, flow.ErrSegmentMissingSeal)
 }
 
 // TestBuild_RootSegment tests we can build a valid root sealing segment.

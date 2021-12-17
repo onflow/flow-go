@@ -60,7 +60,7 @@ type SealingSegment struct {
 
 	// FirstSeal contains the latest seal as of the first block in the segment.
 	// It is needed for the `Commit` method of protocol snapshot to return the
-	// sealed state, when the first block contains no seal. 
+	// sealed state, when the first block contains no seal.
 	// If the first block in the segment contains seal, then this field is `nil`
 	FirstSeal *Seal
 }
@@ -259,27 +259,24 @@ func (builder *SealingSegmentBuilder) isValidHeight(block *Block) bool {
 // hasValidSeal returns true if the latest seal as of highest is for lowest.
 func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 	lowestID := builder.lowest().ID()
+	highestID := builder.highest().ID()
 
-	// due to the fact that lowest is not always sealed by highest,
-	// if highest does not have any seals check that a valid ancestor does.
+	// get the ID of the latest seal for highest block
+	latestSealID := builder.latestSeals[highestID]
+
+	// find the seal within the block payloads
+	// NOTE: it is impossible for latestSeal to be builder.FirstSeal
 	for i := len(builder.blocks) - 1; i >= 0; i-- {
-
-		// get first block that contains any seal
 		block := builder.blocks[i]
-		if len(block.Payload.Seals) == 0 {
-			continue
-		}
-
-		// check if block seals lowest
+		// look for latestSealID in the payload
 		for _, seal := range block.Payload.Seals {
-			if seal.BlockID == lowestID {
-				return true
+			// if we found the latest seal, confirm it seals lowest
+			if seal.ID() == latestSealID {
+				return seal.BlockID == lowestID
 			}
+			return false
 		}
-
-		return false
 	}
-
 	return false
 }
 
