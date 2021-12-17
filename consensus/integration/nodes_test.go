@@ -29,8 +29,6 @@ import (
 	synceng "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/engine/consensus/compliance"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/dkg"
-	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/flow/order"
@@ -458,30 +456,21 @@ func createNode(
 	validator := consensus.NewValidator(metrics, committee, forks)
 	require.NoError(t, err)
 
-	keys := &storagemock.DKGKeys{}
+	keys := &storagemock.SafeBeaconKeys{}
 	// there is DKG key for this epoch
-	keys.On("RetrieveMyDKGPrivateInfo", mock.Anything).Return(
-		func(epochCounter uint64) *dkg.DKGParticipantPriv {
+	keys.On("RetrieveMyBeaconPrivateKey", mock.Anything).Return(
+		func(epochCounter uint64) crypto.PrivateKey {
 			dkgInfo, ok := participant.beaconInfoByEpoch[epochCounter]
 			if !ok {
 				return nil
 			}
-
-			return &dkg.DKGParticipantPriv{
-				NodeID: participant.nodeInfo.NodeID,
-				RandomBeaconPrivKey: encodable.RandomBeaconPrivKey{
-					PrivateKey: dkgInfo.RandomBeaconPrivKey,
-				},
-				GroupIndex: int(dkgInfo.DKGParticipant.Index),
-			}
+			return dkgInfo.RandomBeaconPrivKey
 		},
 		func(epochCounter uint64) bool {
 			_, ok := participant.beaconInfoByEpoch[epochCounter]
 			return ok
 		},
-		func(epochCounter uint64) error {
-			return nil
-		})
+		nil)
 
 	// use epoch aware store for testing scenarios where epoch changes
 	beaconKeyStore := hsig.NewEpochAwareRandomBeaconKeyStore(epochLookup, keys)
