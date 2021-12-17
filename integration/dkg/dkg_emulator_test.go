@@ -181,8 +181,8 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	threshold := signature.RandomBeaconThreshold(len(nodes))
-	groupSignature, err := crypto.ReconstructThresholdSignature(len(nodes), threshold, signatures, indices)
+	threshold := signature.RandomBeaconThreshold(numberOfNodes)
+	groupSignature, err := crypto.ReconstructThresholdSignature(numberOfNodes, threshold, signatures, indices)
 	require.NoError(s.T(), err)
 
 	ok, err := groupPubKey.Verify(groupSignature, sigData, hasher)
