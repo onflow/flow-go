@@ -166,13 +166,19 @@ func TestArrayBackData_LRU_Ejection(t *testing.T) {
 	testRetrievableFrom(t, bd, entities, 900_000)
 }
 
+// TestArrayBackData_Random_Ejection evaluates correctness of ArrayBackData under the writing and retrieving
+// a heavy load of entities beyond its limit. With random ejection, only as many entities as capacity of
+// ArrayBackData must be retrievable.
 func TestArrayBackData_Random_Ejection(t *testing.T) {
 	// mempool has the limit of 100K, but we put 1M
 	// (10 time more than its capacity)
 	limit := 100_000
 	items := uint(1_000_000)
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.RandomEjection, unittest.Logger())
+	bd := NewArrayBackData(uint32(limit),
+		8,
+		arraylinkedlist.RandomEjection,
+		unittest.Logger())
 
 	entities := unittest.EntityListFixture(items)
 
