@@ -142,20 +142,26 @@ func TestArrayBackData_WriteHeavy(t *testing.T) {
 	testRetrievableFrom(t, bd, entities, 0)
 }
 
+// TestArrayBackData_LRU_Ejection evaluates correctness of ArrayBackData under the writing and retrieving
+// a heavy load of entities beyond its limit. With LRU ejection, only most recently written data must be maintained
+// by mempool.
 func TestArrayBackData_LRU_Ejection(t *testing.T) {
 	// mempool has the limit of 100K, but we put 1M
 	// (10 time more than its capacity)
 	limit := 100_000
 	items := uint(1_000_000)
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection, unittest.Logger())
+	bd := NewArrayBackData(uint32(limit),
+		8,
+		arraylinkedlist.LRUEjection,
+		unittest.Logger())
 
 	entities := unittest.EntityListFixture(items)
 
 	// adds all entities to backdata
 	testAddEntities(t, bd, entities)
 
-	// only last 100K items must be retrievable, and
+	// only last 100K (i.e., 900Kth forward) items must be retrievable, and
 	// the rest must be ejected.
 	testRetrievableFrom(t, bd, entities, 900_000)
 }
