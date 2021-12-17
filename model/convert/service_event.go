@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/order"
-	"github.com/onflow/flow-go/module/signature"
 )
 
 // ServiceEvent converts a service event encoded as the generic flow.Event
@@ -333,10 +332,6 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 	// CAUTION: Votes are not validated prior to aggregation. This means a single
 	// invalid vote submission will result in a fully invalid QC for that cluster.
 	// Votes must be validated by the ClusterQC smart contract.
-	//
-	// NOTE: Aggregation doesn't require a tag or local, but is only accessible
-	// through the broader Provider API, hence the empty arguments.
-	aggregator := signature.NewAggregationProvider("", nil)
 
 	for _, cdcClusterQC := range cdcClusterQCs {
 		cdcClusterQCStruct, ok := cdcClusterQC.(cadence.Struct)
@@ -394,7 +389,8 @@ func convertClusterQCVotes(cdcClusterQCs []cadence.Value) ([]flow.ClusterQCVoteD
 			}
 			signatures = append(signatures, rawVoteBytes)
 		}
-		aggregatedSignature, err := aggregator.Aggregate(signatures)
+		// Aggregate BLS signatures
+		aggregatedSignature, err := crypto.AggregateBLSSignatures(signatures)
 		if err != nil {
 			return nil, fmt.Errorf("cluster qc vote aggregation failed: %w", err)
 		}
