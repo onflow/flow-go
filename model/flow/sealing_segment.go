@@ -274,7 +274,6 @@ func (builder *SealingSegmentBuilder) hasValidSeal() bool {
 			if seal.ID() == latestSealID {
 				return seal.BlockID == lowestID
 			}
-			return false
 		}
 	}
 	return false

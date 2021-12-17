@@ -12,6 +12,12 @@ import (
 )
 
 // SealingSegmentSuite is the test suite for sealing segment construction and validation.
+// Notation:
+// B1 - block 1
+// R1 - execution result+receipt for block 1
+// S1 - seal for block 1
+// R* - execution result+receipt for some block before the segment
+// S* - seal for some block before the segment
 type SealingSegmentSuite struct {
 	suite.Suite
 
@@ -214,6 +220,39 @@ func (suite *SealingSegmentSuite) TestBuild_WrongLatestSeal() {
 
 	_, err := suite.builder.SealingSegment()
 	require.ErrorIs(suite.T(), err, flow.ErrSegmentMissingSeal)
+}
+
+// Tests the case where the final block in the segment seals multiple
+// blocks, but the latest sealed is still lowest, hence it is a valid
+// sealing segment.
+//
+// B1(S*,R*) <- B2(R1) <- B3(S**,S1)
+func (suite *SealingSegmentSuite) TestBuild_MultipleFinalBlockSeals() {
+
+	block1 := suite.FirstBlock()
+
+	receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
+	// create a seal referencing some past receipt/block
+	pastResult := unittest.ExecutionResultFixture()
+	suite.addResult(pastResult)
+	pastSeal := unittest.Seal.Fixture()
+	pastSeal.ResultID = pastResult.ID()
+
+	block2 := unittest.BlockWithParentFixture(block1.Header)
+	block2.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipt1)))
+
+	block3 := unittest.BlockWithParentFixture(block2.Header)
+	block3.SetPayload(unittest.PayloadFixture(unittest.WithSeals(pastSeal, seal1)))
+
+	suite.AddBlocks(block1, block2, block3)
+
+	segment, err := suite.builder.SealingSegment()
+	require.NoError(suite.T(), err)
+
+	unittest.AssertEqualBlocksLenAndOrder(suite.T(), []*flow.Block{block1, block2, block3}, segment.Blocks)
+	require.Equal(suite.T(), 1, segment.ExecutionResults.Size())
+	require.Equal(suite.T(), pastResult.ID(), segment.ExecutionResults[0].ID())
+	require.NoError(suite.T(), segment.Validate())
 }
 
 // TestBuild_RootSegment tests we can build a valid root sealing segment.
