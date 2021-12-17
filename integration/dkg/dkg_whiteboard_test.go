@@ -13,12 +13,13 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 
+	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	dkgeng "github.com/onflow/flow-go/engine/consensus/dkg"
 	"github.com/onflow/flow-go/engine/testutil"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/dkg"
-	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/network/stub"
 	"github.com/onflow/flow-go/state/protocol/events/gadgets"
 	protocolmock "github.com/onflow/flow-go/state/protocol/mock"
@@ -162,9 +163,12 @@ func createNode(
 	// reactorEngine consumes the EpochSetupPhaseStarted event
 	core.ProtocolEvents.AddConsumer(reactorEngine)
 
+	safeBeaconKeys := badger.NewSafeBeaconPrivateKeys(dkgState)
+
 	node := node{
 		GenericNode:     core,
 		dkgState:        dkgState,
+		safeBeaconKeys:  safeBeaconKeys,
 		messagingEngine: messagingEngine,
 		reactorEngine:   reactorEngine,
 	}
@@ -268,6 +272,8 @@ func TestWithWhiteboard(t *testing.T) {
 
 	t.Logf("there are %d result(s)", len(whiteboard.results))
 	assert.Equal(t, 1, len(whiteboard.results))
+	tag := "some tag"
+	hasher := crypto.NewBLSKMAC(tag)
 
 	for _, result := range whiteboard.results {
 		signers := whiteboard.resultSubmitters[flow.MakeID(result)]
@@ -277,22 +283,21 @@ func TestWithWhiteboard(t *testing.T) {
 
 	// create and test a threshold signature with the keys computed by dkg
 	sigData := []byte("message to be signed")
-	signers := make([]*signature.ThresholdProvider, 0, N)
+	beaconKeys := make([]crypto.PrivateKey, 0, N)
 	signatures := []crypto.Signature{}
-	indices := []uint{}
+	indices := []int{}
 	for i, n := range nodes {
-		// TODO: use SafeBeaconKeys
-		priv, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
-		require.NoError(t, err)
 
-		signer := signature.NewThresholdProvider("TAG", priv)
-		signers = append(signers, signer)
+		epochLookup := epochs.NewEpochLookup(n.State)
+		beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, n.safeBeaconKeys)
+		beaconKey, err := beaconKeyStore.ByView(nextEpochSetup.FirstView)
+		beaconKeys = append(beaconKeys, beaconKey)
 
-		signature, err := signer.Sign(sigData)
+		signature, err := beaconKey.Sign(sigData, hasher)
 		require.NoError(t, err)
 
 		signatures = append(signatures, signature)
-		indices = append(indices, uint(i))
+		indices = append(indices, i)
 	}
 
 	// shuffle the signatures and indices before constructing the group
@@ -304,15 +309,13 @@ func TestWithWhiteboard(t *testing.T) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	// NOTE: Reconstruction doesn't require a tag or local, but is only accessible
-	// through the broader Provider API, hence the empty arguments.
-	thresholdSigner := signature.NewThresholdProvider("", nil)
-	groupSignature, err := thresholdSigner.Reconstruct(uint(len(nodes)), signatures, indices)
+	threshold := (len(nodes) - 1) / 2
+	groupSignature, err := crypto.ReconstructThresholdSignature(len(nodes), threshold, signatures, indices)
 	require.NoError(t, err)
 
 	result := whiteboard.resultBySubmitter[nodes[0].Me.NodeID()]
 	groupPk := result.groupKey
-	ok, err := signers[0].Verify(sigData, groupSignature, groupPk)
+	ok, err := groupPk.Verify(sigData, groupSignature, hasher)
 	require.NoError(t, err)
 	assert.True(t, ok, "failed to verify threshold signature")
 }

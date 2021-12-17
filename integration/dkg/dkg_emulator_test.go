@@ -11,8 +11,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	hotsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/epochs"
 	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -142,25 +144,26 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 	groupPubKey, err := crypto.DecodePublicKey(crypto.BLSBLS12381, groupPubKeyBytes)
 	assert.NoError(s.T(), err)
 
+	tag := "some tag"
+	hasher := crypto.NewBLSKMAC(tag)
 	// create and test a threshold signature with the keys computed by dkg
 	sigData := []byte("message to be signed")
-	signers := make([]*signature.ThresholdProvider, 0, len(nodes))
+	beaconKeys := make([]crypto.PrivateKey, 0, len(nodes))
 	signatures := []crypto.Signature{}
-	indices := []uint{}
+	indices := []int{}
 	for i, n := range nodes {
-		priv, err := n.dkgState.RetrieveMyBeaconPrivateKey(nextEpochSetup.Counter)
-		require.NoError(s.T(), err)
+		epochLookup := epochs.NewEpochLookup(n.State)
+		beaconKeyStore := hotsignature.NewEpochAwareRandomBeaconKeyStore(epochLookup, n.safeBeaconKeys)
+		beaconKey, err := beaconKeyStore.ByView(nextEpochSetup.FirstView)
+		beaconKeys = append(beaconKeys, beaconKey)
 
-		signer := signature.NewThresholdProvider("TAG", priv)
-		signers = append(signers, signer)
-
-		signature, err := signer.Sign(sigData)
+		signature, err := beaconKey.Sign(sigData, hasher)
 		require.NoError(s.T(), err)
 
 		signatures = append(signatures, signature)
-		indices = append(indices, uint(i))
+		indices = append(indices, i)
 
-		ok, err := signer.Verify(sigData, signature, pubKeys[1+i])
+		ok, err := pubKeys[i+1].Verify(signature, sigData, hasher)
 		require.NoError(s.T(), err)
 		assert.True(s.T(), ok, fmt.Sprintf("signature %d share doesn't verify under the public key share", i+1))
 	}
@@ -174,13 +177,11 @@ func (s *DKGSuite) runTest(goodNodes int, emulatorProblems bool) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	// NOTE: Reconstruction doesn't require a tag or local, but is only accessible
-	// through the broader Provider API, hence the empty arguments.
-	thresholdSigner := signature.NewThresholdProvider("", nil)
-	groupSignature, err := thresholdSigner.Reconstruct(uint(len(s.nodes)), signatures, indices)
+	threshold := (len(nodes) - 1) / 2
+	groupSignature, err := crypto.ReconstructThresholdSignature(len(nodes), threshold, signatures, indices)
 	require.NoError(s.T(), err)
 
-	ok, err := signers[0].Verify(sigData, groupSignature, groupPubKey)
+	ok, err := groupPubKey.Verify(groupSignature, sigData, hasher)
 	require.NoError(s.T(), err)
 	assert.True(s.T(), ok, "failed to verify threshold signature")
 }

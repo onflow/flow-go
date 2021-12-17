@@ -34,6 +34,7 @@ type node struct {
 	account           *nodeAccount
 	dkgContractClient *DKGClientWrapper
 	dkgState          storage.DKGState
+	safeBeaconKeys    storage.SafeBeaconKeys
 	messagingEngine   *dkg.MessagingEngine
 	reactorEngine     *dkg.ReactorEngine
 }
