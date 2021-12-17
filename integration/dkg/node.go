@@ -47,6 +47,9 @@ func (n *node) Ready() {
 func (n *node) Done() {
 	<-n.messagingEngine.Done()
 	<-n.reactorEngine.Done()
+	// close database otherwise hitting "too many file open"
+	_ = n.PublicDB.Close()
+	_ = n.SecretsDB.Close()
 }
 
 // setEpochs configures the mock state snapthost at firstBlock to return the
