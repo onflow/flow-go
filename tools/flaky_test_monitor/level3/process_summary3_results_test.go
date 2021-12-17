@@ -26,8 +26,10 @@ func TestProcessSummary3TestRun(t *testing.T) {
 
 }
 
+const testDataDir = "../testdata/summary3/"
+
 func runProcessSummary3TestRun(t *testing.T, testDir string) {
-	testDataBaseDir := "../testdata/summary3/" + testDir
+	testDataBaseDir := testDataDir + testDir
 	inputTestDataPath := testDataBaseDir + "/input/"
 	expectedOutputTestDataPath := testDataBaseDir + "/expected-output/" + testDir + ".json"
 
@@ -66,7 +68,14 @@ func runProcessSummary3TestRun(t *testing.T, testDir string) {
 	require.Equal(t, expectedTestSummary3, actualTestSummary3)
 }
 
+var expectedPanicFunc = func() {
+	inputTestDataPath := testDataDir + "test6-error-multiple-level2-files/input/"
+	// **************************************************************
+	processSummary3TestRun(inputTestDataPath)
+	// **************************************************************
+}
+
 // test that error is thrown when there are > 1 level 2 summary files in a folder
 func TestProcessSummary3TestRun_Error_Multiple_Level2_Files(t *testing.T) {
-	t.FailNow()
+	require.PanicsWithValue(t, "can't process multiple level 2 files", expectedPanicFunc)
 }
