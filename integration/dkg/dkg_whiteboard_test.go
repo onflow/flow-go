@@ -311,13 +311,13 @@ func TestWithWhiteboard(t *testing.T) {
 		indices[i], indices[j] = indices[j], indices[i]
 	})
 
-	threshold := signature.RandomBeaconThreshold(numberOfNodes)
-	groupSignature, err := crypto.ReconstructThresholdSignature(numberOfNodes, threshold, signatures, indices)
+	threshold := signature.RandomBeaconThreshold(len(nodes))
+	groupSignature, err := crypto.ReconstructThresholdSignature(len(nodes), threshold, signatures, indices)
 	require.NoError(t, err)
 
 	result := whiteboard.resultBySubmitter[nodes[0].Me.NodeID()]
 	groupPk := result.groupKey
-	ok, err := groupPk.Verify(sigData, groupSignature, hasher)
+	ok, err := groupPk.Verify(groupSignature, sigData, hasher)
 	require.NoError(t, err)
 	assert.True(t, ok, "failed to verify threshold signature")
 }
