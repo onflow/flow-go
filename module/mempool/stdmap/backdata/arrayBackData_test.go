@@ -218,7 +218,10 @@ func TestArrayBackData_AddDuplicate(t *testing.T) {
 func TestArrayBackData_Clear(t *testing.T) {
 	limit := 100
 
-	bd := NewArrayBackData(uint32(limit), 8, arraylinkedlist.LRUEjection, unittest.Logger())
+	bd := NewArrayBackData(uint32(limit),
+		8,
+		arraylinkedlist.LRUEjection,
+		unittest.Logger())
 
 	entities := unittest.EntityListFixture(uint(limit))
 
@@ -239,7 +242,7 @@ func TestArrayBackData_Clear(t *testing.T) {
 	testRetrievableCount(t, bd, entities, 0)
 }
 
-// TestArrayBackData_All_BelowLimit checks correctness of All method when mempool is not full yet.
+// TestArrayBackData_All checks correctness of All method in returning all stored entities in it.
 func TestArrayBackData_All(t *testing.T) {
 	tt := []struct {
 		limit        uint32
@@ -270,7 +273,10 @@ func TestArrayBackData_All(t *testing.T) {
 
 	for _, tc := range tt {
 		t.Run(fmt.Sprintf("%d-limit-%d-items-%s-ejection", tc.limit, tc.items, tc.ejectionMode), func(t *testing.T) {
-			bd := NewArrayBackData(tc.limit, 8, tc.ejectionMode, unittest.Logger())
+			bd := NewArrayBackData(tc.limit,
+				8,
+				tc.ejectionMode,
+				unittest.Logger())
 			entities := unittest.EntityListFixture(uint(tc.items))
 
 			testAddEntities(t, bd, entities)
@@ -292,7 +298,7 @@ func TestArrayBackData_All(t *testing.T) {
 	}
 }
 
-// TestArrayBackData_Rem checks correctness of All method when mempool is not full yet.
+// TestArrayBackData_Rem checks correctness of removing elements from ArrayBackData.
 func TestArrayBackData_Rem(t *testing.T) {
 	tt := []struct {
 		limit uint32
@@ -300,25 +306,25 @@ func TestArrayBackData_Rem(t *testing.T) {
 		from  int // index start to be removed (set -1 to remove randomly)
 		count int // total elements to be removed
 	}{
-		{ // removing range from mempool with items below its limit
+		{ // removing range with total items below the limit
 			limit: 100_000,
 			items: 10_000,
 			from:  188,
 			count: 2012,
 		},
-		{ // removing range from full mempool
+		{ // removing range from full ArrayBackData
 			limit: 100_000,
 			items: 100_000,
 			from:  50_333,
 			count: 6667,
 		},
-		{ // removing random from mempool with items below its limit
+		{ // removing random from ArrayBackData with total items below its limit
 			limit: 100_000,
 			items: 10_000,
 			from:  -1,
 			count: 6888,
 		},
-		{ // removing random from full mempool
+		{ // removing random from full ArrayBackData
 			limit: 100_000,
 			items: 10_000,
 			from:  -1,
@@ -339,6 +345,7 @@ func TestArrayBackData_Rem(t *testing.T) {
 				// except removed ones, the rest must be retrievable
 				testRetrievableCount(t, bd, entities, uint64(int(tc.items)-tc.count))
 			} else {
+				// removing a range
 				testRemoveRange(t, bd, entities, tc.from, tc.from+tc.count)
 				testCheckRangeRemoved(t, bd, entities, tc.from, tc.from+tc.count)
 			}
@@ -346,7 +353,7 @@ func TestArrayBackData_Rem(t *testing.T) {
 	}
 }
 
-// testAddEntities is a test helper that checks entities are added successfully to the backdata.
+// testAddEntities is a test helper that checks entities are added successfully to the ArrayBackData.
 // and each entity is retrievable right after it is written to backdata.
 func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity) {
 	// adding elements
@@ -355,8 +362,8 @@ func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 		require.True(t, bd.Add(e.ID(), e))
 
 		if uint32(i) < bd.limit {
-			// when we are below limit the total of
-			// backdata should be incremented by each addition.
+			// when we are below limit the size of
+			// ArrayBackData should be incremented by each addition.
 			require.Equal(t, bd.Size(), uint(i+1))
 		} else {
 			// when we cross the limit, the ejection kicks in, and
@@ -371,7 +378,7 @@ func testAddEntities(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 	}
 }
 
-// testGettingEntities is a test helper that checks entities are retrievable from backdata.
+// testRetrievableFrom is a test helper that evaluates that all entities starting from given index are retrievable from ArrayBackData.
 func testRetrievableFrom(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, from int) {
 	for i := range entities {
 		expected := entities[i]
@@ -386,6 +393,7 @@ func testRetrievableFrom(t *testing.T, bd *ArrayBackData, entities []*unittest.M
 	}
 }
 
+// testRemoveAtRandom is a test helper removes specified number of entities from ArrayBackData at random.
 func testRemoveAtRandom(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, count int) {
 	for removedCount := 0; removedCount < count; {
 		unittest.RequireReturnsBefore(t, func() {
@@ -402,6 +410,7 @@ func testRemoveAtRandom(t *testing.T, bd *ArrayBackData, entities []*unittest.Mo
 	}
 }
 
+// testRemoveRange is a test helper that removes specified range of entities from ArrayBackData.
 func testRemoveRange(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, from int, to int) {
 	for i := from; i < to; i++ {
 		expected, removed := bd.Rem(entities[i].ID())
@@ -412,9 +421,10 @@ func testRemoveRange(t *testing.T, bd *ArrayBackData, entities []*unittest.MockE
 	}
 }
 
+// testCheckRangeRemoved is a test helper that evaluates the specified range of entities have been removed from ArrayBackData.
 func testCheckRangeRemoved(t *testing.T, bd *ArrayBackData, entities []*unittest.MockEntity, from int, to int) {
 	for i := from; i < to; i++ {
-		// bot removal and retrieval must fail
+		// both removal and retrieval must fail
 		expected, removed := bd.Rem(entities[i].ID())
 		require.False(t, removed)
 		require.Nil(t, expected)
@@ -425,7 +435,7 @@ func testCheckRangeRemoved(t *testing.T, bd *ArrayBackData, entities []*unittest
 	}
 }
 
-// testMapMatchFrom is a test helper that checks entities are retrievable from entitiesMap.
+// testMapMatchFrom is a test helper that checks entities are retrievable from entitiesMap starting specified index.
 func testMapMatchFrom(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity, entities []*unittest.MockEntity, from int) {
 	require.Len(t, entitiesMap, len(entities)-from)
 
@@ -442,18 +452,20 @@ func testMapMatchFrom(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity,
 	}
 }
 
-// testMapMatchFrom is a test helper that checks entities are retrievable from entitiesMap.
+// testMapMatchFrom is a test helper that checks specified number of entities are retrievable from entitiesMap.
 func testMapMatchCount(t *testing.T, entitiesMap map[flow.Identifier]flow.Entity, entities []*unittest.MockEntity, count int) {
 	require.Len(t, entitiesMap, count)
 	actualCount := 0
 	for i := range entities {
 		expected := entities[i]
 		actual, ok := entitiesMap[expected.ID()]
-		if ok {
-			require.Equal(t, expected, actual)
-			actualCount++
+		if !ok {
+			continue
 		}
+		require.Equal(t, expected, actual)
+		actualCount++
 	}
+	require.Equal(t, count, actualCount)
 }
 
 // testRetrievableCount is a test helper that checks the number of retrievable entities from backdata exactly matches
