@@ -24,9 +24,9 @@ type node interface {
 // that has identical hash would otherwise be possible).
 // Values are intended to be global constants and must be unique.
 var (
-	leafNodeTag  = [1]byte{uint8(0)}
-	fullNodeTag  = [1]byte{uint8(1)}
-	shortNodeTag = [1]byte{uint8(2)}
+	leafNodeTag  = []byte{0}
+	fullNodeTag  = []byte{1}
+	shortNodeTag = []byte{2}
 )
 
 /* ******************************* Short Node ******************************* */
