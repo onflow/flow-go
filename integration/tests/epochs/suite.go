@@ -147,12 +147,15 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		SetHashAlgo(sdkcrypto.SHA2_256).
 		SetWeight(sdk.AccountKeyWeightThreshold)
 
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
 	// create staking account
 	stakingAccountAddress, err := s.createAccount(
 		ctx,
 		fullAccountKey,
 		s.client.Account(),
 		s.client.SDKServiceAddress(),
+		latestBlockID,
 	)
 	require.NoError(s.T(), err)
 
@@ -296,10 +299,8 @@ func (s *Suite) createAccount(ctx context.Context,
 	accountKey *sdk.AccountKey,
 	payerAccount *sdk.Account,
 	payer sdk.Address,
+	latestBlockID flow.Identifier,
 ) (sdk.Address, error) {
-	latestBlockID, err := s.client.GetLatestBlockID(ctx)
-	require.NoError(s.T(), err)
-
 	addr, err := s.client.CreateAccount(ctx, accountKey, payerAccount, payer, sdk.Identifier(latestBlockID))
 	require.NoError(s.T(), err)
 
@@ -632,5 +633,47 @@ func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templat
 	require.NoError(s.T(), err)
 
 	// head should now be at-least 20 blocks higher from when we started
-	require.True(s.T(), head.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height))
+	require.Truef(s.T(), head.Height-bootstrapHead.Height >= 20, "expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height)
+}
+
+// assertNetworkHealthyAfterLNChange after an collection node is removed or added to the network
+// this func can be used to perform sanity.
+// 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
+// is after the first epoch starts.
+// 2. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
+func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo)  {
+	bootstrapHead, err := rootSnapshot.Head()
+	require.NoError(s.T(), err)
+
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+
+	head, err := snapshot.Head()
+	require.NoError(s.T(), err)
+
+	// head should now be at-least 20 blocks higher from when we started
+	require.Truef(s.T(), head.Height-bootstrapHead.Height >= 20, "expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height)
+
+	currEpochCounter, err := snapshot.Epochs().Current().Counter()
+	require.NoError(s.T(), err)
+	require.Truef(s.T(), currEpochCounter == 2, "expected to be in epoch 2 instead got %d", currEpochCounter)
+
+	// get latest block ID, because it resides in current epoch it will target our new LN
+	latestBlockID, err := s.client.GetLatestBlockID(ctx)
+	require.NoError(s.T(), err)
+
+	fullAccountKey := sdk.NewAccountKey().
+		SetPublicKey(unittest.PrivateKeyFixture(crypto.ECDSAP256, crypto.KeyGenSeedMinLenECDSAP256).PublicKey()).
+		SetHashAlgo(sdkcrypto.SHA2_256).
+		SetWeight(sdk.AccountKeyWeightThreshold)
+
+	// submit transaction to create account
+	_, err = s.createAccount(
+		ctx,
+		fullAccountKey,
+		s.client.Account(),
+		s.client.SDKServiceAddress(),
+		latestBlockID,
+	)
+	require.NoError(s.T(), err)
 }
