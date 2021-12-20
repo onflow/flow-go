@@ -193,7 +193,7 @@ func (cs *ComplianceSuite) TestSubmittingMultipleEntries() {
 
 	time.Sleep(time.Second)
 
-	// check the submit vote was called with correct parameters
+	// check that submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
 	cs.voteAggregator.AssertExpectations(cs.T())
 }

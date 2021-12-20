@@ -81,6 +81,7 @@ func NewVoteAggregator(
 		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
 		// start vote collectors
 		collectors.Start(signalerCtx)
+		<-collectors.Ready()
 
 		ready()
 

@@ -79,16 +79,15 @@ func (f *combinedVoteProcessorFactoryBaseV2) Create(log zerolog.Logger, block *m
 	rbRector := signature.NewRandomBeaconReconstructor(dkg, randomBeaconInspector)
 	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(allParticipants.TotalStake())
 
-	return &CombinedVoteProcessorV2{
-		log:              log,
-		block:            block,
-		stakingSigAggtor: stakingSigAggtor,
-		rbRector:         rbRector,
-		onQCCreated:      f.onQCCreated,
-		packer:           f.packer,
-		minRequiredStake: minRequiredStake,
-		done:             *atomic.NewBool(false),
-	}, nil
+	return NewCombinedVoteProcessor(
+		log,
+		block,
+		stakingSigAggtor,
+		rbRector,
+		f.onQCCreated,
+		f.packer,
+		minRequiredStake,
+	), nil
 }
 
 /* ****************** CombinedVoteProcessorV2 Implementation ****************** */
@@ -120,7 +119,8 @@ func NewCombinedVoteProcessor(log zerolog.Logger,
 	rbRector hotstuff.RandomBeaconReconstructor,
 	onQCCreated hotstuff.OnQCCreated,
 	packer hotstuff.Packer,
-	minRequiredStake uint64) *CombinedVoteProcessorV2 {
+	minRequiredStake uint64,
+) *CombinedVoteProcessorV2 {
 	return &CombinedVoteProcessorV2{
 		log:              log,
 		block:            block,
