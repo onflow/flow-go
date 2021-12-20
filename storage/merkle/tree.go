@@ -12,26 +12,21 @@ import (
 // single intermediary node, which makes it significantly more space-efficient
 // and a lot harder to exploit for denial-of-service attacks. On the downside,
 // it makes insertions and deletions more complex, as we need to split nodes
-// and merge them, depending on whether there are leaves or not.
-//
-// CONVENTION:
-//  * If the tree contains _any_ elements, the tree is defined by its root vertex.
-//    This case follows completely the convention for nodes: "In any existing tree,
-//    all nodes are non-nil."
-//  * Without any stored elements, there exists no root vertex in this data model,
-//    and we set `root` to nil.
+// and merge them, depending on whethere their are leaves or not.
 type Tree struct {
 	root node
 }
 
 // NewTree creates a new empty patricia merkle tree.
 func NewTree() *Tree {
-	return &Tree{}
+	t := &Tree{}
+	return t
 }
 
 // Put will stores the given value in the trie under the given key. If the key
 // already exists, it will replace the value and return true.
-func (t *Tree) Put(key []byte, val []byte) bool {
+func (t *Tree) Put(key []byte, val interface{}) bool {
+
 	// the path through the tree is determined by the key; we decide whether to
 	// go left or right based on whether the next bit is set or not
 	path := bitset.Bytes(key[:])
@@ -178,9 +173,15 @@ PutLoop:
 // Get will retrieve the value associated with the given key. It returns true
 // if the key was found and false otherwise.
 func (t *Tree) Get(key []byte) (interface{}, bool) {
-	cur := &t.root               // we start at the root again
-	path := bitset.Bytes(key[:]) // we use the given key as path again
-	index := uint(0)             // and we start at a zero index in the path
+
+	// we start at the root again
+	cur := &t.root
+
+	// we use the given key as path again
+	path := bitset.Bytes(key[:])
+
+	// and we start at a zero index in the path
+	index := uint(0)
 
 GetLoop:
 	for {
@@ -200,8 +201,8 @@ GetLoop:
 
 			continue GetLoop
 
-		// if we have a short path, we can only follow the short node if
-		// its paths has all bits in common with the key we are retrieving
+		// if we have a short path, we can only follow the path if we have all
+		// of the short node path in common with the key
 		case *short:
 
 			// if any part of the path doesn't match, key doesn't exist
@@ -238,17 +239,17 @@ GetLoop:
 // insertion and deletion orders.
 func (t *Tree) Del(key []byte) bool {
 
-	// we set the current pointer to the root
-	cur := &t.root
-
 	// we initialize three pointers pointing to a dummy empty node
 	// this is used to keep track of the node we last pointed to, as well as
 	// its parent and grand parent, which is needed in case we remove a full
 	// node and have to merge several other nodes into a short node; otherwise,
 	// we would not keep the tree as compact as possible, and it would no longer
 	// be deterministic after deletes
-	dummy := node(&dummy{})
+	dummy := node(&struct{}{})
 	last, parent, grand := &dummy, &dummy, &dummy
+
+	// we set the current pointer to the root
+	cur := &t.root
 
 	// we use the key as the path
 	path := bitset.Bytes(key[:])
@@ -362,16 +363,14 @@ DelLoop:
 
 	// NOTE: if neither the parent nor the child are short nodes, we simply
 	// bypass both conditional scopes and land here right away
+
 	return true
 }
 
 // Hash will return the root hash of this patricia merkle tree.
 func (t *Tree) Hash() []byte {
-	if t.root == nil {
-		h, _ := blake2b.New256(nil)
-		return h.Sum(nil)
-	}
-	return t.root.Hash()
+	hash := t.nodeHash(t.root)
+	return hash
 }
 
 // merge will merge a child short node into a parent short node.
@@ -387,6 +386,41 @@ func (t *Tree) merge(p *short, c *short) {
 		totalPath.SetBool(int(i+p.count), childPath.Get(int(i)))
 	}
 	p.count = totalCount
-	p.path = totalPath
+	p.path = []byte(totalPath)
 	p.child = c.child
+}
+
+// nodeHash will return the hash of a given node.
+func (t *Tree) nodeHash(node node) []byte {
+
+	// use the blake2b hash for now
+	h, _ := blake2b.New256(nil)
+
+	switch n := node.(type) {
+
+	// for the full node, we concatenate & hash the right hash and the left hash
+	case *full:
+		_, _ = h.Write(t.nodeHash(n.left))
+		_, _ = h.Write(t.nodeHash(n.right))
+		return h.Sum(nil)
+
+	// for the short node, we concatenate & hash the count, path and child hash
+	case *short:
+		_, _ = h.Write([]byte{byte(n.count)})
+		_, _ = h.Write(n.path)
+		_, _ = h.Write(t.nodeHash(n.child))
+		return h.Sum(nil)
+
+	// for leafs, we simply use the key as the hash
+	case *leaf:
+		return n.key[:]
+
+		// for a nil node (empty root) we use the zero hash
+	case nil:
+		return h.Sum(nil)
+
+	// this should never happen
+	default:
+		panic("invalid node type")
+	}
 }
