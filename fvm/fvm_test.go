@@ -1010,10 +1010,17 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 			}))
 
 	t.Run("Using to much interaction fails during dictionary copying - and is recovered", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
-		withContextOptions(fvm.WithTransactionFeesEnabled(true)).
+		withContextOptions(
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithTransactionProcessors(
+				fvm.NewTransactionAccountFrozenChecker(),
+				fvm.NewTransactionAccountFrozenEnabler(),
+				fvm.NewTransactionInvoker(zerolog.Nop()),
+			),
+		).
 		run(
 			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
-				ctx.MaxStateInteractionSize = 500_000
+
 				//ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
 
 				// Create an account private key.
@@ -1109,6 +1116,8 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				require.NoError(t, err)
 				require.NoError(t, tx.Err)
 
+				ctx.MaxStateInteractionSize = 595_720
+				ctx.LimitAccountStorage = true
 				// ========== run transaction ============
 				txBody = flow.NewTransactionBody().
 					SetScript([]byte(fmt.Sprintf(`
@@ -1132,12 +1141,12 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					AddAuthorizer(accounts[1])
 
 				txBody.SetProposalKey(chain.ServiceAddress(), 0, 1)
-				txBody.SetPayer(chain.ServiceAddress())
+				txBody.SetPayer(accounts[0])
 
 				err = testutil.SignPayload(txBody, accounts[1], privateKeys[1])
 				require.NoError(t, err)
 
-				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
 				tx = fvm.Transaction(txBody, 0)
