@@ -1,11 +1,12 @@
 package integration
 
 import (
+	"context"
 	"fmt"
-	"os"
 	"sync"
 	"time"
 
+	"github.com/gammazero/workerpool"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
@@ -16,16 +17,21 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/forks"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/finalizer"
 	"github.com/onflow/flow-go/consensus/hotstuff/forks/forkchoice"
+	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker"
 	"github.com/onflow/flow-go/consensus/hotstuff/pacemaker/timeout"
+	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
+	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	"github.com/onflow/flow-go/consensus/hotstuff/voter"
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/module/irrecoverable"
 	module "github.com/onflow/flow-go/module/mock"
+	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -193,7 +199,7 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 				View:     block.View,
 				BlockID:  block.BlockID,
 				SignerID: in.localID,
-				SigData:  nil,
+				SigData:  unittest.RandomBytes(hsig.SigLen * 2), // double sig, one staking, one beacon
 			}
 			return vote
 		},
@@ -282,7 +288,11 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// initialize error handling and logging
 	var err error
 	zerolog.TimestampFunc = func() time.Time { return time.Now().UTC() }
-	log := zerolog.New(os.Stderr).Level(zerolog.DebugLevel).With().Timestamp().Uint("index", index).Hex("local_id", in.localID[:]).Logger()
+	// log with node index an ID
+	log := unittest.Logger().With().
+		Int("index", int(index)).
+		Hex("node_id", in.localID[:]).
+		Logger()
 	notifier := notifications.NewLogConsumer(log)
 
 	// initialize the pacemaker
@@ -315,9 +325,39 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 	// initialize the validator
 	in.validator = validator.New(in.committee, in.forks, in.verifier)
 
+	stake := uint64(1000)
+	stakingSigAggtor := helper.MakeWeightedSignatureAggregator(stake)
+	stakingSigAggtor.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	rbRector := helper.MakeRandomBeaconReconstructor(msig.RandomBeaconThreshold(int(in.participants.Count())))
+	rbRector.On("Verify", mock.Anything, mock.Anything).Return(nil).Maybe()
+
+	packer := &mocks.Packer{}
+	packer.On("Pack", mock.Anything, mock.Anything).Return(in.participants.NodeIDs(), unittest.RandomBytes(128), nil).Maybe()
+
+	onQCCreated := func(qc *flow.QuorumCertificate) {
+		in.queue <- qc
+	}
+
+	minRequiredStake := hotstuff.ComputeStakeThresholdForBuildingQC(uint64(in.participants.Count()) * stake)
+	voteProcessorFactory := &mocks.VoteProcessorFactory{}
+	voteProcessorFactory.On("Create", mock.Anything, mock.Anything).Return(
+		func(log zerolog.Logger, proposal *model.Proposal) hotstuff.VerifyingVoteProcessor {
+			return votecollector.NewCombinedVoteProcessor(
+				log, proposal.Block,
+				stakingSigAggtor, rbRector,
+				onQCCreated,
+				packer,
+				minRequiredStake,
+			)
+		}, nil)
+
+	createCollectorFactoryMethod := votecollector.NewStateMachineFactory(log, notifier, voteProcessorFactory.Create)
+	voteCollectors := voteaggregator.NewVoteCollectors(DefaultPruned(), workerpool.New(2), createCollectorFactoryMethod)
+
 	// initialize the vote aggregator
-	// TODO: fix creating of vote aggregator when fixing tests
-	//in.aggregator = voteaggregator.New(notifier, DefaultPruned(), in.committee, in.validator, in.signer)
+	in.aggregator, err = voteaggregator.NewVoteAggregator(log, notifier, DefaultPruned(), voteCollectors)
+	require.NoError(t, err)
 
 	// initialize the voter
 	in.voter = voter.New(in.signer, in.forks, in.persist, in.committee, DefaultVoted())
@@ -330,6 +370,14 @@ func NewInstance(t require.TestingT, options ...Option) *Instance {
 }
 
 func (in *Instance) Run() error {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer func() {
+		cancel()
+		<-in.aggregator.Done()
+	}()
+	signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+	in.aggregator.Start(signalerCtx)
+	<-in.aggregator.Ready()
 
 	// start the event handler
 	err := in.handler.Start()
@@ -376,6 +424,11 @@ func (in *Instance) Run() error {
 				}
 			case *model.Vote:
 				in.aggregator.AddVote(m)
+			case *flow.QuorumCertificate:
+				err := in.handler.OnQCConstructed(m)
+				if err != nil {
+					return fmt.Errorf("could not process created qc: %w", err)
+				}
 			}
 		}
 

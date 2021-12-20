@@ -20,7 +20,6 @@ const safeTimeout = 2 * time.Second
 const safeDecreaseFactor = 0.85
 
 func TestSingleInstance(t *testing.T) {
-	t.Skip("no eventhandler, fix later")
 
 	// set up a single instance to run
 	// NOTE: currently, the HotStuff logic will infinitely call back on itself
@@ -34,14 +33,13 @@ func TestSingleInstance(t *testing.T) {
 
 	// run the event handler until we reach a stop condition
 	err := in.Run()
-	require.True(t, errors.Is(err, errStopCondition), "should run until stop condition")
+	require.ErrorIs(t, err, errStopCondition, "should run until stop condition")
 
 	// check if forks and pacemaker are in expected view state
 	assert.Equal(t, finalView, in.forks.FinalizedView(), "finalized view should be three lower than current view")
 }
 
 func TestThreeInstances(t *testing.T) {
-	t.Skip("no eventhandler, fix later")
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
 	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on
@@ -98,8 +96,6 @@ func TestThreeInstances(t *testing.T) {
 }
 
 func TestSevenInstances(t *testing.T) {
-	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
-
 	// test parameters
 	// NOTE: block finalization seems to be rather slow on CI at the moment,
 	// needing around 1 minute on Travis for 1000 blocks and 10 minutes on

@@ -29,7 +29,6 @@ import (
 	"github.com/onflow/flow-go/engine/common/provider"
 	consync "github.com/onflow/flow-go/engine/common/synchronization"
 	"github.com/onflow/flow-go/fvm/systemcontracts"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -42,7 +41,6 @@ import (
 	epochpool "github.com/onflow/flow-go/module/mempool/epochs"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
@@ -427,7 +425,6 @@ func main() {
 			createMetrics := func(chainID flow.ChainID) module.HotstuffMetrics {
 				return metrics.NewHotstuffCollector(chainID)
 			}
-			staking := signature.NewAggregationProvider(encoding.CollectorVoteTag, node.Me)
 
 			opts := []consensus.Option{
 				consensus.WithBlockRateDelay(blockRateDelay),
@@ -445,7 +442,6 @@ func main() {
 			hotstuffFactory, err := factories.NewHotStuffFactory(
 				node.Logger,
 				node.Me,
-				staking,
 				node.DB,
 				node.State,
 				createMetrics,
