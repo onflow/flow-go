@@ -48,7 +48,7 @@ type Accounts interface {
 	GetValue(address flow.Address, key string) (flow.RegisterValue, error)
 	CheckAccountNotFrozen(address flow.Address) error
 	GetStorageUsed(address flow.Address) (uint64, error)
-	SetValue(address flow.Address, key string, value []byte) error
+	SetValue(address flow.Address, key string, value flow.RegisterValue) error
 	AllocateStorageIndex(address flow.Address) (atree.StorageIndex, error)
 	SetAccountFrozen(address flow.Address, frozen bool) error
 }
@@ -82,6 +82,16 @@ func (a *StatefulAccounts) AllocateStorageIndex(address flow.Address) (atree.Sto
 	copy(index[:], indexBytes[:8])
 	newIndexBytes := index.Next()
 
+	// store nil so that the setValue for new allocated slabs would be faster
+	// and won't do ledger getValue for every new slabs (currently happening to compute storage size changes)
+	// this way the getValue would load this value from deltas
+	key := atree.SlabIndexToLedgerKey(index)
+	err = a.stateHolder.State().Set(string(address.Bytes()), "", string(key), []byte{}, false)
+	if err != nil {
+		return atree.StorageIndex{}, fmt.Errorf("failed to store empty value for newly allocated storage index: %w", err)
+	}
+
+	// update the storageIndex bytes
 	err = a.setValue(address, false, KeyStorageIndex, newIndexBytes[:])
 	if err != nil {
 		return atree.StorageIndex{}, fmt.Errorf("failed to store the key storage index: %w", err)
@@ -421,7 +431,7 @@ func (a *StatefulAccounts) SetValue(address flow.Address, key string, value flow
 func (a *StatefulAccounts) setValue(address flow.Address, isController bool, key string, value flow.RegisterValue) error {
 	err := a.updateRegisterSizeChange(address, isController, key, value)
 	if err != nil {
-		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", key, address, err)
+		return fmt.Errorf("failed to update storage used by key %s on account %s: %w", PrintableKey(key), address, err)
 	}
 
 	if isController {
@@ -458,7 +468,7 @@ func (a *StatefulAccounts) updateRegisterSizeChange(address flow.Address, isCont
 		absChange := uint64(-sizeChange)
 		if absChange > oldSize {
 			// should never happen
-			return fmt.Errorf("storage used by key %s on account %s would be negative", key, address.Hex())
+			return fmt.Errorf("storage used by key %s on account %s would be negative", PrintableKey(key), address.Hex())
 		}
 		newSize = oldSize - absChange
 	} else {

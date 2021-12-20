@@ -59,27 +59,27 @@ func (suite *CollectorSuite) TestTransactionIngress_InvalidTransaction() {
 	})
 	t.Run("expired transaction", func(t *testing.T) {
 		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
-		t.Skip()
+		unittest.SkipUnless(t, unittest.TEST_WIP, "blocked by https://github.com/dapperlabs/flow-go/issues/3005")
 	})
 	t.Run("non-existent reference block ID", func(t *testing.T) {
 		// TODO blocked by https://github.com/dapperlabs/flow-go/issues/3005
-		t.Skip()
+		unittest.SkipUnless(t, unittest.TEST_WIP, "blocked by https://github.com/dapperlabs/flow-go/issues/3005")
 	})
 	t.Run("unparseable script", func(t *testing.T) {
 		// TODO script parsing not implemented
-		t.Skip()
+		unittest.SkipUnless(t, unittest.TEST_WIP, "script parsing not implemented")
 	})
 	t.Run("invalid signature", func(t *testing.T) {
 		// TODO signature validation not implemented
-		t.Skip()
+		unittest.SkipUnless(t, unittest.TEST_WIP, "signature validation not implemented")
 	})
 	t.Run("invalid sequence number", func(t *testing.T) {
 		// TODO nonce validation not implemented
-		t.Skip()
+		unittest.SkipUnless(t, unittest.TEST_WIP, "nonce validation not implemented")
 	})
 	t.Run("insufficient payer balance", func(t *testing.T) {
 		// TODO balance checking not implemented
-		t.Skip()
+		unittest.SkipUnless(t, unittest.TEST_WIP, "balance checking not implemented")
 	})
 }
 
@@ -154,7 +154,7 @@ func (suite *CollectorSuite) TestTxIngressMultiCluster_CorrectCluster() {
 	ctx, cancel := context.WithTimeout(suite.ctx, defaultTimeout)
 	err = client.SendTransaction(ctx, *tx)
 	cancel()
-	assert.Nil(t, err)
+	require.NoError(t, err)
 
 	// wait for the transaction to be included in a collection
 	suite.AwaitTransactionsIncluded(convert.IDFromSDK(tx.ID()))

@@ -21,7 +21,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/model/libp2p/message"
-	"github.com/onflow/flow-go/network/p2p"
+	"github.com/onflow/flow-go/network"
 	mockprotocol "github.com/onflow/flow-go/state/protocol/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -46,8 +46,8 @@ type MutableIdentityTableSuite struct {
 // mesh engine and the id refresher
 type testNode struct {
 	id     *flow.Identity
-	mw     *p2p.Middleware
-	net    *p2p.Network
+	mw     network.Middleware
+	net    network.Network
 	engine *MeshEngine
 }
 
@@ -107,10 +107,10 @@ func (t *testNodeList) engines() []*MeshEngine {
 	return engs
 }
 
-func (t *testNodeList) networks() []*p2p.Network {
+func (t *testNodeList) networks() []network.Network {
 	t.RLock()
 	defer t.RUnlock()
-	nets := make([]*p2p.Network, len(t.nodes))
+	nets := make([]network.Network, len(t.nodes))
 	for i, node := range t.nodes {
 		nets[i] = node.net
 	}
@@ -119,7 +119,7 @@ func (t *testNodeList) networks() []*p2p.Network {
 
 func TestEpochTransitionTestSuite(t *testing.T) {
 	// Test is flaky, print it in order to avoid the unused linting error
-	t.Skip(fmt.Sprintf("test is flaky: %v", &MutableIdentityTableSuite{}))
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, fmt.Sprintf("test is flaky: %v", &MutableIdentityTableSuite{}))
 }
 
 // signalIdentityChanged update IDs for all the current set of nodes (simulating an epoch)
@@ -175,9 +175,12 @@ func (suite *MutableIdentityTableSuite) setupStateMock() {
 
 // addNodes creates count many new nodes and appends them to the suite state variables
 func (suite *MutableIdentityTableSuite) addNodes(count int) {
+	ctx, cancel := context.WithCancel(context.Background())
 
 	// create the ids, middlewares and networks
-	ids, mws, nets, _, cancel := GenerateIDsMiddlewaresNetworks(suite.T(), count, suite.logger, 100, nil, !DryRun)
+	ids, mws, nets, _ := GenerateIDsMiddlewaresNetworks(
+		ctx, suite.T(), count, suite.logger, 100, nil,
+	)
 	suite.cancels = append(suite.cancels, cancel)
 
 	// create the engines for the new nodes
@@ -303,7 +306,7 @@ func (suite *MutableIdentityTableSuite) TestNodesAddedAndRemoved() {
 
 // assertConnected checks that the middleware of a node is directly connected
 // to at least half of the other nodes.
-func (suite *MutableIdentityTableSuite) assertConnected(mw *p2p.Middleware, ids flow.IdentityList) {
+func (suite *MutableIdentityTableSuite) assertConnected(mw network.Middleware, ids flow.IdentityList) {
 	t := suite.T()
 	threshold := len(ids) / 2
 	require.Eventuallyf(t, func() bool {
@@ -325,7 +328,7 @@ func (suite *MutableIdentityTableSuite) assertConnected(mw *p2p.Middleware, ids 
 
 // assertDisconnected checks that the middleware of a node is not connected to any of the other nodes specified in the
 // ids list
-func (suite *MutableIdentityTableSuite) assertDisconnected(mw *p2p.Middleware, ids flow.IdentityList) {
+func (suite *MutableIdentityTableSuite) assertDisconnected(mw network.Middleware, ids flow.IdentityList) {
 	t := suite.T()
 	require.Eventuallyf(t, func() bool {
 		for _, id := range ids {

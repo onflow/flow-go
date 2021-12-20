@@ -76,7 +76,7 @@ func (s *SealValidationSuite) TestSeal_EnforceGap() {
 		Seals: []*flow.Seal{sealB0},
 	})
 
-	_, err := s.sealValidator.Validate(&newBlock)
+	_, err := s.sealValidator.Validate(newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err))
 }
@@ -270,13 +270,13 @@ func (s *SealValidationSuite) TestHighestSeal() {
 		Receipts: []*flow.ExecutionReceiptMeta{block2Receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&block2Receipt.ExecutionResult},
 	})
-	s.Extend(&block3)
+	s.Extend(block3)
 
 	// create and insert block4 containing a receipt for block3
 	block3Receipt := unittest.ExecutionReceiptFixture(
 		unittest.WithExecutorID(s.ExeID),
 		unittest.WithResult(unittest.ExecutionResultFixture(
-			unittest.WithBlock(&block3),
+			unittest.WithBlock(block3),
 			unittest.WithPreviousResult(block2Receipt.ExecutionResult),
 		)),
 	)
@@ -285,11 +285,11 @@ func (s *SealValidationSuite) TestHighestSeal() {
 		Receipts: []*flow.ExecutionReceiptMeta{block3Receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&block3Receipt.ExecutionResult},
 	})
-	s.Extend(&block4)
+	s.Extend(block4)
 
 	// block B5
 	block5 := unittest.BlockWithParentFixture(block4.Header)
-	s.Extend(&block5)
+	s.Extend(block5)
 
 	// construct block B5 and its payload components, i.e. seals for block B2 and B3
 	seal2 := s.validSealForResult(&block2Receipt.ExecutionResult)
@@ -301,7 +301,7 @@ func (s *SealValidationSuite) TestHighestSeal() {
 		Seals: []*flow.Seal{seal3, seal2},
 	})
 
-	last, err := s.sealValidator.Validate(&block6)
+	last, err := s.sealValidator.Validate(block6)
 	require.NoError(s.T(), err)
 	require.Equal(s.T(), last.FinalState, seal3.FinalState)
 }
@@ -336,7 +336,7 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 		Results:  []*flow.ExecutionResult{&receipts[0].ExecutionResult, &receipts[1].ExecutionResult, &receipts[2].ExecutionResult},
 	})
 	b4 := unittest.BlockWithParentFixture(blocks[3].Header)
-	blocks = append(blocks, &b4)
+	blocks = append(blocks, b4)
 
 	for _, b := range blocks {
 		s.Extend(b)
@@ -353,7 +353,7 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 			Seals: []*flow.Seal{block1Seal},
 		})
 
-		_, err := s.sealValidator.Validate(&X)
+		_, err := s.sealValidator.Validate(X)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err), err)
 	})
@@ -365,7 +365,7 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 			Seals: []*flow.Seal{block0Seal, block2Seal},
 		})
 
-		_, err := s.sealValidator.Validate(&X)
+		_, err := s.sealValidator.Validate(X)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err), err)
 	})
@@ -377,7 +377,7 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 			Seals: []*flow.Seal{block0Seal, block1Seal, block2Seal},
 		})
 
-		_, err := s.sealValidator.Validate(&X)
+		_, err := s.sealValidator.Validate(X)
 		require.NoError(s.T(), err)
 	})
 }
@@ -445,7 +445,7 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 			Seals: []*flow.Seal{sealA2},
 		})
 
-		_, err := s.sealValidator.Validate(&X)
+		_, err := s.sealValidator.Validate(X)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err), err)
 	})
@@ -457,7 +457,7 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 			Seals: []*flow.Seal{sealA1, sealB2},
 		})
 
-		_, err := s.sealValidator.Validate(&X)
+		_, err := s.sealValidator.Validate(X)
 		require.Error(s.T(), err)
 		require.True(s.T(), engine.IsInvalidInputError(err), err)
 	})
@@ -469,7 +469,7 @@ func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
 			Seals: []*flow.Seal{sealA1, sealB1},
 		})
 
-		_, err := s.sealValidator.Validate(&X)
+		_, err := s.sealValidator.Validate(X)
 		require.NoError(s.T(), err)
 	})
 }
@@ -496,7 +496,7 @@ func (s *SealValidationSuite) TestExtendSealDuplicate() {
 
 		// we expect an error because block 4 contains a seal that is
 		// already contained in another block on the fork
-		_, err = s.sealValidator.Validate(&b4)
+		_, err = s.sealValidator.Validate(b4)
 		require.Error(t, err)
 		require.True(t, engine.IsInvalidInputError(err), err)
 	})
@@ -527,8 +527,8 @@ func (s *SealValidationSuite) TestExtendSeal_NoIncorporatedResult() {
 	// construct block B1 and B2
 	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	b2 := unittest.BlockWithParentFixture(b1.Header)
-	s.Extend(&b1)
-	s.Extend(&b2)
+	s.Extend(b1)
+	s.Extend(b2)
 
 	// construct `newBlock`
 	receipt := unittest.ExecutionReceiptFixture(
@@ -546,7 +546,7 @@ func (s *SealValidationSuite) TestExtendSeal_NoIncorporatedResult() {
 
 	// we expect an error because there is no block on the fork that
 	// contains a receipt committing to block1
-	_, err := s.sealValidator.Validate(&newBlock)
+	_, err := s.sealValidator.Validate(newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err), err)
 }
@@ -601,13 +601,13 @@ func (s *SealValidationSuite) TestExtendSeal_ResultIncorporatedOnDifferentFork()
 		Receipts: []*flow.ExecutionReceiptMeta{receipt.Meta()},
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
-	s.Extend(&a1)
+	s.Extend(a1)
 
 	// construct block B1 and B2
 	b1 := unittest.BlockWithParentFixture(s.LatestFinalizedBlock.Header)
 	b2 := unittest.BlockWithParentFixture(b1.Header)
-	s.Extend(&b1)
-	s.Extend(&b2)
+	s.Extend(b1)
+	s.Extend(b2)
 
 	// construct `newBlock`
 	seal := s.validSealForResult(&receipt.ExecutionResult)
@@ -618,7 +618,7 @@ func (s *SealValidationSuite) TestExtendSeal_ResultIncorporatedOnDifferentFork()
 
 	// we expect an error because there is no block on the fork that
 	// contains a receipt committing to the seal's result
-	_, err := s.sealValidator.Validate(&newBlock)
+	_, err := s.sealValidator.Validate(newBlock)
 	s.Require().Error(err)
 	s.Require().True(engine.IsInvalidInputError(err), err)
 }
@@ -665,7 +665,7 @@ func (s *SealValidationSuite) makeBlockSealingResult(parentBlock *flow.Header, s
 	sealingBlock.SetPayload(flow.Payload{
 		Seals: []*flow.Seal{seal},
 	})
-	return &sealingBlock
+	return sealingBlock
 }
 
 // generateBasicTestFork initializes the following fork (basis for many tests):
@@ -693,8 +693,8 @@ func (s *SealValidationSuite) generateBasicTestFork() (*flow.Block, *flow.Block,
 		Results:  []*flow.ExecutionResult{&receipt.ExecutionResult},
 	})
 	b2 := unittest.BlockWithParentFixture(b1.Header)
-	s.Extend(&b1)
-	s.Extend(&b2)
+	s.Extend(b1)
+	s.Extend(b2)
 
 	seal := s.validSealForResult(&receipt.ExecutionResult)
 	newBlock := unittest.BlockWithParentFixture(b2.Header)
@@ -702,5 +702,5 @@ func (s *SealValidationSuite) generateBasicTestFork() (*flow.Block, *flow.Block,
 		Seals: []*flow.Seal{seal},
 	})
 
-	return &b1, &b2, &newBlock, receipt, seal
+	return b1, b2, newBlock, receipt, seal
 }

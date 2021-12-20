@@ -2,6 +2,11 @@
 
 package crypto
 
+import (
+	"errors"
+	"fmt"
+)
+
 // DKG stands for distributed key generation. In this library, DKG
 // refers to discrete-log based protocols that generate keys for a BLS-based
 // threshold signature scheme.
@@ -53,6 +58,29 @@ type DKGState interface {
 	ForceDisqualify(node int) error
 }
 
+// dkgFailureError is an error returned when a participant
+// detects a failure in the protocol and is not able to compute output keys.
+// Such a failure can be local and only depends on the participant's view of what
+// happened in the protocol. The error can only be returned using the End() function.
+type dkgFailureError struct {
+	error
+}
+
+// dkgFailureErrorf constructs a new dkgFailureError
+func dkgFailureErrorf(msg string, args ...interface{}) error {
+	return &dkgFailureError{
+		error: fmt.Errorf(msg, args...),
+	}
+}
+
+// IsDKGFailureError checks if the input error is of a dkgFailureError type.
+// dkgFailureError is an error returned when a participant
+// detects a failure in the protocol and is not able to compute output keys.
+func IsDKGFailureError(err error) bool {
+	var target *dkgFailureError
+	return errors.As(err, &target)
+}
+
 // index is the node index type used as participants ID
 type index byte
 
@@ -60,21 +88,21 @@ type index byte
 func newDKGCommon(size int, threshold int, currentIndex int,
 	processor DKGProcessor, leaderIndex int) (*dkgCommon, error) {
 	if size < DKGMinSize || size > DKGMaxSize {
-		return nil, newInvalidInputsError(
+		return nil, invalidInputsErrorf(
 			"size should be between %d and %d",
 			DKGMinSize,
 			DKGMaxSize)
 	}
 
 	if currentIndex >= size || leaderIndex >= size || currentIndex < 0 || leaderIndex < 0 {
-		return nil, newInvalidInputsError(
+		return nil, invalidInputsErrorf(
 			"indices of current and leader nodes must be between 0 and %d, got %d",
 			size-1,
 			currentIndex)
 	}
 
 	if threshold >= size || threshold < MinimumThreshold {
-		return nil, newInvalidInputsError(
+		return nil, invalidInputsErrorf(
 			"The threshold must be between %d and %d, got %d",
 			MinimumThreshold,
 			size-1,

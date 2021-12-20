@@ -87,6 +87,11 @@ const (
 	DefaultViewsInStakingAuction uint64 = 5
 	DefaultViewsInDKGPhase       uint64 = 50
 	DefaultViewsInEpoch          uint64 = 180
+
+	integrationBootstrap = "flow-integration-bootstrap"
+
+	// DefaultMinimumNumOfAccessNodeIDS at-least 1 AN ID must be configured for LN & SN
+	DefaultMinimumNumOfAccessNodeIDS = 1
 )
 
 func init() {
@@ -95,18 +100,20 @@ func init() {
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
-	t                  *testing.T
-	suite              *testingdock.Suite
-	config             NetworkConfig
-	cli                *dockerclient.Client
-	network            *testingdock.Network
-	Containers         map[string]*Container
-	ConsensusFollowers map[flow.Identifier]consensus_follower.ConsensusFollower
-	AccessPorts        map[string]string
-	root               *flow.Block
-	result             *flow.ExecutionResult
-	seal               *flow.Seal
-	bootstrapDir       string
+	t                          *testing.T
+	suite                      *testingdock.Suite
+	config                     NetworkConfig
+	cli                        *dockerclient.Client
+	network                    *testingdock.Network
+	Containers                 map[string]*Container
+	ConsensusFollowers         map[flow.Identifier]consensus_follower.ConsensusFollower
+	AccessPorts                map[string]string
+	AccessPortsByContainerName map[string]string
+	root                       *flow.Block
+	result                     *flow.ExecutionResult
+	seal                       *flow.Seal
+	BootstrapDir               string
+	BootstrapSnapshot          *inmem.Snapshot
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -116,6 +123,17 @@ func (net *FlowNetwork) Identities() flow.IdentityList {
 		il = append(il, c.Config.Identity())
 	}
 	return il
+}
+
+// ContainersByRole returns all the containers in the network with the specified role
+func (net *FlowNetwork) ContainersByRole(role flow.Role) []*Container {
+	cl := make([]*Container, 0, len(net.Containers))
+	for _, c := range net.Containers {
+		if c.Config.Role == role {
+			cl = append(cl, c)
+		}
+	}
+	return cl
 }
 
 // Root returns the root block generated for the network.
@@ -441,6 +459,11 @@ func WithAdditionalFlag(flag string) func(config *NodeConfig) {
 	}
 }
 
+// integrationBootstrapDir creates a temporary directory at /tmp/flow-integration-bootstrap
+func integrationBootstrapDir() (string, error) {
+	return ioutil.TempDir(TmpRoot, integrationBootstrap)
+}
+
 func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 
 	// number of nodes
@@ -464,29 +487,30 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		Name: networkConf.Name,
 	})
 
-	// create a temporary directory to store all bootstrapping files, these
-	// will be shared between all nodes
-	bootstrapDir, err := ioutil.TempDir(TmpRoot, "flow-integration-bootstrap")
+	// create a temporary directory to store all bootstrapping files 
+	bootstrapDir, err := integrationBootstrapDir()
 	require.Nil(t, err)
 
-	fmt.Printf("bootstrapDir: %s \n", bootstrapDir)
+	fmt.Printf("BootstrapDir: %s \n", bootstrapDir)
 
-	root, result, seal, confs, err := BootstrapNetwork(networkConf, bootstrapDir)
+	root, result, seal, confs, bootstrapSnapshot, err := BootstrapNetwork(networkConf, bootstrapDir)
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
-		t:                  t,
-		cli:                dockerClient,
-		config:             networkConf,
-		suite:              suite,
-		network:            network,
-		Containers:         make(map[string]*Container, nNodes),
-		ConsensusFollowers: make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
-		AccessPorts:        make(map[string]string),
-		root:               root,
-		seal:               seal,
-		result:             result,
-		bootstrapDir:       bootstrapDir,
+		t:                          t,
+		cli:                        dockerClient,
+		config:                     networkConf,
+		suite:                      suite,
+		network:                    network,
+		Containers:                 make(map[string]*Container, nNodes),
+		ConsensusFollowers:         make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
+		AccessPorts:                make(map[string]string),
+		AccessPortsByContainerName: make(map[string]string),
+		root:                       root,
+		seal:                       seal,
+		result:                     result,
+		BootstrapDir:               bootstrapDir,
+		BootstrapSnapshot: 			bootstrapSnapshot,
 	}
 
 	// check that at-least 2 full access nodes must be configure in your test suite
@@ -497,7 +521,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			accessNodeIDS = append(accessNodeIDS, n.NodeID.String())
 		}
 	}
-	require.True(t, len(accessNodeIDS) > 1, "at-least 2 access node that is not a ghost must be configured for test suite")
+	require.True(t, len(accessNodeIDS) >= DefaultMinimumNumOfAccessNodeIDS, fmt.Sprintf("at-least %d access node that is not a ghost must be configured for test suite", DefaultMinimumNumOfAccessNodeIDS))
 
 	// add each node to the network
 	for _, nodeConf := range confs {
@@ -719,6 +743,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
 			nodeContainer.Ports[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 			net.AccessPorts[AccessNodeAPIPort] = hostGRPCPort
+			net.AccessPortsByContainerName[nodeContainer.Name()] = hostGRPCPort
 			net.AccessPorts[AccessNodeAPIProxyPort] = hostHTTPProxyPort
 
 			if nodeConf.SupportsUnstakedNodes {
@@ -776,7 +801,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 }
 
 func (net *FlowNetwork) WriteRootSnapshot(snapshot *inmem.Snapshot) {
-	err := WriteJSON(filepath.Join(net.bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
+	err := WriteJSON(filepath.Join(net.BootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
 	require.NoError(net.t, err)
 }
 
@@ -804,14 +829,14 @@ func followerNodeInfos(confs []ConsensusFollowerConfig) ([]bootstrap.NodeInfo, e
 	return nodeInfos, nil
 }
 
-func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.ExecutionResult, *flow.Seal, []ContainerConfig, error) {
+func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Block, *flow.ExecutionResult, *flow.Seal, []ContainerConfig, *inmem.Snapshot, error) {
 	chainID := flow.Localnet
 	chain := chainID.Chain()
 
 	// number of nodes
 	nNodes := len(networkConf.Nodes)
 	if nNodes == 0 {
-		return nil, nil, nil, nil, fmt.Errorf("must specify at least one node")
+		return nil, nil, nil, nil, nil, fmt.Errorf("must specify at least one node")
 	}
 
 	// Sort so that access nodes start up last
@@ -820,13 +845,13 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// generate staking and networking keys for each configured node
 	stakedConfs, err := setupKeys(networkConf)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to setup keys: %w", err)
 	}
 
 	// generate the follower node keys (follow nodes do not run as docker containers)
 	followerInfos, err := followerNodeInfos(networkConf.ConsensusFollowers)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to generate node info for consensus followers: %w", err)
 	}
 
 	allNodeInfos := append(toNodeInfos(stakedConfs), followerInfos...)
@@ -838,23 +863,18 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// run DKG for all consensus nodes
 	dkg, err := runDKG(stakedConfs)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to run DKG: %w", err)
 	}
 
 	// write private key files for each DKG participant
 	consensusNodes := bootstrap.FilterByRole(stakedNodeInfos, flow.RoleConsensus)
 	for i, sk := range dkg.PrivKeyShares {
 		nodeID := consensusNodes[i].NodeID
-		encodableSk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
-		privParticipant := dkgmod.DKGParticipantPriv{
-			NodeID:              nodeID,
-			RandomBeaconPrivKey: encodableSk,
-			GroupIndex:          i,
-		}
+		sk := encodable.RandomBeaconPrivKey{PrivateKey: sk}
 		path := fmt.Sprintf(bootstrap.PathRandomBeaconPriv, nodeID)
-		err = WriteJSON(filepath.Join(bootstrapDir, path), privParticipant)
+		err = WriteJSON(filepath.Join(bootstrapDir, path), sk)
 		if err != nil {
-			return nil, nil, nil, nil, err
+			return nil, nil, nil, nil, nil, err
 		}
 	}
 
@@ -867,17 +887,17 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	}
 	err = utils.WriteStakingNetworkingKeyFiles(allNodeInfos, writeJSONFile)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to write private key files: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write private key files: %w", err)
 	}
 
 	err = utils.WriteSecretsDBEncryptionKeyFiles(allNodeInfos, writeFile)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to write secrets db key files: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write secrets db key files: %w", err)
 	}
 
 	err = utils.WriteMachineAccountFiles(chainID, stakedNodeInfos, writeJSONFile)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("failed to write machine account files: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("failed to write machine account files: %w", err)
 	}
 
 	// define root block parameters
@@ -893,27 +913,27 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 	// generate QC
 	signerData, err := run.GenerateQCParticipantData(consensusNodes, consensusNodes, dkg)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	votes, err := run.GenerateRootBlockVotes(root, signerData)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 	qc, err := run.GenerateRootQC(root, votes, signerData, signerData.Identities())
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	// generate root blocks for each collector cluster
 	clusterAssignments, clusterQCs, err := setupClusterGenesisBlockQCs(networkConf.NClusters, epochCounter, stakedConfs)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	randomSource := make([]byte, flow.EpochSetupRandomSourceLength)
 	_, err = rand.Read(randomSource)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	dkgOffsetView := root.Header.View + networkConf.ViewsInStakingAuction - 1
@@ -940,7 +960,7 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 
 	cdcRandomSource, err := cadence.NewString(hex.EncodeToString(randomSource))
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not convert random source: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not convert random source: %w", err)
 	}
 	epochConfig := epochs.EpochConfig{
 		EpochTokenPayout:             cadence.UFix64(0),
@@ -972,27 +992,27 @@ func BootstrapNetwork(networkConf NetworkConfig, bootstrapDir string) (*flow.Blo
 		fvm.WithIdentities(participants),
 	)
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
 	// generate execution result and block seal
 	result := run.GenerateRootResult(root, commit, epochSetup, epochCommit)
 	seal, err := run.GenerateRootSeal(result)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("generating root seal failed: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("generating root seal failed: %w", err)
 	}
 
 	snapshot, err := inmem.SnapshotFromBootstrapState(root, result, seal, qc)
 	if err != nil {
-		return nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
+		return nil, nil, nil, nil, nil, fmt.Errorf("could not create bootstrap state snapshot: %w", err)
 	}
 
 	err = WriteJSON(filepath.Join(bootstrapDir, bootstrap.PathRootProtocolStateSnapshot), snapshot.Encodable())
 	if err != nil {
-		return nil, nil, nil, nil, err
+		return nil, nil, nil, nil, nil, err
 	}
 
-	return root, result, seal, stakedConfs, nil
+	return root, result, seal, stakedConfs, snapshot, nil
 }
 
 // setupKeys generates private staking and networking keys for each configured

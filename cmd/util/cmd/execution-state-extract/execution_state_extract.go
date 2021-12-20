@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog"
 
 	mgr "github.com/onflow/flow-go/cmd/util/ledger/migrations"
+	"github.com/onflow/flow-go/cmd/util/ledger/reporters"
 	"github.com/onflow/flow-go/ledger"
 	"github.com/onflow/flow-go/ledger/common/pathfinder"
 	"github.com/onflow/flow-go/ledger/complete"
@@ -25,6 +26,7 @@ func extractExecutionState(
 	targetHash flow.StateCommitment,
 	outputDir string,
 	log zerolog.Logger,
+	chain flow.Chain,
 	migrate bool,
 	report bool,
 ) error {
@@ -55,46 +57,45 @@ func extractExecutionState(
 		return fmt.Errorf("cannot create ledger from write-a-head logs and checkpoints: %w", err)
 	}
 
-	migrations := []ledger.Migration{}
-	reporters := []ledger.Reporter{}
+	var migrations []ledger.Migration
+	var rs []ledger.Reporter
 
 	if migrate {
-		//storageFormatV6Migration := mgr.StorageFormatV6Migration{
-		//	Log:       log,
-		//	OutputDir: outputDir,
-		//}
-
 		storageUsedUpdateMigration := mgr.StorageUsedUpdateMigration{
 			Log:       log,
 			OutputDir: outputDir,
 		}
 
 		migrations = []ledger.Migration{
-			//storageFormatV6Migration.Migrate,
 			storageUsedUpdateMigration.Migrate,
 			mgr.PruneMigration,
 		}
+
 	}
 	if report {
-		reporters = []ledger.Reporter{
-			mgr.ContractReporter{
-				Log:       log,
-				OutputDir: outputDir,
+		reportFileWriterFactory := reporters.NewReportFileWriterFactory(outputDir, log)
+
+		rs = []ledger.Reporter{
+			&reporters.EpochCounterReporter{
+				Log:   log,
+				Chain: chain,
 			},
-			// mgr.StorageReporter{
-			// 	Log:       log,
-			// 	OutputDir: outputDir,
-			// },
-			// &mgr.BalanceReporter{
-			// 	Log:       log,
-			// 	OutputDir: outputDir,
-			// },
+			&reporters.AccountReporter{
+				Log:   log,
+				Chain: chain,
+				RWF:   reportFileWriterFactory,
+			},
+			&reporters.BalanceReporter{
+				Log:   log,
+				Chain: chain,
+				RWF:   reportFileWriterFactory,
+			},
 		}
 	}
 	newState, err := led.ExportCheckpointAt(
 		ledger.State(targetHash),
 		migrations,
-		reporters,
+		rs,
 		complete.DefaultPathFinderVersion,
 		outputDir,
 		bootstrap.FilenameWALRootCheckpoint,

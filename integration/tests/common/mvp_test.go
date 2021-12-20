@@ -19,6 +19,7 @@ import (
 	"github.com/onflow/flow-go/integration/testnet"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 // timeout for individual actions
@@ -37,9 +38,7 @@ func TestMVP_Network(t *testing.T) {
 }
 
 func TestMVP_Bootstrap(t *testing.T) {
-
-	// skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451
-	t.Skip()
+	unittest.SkipUnless(t, unittest.TEST_WIP, "skipping to be re-visited in https://github.com/dapperlabs/flow-go/issues/5451")
 
 	testingdock.Verbose = false
 
@@ -57,12 +56,12 @@ func TestMVP_Bootstrap(t *testing.T) {
 	client, err := testnet.NewClient(fmt.Sprintf(":%s", flowNetwork.AccessPorts[testnet.AccessNodeAPIPort]), chain)
 	require.NoError(t, err)
 
-	fmt.Println("@@ running mvp test 1")
+	t.Log("@@ running mvp test 1")
 
 	// run mvp test to build a few blocks
 	runMVPTest(t, ctx, flowNetwork)
 
-	fmt.Println("@@ finished running mvp test 1")
+	t.Log("@@ finished running mvp test 1")
 
 	// download root snapshot from access node
 	snapshot, err := client.GetLatestProtocolSnapshot(ctx)
@@ -73,7 +72,7 @@ func TestMVP_Bootstrap(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, header.ID() != initialRoot.Header.ID())
 
-	fmt.Println("@@ restarting network with new root snapshot")
+	t.Log("@@ restarting network with new root snapshot")
 
 	flowNetwork.StopContainers()
 	flowNetwork.RemoveContainers()
@@ -83,45 +82,28 @@ func TestMVP_Bootstrap(t *testing.T) {
 		Filter(filter.HasRole(flow.RoleConsensus)).
 		Sample(1)[0]
 
-	fmt.Println("@@ booting from non-root state on consensus node ", con1.NodeID)
+	t.Log("@@ booting from non-root state on consensus node ", con1.NodeID)
 
 	flowNetwork.DropDBs(filter.HasNodeID(con1.NodeID))
 	con1Container := flowNetwork.ContainerByID(con1.NodeID)
 	con1Container.DropDB()
 	con1Container.WriteRootSnapshot(snapshot)
 
-	fmt.Println("@@ running mvp test 2")
+	t.Log("@@ running mvp test 2")
 
 	flowNetwork.Start(ctx)
 
 	// Run MVP tests
 	runMVPTest(t, ctx, flowNetwork)
 
-	fmt.Println("@@ finished running mvp test 2")
-}
-
-func TestMVP_Emulator(t *testing.T) {
-	// Start emulator manually for now, used for testing the test
-	// TODO - start an emulator instance
-	t.Skip()
-
-	// key, err := unittest.EmulatorRootKey()
-	// require.NoError(t, err)
-
-	// c, err := testnet.NewClientWithKey(":3569", key, flow.Emulator.Chain())
-	// require.NoError(t, err)
-
-	//TODO commented out because main test requires root for sending tx
-	// with valid reference block ID
-	//runMVPTest(t, c)
-	// _ = c
+	t.Log("@@ finished running mvp test 2")
 }
 
 func buildMVPNetConfig() testnet.NetworkConfig {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -129,20 +111,19 @@ func buildMVPNetConfig() testnet.NetworkConfig {
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-verification-seal-approvals=%d", 1)),
 		testnet.WithAdditionalFlag(fmt.Sprintf("--required-construction-seal-approvals=%d", 1)),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.FatalLevel),
 	}
 
 	net := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
-		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithDebugImage(false)),
-		testnet.NewNodeConfig(flow.RoleAccess),
-		testnet.NewNodeConfig(flow.RoleAccess),
+		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleAccess, testnet.WithLogLevel(zerolog.FatalLevel)),
 	}
 
 	return testnet.NewNetworkConfig("mvp", net)
@@ -203,7 +184,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	}
 	require.NotEqual(t, sdk.EmptyAddress, newAccountAddress)
 
-	fmt.Println(">> new account address: ", newAccountAddress)
+	t.Log(">> new account address: ", newAccountAddress)
 
 	// Generate the fund account transaction (so account can be used as a payer)
 	fundAccountTx := sdk.NewTransaction().
@@ -239,7 +220,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	err = fundAccountTx.AddArgument(cadence.NewAddress(newAccountAddress))
 	require.NoError(t, err)
 
-	fmt.Println(">> funding new account...")
+	t.Log(">> funding new account...")
 
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
 	err = serviceAccountClient.SignAndSendTransaction(ctx, fundAccountTx)
@@ -275,7 +256,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 		AddAuthorizer(newAccountAddress).
 		SetGasLimit(9999)
 
-	fmt.Println(">> creating counter...")
+	t.Log(">> creating counter...")
 
 	childCtx, cancel = context.WithTimeout(ctx, defaultTimeout)
 	err = accountClient.SignAndSendTransaction(ctx, createCounterTx)
@@ -289,7 +270,7 @@ func runMVPTest(t *testing.T, ctx context.Context, net *testnet.FlowNetwork) {
 	require.NoError(t, resp.Error)
 	t.Log(resp)
 
-	fmt.Println(">> awaiting counter incrementing...")
+	t.Log(">> awaiting counter incrementing...")
 
 	// counter is created and incremented eventually
 	require.Eventually(t, func() bool {

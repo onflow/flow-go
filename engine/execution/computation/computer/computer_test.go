@@ -279,7 +279,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 
 	t.Run("service events are emitted", func(t *testing.T) {
 		execCtx := fvm.NewContext(zerolog.Nop(), fvm.WithServiceEventCollectionEnabled(), fvm.WithTransactionProcessors(
-			fvm.NewTransactionInvocator(zerolog.Nop()), //we don't need to check signatures or sequence numbers
+			fvm.NewTransactionInvoker(zerolog.Nop()), //we don't need to check signatures or sequence numbers
 		))
 
 		collectionCount := 2
@@ -303,7 +303,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		serviceEventA := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(serviceEvents.EpochSetup.Address.Bytes()),
+					Address: common.Address(serviceEvents.EpochSetup.Address),
 				},
 				QualifiedIdentifier: serviceEvents.EpochSetup.QualifiedIdentifier(),
 			},
@@ -311,7 +311,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		serviceEventB := cadence.Event{
 			EventType: &cadence.EventType{
 				Location: common.AddressLocation{
-					Address: common.BytesToAddress(serviceEvents.EpochCommit.Address.Bytes()),
+					Address: common.Address(serviceEvents.EpochCommit.Address),
 				},
 				QualifiedIdentifier: serviceEvents.EpochCommit.QualifiedIdentifier(),
 			},
@@ -413,7 +413,7 @@ func TestBlockExecutor_ExecuteBlock(t *testing.T) {
 		execCtx := fvm.NewContext(
 			logger,
 			fvm.WithTransactionProcessors(
-				fvm.NewTransactionInvocator(logger),
+				fvm.NewTransactionInvoker(logger),
 			),
 		)
 

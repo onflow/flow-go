@@ -1,11 +1,12 @@
 package fvm
 
 import (
+	"github.com/opentracing/opentracing-go"
+
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/fvm/programs"
 	"github.com/onflow/flow-go/fvm/state"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/opentracing/opentracing-go"
 )
 
 func Transaction(tx *flow.TransactionBody, txIndex uint32) *TransactionProcedure {
@@ -51,6 +52,10 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 			panic(r)
 		}
 	}()
+
+	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
+		st.SetPayerIsServiceAccount()
+	}
 
 	for _, p := range ctx.TransactionProcessors {
 		err := p.Process(vm, &ctx, proc, st, programs)

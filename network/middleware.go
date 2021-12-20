@@ -58,6 +58,8 @@ type Middleware interface {
 	// UpdateNodeAddresses fetches and updates the addresses of all the staked participants
 	// in the Flow protocol.
 	UpdateNodeAddresses()
+
+	IsConnected(nodeID flow.Identifier) (bool, error)
 }
 
 // Overlay represents the interface that middleware uses to interact with the

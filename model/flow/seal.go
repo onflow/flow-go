@@ -2,6 +2,8 @@
 
 package flow
 
+import "encoding/json"
+
 // A Seal is produced when an Execution Result (referenced by `ResultID`) for
 // particular block (referenced by `BlockID`) is committed into the chain.
 // A Seal for a block B can be included in the payload B's descendants. Only
@@ -40,13 +42,6 @@ type Seal struct {
 	ResultID               Identifier
 	FinalState             StateCommitment
 	AggregatedApprovalSigs []AggregatedSignature // one AggregatedSignature per chunk
-
-	// Service Events are copied from the Execution Result. Therefore, repeating the
-	// the service events here opens the possibility for a data-inconsistency attack.
-	// It is _not_ necessary to repeat the ServiceEvents here, as an Execution Result
-	// must be incorporated into the fork before it can be sealed.
-	// TODO: include ServiceEvents in Execution Result and remove from Seal
-	ServiceEvents []ServiceEvent
 }
 
 func (s Seal) Body() interface{} {
@@ -69,4 +64,15 @@ func (s Seal) ID() Identifier {
 
 func (s Seal) Checksum() Identifier {
 	return MakeID(s)
+}
+
+func (s Seal) MarshalJSON() ([]byte, error) {
+	type Alias Seal
+	return json.Marshal(struct {
+		Alias
+		ID string
+	}{
+		Alias: Alias(s),
+		ID:    s.ID().String(),
+	})
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/onflow/flow-go/module/irrecoverable"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/observable"
+	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/codec/cbor"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/mocknetwork"
@@ -62,8 +63,8 @@ func (co *tagsObserver) OnComplete() {
 type MiddlewareTestSuite struct {
 	suite.Suite
 	sync.RWMutex
-	size      int               // used to determine number of middlewares under test
-	mws       []*p2p.Middleware // used to keep track of middlewares under test
+	size      int                  // used to determine number of middlewares under test
+	mws       []network.Middleware // used to keep track of middlewares under test
 	ov        []*mocknetwork.Overlay
 	obs       chan string // used to keep track of Protect events tagged by pubsub messages
 	ids       []*flow.Identity
@@ -98,7 +99,7 @@ func (m *MiddlewareTestSuite) SetupTest() {
 		log:  logger,
 	}
 
-	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, !DryRun, logger)
+	m.ids, m.mws, obs, m.providers = GenerateIDsAndMiddlewares(m.T(), m.size, logger)
 
 	for _, observableConnMgr := range obs {
 		observableConnMgr.Subscribe(&ob)
@@ -139,8 +140,8 @@ func (m *MiddlewareTestSuite) SetupTest() {
 // the addresses of the staked network participants.
 func (m *MiddlewareTestSuite) TestUpdateNodeAddresses() {
 	// create a new staked identity
-	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1, false, false)
-	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes, false)
+	ids, libP2PNodes, _ := GenerateIDs(m.T(), m.logger, 1)
+	mws, providers := GenerateMiddlewares(m.T(), m.logger, ids, libP2PNodes)
 	require.Len(m.T(), ids, 1)
 	require.Len(m.T(), providers, 1)
 	require.Len(m.T(), mws, 1)

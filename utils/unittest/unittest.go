@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/model/flow"
+
 	"github.com/dgraph-io/badger/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,6 +17,39 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/util"
 )
+
+type SkipReason int
+
+const (
+	TEST_FLAKY               SkipReason = iota + 1 // flaky
+	TEST_WIP                                       // not fully implemented / broken
+	TEST_REQUIRES_GCP_ACCESS                       // requires the environment to be configured with GCP credentials
+	TEST_DEPRECATED                                // uses code that has been deprecated / disabled
+	TEST_LONG_RUNNING                              // long running
+)
+
+func (s SkipReason) String() string {
+	switch s {
+	case TEST_FLAKY:
+		return "TEST_FLAKY"
+	case TEST_WIP:
+		return "TEST_WIP"
+	case TEST_REQUIRES_GCP_ACCESS:
+		return "TEST_REQUIRES_GCP_ACCESS"
+	case TEST_DEPRECATED:
+		return "TEST_DEPRECATED"
+	case TEST_LONG_RUNNING:
+		return "TEST_LONG"
+	}
+	return "UNKNOWN"
+}
+
+func SkipUnless(t *testing.T, reason SkipReason, message string) {
+	t.Helper()
+	if os.Getenv(reason.String()) == "" {
+		t.Skip(message)
+	}
+}
 
 func ExpectPanic(expectedMsg string, t *testing.T) {
 	if r := recover(); r != nil {
@@ -29,7 +64,7 @@ func ExpectPanic(expectedMsg string, t *testing.T) {
 
 // AssertReturnsBefore asserts that the given function returns before the
 // duration expires.
-func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
+func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration, msgAndArgs ...interface{}) {
 	done := make(chan struct{})
 
 	go func() {
@@ -40,7 +75,7 @@ func AssertReturnsBefore(t *testing.T, f func(), duration time.Duration) {
 	select {
 	case <-time.After(duration):
 		t.Log("function did not return in time")
-		t.Fail()
+		assert.Fail(t, "function did not close in time", msgAndArgs...)
 	case <-done:
 		return
 	}
@@ -264,4 +299,9 @@ func Concurrently(n int, f func(int)) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+// AssertEqualBlocksLenAndOrder asserts that both a segment of blocks have the same len and blocks are in the same order
+func AssertEqualBlocksLenAndOrder(t *testing.T, expectedBlocks, actualSegmentBlocks []*flow.Block) {
+	assert.Equal(t, flow.GetIDs(expectedBlocks), flow.GetIDs(actualSegmentBlocks))
 }

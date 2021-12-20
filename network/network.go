@@ -1,6 +1,8 @@
 package network
 
 import (
+	"github.com/ipfs/go-datastore"
+
 	"github.com/onflow/flow-go/module/component"
 )
 
@@ -15,4 +17,9 @@ type Network interface {
 	// The returned Conduit can be used to send messages to engines on other nodes subscribed to the same channel
 	// On a single node, only one engine can be subscribed to a channel at any given time.
 	Register(channel Channel, engine Engine) (Conduit, error)
+
+	// RegisterBlobService registers a BlobService on the given channel, using the given datastore to retrieve values.
+	// The returned BlobService can be used to request blocks from the network.
+	// TODO: We should return a function that can be called to unregister / close the BlobService
+	RegisterBlobService(channel Channel, store datastore.Batching) (BlobService, error)
 }
