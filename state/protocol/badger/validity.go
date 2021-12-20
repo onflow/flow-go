@@ -203,8 +203,9 @@ func isValidRootSnapshot(snap protocol.Snapshot, verifyResultID bool) error {
 		return fmt.Errorf("could not latest sealed result: %w", err)
 	}
 
-	if len(segment.Blocks) == 0 {
-		return fmt.Errorf("invalid empty sealing segment")
+	err = segment.Validate()
+	if err != nil {
+		return fmt.Errorf("invalid root sealing segment: %w", err)
 	}
 
 	highest := segment.Highest() // reference block of the snapshot

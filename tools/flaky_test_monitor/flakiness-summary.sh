@@ -20,7 +20,7 @@ case $TEST_CATEGORY in
 esac
 
 # save result processing script command for later use
-process_results="go run $(realpath ./process_results.go) test-results.json"
+process_results="go run $(realpath ./process_summary1_results.go) test-results.json"
 
 cd ../..
 
