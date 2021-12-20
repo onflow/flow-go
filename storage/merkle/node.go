@@ -30,7 +30,7 @@ var (
 )
 
 /* ******************************* Short Node ******************************* */
-// Per convention a Full node has _always_ one child, which is either
+// Per convention a Short node has _always_ one child, which is either
 // a full node or a leaf.
 
 type short struct {
