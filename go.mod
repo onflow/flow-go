@@ -39,7 +39,7 @@ require (
 	github.com/ipfs/go-blockservice v0.2.0
 	github.com/ipfs/go-cid v0.1.0
 	github.com/ipfs/go-datastore v0.5.0
-	github.com/ipfs/go-ds-badger2 v0.1.2 // indirect
+	github.com/ipfs/go-ds-badger2 v0.1.2
 	github.com/ipfs/go-ipfs-blockstore v0.2.0
 	github.com/ipfs/go-ipfs-provider v0.7.0
 	github.com/ipfs/go-log v1.0.5
