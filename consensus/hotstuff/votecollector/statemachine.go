@@ -120,8 +120,10 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 				m.notifier.OnInvalidVoteDetected(vote)
 				return nil
 			}
+			// ATTENTION: due to how our logic is designed this situation is only possible
+			// where we receive the same vote twice, this is not a case of double voting.
+			// This scenario is possible if leader submits his vote additionally to the vote in proposal.
 			if engine.IsDuplicatedEntryError(err) {
-				// TODO: check if we can do this, maybe this behavior can be slashed
 				return nil
 			}
 			return err
