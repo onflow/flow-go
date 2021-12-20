@@ -17,14 +17,11 @@
           "package": "github.com/onflow/flow-go/model/encodable",
           "output": [
             "=== RUN   TestEncodableRandomBeaconPrivKeyMsgPack\n",
-            "    keys_test.go:245: bytes: 194\n",
-            "PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
+            "bytes: 194--- PASS: TestEncodableRandomBeaconPrivKeyMsgPack (0.00s)\n"
           ],
-          "result": "pass",
+          "result": "",
           "elapsed": 0
-        }
-      ],
-      "nil_tests": [
+        },
         {
           "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
           "package": "github.com/onflow/flow-go/model/encodable",

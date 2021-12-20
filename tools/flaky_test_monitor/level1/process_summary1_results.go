@@ -3,68 +3,12 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flaky-test-monitor/common"
 	"fmt"
 	"os"
 	"sort"
 	"time"
 )
-
-// models single line from "go test -json" output
-type RawTestStep struct {
-	Time    time.Time `json:"Time"`
-	Action  string    `json:"Action"`
-	Package string    `json:"Package"`
-	Test    string    `json:"Test"`
-	Output  string    `json:"Output"`
-	Elapsed float32   `json:"Elapsed"`
-}
-
-// models full summary of a test run from "go test -json"
-type TestRun struct {
-	CommitSha      string          `json:"commit_sha"`
-	CommitDate     time.Time       `json:"commit_date"`
-	JobRunDate     time.Time       `json:"job_run_date"`
-	PackageResults []PackageResult `json:"results"`
-}
-
-// save TestRun to local JSON file
-func (testRun *TestRun) save(fileName string) {
-	testRunBytes, err := json.MarshalIndent(testRun, "", "  ")
-
-	if err != nil {
-		panic("error marshalling json" + err.Error())
-	}
-
-	file, err := os.Create(fileName)
-	if err != nil {
-		panic("error creating filename: " + err.Error())
-	}
-	defer file.Close()
-
-	_, err = file.Write(testRunBytes)
-	if err != nil {
-		panic("error saving test run to file: " + err.Error())
-	}
-}
-
-// models test result of an entire package which can have multiple tests
-type PackageResult struct {
-	Package string                  `json:"package"`
-	Result  string                  `json:"result"`
-	Elapsed float32                 `json:"elapsed"`
-	Output  []string                `json:"output"`
-	Tests   []TestResult            `json:"tests"`
-	TestMap map[string][]TestResult `json:"-"`
-}
-
-// models result of a single test that's part of a larger package result
-type TestResult struct {
-	Test    string   `json:"test"`
-	Package string   `json:"package"`
-	Output  []string `json:"output"`
-	Result  string   `json:"result"`
-	Elapsed float32  `json:"elapsed"`
-}
 
 // this interface gives us the flexibility to read test results in multiple ways - from stdin (for production) and from a local file (for testing)
 type ResultReader interface {
@@ -91,7 +35,7 @@ func (stdinResultReader StdinResultReader) getResultsFileName() string {
 	return os.Args[1]
 }
 
-func processTestRun(resultReader ResultReader) TestRun {
+func processSummary1TestRun(resultReader ResultReader) common.TestRun {
 	reader := resultReader.getReader()
 	scanner := bufio.NewScanner(reader)
 
@@ -100,9 +44,7 @@ func processTestRun(resultReader ResultReader) TestRun {
 	packageResultMap := processTestRunLineByLine(scanner)
 
 	err := scanner.Err()
-	if err != nil {
-		panic("error returning EOF for scanner: " + err.Error())
-	}
+	common.AssertNoError(err, "error returning EOF for scanner")
 
 	postProcessTestRun(packageResultMap)
 
@@ -118,24 +60,22 @@ func processTestRun(resultReader ResultReader) TestRun {
 // 3. pause (zero or once) - for tests using t.Parallel()
 // 4. cont (zero or once) - for tests using t.Parallel()
 // 5. pass OR fail OR skip (once)
-func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*PackageResult {
-	packageResultMap := make(map[string]*PackageResult)
+func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*common.PackageResult {
+	packageResultMap := make(map[string]*common.PackageResult)
 	// reuse the same package result over and over
 	for scanner.Scan() {
-		var rawTestStep RawTestStep
+		var rawTestStep common.RawTestStep
 		err := json.Unmarshal(scanner.Bytes(), &rawTestStep)
-		if err != nil {
-			panic("error unmarshalling raw test step: " + err.Error())
-		}
+		common.AssertNoError(err, "error unmarshalling raw test step")
 
 		// check if package result exists to hold test results
 		packageResult, packageResultExists := packageResultMap[rawTestStep.Package]
 		if !packageResultExists {
-			packageResult = &PackageResult{
+			packageResult = &common.PackageResult{
 				Package: rawTestStep.Package,
 
 				// package result will hold map of test results
-				TestMap: make(map[string][]TestResult),
+				TestMap: make(map[string][]common.TestResult),
 
 				// store outputs as a slice of strings - that's how "go test -json" outputs each output string on a separate line
 				// there are usually 2 or more outputs for a package
@@ -149,7 +89,7 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*PackageResult 
 
 			// "run" is the very first test step and it needs special treatment - to create all the data structures that will be used by subsequent test steps for the same test
 			if rawTestStep.Action == "run" {
-				var newTestResult TestResult
+				var newTestResult common.TestResult
 				newTestResult.Test = rawTestStep.Test
 				newTestResult.Package = rawTestStep.Package
 
@@ -206,7 +146,7 @@ func processTestRunLineByLine(scanner *bufio.Scanner) map[string]*PackageResult 
 	return packageResultMap
 }
 
-func postProcessTestRun(packageResultMap map[string]*PackageResult) {
+func postProcessTestRun(packageResultMap map[string]*common.PackageResult) {
 	// transfer each test result map in each package result to a test result slice
 	for packageName, packageResult := range packageResultMap {
 
@@ -234,23 +174,19 @@ func postProcessTestRun(packageResultMap map[string]*PackageResult) {
 	}
 }
 
-func finalizeTestRun(packageResultMap map[string]*PackageResult) TestRun {
+func finalizeTestRun(packageResultMap map[string]*common.PackageResult) common.TestRun {
 	commitSha := os.Getenv("COMMIT_SHA")
 	if commitSha == "" {
 		panic("COMMIT_SHA can't be empty")
 	}
 
 	commitDate, err := time.Parse(time.RFC3339, os.Getenv("COMMIT_DATE"))
-	if err != nil {
-		panic("error parsing COMMIT_DATE: " + err.Error())
-	}
+	common.AssertNoError(err, "error parsing COMMIT_DATE")
 
 	jobStarted, err := time.Parse(time.RFC3339, os.Getenv("JOB_STARTED"))
-	if err != nil {
-		panic("error parsing JOB_STARTED: " + err.Error())
-	}
+	common.AssertNoError(err, "error parsing JOB_STARTED")
 
-	var testRun TestRun
+	var testRun common.TestRun
 	testRun.CommitDate = commitDate.UTC()
 	testRun.CommitSha = commitSha
 	testRun.JobRunDate = jobStarted.UTC()
@@ -268,10 +204,13 @@ func finalizeTestRun(packageResultMap map[string]*PackageResult) TestRun {
 	return testRun
 }
 
+// level 1 flaky test summary processor
+// input: json formatted test results from `go test -json` from console (not file)
+// output: level 1 summary json file that will be used as input for level 2 summary processor
 func main() {
 	resultReader := StdinResultReader{}
 
-	testRun := processTestRun(resultReader)
+	testRun := processSummary1TestRun(resultReader)
 
-	testRun.save(resultReader.getResultsFileName())
+	common.SaveToFile(resultReader.getResultsFileName(), testRun)
 }

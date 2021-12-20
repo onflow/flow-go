@@ -11,7 +11,7 @@
         "PASS\n",
         "ok  \tgithub.com/onflow/flow-go/model/encodable\t0.209s\n"
       ],
-      "nil_tests": [
+      "tests": [
         {
           "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
           "package": "github.com/onflow/flow-go/model/encodable",
