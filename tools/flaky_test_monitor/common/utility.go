@@ -32,7 +32,7 @@ func AddTrailingSlash(path string) string {
 }
 
 // ConvertToNDecimalPlaces2 converts the supplied numerator and denominator fraction into
-// a decimal with n decimla places. Works the same way as ConvertToNDecimalPlaces()
+// a decimal with n decimal places. Works the same way as ConvertToNDecimalPlaces()
 // but has a float for the numerator.
 func ConvertToNDecimalPlaces2(n int, numerator float32, denominator int) float32 {
 	return convertToNDecimalPlacesInternal(n, numerator, float32(denominator))

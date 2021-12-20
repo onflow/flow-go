@@ -27,7 +27,7 @@ type TestResultSummary struct {
 
 // AssertTestSummariesEqual checks that 2 TestResultSummary structs are equal, doing a deep comparison.
 // This is needed for multiple test files (level 2 and 3) so it's extracted as a helper function here.
-func AssertTestSummariesEqual(t *testing.T, expectedTestSummary, actualTestSummary TestResultSummary) {
+func AssertTestSummariesEqual(t *testing.T, expectedTestSummary, actualTestSummary *TestResultSummary) {
 	require.Equal(t, expectedTestSummary.Package, actualTestSummary.Package)
 	require.Equal(t, expectedTestSummary.Test, actualTestSummary.Test)
 
