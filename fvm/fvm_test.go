@@ -1095,12 +1095,12 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 					chain)
 
 				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
-				txBody.SetPayer(chain.ServiceAddress())
+				txBody.SetPayer(accounts[0])
 
-				err = testutil.SignPayload(txBody, accounts[0], privateKeys[0])
+				err = testutil.SignPayload(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
 				require.NoError(t, err)
 
-				err = testutil.SignEnvelope(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
 				require.NoError(t, err)
 
 				tx := fvm.Transaction(txBody, 0)
