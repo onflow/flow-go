@@ -208,7 +208,7 @@ func main() {
 				node.Storage.Index,
 				node.Storage.Results,
 				node.Storage.Seals,
-				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+				encoding.ExecutionReceiptTag)
 
 			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 

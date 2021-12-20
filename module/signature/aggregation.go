@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/module"
 )
 
 // SignatureAggregatorSameMessage aggregates BLS signatures of the same message from different signers.

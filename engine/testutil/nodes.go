@@ -385,7 +385,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	require.Nil(t, err)
 
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals,
-		signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
+		encoding.ExecutionReceiptTag)
 
 	approvalVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 

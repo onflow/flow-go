@@ -4,9 +4,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -15,22 +16,28 @@ import (
 // receiptValidator holds all needed context for checking
 // receipt validity against current protocol state.
 type receiptValidator struct {
-	headers  storage.Headers
-	seals    storage.Seals
-	state    protocol.State
-	index    storage.Index
-	results  storage.ExecutionResults
-	verifier module.Verifier
+	headers         storage.Headers
+	seals           storage.Seals
+	state           protocol.State
+	index           storage.Index
+	results         storage.ExecutionResults
+	signatureHasher hash.Hasher
 }
 
-func NewReceiptValidator(state protocol.State, headers storage.Headers, index storage.Index, results storage.ExecutionResults, seals storage.Seals, verifier module.Verifier) *receiptValidator {
+func NewReceiptValidator(state protocol.State,
+	headers storage.Headers,
+	index storage.Index,
+	results storage.ExecutionResults,
+	seals storage.Seals,
+	signatureTag string,
+) *receiptValidator {
 	rv := &receiptValidator{
-		state:    state,
-		headers:  headers,
-		index:    index,
-		results:  results,
-		verifier: verifier,
-		seals:    seals,
+		state:           state,
+		headers:         headers,
+		index:           index,
+		results:         results,
+		signatureHasher: crypto.NewBLSKMAC(signatureTag),
+		seals:           seals,
 	}
 
 	return rv
@@ -38,7 +45,7 @@ func NewReceiptValidator(state protocol.State, headers storage.Headers, index st
 
 func (v *receiptValidator) verifySignature(receipt *flow.ExecutionReceiptMeta, nodeIdentity *flow.Identity) error {
 	id := receipt.ID()
-	valid, err := v.verifier.Verify(id[:], receipt.ExecutorSignature, nodeIdentity.StakingPubKey)
+	valid, err := nodeIdentity.StakingPubKey.Verify(receipt.ExecutorSignature, id[:], v.signatureHasher)
 	if err != nil {
 		return fmt.Errorf("failed to verify signature: %w", err)
 	}
