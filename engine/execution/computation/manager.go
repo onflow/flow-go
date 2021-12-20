@@ -72,6 +72,7 @@ func New(
 	committer computer.ViewCommitter,
 	scriptLogThreshold time.Duration,
 	uploaders []uploader.Uploader,
+	eds state_synchronization.ExecutionDataService,
 ) (*Manager, error) {
 	log := logger.With().Str("engine", "computation").Logger()
 
@@ -104,6 +105,7 @@ func New(
 		programsCache:      programsCache,
 		scriptLogThreshold: scriptLogThreshold,
 		uploaders:          uploaders,
+		eds:                eds,
 	}
 
 	return &e, nil

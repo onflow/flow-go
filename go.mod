@@ -12,7 +12,7 @@ require (
 	github.com/btcsuite/btcd v0.22.0-beta
 	github.com/dapperlabs/testingdock v0.4.2
 	github.com/davecgh/go-spew v1.1.1
-	github.com/dgraph-io/badger/v2 v2.0.3
+	github.com/dgraph-io/badger/v2 v2.2007.3
 	github.com/ef-ds/deque v1.0.4
 	github.com/ethereum/go-ethereum v1.9.13
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
@@ -38,6 +38,7 @@ require (
 	github.com/ipfs/go-blockservice v0.2.0
 	github.com/ipfs/go-cid v0.1.0
 	github.com/ipfs/go-datastore v0.5.0
+	github.com/ipfs/go-ds-badger2 v0.1.2 // indirect
 	github.com/ipfs/go-ipfs-blockstore v0.2.0
 	github.com/ipfs/go-ipfs-provider v0.7.0
 	github.com/ipfs/go-log v1.0.5

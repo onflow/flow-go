@@ -11,6 +11,7 @@ import (
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	badger "github.com/ipfs/go-ds-badger2"
 	"github.com/spf13/pflag"
 
 	"github.com/onflow/flow-core-contracts/lib/go/templates"
@@ -46,6 +47,7 @@ import (
 	bootstrapFilenames "github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
 	"github.com/onflow/flow-go/model/encoding"
+	"github.com/onflow/flow-go/model/encoding/cbor"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -53,7 +55,9 @@ import (
 	finalizer "github.com/onflow/flow-go/module/finalizer/consensus"
 	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/module/signature"
+	"github.com/onflow/flow-go/module/state_synchronization"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
+	"github.com/onflow/flow-go/network/compressor"
 	"github.com/onflow/flow-go/state/protocol"
 	badgerState "github.com/onflow/flow-go/state/protocol/badger"
 	"github.com/onflow/flow-go/state/protocol/blocktimer"
@@ -86,6 +90,7 @@ func main() {
 		err                           error
 		executionState                state.ExecutionState
 		triedir                       string
+		executionDataDir              string
 		collector                     module.ExecutionMetrics
 		mTrieCacheSize                uint32
 		transactionResultsCacheSize   uint
@@ -112,6 +117,7 @@ func main() {
 		blockDataUploaders            []uploader.Uploader
 		blockDataUploaderMaxRetry     uint64 = 5
 		blockdataUploaderRetryTimeout        = 1 * time.Second
+		eds                           state_synchronization.ExecutionDataService
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleExecution.String())
@@ -123,6 +129,7 @@ func main() {
 			flags.StringVarP(&rpcConf.ListenAddr, "rpc-addr", "i", "localhost:9000", "the address the gRPC server listens on")
 			flags.BoolVar(&rpcConf.RpcMetricsEnabled, "rpc-metrics-enabled", false, "whether to enable the rpc metrics")
 			flags.StringVar(&triedir, "triedir", datadir, "directory to store the execution State")
+			flags.StringVar(&executionDataDir, "execution-data-dir", filepath.Join(homedir, ".flow", "execution_data"), "directory to use for Execution Data blobstore")
 			flags.Uint32Var(&mTrieCacheSize, "mtrie-cache-size", 500, "cache size for MTrie")
 			flags.UintVar(&checkpointDistance, "checkpoint-distance", 40, "number of WAL segments between checkpoints")
 			flags.UintVar(&checkpointsToKeep, "checkpoints-to-keep", 5, "number of recent checkpoints to keep (0 to keep all)")
@@ -318,6 +325,29 @@ func main() {
 
 			return compactor, nil
 		}).
+		Component("execution data service", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			ds, err := badger.NewDatastore(executionDataDir, &badger.DefaultOptions)
+
+			if err != nil {
+				return nil, err
+			}
+
+			bs, err := node.Network.RegisterBlobService(engine.ExecutionDataService, ds)
+
+			if err != nil {
+				return nil, err
+			}
+
+			eds := state_synchronization.NewExecutionDataService(
+				&cbor.Codec{},
+				compressor.NewLz4Compressor(),
+				bs,
+				metrics.NewExecutionDataServiceCollector(),
+				node.Logger,
+			)
+
+			return eds, nil
+		}).
 		Component("provider engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			extraLogPath := path.Join(triedir, "extralogs")
 			err := os.MkdirAll(extraLogPath, 0777)
@@ -345,6 +375,7 @@ func main() {
 				committer,
 				scriptLogThreshold,
 				blockDataUploaders,
+				eds,
 			)
 			if err != nil {
 				return nil, err

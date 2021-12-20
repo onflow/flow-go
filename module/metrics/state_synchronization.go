@@ -22,7 +22,7 @@ type ExecutionDataServiceCollector struct {
 	executionDataBlobTreeSize prometheus.Histogram
 }
 
-func NewExecutionDataServiceCollector(registerer prometheus.Registerer) module.ExecutionDataServiceMetrics {
+func NewExecutionDataServiceCollector() module.ExecutionDataServiceMetrics {
 	executionDataAddDuration := promauto.NewHistogram(prometheus.HistogramOpts{
 		Namespace: namespaceStateSync,
 		Subsystem: subsystemExecutionDataService,

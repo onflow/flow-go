@@ -60,6 +60,14 @@ func NewExecutionDataService(
 	}
 }
 
+func (s *executionDataServiceImpl) Ready() <-chan struct{} {
+	return s.blobService.Ready()
+}
+
+func (s *executionDataServiceImpl) Done() <-chan struct{} {
+	return s.blobService.Done()
+}
+
 // receiveBatch receives a batch of blobs from the given BlobReceiver, and returns them as a slice
 func (s *executionDataServiceImpl) receiveBatch(ctx context.Context, br *blobs.BlobReceiver) ([]blobs.Blob, error) {
 	var batch []blobs.Blob

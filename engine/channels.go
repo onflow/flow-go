@@ -151,6 +151,9 @@ const (
 
 	// Public network channels
 	PublicSyncCommittee = network.Channel("public-sync-committee")
+
+	// Execution data service
+	ExecutionDataService = network.Channel("execution-data-service")
 )
 
 // initializeChannelRoleMap initializes an instance of channelRoleMap and populates it with the channels and their
