@@ -875,6 +875,10 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 	_, err := rand.Read(b)
 	require.NoError(t, err)
 	longString := base64.StdEncoding.EncodeToString(b) // ~1.3 times 1MB
+	b = make([]byte, 10000)                            // 10kB
+	_, err = rand.Read(b)
+	require.NoError(t, err)
+	tenKBString := base64.StdEncoding.EncodeToString(b) // 1.3 times 10kB
 
 	// save a really large contract to an account should fail because of interaction limit reached
 	script := fmt.Sprintf(`
@@ -1002,6 +1006,156 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				err = vm.Run(ctx, tx, view, programs)
 				require.NoError(t, err)
 				require.Error(t, tx.Err)
+				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
+			}))
+
+	t.Run("Using to much interaction fails during storage limit check - and is recovered", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
+		withContextOptions(
+			fvm.WithTransactionFeesEnabled(true),
+			fvm.WithTransactionProcessors(
+				fvm.NewTransactionAccountFrozenChecker(),
+				fvm.NewTransactionAccountFrozenEnabler(),
+				fvm.NewTransactionInvoker(zerolog.Nop()),
+			),
+		).
+		run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+				//ctx.MaxStateInteractionSize = 100_000 // this is not enough to load the FlowServiceAccount for fee deduction
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(2)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				require.NoError(t, err)
+
+				// ====== deploy contract ========
+				txBody := testutil.CreateContractDeploymentTransaction(
+					"DemoInteractionLimit",
+					fmt.Sprintf(`
+						access(all) contract DemoInteractionLimit {
+						   pub var totalSupply: UInt64
+						   pub resource NFT {
+								pub let id: UInt64
+								pub let data: String
+								init() {
+									DemoInteractionLimit.totalSupply = DemoInteractionLimit.totalSupply + UInt64(1)
+									self.id = DemoInteractionLimit.totalSupply
+									self.data = "%s"
+								}
+							}
+							pub resource interface PubCollection{
+								pub fun batchDeposit(tokens: @Collection)
+							}
+							pub resource Collection:PubCollection {
+								pub var ownedNFTs: @{UInt64: NFT}
+								init () {
+									self.ownedNFTs <- {}
+								}
+								pub fun withdraw(withdrawID: UInt64): @NFT {
+									return <-self.ownedNFTs.remove(key: withdrawID)!
+								}
+								pub fun deposit(token: @NFT) {
+									let oldToken <- self.ownedNFTs[token.id] <- token
+									destroy oldToken
+								}
+								pub fun getIDs(): [UInt64] {
+									return self.ownedNFTs.keys
+								}
+								pub fun batchDeposit(tokens: @Collection) {
+									let keys = tokens.getIDs()
+									for key in keys {
+										self.deposit(token: <-tokens.withdraw(withdrawID: key))
+									}
+									destroy tokens
+								}
+								destroy() {
+									destroy self.ownedNFTs
+								}
+							}
+							pub fun newCollection() : @Collection {
+								return <- create Collection()
+							}
+							pub fun batchMintPiece( quantity: UInt64): @Collection {
+								let newCollection <- create Collection()
+						
+								var i: UInt64 = 0
+								while i < quantity {
+									newCollection.deposit(token: <-self.mintPiece())
+									i = i + UInt64(1)
+								}
+						
+								return <-newCollection
+							}
+							pub fun mintPiece(): @NFT {
+								let newPiece: @NFT <- create NFT()
+								return <-newPiece
+							}
+							init() {
+								self.totalSupply = 0
+							}
+						}
+					`, tenKBString),
+					accounts[0],
+					chain)
+
+				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+				txBody.SetPayer(accounts[0])
+
+				err = testutil.SignPayload(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+				require.NoError(t, tx.Err)
+
+				// magic number so interaction limit is reached during storage limit check
+				ctx.MaxStateInteractionSize = 595_720
+				ctx.LimitAccountStorage = true
+				// ========== run transaction ============
+				txBody = flow.NewTransactionBody().
+					SetScript([]byte(fmt.Sprintf(`
+						import DemoInteractionLimit from 0x%s
+						
+						transaction() {
+							var address: Address
+							prepare(acct: AuthAccount) {
+								acct.save<@DemoInteractionLimit.Collection>(<- DemoInteractionLimit.newCollection(), to: /storage/DemoInteractionLimitCollection)
+								acct.link<&{DemoInteractionLimit.PubCollection}>(/public/PubCollection, target: /storage/DemoInteractionLimitCollection)
+								self.address = acct.address
+							}
+							execute {
+								let collection <- DemoInteractionLimit.batchMintPiece(quantity: %d)
+								let recipient = getAccount(self.address)
+								let receiverRef = recipient.getCapability(/public/PubCollection).borrow<&{DemoInteractionLimit.PubCollection}>()!
+								receiverRef.batchDeposit(tokens: <-collection)
+							}
+						}
+					`, accounts[0].Hex(), 30))).
+					AddAuthorizer(accounts[1])
+
+				txBody.SetProposalKey(chain.ServiceAddress(), 0, 1)
+				txBody.SetPayer(accounts[0])
+
+				err = testutil.SignPayload(txBody, accounts[1], privateKeys[1])
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				tx = fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+				require.Error(t, tx.Err)
+
 				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
 			}))
 }
