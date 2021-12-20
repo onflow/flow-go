@@ -423,7 +423,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	nextAcc := lg.accounts[(acc.i+1)%len(lg.accounts)]
 
 	lg.log.Trace().Msgf("creating transfer script")
-	transferScript, err := TokenTransferScript(
+	transferTx, err := TokenTransferTransaction(
 		lg.fungibleTokenAddress,
 		lg.flowTokenAddress,
 		nextAcc.address,
@@ -434,9 +434,8 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 	}
 
 	lg.log.Trace().Msgf("creating token transfer transaction")
-	transferTx := flowsdk.NewTransaction().
+	transferTx = transferTx.
 		SetReferenceBlockID(blockRef).
-		SetScript(transferScript).
 		SetGasLimit(9999).
 		SetProposalKey(*acc.address, 0, acc.seqNumber).
 		SetPayer(*acc.address).
