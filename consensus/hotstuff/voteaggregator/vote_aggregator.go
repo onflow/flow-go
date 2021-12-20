@@ -69,7 +69,8 @@ func NewVoteAggregator(
 	wg.Add(defaultVoteAggregatorWorkers)
 	for i := 0; i < defaultVoteAggregatorWorkers; i++ { // manager for worker routines that process inbound votes
 		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-			aggregator.queuedVotesProcessingLoop(ctx, ready)
+			ready()
+			aggregator.queuedVotesProcessingLoop(ctx)
 			wg.Done()
 		})
 	}
@@ -97,9 +98,8 @@ func NewVoteAggregator(
 	return aggregator, nil
 }
 
-func (va *VoteAggregator) queuedVotesProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (va *VoteAggregator) queuedVotesProcessingLoop(ctx irrecoverable.SignalerContext) {
 	notifier := va.queuedVotesNotifier.Channel()
-	ready() // signal that this worker is ready
 	for {
 		select {
 		case <-ctx.Done():
