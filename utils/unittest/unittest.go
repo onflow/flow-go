@@ -26,6 +26,7 @@ const (
 	TEST_REQUIRES_GCP_ACCESS                       // requires the environment to be configured with GCP credentials
 	TEST_DEPRECATED                                // uses code that has been deprecated / disabled
 	TEST_LONG_RUNNING                              // long running
+	TEST_RESOURCE_INTENSIVE                        // resource intensive test
 )
 
 func (s SkipReason) String() string {
@@ -40,6 +41,8 @@ func (s SkipReason) String() string {
 		return "TEST_DEPRECATED"
 	case TEST_LONG_RUNNING:
 		return "TEST_LONG"
+	case TEST_RESOURCE_INTENSIVE:
+		return "TEST_RESOURCE_INTENSIVE"
 	}
 	return "UNKNOWN"
 }
