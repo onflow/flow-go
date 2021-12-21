@@ -20,7 +20,7 @@ case $TEST_CATEGORY in
 esac
 
 # save result processing script command for later use
-process_results="go run $(realpath ./process_results.go) test-results.json"
+process_results="go run $(realpath ./process_summary1_results.go) test-results.json"
 
 cd ../..
 
@@ -36,6 +36,8 @@ export COMMIT_DATE=$(git show --no-patch --no-notes --pretty='%cI' $COMMIT_SHA)
 make crypto/relic/build
 
 export JSON_OUTPUT=true
+export TEST_FLAKY=true
+export TEST_LONG_RUNNING=true
 
 # run tests and process results
 if [[ $TEST_CATEGORY =~ integration-(common|network|epochs|access|collection|consensus|execution|verification)$ ]]

@@ -171,7 +171,8 @@ func (r *rapidSync) Check(t *rapid.T) {
 }
 
 func TestRapidSync(t *testing.T) {
-	t.Skip("flaky test - quarantined")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
+
 	rapid.Check(t, rapid.Run(&rapidSync{}))
 }
 
