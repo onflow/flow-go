@@ -15,6 +15,27 @@ type addressWrapper struct {
 	Address Address
 }
 
+func TestHexToAddress(t *testing.T) {
+
+	type testCase struct {
+		literal string
+		value   []byte
+	}
+
+	for _, test := range []testCase{
+		{"123", []byte{0x1, 0x23}},
+		{"1", []byte{0x1}},
+		// leading zero
+		{"01", []byte{0x1}},
+	} {
+
+		expected := BytesToAddress(test.value)
+
+		assert.Equal(t, expected, HexToAddress(test.literal))
+		assert.Equal(t, expected, HexToAddress("0x"+test.literal))
+	}
+}
+
 func TestAddressJSON(t *testing.T) {
 	addr := Mainnet.Chain().ServiceAddress()
 	data, err := json.Marshal(addressWrapper{Address: addr})
