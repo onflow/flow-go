@@ -3,7 +3,6 @@
 package merkle
 
 import (
-	"github.com/onflow/flow-go/crypto/hash"
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -19,8 +18,8 @@ type node interface {
 	Hash() []byte
 }
 
-// nodeTag encodes the type of node when hashing it. Required for cryptographic
-// safety to prevent malleability attacks (replacing a full node with a short node
+// NodeTags encodes the type of node when hashing it. Required for cryptographic
+// safety to prevent collision attacks (replacing a full node with a short node
 // that has identical hash would otherwise be possible).
 // Values are intended to be global constants and must be unique.
 var (
@@ -30,7 +29,7 @@ var (
 )
 
 /* ******************************* Short Node ******************************* */
-// Per convention a Short node has _always_ one child, which is either
+// Per convention a Short node has always _one child_, which is either
 // a full node or a leaf.
 
 type short struct {
@@ -39,54 +38,61 @@ type short struct {
 	child node   // holds the child after the common path; never nil
 }
 
-func (n short) Hash() []byte {
-	h, _ := blake2b.New256(shortNodeTag[:])
-	_, _ = h.Write([]byte{byte(n.count)})
-	_, _ = h.Write(n.path)
-	_, _ = h.Write(n.child.Hash())
+var _ node = &short{}
+
+func (n *short) Hash() []byte {
+	h, _ := blake2b.New256(shortNodeTag[:]) // blake2b.New256(..) error for given MAC (verified in tests)
+	_, _ = h.Write([]byte{byte(n.count)})   // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(n.path)                  // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(n.child.Hash())          // blake2b.Write(..) never errors for _any_ input
 	return h.Sum(nil)
 }
 
 /* ******************************** Full Node ******************************* */
-// Per convention a Full node has _always_ two children. Nil values not allowed.
+// Per convention a Full Node has always _two children_. Nil values not allowed.
 
 type full struct {
 	left  node // holds the left path node (bit 0); never nil
 	right node // holds the right path node (bit 1); never nil
 }
 
-func (n full) Hash() []byte {
-	h, _ := blake2b.New256(fullNodeTag[:])
-	_, _ = h.Write(n.left.Hash())
-	_, _ = h.Write(n.right.Hash())
+var _ node = &full{}
+
+func (n *full) Hash() []byte {
+	h, _ := blake2b.New256(fullNodeTag[:]) // blake2b.New256(..) error for given MAC (verified in tests)
+	_, _ = h.Write(n.left.Hash())          // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(n.right.Hash())         // blake2b.Write(..) never errors for _any_ input
 	return h.Sum(nil)
 }
 
 /* ******************************** Leaf Node ******************************* */
-// Holds a key-value pair. We only hash the value, because the key is committed
-// to by the merkle path through the trie.
+// Leaf represents a key-value pair. We only store the value, because the
+// key is implicitly stored as the merkle path through the tree.
 
 type leaf struct {
-	key hash.Hash // copy of key
-	val []byte    // the concrete data we actually stored
+	val []byte
 }
 
-func (n leaf) Hash() []byte {
-	h, _ := blake2b.New256(leafNodeTag[:])
-	_, _ = h.Write(n.val)
+var _ node = &leaf{}
+
+func (n *leaf) Hash() []byte {
+	h, _ := blake2b.New256(leafNodeTag[:]) // blake2b.New256(..) error for given MAC (verified in tests)
+	_, _ = h.Write(n.val)                  // blake2b.Write(..) never errors for _any_ input
 	return h.Sum(nil)
 }
 
 /* ******************************** Dummy Node ******************************* */
-// 4th dummy node type as substitute for `nil`. Not used in the trie but as zero
+// Dummy node type as substitute for `nil`. Not used in the trie, but as zero
 // value for auxiliary variables during trie update operations. This reduces
 // complexity of the business logic, as we can then also apply the convention of
 // "nodes are never nil" to the auxiliary variables.
 
 type dummy struct{}
 
-func (n dummy) Hash() []byte {
+var _ node = &dummy{}
+
+func (n *dummy) Hash() []byte {
 	// Per convention, Hash should never be called by the business logic but
-	// is required to implement the node iterface
+	// is required to implement the node interface
 	panic("dummy node has no hash")
 }

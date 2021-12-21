@@ -3,8 +3,14 @@
 package merkle
 
 import (
+	"errors"
+
 	"github.com/jrick/bitset"
-	"golang.org/x/crypto/blake2b"
+)
+
+var (
+	ErrorZeroKeyLength         = errors.New("requiring keys with non-zero length")
+	ErrorIncompatibleKeyLength = errors.New("only keys with uniform lengths are supported")
 )
 
 // Tree represents a binary patricia merkle tree. The difference with a normal
@@ -21,7 +27,9 @@ import (
 //  * Without any stored elements, there exists no root vertex in this data model,
 //    and we set `root` to nil.
 type Tree struct {
-	root node
+	pathLength int
+	size       uint64
+	root       node
 }
 
 // NewTree creates a new empty patricia merkle tree.
@@ -29,9 +37,47 @@ func NewTree() *Tree {
 	return &Tree{}
 }
 
-// Put will stores the given value in the trie under the given key. If the key
+// Size returns the number of stored key-value pairs
+func (t *Tree) Size() uint64 {
+	return t.size
+}
+
+// Put stores the given value in the trie under the given key. If the key
 // already exists, it will replace the value and return true.
-func (t *Tree) Put(key []byte, val []byte) bool {
+// Returns:
+//  * (false, nil):
+//  * (true, nil):
+//  * (false, error): with possible error returns
+//    - ErrorZeroKeyLength if `key` is nil or empty
+//    - ErrorIncompatibleKeyLength if the provided key length is _different_
+//      than previously stored elements.
+// No generic errors are returned.
+func (t *Tree) Put(key []byte, val []byte) (bool, error) {
+	if t.size == 0 { // empty key-value store
+		if len(key) == 0 {
+			return false, ErrorZeroKeyLength
+		}
+		t.pathLength = len(key)
+		t.size = 1
+		return t.unsafePut(key, val), nil
+	}
+
+	// for non-empty key-value store: enforce that all keys have identical length
+	if len(key) != t.pathLength {
+		return false, ErrorIncompatibleKeyLength
+	}
+	replaced := t.unsafePut(key, val)
+	if !replaced {
+		t.size++
+	}
+	return replaced, nil
+}
+
+// Put stores the given value in the trie under the given key. If the key
+// already exists, it will replace the value and return true.
+// UNSAFE:
+//  * all keys must have identical lengths, which is not checked here.
+func (t *Tree) unsafePut(key []byte, val []byte) bool {
 	// the path through the tree is determined by the key; we decide whether to
 	// go left or right based on whether the next bit is set or not
 	path := bitset.Bytes(key[:])
@@ -52,7 +98,6 @@ PutLoop:
 		// if we have a full node, we have a node on each side to go to, so we
 		// just pick the next node based on whether the bit is set or not
 		case *full:
-
 			// if the bit is 0 (false), we go left
 			// otherwise, it's 1 (true) and we go right
 			if !path.Get(int(index)) {
@@ -69,7 +114,6 @@ PutLoop:
 		// if we have a short node, we have a path of several bits to the next
 		// node; in that case, we use as much of the shared path as possible
 		case *short:
-
 			// first, we find out how many bits we have in common
 			nodePath := bitset.Bytes(n.path)
 			var commonCount uint
@@ -136,25 +180,18 @@ PutLoop:
 
 		// if we have a leaf node, we reached a non-empty leaf
 		case *leaf:
-
-			// replace the current value with the new one
-			n.val = val
-
-			// return true to indicate that we overwrote
-			return true
+			n.val = append(make([]byte, 0, len(val)), val...)
+			return true // return true to indicate that we overwrote
 
 		// if we have nil, we reached the end of any shared path
 		case nil:
-
 			// if we have reached the end of the key, insert the new value
 			totalCount := uint(len(key)) * 8
 			if index == totalCount {
-				// Make a copy of the key, to ensure we have the only pointer to it
-				keyCopy := make([]byte, len(key))
-				copy(keyCopy, key)
+				// Instantiate a new leaf holding a _copy_ of the provided key-value pair,
+				// to protect the slices from external modification.
 				*cur = &leaf{
-					key: keyCopy,
-					val: val,
+					val: append(make([]byte, 0, len(val)), val...),
 				}
 				return false
 			}
@@ -177,7 +214,18 @@ PutLoop:
 
 // Get will retrieve the value associated with the given key. It returns true
 // if the key was found and false otherwise.
-func (t *Tree) Get(key []byte) (interface{}, bool) {
+func (t *Tree) Get(key []byte) ([]byte, bool) {
+	if t.size == 0 || t.pathLength != len(key) {
+		return nil, false
+	}
+	return t.unsafeGet(key)
+}
+
+// unsafeGet retrieves the value associated with the given key. It returns true
+// if the key was found and false otherwise.
+// UNSAFE:
+//  * all keys must have identical lengths, which is not checked here.
+func (t *Tree) unsafeGet(key []byte) ([]byte, bool) {
 	cur := &t.root               // we start at the root again
 	path := bitset.Bytes(key[:]) // we use the given key as path again
 	index := uint(0)             // and we start at a zero index in the path
@@ -237,6 +285,24 @@ GetLoop:
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
 func (t *Tree) Del(key []byte) bool {
+	if t.size == 0 || t.pathLength != len(key) {
+		return false
+	}
+	deleted := t.unsafeDel(key)
+	if deleted {
+		t.size--
+	}
+	return deleted
+}
+
+// unsafeDel removes the value associated with the given key from the patricia
+// merkle trie. It returns true if they key was found and false otherwise.
+// Internally, any parent nodes between the leaf up to the closest shared path
+// will be deleted or merged, which keeps the trie deterministic regardless of
+// insertion and deletion orders.
+// UNSAFE:
+//  * all keys must have identical lengths, which is not checked here.
+func (t *Tree) unsafeDel(key []byte) bool {
 
 	// we set the current pointer to the root
 	cur := &t.root
@@ -350,14 +416,14 @@ DelLoop:
 	// child's child as the child of the merged short node
 	c, ok := n.child.(*short)
 	if ok {
-		t.merge(n, c)
+		merge(n, c)
 	}
 
 	// if the parent is also a short node, we have to merge them and use the
 	// current child as the child of the merged node
 	p, ok := (*parent).(*short)
 	if ok {
-		t.merge(p, n)
+		merge(p, n)
 	}
 
 	// NOTE: if neither the parent nor the child are short nodes, we simply
@@ -367,15 +433,14 @@ DelLoop:
 
 // Hash will return the root hash of this patricia merkle tree.
 func (t *Tree) Hash() []byte {
-	if t.root == nil {
-		h, _ := blake2b.New256(nil)
-		return h.Sum(nil)
+	if t.size == 0 {
+		return []byte{14, 87, 81, 192, 38, 229, 67, 178, 232, 171, 46, 176, 96, 153, 218, 161, 209, 229, 223, 71, 119, 143, 119, 135, 250, 171, 69, 205, 241, 47, 227, 168}
 	}
 	return t.root.Hash()
 }
 
 // merge will merge a child short node into a parent short node.
-func (t *Tree) merge(p *short, c *short) {
+func merge(p *short, c *short) {
 	totalCount := p.count + c.count
 	totalPath := bitset.NewBytes(int(totalCount))
 	parentPath := bitset.Bytes(p.path)

@@ -1,6 +1,7 @@
 package flow_test
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -82,7 +83,6 @@ func TestIdentifierSample(t *testing.T) {
 }
 
 func TestMerkleRoot(t *testing.T) {
-
 	total := 10
 	ids := make([]flow.Identifier, total)
 	for i := range ids {
@@ -97,18 +97,19 @@ func TestMerkleRoot(t *testing.T) {
 	fmt.Println(idsBad)
 
 	require.NotEqual(t, flow.MerkleRoot(ids...), flow.MerkleRoot(idsBad...))
-	require.Equal(t, referenceMerkleRoot(ids...), flow.MerkleRoot(ids...))
-
+	require.Equal(t, referenceMerkleRoot(t, ids...), flow.MerkleRoot(ids...))
 }
 
 // We should ideally replace this with a completely different reference implementation
-// Possibly writen in another language, such as python, similar to the Ledger Trie Implementation
-func referenceMerkleRoot(ids ...flow.Identifier) flow.Identifier {
+// Possibly written in another language, such as python, similar to the Ledger Trie Implementation
+func referenceMerkleRoot(t *testing.T, ids ...flow.Identifier) flow.Identifier {
 	var root flow.Identifier
 	tree := merkle.NewTree()
-	for i, id := range ids {
-		iCopy, idCopy := i, id
-		tree.Put(idCopy[:], iCopy)
+	for idx, id := range ids {
+		idxVal := make([]byte, 8)
+		binary.BigEndian.PutUint64(idxVal, uint64(idx))
+		_, err := tree.Put(id[:], idxVal)
+		assert.NoError(t, err)
 	}
 	hash := tree.Hash()
 	copy(root[:], hash)

@@ -3,6 +3,7 @@
 package merkle
 
 import (
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"testing"
@@ -10,9 +11,25 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/crypto/blake2b"
 )
 
 const TreeTestLength = 100000
+
+// TestEmptyTreeHash verifies that an empty tree has the expected hash value.
+// Convention: Root hash equals to zero-state of blake2b hasher
+func TestEmptyTreeHash(t *testing.T) {
+	// zero-state of blake2b hasher
+	b, _ := blake2b.New256(nil)
+	zeroBlake := b.Sum(nil)
+
+	// reference value (from python reference implementation)
+	ref := "0e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8"
+	require.Equal(t, ref, hex.EncodeToString(zeroBlake))
+
+	// compare with tree
+	assert.Equal(t, zeroBlake, NewTree().Hash())
+}
 
 func TestTreeSingle(t *testing.T) {
 
@@ -30,7 +47,8 @@ func TestTreeSingle(t *testing.T) {
 		val := make([]byte, 128)
 		_, _ = rand.Read(key)
 		_, _ = rand.Read(val)
-		existed := tree.Put(key, val)
+		existed, err := tree.Put(key, val)
+		assert.NoError(t, err)
 		assert.False(t, existed)
 
 		// retrieve the value again, check it as successful and the same
@@ -73,7 +91,8 @@ func TestTreeBatch(t *testing.T) {
 	// insert all of the key-value pairs and ensure they were unique
 	for i, key := range keys {
 		val := vals[i]
-		existed := tree.Put(key, val)
+		existed, err := tree.Put(key, val)
+		assert.NoError(t, err)
 		assert.False(t, existed)
 	}
 
@@ -120,7 +139,8 @@ func TestRandomOrder(t *testing.T) {
 	// insert all of the values into the first tree
 	for _, key := range keys {
 		val := vals[string(key)]
-		existed := tree1.Put(key, val)
+		existed, err := tree1.Put(key, val)
+		assert.NoError(t, err)
 		require.False(t, existed)
 	}
 
@@ -130,7 +150,8 @@ func TestRandomOrder(t *testing.T) {
 	})
 	for _, key := range keys {
 		val := vals[string(key)]
-		existed := tree2.Put(key, val)
+		existed, err := tree2.Put(key, val)
+		assert.NoError(t, err)
 		require.False(t, existed)
 	}
 
@@ -181,7 +202,7 @@ func treePut(n int) func(*testing.B) {
 		for i := 0; i < b.N; i++ {
 			key, val := createPair()
 			b.StartTimer()
-			_ = t.Put(key, val)
+			_, _ = t.Put(key, val)
 			b.StopTimer()
 			_ = t.Del(key)
 		}
@@ -195,7 +216,7 @@ func treeGet(n int) func(*testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			key, val := createPair()
-			_ = t.Put(key, val)
+			_, _ = t.Put(key, val)
 			b.StartTimer()
 			_, _ = t.Get(key)
 			b.StopTimer()
@@ -211,7 +232,7 @@ func treeDel(n int) func(*testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			key, val := createPair()
-			_ = t.Put(key, val)
+			_, _ = t.Put(key, val)
 			b.StartTimer()
 			_ = t.Del(key)
 			b.StopTimer()

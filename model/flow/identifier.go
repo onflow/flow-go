@@ -148,13 +148,13 @@ func MerkleRoot(ids ...Identifier) Identifier {
 	for i, id := range ids {
 		val := make([]byte, 8)
 		binary.BigEndian.PutUint64(val, uint64(i))
-
-		// NOTE: the id[:] passed in here will be the address of byte array
-		// that is used by Go in the loop, so it MUST be copied to a different
-		// slice if the intention is to store it's value. Otherwise,
-		// all the value will be the last item of the ids slice.
-		// This is not a problem for i, due to it being a primative (int)
-		tree.Put(id[:], val)
+		_, err := tree.Put(id[:], val) // Merkle copies key and values internally
+		if err != nil {
+			// This should never happen: per API, `Put` only errors if we feed it with
+			// zero-length keys or keys of different length. As Identifiers are fixed-sized
+			// arrays, either error condition is impossible.
+			panic("unexpected internal error: " + err.Error())
+		}
 	}
 	hash := tree.Hash()
 	copy(root[:], hash)
