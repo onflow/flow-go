@@ -224,8 +224,9 @@ func (b *Backend) GetNetworkParameters(_ context.Context) access.NetworkParamete
 	}
 }
 
+// GetLatestProtocolStateSnapshot returns the latest finalized snapshot
 func (b *Backend) GetLatestProtocolStateSnapshot(_ context.Context) ([]byte, error) {
-	data, err := convert.SnapshotToBytes(b.state.Sealed())
+	data, err := convert.SnapshotToBytes(b.state.Final())
 	if err != nil {
 		return nil, err
 	}

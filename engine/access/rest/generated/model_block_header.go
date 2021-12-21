@@ -17,7 +17,7 @@ type BlockHeader struct {
 
 	ParentId string `json:"parent_id"`
 
-	Height int32 `json:"height"`
+	Height string `json:"height"`
 
 	Timestamp time.Time `json:"timestamp"`
 

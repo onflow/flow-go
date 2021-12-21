@@ -573,7 +573,8 @@ func Test_OnlyHeadOfTheQueueIsExecuted(t *testing.T) {
 }
 
 func TestBlocksArentExecutedMultipleTimes_multipleBlockEnqueue(t *testing.T) {
-	t.Skip("flakey")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
+
 	runWithEngine(t, func(ctx testingContext) {
 
 		colSigner := unittest.IdentifierFixture()
@@ -1001,7 +1002,8 @@ func Test_SPOCKGeneration(t *testing.T) {
 }
 
 func TestUnstakedNodeDoesNotBroadcastReceipts(t *testing.T) {
-	t.Skip("flakey")
+	unittest.SkipUnless(t, unittest.TEST_FLAKY, "flaky test")
+
 	runWithEngine(t, func(ctx testingContext) {
 
 		// create blocks with the following relations

@@ -21,6 +21,10 @@ var (
 	// not been committed and information is queried that is only accessible
 	// in the EpochCommitted phase.
 	ErrEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
+
+	// ErrSealingSegmentBelowRootBlock is a sentinel error returned for queries
+	// for a sealing segment below the root block.
+	ErrSealingSegmentBelowRootBlock = fmt.Errorf("cannot query sealing segment below root block")
 )
 
 type IdentityNotFoundError struct {

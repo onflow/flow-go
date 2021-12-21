@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/atomic"
 
-	"github.com/onflow/flow-go/engine/execution/state/unittest"
-
 	"github.com/onflow/flow-go/engine/execution"
+	"github.com/onflow/flow-go/engine/execution/state/unittest"
 	"github.com/onflow/flow-go/module/metrics"
+	testutils "github.com/onflow/flow-go/utils/unittest"
 )
 
 func Test_AsyncUploader(t *testing.T) {
@@ -98,7 +98,7 @@ func Test_AsyncUploader(t *testing.T) {
 	time.Sleep(1 * time.Second)
 
 	t.Run("stopping component stops retrying", func(t *testing.T) {
-		t.Skip("flakey")
+		testutils.SkipUnless(t, testutils.TEST_FLAKY, "flaky")
 
 		callCount := 0
 
@@ -130,12 +130,11 @@ func Test_AsyncUploader(t *testing.T) {
 }
 
 func Test_GCPBucketUploader(t *testing.T) {
+	testutils.SkipUnless(t, testutils.TEST_REQUIRES_GCP_ACCESS, "requires GCP Bucket setup")
 
-	t.Skip("requires GCP Bucket setup")
-
-	bucketName := os.Getenv("FLOW_TEST_GCP_BUCKET")
+	bucketName := os.Getenv("FLOW_TEST_GCP_BUCKET_NAME")
 	if bucketName == "" {
-		t.Fatal("please set FLOW_TEST_GCP_BUCKET environmental variable")
+		t.Fatal("please set FLOW_TEST_GCP_BUCKET_NAME environmental variable")
 	}
 	uploader, err := NewGCPBucketUploader(context.Background(), bucketName, zerolog.Nop())
 	require.NoError(t, err)

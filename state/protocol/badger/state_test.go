@@ -154,15 +154,15 @@ func TestBootstrapNonRoot(t *testing.T) {
 	t.Run("with sealed block", func(t *testing.T) {
 		after := snapshotAfter(t, rootSnapshot, func(state *bprotocol.FollowerState) protocol.Snapshot {
 			block1 := unittest.BlockWithParentFixture(rootBlock)
-			buildBlock(t, state, &block1)
+			buildBlock(t, state, block1)
 
-			receipt1, seal1 := unittest.ReceiptAndSealForBlock(&block1)
+			receipt1, seal1 := unittest.ReceiptAndSealForBlock(block1)
 			block2 := unittest.BlockWithParentFixture(block1.Header)
 			block2.SetPayload(unittest.PayloadFixture(unittest.WithSeals(seal1), unittest.WithReceipts(receipt1)))
-			buildBlock(t, state, &block2)
+			buildBlock(t, state, block2)
 
 			child := unittest.BlockWithParentFixture(block2.Header)
-			buildBlock(t, state, &child)
+			buildBlock(t, state, child)
 
 			return state.AtBlockID(block2.ID())
 		})
@@ -320,6 +320,32 @@ func TestBootstrap_DisconnectedSealingSegment(t *testing.T) {
 	})
 }
 
+func TestBootstrap_SealingSegmentMissingSeal(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	// convert to encodable to easily modify snapshot
+	encodable := rootSnapshot.Encodable()
+	// we are missing the required first seal
+	encodable.SealingSegment.FirstSeal = nil
+	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
+
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		assert.Error(t, err)
+	})
+}
+
+func TestBootstrap_SealingSegmentMissingResult(t *testing.T) {
+	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
+	// convert to encodable to easily modify snapshot
+	encodable := rootSnapshot.Encodable()
+	// we are missing the result referenced by the root seal
+	encodable.SealingSegment.ExecutionResults = nil
+	rootSnapshot = inmem.SnapshotFromEncodable(encodable)
+
+	bootstrap(t, rootSnapshot, func(state *bprotocol.State, err error) {
+		assert.Error(t, err)
+	})
+}
+
 func TestBootstrap_InvalidQuorumCertificate(t *testing.T) {
 	rootSnapshot := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
 	// convert to encodable to easily modify snapshot
@@ -403,4 +429,39 @@ func buildBlock(t *testing.T, state protocol.MutableState, block *flow.Block) {
 	require.NoError(t, err)
 	err = state.MarkValid(block.ID())
 	require.NoError(t, err)
+}
+
+// assertSealingSegmentBlocksQueryable bootstraps the state with the given
+// snapshot, then verifies that all sealing segment blocks are queryable.
+func assertSealingSegmentBlocksQueryableAfterBootstrap(t *testing.T, snapshot protocol.Snapshot) {
+	bootstrap(t, snapshot, func(state *bprotocol.State, err error) {
+		require.NoError(t, err)
+
+		segment, err := state.Final().SealingSegment()
+		assert.NoError(t, err)
+
+		// for each block in the sealing segment we should be able to query:
+		// * Head
+		// * SealedResult
+		// * Commit
+		for _, block := range segment.Blocks {
+			blockID := block.ID()
+			snap := state.AtBlockID(blockID)
+			header, err := snap.Head()
+			assert.NoError(t, err)
+			assert.Equal(t, blockID, header.ID())
+			_, seal, err := snap.SealedResult()
+			assert.NoError(t, err)
+			assert.Equal(t, segment.LatestSeals[blockID], seal.ID())
+			commit, err := snap.Commit()
+			assert.NoError(t, err)
+			assert.Equal(t, seal.FinalState, commit)
+		}
+		// for all blocks but the head, we should be unable to query SealingSegment:
+		for _, block := range segment.Blocks[:len(segment.Blocks)-1] {
+			snap := state.AtBlockID(block.ID())
+			_, err := snap.SealingSegment()
+			assert.ErrorIs(t, err, protocol.ErrSealingSegmentBelowRootBlock)
+		}
+	})
 }

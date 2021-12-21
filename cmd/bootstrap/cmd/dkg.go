@@ -38,15 +38,9 @@ func runDKG(nodes []model.NodeInfo) dkg.DKGData {
 		nodeID := nodes[i].NodeID
 
 		encKey := encodable.RandomBeaconPrivKey{PrivateKey: privKey}
-		privParticpant := dkg.DKGParticipantPriv{
-			NodeID:              nodeID,
-			RandomBeaconPrivKey: encKey,
-			GroupIndex:          i,
-		}
-
 		privKeyShares = append(privKeyShares, encKey)
 
-		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), privParticpant)
+		writeJSON(fmt.Sprintf(model.PathRandomBeaconPriv, nodeID), encKey)
 	}
 
 	// write full DKG info that will be used to construct QC

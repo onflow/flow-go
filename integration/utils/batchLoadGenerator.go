@@ -299,7 +299,7 @@ func (lg *BatchLoadGenerator) distributeInitialTokens() error {
 	for i := 0; i < len(lg.accounts); i++ {
 
 		// Transfer 10000 tokens
-		transferScript, err := TokenTransferScript(
+		transferTx, err := TokenTransferTransaction(
 			lg.fungibleTokenAddress,
 			lg.flowTokenAddress,
 			lg.accounts[i].address,
@@ -307,9 +307,8 @@ func (lg *BatchLoadGenerator) distributeInitialTokens() error {
 		if err != nil {
 			return err
 		}
-		transferTx := flowsdk.NewTransaction().
+		transferTx = transferTx.
 			SetReferenceBlockID(blockRef).
-			SetScript(transferScript).
 			SetProposalKey(*lg.serviceAccount.address, i+1, 1).
 			SetPayer(*lg.serviceAccount.address).
 			AddAuthorizer(*lg.serviceAccount.address)
@@ -352,7 +351,7 @@ func (lg *BatchLoadGenerator) rotateTokens() error {
 
 	for i := 0; i < len(lg.accounts); i++ {
 		j := (i + 1) % len(lg.accounts)
-		transferScript, err := TokenTransferScript(
+		transferTx, err := TokenTransferTransaction(
 			lg.fungibleTokenAddress,
 			lg.flowTokenAddress,
 			lg.accounts[j].address,
@@ -360,9 +359,8 @@ func (lg *BatchLoadGenerator) rotateTokens() error {
 		if err != nil {
 			return err
 		}
-		transferTx := flowsdk.NewTransaction().
+		transferTx = transferTx.
 			SetReferenceBlockID(blockRef).
-			SetScript(transferScript).
 			SetProposalKey(*lg.accounts[i].address, 0, lg.accounts[i].seqNumber).
 			SetPayer(*lg.accounts[i].address).
 			AddAuthorizer(*lg.accounts[i].address)

@@ -1,4 +1,4 @@
-// +build relic, blst
+// +build relic
 
 package crypto
 
