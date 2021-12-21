@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io/ioutil"
 	"path"
+	"runtime/debug"
+	"strings"
 	"time"
 
 	"github.com/onflow/cadence/runtime"
@@ -120,17 +122,20 @@ func (i *TransactionInvoker) Process(
 
 		location := common.TransactionLocation(proc.ID[:])
 
-		err := vm.Runtime.ExecuteTransaction(
-			runtime.Script{
-				Source:    proc.Transaction.Script,
-				Arguments: proc.Transaction.Arguments,
-			},
-			runtime.Context{
-				Interface:         env,
-				Location:          location,
-				PredeclaredValues: predeclaredValues,
-			},
-		)
+		err := recoverLedgerInteractionLimitExceeded(i.logger, func() error {
+			return vm.Runtime.ExecuteTransaction(
+				runtime.Script{
+					Source:    proc.Transaction.Script,
+					Arguments: proc.Transaction.Arguments,
+				},
+				runtime.Context{
+					Interface:         env,
+					Location:          location,
+					PredeclaredValues: predeclaredValues,
+				},
+			)
+		})
+
 		if err != nil {
 			txError = fmt.Errorf("transaction invocation failed: %w", errors.HandleRuntimeError(err))
 		}
@@ -172,7 +177,9 @@ func (i *TransactionInvoker) Process(
 
 	// if there is still no error check if all account storage limits are ok
 	if txError == nil {
-		txError = NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+		txError = recoverLedgerInteractionLimitExceeded(i.logger, func() error {
+			return NewTransactionStorageLimiter().CheckLimits(env, sth.State().UpdatedAddresses())
+		})
 	}
 
 	// it there was any transaction error clear changes and try to deduct fees again
@@ -239,6 +246,30 @@ func (i *TransactionInvoker) Process(
 	return txError
 }
 
+// Recover specific panic coming from ExecuteTransaction and return it as an error.
+// This panic is documented in https://www.notion.so/dapperlabs/Testnet-31-Execution-restart-11-15-2021-2446a26f55994f73bf1e4c275d640bd2#47a0ad9c4f4443f39b109ba4c1934e3c.
+// An attempt to catch it was done in the following PR: https://github.com/onflow/flow-go/pull/1625
+// That PR caught the panic to late, and the state was potentially not roll-backed correctly
+// This panic is in an un-unwrappable error so errors.As or errors.Is will not work.
+// The proper fix is that this panic does not reach this point at all https://github.com/onflow/cadence/issues/1255.
+func recoverLedgerInteractionLimitExceeded(logger zerolog.Logger, f func() error) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			if strings.Contains(fmt.Sprintf("%v", r), "[Error Code: 1106]") {
+				logger.Error().
+					Interface("error", r).
+					Str("trace", string(debug.Stack())). // there was a problem with the stack being cut off
+					Msg("VM LedgerIntractionLimitExceeded panic")
+				err = errors.NewLedgerIntractionLimitExceededError(state.DefaultMaxInteractionSize, state.DefaultMaxInteractionSize)
+				return
+			}
+			panic(r)
+		}
+	}()
+
+	return f()
+}
+
 func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *TransactionProcedure) (err error) {
 	if !env.ctx.TransactionFeesEnabled {
 		return nil
@@ -262,7 +293,10 @@ func (i *TransactionInvoker) deductTransactionFees(env *TransactionEnv, proc *Tr
 	}()
 
 	deductTxFees := DeductTransactionFeesInvocation(env, proc.TraceSpan)
-	_, err = deductTxFees(proc.Transaction.Payer)
+	err = recoverLedgerInteractionLimitExceeded(i.logger, func() error {
+		_, err := deductTxFees(proc.Transaction.Payer)
+		return err
+	})
 
 	if err != nil {
 		// TODO: Fee value is currently a constant. this should be changed when it is not

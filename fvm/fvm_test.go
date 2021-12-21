@@ -1004,6 +1004,48 @@ func TestBlockContext_ExecuteTransaction_InteractionLimitReached(t *testing.T) {
 				require.Error(t, tx.Err)
 				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
 			}))
+
+	t.Run("Using to much interaction fails during storage limit check - and is recovered", newVMTest().withBootstrapProcedureOptions(bootstrapOptions...).
+		withContextOptions(
+			fvm.WithTransactionProcessors(
+				fvm.NewTransactionAccountFrozenChecker(),
+				fvm.NewTransactionAccountFrozenEnabler(),
+				fvm.NewTransactionInvoker(zerolog.Nop()),
+			),
+		).
+		run(
+			func(t *testing.T, vm *fvm.VirtualMachine, chain flow.Chain, ctx fvm.Context, view state.View, programs *programs.Programs) {
+
+				// magic number so interaction limit is reached during storage limit check
+				ctx.MaxStateInteractionSize = 6_269_169
+				ctx.LimitAccountStorage = true
+
+				// Create an account private key.
+				privateKeys, err := testutil.GenerateAccountPrivateKeys(1)
+				require.NoError(t, err)
+
+				// Bootstrap a ledger, creating accounts with the provided private keys and the root account.
+				accounts, err := testutil.CreateAccounts(vm, view, programs, privateKeys, chain)
+				require.NoError(t, err)
+
+				_, txBody := testutil.CreateMultiAccountCreationTransaction(t, chain, 40)
+
+				txBody.SetProposalKey(chain.ServiceAddress(), 0, 0)
+				txBody.SetPayer(accounts[0])
+
+				err = testutil.SignPayload(txBody, chain.ServiceAddress(), unittest.ServiceAccountPrivateKey)
+				require.NoError(t, err)
+
+				err = testutil.SignEnvelope(txBody, accounts[0], privateKeys[0])
+				require.NoError(t, err)
+
+				tx := fvm.Transaction(txBody, 0)
+
+				err = vm.Run(ctx, tx, view, programs)
+				require.NoError(t, err)
+				require.Error(t, tx.Err)
+				assert.Equal(t, (&errors.LedgerIntractionLimitExceededError{}).Code(), tx.Err.Code())
+			}))
 }
 
 var createAccountScript = []byte(`
