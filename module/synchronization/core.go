@@ -24,20 +24,37 @@ type Core struct {
 	activeRange           module.ActiveRange
 	targetFinalizedHeight module.TargetFinalizedHeight
 
-	blockIDs map[flow.Identifier]struct{}
+	blockIDs map[flow.Identifier]uint64
+
+	config *Config
+
+	finalizedHeader     *module.FinalizedHeaderCache
+	lastFinalizedHeight uint64
 }
 
 var _ module.SyncCore = (*Core)(nil)
 var _ module.BlockRequester = (*Core)(nil)
 
-func New(log zerolog.Logger, activeRange module.ActiveRange, targetFinalizedHeight module.TargetFinalizedHeight) (*Core, error) {
-	core := &Core{
+type Config struct {
+	BlockHeightDifferenceThreshold uint64
+	DefaultRangeSize               uint
+}
+
+func DefaultConfig() *Config {
+	return &Config{
+		BlockHeightDifferenceThreshold: 192,
+		DefaultRangeSize:               192,
+	}
+}
+
+func New(log zerolog.Logger, activeRange module.ActiveRange, targetFinalizedHeight module.TargetFinalizedHeight, config *Config) *Core {
+	return &Core{
 		log:                   log.With().Str("module", "synchronization").Logger(),
-		blockIDs:              make(map[flow.Identifier]struct{}),
+		blockIDs:              make(map[flow.Identifier]uint64),
 		activeRange:           activeRange,
 		targetFinalizedHeight: targetFinalizedHeight,
+		config:                config,
 	}
-	return core, nil
 }
 
 // RequestBlock indicates that the given block should be queued for retrieval.
@@ -45,10 +62,15 @@ func (c *Core) RequestBlock(blockID flow.Identifier, height uint64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// TODO: ignore if more than x ahead of local finalized
-	// TODO: ignore if less than local finalized
+	localHeight := c.finalizedHeader.Get().Height
 
-	c.blockIDs[blockID] = struct{}{}
+	c.activeRange.LocalFinalizedHeight(localHeight)
+
+	if height > localHeight+c.config.BlockHeightDifferenceThreshold || height <= localHeight {
+		return
+	}
+
+	c.blockIDs[blockID] = height
 }
 
 // GetRequestableItems returns the set of requestable items.
@@ -56,21 +78,22 @@ func (c *Core) GetRequestableItems() (flow.Range, flow.Batch) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
-	// TODO: update target or local finalized height
+	localHeight := c.finalizedHeader.Get().Height
+
+	c.activeRange.LocalFinalizedHeight(localHeight)
+	c.activeRange.TargetFinalizedHeight(c.targetFinalizedHeight.Get())
 
 	blockIDs := make([]flow.Identifier, 0, len(c.blockIDs))
 
-	for blockID := range c.blockIDs {
-		blockIDs = append(blockIDs, blockID)
+	for blockID, height := range c.blockIDs {
+		if height <= localHeight {
+			delete(c.blockIDs, blockID)
+		} else {
+			blockIDs = append(blockIDs, blockID)
+		}
 	}
 
 	return c.activeRange.Get(), flow.Batch{BlockIDs: blockIDs}
-}
-
-func (c *Core) prune() {
-	// TODO:
-	// prune blockIDs
-	//
 }
 
 // RangeReceived updates sync state after a Range Request response is received.
