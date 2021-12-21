@@ -12,6 +12,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
+	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -49,6 +50,11 @@ func (s *ApprovalProcessingCoreTestSuite) TearDownTest() {
 func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.BaseAssignmentCollectorTestSuite.SetupTest()
 
+	// mock all verifier's valid signatures
+	for _, ver := range s.AuthorizedVerifiers {
+		ver.StakingPubKey = s.PublicKey
+	}
+
 	s.sealsDB = &storage.Seals{}
 
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Maybe()
@@ -63,7 +69,8 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	}
 
 	var err error
-	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigVerifier, s.SealsPL, s.Conduit, options)
+	hasher := crypto.NewBLSKMAC("test_tag")
+	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, hasher, s.SealsPL, s.Conduit, options)
 	require.NoError(s.T(), err)
 }
 
@@ -214,7 +221,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_CollectorsCl
 // execution result and after that we discovered execution result. In this scenario we should be able
 // to create a seal right after discovering execution result since all approvals should be cached.(if cache capacity is big enough)
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBeforeResult() {
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
@@ -239,7 +246,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBefor
 //// and after that we started receiving approvals. In this scenario we should be able to create a seal right
 //// after processing last needed approval to meet `RequiredApprovalsForSealConstruction` threshold.
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfterResult() {
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	s.SealsPL.On("Add", mock.Anything).Return(true, nil).Once()
 
@@ -264,7 +271,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfter
 // is correctly handled in case of sentinel error
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ProcessingInvalidApproval() {
 	// fail signature verification for first approval
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
 
 	// generate approvals for first chunk
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
@@ -286,7 +293,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ProcessingInva
 // is correctly handled in case of exception
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerificationException() {
 	// fail signature verification with exception
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, fmt.Errorf("exception")).Once()
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, fmt.Errorf("exception")).Once()
 
 	// generate approvals for first chunk
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
@@ -386,7 +393,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 	require.NoError(s.T(), err)
 
 	// verify will be called twice for every approval in first fork
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Times(len(forkResults[0]) * 2)
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Times(len(forkResults[0]) * 2)
 
 	// try submitting approvals for each result
 	for _, results := range forkResults {
@@ -706,8 +713,9 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	finalSnapShot.On("ValidDescendants").Return(blockChildren, nil)
 	s.State.On("Final").Return(finalSnapShot)
 
+	hasher := crypto.NewBLSKMAC("test_tag")
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, s.SigVerifier, s.SealsPL, s.Conduit, s.core.config)
+		s.Headers, s.State, s.sealsDB, assigner, hasher, s.SealsPL, s.Conduit, s.core.config)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)

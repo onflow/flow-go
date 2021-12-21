@@ -54,7 +54,6 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
@@ -405,7 +404,6 @@ func main() {
 		}).
 		Component("sealing engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
 
 			config := sealing.DefaultConfig()
@@ -428,7 +426,7 @@ func main() {
 				node.State,
 				node.Storage.Seals,
 				chunkAssigner,
-				resultApprovalSigVerifier,
+				encoding.ResultApprovalTag,
 				seals,
 				config,
 			)
