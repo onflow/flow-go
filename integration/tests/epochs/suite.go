@@ -412,8 +412,7 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	return result, nil
 }
 
-
-func (s *Suite) removeNodeFromProtocol(ctx context.Context, env templates.Environment, nodeID flow.Identifier)  {
+func (s *Suite) removeNodeFromProtocol(ctx context.Context, env templates.Environment, nodeID flow.Identifier) {
 	result, err := s.submitAdminRemoveNodeTx(ctx, env, nodeID)
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
@@ -534,8 +533,17 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 		testnet.WithID(info.NodeID),
 	}
 
+	if role == flow.RoleConsensus || role == flow.RoleCollection {
+		containerConfigs = append(
+			containerConfigs,
+			testnet.WithAdditionalFlag("insecure-access-api=false"),
+			testnet.WithAdditionalFlag("access-node-ids=*"),
+		)
+	}
+
 	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
 	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
+
 	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
@@ -584,7 +592,6 @@ func (s *Suite) assertInPhase(ctx context.Context, expectedPhase flow.EpochPhase
 
 	require.Equal(s.T(), expectedPhase, actualPhase)
 
-
 	return head.View
 }
 
@@ -622,7 +629,7 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 // assertNetworkHealthyAfterVNChange after an verification node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
-func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo)  {
+func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	bootstrapHead, err := rootSnapshot.Head()
 	require.NoError(s.T(), err)
 
@@ -641,7 +648,7 @@ func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templat
 // 1. Submit transaction to network that will target the newly staked LN by making sure the reference block ID
 // is after the first epoch starts.
 // 2. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
-func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo)  {
+func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	bootstrapHead, err := rootSnapshot.Head()
 	require.NoError(s.T(), err)
 
