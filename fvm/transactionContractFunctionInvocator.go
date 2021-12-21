@@ -41,7 +41,7 @@ func NewTransactionContractFunctionInvoker(
 	}
 }
 
-func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTraceSpan opentracing.Span) (value cadence.Value, err error) {
+func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTraceSpan opentracing.Span) (cadence.Value, error) {
 	var span opentracing.Span
 
 	ctx := env.Context()
@@ -55,7 +55,7 @@ func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTrace
 
 	predeclaredValues := valueDeclarations(ctx, env)
 
-	value, err = env.VM().Runtime.InvokeContractFunction(
+	value, err := env.VM().Runtime.InvokeContractFunction(
 		i.contractLocation,
 		i.functionName,
 		i.arguments,
