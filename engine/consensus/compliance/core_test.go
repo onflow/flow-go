@@ -404,7 +404,7 @@ func (cs *ComplianceCoreSuite) TestOnSubmitVote() {
 	err := cs.core.OnBlockVote(originID, &vote)
 	require.NoError(cs.T(), err, "block vote should pass")
 
-	// check the submit vote was called with correct parameters
+	// check that submit vote was called with correct parameters
 	cs.hotstuff.AssertExpectations(cs.T())
 }
 
