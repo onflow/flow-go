@@ -22,17 +22,19 @@ type SealValidationSuite struct {
 
 	sealValidator *sealValidator
 	metrics       *module.ConsensusMetrics
-	verifier      *module.Verifier
+	signatureTag  string
+	publicKey     *module.PublicKey
 }
 
 func (s *SealValidationSuite) SetupTest() {
 	s.SetupChain()
-	s.verifier = &module.Verifier{}
+	s.publicKey = &module.PublicKey{}
 	s.metrics = &module.ConsensusMetrics{}
+	s.signatureTag = "test_tag"
 
 	var err error
 	s.sealValidator, err = NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
-		s.Assigner, s.verifier, 2, 2, s.metrics)
+		s.Assigner, s.signatureTag, 2, 2, s.metrics)
 	s.Require().NoError(err)
 }
 
@@ -40,7 +42,7 @@ func (s *SealValidationSuite) SetupTest() {
 // required number of approvals for seal construction is smaller than for seal verification
 func (s *SealValidationSuite) TestConsistencyCheckOnApprovals() {
 	_, err := NewSealValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB,
-		s.Assigner, s.verifier, 2, 3, s.metrics)
+		s.Assigner, s.signatureTag, 2, 3, s.metrics)
 	s.Require().Error(err)
 }
 
@@ -323,8 +325,6 @@ func (s *SealValidationSuite) TestHighestSeal() {
 //      the seal for one of the following blocks (here B1)
 // In addition, we also run a valid test case to confirm the proper construction of the test
 func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
-	// assuming signatures are all good
-	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 
 	blocks := unittest.ChainFixtureFrom(4, s.LatestSealedBlock.Header)
 
@@ -404,8 +404,6 @@ func (s *SealValidationSuite) TestValidatePayload_SealsSkipBlock() {
 //       from the sealed result (we verify checking of the payload seals with respect to each other)
 // In addition, we also run a valid test case to confirm the proper construction of the test
 func (s *SealValidationSuite) TestValidatePayload_ExecutionDisconnected() {
-	// assuming signatures are all good
-	s.verifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Maybe()
 
 	blocks := []*flow.Block{&s.LatestSealedBlock} // slice with elements  [S, A, B, C, D]
 	blocks = append(blocks, unittest.ChainFixtureFrom(4, s.LatestSealedBlock.Header)...)
@@ -641,10 +639,13 @@ func (s *SealValidationSuite) validSealForResult(result *flow.ExecutionResult) *
 				ExecutionResultID: result.ID(),
 				ChunkIndex:        chunk.Index,
 			}.ID()
-			s.verifier.On("Verify",
-				payload[:],
+			// assuming all signatures are valid
+			s.Identities[aggregatedSigs.SignerIDs[i]].StakingPubKey = s.publicKey
+			s.publicKey.On("Verify",
 				aggregatedSig,
-				s.Identities[aggregatedSigs.SignerIDs[i]].StakingPubKey).Return(true, nil).Maybe()
+				payload[:],
+				mock.Anything,
+			).Return(true, nil).Maybe()
 		}
 	}
 	return seal

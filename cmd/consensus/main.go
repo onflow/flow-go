@@ -210,8 +210,6 @@ func main() {
 				node.Storage.Seals,
 				encoding.ExecutionReceiptTag)
 
-			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
-
 			sealValidator, err := validation.NewSealValidator(
 				node.State,
 				node.Storage.Headers,
@@ -219,7 +217,7 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Seals,
 				chunkAssigner,
-				resultApprovalSigVerifier,
+				encoding.ResultApprovalTag,
 				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				conMetrics)

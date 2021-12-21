@@ -3,7 +3,9 @@ package validation
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
+	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/fork"
@@ -24,7 +26,7 @@ const DefaultRequiredApprovalsForSealValidation = 0
 type sealValidator struct {
 	state                                protocol.State
 	assigner                             module.ChunkAssigner
-	verifier                             module.Verifier
+	signatureHasher                      hash.Hasher
 	seals                                storage.Seals
 	headers                              storage.Headers
 	index                                storage.Index
@@ -41,7 +43,7 @@ func NewSealValidator(
 	results storage.ExecutionResults,
 	seals storage.Seals,
 	assigner module.ChunkAssigner,
-	verifier module.Verifier,
+	signatureTag string,
 	requiredApprovalsForSealConstruction uint,
 	requiredApprovalsForSealVerification uint,
 	metrics module.ConsensusMetrics,
@@ -54,7 +56,7 @@ func NewSealValidator(
 	return &sealValidator{
 		state:                                state,
 		assigner:                             assigner,
-		verifier:                             verifier,
+		signatureHasher:                      crypto.NewBLSKMAC(signatureTag),
 		headers:                              headers,
 		results:                              results,
 		seals:                                seals,
@@ -84,7 +86,7 @@ func (s *sealValidator) verifySealSignature(aggregatedSignatures *flow.Aggregate
 			return err
 		}
 
-		valid, err := s.verifier.Verify(atstID[:], signature, nodeIdentity.StakingPubKey)
+		valid, err := nodeIdentity.StakingPubKey.Verify(signature, atstID[:], s.signatureHasher)
 		if err != nil {
 			return fmt.Errorf("failed to verify signature: %w", err)
 		}
