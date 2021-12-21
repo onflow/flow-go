@@ -148,7 +148,7 @@ func MerkleRoot(ids ...Identifier) Identifier {
 	for i, id := range ids {
 		val := make([]byte, 8)
 		binary.BigEndian.PutUint64(val, uint64(i))
-		_, err := tree.Put(id[:], val) // Merkle copies key and values internally
+		_, err := tree.Put(id[:], val) // Tree copies keys and values internally
 		if err != nil {
 			// This should never happen: per API, `Put` only errors if we feed it with
 			// zero-length keys or keys of different length. As Identifiers are fixed-sized

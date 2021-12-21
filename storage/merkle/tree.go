@@ -43,15 +43,18 @@ func (t *Tree) Size() uint64 {
 }
 
 // Put stores the given value in the trie under the given key. If the key
-// already exists, it will replace the value and return true.
+// already exists, it will replace the value and return true. All inputs
+// are internally stored and copied where necessary, thereby allowing
+// external code to re-use the slices.
 // Returns:
-//  * (false, nil):
-//  * (true, nil):
+//  * (false, nil): key-value pair is stored; key did _not_ yet exist prior to update
+//  * (true, nil):  key-value pair is stored; key existed prior to update and the old
+//                  value was overwritten
 //  * (false, error): with possible error returns
 //    - ErrorZeroKeyLength if `key` is nil or empty
 //    - ErrorIncompatibleKeyLength if the provided key length is _different_
 //      than previously stored elements.
-// No generic errors are returned.
+//    No other errors are returned.
 func (t *Tree) Put(key []byte, val []byte) (bool, error) {
 	if t.size == 0 { // empty key-value store
 		if len(key) == 0 {
@@ -279,8 +282,8 @@ GetLoop:
 	}
 }
 
-// Del will remove the value associated with the given key from the patricia
-// merkle trie. It will return true if they key was found and false otherwise.
+// Del removes the value associated with the given key from the patricia
+// merkle trie. It returns true if they key was found and false otherwise.
 // Internally, any parent nodes between the leaf up to the closest shared path
 // will be deleted or merged, which keeps the trie deterministic regardless of
 // insertion and deletion orders.
@@ -431,7 +434,7 @@ DelLoop:
 	return true
 }
 
-// Hash will return the root hash of this patricia merkle tree.
+// Hash returns the root hash of this patricia merkle tree.
 func (t *Tree) Hash() []byte {
 	if t.size == 0 {
 		return []byte{14, 87, 81, 192, 38, 229, 67, 178, 232, 171, 46, 176, 96, 153, 218, 161, 209, 229, 223, 71, 119, 143, 119, 135, 250, 171, 69, 205, 241, 47, 227, 168}
