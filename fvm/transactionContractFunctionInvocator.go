@@ -55,11 +55,15 @@ func (i *TransactionContractFunctionInvoker) Invoke(env Environment, parentTrace
 
 	predeclaredValues := valueDeclarations(ctx, env)
 
-	// recover panic coming from InvokeContractFunction and return it as an error
+	// Recover panic coming from InvokeContractFunction and return it as an error.
+	// This error will get properly handled down the line.
+	// If this panic is not caught the node will crash.
+	// Ideally ony user errors would be caught here, or better, no panics would reach this point.
 	defer func() {
 		if r := recover(); r != nil {
 			if recoveredError, ok := r.(error); ok {
 				err = recoveredError
+				i.logger.Error().Err(recoveredError).Msgf("InvokeContractFunction panic recovered")
 				return
 			}
 

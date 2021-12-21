@@ -120,17 +120,34 @@ func (i *TransactionInvoker) Process(
 
 		location := common.TransactionLocation(proc.ID[:])
 
-		err := vm.Runtime.ExecuteTransaction(
-			runtime.Script{
-				Source:    proc.Transaction.Script,
-				Arguments: proc.Transaction.Arguments,
-			},
-			runtime.Context{
-				Interface:         env,
-				Location:          location,
-				PredeclaredValues: predeclaredValues,
-			},
-		)
+		// Recover panic coming from ExecuteTransaction and return it as an error.
+		// This error will be properly handled lower down.
+		// If this panic is not caught the node will crash.
+		// Ideally ony user errors would be caught here, or better, no panics would reach this point.
+		err := func() (err error) {
+			if r := recover(); r != nil {
+				if recoveredError, ok := r.(error); ok {
+					err = recoveredError
+					i.logger.Error().Err(recoveredError).Msgf("ExecuteTransaction panic recovered")
+					return
+				}
+
+				panic(r)
+			}
+
+			return vm.Runtime.ExecuteTransaction(
+				runtime.Script{
+					Source:    proc.Transaction.Script,
+					Arguments: proc.Transaction.Arguments,
+				},
+				runtime.Context{
+					Interface:         env,
+					Location:          location,
+					PredeclaredValues: predeclaredValues,
+				},
+			)
+		}()
+
 		if err != nil {
 			txError = fmt.Errorf("transaction invocation failed: %w", errors.HandleRuntimeError(err))
 		}
