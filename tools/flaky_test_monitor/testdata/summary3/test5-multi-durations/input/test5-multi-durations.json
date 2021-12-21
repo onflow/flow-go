@@ -321,6 +321,22 @@
         ]
       },
 
+      "github.com/onflow/flow-go/crypto/hash/TestSha3_4":
+      {
+        "test": "TestSha3_4",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 25,
+        "passed": 25,
+        "failed": 0,
+        "skipped": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0.01,
+        "durations": [
+          0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
+        ]
+      },
+
       "github.com/onflow/flow-go/model/encodable/TestEncodableStakingPubKeyNil":
       {
         "test": "TestEncodableStakingPubKeyNil",
@@ -366,6 +382,38 @@
         "average_duration": 0,
         "durations": [
           0
+        ]
+      },
+
+      "github.com/onflow/flow-go/crypto/hash/TestSha3_2":
+      {
+        "test": "TestSha3_2",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 25,
+        "passed": 25,
+        "failed": 0,
+        "skipped": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0.25,
+        "durations": [
+          0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
+        ]
+      },
+
+      "github.com/onflow/flow-go/crypto/hash/TestSha3_3":
+      {
+        "test": "TestSha3_3",
+        "package": "github.com/onflow/flow-go/crypto/hash",
+        "runs": 25,
+        "passed": 25,
+        "failed": 0,
+        "skipped": 0,
+        "no_result": 0,
+        "failure_rate": 0,
+        "average_duration": 0.19,
+        "durations": [
+          0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
         ]
       }
 

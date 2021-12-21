@@ -49,6 +49,20 @@
 
   "longest_running": [
     {
+      "test": "TestSha3_2",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "runs": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 0,
+      "failure_rate": 0,
+      "average_duration": 0.25,
+      "durations": [
+        0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
+      ]
+    },
+    {
       "test": "TestSha3",
       "package": "github.com/onflow/flow-go/crypto/hash",
       "runs": 25,
@@ -58,6 +72,20 @@
       "no_result": 0,
       "failure_rate": 0,
       "average_duration": 0.23,
+      "durations": [
+        0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
+      ]
+    },
+    {
+      "test": "TestSha3_3",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "runs": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 0,
+      "failure_rate": 0,
+      "average_duration": 0.19,
       "durations": [
         0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
       ]
@@ -88,6 +116,20 @@
       "average_duration": 0.10,
       "durations": [
         0.11, 0.1, 0.11, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.12, 0.1, 0.11, 0.1, 0.1, 0.1, 0.1, 0.12, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1
+      ]
+    },
+    {
+      "test": "TestSha3_4",
+      "package": "github.com/onflow/flow-go/crypto/hash",
+      "runs": 25,
+      "passed": 25,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 0,
+      "failure_rate": 0,
+      "average_duration": 0.01,
+      "durations": [
+        0.23, 0.23, 0.24, 0.24, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.22, 0.23, 0.23, 0.22, 0.22, 0.22, 0.24, 0.22, 0.23, 0.22, 0.22, 0.23, 0.23, 0.22
       ]
     }
   ]

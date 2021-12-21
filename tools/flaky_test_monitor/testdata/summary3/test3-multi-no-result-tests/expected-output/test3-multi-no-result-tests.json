@@ -1,6 +1,21 @@
 {
   "no_results": [
     {
+      "test": "TestEncodableRandomBeaconPrivKeyMsgPack3",
+      "package": "github.com/onflow/flow-go/model/encodable",
+      "runs": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 33,
+      "failure_rate": 0,
+      "average_duration": 0,
+      "durations": [
+        0
+      ]
+    },
+
+    {
       "test": "TestEncodableRandomBeaconPrivKeyMsgPack",
       "package": "github.com/onflow/flow-go/model/encodable",
       "runs": 1,
@@ -8,6 +23,36 @@
       "failed": 0,
       "skipped": 0,
       "no_result": 13,
+      "failure_rate": 0,
+      "average_duration": 0,
+      "durations": [
+        0
+      ]
+    },
+
+    {
+      "test": "TestEncodableRandomBeaconPrivKeyMsgPack4",
+      "package": "github.com/onflow/flow-go/model/encodable",
+      "runs": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 12,
+      "failure_rate": 0,
+      "average_duration": 0,
+      "durations": [
+        0
+      ]
+    },
+
+    {
+      "test": "TestEncodableRandomBeaconPrivKeyMsgPack2",
+      "package": "github.com/onflow/flow-go/model/encodable",
+      "runs": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "no_result": 3,
       "failure_rate": 0,
       "average_duration": 0,
       "durations": [

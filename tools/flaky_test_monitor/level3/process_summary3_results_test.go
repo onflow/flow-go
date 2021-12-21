@@ -11,11 +11,11 @@ import (
 
 func TestProcessSummary3TestRun(t *testing.T) {
 	testDataMap := map[string]string{
-		// "1 failure the rest pass":                                                  "test1-1package-1failure",
-		// "1 no-result test, no other tests":                                         "test2-1-no-result-test",
-		// "many level 1 summaries, many no-result tests":                             "test3-multi-no-result-tests",
-		// "many level 1 summaries, many failures, many passes":                       "test4-multi-failures",
-		// "many level 1 summaries, many failures, many passes, many no-result tests": "test5-multi-failures-multi-no-result-tests",
+		"1 failure the rest pass":                                                  "test1-1package-1failure",
+		"1 no-result test, no other tests":                                         "test2-1-no-result-test",
+		"many level 1 summaries, many no-result tests":                             "test3-multi-no-result-tests",
+		"many level 1 summaries, many failures, many passes":                       "test4-multi-failures",
+		"many level 1 summaries, many failures, many passes, many no-result tests": "test5-multi-durations",
 	}
 
 	for k, testDir := range testDataMap {
@@ -62,7 +62,7 @@ func runProcessSummary3TestRun(t *testing.T, testDir string) {
 	}
 
 	for durationIndex := range expectedTestSummary3.LongestRunning {
-		common.AssertTestSummariesEqual(t, expectedTestSummary3.LongestRunning[durationIndex], expectedTestSummary3.LongestRunning[durationIndex])
+		common.AssertTestSummariesEqual(t, expectedTestSummary3.LongestRunning[durationIndex], actualTestSummary3.LongestRunning[durationIndex])
 	}
 
 	require.Equal(t, expectedTestSummary3, actualTestSummary3)
