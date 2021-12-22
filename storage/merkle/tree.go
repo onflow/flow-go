@@ -4,6 +4,7 @@ package merkle
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/jrick/bitset"
 )
@@ -132,6 +133,9 @@ PutLoop:
 			nodePath := bitset.Bytes(n.path)
 			var commonCount uint
 			for i := uint(0); i < n.count; i++ {
+				fmt.Println(path.Get(int(i + index)))
+				fmt.Println(nodePath.Get(int(i)))
+
 				if path.Get(int(i+index)) != nodePath.Get(int(i)) {
 					break
 				}
