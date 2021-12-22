@@ -122,7 +122,7 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 
-	hotstuffModules, err := factory.hotstuff.CreateModules(epoch, cluster, state, headers, payloads, finalizer)
+	hotstuffModules, metrics, err := factory.hotstuff.CreateModules(epoch, cluster, state, headers, payloads, finalizer)
 	if err != nil {
 		err = fmt.Errorf("could not create consensus modules: %w", err)
 		return
@@ -142,8 +142,8 @@ func (factory *EpochComponentsFactory) Create(
 		return
 	}
 	hotstuff, err = factory.hotstuff.Create(
-		cluster,
 		state,
+		metrics,
 		builder,
 		headers,
 		proposalEng,

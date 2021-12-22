@@ -56,13 +56,14 @@ func NewHotStuffFactory(
 	return factory, nil
 }
 
-func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
+func (f *HotStuffFactory) CreateModules(
+	epoch protocol.Epoch,
 	cluster protocol.Cluster,
 	clusterState cluster.State,
 	headers storage.Headers,
 	payloads storage.ClusterPayloads,
 	updater module.Finalizer,
-) (*consensus.HotstuffModules, error) {
+) (*consensus.HotstuffModules, module.HotstuffMetrics, error) {
 
 	// setup metrics/logging with the new chain ID
 	metrics := f.createMetrics(cluster.ChainID())
@@ -77,7 +78,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	)
 	committee, err = committees.NewClusterCommittee(f.protoState, payloads, cluster, epoch, f.me.NodeID())
 	if err != nil {
-		return nil, fmt.Errorf("could not create cluster committee: %w", err)
+		return nil, nil, fmt.Errorf("could not create cluster committee: %w", err)
 	}
 	committee = committees.NewMetricsWrapper(committee, metrics) // wrapper for measuring time spent determining consensus committee relations
 
@@ -87,7 +88,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 
 	finalizedBlock, err := clusterState.Final().Head()
 	if err != nil {
-		return nil, fmt.Errorf("could not get cluster finalized block: %w", err)
+		return nil, nil, fmt.Errorf("could not get cluster finalized block: %w", err)
 	}
 
 	forks, err := consensus.NewForks(
@@ -99,7 +100,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 		cluster.RootQC(),
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	qcDistributor := pubsub.NewQCCreatedDistributor()
@@ -116,7 +117,7 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 		voteProcessorFactory,
 	)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	return &consensus.HotstuffModules{
@@ -128,12 +129,12 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 		Persist:              persister.New(f.db, cluster.ChainID()),
 		Aggregator:           aggregator,
 		QCCreatedDistributor: qcDistributor,
-	}, nil
+	}, metrics, nil
 }
 
 func (f *HotStuffFactory) Create(
-	cluster protocol.Cluster,
 	clusterState cluster.State,
+	metrics module.HotstuffMetrics,
 	builder module.Builder,
 	headers storage.Headers,
 	communicator hotstuff.Communicator,
@@ -141,7 +142,6 @@ func (f *HotStuffFactory) Create(
 ) (module.HotStuff, error) {
 
 	// setup metrics/logging with the new chain ID
-	metrics := f.createMetrics(cluster.ChainID())
 	builder = blockproducer.NewMetricsWrapper(builder, metrics) // wrapper for measuring time spent building block payload component
 
 	finalizedBlock, pendingBlocks, err := recovery.FindLatest(clusterState, headers)
