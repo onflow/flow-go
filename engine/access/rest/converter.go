@@ -373,6 +373,7 @@ func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkG
 	}
 
 	// add the payload to the response if it is specified as an expandable field
+	const ExpandableFieldPayload = "payload"
 	if expand[ExpandableFieldPayload] {
 		payloadResp, err := blockPayloadResponse(blk.Payload)
 		if err != nil {
@@ -391,6 +392,7 @@ func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkG
 	// execution result might not yet exist
 	if execResult != nil {
 		// add the execution result to the response if it is specified as an expandable field
+		const ExpandableExecutionResult = "execution_result"
 		if expand[ExpandableExecutionResult] {
 			execResultResp, err := executionResultResponse(execResult, link)
 			if err != nil {
