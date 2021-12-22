@@ -42,13 +42,14 @@ func (i *IDs) Parse(raw []string) error {
 	}
 
 	id := make([]ID, len(raw))
-	for i, r := range raw {
-		err := id[i].Parse(r)
+	for j, r := range raw {
+		err := id[j].Parse(r)
 		if err != nil {
 			return err
 		}
 	}
 
+	*i = id
 	return nil
 }
 
