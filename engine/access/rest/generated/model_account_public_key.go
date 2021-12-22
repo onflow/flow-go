@@ -9,7 +9,7 @@
 package generated
 
 type AccountPublicKey struct {
-	Index int32 `json:"index"`
+	Index string `json:"index"`
 
 	PublicKey string `json:"public_key"`
 
@@ -17,9 +17,9 @@ type AccountPublicKey struct {
 
 	HashingAlgorithm *HashingAlgorithm `json:"hashing_algorithm"`
 
-	SequenceNumber int32 `json:"sequence_number"`
+	SequenceNumber string `json:"sequence_number"`
 
-	Weight int32 `json:"weight"`
+	Weight string `json:"weight"`
 
 	Revoked bool `json:"revoked"`
 }
