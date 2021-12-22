@@ -31,6 +31,161 @@ func TestEmptyTreeHash(t *testing.T) {
 	assert.Equal(t, zeroBlake, NewTree().Hash())
 }
 
+// Test_ReferenceSingleEntry we construct a tree with a single key-value pair
+// and compare its hash to a pre-computed value from a python reference implementation.
+func Test_ReferenceSingleEntry(t *testing.T) {
+	val, _ := hex.DecodeString("bab02e6213dfad3546aa473922bba0")
+
+	t.Run("2-byte path", func(t *testing.T) {
+		key := []byte{22, 83}                                                                  // key: 00010110 01010011
+		expectedRootHash := "3c4fd8e7bc5572d708d7ccab0a9ee06f74aac780e68c68d0b629ecb58a1fdf9d" // from python reference impl
+
+		tree := NewTree()
+		existed, err := tree.Put(key, val)
+		assert.NoError(t, err)
+		assert.False(t, existed)
+		require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
+	})
+
+	t.Run("32-byte path", func(t *testing.T) {
+		key, _ := hex.DecodeString("1b30482d4dc8c1a8d846d05765c03a33f0267b56b9a7be8defe38958f89c95fc")
+		expectedRootHash := "10eb7e9ffa397651acc2faf8a3c56207914418ca02ff9f39694effaf83d261e0" // from python reference impl
+
+		tree := NewTree()
+		existed, err := tree.Put(key, val)
+		assert.NoError(t, err)
+		assert.False(t, existed)
+		require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
+	})
+
+	t.Run("8192-byte path", func(t *testing.T) {
+		// for a key, we just repeat the following 32 bytes 256 times
+		k, _ := hex.DecodeString("1b30482d4dc8c1a8d846d05765c03a33f0267b56b9a7be8defe38958f89c95fc")
+		key := make([]byte, 0, 8192)
+		for i := 1; i <= 256; i++ {
+			key = append(key, k...)
+		}
+
+		expectedRootHash := "80ae4aaff2f9cc82e56968db6c313a578b07723701e6fd745f256b30fac496bf" // from python reference impl
+		tree := NewTree()
+		existed, err := tree.Put(key, val)
+		assert.NoError(t, err)
+		assert.False(t, existed)
+		require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
+	})
+}
+
+// Test_KeyLengthChecked verifies that the Tree implementation checks that
+// * the key length is between 1 and 8192 bytes
+// * all keys have the4 same length
+func Test_KeyLengthChecked(t *testing.T) {
+	val, _ := hex.DecodeString("bab02e6213dfad3546aa473922bba0")
+
+	t.Run("nil key", func(t *testing.T) {
+		tree := NewTree()
+		_, err := tree.Put(nil, val)
+		assert.ErrorIs(t, err, ErrorIncompatibleKeyLength)
+	})
+
+	t.Run("empty key", func(t *testing.T) {
+		tree := NewTree()
+		_, err := tree.Put([]byte{}, val)
+		assert.ErrorIs(t, err, ErrorIncompatibleKeyLength)
+	})
+
+	t.Run("1-byte key", func(t *testing.T) {
+		key := make([]byte, 1)
+		tree := NewTree()
+		_, err := tree.Put(key, val)
+		assert.NoError(t, err)
+	})
+
+	t.Run("8192-byte key", func(t *testing.T) {
+		key := make([]byte, maxKeyLength)
+		tree := NewTree()
+		_, err := tree.Put(key, val)
+		assert.NoError(t, err)
+	})
+
+	t.Run("key too long", func(t *testing.T) {
+		key := make([]byte, maxKeyLength+1)
+		tree := NewTree()
+		_, err := tree.Put(key, val)
+		assert.ErrorIs(t, err, ErrorIncompatibleKeyLength)
+	})
+}
+
+// Test_DifferentLengthKeys verifies that the Tree refuses to add entries
+// with different key length
+func Test_DifferentLengthKeys(t *testing.T) {
+	key1 := make([]byte, 17) // 00...0
+	val1, _ := hex.DecodeString("bab02e6213dfad3546aa473922bba0")
+
+	key2 := make([]byte, 18)
+	key2[0] = byte(1) // 10...0
+	val2, _ := hex.DecodeString("62b0326507ebce9d4a242908d20559")
+
+	tree := NewTree()
+	_, err := tree.Put(key1, val1)
+	assert.NoError(t, err)
+	_, err = tree.Put(key2, val2)
+	assert.ErrorIs(t, err, ErrorVariableKeyLengths)
+}
+
+// Test_Size checks the tree's size computation
+func Test_Size(t *testing.T) {
+	// insert a random key with a random value and make sure it didn't
+	// exist yet; collisions are unlikely enough to never happen
+	key1, val1 := randomKeyValuePair(32, 128)
+	key2, val2a := randomKeyValuePair(32, 128)
+	_, val2b := randomKeyValuePair(32, 128)
+	key3, val3 := randomKeyValuePair(32, 128)
+	unknownKey, _ := randomKeyValuePair(32, 128)
+
+	tree := NewTree()
+	replaced, err := tree.Put(key1, val1) // add key-value pair with new key
+	assert.NoError(t, err)
+	assert.False(t, replaced)
+	assert.Equal(t, uint64(1), tree.Size())
+
+	replaced, err = tree.Put(key2, val2a) // add key-value pair with new key
+	assert.NoError(t, err)
+	assert.False(t, replaced)
+	assert.Equal(t, uint64(2), tree.Size())
+
+	replaced, err = tree.Put(key2, val2b) // overwrite value of existing key
+	assert.NoError(t, err)
+	assert.True(t, replaced)
+	assert.Equal(t, uint64(2), tree.Size())
+
+	replaced, err = tree.Put(key3, val3) // add key-value pair with new key
+	assert.NoError(t, err)
+	assert.False(t, replaced)
+	assert.Equal(t, uint64(3), tree.Size())
+
+	removed := tree.Del(key2) // remove existing key-value pair
+	assert.True(t, removed)
+	assert.Equal(t, uint64(2), tree.Size())
+
+	removed = tree.Del(unknownKey) // remove unknown key-value pair
+	assert.False(t, removed)
+	assert.Equal(t, uint64(2), tree.Size())
+
+	removed = tree.Del(key1) // remove existing key-value pair
+	assert.True(t, removed)
+	assert.Equal(t, uint64(1), tree.Size())
+
+	removed = tree.Del(key1) // repeated removal should be no-op
+	assert.False(t, removed)
+	assert.Equal(t, uint64(1), tree.Size())
+
+	removed = tree.Del(key3) // remove existing key-value pair
+	assert.True(t, removed)
+	assert.Equal(t, uint64(0), tree.Size())
+}
+
+// TestTreeSingle verifies addition, retrieval and deletion operations
+// of a _single_ key-value pair to an otherwise empty tree.
 func TestTreeSingle(t *testing.T) {
 
 	// initialize the random generator, tree and zero hash
@@ -43,10 +198,7 @@ func TestTreeSingle(t *testing.T) {
 
 		// insert a random key with a random value and make sure it didn't
 		// exist yet; collisions are unlikely enough to never happen
-		key := make([]byte, 32)
-		val := make([]byte, 128)
-		_, _ = rand.Read(key)
-		_, _ = rand.Read(val)
+		key, val := randomKeyValuePair(32, 128)
 		existed, err := tree.Put(key, val)
 		assert.NoError(t, err)
 		assert.False(t, existed)
@@ -80,10 +232,7 @@ func TestTreeBatch(t *testing.T) {
 	keys := make([][]byte, 0, TreeTestLength)
 	vals := make([][]byte, 0, TreeTestLength)
 	for i := 0; i < TreeTestLength; i++ {
-		key := make([]byte, 32)
-		val := make([]byte, 128)
-		_, _ = rand.Read(key)
-		_, _ = rand.Read(val)
+		key, val := randomKeyValuePair(32, 128)
 		keys = append(keys, key)
 		vals = append(vals, val)
 	}
@@ -128,10 +277,7 @@ func TestRandomOrder(t *testing.T) {
 	keys := make([][]byte, 0, TreeTestLength)
 	vals := make(map[string][]byte)
 	for i := 0; i < TreeTestLength; i++ {
-		key := make([]byte, 32)
-		val := make([]byte, 128)
-		_, _ = rand.Read(key)
-		_, _ = rand.Read(val)
+		key, val := randomKeyValuePair(32, 128)
 		keys = append(keys, key)
 		vals[string(key)] = val
 	}
@@ -177,9 +323,9 @@ func BenchmarkTree(b *testing.B) {
 	}
 }
 
-func createPair() ([]byte, []byte) {
-	key := make([]byte, 32)
-	val := make([]byte, 128)
+func randomKeyValuePair(keySize, valueSize int) ([]byte, []byte) {
+	key := make([]byte, keySize)
+	val := make([]byte, valueSize)
 	_, _ = rand.Read(key)
 	_, _ = rand.Read(val)
 	return key, val
@@ -188,7 +334,7 @@ func createPair() ([]byte, []byte) {
 func createTree(n int) *Tree {
 	t := NewTree()
 	for i := 0; i < n; i++ {
-		key, val := createPair()
+		key, val := randomKeyValuePair(32, 128)
 		t.Put(key, val)
 	}
 	return t
@@ -200,7 +346,7 @@ func treePut(n int) func(*testing.B) {
 		b.StopTimer()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			key, val := createPair()
+			key, val := randomKeyValuePair(32, 128)
 			b.StartTimer()
 			_, _ = t.Put(key, val)
 			b.StopTimer()
@@ -215,7 +361,7 @@ func treeGet(n int) func(*testing.B) {
 		b.StopTimer()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			key, val := createPair()
+			key, val := randomKeyValuePair(32, 128)
 			_, _ = t.Put(key, val)
 			b.StartTimer()
 			_, _ = t.Get(key)
@@ -231,7 +377,7 @@ func treeDel(n int) func(*testing.B) {
 		b.StopTimer()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			key, val := createPair()
+			key, val := randomKeyValuePair(32, 128)
 			_, _ = t.Put(key, val)
 			b.StartTimer()
 			_ = t.Del(key)

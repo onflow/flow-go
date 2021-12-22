@@ -3,6 +3,9 @@
 package merkle
 
 import (
+	"encoding/hex"
+	"fmt"
+
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -33,19 +36,34 @@ var (
 // a full node or a leaf.
 
 type short struct {
-	path  []byte // holds the common path to the next node
 	count uint   // holds the count of bits in the path
+	path  []byte // holds the common path to the next node
 	child node   // holds the child after the common path; never nil
 }
 
 var _ node = &short{}
 
 func (n *short) Hash() []byte {
-	h, _ := blake2b.New256(shortNodeTag[:]) // blake2b.New256(..) error for given MAC (verified in tests)
-	_, _ = h.Write([]byte{byte(n.count)})   // blake2b.Write(..) never errors for _any_ input
-	_, _ = h.Write(n.path)                  // blake2b.Write(..) never errors for _any_ input
-	_, _ = h.Write(n.child.Hash())          // blake2b.Write(..) never errors for _any_ input
-	return h.Sum(nil)
+	// For any key, we need to ensure that the entire path can be stored in a short node.
+	// Here, we store the _number of bits_ for the path segment as uint16. However, a short node
+	// with zero path length is not part of our storage model. Therefore, we use the convention:
+	//  * for path length l with 1 ≤ l ≤ 65535: we represent l as unsigned int with big-endian encoding
+	//  * for l = 65536: we represent l as binary 00000000 00000000
+	// This convention organically utilizes the natural occurring overflow and is therefore extremely
+	// efficient. In summary, we are able to represent key length of up to 65536 bits, i.e. 8192 bytes.
+	var byteCount [2]byte
+	byteCount[0] = byte(n.count >> 8)
+	byteCount[1] = byte(n.count)
+
+	h, _ := blake2b.New256(shortNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
+	_, _ = h.Write(byteCount[:])         // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(n.path)               // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(n.child.Hash())       // blake2b.Write(..) never errors for _any_ input
+	//return h.Sum(nil)
+
+	x := h.Sum(nil)
+	fmt.Println("short node Hash: " + hex.EncodeToString(x))
+	return x
 }
 
 /* ******************************** Full Node ******************************* */
@@ -59,10 +77,14 @@ type full struct {
 var _ node = &full{}
 
 func (n *full) Hash() []byte {
-	h, _ := blake2b.New256(fullNodeTag[:]) // blake2b.New256(..) error for given MAC (verified in tests)
-	_, _ = h.Write(n.left.Hash())          // blake2b.Write(..) never errors for _any_ input
-	_, _ = h.Write(n.right.Hash())         // blake2b.Write(..) never errors for _any_ input
-	return h.Sum(nil)
+	h, _ := blake2b.New256(fullNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
+	_, _ = h.Write(n.left.Hash())       // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(n.right.Hash())      // blake2b.Write(..) never errors for _any_ input
+
+	//return h.Sum(nil)
+	x := h.Sum(nil)
+	fmt.Println("full node Hash: " + hex.EncodeToString(x))
+	return x
 }
 
 /* ******************************** Leaf Node ******************************* */
@@ -78,7 +100,12 @@ var _ node = &leaf{}
 func (n *leaf) Hash() []byte {
 	h, _ := blake2b.New256(leafNodeTag[:]) // blake2b.New256(..) error for given MAC (verified in tests)
 	_, _ = h.Write(n.val)                  // blake2b.Write(..) never errors for _any_ input
-	return h.Sum(nil)
+	//return h.Sum(nil)
+
+	x := h.Sum(nil)
+	fmt.Println("leaf node Hash: " + hex.EncodeToString(x))
+	return x
+
 }
 
 /* ******************************** Dummy Node ******************************* */

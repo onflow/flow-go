@@ -65,9 +65,9 @@ func Test_TrieWithRightRegister(t *testing.T) {
 	require.Equal(t, expectedRootHashHex, hashToString(rightPopulatedTrie.RootHash()))
 }
 
-// // Test_TrieWithMiddleRegister tests the root hash of trie holding only a single
-// // allocated register somewhere in the middle.
-// // The expected value is coming from a reference implementation in python and is hard-coded here.
+// Test_TrieWithMiddleRegister tests the root hash of trie holding only a single
+// allocated register somewhere in the middle.
+// The expected value is coming from a reference implementation in python and is hard-coded here.
 func Test_TrieWithMiddleRegister(t *testing.T) {
 	// Make new Trie (independently of MForest):
 	emptyTrie := trie.NewEmptyMTrie()

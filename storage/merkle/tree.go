@@ -9,9 +9,20 @@ import (
 )
 
 var (
-	ErrorZeroKeyLength         = errors.New("requiring keys with non-zero length")
-	ErrorIncompatibleKeyLength = errors.New("only keys with uniform lengths are supported")
+	ErrorIncompatibleKeyLength = errors.New("only non-empty keys with up to 8192 bytes are supported")
+	ErrorVariableKeyLengths    = errors.New("only keys with uniform lengths are supported")
 )
+
+// maxKeyLength in bytes:
+// For any key, we need to ensure that the entire path can be stored in a short node.
+// A short node stores the _number of bits_ for the path segment it represents as uint16.
+// However, a short node with zero path length is not part of our storage model. Therefore,
+// we use the convention:
+//  * for path length l with 1 ≤ l ≤ 65535: we represent l as unsigned int with big-endian encoding
+//  * for l = 65536: we represent l as binary 00000000 00000000
+// This convention organically utilizes the natural occurring overflow and is therefore extremely
+// efficient. In summary, we are able to represent key length of up to 65536 bits, i.e. 8192 bytes.
+const maxKeyLength = 8192
 
 // Tree represents a binary patricia merkle tree. The difference with a normal
 // merkle tree is that it compresses paths that lead to a single leaf into a
@@ -51,14 +62,14 @@ func (t *Tree) Size() uint64 {
 //  * (true, nil):  key-value pair is stored; key existed prior to update and the old
 //                  value was overwritten
 //  * (false, error): with possible error returns
-//    - ErrorZeroKeyLength if `key` is nil or empty
-//    - ErrorIncompatibleKeyLength if the provided key length is _different_
-//      than previously stored elements.
+//    - ErrorIncompatibleKeyLength if `key` is empty, or exceeds the max supported length of 8192 bytes.
+//    - ErrorVariableKeyLengths if the provided key length is _different_ than previously stored elements.
 //    No other errors are returned.
 func (t *Tree) Put(key []byte, val []byte) (bool, error) {
 	if t.size == 0 { // empty key-value store
-		if len(key) == 0 {
-			return false, ErrorZeroKeyLength
+		l := len(key)
+		if l < 1 || maxKeyLength < l {
+			return false, ErrorIncompatibleKeyLength
 		}
 		t.pathLength = len(key)
 		t.size = 1
@@ -67,7 +78,7 @@ func (t *Tree) Put(key []byte, val []byte) (bool, error) {
 
 	// for non-empty key-value store: enforce that all keys have identical length
 	if len(key) != t.pathLength {
-		return false, ErrorIncompatibleKeyLength
+		return false, ErrorVariableKeyLengths
 	}
 	replaced := t.unsafePut(key, val)
 	if !replaced {

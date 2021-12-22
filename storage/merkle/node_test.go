@@ -53,7 +53,7 @@ func TestLeafHash(t *testing.T) {
 // We compare with a python-reference implementation.
 func TestShortHash(t *testing.T) {
 	// reference value (from python reference implementation)
-	ref := "ae45d4f19809443f57d15bab02e6213dfad3546aa473922bba0eebda4e51b5ae"
+	ref := "a5632447428968cca925e802e5251c2c2b31e4ebf5236a3a66a60fe0509d6e40"
 
 	// path of 13 bits: 1011001010011
 	// per convention, we pad zeros to the end to obtain full bytes:
