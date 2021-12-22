@@ -3,9 +3,6 @@
 package merkle
 
 import (
-	"encoding/hex"
-	"fmt"
-
 	"golang.org/x/crypto/blake2b"
 )
 
@@ -59,11 +56,7 @@ func (n *short) Hash() []byte {
 	_, _ = h.Write(byteCount[:])         // blake2b.Write(..) never errors for _any_ input
 	_, _ = h.Write(n.path)               // blake2b.Write(..) never errors for _any_ input
 	_, _ = h.Write(n.child.Hash())       // blake2b.Write(..) never errors for _any_ input
-	//return h.Sum(nil)
-
-	x := h.Sum(nil)
-	fmt.Println("short node Hash: " + hex.EncodeToString(x))
-	return x
+	return h.Sum(nil)
 }
 
 /* ******************************** Full Node ******************************* */
@@ -80,11 +73,7 @@ func (n *full) Hash() []byte {
 	h, _ := blake2b.New256(fullNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
 	_, _ = h.Write(n.left.Hash())       // blake2b.Write(..) never errors for _any_ input
 	_, _ = h.Write(n.right.Hash())      // blake2b.Write(..) never errors for _any_ input
-
-	//return h.Sum(nil)
-	x := h.Sum(nil)
-	fmt.Println("full node Hash: " + hex.EncodeToString(x))
-	return x
+	return h.Sum(nil)
 }
 
 /* ******************************** Leaf Node ******************************* */
@@ -100,12 +89,7 @@ var _ node = &leaf{}
 func (n *leaf) Hash() []byte {
 	h, _ := blake2b.New256(leafNodeTag[:]) // blake2b.New256(..) error for given MAC (verified in tests)
 	_, _ = h.Write(n.val)                  // blake2b.Write(..) never errors for _any_ input
-	//return h.Sum(nil)
-
-	x := h.Sum(nil)
-	fmt.Println("leaf node Hash: " + hex.EncodeToString(x))
-	return x
-
+	return h.Sum(nil)
 }
 
 /* ******************************** Dummy Node ******************************* */
