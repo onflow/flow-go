@@ -34,7 +34,7 @@ func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 		assigner:                             s.Assigner,
 		state:                                s.State,
 		headers:                              s.Headers,
-		verifier:                             s.SigVerifier,
+		sigHasher:                            s.sigHasher,
 		seals:                                s.SealsPL,
 		approvalConduit:                      s.Conduit,
 		requestTracker:                       s.RequestTracker,
@@ -51,7 +51,7 @@ func (s *AssignmentCollectorStateMachineTestSuite) TestChangeProcessingStatus_Ca
 	require.Equal(s.T(), CachingApprovals, s.collector.ProcessingStatus())
 	results := make([]*flow.IncorporatedResult, 3)
 
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	for i := range results {
 		block := unittest.BlockHeaderWithParentFixture(&s.Block)

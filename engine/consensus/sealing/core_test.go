@@ -50,11 +50,6 @@ func (s *ApprovalProcessingCoreTestSuite) TearDownTest() {
 func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	s.BaseAssignmentCollectorTestSuite.SetupTest()
 
-	// mock all verifier's valid signatures
-	for _, ver := range s.AuthorizedVerifiers {
-		ver.StakingPubKey = s.PublicKey
-	}
-
 	s.sealsDB = &storage.Seals{}
 
 	s.State.On("Sealed").Return(unittest.StateSnapshotForKnownBlock(&s.ParentBlock, nil)).Maybe()

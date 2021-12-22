@@ -62,7 +62,6 @@ import (
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
 	mockmodule "github.com/onflow/flow-go/module/mock"
-	"github.com/onflow/flow-go/module/signature"
 	chainsync "github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/trace"
 	"github.com/onflow/flow-go/module/validation"
@@ -387,8 +386,6 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals,
 		encoding.ExecutionReceiptTag)
 
-	approvalVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
-
 	sealingConfig := sealing.DefaultConfig()
 
 	sealingEngine, err := sealing.NewEngine(
@@ -407,7 +404,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.State,
 		node.Seals,
 		assigner,
-		approvalVerifier,
+		encoding.ResultApprovalTag,
 		seals,
 		sealingConfig)
 	require.NoError(t, err)
