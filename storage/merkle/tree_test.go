@@ -9,8 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jrick/bitset"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/blake2b"
@@ -61,7 +59,7 @@ func Test_ReferenceSingleEntry(t *testing.T) {
 	})
 
 	t.Run("8192-byte path", func(t *testing.T) {
-		// for a key, we just repeat the following 32 bytes 256 times
+		// as key, we just repeat the following 32 bytes 256 times
 		k, _ := hex.DecodeString("1b30482d4dc8c1a8d846d05765c03a33f0267b56b9a7be8defe38958f89c95fc")
 		key := make([]byte, 0, 8192)
 		for i := 1; i <= 256; i++ {
@@ -80,46 +78,15 @@ func Test_ReferenceSingleEntry(t *testing.T) {
 // Test_2EntryTree we construct a tree with a 2 key-value pairs and compare
 // its hash to a pre-computed value from a python reference implementation.
 func Test_2EntryTree(t *testing.T) {
-
-	key0 := []byte{uint8(20), uint8(3)}   // 00010100 00000011
-	key1 := []byte{uint8(23), uint8(252)} // 00010111 11111100
+	key0 := []byte{20, 3}   // 00010100 00000011
+	key1 := []byte{23, 252} // 00010111 11111100
 	val0, _ := hex.DecodeString("62b0326507ebce9d4a242908d20559")
 	val1, _ := hex.DecodeString("bab02e6213dfad3546aa473922bba0")
 	expectedRootHash := "7f372aca94b91a527539967ba966c3a91c91e97b265fc4830801b4bcca01b06e" // from python reference impl
 
-	fmt.Println()
-	fmt.Println()
-	k, _ := hex.DecodeString("1400")
-	for i := 0; i < 16; i++ {
-		if bitset.Bytes(k).Get(i) {
-			fmt.Print(1)
-		} else {
-			fmt.Print(0)
-		}
-	}
-	fmt.Println()
-
-	for i := 0; i < 16; i++ {
-		if bitset.Bytes(key0).Get(i) {
-			fmt.Print(1)
-		} else {
-			fmt.Print(0)
-		}
-	}
-	fmt.Println()
-	for i := 0; i < 16; i++ {
-		if bitset.Bytes(key1).Get(i) {
-			fmt.Print(1)
-		} else {
-			fmt.Print(0)
-		}
-	}
-	fmt.Println()
-
 	tree := NewTree()
 	tree.Put(key0, val0)
 	tree.Put(key1, val1)
-
 	require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
 }
 
@@ -127,34 +94,32 @@ func Test_2EntryTree(t *testing.T) {
 // tree implementation is _not_ vulnerable to the slices of the key-value
 // pair being modified in-place _after_ addition to the tree.
 func Test_KeyValuesAreSafeFromExternalModification(t *testing.T) {
-	// random key-value pairs (collisions are unlikely enough to never happen)
-	key1, val1 := randomKeyValuePair(32, 128)
-	key2, val2 := randomKeyValuePair(32, 128)
-	postKey, postVal := randomKeyValuePair(32, 128)
+	// we re-use the same key-value pairs as in Test_2EntryTree:
+	key0 := []byte{20, 3}   // 00010100 00000011
+	key1 := []byte{23, 252} // 00010111 11111100
+	val0, _ := hex.DecodeString("62b0326507ebce9d4a242908d20559")
+	val1, _ := hex.DecodeString("bab02e6213dfad3546aa473922bba0")
+	expectedRootHash := "7f372aca94b91a527539967ba966c3a91c91e97b265fc4830801b4bcca01b06e" // from python reference impl
 
-	// completely separate tree for reference
-	referenceTree := NewTree()
-	referenceTree.Put(key1, val1)
-	referenceTree.Put(key2, val2)
-	refHash := append([]byte{}, referenceTree.Hash()...) // copies hash
-	fmt.Println(refHash)
-
-	// put the same key-value pairs into a separate instance,
-	// but overwrite the slices _afterwards_
+	// we now put the key-value pairs into a tree,
+	// but overwrite the key and value slices right after
+	postKey := []byte{255, 255}
+	postVal, _ := hex.DecodeString("1b30482d4dc8c1a8d846d05765c03a")
 	tree := NewTree()
+	tree.Put(key0, val0)
+	copy(key0, postKey)
+	copy(val0, postVal)
 	tree.Put(key1, val1)
 	copy(key1, postKey)
 	copy(val1, postVal)
-	tree.Put(key2, val2)
-	copy(key2, postKey)
-	copy(val2, postVal)
+
 	// (key1, val1) and (key2, val2) should now contain the same data as (postKey, postVal)
+	require.Equal(t, postKey, key0)
+	require.Equal(t, postVal, val0)
 	require.Equal(t, postKey, key1)
 	require.Equal(t, postVal, val1)
-	require.Equal(t, postKey, key2)
-	require.Equal(t, postVal, val2)
-
-	require.Equal(t, refHash, tree.Hash())
+	// but the tree's root hash should still be the expected value:
+	require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
 }
 
 // Test_KeyLengthChecked verifies that the Tree implementation checks that

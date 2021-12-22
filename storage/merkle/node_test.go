@@ -2,7 +2,7 @@ package merkle
 
 import (
 	"encoding/hex"
-	"fmt"
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -52,22 +52,64 @@ func TestLeafHash(t *testing.T) {
 // TestShortHash verifies that the hash of a short node returns the expected value.
 // We compare with a python-reference implementation.
 func TestShortHash(t *testing.T) {
-	// reference value (from python reference implementation)
-	ref := "a5632447428968cca925e802e5251c2c2b31e4ebf5236a3a66a60fe0509d6e40"
+	t.Run("13-bit path", func(t *testing.T) {
+		// expected value from python reference implementation
+		ref := "a5632447428968cca925e802e5251c2c2b31e4ebf5236a3a66a60fe0509d6e40"
 
-	// path of 13 bits: 1011001010011
-	// per convention, we pad zeros to the end to obtain full bytes:
-	//  -> 10110010 10011000 (padded binary representation)
-	//  ->      178      152 (uint8 representation)
-	//
-	path := []byte{178, 152}
-	fmt.Println(hex.EncodeToString(path))
-	s := short{
-		path:  path,
-		count: 13,
-		child: &leaf{val: payload1},
-	}
-	require.Equal(t, ref, hex.EncodeToString(s.Hash()))
+		// path of 13 bits: 1011001010011
+		// per convention, we pad zeros to the end to obtain full bytes:
+		//  -> 10110010 10011000 (padded binary representation)
+		//  ->      178      152 (uint8 representation)
+		//
+		path := []byte{178, 152}
+		s := short{
+			path:  path,
+			count: 13,
+			child: &leaf{val: payload1},
+		}
+		require.Equal(t, ref, hex.EncodeToString(s.Hash()))
+	})
+
+	t.Run("65536-bit path", func(t *testing.T) {
+		// as path, we just repeat the following 32 bytes 256 times
+		k, _ := hex.DecodeString("1b30482d4dc8c1a8d846d05765c03a33f0267b56b9a7be8defe38958f89c95fc")
+		path := make([]byte, 0, 8192)
+		for i := 1; i <= 256; i++ {
+			path = append(path, k...)
+		}
+		// expected value from python reference implementation
+		ref := "b49541ce56e5cd207cac3a08821ddfc61fc5aaf8886907d226581a7c53a48827"
+
+		s := short{
+			path:  path,
+			count: 65536,
+			child: &leaf{val: payload1},
+		}
+		require.Equal(t, ref, hex.EncodeToString(s.Hash()))
+	})
+}
+
+// Test_ShortNodePathLengthEncoding:
+// The tree enforces a max key length of `maxKeyLength`. We verify that:
+// 1. the resulting number of bits (i.e. maxKeyLength * 8), does not
+//    overflow the hardware-dependent int range.
+// 2. the value range from [1, ..., maxKeyLength * 8] can be encoded into 2 bytes,
+//    as this is required by the short node (but not enforced at run time)
+// 3. serializedPathSegmentLength(l) implements the following encoding
+//    * if 1 ≤ l ≤ 65535: we represent l as unsigned int with big-endian encoding
+//    * for l = 65536: we represent l as binary 00000000 00000000
+func Test_ShortNodePathLengthEncoding(t *testing.T) {
+	// testing 1:
+	require.True(t, maxKeyLength <= math.MaxInt/8)
+
+	// testing 2:
+	// two bytes can encode 2^16 = 65536 different values
+	require.Equal(t, uint64(65536), uint64(maxKeyLength)*8)
+
+	// testing 3:
+	require.Equal(t, [2]byte{0, 1}, serializedPathSegmentLength(1))
+	require.Equal(t, [2]byte{255, 255}, serializedPathSegmentLength(65535))
+	require.Equal(t, [2]byte{0, 0}, serializedPathSegmentLength(65536))
 }
 
 // TestFullHash verifies that the hash of a full node returns the expected value.

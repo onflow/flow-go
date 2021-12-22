@@ -4,9 +4,8 @@ package merkle
 
 import (
 	"errors"
-	"fmt"
 
-	"github.com/jrick/bitset"
+	"github.com/onflow/flow-go/ledger/common/bitutils"
 )
 
 var (
@@ -16,7 +15,7 @@ var (
 
 // maxKeyLength in bytes:
 // For any key, we need to ensure that the entire path can be stored in a short node.
-// A short node stores the _number of bits_ for the path segment it represents as uint16.
+// A short node stores the _number of bits_ for the path segment it represents in 2 bytes.
 // However, a short node with zero path length is not part of our storage model. Therefore,
 // we use the convention:
 //  * for path length l with 1 ≤ l ≤ 65535: we represent l as unsigned int with big-endian encoding
@@ -95,13 +94,12 @@ func (t *Tree) Put(key []byte, val []byte) (bool, error) {
 func (t *Tree) unsafePut(key []byte, val []byte) bool {
 	// the path through the tree is determined by the key; we decide whether to
 	// go left or right based on whether the next bit is set or not
-	path := bitset.Bytes(key[:])
 
 	// we use a pointer that points at the current node in the tree
 	cur := &t.root
 
 	// we use an index to keep track of the bit we are currently looking at
-	index := uint(0)
+	index := 0
 
 	// the for statement keeps running until we reach a leaf in the merkle tree
 	// if the leaf is nil, it was empty and we insert a new value
@@ -113,9 +111,8 @@ PutLoop:
 		// if we have a full node, we have a node on each side to go to, so we
 		// just pick the next node based on whether the bit is set or not
 		case *full:
-			// if the bit is 0 (false), we go left
-			// otherwise, it's 1 (true) and we go right
-			if !path.Get(int(index)) {
+			// if the bit is 0, we go left; otherwise (bit value 1), we go right
+			if bitutils.Bit(key, index) == 0 {
 				cur = &n.left
 			} else {
 				cur = &n.right
@@ -130,13 +127,10 @@ PutLoop:
 		// node; in that case, we use as much of the shared path as possible
 		case *short:
 			// first, we find out how many bits we have in common
-			nodePath := bitset.Bytes(n.path)
-			var commonCount uint
-			for i := uint(0); i < n.count; i++ {
-				fmt.Println(path.Get(int(i + index)))
-				fmt.Println(nodePath.Get(int(i)))
-
-				if path.Get(int(i+index)) != nodePath.Get(int(i)) {
+			commonCount := 0
+			shortPathCount := n.count
+			for i := 0; i < shortPathCount; i++ {
+				if bitutils.Bit(key, i+index) != bitutils.Bit(n.path, i) {
 					break
 				}
 				commonCount++
@@ -144,7 +138,7 @@ PutLoop:
 
 			// if the common and node count are equal, we share all of the path
 			// we can simply forward to the child of the short node and continue
-			if commonCount == n.count {
+			if commonCount == shortPathCount {
 				cur = &n.child
 				index += commonCount
 				continue PutLoop
@@ -153,11 +147,11 @@ PutLoop:
 			// if the common count is non-zero, we share some of the path;
 			// first, we insert a common short node for the shared path
 			if commonCount > 0 {
-				commonPath := bitset.NewBytes(int(commonCount))
-				for i := uint(0); i < commonCount; i++ {
-					commonPath.SetBool(int(i), path.Get(int(i+index)))
+				commonPath := bitutils.MakeBitVector(commonCount)
+				for i := 0; i < commonCount; i++ {
+					bitutils.SetBit(commonPath, i, bitutils.Bit(key, i+index))
 				}
-				commonNode := &short{count: commonCount, path: []byte(commonPath)}
+				commonNode := &short{count: commonCount, path: commonPath}
 				*cur = commonNode
 				cur = &commonNode.child
 				index = index + commonCount
@@ -169,7 +163,7 @@ PutLoop:
 			var remain *node
 			splitNode := &full{}
 			*cur = splitNode
-			if nodePath.Get(int(commonCount)) {
+			if bitutils.Bit(n.path, commonCount) == 1 {
 				cur = &splitNode.left
 				remain = &splitNode.right
 			} else {
@@ -184,11 +178,11 @@ PutLoop:
 			// forward to its path; finally, we set the leaf to original leaf
 			remainCount := n.count - commonCount - 1
 			if remainCount > 0 {
-				remainPath := bitset.NewBytes(int(remainCount))
-				for i := uint(0); i < remainCount; i++ {
-					remainPath.SetBool(int(i), nodePath.Get(int(i+commonCount+1)))
+				remainPath := bitutils.MakeBitVector(remainCount)
+				for i := 0; i < remainCount; i++ {
+					bitutils.SetBit(remainPath, i, bitutils.Bit(n.path, i+commonCount+1))
 				}
-				remainNode := &short{count: remainCount, path: []byte(remainPath)}
+				remainNode := &short{count: remainCount, path: remainPath}
 				*remain = remainNode
 				remain = &remainNode.child
 			}
@@ -204,7 +198,7 @@ PutLoop:
 		// if we have nil, we reached the end of any shared path
 		case nil:
 			// if we have reached the end of the key, insert the new value
-			totalCount := uint(len(key)) * 8
+			totalCount := len(key) * 8
 			if index == totalCount {
 				// Instantiate a new leaf holding a _copy_ of the provided key-value pair,
 				// to protect the slices from external modification.
@@ -216,9 +210,9 @@ PutLoop:
 
 			// otherwise, insert a short node with the remainder of the path
 			finalCount := totalCount - index
-			finalPath := bitset.NewBytes(int(finalCount))
-			for i := uint(0); i < finalCount; i++ {
-				finalPath.SetBool(int(i), path.Get(int(index+i)))
+			finalPath := bitutils.MakeBitVector(finalCount)
+			for i := 0; i < finalCount; i++ {
+				bitutils.SetBit(finalPath, i, bitutils.Bit(key, index+i))
 			}
 			finalNode := &short{count: finalCount, path: []byte(finalPath)}
 			*cur = finalNode
@@ -244,9 +238,8 @@ func (t *Tree) Get(key []byte) ([]byte, bool) {
 // UNSAFE:
 //  * all keys must have identical lengths, which is not checked here.
 func (t *Tree) unsafeGet(key []byte) ([]byte, bool) {
-	cur := &t.root               // we start at the root again
-	path := bitset.Bytes(key[:]) // we use the given key as path again
-	index := uint(0)             // and we start at a zero index in the path
+	cur := &t.root // start at the root
+	index := 0     // and we start at a zero index in the path
 
 GetLoop:
 	for {
@@ -255,25 +248,22 @@ GetLoop:
 		// if we have a full node, we can follow the path for at least one more
 		// bit, so go left or right depending on whether it's set or not
 		case *full:
-
 			// forward pointer and index to the correct child
-			if !path.Get(int(index)) {
+			if bitutils.Bit(key, index) == 0 {
 				cur = &n.left
 			} else {
 				cur = &n.right
 			}
-			index++
 
+			index++
 			continue GetLoop
 
 		// if we have a short path, we can only follow the short node if
 		// its paths has all bits in common with the key we are retrieving
 		case *short:
-
 			// if any part of the path doesn't match, key doesn't exist
-			nodePath := bitset.Bytes(n.path)
-			for i := uint(0); i < n.count; i++ {
-				if path.Get(int(i+index)) != nodePath.Get(int(i)) {
+			for i := 0; i < n.count; i++ {
+				if bitutils.Bit(key, i+index) != bitutils.Bit(n.path, i) {
 					return nil, false
 				}
 			}
@@ -286,12 +276,10 @@ GetLoop:
 
 		// if we have a leaf, we found the key, return value and true
 		case *leaf:
-
 			return n.val, true
 
 		// if we have a nil node, key doesn't exist, return nil and false
 		case nil:
-
 			return nil, false
 		}
 	}
@@ -321,9 +309,8 @@ func (t *Tree) Del(key []byte) bool {
 // UNSAFE:
 //  * all keys must have identical lengths, which is not checked here.
 func (t *Tree) unsafeDel(key []byte) bool {
-
-	// we set the current pointer to the root
-	cur := &t.root
+	cur := &t.root // start at the root
+	index := 0     // the index points to the bit we are processing in the path
 
 	// we initialize three pointers pointing to a dummy empty node
 	// this is used to keep track of the node we last pointed to, as well as
@@ -334,48 +321,38 @@ func (t *Tree) unsafeDel(key []byte) bool {
 	dummy := node(&dummy{})
 	last, parent, grand := &dummy, &dummy, &dummy
 
-	// we use the key as the path
-	path := bitset.Bytes(key[:])
-
-	// the index points to the bit we are processing in the path
-	index := uint(0)
-
 DelLoop:
 	for {
 		switch n := (*cur).(type) {
 
 		// if we have a full node, we forward all of the pointers
 		case *full:
-
 			// keep track of grand-parent, parent and node for cleanup
 			grand = parent
 			parent = last
 			last = cur
 
 			// forward pointer and index to the correct child
-			if !path.Get(int(index)) {
+			if bitutils.Bit(key, index) == 0 {
 				cur = &n.left
 			} else {
 				cur = &n.right
 			}
 
 			index++
-
 			continue DelLoop
 
 		// if we have a short node, we forward by all of the common path if
 		// possible; otherwise the node wasn't found
 		case *short:
-
 			// keep track of grand-parent, parent and node for cleanup
 			grand = parent
 			parent = last
 			last = cur
 
 			// if the path doesn't match at any point, we can't find the node
-			nodePath := bitset.Bytes(n.path)
-			for i := uint(0); i < n.count; i++ {
-				if path.Get(int(i+index)) != nodePath.Get(int(i)) {
+			for i := 0; i < n.count; i++ {
+				if bitutils.Bit(key, i+index) != bitutils.Bit(n.path, i) {
 					return false
 				}
 			}
@@ -388,15 +365,11 @@ DelLoop:
 
 		// if we have a leaf node, we remove it and continue with cleanup
 		case *leaf:
-
-			// replace the current pointer with nil to delete the node
-			*cur = nil
-
+			*cur = nil // replace the current pointer with nil to delete the node
 			break DelLoop
 
 		// if we reach nil, the node doesn't exist
 		case nil:
-
 			return false
 		}
 	}
@@ -420,12 +393,12 @@ DelLoop:
 	// if the last node is a full node, we need to convert it into a short node
 	// that holds the undeleted child and the corresponding bit as path
 	var n *short
-	newPath := bitset.NewBytes(1)
+	newPath := bitutils.MakeBitVector(1)
 	if f.left != nil {
-		newPath.SetBool(0, false)
+		bitutils.SetBit(newPath, 0, 0)
 		n = &short{count: 1, path: newPath, child: f.left}
 	} else {
-		newPath.SetBool(0, true)
+		bitutils.SetBit(newPath, 0, 1)
 		n = &short{count: 1, path: newPath, child: f.right}
 	}
 	*last = n
@@ -460,14 +433,13 @@ func (t *Tree) Hash() []byte {
 // merge will merge a child short node into a parent short node.
 func merge(p *short, c *short) {
 	totalCount := p.count + c.count
-	totalPath := bitset.NewBytes(int(totalCount))
-	parentPath := bitset.Bytes(p.path)
-	for i := uint(0); i < p.count; i++ {
-		totalPath.SetBool(int(i), parentPath.Get(int(i)))
+	totalPath := bitutils.MakeBitVector(totalCount)
+	for i := 0; i < p.count; i++ {
+		bitutils.SetBit(totalPath, i, bitutils.Bit(p.path, i))
 	}
-	childPath := bitset.Bytes(c.path)
-	for i := uint(0); i < c.count; i++ {
-		totalPath.SetBool(int(i+p.count), childPath.Get(int(i)))
+	//childPath := bitset.Bytes(c.path)
+	for i := 0; i < c.count; i++ {
+		bitutils.SetBit(totalPath, i+p.count, bitutils.Bit(c.path, i))
 	}
 	p.count = totalCount
 	p.path = totalPath

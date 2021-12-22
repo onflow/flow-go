@@ -33,7 +33,7 @@ var (
 // a full node or a leaf.
 
 type short struct {
-	count uint   // holds the count of bits in the path
+	count int    // holds the count of bits in the path
 	path  []byte // holds the common path to the next node
 	child node   // holds the child after the common path; never nil
 }
@@ -41,22 +41,25 @@ type short struct {
 var _ node = &short{}
 
 func (n *short) Hash() []byte {
-	// For any key, we need to ensure that the entire path can be stored in a short node.
-	// Here, we store the _number of bits_ for the path segment as uint16. However, a short node
-	// with zero path length is not part of our storage model. Therefore, we use the convention:
-	//  * for path length l with 1 ≤ l ≤ 65535: we represent l as unsigned int with big-endian encoding
-	//  * for l = 65536: we represent l as binary 00000000 00000000
-	// This convention organically utilizes the natural occurring overflow and is therefore extremely
-	// efficient. In summary, we are able to represent key length of up to 65536 bits, i.e. 8192 bytes.
-	var byteCount [2]byte
-	byteCount[0] = byte(n.count >> 8)
-	byteCount[1] = byte(n.count)
-
+	c := serializedPathSegmentLength(n.count)
 	h, _ := blake2b.New256(shortNodeTag) // blake2b.New256(..) error for given MAC (verified in tests)
-	_, _ = h.Write(byteCount[:])         // blake2b.Write(..) never errors for _any_ input
+	_, _ = h.Write(c[:])                 // blake2b.Write(..) never errors for _any_ input
 	_, _ = h.Write(n.path)               // blake2b.Write(..) never errors for _any_ input
 	_, _ = h.Write(n.child.Hash())       // blake2b.Write(..) never errors for _any_ input
 	return h.Sum(nil)
+}
+
+// serializedPathSegmentLength serializes the bitCount into two bytes using the following optimization:
+// A short node with zero path length is not part of our storage model. Therefore, we use the convention:
+//  * for path length l with 1 ≤ l ≤ 65535: we represent l as unsigned int with big-endian encoding
+//  * for l = 65536: we represent l as binary 00000000 00000000
+// This convention organically utilizes the natural occurring overflow and is therefore extremely
+// efficient. In summary, we are able to represent key length of up to 65536 bits, i.e. 8192 bytes.
+func serializedPathSegmentLength(bitCount int) [2]byte {
+	var byteCount [2]byte
+	byteCount[0] = byte(bitCount >> 8)
+	byteCount[1] = byte(bitCount)
+	return byteCount
 }
 
 /* ******************************** Full Node ******************************* */
