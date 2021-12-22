@@ -33,7 +33,7 @@ func NewVoteCollectors(lowestRetainedView uint64, workerPool hotstuff.Workerpool
 	componentBuilder := component.NewComponentManagerBuilder()
 	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 		ready()
-		<-ctx.Done()
+		<-ctx.Done()          // wait for parent context to signal shutdown
 		workerPool.StopWait() // wait till all workers exit
 	})
 

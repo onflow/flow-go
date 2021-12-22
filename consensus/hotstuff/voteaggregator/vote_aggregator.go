@@ -3,6 +3,7 @@ package voteaggregator
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog"
 
@@ -64,22 +65,41 @@ func NewVoteAggregator(
 
 	// manager for own worker routines plus the internal collectors
 	componentBuilder := component.NewComponentManagerBuilder()
+	var wg sync.WaitGroup
+	wg.Add(defaultVoteAggregatorWorkers)
 	for i := 0; i < defaultVoteAggregatorWorkers; i++ { // manager for worker routines that process inbound votes
-		componentBuilder.AddWorker(aggregator.queuedVotesProcessingLoop)
+		componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+			ready()
+			aggregator.queuedVotesProcessingLoop(ctx)
+			wg.Done()
+		})
 	}
-	componentBuilder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		collectors.Start(ctx)
+	componentBuilder.AddWorker(func(_ irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// create new context which is not connected to parent
+		// we need to ensure that our internal workers stop before asking
+		// vote collectors to stop. We want to avoid delivering events to already stopped vote collectors
+		ctx, cancel := context.WithCancel(context.Background())
+		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+		// start vote collectors
+		collectors.Start(signalerCtx)
+		<-collectors.Ready()
+
 		ready()
-		<-ctx.Done()
+
+		// wait for internal workers to stop
+		wg.Wait()
+		// signal vote collectors to stop
+		cancel()
+		// wait for it to stop
+		<-collectors.Done()
 	})
 
 	aggregator.ComponentManager = componentBuilder.Build()
 	return aggregator, nil
 }
 
-func (va *VoteAggregator) queuedVotesProcessingLoop(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+func (va *VoteAggregator) queuedVotesProcessingLoop(ctx irrecoverable.SignalerContext) {
 	notifier := va.queuedVotesNotifier.Channel()
-	ready() // signal that this worker is ready
 	for {
 		select {
 		case <-ctx.Done():

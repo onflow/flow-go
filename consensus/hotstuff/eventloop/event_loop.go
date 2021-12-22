@@ -33,7 +33,7 @@ var _ component.Component = (*EventLoop)(nil)
 // NewEventLoop creates an instance of EventLoop.
 func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandler hotstuff.EventHandler, startTime time.Time) (*EventLoop, error) {
 	proposals := make(chan *model.Proposal)
-	quorumCertificates := make(chan *flow.QuorumCertificate)
+	quorumCertificates := make(chan *flow.QuorumCertificate, 1)
 
 	el := &EventLoop{
 		log:                log,
@@ -57,10 +57,10 @@ func NewEventLoop(log zerolog.Logger, metrics module.HotstuffMetrics, eventHandl
 			el.log.Info().Msgf("starting event loop")
 			err := el.loop(ctx)
 			if err != nil {
+				el.log.Error().Err(err).Msg("irrecoverable event loop error")
 				ctx.Throw(err)
 			}
 		}
-
 	})
 	el.ComponentManager = componentBuilder.Build()
 

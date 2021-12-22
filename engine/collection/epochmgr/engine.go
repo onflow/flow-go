@@ -60,18 +60,25 @@ func NewEpochComponents(
 
 	builder := component.NewComponentManagerBuilder()
 	// start new worker that will start child components and wait for them to finish
-	builder.AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
-		// start hotstuff and aggregator
-		hotstuff.Start(ctx)
-		aggregator.Start(ctx)
+	builder.AddWorker(func(parentCtx irrecoverable.SignalerContext, ready component.ReadyFunc) {
+		// create a separate context that is not connected to parent, reason:
+		// we want to stop vote aggregator after event loop and compliance engine have shutdown
+		ctx, cancel := context.WithCancel(context.Background())
+		signalerCtx, _ := irrecoverable.WithSignaler(ctx)
+		// start aggregator, hotstuff will be started by compliance engine
+		aggregator.Start(signalerCtx)
 		// wait until all components start
-		<-util.AllReady(components.prop, components.sync, components.hotstuff, components.aggregator)
+		<-util.AllReady(components.prop, components.sync, components.aggregator)
 		// signal that startup has finished and we are ready to go
 		ready()
-		// wait until parent context is cancelled and component stops
-		<-util.AllDone(components.hotstuff, components.aggregator)
-		// once startable components are stopped we can stop our engines that don't support module.Startable
+		// wait for shutdown to be commenced
+		<-parentCtx.Done()
+		// wait for compliance engine and event loop to shut down
 		<-util.AllDone(components.prop, components.sync)
+		// after event loop and engines were stopped proceed with stopping vote aggregator
+		cancel()
+		// wait until it stops
+		<-components.aggregator.Done()
 	})
 	components.ComponentManager = builder.Build()
 

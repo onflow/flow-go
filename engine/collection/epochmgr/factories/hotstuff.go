@@ -13,6 +13,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications"
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
 	"github.com/onflow/flow-go/consensus/hotstuff/persister"
+	validatorImpl "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
 	"github.com/onflow/flow-go/consensus/hotstuff/votecollector"
 	recovery "github.com/onflow/flow-go/consensus/recovery/cluster"
@@ -102,7 +103,9 @@ func (f *HotStuffFactory) CreateModules(epoch protocol.Epoch,
 	}
 
 	qcDistributor := pubsub.NewQCCreatedDistributor()
-	validator := consensus.NewValidator(metrics, committee, forks)
+
+	verifier := verification.NewStakingVerifier()
+	validator := validatorImpl.NewMetricsWrapper(validatorImpl.New(committee, forks, verifier), metrics)
 	voteProcessorFactory := votecollector.NewStakingVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
 	aggregator, err := consensus.NewVoteAggregator(
 		f.log,

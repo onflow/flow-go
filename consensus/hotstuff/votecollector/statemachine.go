@@ -11,6 +11,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/consensus/hotstuff/voteaggregator"
+	"github.com/onflow/flow-go/engine"
 )
 
 var (
@@ -117,6 +118,12 @@ func (m *VoteCollector) processVote(vote *model.Vote) error {
 		if err != nil {
 			if model.IsInvalidVoteError(err) {
 				m.notifier.OnInvalidVoteDetected(vote)
+				return nil
+			}
+			// ATTENTION: due to how our logic is designed this situation is only possible
+			// where we receive the same vote twice, this is not a case of double voting.
+			// This scenario is possible if leader submits his vote additionally to the vote in proposal.
+			if engine.IsDuplicatedEntryError(err) {
 				return nil
 			}
 			return err
