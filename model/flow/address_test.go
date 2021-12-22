@@ -27,6 +27,8 @@ func TestHexToAddress(t *testing.T) {
 		{"1", []byte{0x1}},
 		// leading zero
 		{"01", []byte{0x1}},
+		{"001", []byte{0x1}},
+		{"0001", []byte{0x1}},
 	} {
 
 		expected := BytesToAddress(test.value)
