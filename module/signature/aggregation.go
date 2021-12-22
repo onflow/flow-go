@@ -323,31 +323,3 @@ func (p *PublicKeyAggregator) deltaKeys(signers []int) (
 	}
 	return newSignerKeys, missingSignerKeys, signersMap
 }
-
-//------------------------------------------
-
-// TODO : to delete in V2
-// AggregationVerifier is an aggregating verifier that can verify signatures and
-// verify aggregated signatures of the same message.
-// *Important: the aggregation verifier can only verify signatures in the context
-// of the provided KMAC tag.
-type AggregationVerifier struct {
-	hasher hash.Hasher
-}
-
-// TODO : to delete in V2
-// NewAggregationVerifier creates a new aggregation verifier, which can only
-// verify signatures. *Important*: the aggregation verifier can only verify
-// signatures in the context of the provided KMAC tag.
-func NewAggregationVerifier(tag string) *AggregationVerifier {
-	av := &AggregationVerifier{
-		hasher: crypto.NewBLSKMAC(tag),
-	}
-	return av
-}
-
-// TODO : to delete in V2
-// Verify will verify the given signature against the given message and public key.
-func (av *AggregationVerifier) Verify(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
-	return key.Verify(sig, msg, av.hasher)
-}
