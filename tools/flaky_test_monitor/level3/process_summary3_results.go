@@ -30,9 +30,9 @@ func processSummary3TestRun(level2FilePath string) common.TestSummary3 {
 	// 2. tests with failures (ordered by most failures)
 	// 3. tests with durations > 0 (ordered by longest durations)
 
-	var noResultsTRS []common.TestResultSummary = []common.TestResultSummary{}
-	var failuresTRS []common.TestResultSummary = []common.TestResultSummary{}
-	var durationTRS []common.TestResultSummary = []common.TestResultSummary{}
+	noResultsTRS := []common.TestResultSummary{}
+	failuresTRS := []common.TestResultSummary{}
+	durationTRS := []common.TestResultSummary{}
 
 	// go through all level 2 test results to figure out grouping for tests with
 	// most failures, no-results, longest running
