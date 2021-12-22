@@ -78,6 +78,7 @@ func (account *TestBenchAccount) DeployContract(b *testing.B, blockExec TestBenc
 	require.Empty(b, computationResult.TransactionResults[0].ErrorMessage)
 }
 
+// AddArrayToStorage adds an array of strings to the accounts storage
 func (account *TestBenchAccount) AddArrayToStorage(b *testing.B, blockExec TestBenchBlockExecutor, list []string) {
 	serviceAccount := blockExec.ServiceAccount(b)
 	txBody := flow.NewTransactionBody().
@@ -261,16 +262,22 @@ func (b *BasicBlockExecutor) SetupAccounts(tb testing.TB, privateKeys []flow.Acc
 	return accounts
 }
 
+// logExtractor is used as a writer when initializing the zerolog logger.
+// This way it is possible to intercept certain logs we are interested in.
 type logExtractor struct {
 	InteractionUsed map[string]uint64
 }
 
+// txSuccessfulLog is used to decode the log emitted by the transaction invoker when a transaction is successful.
 type txSuccessfulLog struct {
 	TXHash                string `json:"txHash"`
 	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
 }
 
 func (l *logExtractor) Write(p []byte) (n int, err error) {
+	// This is logged when a transaction is successfully executed. We are interested in this log record,
+	// because it contains the ledger interaction used. Wa are only interested int the ledger interaction used
+	// for successful transactions in the benchmark tests.
 	if strings.Contains(string(p), "transaction executed successfully") {
 		w := txSuccessfulLog{}
 		err := json.Unmarshal(p, &w)
@@ -325,6 +332,7 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 			}
 			`)
 
+		// Add a big string array to the service account, so that it can be used in the benchmarks.
 		serviceAccount.AddArrayToStorage(b, blockExecutor, []string{longString, longString, longString, longString, longString})
 
 		btx := []byte(tx)
@@ -443,23 +451,25 @@ func BenchmarkRuntimeTransaction(b *testing.B) {
 	b.Run("emit event", func(b *testing.B) {
 		benchTransaction(b, templateTx(100, `TestContract.emit()`))
 	})
+	// the following two benchmarks are comparing copying an array from storage vs borrowing a reference to that array,
+	// and then iterating over the array.
 	b.Run("borrow array from storage", func(b *testing.B) {
 		benchTransaction(b, templateTx(100, `
 			let strings = signer.borrow<&[String]>(from: /storage/test)!
-			var i = 0
-			while (i < strings.length) {
-			  log(strings[i])
-			  i = i +1
+			var j = 0
+			while (j < strings.length) {
+			  log(strings[j])
+			  j = j + 1
 			}
 		`))
 	})
 	b.Run("copy array from storage", func(b *testing.B) {
 		benchTransaction(b, templateTx(100, `
 			let strings = signer.copy<[String]>(from: /storage/test)!
-			var i = 0
-			while (i < strings.length) {
-			  log(strings[i])
-			  i = i +1
+			var j = 0
+			while (j < strings.length) {
+			  log(strings[j])
+			  j = j + 1
 			}
 		`))
 	})
