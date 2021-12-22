@@ -12,7 +12,6 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/engine/consensus/approvals"
 	"github.com/onflow/flow-go/engine/consensus/approvals/tracker"
-	"github.com/onflow/flow-go/fvm/crypto"
 	"github.com/onflow/flow-go/model/chunks"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
@@ -64,8 +63,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	}
 
 	var err error
-	hasher := crypto.NewBLSKMAC("test_tag")
-	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, hasher, s.SealsPL, s.Conduit, options)
+	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, options)
 	require.NoError(s.T(), err)
 }
 
@@ -708,9 +706,8 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	finalSnapShot.On("ValidDescendants").Return(blockChildren, nil)
 	s.State.On("Final").Return(finalSnapShot)
 
-	hasher := crypto.NewBLSKMAC("test_tag")
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, hasher, s.SealsPL, s.Conduit, s.core.config)
+		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)

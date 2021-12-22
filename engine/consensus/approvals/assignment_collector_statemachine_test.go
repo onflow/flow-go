@@ -34,7 +34,7 @@ func (s *AssignmentCollectorStateMachineTestSuite) SetupTest() {
 		assigner:                             s.Assigner,
 		state:                                s.State,
 		headers:                              s.Headers,
-		sigHasher:                            s.sigHasher,
+		sigHasher:                            s.SigHasher,
 		seals:                                s.SealsPL,
 		approvalConduit:                      s.Conduit,
 		requestTracker:                       s.RequestTracker,

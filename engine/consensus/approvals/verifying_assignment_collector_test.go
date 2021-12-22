@@ -69,7 +69,7 @@ func (s *AssignmentCollectorTestSuite) SetupTest() {
 
 	var err error
 	s.collector, err = newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, s.State, s.Headers,
-		s.Assigner, s.SealsPL, s.sigHasher, s.Conduit, s.RequestTracker, uint(len(s.AuthorizedVerifiers)))
+		s.Assigner, s.SealsPL, s.SigHasher, s.Conduit, s.RequestTracker, uint(len(s.AuthorizedVerifiers)))
 	require.NoError(s.T(), err)
 }
 
@@ -207,7 +207,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		assigner.On("Assign", mock.Anything, mock.Anything).Return(nil, fmt.Errorf(""))
 
 		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, s.State, s.Headers,
-			assigner, s.SealsPL, s.sigHasher, s.Conduit, s.RequestTracker, 1)
+			assigner, s.SealsPL, s.SigHasher, s.Conduit, s.RequestTracker, 1)
 		require.NoError(s.T(), err)
 
 		err = collector.ProcessIncorporatedResult(s.IncorporatedResult)
@@ -218,7 +218,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult() {
 		// delete identities for Result.BlockID
 		delete(s.IdentitiesCache, s.IncorporatedResult.Result.BlockID)
 		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, s.State, s.Headers,
-			s.Assigner, s.SealsPL, s.sigHasher, s.Conduit, s.RequestTracker, 1)
+			s.Assigner, s.SealsPL, s.SigHasher, s.Conduit, s.RequestTracker, 1)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
 	})
@@ -243,7 +243,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		)
 
 		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, state, s.Headers, s.Assigner, s.SealsPL,
-			s.sigHasher, s.Conduit, s.RequestTracker, 1)
+			s.SigHasher, s.Conduit, s.RequestTracker, 1)
 		require.Error(s.T(), err)
 		require.Nil(s.T(), collector)
 	})
@@ -263,7 +263,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		)
 
 		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, state, s.Headers, s.Assigner, s.SealsPL,
-			s.sigHasher, s.Conduit, s.RequestTracker, 1)
+			s.SigHasher, s.Conduit, s.RequestTracker, 1)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
 	})
@@ -282,7 +282,7 @@ func (s *AssignmentCollectorTestSuite) TestProcessIncorporatedResult_InvalidIden
 		)
 
 		collector, err := newVerifyingAssignmentCollector(unittest.Logger(), s.WorkerPool, s.IncorporatedResult.Result, state, s.Headers, s.Assigner, s.SealsPL,
-			s.sigHasher, s.Conduit, s.RequestTracker, 1)
+			s.SigHasher, s.Conduit, s.RequestTracker, 1)
 		require.Nil(s.T(), collector)
 		require.Error(s.T(), err)
 	})

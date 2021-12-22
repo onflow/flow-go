@@ -33,7 +33,7 @@ type BaseApprovalsTestSuite struct {
 	ChunksAssignment    *chunks.Assignment
 	AuthorizedVerifiers map[flow.Identifier]*flow.Identity // map of authorized verifier identities for execution result
 	PublicKey           *module.PublicKey                  // public key used to mock signature verifications
-	sigHasher           hash.Hasher                        // used to verify signatures
+	SigHasher           hash.Hasher                        // used to verify signatures
 	IncorporatedResult  *flow.IncorporatedResult
 }
 
@@ -55,7 +55,7 @@ func (s *BaseApprovalsTestSuite) SetupTest() {
 		// mock all verifier's valid signatures
 		identity.StakingPubKey = s.PublicKey
 	}
-	s.sigHasher = crypto.NewBLSKMAC("test_tag")
+	s.SigHasher = crypto.NewBLSKMAC("test_tag")
 
 	// create assignment
 	for _, chunk := range s.Chunks {
