@@ -3,6 +3,7 @@
 package module
 
 import (
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -19,19 +20,19 @@ type SyncCore interface {
 	GetRequestableItems() (flow.Range, flow.Batch)
 
 	// RangeReceived updates sync state after a Range Request response is received.
-	RangeReceived(headers []flow.Header, originID flow.Identifier)
+	RangeReceived(startHeight uint64, blockIDs []flow.Identifier, originID peer.ID)
 
 	// BatchReceived updates sync state after a Batch Request response is received.
-	BatchReceived(headers []flow.Header, originID flow.Identifier)
+	BatchReceived(blockIDs []flow.Identifier, originID peer.ID)
 
 	// HeightReceived updates sync state after a Sync Height response is received.
-	HeightReceived(height uint64, originID flow.Identifier)
+	HeightReceived(height uint64, originID peer.ID)
 }
 
 type ActiveRange interface {
 	// Update processes a range of blocks received from a Range Request
 	// response and updates the requestable height range.
-	Update(headers []flow.Header, originID flow.Identifier)
+	Update(startHeight uint64, blockIDs []flow.Identifier, originID peer.ID)
 
 	// LocalFinalizedHeight is called to notify a change in the local finalized height.
 	LocalFinalizedHeight(height uint64)
@@ -46,7 +47,7 @@ type ActiveRange interface {
 type TargetFinalizedHeight interface {
 	// Update processes a height received from a Sync Height Response
 	// and updates the finalized height estimate.
-	Update(height uint64, originID flow.Identifier)
+	Update(height uint64, originID peer.ID)
 
 	// Get returns the estimated finalized height of the overall chain.
 	Get() uint64

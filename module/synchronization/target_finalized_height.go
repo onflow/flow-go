@@ -7,11 +7,21 @@ import (
 )
 
 type TargetHeight struct {
-	oldestIndex  int
-	windowSize   int
-	heights      []uint64
-	updated      bool
-	cachedMedian uint64
+	oldestIndex int
+	windowSize  int
+	heights     []uint64
+	updated     bool
+	cachedValue uint64
+}
+
+func NewTargetHeight(windowSize int) *TargetHeight {
+	return &TargetHeight{
+		windowSize:  windowSize,
+		heights:     make([]uint64, 0, windowSize),
+		oldestIndex: 0,
+		updated:     false,
+		cachedValue: 0,
+	}
 }
 
 func (t *TargetHeight) Update(height uint64, originID flow.Identifier) {
@@ -29,15 +39,11 @@ func (t *TargetHeight) Update(height uint64, originID flow.Identifier) {
 
 func (t *TargetHeight) Get() uint64 {
 	if t.updated {
-		t.cachedMedian = median(t.heights)
+		t.cachedValue = quickSelect(t.heights, len(t.heights)/2)
 		t.updated = false
 	}
 
-	return t.cachedMedian
-}
-
-func median(l []uint64) uint64 {
-	return quickSelect(l, len(l)/2)
+	return t.cachedValue
 }
 
 func quickSelect(l []uint64, k int) uint64 {

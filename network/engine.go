@@ -2,6 +2,7 @@
 package network
 
 import (
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -31,5 +32,13 @@ type Engine interface {
 }
 
 type MessageProcessor interface {
-	Process(channel Channel, originID flow.Identifier, message interface{}) error
+	module.ReadyDoneAware
+
+	HandleRequest(request interface{}, originID peer.ID) (response interface{}, err error)
+
+	HandleMessage(message interface{}, originID peer.ID) (err error)
 }
+
+// type MessageProcessor interface {
+// 	Process(channel Channel, originID flow.Identifier, message interface{}) error
+// }

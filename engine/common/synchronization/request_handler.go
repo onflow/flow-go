@@ -37,10 +37,9 @@ type RequestHandlerEngine struct {
 	log     zerolog.Logger
 	metrics module.EngineMetrics
 
-	blocks          storage.Blocks
-	core            module.SyncCore
-	finalizedHeader *FinalizedHeaderCache
-	con             network.Conduit // used for sending responses to requesters
+	blocks storage.Blocks
+	core   module.SyncCore
+	con    network.Conduit // used for sending responses to requesters
 
 	pendingSyncRequests   engine.MessageStore    // message store for *message.SyncRequest
 	pendingBatchRequests  engine.MessageStore    // message store for *message.BatchRequest
@@ -57,7 +56,6 @@ func NewRequestHandlerEngine(
 	me module.Local,
 	blocks storage.Blocks,
 	core module.SyncCore,
-	finalizedHeader *FinalizedHeaderCache,
 	queueMissingHeights bool,
 ) *RequestHandlerEngine {
 	r := &RequestHandlerEngine{

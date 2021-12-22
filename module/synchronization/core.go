@@ -3,8 +3,6 @@ package synchronization
 import (
 	"sync"
 
-	"github.com/rs/zerolog"
-
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 )
@@ -18,42 +16,35 @@ import (
 //
 // Core is safe for concurrent use by multiple goroutines.
 type Core struct {
-	log zerolog.Logger
-	mu  sync.RWMutex
+	mu sync.RWMutex
 
 	activeRange           module.ActiveRange
 	targetFinalizedHeight module.TargetFinalizedHeight
 
 	blockIDs map[flow.Identifier]uint64
 
-	config *Config
+	finalizedHeader *module.FinalizedHeaderCache
 
-	finalizedHeader     *module.FinalizedHeaderCache
-	lastFinalizedHeight uint64
+	blockHeightDifferenceThreshold uint64
 }
 
 var _ module.SyncCore = (*Core)(nil)
 var _ module.BlockRequester = (*Core)(nil)
 
-type Config struct {
-	BlockHeightDifferenceThreshold uint64
-	DefaultRangeSize               uint
-}
+func NewCore(
+	activeRange module.ActiveRange,
+	targetFinalizedHeight module.TargetFinalizedHeight,
+	finalizedHeader *module.FinalizedHeaderCache,
+	blockHeightDifferenceThreshold uint64,
+) *Core {
+	activeRange.LocalFinalizedHeight(finalizedHeader.Get().Height)
 
-func DefaultConfig() *Config {
-	return &Config{
-		BlockHeightDifferenceThreshold: 192,
-		DefaultRangeSize:               192,
-	}
-}
-
-func New(log zerolog.Logger, activeRange module.ActiveRange, targetFinalizedHeight module.TargetFinalizedHeight, config *Config) *Core {
 	return &Core{
-		log:                   log.With().Str("module", "synchronization").Logger(),
-		blockIDs:              make(map[flow.Identifier]uint64),
-		activeRange:           activeRange,
-		targetFinalizedHeight: targetFinalizedHeight,
-		config:                config,
+		blockIDs:                       make(map[flow.Identifier]uint64),
+		activeRange:                    activeRange,
+		targetFinalizedHeight:          targetFinalizedHeight,
+		finalizedHeader:                finalizedHeader,
+		blockHeightDifferenceThreshold: blockHeightDifferenceThreshold,
 	}
 }
 
@@ -66,7 +57,7 @@ func (c *Core) RequestBlock(blockID flow.Identifier, height uint64) {
 
 	c.activeRange.LocalFinalizedHeight(localHeight)
 
-	if height > localHeight+c.config.BlockHeightDifferenceThreshold || height <= localHeight {
+	if height > localHeight+c.blockHeightDifferenceThreshold || height <= localHeight {
 		return
 	}
 

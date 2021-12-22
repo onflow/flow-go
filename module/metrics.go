@@ -63,6 +63,20 @@ type NetworkMetrics interface {
 	UnstakedInboundConnections(connectionCount uint)
 }
 
+type SyncMetrics interface {
+	RangeRequestStarted()
+
+	RangeRequestFinished(duration time.Duration, success bool)
+
+	BatchRequestStarted()
+
+	BatchRequestFinished(duration time.Duration, success bool)
+
+	SyncHeightRequestStarted()
+
+	SyncHeightRequestFinished(duration time.Duration, success bool, height uint64)
+}
+
 type EngineMetrics interface {
 	MessageSent(engine string, message string)
 	MessageReceived(engine string, message string)

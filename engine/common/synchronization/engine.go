@@ -45,13 +45,14 @@ type Engine struct {
 	scanInterval         time.Duration
 	core                 module.SyncCore
 	participantsProvider identifier.IdentifierProvider
-	finalizedHeader      *FinalizedHeaderCache
 
 	requestHandler *RequestHandlerEngine // component responsible for handling requests
 
 	pendingSyncResponses   engine.MessageStore    // message store for *message.SyncResponse
 	pendingBlockResponses  engine.MessageStore    // message store for *message.BlockResponse
 	responseMessageHandler *engine.MessageHandler // message handler responsible for response processing
+
+	finalizedHeader *module.FinalizedHeaderCache
 }
 
 // New creates a new main chain synchronization engine.
@@ -63,8 +64,8 @@ func New(
 	blocks storage.Blocks,
 	comp network.Engine,
 	core module.SyncCore,
-	finalizedHeader *FinalizedHeaderCache,
 	participantsProvider identifier.IdentifierProvider,
+	finalizedHeader *module.FinalizedHeaderCache,
 	opts ...OptionFunc,
 ) (*Engine, error) {
 
@@ -89,8 +90,8 @@ func New(
 		core:                 core,
 		pollInterval:         opt.PollInterval,
 		scanInterval:         opt.ScanInterval,
-		finalizedHeader:      finalizedHeader,
 		participantsProvider: participantsProvider,
+		finalizedHeader:      finalizedHeader,
 	}
 
 	err := e.setupResponseMessageHandler()
@@ -105,7 +106,7 @@ func New(
 	}
 	e.con = con
 
-	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, finalizedHeader, true)
+	e.requestHandler = NewRequestHandlerEngine(log, metrics, con, me, blocks, core, true)
 
 	return e, nil
 }
@@ -164,7 +165,6 @@ func (e *Engine) setupResponseMessageHandler() error {
 // Ready returns a ready channel that is closed once the engine has fully started.
 func (e *Engine) Ready() <-chan struct{} {
 	e.lm.OnStart(func() {
-		<-e.finalizedHeader.Ready()
 		e.unit.Launch(e.checkLoop)
 		e.unit.Launch(e.responseProcessingLoop)
 		// wait for request handler to startup
@@ -182,7 +182,6 @@ func (e *Engine) Done() <-chan struct{} {
 		<-e.unit.Done()
 		// wait for request handler shutdown to complete
 		<-requestHandlerDone
-		<-e.finalizedHeader.Done()
 	})
 	return e.lm.Stopped()
 }
@@ -240,53 +239,10 @@ func (e *Engine) process(originID flow.Identifier, event interface{}) error {
 	}
 }
 
-// responseProcessingLoop is a separate goroutine that performs processing of queued responses
-func (e *Engine) responseProcessingLoop() {
-	notifier := e.responseMessageHandler.GetNotifier()
-	for {
-		select {
-		case <-e.unit.Quit():
-			return
-		case <-notifier:
-			e.processAvailableResponses()
-		}
-	}
-}
-
-// processAvailableResponses is processor of pending events which drives events from networking layer to business logic.
-func (e *Engine) processAvailableResponses() {
-	for {
-		select {
-		case <-e.unit.Quit():
-			return
-		default:
-		}
-
-		msg, ok := e.pendingSyncResponses.Get()
-		if ok {
-			e.onSyncResponse(msg.OriginID, msg.Payload.(*messages.SyncResponse))
-			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageSyncResponse)
-			continue
-		}
-
-		msg, ok = e.pendingBlockResponses.Get()
-		if ok {
-			e.onBlockResponse(msg.OriginID, msg.Payload.(*messages.BlockResponse))
-			e.metrics.MessageHandled(metrics.EngineSynchronization, metrics.MessageBlockResponse)
-			continue
-		}
-
-		// when there is no more messages in the queue, back to the loop to wait
-		// for the next incoming message to arrive.
-		return
-	}
-}
-
 // onSyncResponse processes a synchronization response.
 func (e *Engine) onSyncResponse(originID flow.Identifier, res *messages.SyncResponse) {
 	e.log.Debug().Str("origin_id", originID.String()).Msg("received sync response")
-	final := e.finalizedHeader.Get()
-	e.core.HandleHeight(final, res.Height)
+	e.core.HeightReceived(res.Height, originID)
 }
 
 // onBlockResponse processes a response containing a specifically requested block.
@@ -343,18 +299,17 @@ CheckLoop:
 
 // pollHeight will send a synchronization request to three random nodes.
 func (e *Engine) pollHeight() {
-	head := e.finalizedHeader.Get()
 	participants := e.participantsProvider.Identifiers()
 
 	// send the request for synchronization
 	req := &messages.SyncRequest{
-		Nonce:  rand.Uint64(),
 		Height: head.Height,
 	}
+
 	e.log.Debug().
 		Uint64("height", req.Height).
-		Uint64("range_nonce", req.Nonce).
 		Msg("sending sync request")
+
 	err := e.con.Multicast(req, synccore.DefaultPollNodes, participants...)
 	if err != nil {
 		e.log.Warn().Err(err).Msg("sending sync request to poll heights failed")

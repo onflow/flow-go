@@ -3,10 +3,12 @@
 package network
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sort"
 
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/model/flow"
 )
 
@@ -84,6 +86,12 @@ type Conduit interface {
 	// Close unsubscribes from the channels of this conduit. After calling close,
 	// the conduit can no longer be used to send a message.
 	Close() error
+}
+
+type MessageSender interface {
+	SendMessage(ctx context.Context, event interface{}, targetID peer.ID) error
+
+	SendRequest(ctx context.Context, event interface{}, targetID peer.ID) (interface{}, error)
 }
 
 // PeerUnreachableError is the error when submitting events to target fails due to the

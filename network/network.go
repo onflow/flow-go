@@ -22,4 +22,6 @@ type Network interface {
 	// The returned BlobService can be used to request blocks from the network.
 	// TODO: We should return a function that can be called to unregister / close the BlobService
 	RegisterBlobService(channel Channel, store datastore.Batching) (BlobService, error)
+
+	RegisterMessageProcessor(channel Channel, processor MessageProcessor) (MessageSender, error)
 }

@@ -4,10 +4,10 @@ import (
 	"time"
 )
 
-type Config struct {
-	PollInterval time.Duration
-	ScanInterval time.Duration
-}
+// type Config struct {
+// 	PollInterval time.Duration
+// 	ScanInterval time.Duration
+// }
 
 func DefaultConfig() *Config {
 	return &Config{
