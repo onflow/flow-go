@@ -68,22 +68,19 @@ func runProcessSummary3TestRun(t *testing.T, testDir string) {
 	require.Equal(t, expectedTestSummary3, actualTestSummary3)
 }
 
-var expectedPanicFunc_WrongPath = func() {
-	processSummary3TestRun("foobar")
-}
-
 // test that script panics when supplied file path is invalid (can't find file)
 func TestProcessSummary3TestRun_Panic_WrongPath(t *testing.T) {
 	require.PanicsWithValue(t, "error reading level 2 json: open foobar: no such file or directory",
-		expectedPanicFunc_WrongPath)
-}
-
-var expectedPanicFun_WrongFormat = func() {
-	// supplied file is level 3 file, not level 2 - this should cause a panic
-	processSummary3TestRun(testDataDir + "test1-1package-1failure/expected-output/test1-1package-1failure.json")
+		func() {
+			processSummary3TestRun("foobar")
+		})
 }
 
 // test that script panics when supplied file is not valid level 2 format
 func TestProcessSummary3TestRun_Panic_WrongFormat(t *testing.T) {
-	require.PanicsWithValue(t, "invalid summary 2 file - no test results found", expectedPanicFun_WrongFormat)
+	require.PanicsWithValue(t, "invalid summary 2 file - no test results found",
+		func() {
+			// supplied file is level 3 file, not level 2 - this should cause a panic
+			processSummary3TestRun(testDataDir + "test1-1package-1failure/expected-output/test1-1package-1failure.json")
+		})
 }
