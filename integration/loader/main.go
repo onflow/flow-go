@@ -38,6 +38,7 @@ func main() {
 	logLvl := flag.String("log-level", "info", "set log level")
 	metricport := flag.Uint("metricport", 8080, "port for /metrics endpoint")
 	profilerEnabled := flag.Bool("profiler-enabled", false, "whether to enable the auto-profiler")
+	feedbackEnabled := flag.Bool("feedback-enabled", false, "whether to enable feedback / transaction tracking before account reuse (to avoid sequence number mismatch errors during transaction execution)")
 	flag.Parse()
 
 	chainID := flowsdk.ChainID([]byte(*chainIDStr))
@@ -127,6 +128,7 @@ func main() {
 					&flowTokenAddress,
 					c.tps,
 					utils.LoadType(*loadTypeFlag),
+					*feedbackEnabled,
 				)
 				if err != nil {
 					log.Fatal().Err(err).Msgf("unable to create new cont load generator")
