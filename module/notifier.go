@@ -1,4 +1,4 @@
-package engine
+package module
 
 // Notifier is a concurrency primitive for informing worker routines about the
 // arrival of new work unit(s). Notifiers essentially behave like

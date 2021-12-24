@@ -7,7 +7,6 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/consensus/hotstuff/notifications/pubsub"
-	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/lifecycle"
 	"github.com/onflow/flow-go/state/protocol"
@@ -21,7 +20,7 @@ type FinalizedHeaderCache struct {
 	log                       zerolog.Logger
 	state                     protocol.State
 	lastFinalizedHeader       *flow.Header
-	finalizationEventNotifier engine.Notifier // notifier for finalization events
+	finalizationEventNotifier Notifier // notifier for finalization events
 
 	lm      *lifecycle.LifecycleManager
 	stopped chan struct{}
@@ -33,7 +32,7 @@ func NewFinalizedHeaderCache(log zerolog.Logger, state protocol.State, finalizat
 		state:                     state,
 		lm:                        lifecycle.NewLifecycleManager(),
 		log:                       log.With().Str("component", "finalized_snapshot_cache").Logger(),
-		finalizationEventNotifier: engine.NewNotifier(),
+		finalizationEventNotifier: NewNotifier(),
 		stopped:                   make(chan struct{}),
 	}
 
