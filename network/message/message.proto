@@ -14,3 +14,7 @@ message Message {
   bytes Payload = 5;
   string Type = 6;
 }
+
+message DirectMessage {
+  bytes Payload = 5;
+}
