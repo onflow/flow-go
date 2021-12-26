@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,7 +22,6 @@ import (
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/component"
 	"github.com/onflow/flow-go/module/irrecoverable"
-	"github.com/onflow/flow-go/module/metrics"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/message"
 	"github.com/onflow/flow-go/network/p2p/unicast"
@@ -45,6 +45,8 @@ const (
 	// defines maximum message size in unicast mode for most messages
 	DefaultMaxUnicastMsgSize = 10 * mb // 10 mb
 
+	// TODO: use this for execution and verification nodes
+	// TODO: remove this once we've transitioned to Bitswap for Chunk Data Packs
 	// defines maximum message size in unicast mode for large messages
 	LargeMsgMaxUnicastMsgSize = gb // 1 gb
 
@@ -309,98 +311,259 @@ func (m *Middleware) stop() {
 	m.wg.Wait()
 }
 
-// SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
-// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
-// as the router.
-//
-// Dispatch should be used whenever guaranteed delivery to a specific target is required. Otherwise, Publish is
-// a more efficient candidate.
-func (m *Middleware) SendDirect(msg *message.Message, targetID flow.Identifier) error {
-	// translates identifier to peer id
-	peerID, err := m.idTranslator.GetPeerID(targetID)
-	if err != nil {
-		return fmt.Errorf("could not find peer id for target id: %w", err)
-	}
-
-	maxMsgSize := unicastMaxMsgSize(msg)
-	if msg.Size() > maxMsgSize {
-		// message size goes beyond maximum size that the serializer can handle.
-		// proceeding with this message results in closing the connection by the target side, and
-		// delivery failure.
-		return fmt.Errorf("message size %d exceeds configured max message size %d", msg.Size(), maxMsgSize)
-	}
-
-	maxTimeout := m.unicastMaxMsgDuration(msg)
-	// pass in a context with timeout to make the unicast call fail fast
-	ctx, cancel := context.WithTimeout(m.ctx, maxTimeout)
-	defer cancel()
-
-	// protect the underlying connection from being inadvertently pruned by the peer manager while the stream and
-	// connection creation is being attempted, and remove it from protected list once stream created.
-	tag := fmt.Sprintf("%v:%v", msg.ChannelID, msg.Type)
-	m.libP2PNode.connMgr.Protect(peerID, tag)
-	defer m.libP2PNode.connMgr.Unprotect(peerID, tag)
-
-	// create new stream
-	// (streams don't need to be reused and are fairly inexpensive to be created for each send.
-	// A stream creation does NOT incur an RTT as stream negotiation happens as part of the first message
-	// sent out the receiver
-	stream, err := m.libP2PNode.CreateStream(ctx, peerID)
-	if err != nil {
-		return fmt.Errorf("failed to create stream for %s: %w", targetID, err)
-	}
+func (m *Middleware) writeMessage(stream libp2pnetwork.Stream, msg *message.DirectMessage) error {
+	stream.SetWriteDeadline(time.Now().Add(m.unicastMessageTimeout))
 
 	// create a gogo protobuf writer
 	bufw := bufio.NewWriter(stream)
 	writer := ggio.NewDelimitedWriter(bufw)
 
-	err = writer.WriteMsg(msg)
+	err := writer.WriteMsg(msg)
 	if err != nil {
-		return fmt.Errorf("failed to send message to %s: %w", targetID, err)
+		return fmt.Errorf("failed to write to stream: %w", err)
 	}
 
 	// flush the stream
 	err = bufw.Flush()
 	if err != nil {
-		return fmt.Errorf("failed to flush stream for %s: %w", targetID, err)
+		return fmt.Errorf("failed to flush stream: %w", err)
 	}
-
-	// close the stream immediately
-	err = stream.Close()
-	if err != nil {
-		return fmt.Errorf("failed to close the stream for %s: %w", targetID, err)
-	}
-
-	channel := metrics.ChannelOneToOne
-	if _, isStaked := m.ov.Identities().ByNodeID(targetID); !isStaked {
-		channel = metrics.ChannelOneToOneUnstaked
-	}
-	// OneToOne communication metrics are reported with topic OneToOne
-	m.metrics.NetworkMessageSent(msg.Size(), channel, msg.Type)
 
 	return nil
 }
 
-// handleIncomingStream handles an incoming stream from a remote peer
-// it is a callback that gets called for each incoming stream by libp2p with a new stream object
-func (m *Middleware) handleIncomingStream(s libp2pnetwork.Stream) {
-	// qualify the logger with local and remote address
-	log := streamLogger(m.log, s)
+func (m *Middleware) readMessage(stream libp2pnetwork.Stream) (*message.DirectMessage, error) {
+	stream.SetReadDeadline(time.Now().Add(m.unicastMessageTimeout))
 
-	log.Info().Msg("incoming stream received")
+	r := ggio.NewDelimitedReader(stream, LargeMsgMaxUnicastMsgSize)
 
-	nodeID, err := m.idTranslator.GetFlowID(s.Conn().RemotePeer())
+	var msg message.DirectMessage
+
+	// read the next message
+	err := r.ReadMsg(&msg)
+
 	if err != nil {
-		log.Err(err).Str("peer_id", s.Conn().RemotePeer().Pretty()).Msg("could not translate peer ID of incoming stream")
+		return nil, err
 	}
-	_, isStaked := m.ov.Identities().ByNodeID(nodeID)
 
-	//create a new readConnection with the context of the middleware
-	conn := newReadConnection(m.ctx, s, m.processAuthenticatedMessage, log, m.metrics, LargeMsgMaxUnicastMsgSize, isStaked)
+	return &msg, nil
+}
 
-	// kick off the reception loop to continuously receive messages
-	m.wg.Add(1)
-	go conn.receiveLoop(m.wg)
+func (m *Middleware) withStream(ctx context.Context, channel network.Channel, target peer.ID, f func(libp2pnetwork.Stream) error) (err error) {
+	// TODO: how to tag the connection? maybe use a unique ID for each message?
+	tag := fmt.Sprintf("%v:%v", channel, msg.Type)
+
+	m.libP2PNode.connMgr.Protect(target, tag)
+	defer m.libP2PNode.connMgr.Unprotect(target, tag)
+
+	var stream libp2pnetwork.Stream
+
+	// TODO: get protocol from channel
+	stream, err = m.libP2PNode.CreateStream(ctx, channel, target)
+	if err != nil {
+		err = fmt.Errorf("failed to create stream for %s: %w", target, err)
+		return
+	}
+
+	// TODO: the whole point of deferring instead of just doing this after is that it covers panics.
+	// In that case, we should not let the decision between reset vs not be based on whether the error
+	// is nil or not, because it could panic. if it panics, we should treat that as a reset.
+	defer func() {
+		if err != nil {
+			resetErr := stream.Reset()
+
+			if resetErr != nil {
+				m.log.Err(resetErr).Msg("failed to reset stream")
+			}
+
+			return
+		}
+
+		err = stream.Close()
+
+		if err != nil {
+			err = fmt.Errorf("failed to close stream: %w", err)
+		}
+	}()
+
+	err = f(stream)
+
+	return
+}
+
+// SendDirect sends msg on a 1-1 direct connection to the target ID. It models a guaranteed delivery asynchronous
+// direct one-to-one connection on the underlying network. No intermediate node on the overlay is utilized
+// as the router.
+func (m *Middleware) SendDirect(channel network.Channel, msg *message.DirectMessage, target peer.ID) error {
+	return m.withStream(m.ctx, channel, target, func(s libp2pnetwork.Stream) error {
+		return m.writeMessage(s, msg)
+	})
+}
+
+func (m *Middleware) SendRequest(
+	channel network.Channel,
+	msg *message.DirectMessage,
+	target peer.ID,
+) (*message.DirectMessage, error) {
+	var resp *message.DirectMessage
+
+	if err := m.withStream(m.ctx, channel, target, func(s libp2pnetwork.Stream) error {
+		err := m.writeMessage(s, msg)
+
+		if err != nil {
+			return err
+		}
+
+		resp, err = m.readMessage(s)
+
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+
+	return resp, nil
+}
+
+func (m *Middleware) directMessageHandler(channel network.Channel) libp2pnetwork.StreamHandler {
+	return func(s libp2pnetwork.Stream) {
+		success := false
+
+		// qualify the logger with local and remote address
+		log := streamLogger(m.log, s)
+
+		log.Info().Msg("incoming stream received")
+
+		defer func() {
+			if !success {
+				resetErr := s.Reset()
+
+				if resetErr != nil {
+					log.Err(resetErr).Msg("failed to reset stream")
+				}
+
+				return
+			}
+
+			err := s.Close()
+
+			if err != nil {
+				log.Err(err).Msg("failed to close stream")
+			}
+		}()
+
+		sender := s.Conn().RemotePeer()
+
+		msg, err := m.readMessage(s)
+
+		if err != nil {
+			log.Err(err).Msg("failed to read message")
+
+			return
+		}
+
+		// TODO: metrics for 1to1
+		// rc.metrics.NetworkMessageReceived(msg.Size(), channel, msg.Type)
+
+		m.processMessage(msg.Payload, network.Channel(channel.String()), sender)
+
+		success = true
+	}
+}
+
+func (m *Middleware) requestHandler(channel network.Channel) libp2pnetwork.StreamHandler {
+	return func(s libp2pnetwork.Stream) {
+		success := false
+
+		// TODO: can we combine this boilerplate with previous method?
+
+		// qualify the logger with local and remote address
+		log := streamLogger(m.log, s)
+
+		log.Info().Msg("incoming stream received")
+
+		defer func() {
+			if !success {
+				resetErr := s.Reset()
+
+				if resetErr != nil {
+					log.Err(resetErr).Msg("failed to reset stream")
+				}
+
+				return
+			}
+
+			err := s.Close()
+
+			if err != nil {
+				log.Err(err).Msg("failed to close stream")
+			}
+		}()
+
+		sender := s.Conn().RemotePeer()
+
+		msg, err := m.readMessage(s)
+
+		if err != nil {
+			log.Err(err).Msg("failed to read message")
+
+			return
+		}
+
+		// TODO: metrics for 1to1
+		// rc.metrics.NetworkMessageReceived(msg.Size(), channel, msg.Type)
+
+		m.processRequest(msg.Payload, network.Channel(channel.String()), sender)
+
+		success = true
+	}
+}
+
+func (m *Middleware) handleIncomingStream(handler func(s libp2pnetwork.Stream)) libp2pnetwork.StreamHandler {
+	return func(s libp2pnetwork.Stream) {
+		// TODO: put all the boilerplate here
+
+	}
+}
+
+func (m *Middleware) processRequest(payload []byte, channel network.Channel, sender peer.ID, success func(interface{}), fail func(error)) {
+	// TODO: can we combine this boilerplate with processMessage?
+	msg, err := m.codec.Decode(payload)
+
+	if err != nil {
+		m.log.Err(err).Msg("failed to decode message")
+		return
+	}
+
+	originID, err := m.idTranslator.GetFlowID(peerID)
+
+	if err != nil {
+		m.log.Warn().Err(err).Msgf("received message from unknown peer %v, and was dropped", peerID.String())
+		return
+	}
+
+	m.log.Debug().
+		Str("channel", channel.String()).
+		Str("type", strings.TrimLeft(fmt.Sprintf("%T", msg), "*")).
+		Str("origin_id", originID.String()).
+		Msg("processing new message")
+
+	// run through all the message validators
+	for _, v := range m.validators {
+		// if any one fails, stop message propagation
+		if !v.Validate(channel, msg, originID) {
+			return
+		}
+	}
+
+	// if validation passed, send the message to the overlay
+	err = m.ov.Receive(originID, channel, msg)
+	if err != nil {
+		m.log.Error().Err(err).Msg("could not deliver payload")
+	}
 }
 
 // Subscribe subscribes the middleware to a channel.
@@ -420,7 +583,7 @@ func (m *Middleware) Subscribe(channel network.Channel) error {
 	}
 
 	// create a new readSubscription with the context of the middleware
-	rs := newReadSubscription(m.ctx, s, m.processAuthenticatedMessage, m.log, m.metrics)
+	rs := newReadSubscription(m.ctx, s, m.processMessage, m.log, m.metrics)
 	m.wg.Add(1)
 
 	// kick off the receive loop to continuously receive messages
@@ -446,42 +609,42 @@ func (m *Middleware) Unsubscribe(channel network.Channel) error {
 	return nil
 }
 
-// processAuthenticatedMessage processes a message and a source (indicated by its peer ID) and eventually passes it to the overlay
-// In particular, it populates the `OriginID` field of the message with a Flow ID translated from this source.
-// The assumption is that the message has been authenticated at the network level (libp2p) to originate from the peer with ID `peerID`
-// this requirement is fulfilled by e.g. the output of readConnection and readSubscription
-func (m *Middleware) processAuthenticatedMessage(msg *message.Message, peerID peer.ID) {
-	flowID, err := m.idTranslator.GetFlowID(peerID)
+// processMessage processes a message and eventually passes it to the overlay
+func (m *Middleware) processMessage(
+	payload []byte,
+	channel network.Channel,
+	peerID peer.ID,
+) {
+	msg, err := m.codec.Decode(payload)
+
+	if err != nil {
+		m.log.Err(err).Msg("failed to decode message")
+		return
+	}
+
+	originID, err := m.idTranslator.GetFlowID(peerID)
+
 	if err != nil {
 		m.log.Warn().Err(err).Msgf("received message from unknown peer %v, and was dropped", peerID.String())
 		return
 	}
 
-	msg.OriginID = flowID[:]
-
-	m.processMessage(msg)
-}
-
-// processMessage processes a message and eventually passes it to the overlay
-func (m *Middleware) processMessage(msg *message.Message) {
-	originID := flow.HashToID(msg.OriginID)
-
 	m.log.Debug().
-		Str("channel", msg.ChannelID).
-		Str("type", msg.Type).
+		Str("channel", channel.String()).
+		Str("type", strings.TrimLeft(fmt.Sprintf("%T", msg), "*")).
 		Str("origin_id", originID.String()).
 		Msg("processing new message")
 
 	// run through all the message validators
 	for _, v := range m.validators {
 		// if any one fails, stop message propagation
-		if !v.Validate(*msg) {
+		if !v.Validate(channel, msg, originID) {
 			return
 		}
 	}
 
 	// if validation passed, send the message to the overlay
-	err := m.ov.Receive(originID, msg)
+	err = m.ov.Receive(originID, channel, msg)
 	if err != nil {
 		m.log.Error().Err(err).Msg("could not deliver payload")
 	}

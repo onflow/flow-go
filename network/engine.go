@@ -31,12 +31,10 @@ type Engine interface {
 	Process(channel Channel, originID flow.Identifier, event interface{}) error
 }
 
-type MessageProcessor interface {
+type RequestHandler interface {
 	module.ReadyDoneAware
 
 	HandleRequest(request interface{}, originID peer.ID) (response interface{}, err error)
-
-	HandleMessage(message interface{}, originID peer.ID) (err error)
 }
 
 // type MessageProcessor interface {

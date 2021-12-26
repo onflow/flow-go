@@ -75,6 +75,18 @@ type SyncMetrics interface {
 	SyncHeightRequestStarted()
 
 	SyncHeightRequestFinished(duration time.Duration, success bool, height uint64)
+
+	RangeResponseStarted()
+
+	RangeResponseFinished(duration time.Duration, success bool)
+
+	BatchResponseStarted()
+
+	BatchResponseFinished(duration time.Duration, success bool)
+
+	SyncHeightResponseStarted()
+
+	SyncHeightResponseFinished(duration time.Duration, height uint64)
 }
 
 type EngineMetrics interface {

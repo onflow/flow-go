@@ -148,7 +148,7 @@ func (n *Node) GetPeersForProtocol(pid protocol.ID) peer.IDSlice {
 }
 
 // CreateStream returns an existing stream connected to the peer if it exists, or creates a new stream with it.
-func (n *Node) CreateStream(ctx context.Context, peerID peer.ID) (libp2pnet.Stream, error) {
+func (n *Node) CreateStream(ctx context.Context, proto protocol.ID, peerID peer.ID) (libp2pnet.Stream, error) {
 	lg := n.logger.With().Str("peer_id", peerID.Pretty()).Logger()
 
 	// If we do not currently have any addresses for the given peer, stream creation will almost

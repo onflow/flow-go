@@ -11,7 +11,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/network/message"
+	"github.com/onflow/flow-go/network"
 	validator "github.com/onflow/flow-go/network/validator/pubsub"
 )
 
@@ -22,13 +22,14 @@ type readSubscription struct {
 	log      zerolog.Logger
 	sub      *pubsub.Subscription
 	metrics  module.NetworkMetrics
-	callback func(msg *message.Message, peerID peer.ID)
+	callback func(payload []byte, channel network.Channel, peerID peer.ID)
 }
 
 // newReadSubscription reads the messages coming in on the subscription
-func newReadSubscription(ctx context.Context,
+func newReadSubscription(
+	ctx context.Context,
 	sub *pubsub.Subscription,
-	callback func(msg *message.Message, peerID peer.ID),
+	callback func(payload []byte, channel network.Channel, peerID peer.ID),
 	log zerolog.Logger,
 	metrics module.NetworkMetrics) *readSubscription {
 
@@ -91,6 +92,6 @@ func (r *readSubscription) receiveLoop(wg *sync.WaitGroup) {
 		r.metrics.NetworkMessageReceived(msg.Size(), msg.ChannelID, msg.Type)
 
 		// call the callback
-		r.callback(msg, validatorData.From)
+		r.callback(msg.Payload, network.Channel(msg.ChannelID), validatorData.From)
 	}
 }

@@ -74,7 +74,9 @@ type Overlay interface {
 	// GetIdentity returns the Identity associated with the given peer ID, if it exists
 	Identity(peer.ID) (*flow.Identity, bool)
 
-	Receive(nodeID flow.Identifier, msg *message.Message) error
+	Receive(nodeID flow.Identifier, channel Channel, msg interface{}) error
+
+	ReceiveRequest(nodeID flow.Identifier, channel Channel, msg interface{}, callback func(interface{}, error)) error
 }
 
 // Connection represents an interface to read from & write to a connection.

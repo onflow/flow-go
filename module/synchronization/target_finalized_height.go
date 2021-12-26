@@ -38,6 +38,8 @@ func (t *TargetHeight) Update(height uint64, originID flow.Identifier) {
 }
 
 func (t *TargetHeight) Get() uint64 {
+	// TODO: compute weighted median by age
+
 	if t.updated {
 		t.cachedValue = quickSelect(t.heights, len(t.heights)/2)
 		t.updated = false

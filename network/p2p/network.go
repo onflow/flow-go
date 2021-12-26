@@ -49,6 +49,7 @@ type Network struct {
 	metrics                     module.NetworkMetrics
 	rcache                      *RcvCache // used to deduplicate incoming messages
 	queue                       network.MessageQueue
+	requestQueue                network.MessageQueue
 	subMngr                     network.SubscriptionManager // used to keep track of subscribed channels
 	registerEngineRequests      chan *registerEngineRequest
 	registerBlobServiceRequests chan *registerBlobServiceRequest
@@ -245,6 +246,10 @@ func (n *Network) handleRegisterBlobServiceRequest(parent irrecoverable.Signaler
 	return bs, nil
 }
 
+func (n *Network) RegisterMessageProcessor(channel network.Channel, processor network.RequestHandler) (network.RequestSender, error) {
+
+}
+
 // Register will register the given engine with the given unique engine engineID,
 // returning a conduit to directly submit messages to the message bus of the
 // engine.
@@ -437,6 +442,8 @@ func (n *Network) unicast(channel network.Channel, message interface{}, targetID
 		return fmt.Errorf("unicast could not generate network message: %w", err)
 	}
 
+	// TODO: add check for message size
+	// TODO: also add the metrics calls here instead
 	err = n.mw.SendDirect(msg, targetID)
 	if err != nil {
 		return fmt.Errorf("failed to send message to %x: %w", targetID, err)
@@ -543,4 +550,46 @@ func (n *Network) queueSubmitFunc(message interface{}) {
 	}
 
 	n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))
+}
+
+func (n *Network) requestQueueSubmitFunc(request interface{}) {
+	// TODO
+	// get the request handler
+
+	var handler network.RequestHandler
+	var success func(interface{})
+	var failure func(error)
+
+	qm := message.(queue.QMessage)
+	handler, err := n.subMngr.GetRequestHandler(channel)
+	if err != nil {
+		n.logger.Error().
+			Err(err).
+			Str("channel_id", qm.Target.String()).
+			Str("sender_id", qm.SenderID.String()).
+			Msg("failed to submit message")
+		return
+	}
+
+	// submits the message to the engine synchronously and
+	// tracks its processing time.
+	// startTimestamp := time.Now()
+
+	resp, err := handler.HandleRequest(request, sender)
+	// if err != nil {
+	// 	n.logger.Error().
+	// 		Err(err).
+	// 		Str("channel_id", qm.Target.String()).
+	// 		Str("sender_id", qm.SenderID.String()).
+	// 		Msg("failed to process message")
+	// }
+
+	// n.metrics.InboundProcessDuration(qm.Target.String(), time.Since(startTimestamp))
+
+	if err != nil {
+		failure(err)
+		return
+	}
+
+	success(resp)
 }

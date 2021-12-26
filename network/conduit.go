@@ -88,9 +88,7 @@ type Conduit interface {
 	Close() error
 }
 
-type MessageSender interface {
-	SendMessage(ctx context.Context, event interface{}, targetID peer.ID) error
-
+type RequestSender interface {
 	SendRequest(ctx context.Context, event interface{}, targetID peer.ID) (interface{}, error)
 }
 

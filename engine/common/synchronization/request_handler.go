@@ -3,386 +3,170 @@ package synchronization
 import (
 	"errors"
 	"fmt"
+	"time"
 
-	"github.com/rs/zerolog"
-
+	"github.com/libp2p/go-libp2p-core/peer"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/module"
-	"github.com/onflow/flow-go/module/lifecycle"
-	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/synchronization"
-	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/storage"
+	"github.com/rs/zerolog"
 )
 
-// defaultSyncRequestQueueCapacity maximum capacity of sync requests queue
-const defaultSyncRequestQueueCapacity = 500
-
-// defaultSyncRequestQueueCapacity maximum capacity of range requests queue
-const defaultRangeRequestQueueCapacity = 500
-
-// defaultSyncRequestQueueCapacity maximum capacity of batch requests queue
-const defaultBatchRequestQueueCapacity = 500
-
-// defaultEngineRequestsWorkers number of workers to dispatch events for requests
-const defaultEngineRequestsWorkers = 8
-
-type RequestHandlerEngine struct {
-	unit *engine.Unit
-	lm   *lifecycle.LifecycleManager
-
-	me      module.Local
-	log     zerolog.Logger
-	metrics module.EngineMetrics
-
-	blocks storage.Blocks
-	core   module.SyncCore
-	con    network.Conduit // used for sending responses to requesters
-
-	pendingSyncRequests   engine.MessageStore    // message store for *message.SyncRequest
-	pendingBatchRequests  engine.MessageStore    // message store for *message.BatchRequest
-	pendingRangeRequests  engine.MessageStore    // message store for *message.RangeRequest
-	requestMessageHandler *engine.MessageHandler // message handler responsible for request processing
-
-	queueMissingHeights bool // true if missing heights should be added to download queue
+type RequestHandler struct {
+	blocks          storage.Blocks
+	logger          zerolog.Logger
+	finalizedHeader *module.FinalizedHeaderCache
+	metrics         module.SyncMetrics
+	config          *HandlerConfig
+	core            module.SyncCore
 }
 
-func NewRequestHandlerEngine(
-	log zerolog.Logger,
-	metrics module.EngineMetrics,
-	con network.Conduit,
-	me module.Local,
-	blocks storage.Blocks,
-	core module.SyncCore,
-	queueMissingHeights bool,
-) *RequestHandlerEngine {
-	r := &RequestHandlerEngine{
-		unit:                engine.NewUnit(),
-		lm:                  lifecycle.NewLifecycleManager(),
-		me:                  me,
-		log:                 log.With().Str("engine", "synchronization").Logger(),
-		metrics:             metrics,
-		blocks:              blocks,
-		core:                core,
-		finalizedHeader:     finalizedHeader,
-		con:                 con,
-		queueMissingHeights: queueMissingHeights,
-	}
-
-	r.setupRequestMessageHandler()
-
-	return r
+type HandlerConfig struct {
+	MaxResponseSize        uint64
+	ProcessReceivedHeights bool
 }
 
-// SubmitLocal submits an event originating on the local node.
-func (r *RequestHandlerEngine) SubmitLocal(event interface{}) {
-	err := r.ProcessLocal(event)
-	if err != nil {
-		r.log.Fatal().Err(err).Msg("internal error processing event")
+func (s *RequestHandler) HandleRequest(request interface{}, originID peer.ID) (interface{}, error) {
+	switch r := request.(type) {
+	case *messages.RangeRequest:
+		return s.handleRangeRequest(r, originID)
+	case *messages.BatchRequest:
+		return s.handleBatchRequest(r, originID)
+	case *messages.SyncRequest:
+		return s.handleSyncRequest(r, originID), nil
+	default:
+		return nil, fmt.Errorf("received input with type %T from %v: %w", request, originID.String(), engine.IncompatibleInputTypeError)
 	}
 }
 
-// Submit submits the given event from the node with the given origin ID
-// for processing in a non-blocking manner. It returns instantly and logs
-// a potential processing error internally when done.
-func (r *RequestHandlerEngine) Submit(channel network.Channel, originID flow.Identifier, event interface{}) {
-	err := r.Process(channel, originID, event)
-	if err != nil {
-		r.log.Fatal().Err(err).Msg("internal error processing event")
-	}
-}
+func (s *RequestHandler) handleRangeRequest(req *messages.RangeRequest, origin peer.ID) (resp *messages.BlockResponse, err error) {
+	s.logger.Debug().Str("origin_id", origin.String()).Msg("received new range request")
 
-// ProcessLocal processes an event originating on the local node.
-func (r *RequestHandlerEngine) ProcessLocal(event interface{}) error {
-	return r.process(r.me.NodeID(), event)
-}
+	s.metrics.RangeResponseStarted()
+	started := time.Now()
 
-// Process processes the given event from the node with the given origin ID in
-// a blocking manner. It returns the potential processing error when done.
-func (r *RequestHandlerEngine) Process(channel network.Channel, originID flow.Identifier, event interface{}) error {
-	err := r.process(originID, event)
-	if err != nil {
-		if engine.IsIncompatibleInputTypeError(err) {
-			r.log.Warn().Msgf("%v delivered unsupported message %T through %v", originID, event, channel)
-			return nil
-		}
-		return fmt.Errorf("unexpected error while processing engine message: %w", err)
-	}
-	return nil
-}
+	defer func() {
+		s.metrics.RangeResponseFinished(time.Since(started), err == nil)
+	}()
 
-// process processes events for the synchronization request handler engine.
-// Error returns:
-//  * IncompatibleInputTypeError if input has unexpected type
-//  * All other errors are potential symptoms of internal state corruption or bugs (fatal).
-func (r *RequestHandlerEngine) process(originID flow.Identifier, event interface{}) error {
-	return r.requestMessageHandler.Process(originID, event)
-}
+	// get the local finalized height to determine if we can fulfill the request
+	localHeight := s.finalizedHeader.Get().Height
 
-// setupRequestMessageHandler initializes the inbound queues and the MessageHandler for UNTRUSTED requests.
-func (r *RequestHandlerEngine) setupRequestMessageHandler() {
-	// RequestHeap deduplicates requests by keeping only one sync request for each requester.
-	r.pendingSyncRequests = NewRequestHeap(defaultSyncRequestQueueCapacity)
-	r.pendingRangeRequests = NewRequestHeap(defaultRangeRequestQueueCapacity)
-	r.pendingBatchRequests = NewRequestHeap(defaultBatchRequestQueueCapacity)
-
-	// define message queueing behaviour
-	r.requestMessageHandler = engine.NewMessageHandler(
-		r.log,
-		engine.NewNotifier(),
-		engine.Pattern{
-			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.SyncRequest)
-				if ok {
-					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageSyncRequest)
-				}
-				return ok
-			},
-			Store: r.pendingSyncRequests,
-		},
-		engine.Pattern{
-			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.RangeRequest)
-				if ok {
-					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageRangeRequest)
-				}
-				return ok
-			},
-			Store: r.pendingRangeRequests,
-		},
-		engine.Pattern{
-			Match: func(msg *engine.Message) bool {
-				_, ok := msg.Payload.(*messages.BatchRequest)
-				if ok {
-					r.metrics.MessageReceived(metrics.EngineSynchronization, metrics.MessageBatchRequest)
-				}
-				return ok
-			},
-			Store: r.pendingBatchRequests,
-		},
-	)
-}
-
-// onSyncRequest processes an outgoing handshake; if we have a higher height, we
-// inform the other node of it, so they can organize their block downloads. If
-// we have a lower height, we add the difference to our own download queue.
-func (r *RequestHandlerEngine) onSyncRequest(originID flow.Identifier, req *messages.SyncRequest) error {
-	final := r.finalizedHeader.Get()
-	r.log.Debug().
-		Str("origin_id", originID.String()).
-		Uint64("origin_height", req.Height).
-		Uint64("local_height", final.Height).
-		Msg("received new sync request")
-
-	if r.queueMissingHeights {
-		// queue any missing heights as needed
-		r.core.HandleHeight(final, req.Height)
-	}
-
-	// don't bother sending a response if we're within tolerance or if we're
-	// behind the requester
-	if r.core.WithinTolerance(final, req.Height) || req.Height > final.Height {
-		return nil
-	}
-
-	// if we're sufficiently ahead of the requester, send a response
-	res := &messages.SyncResponse{
-		Height: final.Height,
-		Nonce:  req.Nonce,
-	}
-	err := r.con.Unicast(res, originID)
-	if err != nil {
-		r.log.Warn().Err(err).Msg("sending sync response failed")
-		return nil
-	}
-	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncResponse)
-
-	return nil
-}
-
-// onRangeRequest processes a request for a range of blocks by height.
-func (r *RequestHandlerEngine) onRangeRequest(originID flow.Identifier, req *messages.RangeRequest) error {
-	r.log.Debug().Str("origin_id", originID.String()).Msg("received new range request")
-	// get the latest final state to know if we can fulfill the request
-	head := r.finalizedHeader.Get()
-
-	// if we don't have anything to send, we can bail right away
-	if head.Height < req.FromHeight || req.FromHeight > req.ToHeight {
-		return nil
+	if localHeight < req.FromHeight {
+		err = fmt.Errorf("local height %v is lower than requested range start height %v", localHeight, req.FromHeight)
+		return
 	}
 
 	// enforce client-side max request size
-	maxHeight := req.FromHeight + uint64(synchronization.DefaultConfig().MaxSize)
+	maxHeight := req.FromHeight + uint64(s.config.MaxResponseSize) - 1
+
 	if maxHeight < req.ToHeight {
 		req.ToHeight = maxHeight
 	}
 
-	// get all of the blocks, one by one
 	blocks := make([]*flow.Block, 0, req.ToHeight-req.FromHeight+1)
+
 	for height := req.FromHeight; height <= req.ToHeight; height++ {
-		block, err := r.blocks.ByHeight(height)
-		if errors.Is(err, storage.ErrNotFound) {
-			r.log.Error().Uint64("height", height).Msg("skipping unknown heights")
+		block, err := s.blocks.ByHeight(height)
+
+		if err != nil {
+			logger := s.logger.With().Uint64("height", height).Logger()
+
+			if errors.Is(err, storage.ErrNotFound) {
+				logger.Debug().Msg("skipping unknown heights")
+			} else {
+				logger.Err(err).Msg("failed to get block")
+			}
+
 			break
 		}
-		if err != nil {
-			return fmt.Errorf("could not get block for height (%d): %w", height, err)
-		}
+
 		blocks = append(blocks, block)
 	}
 
 	// if there are no blocks to send, skip network message
 	if len(blocks) == 0 {
-		r.log.Debug().Msg("skipping empty range response")
-		return nil
+		err = errors.New("empty range response")
+		return
 	}
 
-	// send the response
-	res := &messages.BlockResponse{
-		Nonce:  req.Nonce,
+	resp = &messages.BlockResponse{
 		Blocks: blocks,
 	}
-	err := r.con.Unicast(res, originID)
-	if err != nil {
-		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending range response failed")
-		return nil
-	}
-	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 
-	return nil
+	return
 }
 
-// onBatchRequest processes a request for a specific block by block ID.
-func (r *RequestHandlerEngine) onBatchRequest(originID flow.Identifier, req *messages.BatchRequest) error {
-	r.log.Debug().Str("origin_id", originID.String()).Msg("received new batch request")
-	// we should bail and send nothing on empty request
-	if len(req.BlockIDs) == 0 {
-		return nil
-	}
+func (s *RequestHandler) handleBatchRequest(req *messages.BatchRequest, origin peer.ID) (resp *messages.BlockResponse, err error) {
+	s.logger.Debug().Str("origin_id", origin.String()).Msg("received new batch request")
+
+	s.metrics.BatchResponseStarted()
+	started := time.Now()
+
+	// TODO!!! the success should not be based on whether or not the error is nil
+	// similar for other defers
+	defer func() {
+		s.metrics.BatchResponseFinished(time.Since(started), err == 0)
+	}()
 
 	// deduplicate the block IDs in the batch request
 	blockIDs := make(map[flow.Identifier]struct{})
+
 	for _, blockID := range req.BlockIDs {
 		blockIDs[blockID] = struct{}{}
 
 		// enforce client-side max request size
-		if len(blockIDs) == int(synchronization.DefaultConfig().MaxSize) {
+		if len(blockIDs) == int(s.config.MaxResponseSize) {
 			break
 		}
 	}
 
-	// try to get all the blocks by ID
 	blocks := make([]*flow.Block, 0, len(blockIDs))
+
 	for blockID := range blockIDs {
-		block, err := r.blocks.ByID(blockID)
-		if errors.Is(err, storage.ErrNotFound) {
-			r.log.Debug().Hex("block_id", blockID[:]).Msg("skipping unknown block")
+		block, err := s.blocks.ByID(blockID)
+
+		if err != nil {
+			s.logger.Err(err).Str("block_id", blockID.String()).Msg("failed to get block")
+
 			continue
 		}
-		if err != nil {
-			return fmt.Errorf("could not get block by ID (%s): %w", blockID, err)
-		}
+
 		blocks = append(blocks, block)
 	}
 
 	// if there are no blocks to send, skip network message
 	if len(blocks) == 0 {
-		r.log.Debug().Msg("skipping empty batch response")
-		return nil
+		err = errors.New("empty batch response")
+		return
 	}
 
-	// send the response
-	res := &messages.BlockResponse{
-		Nonce:  req.Nonce,
+	resp = &messages.BlockResponse{
 		Blocks: blocks,
 	}
-	err := r.con.Unicast(res, originID)
-	if err != nil {
-		r.log.Warn().Err(err).Hex("origin_id", originID[:]).Msg("sending batch response failed")
-		return nil
+
+	return
+}
+
+func (s *RequestHandler) handleSyncRequest(req *messages.SyncRequest, origin peer.ID) *messages.SyncResponse {
+	s.logger.Debug().Str("origin_id", origin.String()).Msg("received new sync request")
+
+	s.metrics.SyncHeightResponseStarted()
+	started := time.Now()
+
+	defer func() {
+		s.metrics.SyncHeightResponseFinished(time.Since(started), req.Height)
+	}()
+
+	if s.config.ProcessReceivedHeights {
+		s.core.HeightReceived(req.Height, origin)
 	}
-	r.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageBlockResponse)
 
-	return nil
-}
+	localHeight := s.finalizedHeader.Get().Height
 
-// processAvailableRequests is processor of pending events which drives events from networking layer to business logic.
-func (r *RequestHandlerEngine) processAvailableRequests() error {
-	for {
-		select {
-		case <-r.unit.Quit():
-			return nil
-		default:
-		}
-
-		msg, ok := r.pendingSyncRequests.Get()
-		if ok {
-			err := r.onSyncRequest(msg.OriginID, msg.Payload.(*messages.SyncRequest))
-			if err != nil {
-				return fmt.Errorf("processing sync request failed: %w", err)
-			}
-			continue
-		}
-
-		msg, ok = r.pendingRangeRequests.Get()
-		if ok {
-			err := r.onRangeRequest(msg.OriginID, msg.Payload.(*messages.RangeRequest))
-			if err != nil {
-				return fmt.Errorf("processing range request failed: %w", err)
-			}
-			continue
-		}
-
-		msg, ok = r.pendingBatchRequests.Get()
-		if ok {
-			err := r.onBatchRequest(msg.OriginID, msg.Payload.(*messages.BatchRequest))
-			if err != nil {
-				return fmt.Errorf("processing batch request failed: %w", err)
-			}
-			continue
-		}
-
-		// when there is no more messages in the queue, back to the loop to wait
-		// for the next incoming message to arrive.
-		return nil
+	return &messages.SyncResponse{
+		Height: localHeight,
 	}
-}
-
-// requestProcessingLoop is a separate goroutine that performs processing of queued requests
-func (r *RequestHandlerEngine) requestProcessingLoop() {
-	notifier := r.requestMessageHandler.GetNotifier()
-	for {
-		select {
-		case <-r.unit.Quit():
-			return
-		case <-notifier:
-			err := r.processAvailableRequests()
-			if err != nil {
-				r.log.Fatal().Err(err).Msg("internal error processing queued requests")
-			}
-		}
-	}
-}
-
-// Ready returns a ready channel that is closed once the engine has fully started.
-func (r *RequestHandlerEngine) Ready() <-chan struct{} {
-	r.lm.OnStart(func() {
-		<-r.finalizedHeader.Ready()
-		for i := 0; i < defaultEngineRequestsWorkers; i++ {
-			r.unit.Launch(r.requestProcessingLoop)
-		}
-	})
-	return r.lm.Started()
-}
-
-// Done returns a done channel that is closed once the engine has fully stopped.
-func (r *RequestHandlerEngine) Done() <-chan struct{} {
-	r.lm.OnStop(func() {
-		// wait for all request processing workers to exit
-		<-r.unit.Done()
-		<-r.finalizedHeader.Done()
-	})
-	return r.lm.Stopped()
 }

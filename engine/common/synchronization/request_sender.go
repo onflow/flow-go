@@ -15,17 +15,17 @@ import (
 	"golang.org/x/net/context"
 )
 
-type SyncEngine struct {
-	config          *Config
+type RequestSender struct {
+	config          *SenderConfig
 	finalizedHeader *module.FinalizedHeaderCache
 	logger          zerolog.Logger
-	mw              network.Middleware
-	peerProvider    func() peer.IDSlice
+	requestSender   network.RequestSender
+	peerProvider    func() peer.IDSlice // TODO: filter out own ID
 	core            module.SyncCore
 	metrics         module.SyncMetrics
 }
 
-type Config struct {
+type SenderConfig struct {
 	PollInterval        time.Duration
 	ScanInterval        time.Duration
 	NumPeersForRequest  uint
@@ -35,7 +35,7 @@ type Config struct {
 	RequestTimeout      time.Duration
 }
 
-func (s *SyncEngine) loop(ctx irrecoverable.SignalerContext) {
+func (s *RequestSender) loop(ctx irrecoverable.SignalerContext) {
 	poll := time.NewTicker(s.config.PollInterval)
 	defer poll.Stop()
 
@@ -60,7 +60,7 @@ func (s *SyncEngine) loop(ctx irrecoverable.SignalerContext) {
 	}
 }
 
-func (s *SyncEngine) sendRequests() {
+func (s *RequestSender) sendRequests() {
 	activeRange, batch := s.core.GetRequestableItems()
 
 	numRequests := uint(0)
@@ -104,7 +104,7 @@ func (s *SyncEngine) sendRequests() {
 	}
 }
 
-func (s *SyncEngine) sendRangeRequest(req *messages.RangeRequest, target peer.ID) {
+func (s *RequestSender) sendRangeRequest(req *messages.RangeRequest, target peer.ID) {
 	logger := s.logger.With().Str("target", target.String()).Logger()
 
 	logger.Debug().
@@ -116,12 +116,14 @@ func (s *SyncEngine) sendRangeRequest(req *messages.RangeRequest, target peer.ID
 	started := time.Now()
 	success := false
 
-	defer s.metrics.RangeRequestFinished(time.Since(started), success)
+	defer func() {
+		s.metrics.RangeRequestFinished(time.Since(started), success)
+	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.config.RequestTimeout)
 	defer cancel()
 
-	response, err := s.mw.SendMsg(ctx, req, target)
+	response, err := s.requestSender.SendRequest(ctx, req, target)
 	cancel()
 
 	if err != nil {
@@ -152,7 +154,7 @@ func (s *SyncEngine) sendRangeRequest(req *messages.RangeRequest, target peer.ID
 	success = true
 }
 
-func (s *SyncEngine) validateRangeResponse(req *messages.RangeRequest, resp *messages.BlockResponse) ([]flow.Identifier, error) {
+func (s *RequestSender) validateRangeResponse(req *messages.RangeRequest, resp *messages.BlockResponse) ([]flow.Identifier, error) {
 	if len(resp.Blocks) == 0 {
 		// TODO
 		return nil, errors.New("empty response")
@@ -182,7 +184,7 @@ func (s *SyncEngine) validateRangeResponse(req *messages.RangeRequest, resp *mes
 	return blockIDs, nil
 }
 
-func (s *SyncEngine) sendBatchRequest(req *messages.BatchRequest, target peer.ID) {
+func (s *RequestSender) sendBatchRequest(req *messages.BatchRequest, target peer.ID) {
 	logger := s.logger.With().Str("target", target.String()).Logger()
 
 	blockIDsArr := zerolog.Arr()
@@ -199,12 +201,14 @@ func (s *SyncEngine) sendBatchRequest(req *messages.BatchRequest, target peer.ID
 	started := time.Now()
 	success := false
 
-	defer s.metrics.BatchRequestFinished(time.Since(started), success)
+	defer func() {
+		s.metrics.BatchRequestFinished(time.Since(started), success)
+	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.config.RequestTimeout)
 	defer cancel()
 
-	response, err := s.mw.SendMsg(ctx, req, target)
+	response, err := s.requestSender.SendRequest(ctx, req, target)
 	cancel()
 
 	if err != nil {
@@ -235,7 +239,7 @@ func (s *SyncEngine) sendBatchRequest(req *messages.BatchRequest, target peer.ID
 	success = true
 }
 
-func (s *SyncEngine) validateBatchResponse(req *messages.BatchRequest, resp *messages.BlockResponse) ([]flow.Identifier, error) {
+func (s *RequestSender) validateBatchResponse(req *messages.BatchRequest, resp *messages.BlockResponse) ([]flow.Identifier, error) {
 	if len(resp.Blocks) == 0 {
 		// TODO
 		return nil, errors.New("empty response")
@@ -278,7 +282,7 @@ func (s *SyncEngine) validateBatchResponse(req *messages.BatchRequest, resp *mes
 	return blockIDs, nil
 }
 
-func (s *SyncEngine) getTargets() peer.IDSlice {
+func (s *RequestSender) getTargets() peer.IDSlice {
 	peers := s.peerProvider()
 
 	for i := 0; i < int(s.config.NumPeersForRequest); i++ {
@@ -289,7 +293,7 @@ func (s *SyncEngine) getTargets() peer.IDSlice {
 	return peers[:s.config.NumPeersForRequest]
 }
 
-func (s *SyncEngine) pollHeight() {
+func (s *RequestSender) pollHeight() {
 	req := &messages.SyncRequest{
 		Height: s.finalizedHeader.Get().Height,
 	}
@@ -297,11 +301,9 @@ func (s *SyncEngine) pollHeight() {
 	for _, target := range s.getTargets() {
 		go s.sendSyncHeightRequest(req, target)
 	}
-
-	// TODO: e.metrics.MessageSent(metrics.EngineSynchronization, metrics.MessageSyncRequest)
 }
 
-func (s *SyncEngine) sendSyncHeightRequest(req *messages.SyncRequest, target peer.ID) {
+func (s *RequestSender) sendSyncHeightRequest(req *messages.SyncRequest, target peer.ID) {
 	logger := s.logger.With().Str("target", target.String()).Logger()
 
 	logger.Debug().
@@ -313,12 +315,14 @@ func (s *SyncEngine) sendSyncHeightRequest(req *messages.SyncRequest, target pee
 	success := false
 	height := uint64(0)
 
-	defer s.metrics.SyncHeightRequestFinished(time.Since(started), success, height)
+	defer func() {
+		s.metrics.SyncHeightRequestFinished(time.Since(started), success, height)
+	}()
 
 	ctx, cancel := context.WithTimeout(context.Background(), s.config.RequestTimeout)
 	defer cancel()
 
-	response, err := s.mw.SendMsg(ctx, req, target)
+	response, err := s.requestSender.SendRequest(ctx, req, target)
 	cancel()
 
 	if err != nil {
@@ -343,12 +347,4 @@ func (s *SyncEngine) sendSyncHeightRequest(req *messages.SyncRequest, target pee
 	s.core.HeightReceived(msg.Height, target)
 
 	success = true
-}
-
-func (s *SyncEngine) HandleRequest(request interface{}, originID peer.ID) (interface{}, error) {
-
-}
-
-func (s *SyncEngine) HandleMessage(message interface{}, originID peer.ID) error {
-
 }
