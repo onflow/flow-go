@@ -1,3 +1,4 @@
+// TODO: to be replaced by packer in V2
 package signature
 
 import (

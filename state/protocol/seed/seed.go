@@ -15,6 +15,7 @@ import (
 // generate task-specific seeds from the same signature.
 func FromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte, error) {
 	// split the parent voter sig into staking & beacon parts
+	// TODO: replace with packer.Unpack instead
 	combiner := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
 	_, randomBeaconSig, err := combiner.Split(combinedSig)
 	if err != nil {
