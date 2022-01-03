@@ -176,6 +176,10 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	// wait for the first view of the next epoch pause our container to replace
 	s.BlockState.WaitForSealedView(s.T(), nextEpochFirstView+1)
 
+	//currEpochCounter, err := snapshot.Epochs().Current().Counter()
+	//require.NoError(s.T(), err)
+	//require.Equalf(s.T(), currEpochCounter, 2, "expected to be in epoch 2 instead got %d", currEpochCounter)
+
 	s.assertNodeNotApprovedOrProposed(ctx, env, containerToReplace.Config.NodeID)
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
