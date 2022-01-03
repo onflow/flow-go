@@ -2,7 +2,6 @@ package epochs
 
 import (
 	"context"
-	"fmt"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
@@ -176,14 +175,6 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	// wait for the first view of the next epoch pause our container to replace
 	s.BlockState.WaitForSealedView(s.T(), nextEpochFirstView+1)
-
-	// make sure we are in next epoch
-	snapshot, err = s.client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-
-	counter, err := snapshot.Epochs().Current().Counter()
-	require.NoError(s.T(), err)
-	require.Equal(s.T(), uint64(2), counter, fmt.Sprintf("got %v", counter))
 
 	s.assertNodeNotApprovedOrProposed(ctx, env, containerToReplace.Config.NodeID)
 	err = containerToReplace.Pause()
