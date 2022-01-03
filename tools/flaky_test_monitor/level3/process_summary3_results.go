@@ -54,20 +54,24 @@ func processSummary3TestRun(level2FilePath string, propertyFileDirectory string)
 	var testSummary3 common.TestSummary3
 	testSummary3.NoResults = noResultsTRS
 
+	// total # of failed tests that satisfy min failure threshold
+	testSummary3.MostFailuresTotal = len(failuresTRS)
+
 	// check if # of failures exceeded max failures to return
 	if len(failuresTRS) > config.FailuresSliceMax {
 		// truncate slice to return only the first config.FailuresSliceMax failures
 		failuresTRS = failuresTRS[:config.FailuresSliceMax]
 	}
-	testSummary3.MostFailuresTotal = len(failuresTRS)
 	testSummary3.MostFailures = failuresTRS
+
+	// total # of long tests that satisfy min duration threshold
+	testSummary3.LongestRunningTotal = len(durationTRS)
 
 	// check if # of durations exceeded max durations to return
 	if len(durationTRS) > config.DurationSliceMax {
 		// truncate slice to return only the first config.DurationSliceMax durations
 		durationTRS = durationTRS[:config.DurationSliceMax]
 	}
-	testSummary3.LongestRunningTotal = len(durationTRS)
 	testSummary3.LongestRunning = durationTRS
 
 	return testSummary3

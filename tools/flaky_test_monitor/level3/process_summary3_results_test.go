@@ -16,6 +16,7 @@ func TestProcessSummary3TestRun(t *testing.T) {
 		"many level 1 summaries, many no-result tests":                             "test3-multi-no-result-tests",
 		"many level 1 summaries, many failures, many passes":                       "test4-multi-failures",
 		"many level 1 summaries, many failures, many passes, many no-result tests": "test5-multi-durations",
+		"many level 1 summaries, many failures - cap failures":                     "test6-multi-failures-cap",
 	}
 
 	for k, testDir := range testDataMap {
