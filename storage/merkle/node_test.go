@@ -2,7 +2,6 @@ package merkle
 
 import (
 	"encoding/hex"
-	"math"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -101,7 +100,8 @@ func TestShortHash(t *testing.T) {
 // Comment: enforcing that we never exceed the limit 65536 is implemented on the trie-level
 func Test_ShortNodePathLengthEncoding(t *testing.T) {
 	// testing 1:
-	require.True(t, maxKeyLength <= math.MaxInt/8)
+	maxInt := int(^uint(0) >> 1) // largest int value (hardware-dependent)
+	require.True(t, maxKeyLength <= maxInt/8)
 
 	// testing 2:
 	// two bytes can encode 2^16 = 65536 different values
