@@ -112,9 +112,9 @@ func (s *Suite) Ghost() *client.GhostClient {
 
 func (s *Suite) TearDownTest() {
 	//s.net.Remove()
-	//if s.cancel != nil {
-	//	s.cancel()
-	//}
+	if s.cancel != nil {
+		s.cancel()
+	}
 }
 
 // StakedNodeOperationInfo struct contains all the node information needed to start a node after it is onboarded (staked and registered)
