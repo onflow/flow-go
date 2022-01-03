@@ -605,6 +605,8 @@ func (e *TransactionEnv) Hash(data []byte, tag string, hashAlgorithm runtime.Has
 		defer sp.Finish()
 	}
 
+	e.computationHandler.AddUsed(1, "Hash")
+
 	hashAlgo := crypto.RuntimeToCryptoHashingAlgorithm(hashAlgorithm)
 	return crypto.HashWithTag(hashAlgo, tag, data)
 }
@@ -640,6 +642,7 @@ func (e *TransactionEnv) VerifySignature(
 }
 
 func (e *TransactionEnv) ValidatePublicKey(pk *runtime.PublicKey) (bool, error) {
+	e.computationHandler.AddUsed(1, "ValidatePublicKey")
 	return crypto.ValidatePublicKey(pk.SignAlgo, pk.PublicKey)
 }
 
@@ -651,6 +654,8 @@ func (e *TransactionEnv) GetCurrentBlockHeight() (uint64, error) {
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetCurrentBlockHeight)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetCurrentBlockHeight")
 
 	if e.ctx.BlockHeader == nil {
 		return 0, errors.NewOperationNotSupportedError("GetCurrentBlockHeight")
@@ -682,6 +687,8 @@ func (e *TransactionEnv) GetBlockAtHeight(height uint64) (runtime.Block, bool, e
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvGetBlockAtHeight)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "GetBlockAtHeight")
 
 	if e.ctx.Blocks == nil {
 		return runtime.Block{}, false, errors.NewOperationNotSupportedError("GetBlockAtHeight")
@@ -745,6 +752,9 @@ func (e *TransactionEnv) AddEncodedAccountKey(address runtime.Address, publicKey
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvAddAccountKey)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "AddEncodedAccountKey")
+
 	e.sth.DisableLimitEnforcement() // don't enforce limit during adding a key
 	defer e.sth.EnableLimitEnforcement()
 
@@ -770,6 +780,8 @@ func (e *TransactionEnv) RevokeEncodedAccountKey(address runtime.Address, index 
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvRemoveAccountKey)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "RevokeEncodedAccountKey")
 
 	err = e.accounts.CheckAccountNotFrozen(flow.Address(address))
 	if err != nil {
@@ -801,6 +813,8 @@ func (e *TransactionEnv) AddAccountKey(
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvAddAccountKey)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "AddAccountKey")
 
 	accKey, err := e.accountKeys.AddAccountKey(address, publicKey, hashAlgo, weight)
 	if err != nil {
@@ -840,6 +854,8 @@ func (e *TransactionEnv) RevokeAccountKey(address runtime.Address, keyIndex int)
 		sp := e.ctx.Tracer.StartSpanFromParent(e.traceSpan, trace.FVMEnvRemoveAccountKey)
 		defer sp.Finish()
 	}
+
+	e.computationHandler.AddUsed(1, "RevokeAccountKey")
 
 	return e.accountKeys.RevokeAccountKey(address, keyIndex)
 }

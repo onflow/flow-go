@@ -60,8 +60,8 @@ func newContext(ctx Context, opts ...Option) Context {
 const AccountKeyWeightThreshold = 1000
 
 const (
-	DefaultComputationLimit             = 100_000 // 100K
-	DefaultEventCollectionByteSizeLimit = 256_000 // 256KB
+	DefaultComputationLimit             = 100_000_000 // 100K
+	DefaultEventCollectionByteSizeLimit = 256_000     // 256KB
 	DefaultMaxNumOfTxRetries            = 3
 )
 
