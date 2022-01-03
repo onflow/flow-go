@@ -417,7 +417,7 @@ func (s *Suite) removeNodeFromProtocol(ctx context.Context, env templates.Enviro
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
-	// ensure we submit transaction while in epoch setup phase
+	// ensure we submit transaction while in staking phase
 	currView := s.assertInPhase(ctx, flow.EpochPhaseStaking)
 	require.True(s.T(), stakingAuctionViews > currView, "expected remove node transaction to be completed in the epoch staking phase")
 }
