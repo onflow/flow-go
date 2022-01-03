@@ -39,7 +39,7 @@ func TestPopulatedTrie(t *testing.T) {
 	paths := []ledger.Path{p1, p2}
 	payloads := []ledger.Payload{*v1, *v2}
 
-	testTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
+	testTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
 
 	for itr := flattener.NewNodeIterator(testTrie); itr.Next(); {

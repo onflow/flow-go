@@ -163,7 +163,9 @@ func (f *Forest) Update(u *ledger.TrieUpdate) (ledger.RootHash, error) {
 	// TODO rename metrics names
 	f.metrics.UpdateValuesSize(uint64(totalPayloadSize))
 
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads)
+	// apply pruning on update
+	applyPruning := true
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(parentTrie, deduplicatedPaths, deduplicatedPayloads, applyPruning)
 	if err != nil {
 		return emptyHash, fmt.Errorf("constructing updated trie failed: %w", err)
 	}
@@ -216,7 +218,12 @@ func (f *Forest) Proofs(r *ledger.TrieRead) (*ledger.TrieBatchProof, error) {
 
 	// if we have to insert empty values
 	if len(notFoundPaths) > 0 {
-		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads)
+		// for proofs, we have to set the pruning to false,
+		// currently batch proofs are only consists of inclusion proofs
+		// so for non-inclusion proofs we expand the trie with nil value and use an inclusion proof
+		// instead. if pruning is enabled it would break this trick and return the exact trie.
+		applyPruning := false
+		newTrie, err := trie.NewTrieWithUpdatedRegisters(stateTrie, notFoundPaths, notFoundPayloads, applyPruning)
 		if err != nil {
 			return nil, err
 		}

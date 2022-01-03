@@ -36,7 +36,7 @@ func TestTrieStoreAndLoad(t *testing.T) {
 	paths := []ledger.Path{p1, p2, p3, p4, p5}
 	payloads := []ledger.Payload{*v1, *v2, *v3, *v4, *v5}
 
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, true)
 	require.NoError(t, err)
 
 	flattedTrie, err := flattener.FlattenTrie(newTrie)

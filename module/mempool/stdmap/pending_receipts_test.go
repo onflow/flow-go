@@ -203,7 +203,7 @@ func TestPendingReceipts(t *testing.T) {
 
 		nextReceipt := unittest.ExecutionReceiptFixture(unittest.WithResult(
 			unittest.ExecutionResultFixture(
-				unittest.WithBlock(&nextExecutedBlock))))
+				unittest.WithBlock(nextExecutedBlock))))
 		pool.Add(nextReceipt)
 
 		for id := range ids {

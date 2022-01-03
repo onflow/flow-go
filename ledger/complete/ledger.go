@@ -252,6 +252,10 @@ func (l *Ledger) ExportCheckpointAt(
 	// get trie
 	t, err := l.forest.GetTrie(ledger.RootHash(state))
 	if err != nil {
+		rh, _ := l.forest.MostRecentTouchedRootHash()
+		l.logger.Info().
+			Str("hash", rh.String()).
+			Msgf("Most recently touched root hash.")
 		return ledger.State(hash.DummyHash),
 			fmt.Errorf("cannot get try at the given state commitment: %w", err)
 	}
@@ -302,13 +306,22 @@ func (l *Ledger) ExportCheckpointAt(
 	}
 
 	// run reporters
-	for i, reporter := range reporters {
+	for _, reporter := range reporters {
+		l.logger.Info().
+			Str("name", reporter.Name()).
+			Msg("starting reporter")
+
 		start := time.Now()
 		err = reporter.Report(payloads)
 		elapsed := time.Since(start)
-		l.logger.Info().Str("timeTaken", elapsed.String()).Msgf("reporter %d is done", i)
+
+		l.logger.Info().
+			Str("timeTaken", elapsed.String()).
+			Str("name", reporter.Name()).
+			Msg("reporter done")
 		if err != nil {
-			return ledger.State(hash.DummyHash), fmt.Errorf("error running reporter (%d): %w", i, err)
+			return ledger.State(hash.DummyHash),
+				fmt.Errorf("error running reporter (%s): %w", reporter.Name(), err)
 		}
 	}
 
@@ -322,7 +335,9 @@ func (l *Ledger) ExportCheckpointAt(
 
 	emptyTrie := trie.NewEmptyMTrie()
 
-	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads)
+	// no need to prune the data since it has already been prunned through migrations
+	applyPruning := false
+	newTrie, err := trie.NewTrieWithUpdatedRegisters(emptyTrie, paths, payloads, applyPruning)
 	if err != nil {
 		return ledger.State(hash.DummyHash), fmt.Errorf("constructing updated trie failed: %w", err)
 	}

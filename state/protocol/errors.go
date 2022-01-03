@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/onflow/flow-go/model/flow"
+	"github.com/onflow/flow-go/state"
 )
 
 var (
@@ -20,6 +21,10 @@ var (
 	// not been committed and information is queried that is only accessible
 	// in the EpochCommitted phase.
 	ErrEpochNotCommitted = fmt.Errorf("queried info from EpochCommit event before it was emitted")
+
+	// ErrSealingSegmentBelowRootBlock is a sentinel error returned for queries
+	// for a sealing segment below the root block.
+	ErrSealingSegmentBelowRootBlock = fmt.Errorf("cannot query sealing segment below root block")
 )
 
 type IdentityNotFoundError struct {
@@ -56,4 +61,34 @@ func NewInvalidBlockTimestamp(msg string, args ...interface{}) error {
 	return InvalidBlockTimestampError{
 		err: fmt.Errorf(msg, args...),
 	}
+}
+
+// InvalidServiceEventError indicates an invalid service event was processed.
+type InvalidServiceEventError struct {
+	err error
+}
+
+func (e InvalidServiceEventError) Unwrap() error {
+	return e.err
+}
+
+func (e InvalidServiceEventError) Error() string {
+	return e.err.Error()
+}
+
+func IsInvalidServiceEventError(err error) bool {
+	var errInvalidServiceEventError InvalidServiceEventError
+	return errors.As(err, &errInvalidServiceEventError)
+}
+
+// NewInvalidServiceEventError returns an invalid service event error. Since all invalid
+// service events indicate an invalid extension, the service event error is wrapped in
+// the invalid extension error at construction.
+func NewInvalidServiceEventError(msg string, args ...interface{}) error {
+	return state.NewInvalidExtensionErrorf(
+		"cannot extend state with invalid service event: %w",
+		InvalidServiceEventError{
+			err: fmt.Errorf(msg, args...),
+		},
+	)
 }

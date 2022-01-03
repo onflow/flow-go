@@ -246,7 +246,7 @@ This results in the following `Update` algorithm. When applying the updates `(pa
 
 
 ```golang
-FUNCTION Update(height Int, node Node, paths []Path, payloads []Payload, compactLeaf Node) Node {
+FUNCTION Update(height Int, node Node, paths []Path, payloads []Payload, compactLeaf Node, prune bool) Node {
  if len(paths) == 0 {
   // If a compactLeaf from a higher height is carried over, then we are necessarily in case 2.a 
   // (node == nil and only one register to create)
@@ -330,7 +330,15 @@ FUNCTION Update(height Int, node Node, paths []Path, payloads []Payload, compact
  if lChild == newlChild && rChild == newrChild {
   return node
  }
- return NewInterimNode(height, newlChild, newrChild)
+
+nodeToBeReturned := NewInterimNode(height, newlChild, newrChild)
+ // if pruning is enabled, check if we could compactify the nodes after the update
+ // a common example of this is when we update a register payload to nil from a non-nil value
+ // therefore at least one of the children might be a default node (any node that has hashvalue equal to the default hashValue for the given height)
+ if prune { 
+    return nodeToBeReturned.Compactify()
+ }
+
+ return nodeToBeReturned
 }
 ```
-

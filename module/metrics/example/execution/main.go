@@ -30,7 +30,7 @@ func main() {
 			ExecutionCollector: metrics.NewExecutionCollector(tracer, prometheus.DefaultRegisterer),
 			NetworkCollector:   metrics.NewNetworkCollector(),
 		}
-		diskTotal := rand.Int63n(1024 ^ 3)
+		diskTotal := rand.Int63n(1024 * 1024 * 1024)
 		for i := 0; i < 1000; i++ {
 			blockID := unittest.BlockFixture().ID()
 			collector.StartBlockReceivedToExecuted(blockID)
@@ -42,7 +42,7 @@ func main() {
 			collector.ExecutionBlockExecuted(duration, uint64(rand.Int63n(1e6)), 1, 1)
 			collector.ExecutionStateReadsPerBlock(uint64(rand.Int63n(1e6)))
 
-			diskIncrease := rand.Int63n(1024 ^ 2)
+			diskIncrease := rand.Int63n(1024 * 1024)
 			diskTotal += diskIncrease
 			collector.ExecutionStateStorageDiskTotal(diskTotal)
 			collector.ExecutionStorageStateCommitment(diskIncrease)

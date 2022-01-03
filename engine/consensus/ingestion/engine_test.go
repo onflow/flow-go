@@ -71,6 +71,8 @@ func (s *IngestionSuite) TearDownTest() {
 	<-s.ingest.Done()
 }
 
+// TestSubmittingMultipleEntries tests processing of multiple collection guarantees in concurrent way.
+// In happy path we expect that all messages are dispatched to worker goroutines and executed by core.
 func (s *IngestionSuite) TestSubmittingMultipleEntries() {
 	originID := s.collID
 	count := uint64(15)
@@ -100,4 +102,17 @@ func (s *IngestionSuite) TestSubmittingMultipleEntries() {
 	}, time.Millisecond*200, time.Millisecond*20)
 
 	s.pool.AssertExpectations(s.T())
+}
+
+// TestProcessUnsupportedMessageType tests that Process and ProcessLocal correctly handle a case where invalid message type
+// was submitted from network layer.
+func (s *IngestionSuite) TestProcessUnsupportedMessageType() {
+	invalidEvent := uint64(42)
+	err := s.ingest.Process("ch", unittest.IdentifierFixture(), invalidEvent)
+	// shouldn't result in error since byzantine inputs are expected
+	require.NoError(s.T(), err)
+	// in case of local processing error cannot be consumed since all inputs are trusted
+	err = s.ingest.ProcessLocal(invalidEvent)
+	require.Error(s.T(), err)
+	require.True(s.T(), engine.IsIncompatibleInputTypeError(err))
 }

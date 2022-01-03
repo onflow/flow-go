@@ -3,7 +3,9 @@
 package mempool
 
 import (
+	chunks "github.com/onflow/flow-go/model/chunks"
 	flow "github.com/onflow/flow-go/model/flow"
+
 	mempool "github.com/onflow/flow-go/module/mempool"
 
 	mock "github.com/stretchr/testify/mock"
@@ -33,42 +35,19 @@ func (_m *ChunkRequests) Add(request *verification.ChunkDataPackRequest) bool {
 }
 
 // All provides a mock function with given fields:
-func (_m *ChunkRequests) All() []*verification.ChunkDataPackRequest {
+func (_m *ChunkRequests) All() verification.ChunkDataPackRequestInfoList {
 	ret := _m.Called()
 
-	var r0 []*verification.ChunkDataPackRequest
-	if rf, ok := ret.Get(0).(func() []*verification.ChunkDataPackRequest); ok {
+	var r0 verification.ChunkDataPackRequestInfoList
+	if rf, ok := ret.Get(0).(func() verification.ChunkDataPackRequestInfoList); ok {
 		r0 = rf()
 	} else {
 		if ret.Get(0) != nil {
-			r0 = ret.Get(0).([]*verification.ChunkDataPackRequest)
+			r0 = ret.Get(0).(verification.ChunkDataPackRequestInfoList)
 		}
 	}
 
 	return r0
-}
-
-// ByID provides a mock function with given fields: chunkID
-func (_m *ChunkRequests) ByID(chunkID flow.Identifier) (*verification.ChunkDataPackRequest, bool) {
-	ret := _m.Called(chunkID)
-
-	var r0 *verification.ChunkDataPackRequest
-	if rf, ok := ret.Get(0).(func(flow.Identifier) *verification.ChunkDataPackRequest); ok {
-		r0 = rf(chunkID)
-	} else {
-		if ret.Get(0) != nil {
-			r0 = ret.Get(0).(*verification.ChunkDataPackRequest)
-		}
-	}
-
-	var r1 bool
-	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
-		r1 = rf(chunkID)
-	} else {
-		r1 = ret.Get(1).(bool)
-	}
-
-	return r0, r1
 }
 
 // IncrementAttempt provides a mock function with given fields: chunkID
@@ -83,6 +62,29 @@ func (_m *ChunkRequests) IncrementAttempt(chunkID flow.Identifier) bool {
 	}
 
 	return r0
+}
+
+// PopAll provides a mock function with given fields: chunkID
+func (_m *ChunkRequests) PopAll(chunkID flow.Identifier) (chunks.LocatorMap, bool) {
+	ret := _m.Called(chunkID)
+
+	var r0 chunks.LocatorMap
+	if rf, ok := ret.Get(0).(func(flow.Identifier) chunks.LocatorMap); ok {
+		r0 = rf(chunkID)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).(chunks.LocatorMap)
+		}
+	}
+
+	var r1 bool
+	if rf, ok := ret.Get(1).(func(flow.Identifier) bool); ok {
+		r1 = rf(chunkID)
+	} else {
+		r1 = ret.Get(1).(bool)
+	}
+
+	return r0, r1
 }
 
 // Rem provides a mock function with given fields: chunkID

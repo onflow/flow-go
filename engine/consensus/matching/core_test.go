@@ -211,9 +211,9 @@ func (ms *MatchingSuite) TestRequestPendingReceipts() {
 	parentBlock := ms.UnfinalizedBlock
 	for i := 0; i < n; i++ {
 		block := unittest.BlockWithParentFixture(parentBlock.Header)
-		ms.Extend(&block)
-		orderedBlocks = append(orderedBlocks, block)
-		parentBlock = block
+		ms.Extend(block)
+		orderedBlocks = append(orderedBlocks, *block)
+		parentBlock = *block
 	}
 
 	// progress latest sealed and latest finalized:

@@ -2,9 +2,12 @@ package state
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"sort"
+	"strings"
+	"unicode/utf8"
 
 	"github.com/onflow/flow-go/fvm/errors"
 	"github.com/onflow/flow-go/model/flow"
@@ -13,9 +16,9 @@ import (
 // TODO we started with high numbers here and we might
 // tune (reduce) them when we have more data
 const (
-	DefaultMaxKeySize         = 16_000        // ~16KB
-	DefaultMaxValueSize       = 256_000_000   // ~256MB
-	DefaultMaxInteractionSize = 2_000_000_000 // ~2GB
+	DefaultMaxKeySize         = 16_000      // ~16KB
+	DefaultMaxValueSize       = 256_000_000 // ~256MB
+	DefaultMaxInteractionSize = 20_000_000  // ~20MB
 )
 
 type mapKey struct {
@@ -108,7 +111,7 @@ func (s *State) Get(owner, controller, key string, enforceLimit bool) (flow.Regi
 		// wrap error into a fatal error
 		getError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return nil, fmt.Errorf("failed to read key %s on account %s: %w", key, hex.EncodeToString([]byte(owner)), getError)
+		return nil, fmt.Errorf("failed to read key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), getError)
 	}
 
 	// if not part of recent updates count them as read
@@ -137,7 +140,7 @@ func (s *State) Set(owner, controller, key string, value flow.RegisterValue, enf
 		// wrap error into a fatal error
 		setError := errors.NewLedgerFailure(err)
 		// wrap with more info
-		return fmt.Errorf("failed to update key %s on account %s: %w", key, hex.EncodeToString([]byte(owner)), setError)
+		return fmt.Errorf("failed to update key %s on account %s: %w", PrintableKey(key), hex.EncodeToString([]byte(owner)), setError)
 	}
 
 	if enforceLimit {
@@ -311,4 +314,17 @@ func IsFVMStateKey(owner, controller, key string) bool {
 	}
 
 	return false
+}
+
+// PrintableKey formats slabs properly and avoids invalid utf8s
+func PrintableKey(key string) string {
+	// slab
+	if key[0] == '$' && len(key) == 9 {
+		i := uint64(binary.LittleEndian.Uint64([]byte(key)))
+		return fmt.Sprintf("$%d", i)
+	}
+	if !utf8.ValidString(key) {
+		return strings.ToValidUTF8(key, "?")
+	}
+	return key
 }

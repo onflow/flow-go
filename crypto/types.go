@@ -111,18 +111,14 @@ type Signature []byte
 // It allows a function caller differentiate unexpected program errors from errors caused by
 // invalid inputs.
 type invalidInputsError struct {
-	err error
+	error
 }
 
 // invalidInputsErrorf constructs a new invalidInputsError
 func invalidInputsErrorf(msg string, args ...interface{}) error {
 	return &invalidInputsError{
-		err: fmt.Errorf(msg, args...),
+		error: fmt.Errorf(msg, args...),
 	}
-}
-
-func (e invalidInputsError) Error() string {
-	return e.err.Error()
 }
 
 // IsInvalidInputsError checks if the input error is of a invalidInputsError type

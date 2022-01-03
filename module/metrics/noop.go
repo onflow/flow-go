@@ -57,6 +57,7 @@ func (nc *NoopCollector) CurrentEpochFinalView(view uint64)                     
 func (nc *NoopCollector) CurrentDKGPhase1FinalView(view uint64)                                  {}
 func (nc *NoopCollector) CurrentDKGPhase2FinalView(view uint64)                                  {}
 func (nc *NoopCollector) CurrentDKGPhase3FinalView(view uint64)                                  {}
+func (nc *NoopCollector) EpochEmergencyFallbackTriggered()                                       {}
 func (nc *NoopCollector) CacheEntries(resource string, entries uint)                             {}
 func (nc *NoopCollector) CacheHit(resource string)                                               {}
 func (nc *NoopCollector) CacheNotFound(resource string)                                          {}
@@ -146,3 +147,7 @@ func (nc *NoopCollector) ExecutionSync(syncing bool)                            
 func (nc *NoopCollector) DiskSize(uint64)                                                       {}
 func (nc *NoopCollector) ExecutionBlockDataUploadStarted()                                      {}
 func (nc *NoopCollector) ExecutionBlockDataUploadFinished(dur time.Duration)                    {}
+func (nc *NoopCollector) ExecutionDataAddStarted()                                              {}
+func (nc *NoopCollector) ExecutionDataAddFinished(time.Duration, bool, int)                     {}
+func (nc *NoopCollector) ExecutionDataGetStarted()                                              {}
+func (nc *NoopCollector) ExecutionDataGetFinished(time.Duration, bool, int)                     {}

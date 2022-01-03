@@ -312,6 +312,10 @@ func (*ErrorReturningRuntime) SetContractUpdateValidationEnabled(_ bool) {
 	panic("SetContractUpdateValidationEnabled not expected")
 }
 
+func (*ErrorReturningRuntime) SetAtreeValidationEnabled(_ bool) {
+	panic("SetAtreeValidationEnabled not expected")
+}
+
 func (e *ErrorReturningRuntime) ReadStored(_ common.Address, _ cadence.Path, _ runtime.Context) (cadence.Value, error) {
 	panic("ReadStored not expected")
 }
@@ -322,6 +326,10 @@ func (e *ErrorReturningRuntime) ReadLinked(_ common.Address, _ cadence.Path, _ r
 
 func (e *ErrorReturningRuntime) InvokeContractFunction(_ common.AddressLocation, _ string, _ []interpreter.Value, _ []sema.Type, _ runtime.Context) (cadence.Value, error) {
 	panic("InvokeContractFunction not expected")
+}
+
+func (e *ErrorReturningRuntime) SetTracingEnabled(_ bool) {
+	panic("SetTracingEnabled not expected")
 }
 
 func encodeContractNames(contractNames []string) ([]byte, error) {

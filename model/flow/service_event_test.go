@@ -21,6 +21,15 @@ func TestEncodeDecode(t *testing.T) {
 	setup := unittest.EpochSetupFixture()
 	commit := unittest.EpochCommitFixture()
 
+	comparePubKey := cmp.FilterValues(func(a, b crypto.PublicKey) bool {
+		return true
+	}, cmp.Comparer(func(a, b crypto.PublicKey) bool {
+		if a == nil {
+			return b == nil
+		}
+		return a.Equals(b)
+	}))
+
 	t.Run("json", func(t *testing.T) {
 		t.Run("specific event types", func(t *testing.T) {
 			b, err := json.Marshal(setup)
@@ -29,7 +38,7 @@ func TestEncodeDecode(t *testing.T) {
 			gotSetup := new(flow.EpochSetup)
 			err = json.Unmarshal(b, gotSetup)
 			require.NoError(t, err)
-			assert.DeepEqual(t, setup, gotSetup)
+			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
 
 			b, err = json.Marshal(commit)
 			require.NoError(t, err)
@@ -37,11 +46,7 @@ func TestEncodeDecode(t *testing.T) {
 			gotCommit := new(flow.EpochCommit)
 			err = json.Unmarshal(b, gotCommit)
 			require.NoError(t, err)
-			assert.DeepEqual(t, commit, gotCommit, cmp.FilterValues(func(a, b crypto.PublicKey) bool {
-				return true
-			}, cmp.Comparer(func(a, b crypto.PublicKey) bool {
-				return a.Equals(b)
-			})))
+			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -53,7 +58,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			gotSetup, ok := outer.Event.(*flow.EpochSetup)
 			require.True(t, ok)
-			assert.DeepEqual(t, setup, gotSetup)
+			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
 
 			t.Logf("- debug: setup.ServiceEvent()=%+v\n", setup.ServiceEvent())
 			b, err = json.Marshal(commit.ServiceEvent())
@@ -66,11 +71,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			gotCommit, ok := outer.Event.(*flow.EpochCommit)
 			require.True(t, ok)
-			assert.DeepEqual(t, commit, gotCommit, cmp.FilterValues(func(a, b crypto.PublicKey) bool {
-				return true
-			}, cmp.Comparer(func(a, b crypto.PublicKey) bool {
-				return a.Equals(b)
-			})))
+			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 		})
 	})
 
@@ -82,7 +83,7 @@ func TestEncodeDecode(t *testing.T) {
 			gotSetup := new(flow.EpochSetup)
 			err = msgpack.Unmarshal(b, gotSetup)
 			require.NoError(t, err)
-			assert.DeepEqual(t, setup, gotSetup)
+			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
 
 			b, err = msgpack.Marshal(commit)
 			require.NoError(t, err)
@@ -90,11 +91,7 @@ func TestEncodeDecode(t *testing.T) {
 			gotCommit := new(flow.EpochCommit)
 			err = msgpack.Unmarshal(b, gotCommit)
 			require.NoError(t, err)
-			assert.DeepEqual(t, commit, gotCommit, cmp.FilterValues(func(a, b crypto.PublicKey) bool {
-				return true
-			}, cmp.Comparer(func(a, b crypto.PublicKey) bool {
-				return a.Equals(b)
-			})))
+			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -106,7 +103,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			gotSetup, ok := outer.Event.(*flow.EpochSetup)
 			require.True(t, ok)
-			assert.DeepEqual(t, setup, gotSetup)
+			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
 
 			t.Logf("- debug: setup.ServiceEvent()=%+v\n", setup.ServiceEvent())
 			b, err = msgpack.Marshal(commit.ServiceEvent())
@@ -119,11 +116,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			gotCommit, ok := outer.Event.(*flow.EpochCommit)
 			require.True(t, ok)
-			assert.DeepEqual(t, commit, gotCommit, cmp.FilterValues(func(a, b crypto.PublicKey) bool {
-				return true
-			}, cmp.Comparer(func(a, b crypto.PublicKey) bool {
-				return a.Equals(b)
-			})))
+			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 		})
 	})
 
@@ -135,7 +128,7 @@ func TestEncodeDecode(t *testing.T) {
 			gotSetup := new(flow.EpochSetup)
 			err = cbor.Unmarshal(b, gotSetup)
 			require.NoError(t, err)
-			assert.DeepEqual(t, setup, gotSetup)
+			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
 
 			b, err = cborcodec.EncMode.Marshal(commit)
 			require.NoError(t, err)
@@ -143,11 +136,7 @@ func TestEncodeDecode(t *testing.T) {
 			gotCommit := new(flow.EpochCommit)
 			err = cbor.Unmarshal(b, gotCommit)
 			require.NoError(t, err)
-			assert.DeepEqual(t, commit, gotCommit, cmp.FilterValues(func(a, b crypto.PublicKey) bool {
-				return true
-			}, cmp.Comparer(func(a, b crypto.PublicKey) bool {
-				return a.Equals(b)
-			})))
+			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 		})
 
 		t.Run("generic type", func(t *testing.T) {
@@ -162,7 +151,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			gotSetup, ok := outer.Event.(*flow.EpochSetup)
 			require.True(t, ok)
-			assert.DeepEqual(t, setup, gotSetup)
+			assert.DeepEqual(t, setup, gotSetup, comparePubKey)
 
 			b, err = cborcodec.EncMode.Marshal(commit.ServiceEvent())
 			require.NoError(t, err)
@@ -172,11 +161,7 @@ func TestEncodeDecode(t *testing.T) {
 			require.NoError(t, err)
 			gotCommit, ok := outer.Event.(*flow.EpochCommit)
 			require.True(t, ok)
-			assert.DeepEqual(t, commit, gotCommit, cmp.FilterValues(func(a, b crypto.PublicKey) bool {
-				return true
-			}, cmp.Comparer(func(a, b crypto.PublicKey) bool {
-				return a.Equals(b)
-			})))
+			assert.DeepEqual(t, commit, gotCommit, comparePubKey)
 		})
 	})
 }

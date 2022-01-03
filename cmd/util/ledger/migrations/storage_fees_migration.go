@@ -42,7 +42,7 @@ func StorageFeesMigration(payload []ledger.Payload) ([]ledger.Payload, error) {
 }
 
 func incrementStorageUsed(p ledger.Payload, used map[string]uint64) error {
-	id, err := keyToRegisterID(p.Key)
+	id, err := KeyToRegisterID(p.Key)
 	if err != nil {
 		return err
 	}

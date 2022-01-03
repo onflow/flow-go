@@ -1,4 +1,4 @@
-package vertestutils
+package verificationtest
 
 import (
 	"context"
@@ -441,5 +441,35 @@ func ContainerBlockFixture(parent *flow.Header, receipts []*flow.ExecutionReceip
 	containerBlock := unittest.BlockWithParentFixture(parent)
 	containerBlock.SetPayload(unittest.PayloadFixture(unittest.WithReceipts(receipts...)))
 
-	return &containerBlock
+	return containerBlock
+}
+
+// ExecutionResultForkFixture creates two conflicting execution results out of the same block ID.
+// Each execution result has two chunks.
+// First chunks of both results are the same, i.e., have same ID.
+// It returns both results, their shared block, and collection corresponding to their first chunk.
+func ExecutionResultForkFixture(t *testing.T) (*flow.ExecutionResult, *flow.ExecutionResult, *flow.Collection, *flow.Block) {
+	// collection and block
+	collections := unittest.CollectionListFixture(1)
+	block := unittest.BlockWithGuaranteesFixture(
+		unittest.CollectionGuaranteesWithCollectionIDFixture(collections),
+	)
+
+	// execution fork at block with resultA and resultB that share first chunk
+	resultA := unittest.ExecutionResultFixture(
+		unittest.WithBlock(block),
+		unittest.WithChunks(2))
+	resultB := &flow.ExecutionResult{
+		PreviousResultID: resultA.PreviousResultID,
+		BlockID:          resultA.BlockID,
+		Chunks:           append(flow.ChunkList{resultA.Chunks[0]}, unittest.ChunkListFixture(1, resultA.BlockID)...),
+		ServiceEvents:    nil,
+	}
+
+	// to be a valid fixture, results A and B must share first chunk.
+	require.Equal(t, resultA.Chunks[0].ID(), resultB.Chunks[0].ID())
+	// and they must represent a fork
+	require.NotEqual(t, resultA.ID(), resultB.ID())
+
+	return resultA, resultB, collections[0], block
 }

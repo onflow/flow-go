@@ -11,6 +11,7 @@ import (
 
 	"github.com/onflow/flow-go/admin"
 	"github.com/onflow/flow-go/admin/commands"
+	storageCommands "github.com/onflow/flow-go/admin/commands/storage"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/protocol"
 	"github.com/onflow/flow-go/storage"
@@ -159,9 +160,9 @@ func (r *ReadProtocolStateBlocksCommand) Validator(req *admin.CommandRequest) er
 	switch block := block.(type) {
 	case string:
 		block = strings.ToLower(strings.TrimSpace(block))
-		if block == "final" {
+		if block == storageCommands.FINAL {
 			data.requestType = Final
-		} else if block == "sealed" {
+		} else if block == storageCommands.SEALED {
 			data.requestType = Sealed
 		} else if len(block) == 2*flow.IdentifierLen {
 			b, err := hex.DecodeString(block)
