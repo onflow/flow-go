@@ -666,7 +666,7 @@ func (s *Suite) assertNetworkHealthyAfterLNChange(ctx context.Context, _ templat
 
 	currEpochCounter, err := snapshot.Epochs().Current().Counter()
 	require.NoError(s.T(), err)
-	require.Truef(s.T(), currEpochCounter == 2, "expected to be in epoch 2 instead got %d", currEpochCounter)
+	require.Equalf(s.T(), currEpochCounter, 2, "expected to be in epoch 2 instead got %d", currEpochCounter)
 
 	// get latest block ID, because it resides in current epoch it will target our new LN
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)

@@ -2,6 +2,7 @@ package epochs
 
 import (
 	"context"
+	"fmt"
 	"github.com/onflow/flow-go/integration/utils"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/stretchr/testify/require"
@@ -128,10 +129,10 @@ func TestEpochs(t *testing.T) {
 ////specific to that node type are made to ensure the network is healthy.
 ////
 ////TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions related to the node change
-//func (s *Suite) TestEpochJoinAndLeaveAN() {
-//	s.T().Skip()
-//	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
-//}
+func (s *Suite) TestEpochJoinAndLeaveAN() {
+	//s.T().Skip()
+	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
+}
 //
 //// TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions related to the node change
 //func (s *Suite) TestEpochJoinAndLeaveVN() {
@@ -170,17 +171,26 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	testContainer.WriteRootSnapshot(snapshot)
 	testContainer.Container.Start(ctx)
 
-	currentEpochFinalView, err := snapshot.Epochs().Current().FinalView()
+	nextEpochFirstView, err := snapshot.Epochs().Next().FirstView()
 	require.NoError(s.T(), err)
 
 	// wait for the first view of the next epoch pause our container to replace
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+1)
+	s.BlockState.WaitForSealedView(s.T(), nextEpochFirstView+1)
+
+	// make sure we are in next epoch
+	snapshot, err = s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+
+	counter, err := snapshot.Epochs().Current().Counter()
+	require.NoError(s.T(), err)
+	require.Equal(s.T(), uint64(2), counter, fmt.Sprintf("got %v", counter))
+
 	s.assertNodeNotApprovedOrProposed(ctx, env, containerToReplace.Config.NodeID)
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
 
 	//wait for the 75th view after the next epoch starts
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+75)
+	s.BlockState.WaitForSealedView(s.T(), nextEpochFirstView+75)
 
 	// make sure the network is healthy after adding new node
 	checkNetworkHealth(ctx, env, snapshot, info)
