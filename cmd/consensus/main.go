@@ -527,7 +527,7 @@ func main() {
 
 			return ing, err
 		}).
-		Module("hotstuff modules", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+		Component("hotstuff vote aggregator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
 				node.DB,
@@ -547,7 +547,7 @@ func main() {
 			var committee hotstuff.Committee
 			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 			if err != nil {
-				return fmt.Errorf("could not create Committee state for main consensus: %w", err)
+				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
@@ -577,7 +577,7 @@ func main() {
 
 			finalizedBlock, err := node.State.Final().Head()
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			forks, err := consensus.NewForks(
@@ -589,11 +589,17 @@ func main() {
 				node.RootQC,
 			)
 			if err != nil {
-				return err
+				return nil, err
 			}
 
 			qcDistributor := pubsub.NewQCCreatedDistributor()
 			validator := consensus.NewValidator(mainMetrics, committee, forks)
+			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
+			lowestViewForVoteProcessing := finalizedBlock.View + 1
+			aggregator, err := consensus.NewVoteAggregator(node.Logger, lowestViewForVoteProcessing, notifier, voteProcessorFactory)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
+			}
 
 			hotstuffModules = &consensus.HotstuffModules{
 				Notifier:             notifier,
@@ -603,55 +609,10 @@ func main() {
 				QCCreatedDistributor: qcDistributor,
 				Forks:                forks,
 				Validator:            validator,
-				Aggregator:           nil,
+				Aggregator:           aggregator,
 			}
 
-			return nil
-		}).
-		Component("hotstuff vote aggregator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
-			finalizedBlock, err := node.State.Final().Head()
-			if err != nil {
-				return nil, err
-			}
-
-			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(hotstuffModules.Committee, hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
-			lowestViewForVoteProcessing := finalizedBlock.View + 1
-			hotstuffModules.Aggregator, err = consensus.NewVoteAggregator(node.Logger, lowestViewForVoteProcessing, hotstuffModules.Notifier, voteProcessorFactory)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
-			}
-
-			return hotstuffModules.Aggregator, nil
-		}).
-		Module("compliance engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
-			// initialize the pending blocks cache
-			proposals := buffer.NewPendingBlocks()
-
-			core, err := compliance.NewCore(node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Metrics.Mempool,
-				node.Metrics.Compliance,
-				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
-				mutableState,
-				proposals,
-				syncCore,
-				hotstuffModules.Aggregator)
-			if err != nil {
-				return fmt.Errorf("could not initialize compliance core: %w", err)
-			}
-
-			// initialize the compliance engine
-			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
-			if err != nil {
-				return fmt.Errorf("could not initialize compliance engine: %w", err)
-			}
-			return nil
+			return aggregator, nil
 		}).
 		Component("hotstuff participant", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
@@ -696,6 +657,34 @@ func main() {
 			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, err
+			}
+
+			// initialize the entity database accessors
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+
+			// initialize the pending blocks cache
+			proposals := buffer.NewPendingBlocks()
+
+			complianceCore, err := compliance.NewCore(node.Logger,
+				node.Metrics.Engine,
+				node.Tracer,
+				node.Metrics.Mempool,
+				node.Metrics.Compliance,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				mutableState,
+				proposals,
+				syncCore,
+				hotstuffModules.Aggregator)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, complianceCore)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
 			// initialize hotstuff consensus algorithm
