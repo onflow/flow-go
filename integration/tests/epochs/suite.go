@@ -533,14 +533,6 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 		testnet.WithID(info.NodeID),
 	}
 
-	if role == flow.RoleConsensus || role == flow.RoleCollection {
-		containerConfigs = append(
-			containerConfigs,
-			testnet.WithAdditionalFlag("insecure-access-api=false"),
-			testnet.WithAdditionalFlag("access-node-ids=*"),
-		)
-	}
-
 	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
 	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
 
@@ -550,6 +542,17 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 	//add our container to the network
 	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
 	require.NoError(s.T(), err, "failed to add container to network")
+
+	// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
+	if role == flow.RoleConsensus || role == flow.RoleCollection {
+		// ghost containers don't participate in the network skip any SN/LN ghost containers
+		if !testContainerConfig.Ghost {
+			nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
+			nodeContainer.AddFlag("insecure-access-api", "false")
+			nodeContainer.AddFlag("access-node-ids", "*")
+		}
+	}
+
 	return s.net.ContainerByID(info.NodeID)
 }
 
