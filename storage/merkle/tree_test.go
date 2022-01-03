@@ -85,8 +85,12 @@ func Test_2EntryTree(t *testing.T) {
 	expectedRootHash := "7f372aca94b91a527539967ba966c3a91c91e97b265fc4830801b4bcca01b06e" // from python reference impl
 
 	tree := NewTree()
-	tree.Put(key0, val0)
-	tree.Put(key1, val1)
+	replaced, err := tree.Put(key0, val0)
+	require.False(t, replaced)
+	require.NoError(t, err)
+	replaced, err = tree.Put(key1, val1)
+	require.False(t, replaced)
+	require.NoError(t, err)
 	require.Equal(t, expectedRootHash, hex.EncodeToString(tree.Hash()))
 }
 
@@ -106,10 +110,14 @@ func Test_KeyValuesAreSafeFromExternalModification(t *testing.T) {
 	postKey := []byte{255, 255}
 	postVal, _ := hex.DecodeString("1b30482d4dc8c1a8d846d05765c03a")
 	tree := NewTree()
-	tree.Put(key0, val0)
+	replaced, err := tree.Put(key0, val0)
+	require.False(t, replaced)
+	require.NoError(t, err)
 	copy(key0, postKey)
 	copy(val0, postVal)
-	tree.Put(key1, val1)
+	replaced, err = tree.Put(key1, val1)
+	require.False(t, replaced)
+	require.NoError(t, err)
 	copy(key1, postKey)
 	copy(val1, postVal)
 
@@ -381,7 +389,7 @@ func createTree(n int) *Tree {
 	t := NewTree()
 	for i := 0; i < n; i++ {
 		key, val := randomKeyValuePair(32, 128)
-		t.Put(key, val)
+		_, _ = t.Put(key, val)
 	}
 	return t
 }

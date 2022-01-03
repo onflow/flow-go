@@ -87,8 +87,8 @@ func (t *Tree) Put(key []byte, val []byte) (bool, error) {
 	return replaced, nil
 }
 
-// Put stores the given value in the trie under the given key. If the key
-// already exists, it will replace the value and return true.
+// unsafePut stores the given value in the trie under the given key. If the
+// key already exists, it will replace the value and return true.
 // UNSAFE:
 //  * all keys must have identical lengths, which is not checked here.
 func (t *Tree) unsafePut(key []byte, val []byte) bool {
