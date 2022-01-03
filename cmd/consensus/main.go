@@ -527,7 +527,7 @@ func main() {
 
 			return ing, err
 		}).
-		Component("hotstuff vote aggregator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+		Module("hotstuff modules", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// initialize the block finalizer
 			finalize := finalizer.NewFinalizer(
 				node.DB,
@@ -547,7 +547,7 @@ func main() {
 			var committee hotstuff.Committee
 			committee, err = committees.NewConsensusCommittee(node.State, node.Me.NodeID())
 			if err != nil {
-				return nil, fmt.Errorf("could not create Committee state for main consensus: %w", err)
+				return fmt.Errorf("could not create Committee state for main consensus: %w", err)
 			}
 			committee = committees.NewMetricsWrapper(committee, mainMetrics) // wrapper for measuring time spent determining consensus committee relations
 
@@ -577,7 +577,7 @@ func main() {
 
 			finalizedBlock, err := node.State.Final().Head()
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			forks, err := consensus.NewForks(
@@ -589,17 +589,11 @@ func main() {
 				node.RootQC,
 			)
 			if err != nil {
-				return nil, err
+				return err
 			}
 
 			qcDistributor := pubsub.NewQCCreatedDistributor()
 			validator := consensus.NewValidator(mainMetrics, committee, forks)
-			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(committee, qcDistributor.OnQcConstructedFromVotes)
-			lowestViewForVoteProcessing := finalizedBlock.View + 1
-			aggregator, err := consensus.NewVoteAggregator(node.Logger, lowestViewForVoteProcessing, notifier, voteProcessorFactory)
-			if err != nil {
-				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
-			}
 
 			hotstuffModules = &consensus.HotstuffModules{
 				Notifier:             notifier,
@@ -609,10 +603,25 @@ func main() {
 				QCCreatedDistributor: qcDistributor,
 				Forks:                forks,
 				Validator:            validator,
-				Aggregator:           aggregator,
+				Aggregator:           nil,
 			}
 
-			return aggregator, nil
+			return nil
+		}).
+		Component("hotstuff vote aggregator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			finalizedBlock, err := node.State.Final().Head()
+			if err != nil {
+				return nil, err
+			}
+
+			voteProcessorFactory := votecollector.NewCombinedVoteProcessorFactory(hotstuffModules.Committee, hotstuffModules.QCCreatedDistributor.OnQcConstructedFromVotes)
+			lowestViewForVoteProcessing := finalizedBlock.View + 1
+			hotstuffModules.Aggregator, err = consensus.NewVoteAggregator(node.Logger, lowestViewForVoteProcessing, hotstuffModules.Notifier, voteProcessorFactory)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize vote aggregator: %w", err)
+			}
+
+			return hotstuffModules.Aggregator, nil
 		}).
 		Module("compliance engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
 			// initialize the entity database accessors
