@@ -11,12 +11,13 @@ import (
 
 func TestProcessSummary3TestRun(t *testing.T) {
 	testDataMap := map[string]string{
-		"1 failure the rest pass":                                                  "test1-1package-1failure",
-		"1 no-result test, no other tests":                                         "test2-1-no-result-test",
-		"many level 1 summaries, many no-result tests":                             "test3-multi-no-result-tests",
-		"many level 1 summaries, many failures, many passes":                       "test4-multi-failures",
-		"many level 1 summaries, many failures, many passes, many no-result tests": "test5-multi-durations",
-		"many level 1 summaries, many failures - cap failures":                     "test6-multi-failures-cap",
+		"1 failure the rest pass":                          "test1-1package-1failure",
+		"1 no-result test, no other tests":                 "test2-1-no-result-test",
+		"many no-result tests":                             "test3-multi-no-result-tests",
+		"many failures, many passes":                       "test4-multi-failures",
+		"many failures, many passes, many no-result tests": "test5-multi-durations",
+		"many failures - cap failures":                     "test6-multi-failures-cap",
+		"many durations - cap durations":                   "test7-multi-durations-cap",
 	}
 
 	for k, testDir := range testDataMap {
