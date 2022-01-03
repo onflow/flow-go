@@ -128,10 +128,10 @@ func TestEpochs(t *testing.T) {
 ////specific to that node type are made to ensure the network is healthy.
 ////
 ////TestEpochJoinAndLeaveAN should update access nodes and assert healthy network conditions related to the node change
-func (s *Suite) TestEpochJoinAndLeaveAN() {
-	//s.T().Skip()
-	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
-}
+//func (s *Suite) TestEpochJoinAndLeaveAN() {
+//	s.T().Skip()
+//	s.runTestEpochJoinAndLeave(flow.RoleAccess, s.assertNetworkHealthyAfterANChange)
+//}
 //
 //// TestEpochJoinAndLeaveVN should update verification nodes and assert healthy network conditions related to the node change
 //func (s *Suite) TestEpochJoinAndLeaveVN() {
