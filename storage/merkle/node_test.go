@@ -98,6 +98,7 @@ func TestShortHash(t *testing.T) {
 // 3. serializedPathSegmentLength(l) implements the following encoding
 //    * if 1 ≤ l ≤ 65535: we represent l as unsigned int with big-endian encoding
 //    * for l = 65536: we represent l as binary 00000000 00000000
+// Comment: enforcing that we never exceed the limit 65536 is implemented on the trie-level
 func Test_ShortNodePathLengthEncoding(t *testing.T) {
 	// testing 1:
 	require.True(t, maxKeyLength <= math.MaxInt/8)
