@@ -515,7 +515,7 @@ func (s *Suite) assertNodeApprovedAndProposed(ctx context.Context, env templates
 }
 
 // assertNodeNotApprovedOrProposed executes the read approved nodes list and get proposed table scripts
-// and checks that the info.NodeID is in
+// and checks that the info.NodeID is not included in either - this means the node would be excluded from future epochs
 func (s *Suite) assertNodeNotApprovedOrProposed(ctx context.Context, env templates.Environment, nodeID flow.Identifier) {
 	// ensure node ID not in approved list
 	approvedNodes := s.ExecuteReadApprovedNodesScript(ctx, env)
