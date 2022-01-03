@@ -203,8 +203,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	require.NoError(s.T(), result.Error)
 
 	// ensure we are still in staking auction
-	currView := s.assertInPhase(ctx, flow.EpochPhaseStaking)
-	require.True(s.T(), stakingAuctionViews > currView, "expected all staking transactions to be completed in the epoch staking phase")
+	s.assertInPhase(ctx, flow.EpochPhaseStaking)
 
 	return &StakedNodeOperationInfo{
 		NodeID:                  nodeID,
@@ -418,8 +417,7 @@ func (s *Suite) removeNodeFromProtocol(ctx context.Context, env templates.Enviro
 	require.NoError(s.T(), result.Error)
 
 	// ensure we submit transaction while in staking phase
-	currView := s.assertInPhase(ctx, flow.EpochPhaseStaking)
-	require.True(s.T(), stakingAuctionViews > currView, "expected remove node transaction to be completed in the epoch staking phase")
+	s.assertInPhase(ctx, flow.EpochPhaseStaking)
 }
 
 // submitAdminRemoveNodeTx will submit the admin remove node transaction
@@ -573,18 +571,12 @@ func (s *Suite) getContainerToReplace(role flow.Role) *testnet.Container {
 }
 
 // assertInPhase checks if we are in the phase provided and returns the current view
-func (s *Suite) assertInPhase(ctx context.Context, expectedPhase flow.EpochPhase) uint64 {
+func (s *Suite) assertInPhase(ctx context.Context, expectedPhase flow.EpochPhase) {
 	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	actualPhase, err := snapshot.Phase()
 	require.NoError(s.T(), err)
-	head, err := snapshot.Head()
-	require.NoError(s.T(), err)
-
 	require.Equal(s.T(), expectedPhase, actualPhase)
-
-
-	return head.View
 }
 
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network
@@ -625,12 +617,9 @@ func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templat
 	bootstrapHead, err := rootSnapshot.Head()
 	require.NoError(s.T(), err)
 
-	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
-	require.NoError(s.T(), err)
-
-	head, err := snapshot.Head()
+	header, err := s.client.GetLatestSealedBlockHeader(ctx)
 	require.NoError(s.T(), err)
 
 	// head should now be at-least 20 blocks higher from when we started
-	require.True(s.T(), head.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", head.Height, bootstrapHead.Height))
+	require.True(s.T(), header.Height-bootstrapHead.Height >= 20, fmt.Sprintf("expected head.Height %d to be higher than head from the snapshot the node was bootstraped with bootstrapHead.Height %d.", header.Height, bootstrapHead.Height))
 }
