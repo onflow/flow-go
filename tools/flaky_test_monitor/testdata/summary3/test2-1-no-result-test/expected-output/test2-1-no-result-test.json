@@ -18,5 +18,9 @@
 
   "most_failures": [],
 
-  "longest_running": []
+  "most_failures_total": 0,
+
+  "longest_running": [],
+
+  "longest_running_total": 0
 }

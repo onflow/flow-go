@@ -18,6 +18,8 @@
     }
   ],
 
+  "most_failures_total": 1,
+
   "longest_running": [
     {
       "test": "TestSha3",
@@ -61,5 +63,7 @@
         0.11
       ]
     }
-  ]
+  ],
+
+  "longest_running_total": 3
 }

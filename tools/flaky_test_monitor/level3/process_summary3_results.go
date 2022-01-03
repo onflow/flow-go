@@ -9,7 +9,10 @@ import (
 
 // processSummary3TestRun processes a level 2 summary and produces level 3 summary which summarizes:
 // most failed tests, tests with no-results, longest running tests.
-func processSummary3TestRun(level2FilePath string) common.TestSummary3 {
+func processSummary3TestRun(level2FilePath string, propertyFileDirectory string) common.TestSummary3 {
+
+	config := common.ReadProperties(propertyFileDirectory)
+
 	var testSummary2 common.TestSummary2
 
 	level2JsonBytes, err := os.ReadFile(level2FilePath)
@@ -40,18 +43,33 @@ func processSummary3TestRun(level2FilePath string) common.TestSummary3 {
 		if trs.NoResult > 0 {
 			noResultsTRS = insertSortedByNoResult(noResultsTRS, *trs)
 		}
-		if trs.Failed > 0 {
+		if trs.Failed > 0 && trs.FailureRate >= config.FailureThresholdPercent {
 			failuresTRS = insertSortedByFailureRate(failuresTRS, *trs)
 		}
-		if trs.AverageDuration > 0 {
+		if trs.AverageDuration > 0 && trs.AverageDuration >= config.DurationThresholdSeconds {
 			durationTRS = insertSortedByDuration(durationTRS, *trs)
 		}
 	}
 
 	var testSummary3 common.TestSummary3
 	testSummary3.NoResults = noResultsTRS
+
+	// check if # of failures exceeded max failures to return
+	if len(failuresTRS) > config.FailuresSliceMax {
+		// truncate slice to return only the first config.FailuresSliceMax failures
+		failuresTRS = failuresTRS[:config.FailuresSliceMax]
+	}
+	testSummary3.MostFailuresTotal = len(failuresTRS)
 	testSummary3.MostFailures = failuresTRS
+
+	// check if # of durations exceeded max durations to return
+	if len(durationTRS) > config.DurationSliceMax {
+		// truncate slice to return only the first config.DurationSliceMax durations
+		durationTRS = durationTRS[:config.DurationSliceMax]
+	}
+	testSummary3.LongestRunningTotal = len(durationTRS)
 	testSummary3.LongestRunning = durationTRS
+
 	return testSummary3
 }
 
@@ -100,10 +118,10 @@ func insertAt(data []common.TestResultSummary, i int, v common.TestResultSummary
 
 func main() {
 	// need to pass in single argument of where level 1 summary files exist
-	if len(os.Args[1:]) != 1 {
-		panic("wrong number of arguments - expected single argument with name of level 2 file")
+	if len(os.Args[1:]) != 2 {
+		panic("wrong number of arguments - expected arguments 1) path of level 2 file 2) directory of property file")
 	}
 
-	testSummary3 := processSummary3TestRun(os.Args[1])
+	testSummary3 := processSummary3TestRun(os.Args[1], os.Args[2])
 	common.SaveToFile("level3-summary.json", testSummary3)
 }
