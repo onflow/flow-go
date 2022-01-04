@@ -132,14 +132,19 @@ func (c *chachaCore) Read(buffer []byte) {
 	c.bytesCounter += uint64(len(buffer))
 }
 
+// counter is stored over 8 bytes
+const counterBytesLen = 8
+
 // Store returns the internal state of the concatenated Chacha20s
 // This is used for serialization/deserialization purposes.
 func (c *chachaPRG) Store() []byte {
-	bytes := append(c.core.seed[:], c.core.customizer[:]...)
-	counter := make([]byte, 8)
+	bytes := make([]byte, 0, keySize+nonceSize+counterBytesLen)
+	counter := make([]byte, counterBytesLen)
 	binary.LittleEndian.PutUint64(counter, c.core.bytesCounter)
-	bytes = append(bytes, counter...)
 	// output is seed || streamID || counter
+	bytes = append(bytes, c.core.seed[:]...)
+	bytes = append(bytes, c.core.customizer[:]...)
+	bytes = append(bytes, counter...)
 	return bytes
 }
 
@@ -147,7 +152,7 @@ func (c *chachaPRG) Store() []byte {
 // The created PRG is restored at the same state where the previous PRG was stored.
 func RestoreChacha20PRG(stateBytes []byte) (*chachaPRG, error) {
 	// input should be seed (32 bytes) || streamID (12 bytes) || bytesCounter (8 bytes)
-	const expectedLen = keySize + nonceSize + 8
+	const expectedLen = keySize + nonceSize + counterBytesLen
 
 	// check input length
 	if len(stateBytes) != expectedLen {
