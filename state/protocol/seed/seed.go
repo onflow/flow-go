@@ -3,23 +3,21 @@ package seed
 import (
 	"encoding/binary"
 	"fmt"
+	hotstuffSig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 
-	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/module/signature"
 )
 
 // FromParentSignature reads the raw random seed from a combined signature.
 // the combinedSig must be from a QuorumCertificate. The indices can be used to
 // generate task-specific seeds from the same signature.
-func FromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte, error) {
+func FromParentSignature(indices []uint32, sigData []byte) ([]byte, error) {
 	// split the parent voter sig into staking & beacon parts
 	// TODO: replace with packer.Unpack instead
-	combiner := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-	_, randomBeaconSig, err := combiner.Split(combinedSig)
+
+	randomBeaconSig, err := hotstuffSig.UnpackRandomBeaconSig(sigData)
 	if err != nil {
-		return nil, fmt.Errorf("could not split block signature: %w", err)
+		return nil, fmt.Errorf("could not unpack block signature: %w", err)
 	}
 
 	return FromRandomSource(indices, randomBeaconSig)

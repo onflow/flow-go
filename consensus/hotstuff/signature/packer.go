@@ -257,3 +257,16 @@ func deserializeFromBitVector(serialized []byte, count int) ([]hotstuff.SigType,
 
 	return types, nil
 }
+
+func UnpackRandomBeaconSig(sigData []byte) (crypto.Signature, error) {
+	// decode into typed data
+	bs := bytes.NewReader(sigData)
+	codec := rlp.Codec{}
+	decoder := codec.NewDecoder(bs)
+	var decodedSigData signatureData
+	err := decoder.Decode(&sigData)
+	if err != nil {
+		return nil, fmt.Errorf("could not decode sig data %s: %w", err, signature.ErrInvalidFormat)
+	}
+	return decodedSigData.ReconstructedRandomBeaconSig, nil
+}
