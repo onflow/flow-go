@@ -258,6 +258,7 @@ func deserializeFromBitVector(serialized []byte, count int) ([]hotstuff.SigType,
 	return types, nil
 }
 
+// UnpackRandomBeaconSig takes sigData previously packed by packer, decodes it and extracts random beacon signature
 func UnpackRandomBeaconSig(sigData []byte) (crypto.Signature, error) {
 	// decode into typed data
 	bs := bytes.NewReader(sigData)
