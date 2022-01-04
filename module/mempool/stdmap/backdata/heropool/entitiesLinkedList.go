@@ -34,8 +34,8 @@ type doubleLinkedList struct {
 
 func newDoubleLinkedList() *doubleLinkedList {
 	return &doubleLinkedList{
-		head: poolIndex{pointerValue: 0},
-		tail: poolIndex{pointerValue: 0},
+		head: poolIndex{index: 0},
+		tail: poolIndex{index: 0},
 	}
 }
 
@@ -71,14 +71,14 @@ func NewEntityList(limit uint32, ejectionMode EjectionMode) *EntityDoubleLinkedL
 // initFreeEntities initializes the free double linked-list with all slice indices in the range of
 // [0, limit). In other words, all slice indices in cachedEntity are marked as free indices.
 func (e *EntityDoubleLinkedList) initFreeEntities(limit uint32) {
-	e.free.head.setPointer(0)
-	e.free.tail.setPointer(0)
+	e.free.head.setPoolIndex(0)
+	e.free.tail.setPoolIndex(0)
 
 	for i := uint32(1); i < limit; i++ {
 		// appends slice index i to tail of free linked list
 		e.link(e.free.tail, EIndex(i))
 		// and updates its tail
-		e.free.tail.setPointer(EIndex(i))
+		e.free.tail.setPoolIndex(EIndex(i))
 	}
 }
 
@@ -94,7 +94,7 @@ func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entit
 
 	if e.used.head.isUndefined() {
 		// used list is empty, hence setting head of used list to current entityIndex.
-		e.used.head.setPointer(entityIndex)
+		e.used.head.setPoolIndex(entityIndex)
 		e.values[e.used.head.sliceIndex()].node.prev.setUndefined()
 	}
 
@@ -104,7 +104,7 @@ func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entit
 	}
 
 	// since we are appending to the used list, entityIndex also acts as tail of the list.
-	e.used.tail.setPointer(entityIndex)
+	e.used.tail.setPoolIndex(entityIndex)
 
 	e.total++
 	return entityIndex
@@ -170,7 +170,7 @@ func (e EntityDoubleLinkedList) getTails() (*cachedEntity, *cachedEntity) {
 
 // link connects the prev and next nodes as the adjacent nodes in the double-linked list.
 func (e *EntityDoubleLinkedList) link(prev poolIndex, next EIndex) {
-	e.values[prev.sliceIndex()].node.next.setPointer(next)
+	e.values[prev.sliceIndex()].node.next.setPoolIndex(next)
 	e.values[next].node.prev = prev
 }
 
@@ -292,14 +292,14 @@ func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex EIndex) {
 func (e *EntityDoubleLinkedList) appendToFreeList(sliceIndex EIndex) {
 	if e.free.head.isUndefined() {
 		// free list is empty
-		e.free.head.setPointer(sliceIndex)
-		e.free.tail.setPointer(sliceIndex)
+		e.free.head.setPoolIndex(sliceIndex)
+		e.free.tail.setPoolIndex(sliceIndex)
 		return
 	}
 
 	// appends to the tail, and updates the tail
 	e.link(e.free.tail, sliceIndex)
-	e.free.tail.setPointer(sliceIndex)
+	e.free.tail.setPoolIndex(sliceIndex)
 }
 
 // isInvalidate returns true if linked-list node represented by sliceIndex does not contain
