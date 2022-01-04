@@ -19,56 +19,23 @@ const maximumRandomTrials = 10
 // EIndex is data type representing an entity index in EntityDoubleLinkedList.
 type EIndex uint32
 
-// doubleLinkedListPointer represents a slice-based linked list pointer. Instead of pointing
-// to a memory address, this pointer points to a slice index.
-//
-// Note: an "undefined" (i.e., nil) notion for this doubleLinkedListPointer corresponds to the
-// value of uint32(0). Hence, legit "pointer" values start from uint32(1).
-// doubleLinkedListPointer also furnished with methods to convert a "pointer" value to
-// a slice index, and vice versa.
-type doubleLinkedListPointer struct {
-	pointerValue uint32
-}
-
-// isUndefined returns true if this pointer is set to zero. An undefined
-// slice-based pointer is equivalent to a nil address-based one.
-func (d doubleLinkedListPointer) isUndefined() bool {
-	return d.pointerValue == uint32(0)
-}
-
-// setUndefined sets sliced-based pointer to its undefined (i.e., nil equivalent) value.
-func (d *doubleLinkedListPointer) setUndefined() {
-	d.pointerValue = uint32(0)
-}
-
-// sliceIndex returns the slice-index equivalent of the pointer.
-func (d doubleLinkedListPointer) sliceIndex() EIndex {
-	return EIndex(d.pointerValue) - 1
-}
-
-// setPointer converts the input slice-based index into a slice-based pointer and
-// sets the underlying pointer.
-func (d *doubleLinkedListPointer) setPointer(sliceIndex EIndex) {
-	d.pointerValue = uint32(sliceIndex + 1)
-}
-
 // doubleLinkedListNode represents a slice-based double linked list node that
 // consists of a next and previous pointer.
 type doubleLinkedListNode struct {
-	next doubleLinkedListPointer
-	prev doubleLinkedListPointer
+	next poolIndex
+	prev poolIndex
 }
 
 // doubleLinkedList represents a double linked list by its head and tail pointers.
 type doubleLinkedList struct {
-	head doubleLinkedListPointer
-	tail doubleLinkedListPointer
+	head poolIndex
+	tail poolIndex
 }
 
 func newDoubleLinkedList() *doubleLinkedList {
 	return &doubleLinkedList{
-		head: doubleLinkedListPointer{pointerValue: 0},
-		tail: doubleLinkedListPointer{pointerValue: 0},
+		head: poolIndex{pointerValue: 0},
+		tail: poolIndex{pointerValue: 0},
 	}
 }
 
@@ -202,7 +169,7 @@ func (e EntityDoubleLinkedList) getTails() (*cachedEntity, *cachedEntity) {
 }
 
 // link connects the prev and next nodes as the adjacent nodes in the double-linked list.
-func (e *EntityDoubleLinkedList) link(prev doubleLinkedListPointer, next EIndex) {
+func (e *EntityDoubleLinkedList) link(prev poolIndex, next EIndex) {
 	e.values[prev.sliceIndex()].node.next.setPointer(next)
 	e.values[next].node.prev = prev
 }
