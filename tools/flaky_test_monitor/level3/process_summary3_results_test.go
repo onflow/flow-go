@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"flaky-test-monitor/common"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -28,15 +29,16 @@ func TestProcessSummary3TestRun(t *testing.T) {
 
 }
 
-const testDataDir = "../testdata/summary3/"
+const testDataDir = "../testdata/summary3"
 
 func runProcessSummary3TestRun(t *testing.T, testDir string) {
-	testDataBaseDir := testDataDir + testDir
-	inputTestDataPath := testDataBaseDir + "/input/" + testDir + ".json"
-	expectedOutputTestDataPath := testDataBaseDir + "/expected-output/" + testDir + ".json"
+
+	testDataBaseDir := filepath.Join(testDataDir, testDir)
+	inputTestDataPath := filepath.Join(testDataBaseDir, "input", testDir+".json")
+	expectedOutputTestDataPath := filepath.Join(testDataBaseDir, "expected-output", testDir+".json")
 
 	// **************************************************************
-	actualTestSummary3 := processSummary3TestRun(inputTestDataPath, testDataBaseDir+"/input/")
+	actualTestSummary3 := processSummary3TestRun(inputTestDataPath, filepath.Join(testDataBaseDir, "input"))
 	// **************************************************************
 
 	// read in expected summary level 3
@@ -87,6 +89,6 @@ func TestProcessSummary3TestRun_Panic_WrongFormat(t *testing.T) {
 	require.PanicsWithValue(t, "invalid summary 2 file - no test results found",
 		func() {
 			// supplied file is level 3 file, not level 2 - this should cause a panic
-			processSummary3TestRun(testDataDir+"test1-1package-1failure/expected-output/test1-1package-1failure.json", ".")
+			processSummary3TestRun(filepath.Join(testDataDir, "test1-1package-1failure/expected-output/test1-1package-1failure.json"), ".")
 		})
 }

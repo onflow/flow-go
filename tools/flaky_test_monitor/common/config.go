@@ -3,6 +3,7 @@ package common
 import (
 	"bufio"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -14,8 +15,6 @@ const FailuresSliceMax = "failures_slice_max"
 const DurationThresholdSeconds = "duration_threshold_seconds"
 const DurationSliceMax = "duration_slice_max"
 
-// const Duration
-
 type Config struct {
 	FailureThresholdPercent float32
 	FailuresSliceMax        int
@@ -26,7 +25,7 @@ type Config struct {
 
 func ReadProperties(directory string) Config {
 	// looks for properties file with specific name
-	propertyFile := AddTrailingSlash(directory) + "flaky-test-monitor.properties"
+	propertyFile := filepath.Join(directory, "flaky-test-monitor.properties")
 
 	file, err := os.Open(propertyFile)
 
