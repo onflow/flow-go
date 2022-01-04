@@ -36,9 +36,9 @@ func BenchmarkBaselineLRU(b *testing.B) {
 	entities := unittest.EntityListFixture(uint(100_000_000))
 	testAddEntities(b, limit, backData, entities)
 
-	printHeapInfo()         // heap info after writing 100M entities
-	gcAndWriteHeapProfile() // runs garbage collection
-	printHeapInfo()         // heap info after running garbage collection
+	unittest.PrintHeapInfo(unittest.Logger()) // heap info after writing 100M entities
+	gcAndWriteHeapProfile()                   // runs garbage collection
+	unittest.PrintHeapInfo(unittest.Logger()) // heap info after running garbage collection
 }
 
 // BenchmarkArrayBackDataLRU benchmarks heap allocation performance of
@@ -55,20 +55,9 @@ func BenchmarkArrayBackDataLRU(b *testing.B) {
 	entities := unittest.EntityListFixture(uint(100_000_000))
 	testAddEntities(b, limit, backData, entities)
 
-	printHeapInfo()         // heap info after writing 100M entities
-	gcAndWriteHeapProfile() // runs garbage collection
-	printHeapInfo()         // heap info after running garbage collection
-}
-
-func printHeapInfo() {
-	var m runtime.MemStats
-	runtime.ReadMemStats(&m)
-	zlog.Info().
-		Uint64(".Alloc", m.Alloc).
-		Uint64(".AllocObjects", m.HeapObjects).
-		Uint64(".TotalAlloc", m.TotalAlloc).
-		Uint32(".NumGC", m.NumGC).
-		Msg("printHeapInfo()")
+	unittest.PrintHeapInfo(unittest.Logger()) // heap info after writing 100M entities
+	gcAndWriteHeapProfile()                   // runs garbage collection
+	unittest.PrintHeapInfo(unittest.Logger()) // heap info after running garbage collection
 }
 
 func gcAndWriteHeapProfile() {
