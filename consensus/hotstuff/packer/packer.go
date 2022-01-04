@@ -42,8 +42,11 @@ func (p *SigDataPacker) Decode(data []byte) (*SignatureData, error) {
 	return &sigData, err
 }
 
-// UnpackRandomBeaconSig takes sigData previously packed by packer, decodes it and extracts random beacon signature
-func UnpackRandomBeaconSig(sigData []byte) (crypto.Signature, error) {
+// UnpackRandomBeaconSigForV2 takes sigData previously packed by packer,
+// decodes it and extracts random beacon signature
+// TODO: to be removed in V3. Remove it when the combined vote processor
+// uses ConsensusSigDataPacker to pack the the signature
+func UnpackRandomBeaconSigForV2(sigData []byte) (crypto.Signature, error) {
 	// decode into typed data
 	packer := SigDataPacker{}
 	sig, err := packer.Decode(sigData)

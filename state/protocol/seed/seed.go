@@ -11,9 +11,11 @@ import (
 // FromParentSignature reads the raw random seed from a QC sigData.
 // The sigData is an RLP encoded structure that is part of QuorumCertificate.
 // The indices can be used to  generate task-specific seeds from the same signature.
+// TODO: this only works for consensus V2 where a V2 packer is used to unpack the sig data
+// 			 in consensus V3, the ConsensusSigDataPacker should be used instead
 func FromParentSignature(indices []uint32, sigData []byte) ([]byte, error) {
 	// unpack sig data to extract random beacon sig
-	randomBeaconSig, err := packer.UnpackRandomBeaconSig(sigData)
+	randomBeaconSig, err := packer.UnpackRandomBeaconSigForV2(sigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not unpack block signature: %w", err)
 	}
