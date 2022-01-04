@@ -30,8 +30,9 @@ var errIncompleteEpochConfiguration = errors.New("block beyond epoch boundary")
 // Instead, the FollowerState relies on the consensus nodes to run the full
 // payload check. Consequently, a block B should only be considered valid, if
 // a child block with a valid header is known. The child block's header
-// includes quorum certificate, which proves that a supermajority of consensus
-// nodes consider block B a valid.
+// includes quorum certificate, which proves that a super-majority of consensus
+// nodes consider block B as valid.
+//
 // The FollowerState allows non-consensus nodes to execute fork-aware queries
 // against the protocol state, while minimizing the amount of payload checks
 // the non-consensus nodes have to perform.
@@ -623,20 +624,24 @@ func (m *FollowerState) Finalize(ctx context.Context, blockID flow.Identifier) e
 		if err != nil {
 			return fmt.Errorf("could not update sealed height: %w", err)
 		}
+
+		// emit protocol events within the scope of the Badger transaction to
+		// guarantee at-least-once delivery
+		m.consumer.BlockFinalized(header)
+		for _, emit := range events {
+			emit()
+		}
 		return nil
 	})
 	if err != nil {
 		return fmt.Errorf("could not execute finalization: %w", err)
 	}
 
-	// FINALLY: emit notification events and update metrics
+	// FINALLY: update metrics
 	m.metrics.FinalizedHeight(header.Height)
 	m.metrics.SealedHeight(sealed.Height)
 	m.metrics.BlockFinalized(block)
-	m.consumer.BlockFinalized(header)
-	for _, emit := range events {
-		emit()
-	}
+
 	for _, seal := range block.Payload.Seals {
 		sealedBlock, err := m.blocks.ByID(seal.BlockID)
 		if err != nil {
@@ -843,7 +848,8 @@ SealLoop:
 
 // MarkValid marks the block as valid in protocol state, and triggers
 // `BlockProcessable` event to notify that its parent block is processable.
-// why the parent block is processable, not the block itself?
+//
+// Why is the parent block processable, not the block itself?
 // because a block having a child block means it has been verified
 // by the majority of consensus participants.
 // Hence, if a block has passed the header validity check, its parent block
@@ -853,9 +859,11 @@ SealLoop:
 // the consensus participants have done a complete check on its parent block,
 // so consensus followers can trust consensus nodes did the right job, and start
 // processing the parent block.
+//
 // NOTE: since a parent can have multiple children, `BlockProcessable` event
 // could be triggered multiple times for the same block.
 // NOTE: BlockProcessable should not be blocking, otherwise, it will block the follower
+//
 func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 	header, err := m.headers.ByBlockID(blockID)
 	if err != nil {
@@ -871,31 +879,36 @@ func (m *FollowerState) MarkValid(blockID flow.Identifier) error {
 		return fmt.Errorf("can only mark block as valid whose parent is valid")
 	}
 
-	err = operation.RetryOnConflict(
-		m.db.Update,
-		operation.SkipDuplicates(
-			operation.InsertBlockValidity(blockID, true),
-		),
-	)
-	if err != nil {
-		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
-	}
-
-	// root blocks and blocks below the root block are considered as "processed",
-	// so we don't want to trigger `BlockProcessable` event for them.
 	parent, err := m.headers.ByBlockID(parentID)
 	if err != nil {
 		return fmt.Errorf("could not retrieve block header for %x: %w", parentID, err)
 	}
+	// root blocks and blocks below the root block are considered as "processed",
+	// so we don't want to trigger `BlockProcessable` event for them.
 	var rootHeight uint64
 	err = m.db.View(operation.RetrieveRootHeight(&rootHeight))
 	if err != nil {
 		return fmt.Errorf("could not retrieve root block's height: %w", err)
 	}
-	if rootHeight >= parent.Height {
+
+	err = operation.RetryOnConflict(m.db.Update, func(tx *badger.Txn) error {
+		// insert block validity for this block
+		err = operation.SkipDuplicates(operation.InsertBlockValidity(blockID, true))(tx)
+		if err != nil {
+			return fmt.Errorf("could not insert validity for block (id=%x, height=%d): %w", blockID, header.Height, err)
+		}
+
+		// trigger BlockProcessable for parent blocks above root height
+		if parent.Height > rootHeight {
+			// emit protocol event within the scope of the Badger transaction to
+			// guarantee at-least-once delivery
+			m.consumer.BlockProcessable(parent)
+		}
 		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("could not mark block as valid (%x): %w", blockID, err)
 	}
-	m.consumer.BlockProcessable(parent)
 
 	return nil
 }

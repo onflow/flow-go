@@ -44,11 +44,11 @@ func MakeCreateStakingCollectionTx(
 	if err != nil {
 		return nil, fmt.Errorf("could not sign payload: %w", err)
 	}
-	accountKey.SequenceNumber++
+
 	return tx, nil
 }
 
-func MakeCollectionRegisterNodeTx(
+func MakeStakingCollectionRegisterNodeTx(
 	env templates.Environment,
 	stakingAccount *sdk.Account,
 	stakingAccountKeyID int,
@@ -126,6 +126,69 @@ func MakeCollectionRegisterNodeTx(
 	return tx, nil
 }
 
+func MakeStakingCollectionCloseStakeTx(
+	env templates.Environment,
+	stakingAccount *sdk.Account,
+	stakingAccountKeyID int,
+	stakingSigner crypto.Signer,
+	payerAddress sdk.Address,
+	latestBlockID sdk.Identifier,
+	nodeID flow.Identifier,
+) (*sdk.Transaction, error) {
+	accountKey := stakingAccount.Keys[stakingAccountKeyID]
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateCollectionCloseStake(env)).
+		SetGasLimit(9999).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(stakingAccount.Address, stakingAccountKeyID, accountKey.SequenceNumber).
+		SetPayer(payerAddress).
+		AddAuthorizer(stakingAccount.Address)
+
+	id, _ := cadence.NewString(nodeID.String())
+	err := tx.AddArgument(id)
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.AddArgument(cadence.NewOptional(nil))
+	if err != nil {
+		return nil, err
+	}
+
+	err = tx.SignPayload(stakingAccount.Address, stakingAccountKeyID, stakingSigner)
+	if err != nil {
+		return nil, fmt.Errorf("could not sign payload: %w", err)
+	}
+
+	return tx, nil
+}
+
+// MakeAdminRemoveNodeTx makes the admin remove node transaction.  This is equivalent to the node un-staking and will result in removal at the next epoch boundary
+func MakeAdminRemoveNodeTx(
+	env templates.Environment,
+	adminAccount *sdk.Account,
+	adminAccountKeyID int,
+	latestBlockID sdk.Identifier,
+	nodeID flow.Identifier,
+) (*sdk.Transaction, error) {
+	accountKey := adminAccount.Keys[adminAccountKeyID]
+	tx := sdk.NewTransaction().
+		SetScript(templates.GenerateRemoveNodeScript(env)).
+		SetGasLimit(9999).
+		SetReferenceBlockID(latestBlockID).
+		SetProposalKey(adminAccount.Address, adminAccountKeyID, accountKey.SequenceNumber).
+		SetPayer(adminAccount.Address).
+		AddAuthorizer(adminAccount.Address)
+
+	id, _ := cadence.NewString(nodeID.String())
+	err := tx.AddArgument(id)
+	if err != nil {
+		return nil, err
+	}
+
+	return tx, nil
+}
+
 func MakeTransferTokenTx(env templates.Environment, receiver sdk.Address, sender *sdk.Account, senderKeyID int, tokenAmount string, latestBlockID sdk.Identifier) (
 	*sdk.Transaction, error) {
 
@@ -155,6 +218,5 @@ func MakeTransferTokenTx(env templates.Environment, receiver sdk.Address, sender
 	if err != nil {
 		return nil, fmt.Errorf("could not add argument to transaction :%w", err)
 	}
-	senderKey.SequenceNumber++
 	return tx, nil
 }

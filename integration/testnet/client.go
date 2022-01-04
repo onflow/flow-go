@@ -25,12 +25,13 @@ import (
 // NOTE: we use integration/client rather than sdk/client as a stopgap until
 // the SDK client is updated with the latest protobuf definitions.
 type Client struct {
-	client  *client.Client
-	key     *sdk.AccountKey
-	signer  sdkcrypto.InMemorySigner
-	seqNo   uint64
-	Chain   flow.Chain
-	account *sdk.Account
+	client         *client.Client
+	accountKey     *sdk.AccountKey
+	accountKeyPriv sdkcrypto.PrivateKey
+	signer         sdkcrypto.InMemorySigner
+	seqNo          uint64
+	Chain          flow.Chain
+	account        *sdk.Account
 }
 
 // NewClientWithKey returns a new client to an Access API listening at the given
@@ -51,12 +52,13 @@ func NewClientWithKey(accessAddr string, accountAddr sdk.Address, key sdkcrypto.
 	mySigner := crypto.NewInMemorySigner(key, accountKey.HashAlgo)
 
 	tc := &Client{
-		client:  flowClient,
-		key:     accountKey,
-		signer:  mySigner,
-		Chain:   chain,
-		seqNo:   accountKey.SequenceNumber,
-		account: acc,
+		client:         flowClient,
+		accountKey:     accountKey,
+		accountKeyPriv: key,
+		signer:         mySigner,
+		Chain:          chain,
+		seqNo:          accountKey.SequenceNumber,
+		account:        acc,
 	}
 	return tc, nil
 }
@@ -85,6 +87,11 @@ func NewClient(addr string, chain flow.Chain) (*Client, error) {
 	//fmt.Printf("and public key: \n%s\n", publicJson)
 
 	return NewClientWithKey(addr, sdk.Address(chain.ServiceAddress()), privateKey, chain)
+}
+
+// AccountKeyPriv returns the private used to create the in memory signer for the account
+func (c *Client) AccountKeyPriv() sdkcrypto.PrivateKey {
+	return c.accountKeyPriv
 }
 
 func (c *Client) GetSeqNumber() uint64 {
@@ -175,8 +182,9 @@ func (c *Client) SDKServiceAddress() sdk.Address {
 	return sdk.Address(c.Chain.ServiceAddress())
 }
 
-func (c *Client) Accountkey() *sdk.AccountKey {
-	return c.key
+// AccountKey returns the flow account key for the client
+func (c *Client) AccountKey() *sdk.AccountKey {
+	return c.accountKey
 }
 
 func (c *Client) Account() *sdk.Account {
@@ -261,13 +269,13 @@ func (c *Client) UserAddress(txResp *sdk.TransactionResult) (sdk.Address, bool) 
 
 func (c *Client) TokenAmountByRole(role flow.Role) (string, float64, error) {
 	if role == flow.RoleCollection {
-		return "250000.0",250000.0, nil
+		return "250000.0", 250000.0, nil
 	}
 	if role == flow.RoleConsensus {
 		return "500000.0", 500000.0, nil
 	}
 	if role == flow.RoleExecution {
-		return "1250000.0", 1250000.0,nil
+		return "1250000.0", 1250000.0, nil
 	}
 	if role == flow.RoleVerification {
 		return "135000.0", 135000.0, nil
@@ -304,7 +312,6 @@ func (c *Client) CreateAccount(
 		SetProposalKey(payer, 0, payerKey.SequenceNumber).
 		SetPayer(payer)
 
-	payerKey.SequenceNumber++
 	err := c.SignAndSendTransaction(ctx, tx)
 	if err != nil {
 		return sdk.Address{}, fmt.Errorf("failed to sign and send create account transaction %w", err)
