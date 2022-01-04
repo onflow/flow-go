@@ -6,8 +6,6 @@ import (
 
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
-	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/module/signature"
 )
 
 // FromParentSignature reads the raw random seed from a combined signature.
@@ -15,13 +13,17 @@ import (
 // generate task-specific seeds from the same signature.
 func FromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte, error) {
 	// split the parent voter sig into staking & beacon parts
-	combiner := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-	_, randomBeaconSig, err := combiner.Split(combinedSig)
-	if err != nil {
-		return nil, fmt.Errorf("could not split block signature: %w", err)
-	}
 
-	return FromRandomSource(indices, randomBeaconSig)
+	// Temporary breaking point
+	panic("implementation OUTDATED: our packing of signature data within the QC has now changed")
+	// TODO: our packing of signature data within the QC has now changed. We need to update the following logic
+	//combiner := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
+	//_, randomBeaconSig, err := combiner.Split(combinedSig)
+	//if err != nil {
+	//	return nil, fmt.Errorf("could not split block signature: %w", err)
+	//}
+	//
+	//return FromRandomSource(indices, randomBeaconSig)
 }
 
 // FromRandomSource generates a task-specific seed (task is determined by indices).

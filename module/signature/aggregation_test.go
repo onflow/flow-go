@@ -1,3 +1,4 @@
+//go:build relic
 // +build relic
 
 package signature
@@ -13,7 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/engine"
 )
 
 func createAggregationData(t *testing.T, signersNumber int) (*SignatureAggregatorSameMessage, []crypto.Signature) {
@@ -125,9 +125,6 @@ func TestAggregatorSameMessage(t *testing.T) {
 		}
 	})
 
-	invalidInput := engine.NewInvalidInputError("some error")
-	duplicate := newErrDuplicatedSigner("some error")
-
 	// Unhappy paths
 	t.Run("invalid inputs", func(t *testing.T) {
 		aggregator, sigs := createAggregationData(t, signersNum)
@@ -135,33 +132,27 @@ func TestAggregatorSameMessage(t *testing.T) {
 		for _, index := range []int{-1, signersNum} {
 			ok, err := aggregator.Verify(index, sigs[0])
 			assert.False(t, ok)
-			assert.Error(t, err)
-			assert.IsType(t, invalidInput, err)
+			assert.ErrorIs(t, err, ErrInvalidSignerIdx)
 
 			ok, err = aggregator.VerifyAndAdd(index, sigs[0])
 			assert.False(t, ok)
-			assert.Error(t, err)
-			assert.IsType(t, invalidInput, err)
+			assert.ErrorIs(t, err, ErrInvalidSignerIdx)
 
 			err = aggregator.TrustedAdd(index, sigs[0])
-			assert.Error(t, err)
-			assert.IsType(t, invalidInput, err)
+			assert.ErrorIs(t, err, ErrInvalidSignerIdx)
 
 			ok, err = aggregator.HasSignature(index)
 			assert.False(t, ok)
-			assert.Error(t, err)
-			assert.IsType(t, invalidInput, err)
+			assert.ErrorIs(t, err, ErrInvalidSignerIdx)
 
 			ok, err = aggregator.VerifyAggregate([]int{index}, sigs[0])
 			assert.False(t, ok)
-			assert.Error(t, err)
-			assert.IsType(t, invalidInput, err)
+			assert.ErrorIs(t, err, ErrInvalidSignerIdx)
 		}
 		// empty list
 		ok, err := aggregator.VerifyAggregate([]int{}, sigs[0])
 		assert.False(t, ok)
-		assert.Error(t, err)
-		assert.IsType(t, invalidInput, err)
+		assert.ErrorIs(t, err, ErrInvalidSignerIdx)
 	})
 
 	t.Run("duplicate signature", func(t *testing.T) {
@@ -173,16 +164,13 @@ func TestAggregatorSameMessage(t *testing.T) {
 		// TrustedAdd
 		for i := range sigs {
 			err := aggregator.TrustedAdd(i, sigs[i]) // same signature for same index
-			assert.Error(t, err)
-			assert.IsType(t, duplicate, err)
+			assert.ErrorIs(t, err, ErrDuplicatedSigner)
 			err = aggregator.TrustedAdd(i, sigs[(i+1)%signersNum]) // different signature for same index
-			assert.Error(t, err)
-			assert.IsType(t, duplicate, err)
+			assert.ErrorIs(t, err, ErrDuplicatedSigner)
 			// VerifyAndAdd
 			ok, err := aggregator.VerifyAndAdd(i, sigs[i]) // valid but redundant signature
 			assert.False(t, ok)
-			assert.Error(t, err)
-			assert.IsType(t, duplicate, err)
+			assert.ErrorIs(t, err, ErrDuplicatedSigner)
 		}
 	})
 
