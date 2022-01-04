@@ -9,6 +9,7 @@ import (
 	"github.com/onflow/flow-go/module/signature"
 )
 
+// SigDataPacker implements logic for encoding/decoding SignatureData using RLP encoding.
 type SigDataPacker struct {
 	codec rlp.Codec // rlp encoder is used in order to ensure deterministic encoding
 }
@@ -24,6 +25,7 @@ type SignatureData struct {
 	ReconstructedRandomBeaconSig crypto.Signature
 }
 
+// Encode performs encoding of SignatureData
 func (p *SigDataPacker) Encode(sigData *SignatureData) ([]byte, error) {
 	var buf bytes.Buffer
 	encoder := p.codec.NewEncoder(&buf)
@@ -31,6 +33,7 @@ func (p *SigDataPacker) Encode(sigData *SignatureData) ([]byte, error) {
 	return buf.Bytes(), err
 }
 
+// Decode performs decoding of SignatureData
 func (p *SigDataPacker) Decode(data []byte) (*SignatureData, error) {
 	bs := bytes.NewReader(data)
 	decoder := p.codec.NewDecoder(bs)

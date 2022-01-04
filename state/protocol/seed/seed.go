@@ -8,9 +8,9 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
-// FromParentSignature reads the raw random seed from a combined signature.
-// the combinedSig must be from a QuorumCertificate. The indices can be used to
-// generate task-specific seeds from the same signature.
+// FromParentSignature reads the raw random seed from a QC sigData.
+// The sigData is an RLP encoded structure that is part of QuorumCertificate.
+// The indices can be used to  generate task-specific seeds from the same signature.
 func FromParentSignature(indices []uint32, sigData []byte) ([]byte, error) {
 	// unpack sig data to extract random beacon sig
 	randomBeaconSig, err := packer.UnpackRandomBeaconSig(sigData)
