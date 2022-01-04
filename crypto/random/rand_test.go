@@ -69,6 +69,17 @@ func TestChacha20Compliance(t *testing.T) {
 		_, err = NewChacha20PRG(seed[:Chacha20SeedLen], customizer)
 		assert.Error(t, err)
 	})
+
+	t.Run("short nonce", func(t *testing.T) {
+		seed := make([]byte, Chacha20SeedLen)
+		customizer := make([]byte, Chacha20CustomizerMaxLen)
+
+		// short nonces should be accepted
+		_, err := NewChacha20PRG(seed, customizer[:Chacha20CustomizerMaxLen-1])
+		assert.NoError(t, err)
+		_, err = NewChacha20PRG(seed, customizer[:0])
+		assert.NoError(t, err)
+	})
 }
 
 // The tests are targeting the PRG implementations in the package.

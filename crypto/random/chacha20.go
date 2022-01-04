@@ -83,25 +83,24 @@ func NewChacha20PRG(seed []byte, customizer []byte) (*chachaPRG, error) {
 		return nil, fmt.Errorf("new Rand streamID should be %d bytes", Chacha20CustomizerMaxLen)
 	}
 
+	// init the state core
+	var core chachaCore
+	// core.bytesCounter is set to 0
+	copy(core.seed[:], seed)
+	copy(core.customizer[:], customizer) // pad the customizer with zero bytes when it's short
+
 	// create the Chacha20 state, initialized with the seed as a key, and the customizer as a streamID.
-	chacha, err := chacha20.NewUnauthenticatedCipher(seed, customizer)
+	chacha, err := chacha20.NewUnauthenticatedCipher(core.seed[:], core.customizer[:])
 	if err != nil {
 		return nil, fmt.Errorf("chacha20 instance creation failed: %w", err)
 	}
-
-	// init the state
-	core := &chachaCore{
-		cipher:       *chacha,
-		bytesCounter: 0,
-	}
-	copy(core.seed[:], seed)
-	copy(core.customizer[:], customizer)
+	core.cipher = *chacha
 
 	prg := &chachaPRG{
 		genericPRG: genericPRG{
-			randCore: core,
+			randCore: &core,
 		},
-		core: core,
+		core: &core,
 	}
 	return prg, nil
 }
