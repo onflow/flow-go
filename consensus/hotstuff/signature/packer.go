@@ -264,7 +264,7 @@ func UnpackRandomBeaconSig(sigData []byte) (crypto.Signature, error) {
 	codec := rlp.Codec{}
 	decoder := codec.NewDecoder(bs)
 	var decodedSigData signatureData
-	err := decoder.Decode(&sigData)
+	err := decoder.Decode(&decodedSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode sig data %s: %w", err, signature.ErrInvalidFormat)
 	}
