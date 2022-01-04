@@ -56,7 +56,7 @@ func (e *Pool) initFreeEntities(limit uint32) {
 
 	for i := uint32(1); i < limit; i++ {
 		// appends slice index i to tail of free linked list
-		e.link(e.free.tail, EIndex(i))
+		e.connect(e.free.tail, EIndex(i))
 		// and updates its tail
 		e.free.tail.setPoolIndex(EIndex(i))
 	}
@@ -80,7 +80,7 @@ func (e *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) E
 
 	if !e.used.tail.isUndefined() {
 		// links new entity to the tail
-		e.link(e.used.tail, entityIndex)
+		e.connect(e.used.tail, entityIndex)
 	}
 
 	// since we are appending to the used list, entityIndex also acts as tail of the list.
@@ -148,8 +148,8 @@ func (e Pool) getTails() (*cachedEntity, *cachedEntity) {
 	return usedTail, freeTail
 }
 
-// link connects the prev and next nodes as the adjacent nodes in the double-linked list.
-func (e *Pool) link(prev poolIndex, next EIndex) {
+// connect links the prev and next nodes as the adjacent nodes in the double-linked list.
+func (e *Pool) connect(prev poolIndex, next EIndex) {
 	e.values[prev.sliceIndex()].node.next.setPoolIndex(next)
 	e.values[next].node.prev = prev
 }
@@ -225,7 +225,7 @@ func (e *Pool) invalidateEntityAtIndex(sliceIndex EIndex) {
 
 	if sliceIndex != e.used.head.sliceIndex() && sliceIndex != e.used.tail.sliceIndex() {
 		// links next and prev elements for non-head and non-tail element
-		e.link(prev, next.sliceIndex())
+		e.connect(prev, next.sliceIndex())
 	}
 
 	if sliceIndex == e.used.head.sliceIndex() {
@@ -278,7 +278,7 @@ func (e *Pool) appendToFreeList(sliceIndex EIndex) {
 	}
 
 	// appends to the tail, and updates the tail
-	e.link(e.free.tail, sliceIndex)
+	e.connect(e.free.tail, sliceIndex)
 	e.free.tail.setPoolIndex(sliceIndex)
 }
 
