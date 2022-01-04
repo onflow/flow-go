@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
@@ -175,7 +176,7 @@ func (rs *randomBeaconSuite) TestInvalidSignature() {
 	// Verify
 	err = follower.Verify(index, share)
 	assert.Error(rs.T(), err)
-	assert.True(rs.T(), errors.Is(err, signature.ErrInvalidFormat))
+	assert.True(rs.T(), errors.Is(err, model.ErrInvalidFormat))
 	// restore share
 	share[4] ^= 1
 
@@ -184,7 +185,7 @@ func (rs *randomBeaconSuite) TestInvalidSignature() {
 	// VerifyShare
 	err = follower.Verify(otherIndex, share)
 	assert.Error(rs.T(), err)
-	assert.True(rs.T(), errors.Is(err, signature.ErrInvalidFormat))
+	assert.True(rs.T(), errors.Is(err, model.ErrInvalidFormat))
 }
 
 func (rs *randomBeaconSuite) TestConstructorErrors() {

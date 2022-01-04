@@ -15,7 +15,6 @@ import (
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	msig "github.com/onflow/flow-go/module/signature"
 )
 
 /* ***************** Base-Factory for StakingVoteProcessor ****************** */
@@ -115,7 +114,7 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	}
 	err = p.stakingSigAggtor.Verify(vote.SignerID, vote.SigData)
 	if err != nil {
-		if errors.Is(err, msig.ErrInvalidFormat) {
+		if errors.Is(err, model.ErrInvalidFormat) {
 			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has invalid signature: %w", vote.ID(), vote.View, err)
 		}
 		return fmt.Errorf("internal error checking signature validity: %w", err)

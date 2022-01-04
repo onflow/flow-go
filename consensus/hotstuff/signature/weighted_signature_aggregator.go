@@ -5,6 +5,7 @@ import (
 	"sync"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
@@ -80,7 +81,7 @@ func NewWeightedSignatureAggregator(
 //
 // The function errors:
 //  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
-//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
+//  - model.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 //  - random error if the execution failed
 // The function is thread-safe.
 func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypto.Signature) error {
@@ -94,7 +95,7 @@ func (w *WeightedSignatureAggregator) Verify(signerID flow.Identifier, sig crypt
 		return fmt.Errorf("couldn't verify signature from %s: %w", signerID, err)
 	}
 	if !ok {
-		return fmt.Errorf("invalid signature from %s: %w", signerID, signature.ErrInvalidFormat)
+		return fmt.Errorf("invalid signature from %s: %w", signerID, model.ErrInvalidFormat)
 	}
 	return nil
 }

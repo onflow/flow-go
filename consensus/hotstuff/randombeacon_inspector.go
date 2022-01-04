@@ -14,7 +14,7 @@ type RandomBeaconInspector interface {
 	// It allows concurrent verification of the given signature.
 	// Returns :
 	//  - engine.InvalidInputError if signerIndex is invalid
-	//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
+	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
 	//  - other error if there is an unexpected exception.
 	Verify(signerIndex int, share crypto.Signature) error
 

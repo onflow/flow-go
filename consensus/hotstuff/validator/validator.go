@@ -8,7 +8,6 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
-	"github.com/onflow/flow-go/module/signature"
 )
 
 // Validator is responsible for validating QC, Block and Vote
@@ -64,7 +63,7 @@ func (v *Validator) ValidateQC(qc *flow.QuorumCertificate, block *model.Block) e
 	err = v.verifier.VerifyQC(signers, qc.SigData, block)
 	if err != nil {
 		switch {
-		case errors.Is(err, signature.ErrInvalidFormat):
+		case errors.Is(err, model.ErrInvalidFormat):
 			return newInvalidBlockError(block, fmt.Errorf("QC's  signature data has an invalid structure: %w", err))
 		case errors.Is(err, model.ErrInvalidSignature):
 			return newInvalidBlockError(block, fmt.Errorf("QC contains invalid signature(s): %w", err))
@@ -148,7 +147,7 @@ func (v *Validator) ValidateVote(vote *model.Vote, block *model.Block) (*flow.Id
 	err = v.verifier.VerifyVote(voter, vote.SigData, block)
 	if err != nil {
 		switch {
-		case errors.Is(err, signature.ErrInvalidFormat):
+		case errors.Is(err, model.ErrInvalidFormat):
 			return nil, newInvalidVoteError(vote, err)
 		case errors.Is(err, model.ErrInvalidSignature):
 			return nil, newInvalidVoteError(vote, err)

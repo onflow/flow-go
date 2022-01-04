@@ -31,7 +31,7 @@ func NewRandomBeaconReconstructor(dkg hotstuff.DKG, randomBeaconInspector hotstu
 // It allows concurrent verification of the given signature.
 // Returns :
 //  - engine.InvalidInputError if signerIndex is invalid
-//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
+//  - model.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 //  - other error if there is an unexpected exception.
 func (r *RandomBeaconReconstructor) Verify(signerID flow.Identifier, sig crypto.Signature) error {
 	signerIndex, err := r.dkg.Index(signerID)

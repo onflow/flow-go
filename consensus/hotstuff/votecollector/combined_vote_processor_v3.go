@@ -154,7 +154,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	}
 	sigType, sig, err := signature.DecodeSingleSig(vote.SigData)
 	if err != nil {
-		if errors.Is(err, msig.ErrInvalidFormat) {
+		if errors.Is(err, model.ErrInvalidFormat) {
 			return model.NewInvalidVoteErrorf(vote, "could not decode signature: %w", err)
 		}
 		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
@@ -165,7 +165,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	case hotstuff.SigTypeStaking:
 		err := p.stakingSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
-			if errors.Is(err, msig.ErrInvalidFormat) {
+			if errors.Is(err, model.ErrInvalidFormat) {
 				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid staking signature: %w",
 					vote.ID(), vote.View, err)
 			}
@@ -182,7 +182,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 	case hotstuff.SigTypeRandomBeacon:
 		err := p.rbSigAggtor.Verify(vote.SignerID, sig)
 		if err != nil {
-			if errors.Is(err, msig.ErrInvalidFormat) {
+			if errors.Is(err, model.ErrInvalidFormat) {
 				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid random beacon signature: %w",
 					vote.ID(), vote.View, err)
 			}
@@ -202,7 +202,7 @@ func (p *CombinedVoteProcessorV3) Process(vote *model.Vote) error {
 		}
 
 	default:
-		return model.NewInvalidVoteErrorf(vote, "invalid signature type %d: %w", sigType, msig.ErrInvalidFormat)
+		return model.NewInvalidVoteErrorf(vote, "invalid signature type %d: %w", sigType, model.ErrInvalidFormat)
 	}
 
 	// checking of conditions for building QC are satisfied

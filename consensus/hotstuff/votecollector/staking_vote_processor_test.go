@@ -21,7 +21,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -74,13 +73,13 @@ func (s *StakingVoteProcessorTestSuite) TestProcess_InvalidSignature() {
 	exception := errors.New("unexpected-exception")
 	stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 
-	s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
+	s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(model.ErrInvalidFormat).Once()
 
 	// sentinel error from `ErrInvalidFormat` should be wrapped as `InvalidVoteError`
 	err := s.processor.Process(stakingVote)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+	require.ErrorAs(s.T(), err, &model.ErrInvalidFormat)
 
 	s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(exception)
 

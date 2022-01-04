@@ -10,8 +10,8 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/mocks"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -148,7 +148,7 @@ func TestFailToDecode(t *testing.T) {
 	_, err = packer.Unpack(blockID, signerIDs, invalidSigData)
 
 	require.Error(t, err)
-	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
+	require.True(t, errors.Is(err, model.ErrInvalidFormat))
 }
 
 // if the signer IDs doesn't match, return InvalidFormatError
@@ -173,7 +173,7 @@ func TestMismatchSignerIDs(t *testing.T) {
 	_, err = packer.Unpack(blockID, invalidSignerIDs, sig)
 
 	require.Error(t, err)
-	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
+	require.True(t, errors.Is(err, model.ErrInvalidFormat))
 
 	// prepare invalid signerIDs by modifying the valid signerIDs
 	// adding one more signer
@@ -181,7 +181,7 @@ func TestMismatchSignerIDs(t *testing.T) {
 	misPacked, err := packer.Unpack(blockID, invalidSignerIDs, sig)
 
 	require.Error(t, err, fmt.Sprintf("packed signers: %v", misPacked))
-	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
+	require.True(t, errors.Is(err, model.ErrInvalidFormat))
 }
 
 // if sig type doesn't match, return InvalidFormatError
@@ -209,7 +209,7 @@ func TestInvalidSigType(t *testing.T) {
 
 	_, err = packer.Unpack(blockID, signerIDs, encoded)
 
-	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
+	require.True(t, errors.Is(err, model.ErrInvalidFormat))
 }
 
 func TestSerializeAndDeserializeSigTypes(t *testing.T) {
@@ -408,14 +408,14 @@ func TestDeserializeMismatchingBytes(t *testing.T) {
 		}
 		_, err := deserializeFromBitVector(bytes, invalidCount)
 		require.Error(t, err, fmt.Sprintf("invalid count: %v", invalidCount))
-		require.True(t, errors.Is(err, signature.ErrInvalidFormat), fmt.Sprintf("invalid count: %v", invalidCount))
+		require.True(t, errors.Is(err, model.ErrInvalidFormat), fmt.Sprintf("invalid count: %v", invalidCount))
 	}
 }
 
 func TestDeserializeInvalidTailingBits(t *testing.T) {
 	_, err := deserializeFromBitVector([]byte{255, 1<<7 + 1<<1}, 9)
 	require.Error(t, err)
-	require.True(t, errors.Is(err, signature.ErrInvalidFormat))
+	require.True(t, errors.Is(err, model.ErrInvalidFormat))
 	require.Contains(t, fmt.Sprintf("%v", err), "remaining bits")
 }
 

@@ -164,7 +164,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	}
 	stakingSig, randomBeaconSig, err := signature.DecodeDoubleSig(vote.SigData)
 	if err != nil {
-		if errors.Is(err, msig.ErrInvalidFormat) {
+		if errors.Is(err, model.ErrInvalidFormat) {
 			return model.NewInvalidVoteErrorf(vote, "could not decode signature: %w", err)
 		}
 		return fmt.Errorf("unexpected error decoding vote %v: %w", vote.ID(), err)
@@ -173,7 +173,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	// verify staking sig
 	err = p.stakingSigAggtor.Verify(vote.SignerID, stakingSig)
 	if err != nil {
-		if errors.Is(err, msig.ErrInvalidFormat) {
+		if errors.Is(err, model.ErrInvalidFormat) {
 			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid staking signature: %w",
 				vote.ID(), vote.View, err)
 		}
@@ -188,7 +188,7 @@ func (p *CombinedVoteProcessorV2) Process(vote *model.Vote) error {
 	if randomBeaconSig != nil {
 		err = p.rbRector.Verify(vote.SignerID, randomBeaconSig)
 		if err != nil {
-			if errors.Is(err, msig.ErrInvalidFormat) {
+			if errors.Is(err, model.ErrInvalidFormat) {
 				return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid random beacon signature: %w",
 					vote.ID(), vote.View, err)
 			}

@@ -3,10 +3,10 @@ package signature
 import (
 	"fmt"
 
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/encoding"
-	"github.com/onflow/flow-go/module/signature"
 )
 
 // randomBeaconInspector implements hotstuff.RandomBeaconInspector interface.
@@ -46,7 +46,7 @@ func NewRandomBeaconInspector(
 // It allows concurrent verification of the given signature.
 // Returns :
 //  - engine.InvalidInputError if signerIndex is invalid
-//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
+//  - model.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
 //  - other error if there is an unexpected exception.
 func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) error {
 	verif, err := r.inspector.VerifyShare(signerIndex, share)
@@ -58,7 +58,7 @@ func (r *randomBeaconInspector) Verify(signerIndex int, share crypto.Signature) 
 	}
 
 	if !verif { // invalid signature
-		return fmt.Errorf("invalid beacon share from %d: %w", signerIndex, signature.ErrInvalidFormat)
+		return fmt.Errorf("invalid beacon share from %d: %w", signerIndex, model.ErrInvalidFormat)
 	}
 	return nil
 }

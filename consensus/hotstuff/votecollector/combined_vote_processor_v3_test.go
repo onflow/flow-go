@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
-	msig "github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
@@ -132,7 +131,7 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignatureFormat() 
 	err := s.processor.Process(vote)
 	require.Error(s.T(), err)
 	require.True(s.T(), model.IsInvalidVoteError(err))
-	require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+	require.ErrorAs(s.T(), err, &model.ErrInvalidFormat)
 }
 
 // TestProcess_InvalidSignature tests that CombinedVoteProcessorV3 doesn't collect signatures for votes with invalid signature.
@@ -143,13 +142,13 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
 	s.Run("staking-sig", func() {
 		stakingVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithStakingSig())
 
-		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
+		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(model.ErrInvalidFormat).Once()
 
 		// sentinel error from `ErrInvalidFormat` should be wrapped as `InvalidVoteError`
 		err := s.processor.Process(stakingVote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+		require.ErrorAs(s.T(), err, &model.ErrInvalidFormat)
 
 		s.stakingAggregator.On("Verify", stakingVote.SignerID, mock.Anything).Return(exception)
 
@@ -164,13 +163,13 @@ func (s *CombinedVoteProcessorV3TestSuite) TestProcess_InvalidSignature() {
 	s.Run("threshold-sig", func() {
 		thresholdVote := unittest.VoteForBlockFixture(s.proposal.Block, unittest.VoteWithThresholdSig())
 
-		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(msig.ErrInvalidFormat).Once()
+		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(model.ErrInvalidFormat).Once()
 
 		// expect sentinel error in case Verify returns ErrInvalidFormat
 		err := s.processor.Process(thresholdVote)
 		require.Error(s.T(), err)
 		require.True(s.T(), model.IsInvalidVoteError(err))
-		require.ErrorAs(s.T(), err, &msig.ErrInvalidFormat)
+		require.ErrorAs(s.T(), err, &model.ErrInvalidFormat)
 
 		s.rbSigAggregator.On("Verify", thresholdVote.SignerID, mock.Anything).Return(exception)
 

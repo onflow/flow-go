@@ -15,7 +15,7 @@ type RandomBeaconReconstructor interface {
 	// It allows concurrent verification of the given signature.
 	// Returns :
 	//  - engine.InvalidInputError if signerIndex is invalid
-	//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
+	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
 	//  - other error if there is an unexpected exception.
 	Verify(signerID flow.Identifier, sig crypto.Signature) error
 
@@ -81,7 +81,7 @@ type WeightedSignatureAggregator interface {
 	//
 	// The function errors:
 	//  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
-	//  - module/signature.ErrInvalidFormat if signerID is valid but signature is cryptographically invalid
+	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
 	//  - random error if the execution failed
 	Verify(signerID flow.Identifier, sig crypto.Signature) error
 
@@ -130,6 +130,6 @@ type Packer interface {
 	// sig is the aggregated signature data
 	// It returns:
 	//  - (sigData, nil) if successfully unpacked the signature data
-	//  - (nil, signature.ErrInvalidFormat) if failed to unpack the signature data
+	//  - (nil, model.ErrInvalidSignature) if failed to unpack the signature data
 	Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*BlockSignatureData, error)
 }

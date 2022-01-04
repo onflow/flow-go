@@ -21,6 +21,7 @@ func IsNoVoteError(err error) bool {
 }
 
 var ErrUnverifiableBlock = errors.New("block proposal can't be verified, because its view is above the finalized view, but its QC is below the finalized view")
+var ErrInvalidFormat = errors.New("invalid signature format")
 var ErrInvalidSigner = errors.New("invalid signer(s)")
 var ErrInvalidSignature = errors.New("invalid signature")
 

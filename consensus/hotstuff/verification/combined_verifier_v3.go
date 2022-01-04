@@ -8,12 +8,11 @@ import (
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	hotstuffsignature "github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
 )
 
 // CombinedVerifierV3 is a verifier capable of verifying two signatures, one for each
@@ -43,7 +42,7 @@ func NewCombinedVerifierV3(committee hotstuff.Committee, packer hotstuff.Packer)
 // VerifyVote verifies the validity of a combined signature from a vote.
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
-// * signature.ErrInvalidFormat if the signature has an incompatible format.
+// * model.ErrInvalidFormat if the signature has an incompatible format.
 // * model.ErrInvalidSignature is the signature is invalid
 // * unexpected errors should be treated as symptoms of bugs or uncovered
 //   edge cases in the logic (i.e. as fatal)
@@ -52,7 +51,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 	// create the to-be-signed message
 	msg := MakeVoteMessage(block.View, block.BlockID)
 
-	sigType, sig, err := hotstuffsignature.DecodeSingleSig(sigData)
+	sigType, sig, err := signature.DecodeSingleSig(sigData)
 	if err != nil {
 		return fmt.Errorf("could not decode signature for block %v: %w", block.BlockID, err)
 	}
@@ -87,7 +86,7 @@ func (c *CombinedVerifierV3) VerifyVote(signer *flow.Identity, sigData []byte, b
 			return fmt.Errorf("invalid beacon sig for block %v: %w", block.BlockID, model.ErrInvalidSignature)
 		}
 	default:
-		return fmt.Errorf("invalid signature type %d: %w", sigType, signature.ErrInvalidFormat)
+		return fmt.Errorf("invalid signature type %d: %w", sigType, model.ErrInvalidFormat)
 	}
 
 	return nil

@@ -30,7 +30,7 @@ func NewStakingVerifier() *StakingVerifier {
 // Usually this method is only used to verify the proposer's vote, which is
 // the vote included in a block proposal.
 // The implementation returns the following sentinel errors:
-// * signature.ErrInvalidFormat if the signature has an incompatible format.
+// * model.ErrInvalidFormat if the signature has an incompatible format.
 // * model.ErrInvalidSignature is the signature is invalid
 // * unexpected errors should be treated as symptoms of bugs or uncovered
 //   edge cases in the logic (i.e. as fatal)

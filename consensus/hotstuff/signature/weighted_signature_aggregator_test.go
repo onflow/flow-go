@@ -9,11 +9,11 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
+	"github.com/onflow/flow-go/consensus/hotstuff/model"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -151,7 +151,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 	})
 
 	duplicate := engine.NewDuplicatedEntryErrorf("some error")
-	invalidSig := signature.ErrInvalidFormat
+	invalidSig := model.ErrInvalidFormat
 
 	// Unhappy paths
 	t.Run("invalid signer ID", func(t *testing.T) {
