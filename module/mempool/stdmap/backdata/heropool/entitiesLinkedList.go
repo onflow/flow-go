@@ -1,4 +1,4 @@
-package arraylinkedlist
+package heropool
 
 import (
 	"math/rand"

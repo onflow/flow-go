@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog"
 
 	"github.com/onflow/flow-go/model/flow"
-	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/arraylinkedlist"
+	"github.com/onflow/flow-go/module/mempool/stdmap/backdata/heropool"
 )
 
 //go:linkname runtimeNano runtime.nanotime
@@ -40,9 +40,9 @@ type sIndex uint64
 type idPrefix uint32
 
 type key struct {
-	keyIndex    uint64                 // slot age.
-	entityIndex arraylinkedlist.EIndex // link to actual entity.
-	idPref      idPrefix               // 32-bits prefix of entity identifier.
+	keyIndex    uint64          // slot age.
+	entityIndex heropool.EIndex // link to actual entity.
+	idPref      idPrefix        // 32-bits prefix of entity identifier.
 }
 
 // keyBucket represents a bucket of keys.
@@ -56,11 +56,11 @@ type ArrayBackData struct {
 	limit        uint32
 	keyCount     uint64 // total number of non-expired key-values
 	bucketNum    uint64 // total number of buckets (i.e., total of buckets)
-	ejectionMode arraylinkedlist.EjectionMode
+	ejectionMode heropool.EjectionMode
 	// buckets keeps the keys (i.e., entityId) of the (entityId, entity) pairs that are maintained in this BackData.
 	buckets []keyBucket
 	// entities keeps the values (i.e., entity) of the (entityId, entity) pairs that are maintained in this BackData.
-	entities *arraylinkedlist.EntityDoubleLinkedList
+	entities *heropool.EntityDoubleLinkedList
 
 	// telemetry
 	//
@@ -78,7 +78,7 @@ type ArrayBackData struct {
 	lastTelemetryDump int64
 }
 
-func NewArrayBackData(limit uint32, oversizeFactor uint32, ejectionMode arraylinkedlist.EjectionMode, logger zerolog.Logger) *ArrayBackData {
+func NewArrayBackData(limit uint32, oversizeFactor uint32, ejectionMode heropool.EjectionMode, logger zerolog.Logger) *ArrayBackData {
 	// total buckets.
 	capacity := uint64(limit * oversizeFactor)
 	bucketNum := capacity / bucketSize
@@ -93,7 +93,7 @@ func NewArrayBackData(limit uint32, oversizeFactor uint32, ejectionMode arraylin
 		limit:                  limit,
 		buckets:                make([]keyBucket, bucketNum),
 		ejectionMode:           ejectionMode,
-		entities:               arraylinkedlist.NewEntityList(limit, ejectionMode),
+		entities:               heropool.NewEntityList(limit, ejectionMode),
 		availableSlotHistogram: make([]uint64, bucketSize+1), // +1 is to account for empty buckets as well.
 	}
 
@@ -190,7 +190,7 @@ func (a *ArrayBackData) Clear() {
 	defer a.logTelemetry()
 
 	a.buckets = make([]keyBucket, a.bucketNum)
-	a.entities = arraylinkedlist.NewEntityList(a.limit, a.ejectionMode)
+	a.entities = heropool.NewEntityList(a.limit, a.ejectionMode)
 	a.availableSlotHistogram = make([]uint64, bucketSize+1)
 	a.interactionCounter = 0
 	a.lastTelemetryDump = 0
