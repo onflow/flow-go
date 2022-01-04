@@ -79,6 +79,18 @@ const (
 	// ExeNodeMetricsPort is the name used for the execution node metrics server port
 	ExeNodeMetricsPort = "exe-metrics-port"
 
+	// ColNodeMetricsPort is the name used for the collection node metrics server port
+	ColNodeMetricsPort = "col-metrics-port"
+
+	// AccessNodeMetricsPort is the name used for the access node metrics server port
+	AccessNodeMetricsPort = "access-metrics-port"
+
+	// VerNodeMetricsPort is the name used for the verification node metrics server port
+	VerNodeMetricsPort = "verification-metrics-port"
+
+	// ConNodeMetricsPort is the name used for the consensus node metrics server port
+	ConNodeMetricsPort = "con-metrics-port"
+
 	// DefaultFlowPort default gossip network port
 	DefaultFlowPort = 2137
 	// DefaultSecureGRPCPort is the port used to access secure GRPC server running on ANs
@@ -241,6 +253,17 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 	container, exists := net.Containers[name]
 	require.True(net.t, exists, "container %s does not exists", name)
 	return container
+}
+
+func (net *FlowNetwork) MetricsPorts() string {
+	var builder strings.Builder
+	builder.WriteString("metrics ports:\n")
+	builder.WriteString(fmt.Sprintf("\t%s:%s\n", AccessNodeMetricsPort, net.AccessPorts[AccessNodeMetricsPort]))
+	builder.WriteString(fmt.Sprintf("\t%s:%s\n", VerNodeMetricsPort, net.AccessPorts[VerNodeMetricsPort]))
+	builder.WriteString(fmt.Sprintf("\t%s:%s\n", ConNodeMetricsPort, net.AccessPorts[ConNodeMetricsPort]))
+	builder.WriteString(fmt.Sprintf("\t%s:%s\n", ColNodeMetricsPort, net.AccessPorts[ColNodeMetricsPort]))
+	builder.WriteString(fmt.Sprintf("\t%s:%s\n", ExeNodeMetricsPort, net.AccessPorts[ExeNodeMetricsPort]))
+	return builder.String()
 }
 
 type ConsensusFollowerConfig struct {
@@ -546,6 +569,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
 
+	fmt.Print(flowNetwork.MetricsPorts())
+
 	return flowNetwork
 }
 
@@ -681,6 +706,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
+
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[ColNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[ColNodeMetricsPort] = hostMetricsPort
+
 			// set a low timeout so that all nodes agree on the current view more quickly
 			nodeContainer.addFlag("hotstuff-timeout", time.Second.String())
 			nodeContainer.addFlag("hotstuff-min-timeout", time.Second.String())
@@ -753,16 +785,33 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				nodeContainer.addFlag("supports-unstaked-node", "true")
 			}
 
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
+
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[AccessNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[AccessNodeMetricsPort] = hostMetricsPort
+
 		case flow.RoleConsensus:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
 			nodeContainer.addFlag("chunk-alpha", "1")
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
 
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[ConNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[ConNodeMetricsPort] = hostMetricsPort
 		case flow.RoleVerification:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
 			nodeContainer.addFlag("chunk-alpha", "1")
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
 
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[VerNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[VerNodeMetricsPort] = hostMetricsPort
 		}
 	} else {
 		hostPort := testingdock.RandomPort(t)

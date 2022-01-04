@@ -170,16 +170,16 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	currentEpochFinalView, err := snapshot.Epochs().Current().FinalView()
 	require.NoError(s.T(), err)
 
-	// wait for the first view of the next epoch pause our container to replace
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+25)
+	// wait for 5 views after the start of the next epoch before we pause our container to replace
+	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+5)
 	s.assertNodeNotApprovedOrProposed(ctx, env, containerToReplace.Config.NodeID)
 	s.assertEpochCounter(ctx, 1)
 
 	err = containerToReplace.Pause()
 	require.NoError(s.T(), err)
 
-	//wait for the 75th view after the next epoch starts
-	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+50)
+	// wait for 5 views after pausing our container to replace before we assert healthy network
+	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+10)
 
 	// make sure the network is healthy after adding new node
 	checkNetworkHealth(ctx, env, snapshot, info)
