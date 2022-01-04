@@ -101,7 +101,7 @@ func testAddEntities(t testing.TB, limit uint, b *stdmap.Backend, entities []*un
 
 // baseLineLRU implements a BackData wrapper around hashicorp lru, which makes
 // it compliant to be used as BackData component in mempool.Backend. Note that
-// this is used only as an experimental baseline, and hence is not exported for
+// this is used only as an experimental baseline, and so it's not exported for
 // production.
 type baselineLRU struct {
 	c     *lru.Cache // used to incorporate an LRU cache
