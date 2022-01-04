@@ -326,6 +326,7 @@ func main() {
 			return compactor, nil
 		}).
 		Component("execution data service", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
+			err := os.MkdirAll(executionDataDir, 0700)
 			ds, err := badger.NewDatastore(executionDataDir, &badger.DefaultOptions)
 
 			if err != nil {
