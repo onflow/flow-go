@@ -19,46 +19,26 @@ const maximumRandomTrials = 10
 // EIndex is data type representing an entity index in EntityDoubleLinkedList.
 type EIndex uint32
 
-// doubleLinkedListNode represents a slice-based double linked list node that
-// consists of a next and previous pointer.
-type doubleLinkedListNode struct {
-	next poolIndex
-	prev poolIndex
-}
-
-// doubleLinkedList represents a double linked list by its head and tail pointers.
-type doubleLinkedList struct {
-	head poolIndex
-	tail poolIndex
-}
-
-func newDoubleLinkedList() *doubleLinkedList {
-	return &doubleLinkedList{
-		head: poolIndex{index: 0},
-		tail: poolIndex{index: 0},
-	}
-}
-
 // cachedEntity represents a cached entity that is maintained as a double linked list node.
 type cachedEntity struct {
 	owner  uint64
-	node   doubleLinkedListNode
+	node   link
 	id     flow.Identifier
 	entity flow.Entity
 }
 
 type EntityDoubleLinkedList struct {
 	total        uint32
-	free         *doubleLinkedList // keeps track of free slots.
-	used         *doubleLinkedList // keeps track of allocated slots to cachedEntities.
+	free         *state // keeps track of free slots.
+	used         *state // keeps track of allocated slots to cachedEntities.
 	values       []cachedEntity
 	ejectionMode EjectionMode
 }
 
 func NewEntityList(limit uint32, ejectionMode EjectionMode) *EntityDoubleLinkedList {
 	l := &EntityDoubleLinkedList{
-		free:         newDoubleLinkedList(),
-		used:         newDoubleLinkedList(),
+		free:         newState(),
+		used:         newState(),
 		values:       make([]cachedEntity, limit),
 		ejectionMode: ejectionMode,
 	}
