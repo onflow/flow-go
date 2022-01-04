@@ -10,7 +10,7 @@ import (
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
-	mock2 "github.com/onflow/flow-go/module/mock"
+	fmock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
 
@@ -23,12 +23,12 @@ type ReceiptValidationSuite struct {
 
 	receiptValidator module.ReceiptValidator
 	sigTag           string
-	publicKey        *mock2.PublicKey
+	publicKey        *fmock.PublicKey
 }
 
 func (s *ReceiptValidationSuite) SetupTest() {
 	s.SetupChain()
-	s.publicKey = &mock2.PublicKey{}
+	s.publicKey = &fmock.PublicKey{}
 	s.Identities[s.ExeID].StakingPubKey = s.publicKey
 	s.sigTag = "test_tag"
 	s.receiptValidator = NewReceiptValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB, s.sigTag)
@@ -57,7 +57,7 @@ func (s *ReceiptValidationSuite) TestReceiptValid() {
 func (s *ReceiptValidationSuite) TestReceiptNoIdentity() {
 	valSubgrph := s.ValidSubgraphFixture()
 	node := unittest.IdentityFixture()
-	mockPk := &mock2.PublicKey{}
+	mockPk := &fmock.PublicKey{}
 	node.StakingPubKey = mockPk
 
 	receipt := unittest.ExecutionReceiptFixture(unittest.WithExecutorID(node.NodeID),
