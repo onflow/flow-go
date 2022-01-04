@@ -30,7 +30,7 @@ type doubleLinkedListPointer struct {
 	pointerValue uint32
 }
 
-// isUndefined returns true if this pointer is set to its zero value. An undefined
+// isUndefined returns true if this pointer is set to zero. An undefined
 // slice-based pointer is equivalent to a nil address-based one.
 func (d doubleLinkedListPointer) isUndefined() bool {
 	return d.pointerValue == uint32(0)
