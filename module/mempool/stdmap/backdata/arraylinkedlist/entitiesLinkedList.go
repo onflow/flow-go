@@ -25,7 +25,7 @@ type EIndex uint32
 // Note: an "undefined" (i.e., nil) notion for this doubleLinkedListPointer corresponds to the
 // value of uint32(0). Hence, legit "pointer" values start from uint32(1).
 // doubleLinkedListPointer also furnished with methods to convert a "pointer" value to
-// a slice index, and reverse.
+// a slice index, and vice versa.
 type doubleLinkedListPointer struct {
 	pointerValue uint32
 }
