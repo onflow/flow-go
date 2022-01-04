@@ -365,7 +365,7 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 			collectionRPCConn, err := grpc.Dial(
 				anb.rpcConf.CollectionAddr,
 				grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-				grpc.WithInsecure(),
+				grpc.WithInsecure(), //nolint:staticcheck
 				backend.WithClientUnaryInterceptor(anb.rpcConf.CollectionClientTimeout))
 			if err != nil {
 				return err
@@ -384,7 +384,7 @@ func (anb *FlowAccessNodeBuilder) Build() AccessNodeBuilder {
 				historicalAccessRPCConn, err := grpc.Dial(
 					addr,
 					grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcutils.DefaultMaxMsgSize)),
-					grpc.WithInsecure())
+					grpc.WithInsecure()) //nolint:staticcheck
 				if err != nil {
 					return err
 				}
