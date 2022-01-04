@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/onflow/flow-go/consensus/hotstuff/signature"
+	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
@@ -13,7 +13,7 @@ import (
 // generate task-specific seeds from the same signature.
 func FromParentSignature(indices []uint32, sigData []byte) ([]byte, error) {
 	// unpack sig data to extract random beacon sig
-	randomBeaconSig, err := signature.UnpackRandomBeaconSig(sigData)
+	randomBeaconSig, err := packer.UnpackRandomBeaconSig(sigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not unpack block signature: %w", err)
 	}

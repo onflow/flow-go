@@ -26,7 +26,6 @@ import (
 	"github.com/onflow/flow-go/model/messages"
 	"github.com/onflow/flow-go/model/verification"
 	"github.com/onflow/flow-go/module/mempool/entity"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/state/protocol/inmem"
 	"github.com/onflow/flow-go/utils/dsl"
 )
@@ -396,7 +395,7 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 		Timestamp:          time.Now().UTC(),
 		View:               view,
 		ParentVoterIDs:     IdentifierListFixture(4),
-		ParentVoterSigData: CombinedSignatureFixture(2),
+		ParentVoterSigData: SignatureFixture(),
 		ProposerID:         IdentifierFixture(),
 		ProposerSigData:    SignatureFixture(),
 	}
@@ -1089,16 +1088,6 @@ func SignatureFixture() crypto.Signature {
 	return sig
 }
 
-func CombinedSignatureFixture(n int) crypto.Signature {
-	sigs := SignaturesFixture(n)
-	combiner := signature.NewCombiner(48, 48)
-	sig, err := combiner.Join(sigs[0], sigs[1])
-	if err != nil {
-		panic(err)
-	}
-	return sig
-}
-
 func SignaturesFixture(n int) []crypto.Signature {
 	var sigs []crypto.Signature
 	for i := 0; i < n; i++ {
@@ -1482,7 +1471,7 @@ func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.Quoru
 		View:      uint64(rand.Uint32()),
 		BlockID:   IdentifierFixture(),
 		SignerIDs: IdentifierListFixture(3),
-		SigData:   CombinedSignatureFixture(2),
+		SigData:   SignatureFixture(),
 	}
 	for _, apply := range opts {
 		apply(&qc)
