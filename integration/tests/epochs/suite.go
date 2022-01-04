@@ -579,6 +579,15 @@ func (s *Suite) assertInPhase(ctx context.Context, expectedPhase flow.EpochPhase
 	require.Equal(s.T(), expectedPhase, actualPhase)
 }
 
+// assertEpochCounter requires actual epoch counter is equal to counter provided
+func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64)  {
+	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
+	require.NoError(s.T(), err)
+	actualCounter, err := snapshot.Epochs().Current().Counter()
+	require.NoError(s.T(), err)
+	require.Equalf(s.T(), expectedCounter, actualCounter, "expected to be in epoch %d got %d", expectedCounter, actualCounter)
+}
+
 // assertNetworkHealthyAfterANChange after an access node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Check that there is no problem connecting directly to the AN provided and retrieve a protocol snapshot
