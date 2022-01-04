@@ -28,7 +28,7 @@ type cachedEntity struct {
 }
 
 type Pool struct {
-	total        uint32
+	size         uint32
 	free         *state // keeps track of free slots.
 	used         *state // keeps track of allocated slots to cachedEntities.
 	values       []cachedEntity
@@ -86,7 +86,7 @@ func (e *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) E
 	// since we are appending to the used list, entityIndex also acts as tail of the list.
 	e.used.tail.setPoolIndex(entityIndex)
 
-	e.total++
+	e.size++
 	return entityIndex
 }
 
@@ -117,7 +117,7 @@ func (e *Pool) sliceIndexForEntity() EIndex {
 
 // Size returns total number of entities that this list maintains.
 func (e Pool) Size() uint32 {
-	return e.total
+	return e.size
 }
 
 // getHeads returns entities corresponding to the used and free heads.
@@ -172,7 +172,7 @@ func (e *Pool) invalidateRandomEntity() EIndex {
 	var index = e.used.head.sliceIndex()
 
 	for i := 0; i < maximumRandomTrials; i++ {
-		candidate := EIndex(rand.Uint32() % e.total)
+		candidate := EIndex(rand.Uint32() % e.size)
 		if !e.isInvalidated(candidate) {
 			// found a valid entity to invalidate
 			index = candidate
@@ -265,7 +265,7 @@ func (e *Pool) invalidateEntityAtIndex(sliceIndex EIndex) {
 	e.appendToFreeList(sliceIndex)
 
 	// decrements Size
-	e.total--
+	e.size--
 }
 
 // appendToFreeList appends linked-list node represented by sliceIndex to tail of free list.
