@@ -60,7 +60,7 @@ type ArrayBackData struct {
 	// buckets keeps the keys (i.e., entityId) of the (entityId, entity) pairs that are maintained in this BackData.
 	buckets []keyBucket
 	// entities keeps the values (i.e., entity) of the (entityId, entity) pairs that are maintained in this BackData.
-	entities *heropool.EntityDoubleLinkedList
+	entities *heropool.Pool
 
 	// telemetry
 	//
@@ -93,7 +93,7 @@ func NewArrayBackData(limit uint32, oversizeFactor uint32, ejectionMode heropool
 		limit:                  limit,
 		buckets:                make([]keyBucket, bucketNum),
 		ejectionMode:           ejectionMode,
-		entities:               heropool.NewEntityList(limit, ejectionMode),
+		entities:               heropool.NewPool(limit, ejectionMode),
 		availableSlotHistogram: make([]uint64, bucketSize+1), // +1 is to account for empty buckets as well.
 	}
 
@@ -190,7 +190,7 @@ func (a *ArrayBackData) Clear() {
 	defer a.logTelemetry()
 
 	a.buckets = make([]keyBucket, a.bucketNum)
-	a.entities = heropool.NewEntityList(a.limit, a.ejectionMode)
+	a.entities = heropool.NewPool(a.limit, a.ejectionMode)
 	a.availableSlotHistogram = make([]uint64, bucketSize+1)
 	a.interactionCounter = 0
 	a.lastTelemetryDump = 0

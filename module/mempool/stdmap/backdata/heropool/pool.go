@@ -16,7 +16,7 @@ const (
 // number of entries we try to eject before giving up and ejecting LRU
 const maximumRandomTrials = 10
 
-// EIndex is data type representing an entity index in EntityDoubleLinkedList.
+// EIndex is data type representing an entity index in Pool.
 type EIndex uint32
 
 // cachedEntity represents a cached entity that is maintained as a double linked list node.
@@ -27,7 +27,7 @@ type cachedEntity struct {
 	entity flow.Entity
 }
 
-type EntityDoubleLinkedList struct {
+type Pool struct {
 	total        uint32
 	free         *state // keeps track of free slots.
 	used         *state // keeps track of allocated slots to cachedEntities.
@@ -35,8 +35,8 @@ type EntityDoubleLinkedList struct {
 	ejectionMode EjectionMode
 }
 
-func NewEntityList(limit uint32, ejectionMode EjectionMode) *EntityDoubleLinkedList {
-	l := &EntityDoubleLinkedList{
+func NewPool(limit uint32, ejectionMode EjectionMode) *Pool {
+	l := &Pool{
 		free:         newState(),
 		used:         newState(),
 		values:       make([]cachedEntity, limit),
@@ -50,7 +50,7 @@ func NewEntityList(limit uint32, ejectionMode EjectionMode) *EntityDoubleLinkedL
 
 // initFreeEntities initializes the free double linked-list with all slice indices in the range of
 // [0, limit). In other words, all slice indices in cachedEntity are marked as free indices.
-func (e *EntityDoubleLinkedList) initFreeEntities(limit uint32) {
+func (e *Pool) initFreeEntities(limit uint32) {
 	e.free.head.setPoolIndex(0)
 	e.free.tail.setPoolIndex(0)
 
@@ -64,7 +64,7 @@ func (e *EntityDoubleLinkedList) initFreeEntities(limit uint32) {
 
 // Add writes given entity into a cachedEntity on the underlying entities linked-list. Return value is
 // the index at which given entity is written on entities linked-list so that it can be accessed directly later.
-func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) EIndex {
+func (e *Pool) Add(entityId flow.Identifier, entity flow.Entity, owner uint64) EIndex {
 	entityIndex := e.sliceIndexForEntity()
 	e.values[entityIndex].entity = entity
 	e.values[entityIndex].id = entityId
@@ -91,12 +91,12 @@ func (e *EntityDoubleLinkedList) Add(entityId flow.Identifier, entity flow.Entit
 }
 
 // Get returns entity corresponding to the entity index from the underlying list.
-func (e EntityDoubleLinkedList) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
+func (e Pool) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
 	return e.values[entityIndex].id, e.values[entityIndex].entity, e.values[entityIndex].owner
 }
 
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
-func (e *EntityDoubleLinkedList) sliceIndexForEntity() EIndex {
+func (e *Pool) sliceIndexForEntity() EIndex {
 	if e.free.head.isUndefined() {
 		// free list is empty, hence, we are out of space, we
 		// need to eject.
@@ -116,12 +116,12 @@ func (e *EntityDoubleLinkedList) sliceIndexForEntity() EIndex {
 }
 
 // Size returns total number of entities that this list maintains.
-func (e EntityDoubleLinkedList) Size() uint32 {
+func (e Pool) Size() uint32 {
 	return e.total
 }
 
 // getHeads returns entities corresponding to the used and free heads.
-func (e EntityDoubleLinkedList) getHeads() (*cachedEntity, *cachedEntity) {
+func (e Pool) getHeads() (*cachedEntity, *cachedEntity) {
 	var usedHead, freeHead *cachedEntity
 	if !e.used.head.isUndefined() {
 		usedHead = &e.values[e.used.head.sliceIndex()]
@@ -135,7 +135,7 @@ func (e EntityDoubleLinkedList) getHeads() (*cachedEntity, *cachedEntity) {
 }
 
 // getTails returns entities corresponding to the used and free tails.
-func (e EntityDoubleLinkedList) getTails() (*cachedEntity, *cachedEntity) {
+func (e Pool) getTails() (*cachedEntity, *cachedEntity) {
 	var usedTail, freeTail *cachedEntity
 	if !e.used.tail.isUndefined() {
 		usedTail = &e.values[e.used.tail.sliceIndex()]
@@ -149,7 +149,7 @@ func (e EntityDoubleLinkedList) getTails() (*cachedEntity, *cachedEntity) {
 }
 
 // link connects the prev and next nodes as the adjacent nodes in the double-linked list.
-func (e *EntityDoubleLinkedList) link(prev poolIndex, next EIndex) {
+func (e *Pool) link(prev poolIndex, next EIndex) {
 	e.values[prev.sliceIndex()].node.next.setPoolIndex(next)
 	e.values[next].node.prev = prev
 }
@@ -157,7 +157,7 @@ func (e *EntityDoubleLinkedList) link(prev poolIndex, next EIndex) {
 // invalidateUsedHead moves current used head forward by one node. It
 // also removes the entity invalidated head is presenting, and appends the
 // node representing by used head to the tail of free list.
-func (e *EntityDoubleLinkedList) invalidateUsedHead() EIndex {
+func (e *Pool) invalidateUsedHead() EIndex {
 	headSliceIndex := e.used.head.sliceIndex()
 	e.invalidateEntityAtIndex(headSliceIndex)
 
@@ -166,7 +166,7 @@ func (e *EntityDoubleLinkedList) invalidateUsedHead() EIndex {
 
 // invalidateRandomEntity invalidates a random node from used linked list, and appends
 // it to the tail of free list. It also removes the entity that invalidated node is presenting,
-func (e *EntityDoubleLinkedList) invalidateRandomEntity() EIndex {
+func (e *Pool) invalidateRandomEntity() EIndex {
 	// inorder not to keep failing on finding a random valid node to invalidate,
 	// we only try a limited number of times, and if we fail all, we invalidate the used head.
 	var index = e.used.head.sliceIndex()
@@ -186,7 +186,7 @@ func (e *EntityDoubleLinkedList) invalidateRandomEntity() EIndex {
 
 // claimFreeHead moves the free head forward, and returns the slice index of the
 // old free head to host a new entity.
-func (e *EntityDoubleLinkedList) claimFreeHead() EIndex {
+func (e *Pool) claimFreeHead() EIndex {
 	oldFreeHeadIndex := e.free.head.sliceIndex()
 	// moves head forward
 	e.free.head = e.values[oldFreeHeadIndex].node.next
@@ -212,14 +212,14 @@ func (e *EntityDoubleLinkedList) claimFreeHead() EIndex {
 }
 
 // Rem removes entity corresponding to given sliceIndex from the list.
-func (e *EntityDoubleLinkedList) Rem(sliceIndex EIndex) {
+func (e *Pool) Rem(sliceIndex EIndex) {
 	e.invalidateEntityAtIndex(sliceIndex)
 }
 
 // invalidateRandomEntity invalidates the given sliceIndex in the linked list by
 // removing its corresponding linked-list node from used linked list, and appending
 // it to the tail of free list. It also removes the entity that invalidated node is presenting,
-func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex EIndex) {
+func (e *Pool) invalidateEntityAtIndex(sliceIndex EIndex) {
 	prev := e.values[sliceIndex].node.prev
 	next := e.values[sliceIndex].node.next
 
@@ -269,7 +269,7 @@ func (e *EntityDoubleLinkedList) invalidateEntityAtIndex(sliceIndex EIndex) {
 }
 
 // appendToFreeList appends linked-list node represented by sliceIndex to tail of free list.
-func (e *EntityDoubleLinkedList) appendToFreeList(sliceIndex EIndex) {
+func (e *Pool) appendToFreeList(sliceIndex EIndex) {
 	if e.free.head.isUndefined() {
 		// free list is empty
 		e.free.head.setPoolIndex(sliceIndex)
@@ -284,7 +284,7 @@ func (e *EntityDoubleLinkedList) appendToFreeList(sliceIndex EIndex) {
 
 // isInvalidate returns true if linked-list node represented by sliceIndex does not contain
 // a valid entity.
-func (e EntityDoubleLinkedList) isInvalidated(sliceIndex EIndex) bool {
+func (e Pool) isInvalidated(sliceIndex EIndex) bool {
 	if e.values[sliceIndex].id != flow.ZeroID {
 		return false
 	}
