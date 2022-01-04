@@ -62,7 +62,11 @@ func NewClusterSwitchoverTestCase(t *testing.T, conf ClusterSwitchoverTestConf) 
 	encodable := root.Encodable()
 	setup := encodable.LatestResult.ServiceEvents[0].Event.(*flow.EpochSetup)
 	setup.Assignments = unittest.ClusterAssignment(tc.conf.clusters, tc.identities)
-	encodable.LatestSeal.ResultID = encodable.LatestResult.ID()
+	seal := encodable.LatestSeal
+	seal.ResultID = encodable.LatestResult.ID()
+	encodable.LatestSeal = seal
+	encodable.SealingSegment.FirstSeal = seal
+	encodable.SealingSegment.LatestSeals[root.Encodable().Head.ID()] = seal.ID()
 	tc.root = root
 
 	// create a mock node for each collector identity

@@ -71,7 +71,6 @@ type GenericNode struct {
 	PublicDB       *badger.DB
 	SecretsDB      *badger.DB
 	Headers        storage.Headers
-	Identities     storage.Identities
 	Guarantees     storage.Guarantees
 	Seals          storage.Seals
 	Payloads       storage.Payloads
