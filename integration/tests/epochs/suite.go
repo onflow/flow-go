@@ -74,8 +74,8 @@ func (s *Suite) SetupTest() {
 	confs := []testnet.NodeConfig{
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
 		testnet.NewNodeConfig(flow.RoleCollection, collectionConfigs...),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
-		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel)),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel), testnet.WithAdditionalFlag("--extensive-logging=true")),
+		testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.DebugLevel)),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleConsensus, consensusConfigs...),
 		testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel)),
@@ -533,12 +533,24 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 
 	nodeConfig := testnet.NewNodeConfig(role, containerConfigs...)
 	testContainerConfig := testnet.NewContainerConfig(info.ContainerName, nodeConfig, info.NetworkingKey, info.StakingKey)
+
 	err := testContainerConfig.WriteKeyFiles(s.net.BootstrapDir, flow.Localnet, info.MachineAccountAddress, encodable.MachineAccountPrivKey{PrivateKey: info.MachineAccountKey}, role)
 	require.NoError(s.T(), err)
 
 	//add our container to the network
 	err = s.net.AddNode(s.T(), s.net.BootstrapDir, testContainerConfig)
 	require.NoError(s.T(), err, "failed to add container to network")
+
+	// if node is of LN/SN role type add additional flags to node container for secure GRPC connection
+	if role == flow.RoleConsensus || role == flow.RoleCollection {
+		// ghost containers don't participate in the network skip any SN/LN ghost containers
+		if !testContainerConfig.Ghost {
+			nodeContainer := s.net.ContainerByID(testContainerConfig.NodeID)
+			nodeContainer.AddFlag("insecure-access-api", "false")
+			nodeContainer.AddFlag("access-node-ids", "*")
+		}
+	}
+
 	return s.net.ContainerByID(info.NodeID)
 }
 
