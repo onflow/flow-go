@@ -133,7 +133,7 @@ func NewBlobService(
 		}).
 		Build()
 
-	bs.Component = cm.Component()
+	bs.Component = cm
 
 	return bs
 }

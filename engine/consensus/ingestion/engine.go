@@ -97,7 +97,7 @@ func New(
 		})
 	}
 
-	e.Component = componentManagerBuilder.Build().Component()
+	e.Component = componentManagerBuilder.Build()
 
 	// register the engine with the network layer and store the conduit
 	con, err := net.Register(engine.ReceiveGuarantees, e)

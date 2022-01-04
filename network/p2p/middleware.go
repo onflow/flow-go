@@ -80,7 +80,6 @@ type Middleware struct {
 	unicastMessageTimeout      time.Duration
 	idTranslator               IDTranslator
 	previousProtocolStatePeers []peer.AddrInfo
-	cm                         component.ComponentManager
 	component.Component
 }
 
@@ -146,7 +145,7 @@ func NewMiddleware(
 		opt(mw)
 	}
 
-	mw.cm = component.NewComponentManagerBuilder().
+	cm := component.NewComponentManagerBuilder().
 		AddWorker(func(ctx irrecoverable.SignalerContext, ready component.ReadyFunc) {
 			// TODO: refactor to avoid storing ctx altogether
 			mw.ctx = ctx
@@ -161,7 +160,7 @@ func NewMiddleware(
 			mw.stop()
 		}).Build()
 
-	mw.Component = mw.cm.Component()
+	mw.Component = cm
 
 	return mw
 }

@@ -2,18 +2,17 @@ package p2p
 
 import (
 	"context"
-	"strings"
 	"testing"
 	"time"
 
 	golog "github.com/ipfs/go-log"
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/peer"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/onflow/flow-go/model/flow"
 	flownet "github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -49,7 +48,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 	// wait for clients to connect to DHT servers and update their routing tables
 	require.Eventually(t, func() bool {
 		for i, clientNode := range dhtClientNodes {
-			if clientNode.dht.RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
+			if clientNode.routing.(*dht.IpfsDHT).RoutingTable().Find(getDhtServerAddr(uint(i%2)).ID) == "" {
 				return false
 			}
 		}
@@ -62,7 +61,7 @@ func TestFindPeerWithDHT(t *testing.T) {
 
 	// wait for the first server to connect to the second and update its routing table
 	require.Eventually(t, func() bool {
-		return dhtServerNodes[0].dht.RoutingTable().Find(getDhtServerAddr(1).ID) != ""
+		return dhtServerNodes[0].routing.(*dht.IpfsDHT).RoutingTable().Find(getDhtServerAddr(1).ID) != ""
 	}, time.Second*5, ticksForAssertEventually, "dht servers failed to connect")
 
 	// check that all even numbered clients can create streams with all odd numbered clients
@@ -132,16 +131,15 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 	// Step 3: Subscribe to the test topic
 	// A node will receive its own message (https://github.com/libp2p/go-libp2p-pubsub/issues/65)
 	// hence expect count and not count - 1 messages to be received (one by each node, including the sender)
-	ch := make(chan flow.Identifier, count)
+	ch := make(chan peer.ID, count)
 	for _, n := range nodes {
-		m := n.id
 		// defines a func to read from the subscription
 		subReader := func(s *pubsub.Subscription) {
 			msg, err := s.Next(ctx)
 			require.NoError(t, err)
 			require.NotNil(t, msg)
 			assert.Equal(t, []byte("hello"), msg.Data)
-			ch <- m
+			ch <- n.host.ID()
 		}
 
 		// Subscribes to the test topic
@@ -172,19 +170,19 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	// Step 5: By now, all peers would have been discovered and the message should have been successfully published
 	// A hash set to keep track of the nodes who received the message
-	recv := make(map[flow.Identifier]bool, count)
+	recv := make(map[peer.ID]bool, count)
 	for i := 0; i < count; i++ {
 		select {
 		case res := <-ch:
 			recv[res] = true
 		case <-time.After(3 * time.Second):
-			var missing flow.IdentifierList
+			var missing peer.IDSlice
 			for _, n := range nodes {
-				if _, found := recv[n.id]; !found {
-					missing = append(missing, n.id)
+				if _, found := recv[n.host.ID()]; !found {
+					missing = append(missing, n.host.ID())
 				}
 			}
-			assert.Fail(t, " messages not received by nodes: "+strings.Join(missing.Strings(), ","))
+			assert.Fail(t, "messages not received by some nodes", "%v", missing)
 			break
 		}
 	}
