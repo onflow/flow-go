@@ -172,7 +172,11 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	// wait for 5 views after the start of the next epoch before we pause our container to replace
 	s.BlockState.WaitForSealedView(s.T(), currentEpochFinalView+5)
+
+	//make sure container to replace removed from smart contract state
 	s.assertNodeNotApprovedOrProposed(ctx, env, containerToReplace.Config.NodeID)
+
+	// assert epoch transition happens, if not epoch emergency fallback was triggered and we can fail early
 	s.assertEpochCounter(ctx, 1)
 
 	err = containerToReplace.Pause()
