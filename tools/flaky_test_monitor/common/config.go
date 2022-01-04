@@ -44,13 +44,14 @@ func ReadProperties(directory string) Config {
 			continue
 		}
 
-		// check that line has "="
-		equalIndex := strings.Index(line, "=")
-		if equalIndex > 0 {
-			key := strings.TrimSpace(line[:equalIndex])
-			value := strings.TrimSpace(line[equalIndex+1:])
-			properties[key] = value
+		// if line is empty or doesn't follow the `property=value` format, skip it
+		property := strings.Split(line, "=")
+		if len(property) != 2 {
+			continue
 		}
+
+		// add property and trim any whitespace from property name and value
+		properties[strings.TrimSpace(property[0])] = strings.TrimSpace(property[1])
 	}
 
 	// create struct with all properties set for easy retrieval
