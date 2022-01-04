@@ -128,6 +128,7 @@ func ReadShortData(input []byte) (data []byte, rest []byte, err error) {
 		return nil, rest, err
 	}
 	data = rest[:size]
+	rest = rest[size:]
 	return
 }
 
