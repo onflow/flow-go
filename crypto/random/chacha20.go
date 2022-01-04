@@ -10,12 +10,12 @@ import (
 // We use Chacha20, to build a cryptographically secure random number generator
 // that uses the ChaCha algorithm.
 //
-// ChaCha is a stream cipher designed by Daniel J. Bernstein[^1], that we use as an PRG. It is
+// ChaCha is a stream cipher designed by Daniel J. Bernstein[^1], that we use as a PRG. It is
 // an improved variant of the Salsa20 cipher family.
 //
 // We use Chacha20 with a 256-bit key, a 192-bit stream identifier and a 32-bit counter as
 // as specified in RFC 8439 [^2].
-// The encryption key is used as the PRG seed while the stream identifer is used as a nonce
+// The encryption key is used as the PRG seed while the stream identifier is used as a nonce
 // to customize the PRG. The PRG outputs are the successive encryptions of a constant message.
 //
 // A 32-bit counter over 64-byte blocks allows 256 GiB of output before cycling,
@@ -68,7 +68,7 @@ const (
 // the input seed (32 bytes) and a customizer (up to 12 bytes).
 //
 // It is recommended to sample the seed uniformly at random.
-// The function errors if the the seed is different than 32 bytes,
+// The function errors if the seed is different than 32 bytes,
 // or if the customizer is larger than 12 bytes.
 // Shorter customizers than 12 bytes are padded by zero bytes.
 func NewChacha20PRG(seed []byte, customizer []byte) (*chachaPRG, error) {
@@ -147,7 +147,7 @@ func (c *chachaPRG) Store() []byte {
 // RestoreChacha20PRG creates a chacha20 base PRG based on a previously stored state.
 // The created PRG is restored at the same state where the previous PRG was stored.
 func RestoreChacha20PRG(stateBytes []byte) (*chachaPRG, error) {
-	// inpout should be seed (32 bytes) || streamID (12 bytes) || bytesCounter (8 bytes)
+	// input should be seed (32 bytes) || streamID (12 bytes) || bytesCounter (8 bytes)
 	const expectedLen = keySize + nonceSize + 8
 
 	// check input length

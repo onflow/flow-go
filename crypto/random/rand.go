@@ -91,7 +91,6 @@ func (p *genericPRG) UintN(n uint64) uint64 {
 	// For a better uniformity of the result, loop till a sample is less than `n`.
 	// This means the function might take longer time to output a random.
 	// Using the size of `n` in bits helps the loop end earlier.
-
 	// (a different approach would be to pull at least 128 bits from the random source
 	// and use big number modular reduction)
 	random := n
