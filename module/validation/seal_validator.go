@@ -6,6 +6,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/state/fork"
@@ -43,7 +44,6 @@ func NewSealValidator(
 	results storage.ExecutionResults,
 	seals storage.Seals,
 	assigner module.ChunkAssigner,
-	signatureTag string,
 	requiredApprovalsForSealConstruction uint,
 	requiredApprovalsForSealVerification uint,
 	metrics module.ConsensusMetrics,
@@ -56,7 +56,7 @@ func NewSealValidator(
 	return &sealValidator{
 		state:                                state,
 		assigner:                             assigner,
-		signatureHasher:                      crypto.NewBLSKMAC(signatureTag),
+		signatureHasher:                      crypto.NewBLSKMAC(encoding.ResultApprovalTag),
 		headers:                              headers,
 		results:                              results,
 		seals:                                seals,
