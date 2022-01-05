@@ -103,8 +103,7 @@ func (e Pool) Get(entityIndex EIndex) (flow.Identifier, flow.Entity, uint64) {
 // sliceIndexForEntity returns a slice index which hosts the next entity to be added to the list.
 func (e *Pool) sliceIndexForEntity() EIndex {
 	if e.free.head.isUndefined() {
-		// free list is empty, hence, we are out of space, we
-		// need to eject.
+		// the free list is empty, so we are out of space, and we need to eject.
 		if e.ejectionMode == RandomEjection {
 			// turning a random entity into a free head.
 			e.invalidateRandomEntity()
