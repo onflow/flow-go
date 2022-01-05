@@ -219,9 +219,9 @@ func (e *Pool) Rem(sliceIndex EIndex) {
 	e.invalidateEntityAtIndex(sliceIndex)
 }
 
-// invalidateRandomEntity invalidates the given sliceIndex in the linked list by
-// removing its corresponding linked-list node from used linked list, and appending
-// it to the tail of free list. It also removes the entity that invalidated node is presenting,
+// invalidateEntityAtIndex invalidates the given sliceIndex in the linked list by
+// removing its corresponding linked-list node from the used linked list, and appending
+// it to the tail of the free list. It also removes the entity that the invalidated node is presenting.
 func (e *Pool) invalidateEntityAtIndex(sliceIndex EIndex) {
 	prev := e.values[sliceIndex].node.prev
 	next := e.values[sliceIndex].node.next
