@@ -206,8 +206,7 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Index,
 				node.Storage.Results,
-				node.Storage.Seals,
-				encoding.ExecutionReceiptTag)
+				node.Storage.Seals)
 
 			sealValidator, err := validation.NewSealValidator(
 				node.State,

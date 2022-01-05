@@ -7,6 +7,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/fvm/crypto"
+	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/state/fork"
 	"github.com/onflow/flow-go/state/protocol"
@@ -29,14 +30,13 @@ func NewReceiptValidator(state protocol.State,
 	index storage.Index,
 	results storage.ExecutionResults,
 	seals storage.Seals,
-	signatureTag string,
 ) *receiptValidator {
 	rv := &receiptValidator{
 		state:           state,
 		headers:         headers,
 		index:           index,
 		results:         results,
-		signatureHasher: crypto.NewBLSKMAC(signatureTag),
+		signatureHasher: crypto.NewBLSKMAC(encoding.ExecutionReceiptTag),
 		seals:           seals,
 	}
 

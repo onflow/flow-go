@@ -22,7 +22,6 @@ type ReceiptValidationSuite struct {
 	unittest.BaseChainSuite
 
 	receiptValidator module.ReceiptValidator
-	sigTag           string
 	publicKey        *fmock.PublicKey
 }
 
@@ -30,8 +29,7 @@ func (s *ReceiptValidationSuite) SetupTest() {
 	s.SetupChain()
 	s.publicKey = &fmock.PublicKey{}
 	s.Identities[s.ExeID].StakingPubKey = s.publicKey
-	s.sigTag = "test_tag"
-	s.receiptValidator = NewReceiptValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB, s.sigTag)
+	s.receiptValidator = NewReceiptValidator(s.State, s.HeadersDB, s.IndexDB, s.ResultsDB, s.SealsDB)
 }
 
 // TestReceiptValid try submitting valid receipt
