@@ -887,7 +887,7 @@ func VoteWithDoubleSig() func(*model.Vote) {
 	}
 }
 
-// Test that a constructed QC can be unpacked and from which the random source can be
+// TestReadRandomSourceFromPackedQCV2 tests that a constructed QC can be unpacked and from which the random source can be
 // retrieved
 func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
 
