@@ -109,8 +109,7 @@ func (e *Pool) sliceIndexForEntity() EIndex {
 			e.invalidateRandomEntity()
 		} else {
 			// LRU ejection
-			// used head is the oldest entity, hence,
-			// turning the used head to a free head.
+			// the used head is the oldest entity, so we turn the used head to a free head here.
 			e.invalidateUsedHead()
 		}
 	}
