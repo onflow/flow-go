@@ -11,7 +11,6 @@ import (
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine"
-	"github.com/onflow/flow-go/module"
 )
 
 // SignatureAggregatorSameMessage aggregates BLS signatures of the same message from different signers.
@@ -323,73 +322,4 @@ func (p *PublicKeyAggregator) deltaKeys(signers []int) (
 		}
 	}
 	return newSignerKeys, missingSignerKeys, signersMap
-}
-
-//------------------------------------------
-
-// TODO : to delete in V2
-// AggregationVerifier is an aggregating verifier that can verify signatures and
-// verify aggregated signatures of the same message.
-// *Important: the aggregation verifier can only verify signatures in the context
-// of the provided KMAC tag.
-type AggregationVerifier struct {
-	hasher hash.Hasher
-}
-
-// TODO : to delete in V2
-// NewAggregationVerifier creates a new aggregation verifier, which can only
-// verify signatures. *Important*: the aggregation verifier can only verify
-// signatures in the context of the provided KMAC tag.
-func NewAggregationVerifier(tag string) *AggregationVerifier {
-	av := &AggregationVerifier{
-		hasher: crypto.NewBLSKMAC(tag),
-	}
-	return av
-}
-
-// TODO : to delete in V2
-// Verify will verify the given signature against the given message and public key.
-func (av *AggregationVerifier) Verify(msg []byte, sig crypto.Signature, key crypto.PublicKey) (bool, error) {
-	return key.Verify(sig, msg, av.hasher)
-}
-
-// TODO : to delete in V2
-// AggregationProvider is an aggregating signer and verifier that can create/verify
-// signatures, as well as aggregating & verifying aggregated signatures.
-// *Important*: the aggregation verifier can only verify signatures in the context
-// of the provided KMAC tag.
-type AggregationProvider struct {
-	*AggregationVerifier
-	local module.Local
-}
-
-// TODO : to delete in V2
-// NewAggregationProvider creates a new aggregation provider using the given private
-// key to generate signatures. *Important*: the aggregation provider can only
-// create and verify signatures in the context of the provided HMAC tag.
-func NewAggregationProvider(tag string, local module.Local) *AggregationProvider {
-	ap := &AggregationProvider{
-		AggregationVerifier: NewAggregationVerifier(tag),
-		local:               local,
-	}
-	return ap
-}
-
-// TODO : to delete in V2
-// Sign will sign the given message bytes with the internal private key and
-// return the signature on success.
-func (ap *AggregationProvider) Sign(msg []byte) (crypto.Signature, error) {
-	return ap.local.Sign(msg, ap.hasher)
-}
-
-// TODO : to delete in V2
-// Aggregate will aggregate the given signatures into one aggregated signature.
-func (ap *AggregationProvider) Aggregate(sigs []crypto.Signature) (crypto.Signature, error) {
-
-	// BLS aggregation
-	sig, err := crypto.AggregateBLSSignatures(sigs)
-	if err != nil {
-		return nil, fmt.Errorf("could not aggregate BLS signatures: %w", err)
-	}
-	return sig, nil
 }

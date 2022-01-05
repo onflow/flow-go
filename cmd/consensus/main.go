@@ -40,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -54,7 +53,6 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
@@ -207,10 +205,7 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Index,
 				node.Storage.Results,
-				node.Storage.Seals,
-				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
-
-			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+				node.Storage.Seals)
 
 			sealValidator, err := validation.NewSealValidator(
 				node.State,
@@ -219,7 +214,6 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Seals,
 				chunkAssigner,
-				resultApprovalSigVerifier,
 				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				conMetrics)
@@ -407,7 +401,6 @@ func main() {
 		}).
 		Component("sealing engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
 
 			config := sealing.DefaultConfig()
@@ -430,7 +423,6 @@ func main() {
 				node.State,
 				node.Storage.Seals,
 				chunkAssigner,
-				resultApprovalSigVerifier,
 				seals,
 				config,
 			)
