@@ -40,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -424,7 +423,6 @@ func main() {
 				node.State,
 				node.Storage.Seals,
 				chunkAssigner,
-				encoding.ResultApprovalTag,
 				seals,
 				config,
 			)

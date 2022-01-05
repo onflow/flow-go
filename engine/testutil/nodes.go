@@ -48,7 +48,6 @@ import (
 	completeLedger "github.com/onflow/flow-go/ledger/complete"
 	"github.com/onflow/flow-go/ledger/complete/wal"
 	"github.com/onflow/flow-go/model/bootstrap"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -370,8 +369,7 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 	assigner, err := chunks.NewChunkAssigner(chunks.DefaultChunkAssignmentAlpha, node.State)
 	require.Nil(t, err)
 
-	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals,
-		encoding.ExecutionReceiptTag)
+	receiptValidator := validation.NewReceiptValidator(node.State, node.Headers, node.Index, resultsDB, node.Seals)
 
 	sealingConfig := sealing.DefaultConfig()
 
@@ -391,7 +389,6 @@ func ConsensusNode(t *testing.T, hub *stub.Hub, identity *flow.Identity, identit
 		node.State,
 		node.Seals,
 		assigner,
-		encoding.ResultApprovalTag,
 		seals,
 		sealingConfig)
 	require.NoError(t, err)
