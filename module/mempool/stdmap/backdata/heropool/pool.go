@@ -29,16 +29,22 @@ type cachedEntity struct {
 
 type Pool struct {
 	size         uint32
-	free         *state // keeps track of free slots.
-	used         *state // keeps track of allocated slots to cachedEntities.
+	free         state // keeps track of free slots.
+	used         state // keeps track of allocated slots to cachedEntities.
 	values       []cachedEntity
 	ejectionMode EjectionMode
 }
 
 func NewPool(limit uint32, ejectionMode EjectionMode) *Pool {
 	l := &Pool{
-		free:         newState(),
-		used:         newState(),
+		free: state{
+			head: poolIndex{index: 0},
+			tail: poolIndex{index: 0},
+		},
+		used: state{
+			head: poolIndex{index: 0},
+			tail: poolIndex{index: 0},
+		},
 		values:       make([]cachedEntity, limit),
 		ejectionMode: ejectionMode,
 	}

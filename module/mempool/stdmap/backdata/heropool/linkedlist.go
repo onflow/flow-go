@@ -12,10 +12,3 @@ type state struct {
 	head poolIndex
 	tail poolIndex
 }
-
-func newState() *state {
-	return &state{
-		head: poolIndex{index: 0},
-		tail: poolIndex{index: 0},
-	}
-}
