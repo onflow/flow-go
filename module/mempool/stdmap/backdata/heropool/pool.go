@@ -285,7 +285,7 @@ func (e *Pool) appendToFreeList(sliceIndex EIndex) {
 	e.free.tail.setPoolIndex(sliceIndex)
 }
 
-// isInvalidate returns true if linked-list node represented by sliceIndex does not contain
+// isInvalidated returns true if linked-list node represented by sliceIndex does not contain
 // a valid entity.
 func (e Pool) isInvalidated(sliceIndex EIndex) bool {
 	if e.values[sliceIndex].id != flow.ZeroID {
