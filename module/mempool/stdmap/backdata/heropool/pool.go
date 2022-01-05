@@ -49,18 +49,17 @@ func NewPool(limit uint32, ejectionMode EjectionMode) *Pool {
 		ejectionMode: ejectionMode,
 	}
 
-	l.initFreeEntities(limit)
+	l.initFreeEntities()
 
 	return l
 }
 
-// initFreeEntities initializes the free double linked-list with all slice indices in the range of
-// [0, limit). In other words, all slice indices in cachedEntity are marked as free indices.
-func (e *Pool) initFreeEntities(limit uint32) {
+// initFreeEntities initializes the free double linked-list with the indices of all cached entity values.
+func (e *Pool) initFreeEntities() {
 	e.free.head.setPoolIndex(0)
 	e.free.tail.setPoolIndex(0)
 
-	for i := uint32(1); i < limit; i++ {
+	for i := 1; i < len(e.values); i++ {
 		// appends slice index i to tail of free linked list
 		e.connect(e.free.tail, EIndex(i))
 		// and updates its tail
