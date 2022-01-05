@@ -63,7 +63,7 @@ func (s *ApprovalProcessingCoreTestSuite) SetupTest() {
 	}
 
 	var err error
-	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigVerifier, s.SealsPL, s.Conduit, options)
+	s.core, err = NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(), s.Headers, s.State, s.sealsDB, s.Assigner, s.SigHasher, s.SealsPL, s.Conduit, options)
 	require.NoError(s.T(), err)
 }
 
@@ -214,7 +214,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessFinalizedBlock_CollectorsCl
 // execution result and after that we discovered execution result. In this scenario we should be able
 // to create a seal right after discovering execution result since all approvals should be cached.(if cache capacity is big enough)
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBeforeResult() {
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	for _, chunk := range s.Chunks {
 		for verID := range s.AuthorizedVerifiers {
@@ -239,7 +239,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsBefor
 //// and after that we started receiving approvals. In this scenario we should be able to create a seal right
 //// after processing last needed approval to meet `RequiredApprovalsForSealConstruction` threshold.
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfterResult() {
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil)
 
 	s.SealsPL.On("Add", mock.Anything).Return(true, nil).Once()
 
@@ -264,7 +264,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalsAfter
 // is correctly handled in case of sentinel error
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ProcessingInvalidApproval() {
 	// fail signature verification for first approval
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, nil).Once()
 
 	// generate approvals for first chunk
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
@@ -286,7 +286,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ProcessingInva
 // is correctly handled in case of exception
 func (s *ApprovalProcessingCoreTestSuite) TestProcessIncorporated_ApprovalVerificationException() {
 	// fail signature verification with exception
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, fmt.Errorf("exception")).Once()
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(false, fmt.Errorf("exception")).Once()
 
 	// generate approvals for first chunk
 	approval := unittest.ResultApprovalFixture(unittest.WithChunk(s.Chunks[0].Index),
@@ -386,7 +386,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestOnBlockFinalized_ProcessingOrphanA
 	require.NoError(s.T(), err)
 
 	// verify will be called twice for every approval in first fork
-	s.SigVerifier.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Times(len(forkResults[0]) * 2)
+	s.PublicKey.On("Verify", mock.Anything, mock.Anything, mock.Anything).Return(true, nil).Times(len(forkResults[0]) * 2)
 
 	// try submitting approvals for each result
 	for _, results := range forkResults {
@@ -707,7 +707,7 @@ func (s *ApprovalProcessingCoreTestSuite) TestRepopulateAssignmentCollectorTree(
 	s.State.On("Final").Return(finalSnapShot)
 
 	core, err := NewCore(unittest.Logger(), s.WorkerPool, tracer, metrics, &tracker.NoopSealingTracker{}, engine.NewUnit(),
-		s.Headers, s.State, s.sealsDB, assigner, s.SigVerifier, s.SealsPL, s.Conduit, s.core.config)
+		s.Headers, s.State, s.sealsDB, assigner, s.SigHasher, s.SealsPL, s.Conduit, s.core.config)
 	require.NoError(s.T(), err)
 
 	err = core.RepopulateAssignmentCollectorTree(payloads)
