@@ -112,20 +112,21 @@ func init() {
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
-	t                          *testing.T
-	suite                      *testingdock.Suite
-	config                     NetworkConfig
-	cli                        *dockerclient.Client
-	network                    *testingdock.Network
-	Containers                 map[string]*Container
-	ConsensusFollowers         map[flow.Identifier]consensus_follower.ConsensusFollower
-	AccessPorts                map[string]string
-	AccessPortsByContainerName map[string]string
-	root                       *flow.Block
-	result                     *flow.ExecutionResult
-	seal                       *flow.Seal
-	BootstrapDir               string
-	BootstrapSnapshot          *inmem.Snapshot
+	t                           *testing.T
+	suite                       *testingdock.Suite
+	config                      NetworkConfig
+	cli                         *dockerclient.Client
+	network                     *testingdock.Network
+	Containers                  map[string]*Container
+	ConsensusFollowers          map[flow.Identifier]consensus_follower.ConsensusFollower
+	AccessPorts                 map[string]string
+	AccessPortsByContainerName  map[string]string
+	MetricsPortsByContainerName map[string]string
+	root                        *flow.Block
+	result                      *flow.ExecutionResult
+	seal                        *flow.Seal
+	BootstrapDir                string
+	BootstrapSnapshot           *inmem.Snapshot
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -257,12 +258,10 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 
 func (net *FlowNetwork) MetricsPorts() string {
 	var builder strings.Builder
-	builder.WriteString("metrics ports:\n")
-	builder.WriteString(fmt.Sprintf("\t%s:%s\n", AccessNodeMetricsPort, net.AccessPorts[AccessNodeMetricsPort]))
-	builder.WriteString(fmt.Sprintf("\t%s:%s\n", VerNodeMetricsPort, net.AccessPorts[VerNodeMetricsPort]))
-	builder.WriteString(fmt.Sprintf("\t%s:%s\n", ConNodeMetricsPort, net.AccessPorts[ConNodeMetricsPort]))
-	builder.WriteString(fmt.Sprintf("\t%s:%s\n", ColNodeMetricsPort, net.AccessPorts[ColNodeMetricsPort]))
-	builder.WriteString(fmt.Sprintf("\t%s:%s\n", ExeNodeMetricsPort, net.AccessPorts[ExeNodeMetricsPort]))
+	builder.WriteString("metrics endpoints by container name:\n")
+	for containerName, metricsPort := range net.MetricsPortsByContainerName {
+		builder.WriteString(fmt.Sprintf("\t%s: 0.0.0.0:%s/metrics\n", containerName, metricsPort))
+	}
 	return builder.String()
 }
 
@@ -510,7 +509,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		Name: networkConf.Name,
 	})
 
-	// create a temporary directory to store all bootstrapping files 
+	// create a temporary directory to store all bootstrapping files
 	bootstrapDir, err := integrationBootstrapDir()
 	require.Nil(t, err)
 
@@ -520,20 +519,21 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
-		t:                          t,
-		cli:                        dockerClient,
-		config:                     networkConf,
-		suite:                      suite,
-		network:                    network,
-		Containers:                 make(map[string]*Container, nNodes),
-		ConsensusFollowers:         make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
-		AccessPorts:                make(map[string]string),
-		AccessPortsByContainerName: make(map[string]string),
-		root:                       root,
-		seal:                       seal,
-		result:                     result,
-		BootstrapDir:               bootstrapDir,
-		BootstrapSnapshot: 			bootstrapSnapshot,
+		t:                           t,
+		cli:                         dockerClient,
+		config:                      networkConf,
+		suite:                       suite,
+		network:                     network,
+		Containers:                  make(map[string]*Container, nNodes),
+		ConsensusFollowers:          make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
+		AccessPorts:                 make(map[string]string),
+		AccessPortsByContainerName:  make(map[string]string),
+		MetricsPortsByContainerName: make(map[string]string),
+		root:                        root,
+		seal:                        seal,
+		result:                      result,
+		BootstrapDir:                bootstrapDir,
+		BootstrapSnapshot:           bootstrapSnapshot,
 	}
 
 	// check that at-least 2 full access nodes must be configure in your test suite
@@ -556,8 +556,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			// ghost containers don't participate in the network skip any SN/LN ghost containers
 			if !nodeConf.Ghost {
 				nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
-				nodeContainer.addFlag("insecure-access-api", "false")
-				nodeContainer.addFlag("access-node-ids", "*")
+				nodeContainer.AddFlag("insecure-access-api", "false")
+				nodeContainer.AddFlag("access-node-ids", "*")
 			}
 		}
 	}
@@ -712,12 +712,12 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
 			nodeContainer.Ports[ColNodeMetricsPort] = hostMetricsPort
 			net.AccessPorts[ColNodeMetricsPort] = hostMetricsPort
-
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 			// set a low timeout so that all nodes agree on the current view more quickly
-			nodeContainer.addFlag("hotstuff-timeout", time.Second.String())
-			nodeContainer.addFlag("hotstuff-min-timeout", time.Second.String())
+			nodeContainer.AddFlag("hotstuff-timeout", time.Second.String())
+			nodeContainer.AddFlag("hotstuff-min-timeout", time.Second.String())
 
-			nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.AddFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.Ports[ColNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 			net.AccessPorts[ColNodeAPIPort] = hostPort
@@ -733,8 +733,9 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			containerMetricsPort := "8080/tcp"
 
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
-			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 
 			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
@@ -753,7 +754,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
 			)
 
-			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
+			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
 
 		case flow.RoleAccess:
 			hostGRPCPort := testingdock.RandomPort(t)
@@ -765,11 +766,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
 			nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
 			nodeContainer.bindPort(hostSecureGRPCPort, containerSecureGRPCPort)
-			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			nodeContainer.addFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
+			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.AddFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
 			// uncomment line below to point the access node exclusively to a single collection node
-			// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
-			nodeContainer.addFlag("collection-ingress-port", "9000")
+			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")
+			nodeContainer.AddFlag("collection-ingress-port", "9000")
 			net.AccessPorts[AccessNodeAPISecurePort] = hostSecureGRPCPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
 			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
@@ -782,7 +783,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				hostExternalNetworkPort := testingdock.RandomPort(t)
 				nodeContainer.bindPort(hostExternalNetworkPort, fmt.Sprintf("%s/tcp", strconv.Itoa(DefaultFlowPort)))
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
-				nodeContainer.addFlag("supports-unstaked-node", "true")
+				nodeContainer.AddFlag("supports-unstaked-node", "true")
 			}
 
 			hostMetricsPort := testingdock.RandomPort(t)
@@ -791,33 +792,36 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
 			nodeContainer.Ports[AccessNodeMetricsPort] = hostMetricsPort
 			net.AccessPorts[AccessNodeMetricsPort] = hostMetricsPort
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
 		case flow.RoleConsensus:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
-			nodeContainer.addFlag("chunk-alpha", "1")
+			nodeContainer.AddFlag("chunk-alpha", "1")
 			hostMetricsPort := testingdock.RandomPort(t)
 			containerMetricsPort := "8080/tcp"
 
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
 			nodeContainer.Ports[ConNodeMetricsPort] = hostMetricsPort
 			net.AccessPorts[ConNodeMetricsPort] = hostMetricsPort
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 		case flow.RoleVerification:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
-			nodeContainer.addFlag("chunk-alpha", "1")
+			nodeContainer.AddFlag("chunk-alpha", "1")
 			hostMetricsPort := testingdock.RandomPort(t)
 			containerMetricsPort := "8080/tcp"
 
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
 			nodeContainer.Ports[VerNodeMetricsPort] = hostMetricsPort
 			net.AccessPorts[VerNodeMetricsPort] = hostMetricsPort
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 		}
 	} else {
 		hostPort := testingdock.RandomPort(t)
 		containerPort := "9000/tcp"
 
-		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+		nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 		nodeContainer.bindPort(hostPort, containerPort)
 		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
 
