@@ -114,8 +114,13 @@ func (p *StakingVoteProcessor) Process(vote *model.Vote) error {
 	}
 	err = p.stakingSigAggtor.Verify(vote.SignerID, vote.SigData)
 	if err != nil {
-		if errors.Is(err, model.ErrInvalidFormat) {
-			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has invalid signature: %w", vote.ID(), vote.View, err)
+		if errors.Is(err, model.ErrInvalidSigner) {
+			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d is not signed by an authorized consensus participant: %w",
+				vote.ID(), vote.View, err)
+		}
+		if errors.Is(err, model.ErrInvalidSignature) {
+			return model.NewInvalidVoteErrorf(vote, "vote %x for view %d has an invalid staking signature: %w",
+				vote.ID(), vote.View, err)
 		}
 		return fmt.Errorf("internal error checking signature validity: %w", err)
 	}

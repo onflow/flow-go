@@ -4,7 +4,6 @@
 package signature
 
 import (
-	"errors"
 	"fmt"
 	"sync"
 
@@ -14,7 +13,7 @@ import (
 )
 
 // SignatureAggregatorSameMessage aggregates BLS signatures of the same message from different signers.
-// The public keys and message are aggreed upon upfront.
+// The public keys and message are agreed upon upfront.
 //
 // Currently, the module does not support signatures with multiplicity higher than 1. Each signer is allowed
 // to sign at most once.
@@ -30,7 +29,11 @@ type SignatureAggregatorSameMessage struct {
 	n                int                // number of participants indexed from 0 to n-1
 	publicKeys       []crypto.PublicKey // keys indexed from 0 to n-1, signer i is assigned to public key i
 	indexToSignature map[int]string     // signatures indexed by the signer index
-	cachedSignature  crypto.Signature   // cached aggregated signature
+
+	// To remove overhead from repeated Aggregate() calls, we cache the aggregation result.
+	// Whenever a new signature is added, we reset `cachedSignature` to nil.
+	cachedSignature     crypto.Signature // cached raw aggregated signature
+	cachedSignerIndices []int            // cached indices of signers that contributed to `cachedSignature`
 }
 
 // NewSignatureAggregatorSameMessage returns a new SignatureAggregatorSameMessage structure.
@@ -80,7 +83,7 @@ func NewSignatureAggregatorSameMessage(
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) Verify(signer int, sig crypto.Signature) (bool, error) {
 	if signer >= s.n || signer < 0 {
-		return false, fmt.Errorf("input index %d is invalid: %w", signer, ErrInvalidSignerIdx)
+		return false, ErrInvalidSignerIdx
 	}
 	return s.publicKeys[signer].Verify(sig, s.message, s.hasher)
 }
@@ -89,23 +92,23 @@ func (s *SignatureAggregatorSameMessage) Verify(signer int, sig crypto.Signature
 // key at the input index. If the verification passes, the signature is added to the internal
 // signature state.
 // The function errors:
-//  - ErrInvalidSignerIdx if the index input is invalid
-//  - DuplicatedSignerError if the signer has been already added
-//  - random error if the execution failed
+//  - ErrInvalidSignerIdx if the signer index is out of bound
+//  - DuplicatedSignerError if a signature from the same signer index has already been added
+//  - generic error for unexpected runtime failures
 // The function does not return an error for any invalid signature.
 // If any error is returned, the returned bool is false.
 // If no error is returned, the bool represents the validity of the signature.
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) VerifyAndAdd(signer int, sig crypto.Signature) (bool, error) {
 	if signer >= s.n || signer < 0 {
-		return false, fmt.Errorf("input index %d is invalid: %w", signer, ErrInvalidSignerIdx)
+		return false, ErrInvalidSignerIdx
 	}
 	_, duplicate := s.indexToSignature[signer]
 	if duplicate {
-		return false, fmt.Errorf("signer %d was already added: %w", signer, ErrDuplicatedSigner)
+		return false, ErrDuplicatedSigner
 	}
 	// signature is new
-	ok, err := s.publicKeys[signer].Verify(sig, s.message, s.hasher)
+	ok, err := s.publicKeys[signer].Verify(sig, s.message, s.hasher) // no errors expected
 	if ok {
 		s.add(signer, sig)
 	}
@@ -124,17 +127,16 @@ func (s *SignatureAggregatorSameMessage) add(signer int, sig crypto.Signature) {
 // outputs valid signatures. This would detect if TrustedAdd has added any invalid
 // signature.
 // The function errors:
-//  - ErrInvalidSignerIdx if the index input is invalid
-//  - DuplicatedSignerError if the signer has been already added
-//  - random error if the execution failed
+//  - ErrInvalidSignerIdx if the signer index is out of bound
+//  - DuplicatedSignerError if a signature from the same signer index has already been added
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) TrustedAdd(signer int, sig crypto.Signature) error {
 	if signer >= s.n || signer < 0 {
-		return fmt.Errorf("input index %d is invalid: %w", signer, ErrInvalidSignerIdx)
+		return ErrInvalidSignerIdx
 	}
 	_, duplicate := s.indexToSignature[signer]
 	if duplicate {
-		return fmt.Errorf("signer %d was already added: %w", signer, ErrDuplicatedSigner)
+		return ErrDuplicatedSigner
 	}
 	// signature is new
 	s.add(signer, sig)
@@ -142,14 +144,12 @@ func (s *SignatureAggregatorSameMessage) TrustedAdd(signer int, sig crypto.Signa
 }
 
 // HasSignature checks if a signer has already provided a valid signature.
-//
 // The function errors:
-//  - ErrInvalidSignerIdx if the index input is invalid
-//  - random error if the execution failed
+//  - ErrInvalidSignerIdx if the signer index is out of bound
 // The function is not thread-safe.
 func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) {
 	if signer >= s.n || signer < 0 {
-		return false, fmt.Errorf("input index %d is invalid: %w", signer, ErrInvalidSignerIdx)
+		return false, ErrInvalidSignerIdx
 	}
 	_, ok := s.indexToSignature[signer]
 	return ok, nil
@@ -158,42 +158,53 @@ func (s *SignatureAggregatorSameMessage) HasSignature(signer int) (bool, error) 
 // Aggregate aggregates the stored BLS signatures and returns the aggregated signature.
 //
 // Aggregate attempts to aggregate the internal signatures and returns the resulting signature.
-// The function performs a final verification and errors if any signature fails the desrialization
+// The function performs a final verification and errors if any signature fails the deserialization
 // or if the aggregated signature is not valid. It also errors if no signatures were added.
-// required for the function safety since "TrustedAdd" allows adding invalid signatures.
-// The function is not thread-safe.
+// Post-check of aggregated signature is required for function safety, as `TrustedAdd` allows
+// adding invalid signatures. The function is not thread-safe.
+// Returns:
+//  - ErrInvalidSignerIdx if no signatures have been added yet
+//  - InvalidSignatureIncludedError if some signature(s), included via TrustedAdd, are invalid
 //
 // TODO : When compacting the list of signers, update the return from []int
 // to a compact bit vector.
 func (s *SignatureAggregatorSameMessage) Aggregate() ([]int, crypto.Signature, error) {
-	sharesNum := len(s.indexToSignature)
-	indices := make([]int, 0, sharesNum)
-	for index := range s.indexToSignature {
-		indices = append(indices, index)
-	}
-
 	// check if signature was already computed
 	if s.cachedSignature != nil {
-		return indices, s.cachedSignature, nil
+		return s.cachedSignerIndices, s.cachedSignature, nil
 	}
 
+	//
+	sharesNum := len(s.indexToSignature)
+	if sharesNum == 0 {
+		return nil, nil, fmt.Errorf("signers list is empty: %w", ErrInvalidSignerIdx)
+	}
+	indices := make([]int, 0, sharesNum)
 	signatures := make([]crypto.Signature, 0, sharesNum)
-	for _, sig := range s.indexToSignature {
+	for i, sig := range s.indexToSignature {
+		indices = append(indices, i)
 		signatures = append(signatures, []byte(sig))
 	}
 
 	aggregatedSignature, err := crypto.AggregateBLSSignatures(signatures)
 	if err != nil {
-		return nil, nil, fmt.Errorf("BLS signature aggregtion failed %w", err)
+		// invalidInputsError for:
+		//  * empty `signatures` slice, i.e. sharesNum == 0, which we exclude by earlier check
+		//  * if some signature(s), included via TrustedAdd, could not be decoded
+		if crypto.IsInvalidInputsError(err) {
+			return nil, nil, NewInvalidSignatureIncludedErrorf("signatures with invalid structure were included via TrustedAdd: %w", err)
+		}
+		return nil, nil, fmt.Errorf("BLS signature aggregtion failed: %w", err)
 	}
-	ok, err := s.VerifyAggregate(indices, aggregatedSignature)
+	ok, err := s.VerifyAggregate(indices, aggregatedSignature) // no errors expected (unless some public BLS keys are invalid)
 	if err != nil {
-		return nil, nil, fmt.Errorf("BLS signature aggregtion failed %w", err)
+		return nil, nil, fmt.Errorf("unexpected error during signature aggregation: %w", err)
 	}
 	if !ok {
-		return nil, nil, errors.New("resulting BLS aggregated signatutre is invalid")
+		return nil, nil, NewInvalidSignatureIncludedErrorf("signatures that do not match their public key were included via TrustedAdd")
 	}
 	s.cachedSignature = aggregatedSignature
+	s.cachedSignerIndices = indices
 	return indices, aggregatedSignature, nil
 }
 
@@ -222,9 +233,13 @@ func (s *SignatureAggregatorSameMessage) VerifyAggregate(signers []int, sig cryp
 	}
 	KeyAggregate, err := crypto.AggregateBLSPublicKeys(keys)
 	if err != nil {
+		// invalidInputsError for:
+		//  * empty `keys` slice, i.e. sharesNum == 0, which we exclude by earlier check
+		//  * some keys are not BLS12 381 keys, which should not happen, as we checked
+		//    each key's signing algorithm in the constructor to be `crypto.BLSBLS12381`
 		return false, fmt.Errorf("aggregating public keys failed: %w", err)
 	}
-	ok, err := KeyAggregate.Verify(sig, s.message, s.hasher)
+	ok, err := KeyAggregate.Verify(sig, s.message, s.hasher) // no errors expected
 	if err != nil {
 		return false, fmt.Errorf("signature verification failed: %w", err)
 	}

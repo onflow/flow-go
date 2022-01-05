@@ -1549,7 +1549,7 @@ func VoteWithStakingSig() func(*hotstuff.Vote) {
 	}
 }
 
-func VoteWithThresholdSig() func(*hotstuff.Vote) {
+func VoteWithBeaconSig() func(*hotstuff.Vote) {
 	return func(vote *hotstuff.Vote) {
 		vote.SigData = append([]byte{byte(hotstuffroot.SigTypeRandomBeacon)}, vote.SigData...)
 	}

@@ -67,7 +67,6 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		// identity with empty key
 		_, err := NewWeightedSignatureAggregator(flow.IdentityList{signer}, []crypto.PublicKey{nil}, msg, tag)
 		assert.Error(t, err)
-		assert.True(t, engine.IsInvalidInputError(err))
 		// wrong key type
 		seed := make([]byte, crypto.KeyGenSeedMinLenECDSAP256)
 		_, err = rand.Read(seed)
@@ -77,18 +76,15 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		pk := sk.PublicKey()
 		_, err = NewWeightedSignatureAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk}, msg, tag)
 		assert.Error(t, err)
-		assert.True(t, engine.IsInvalidInputError(err))
 		// empty signers
 		_, err = NewWeightedSignatureAggregator(flow.IdentityList{}, []crypto.PublicKey{}, msg, tag)
 		assert.Error(t, err)
-		assert.True(t, engine.IsInvalidInputError(err))
 		// mismatching input lengths
 		sk, err = crypto.GeneratePrivateKey(crypto.BLSBLS12381, seed)
 		require.NoError(t, err)
 		pk = sk.PublicKey()
 		_, err = NewWeightedSignatureAggregator(flow.IdentityList{signer}, []crypto.PublicKey{pk, pk}, msg, tag)
 		assert.Error(t, err)
-		assert.True(t, engine.IsInvalidInputError(err))
 	})
 
 	// Happy paths
@@ -151,7 +147,6 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 	})
 
 	duplicate := engine.NewDuplicatedEntryErrorf("some error")
-	invalidSig := model.ErrInvalidFormat
 
 	// Unhappy paths
 	t.Run("invalid signer ID", func(t *testing.T) {
@@ -160,8 +155,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		invalidId := unittest.IdentityFixture().NodeID
 
 		err := aggregator.Verify(invalidId, sigs[0])
-		assert.Error(t, err)
-		assert.True(t, engine.IsInvalidInputError(err))
+		assert.ErrorIs(t, err, model.ErrInvalidSigner)
 
 		weight, err := aggregator.TrustedAdd(invalidId, sigs[0])
 		assert.Equal(t, uint64(0), weight)
@@ -208,8 +202,7 @@ func TestWeightedSignatureAggregator(t *testing.T) {
 		sigs[0][4] ^= 1
 		// test Verify
 		err := aggregator.Verify(ids[0].NodeID, sigs[0])
-		require.Error(t, err)
-		assert.ErrorIs(t, err, invalidSig)
+		assert.ErrorIs(t, err, model.ErrInvalidSignature)
 
 		// add signatures for aggregation including corrupt sigs[0]
 		expectedWeight := uint64(0)

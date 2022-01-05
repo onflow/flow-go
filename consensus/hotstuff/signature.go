@@ -77,12 +77,11 @@ func (t SigType) Valid() bool {
 // The module is aware of weights assigned to each signer, as well as a total weight threshold.
 // Implementation of SignatureAggregator must be concurrent safe.
 type WeightedSignatureAggregator interface {
-	// Verify verifies the signature under the stored public and message.
-	//
-	// The function errors:
-	//  - engine.InvalidInputError if signerID is invalid (not a consensus participant)
+	// Verify verifies the signature under the stored public keys and message.
+	// Error returns:
+	//  - model.ErrInvalidSigner if signerID is invalid (not a consensus participant)
 	//  - model.ErrInvalidSignature if signerID is valid but signature is cryptographically invalid
-	//  - random error if the execution failed
+	//  - generic error in case of unexpected runtime failures
 	Verify(signerID flow.Identifier, sig crypto.Signature) error
 
 	// TrustedAdd adds a signature to the internal set of signatures and adds the signer's
