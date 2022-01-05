@@ -8,7 +8,7 @@ import (
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
-// FromParentSignature reads the raw random seed from a QC sigData.
+// FromParentSignature reads the raw random seed from a main consensus QC sigData.
 // The sigData is an RLP encoded structure that is part of QuorumCertificate.
 // The indices can be used to  generate task-specific seeds from the same signature.
 func FromParentSignature(indices []uint32, sigData []byte) ([]byte, error) {
