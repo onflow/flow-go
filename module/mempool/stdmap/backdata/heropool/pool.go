@@ -167,10 +167,10 @@ func (e *Pool) invalidateUsedHead() EIndex {
 	return headSliceIndex
 }
 
-// invalidateRandomEntity invalidates a random node from used linked list, and appends
-// it to the tail of free list. It also removes the entity that invalidated node is presenting,
+// invalidateRandomEntity invalidates a random node from the used linked list, and appends it to the tail of the free list.
+// It also removes the entity that the invalidated node is presenting.
 func (e *Pool) invalidateRandomEntity() EIndex {
-	// inorder not to keep failing on finding a random valid node to invalidate,
+	// in order not to keep failing on finding a random valid node to invalidate,
 	// we only try a limited number of times, and if we fail all, we invalidate the used head.
 	var index = e.used.head.sliceIndex()
 
@@ -200,9 +200,9 @@ func (e *Pool) claimFreeHead() EIndex {
 		e.values[e.free.head.sliceIndex()].node.prev.setUndefined()
 	}
 
-	// also, we check if old head and tail aligned so to update
+	// also, we check if the old head and tail are aligned and, if so, update the
 	// tail as well. This happens when we claim the only existing
-	// node of free list.
+	// node of the free list.
 	if e.free.tail.sliceIndex() == oldFreeHeadIndex {
 		e.free.tail.setUndefined()
 	}
