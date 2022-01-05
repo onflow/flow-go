@@ -42,7 +42,8 @@ func (p *SigDataPacker) Decode(data []byte) (*SignatureData, error) {
 	return &sigData, err
 }
 
-// UnpackRandomBeaconSig takes sigData previously packed by packer, decodes it and extracts random beacon signature
+// UnpackRandomBeaconSig takes sigData previously packed by packer,
+// decodes it and extracts random beacon signature
 func UnpackRandomBeaconSig(sigData []byte) (crypto.Signature, error) {
 	// decode into typed data
 	packer := SigDataPacker{}
