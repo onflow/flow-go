@@ -158,7 +158,7 @@ func (e *Pool) connect(prev poolIndex, next EIndex) {
 }
 
 // invalidateUsedHead moves current used head forward by one node. It
-// also removes the entity invalidated head is presenting, and appends the
+// also removes the entity the invalidated head is presenting and appends the
 // node representing by used head to the tail of free list.
 func (e *Pool) invalidateUsedHead() EIndex {
 	headSliceIndex := e.used.head.sliceIndex()
