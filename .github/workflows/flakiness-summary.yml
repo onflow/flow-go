@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - master
-      - 'misha/flaky-test-monitor-ci-fix'
 
 env:
   NUM_RUNS: 1
