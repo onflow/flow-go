@@ -554,7 +554,7 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 	return s.net.ContainerByID(info.NodeID)
 }
 
-func (s *Suite) asserQCVotingSuccessful(ctx context.Context, env templates.Environment) {
+func (s *Suite) assertQCVotingSuccessful(ctx context.Context, env templates.Environment) {
 	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetVotingCompletedScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected qc voting to have completed successfully")
@@ -562,7 +562,7 @@ func (s *Suite) asserQCVotingSuccessful(ctx context.Context, env templates.Envir
 	//.ToGoValue().(bool)
 }
 
-func (s *Suite) asserDKGSuccessful(ctx context.Context, env templates.Environment)  {
+func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environment)  {
 	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetDKGCompletedScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected dkg to have completed successfully")

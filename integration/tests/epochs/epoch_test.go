@@ -178,8 +178,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 	//make sure container to replace removed from smart contract state
 	s.assertNodeNotApprovedOrProposed(ctx, env, containerToReplace.Config.NodeID)
 
-	s.asserQCVotingSuccessful(ctx, env)
-	s.asserDKGSuccessful(ctx, env)
+	s.assertDKGSuccessful(ctx, env)
 
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
