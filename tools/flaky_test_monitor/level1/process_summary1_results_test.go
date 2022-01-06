@@ -10,8 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 	"github.com/stretchr/testify/require"
+
+	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 )
 
 // data driven table test
