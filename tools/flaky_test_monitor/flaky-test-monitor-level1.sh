@@ -20,7 +20,9 @@ case $TEST_CATEGORY in
 esac
 
 # save result processing script command for later use
-process_results="go run $(realpath ./level1/process_summary1_results.go) test-results-level1.json"
+export $TEST_RESULT_FILE=test-results-level1.json
+
+process_results="go run $(realpath ./level1/process_summary1_results.go) $TEST_RESULT_FILE"
 
 cd ../..
 
@@ -61,4 +63,4 @@ else
 fi
 
 # upload results to GCS bucket
-gsutil cp test-results.json gs://$GCS_BUCKET/$COMMIT_SHA-$JOB_STARTED-$TEST_CATEGORY.json
+gsutil cp $TEST_RESULT_FILE gs://$GCS_BUCKET/$COMMIT_SHA-$JOB_STARTED-$TEST_CATEGORY.json

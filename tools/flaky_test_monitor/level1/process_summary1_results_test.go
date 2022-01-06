@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"flaky-test-monitor/common"
 	"fmt"
 	"log"
 	"os"
@@ -11,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/onflow/flow-go/tools/flaky-test-monitor/common"
 	"github.com/stretchr/testify/require"
 )
 
