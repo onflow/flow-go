@@ -495,14 +495,14 @@ func TestReadOrder(t *testing.T) {
 	read := &ledger.TrieRead{RootHash: testRoot, Paths: []ledger.Path{p1, p2}}
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
-	require.Equal(t, len(payloads), len(retPayloads))
+	require.Equal(t, len(read.Paths), len(retPayloads))
 	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[0]), encoding.EncodePayload(payloads[0])))
 	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[1]), encoding.EncodePayload(payloads[1])))
 
 	read = &ledger.TrieRead{RootHash: testRoot, Paths: []ledger.Path{p2, p1}}
 	retPayloads, err = forest.Read(read)
 	require.NoError(t, err)
-	require.Equal(t, len(payloads), len(retPayloads))
+	require.Equal(t, len(read.Paths), len(retPayloads))
 	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[1]), encoding.EncodePayload(payloads[0])))
 	require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[0]), encoding.EncodePayload(payloads[1])))
 }
@@ -570,7 +570,7 @@ func TestReadWithDuplicatedKeys(t *testing.T) {
 	read := &ledger.TrieRead{RootHash: updatedRoot, Paths: paths}
 	retPayloads, err := forest.Read(read)
 	require.NoError(t, err)
-	require.Equal(t, len(expectedPayloads), len(retPayloads))
+	require.Equal(t, len(read.Paths), len(retPayloads))
 	for i := range paths {
 		require.True(t, bytes.Equal(encoding.EncodePayload(retPayloads[i]), encoding.EncodePayload(expectedPayloads[i])))
 	}
