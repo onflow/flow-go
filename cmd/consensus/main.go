@@ -606,36 +606,6 @@ func main() {
 
 			return aggregator, nil
 		}).
-		Module("compliance engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
-			// initialize the pending blocks cache
-			proposals := buffer.NewPendingBlocks()
-
-			core, err := compliance.NewCore(node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Metrics.Mempool,
-				node.Metrics.Compliance,
-				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
-				mutableState,
-				proposals,
-				syncCore,
-				hotstuffModules.Aggregator)
-			if err != nil {
-				return fmt.Errorf("could not initialize compliance core: %w", err)
-			}
-
-			// initialize the compliance engine
-			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
-			if err != nil {
-				return fmt.Errorf("could not initialize compliance engine: %w", err)
-			}
-			return nil
-		}).
 		Component("hotstuff participant", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
 			var build module.Builder
@@ -679,6 +649,34 @@ func main() {
 			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, err
+			}
+
+			// initialize the entity database accessors
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+
+			// initialize the pending blocks cache
+			proposals := buffer.NewPendingBlocks()
+
+			complianceCore, err := compliance.NewCore(node.Logger,
+				node.Metrics.Engine,
+				node.Tracer,
+				node.Metrics.Mempool,
+				node.Metrics.Compliance,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				mutableState,
+				proposals,
+				syncCore,
+				hotstuffModules.Aggregator)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, complianceCore)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
 			// initialize hotstuff consensus algorithm
