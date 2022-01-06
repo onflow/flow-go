@@ -743,9 +743,3 @@ func blockResponse(blk *flow.Block, execResult *flow.ExecutionResult, link LinkG
 	// ship it
 	return response, nil
 }
-
-func networkStatusResponse(params access.NetworkParameters) generated.Status {
-	return generated.Status{
-		ChainID: params.ChainID.String(),
-	}
-}
