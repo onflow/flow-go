@@ -9,4 +9,5 @@
 package generated
 
 type Links struct {
+	Self string `json:"_self,omitempty"`
 }
