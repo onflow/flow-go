@@ -5,8 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"flow-go/tools/flaky-test-monitor/common"
-
+	"github.com/onflow/flow-go/tools/flaky_test_monitor/common"
 	"github.com/stretchr/testify/require"
 )
 
