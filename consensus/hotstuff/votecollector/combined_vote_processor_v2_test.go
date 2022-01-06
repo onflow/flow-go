@@ -18,6 +18,7 @@ import (
 	"github.com/onflow/flow-go/consensus/hotstuff/helper"
 	mockhotstuff "github.com/onflow/flow-go/consensus/hotstuff/mocks"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
+	"github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hsig "github.com/onflow/flow-go/consensus/hotstuff/signature"
 	hotstuffvalidator "github.com/onflow/flow-go/consensus/hotstuff/validator"
 	"github.com/onflow/flow-go/consensus/hotstuff/verification"
@@ -27,6 +28,7 @@ import (
 	"github.com/onflow/flow-go/module/local"
 	modulemock "github.com/onflow/flow-go/module/mock"
 	"github.com/onflow/flow-go/state/protocol/inmem"
+	"github.com/onflow/flow-go/state/protocol/seed"
 	storagemock "github.com/onflow/flow-go/storage/mock"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -902,4 +904,41 @@ func VoteWithDoubleSig() func(*model.Vote) {
 	return func(vote *model.Vote) {
 		vote.SigData = unittest.RandomBytes(96)
 	}
+}
+
+// TestReadRandomSourceFromPackedQCV2 tests that a constructed QC can be unpacked and from which the random source can be
+// retrieved
+func TestReadRandomSourceFromPackedQCV2(t *testing.T) {
+
+	// for V2 there is no aggregated random beacon sig or random beacon signers
+	allSigners := unittest.IdentityListFixture(5)
+	// staking signers are only subset of all signers
+	stakingSigners := allSigners.NodeIDs()[:3]
+
+	aggregatedStakingSig := unittest.SignatureFixture()
+	reconstructedBeaconSig := unittest.SignatureFixture()
+
+	blockSigData := buildBlockSignatureDataForV2(stakingSigners, aggregatedStakingSig, reconstructedBeaconSig)
+
+	// making a mock block
+	header := unittest.BlockHeaderFixture()
+	block := model.BlockFromFlow(&header, header.View-1)
+
+	// create a packer
+	committee := &mockhotstuff.Committee{}
+	committee.On("Identities", block.BlockID, mock.Anything).Return(allSigners, nil)
+	packer := signature.NewConsensusSigDataPacker(committee)
+
+	qc, err := buildQCWithPackerAndSigData(packer, block, blockSigData)
+	require.NoError(t, err)
+
+	indices := []uint32{1, 2, 3, 4}
+	randomSource, err := seed.FromParentSignature(indices, qc.SigData)
+	require.NoError(t, err)
+
+	randomSourceAgain, err := seed.FromParentSignature(indices, qc.SigData)
+	require.NoError(t, err)
+
+	// verify the randomness is deterministic
+	require.Equal(t, randomSource, randomSourceAgain)
 }

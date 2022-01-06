@@ -1,13 +1,11 @@
 package signature
 
 import (
-	"bytes"
 	"fmt"
 
 	"github.com/onflow/flow-go/consensus/hotstuff"
 	"github.com/onflow/flow-go/consensus/hotstuff/model"
-	"github.com/onflow/flow-go/crypto"
-	"github.com/onflow/flow-go/model/encoding/rlp"
+	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 )
@@ -15,8 +13,8 @@ import (
 // ConsensusSigDataPacker implements the hotstuff.Packer interface.
 // The encoding method is RLP.
 type ConsensusSigDataPacker struct {
+	packer.SigDataPacker
 	committees hotstuff.Committee
-	codec      *rlp.Codec // rlp encoder is used in order to ensure deterministic encoding
 }
 
 var _ hotstuff.Packer = &ConsensusSigDataPacker{}
@@ -24,19 +22,7 @@ var _ hotstuff.Packer = &ConsensusSigDataPacker{}
 func NewConsensusSigDataPacker(committees hotstuff.Committee) *ConsensusSigDataPacker {
 	return &ConsensusSigDataPacker{
 		committees: committees,
-		codec:      &rlp.Codec{},
 	}
-}
-
-// signatureData is a compact data type for encoding the block signature data
-type signatureData struct {
-	// bit-vector indicating type of signature for each signer.
-	// the order of each sig type matches the order of corresponding signer IDs
-	SigType []byte
-
-	AggregatedStakingSig         []byte
-	AggregatedRandomBeaconSig    []byte
-	ReconstructedRandomBeaconSig crypto.Signature
 }
 
 // Pack serializes the block signature data into raw bytes, suitable to creat a QC.
@@ -50,8 +36,8 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	signerIDs := make([]flow.Identifier, 0, count)
 	sigTypes := make([]hotstuff.SigType, 0, count)
 
-	// read all the possible signer IDs at the given block
-	consensus, err := p.committees.Identities(blockID, filter.HasRole(flow.RoleConsensus))
+	// retrieve all authorized consensus participants at the given block
+	consensus, err := p.committees.Identities(blockID, filter.Any)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not find consensus committees by block id(%v): %w", blockID, err)
 	}
@@ -86,7 +72,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 		return nil, nil, fmt.Errorf("could not serialize sig types to bytes at block: %v, %w", blockID, err)
 	}
 
-	data := signatureData{
+	data := packer.SignatureData{
 		SigType:                      serialized,
 		AggregatedStakingSig:         sig.AggregatedStakingSig,
 		AggregatedRandomBeaconSig:    sig.AggregatedRandomBeaconSig,
@@ -94,7 +80,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 	}
 
 	// encode the structured data into raw bytes
-	encoded, err := p.encode(&data)
+	encoded, err := p.Encode(&data)
 	if err != nil {
 		return nil, nil, fmt.Errorf("could not encode data %v, %w", data, err)
 	}
@@ -110,7 +96,7 @@ func (p *ConsensusSigDataPacker) Pack(blockID flow.Identifier, sig *hotstuff.Blo
 //  - (nil, model.ErrInvalidFormat) if failed to unpack the signature data
 func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flow.Identifier, sigData []byte) (*hotstuff.BlockSignatureData, error) {
 	// decode into typed data
-	data, err := p.decode(sigData)
+	data, err := p.Decode(sigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not decode sig data %s: %w", err, model.ErrInvalidFormat)
 	}
@@ -160,21 +146,6 @@ func (p *ConsensusSigDataPacker) Unpack(blockID flow.Identifier, signerIDs []flo
 		AggregatedRandomBeaconSig:    data.AggregatedRandomBeaconSig,
 		ReconstructedRandomBeaconSig: data.ReconstructedRandomBeaconSig,
 	}, nil
-}
-
-func (p *ConsensusSigDataPacker) encode(sigData *signatureData) ([]byte, error) {
-	var buf bytes.Buffer
-	encoder := p.codec.NewEncoder(&buf)
-	err := encoder.Encode(sigData)
-	return buf.Bytes(), err
-}
-
-func (p *ConsensusSigDataPacker) decode(data []byte) (*signatureData, error) {
-	bs := bytes.NewReader(data)
-	decoder := p.codec.NewDecoder(bs)
-	var sigData signatureData
-	err := decoder.Decode(&sigData)
-	return &sigData, err
 }
 
 // the total number of bytes required to fit the `count` number of bits

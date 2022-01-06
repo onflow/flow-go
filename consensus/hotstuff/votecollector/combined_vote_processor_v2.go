@@ -263,20 +263,43 @@ func (p *CombinedVoteProcessorV2) buildQC() (*flow.QuorumCertificate, error) {
 		return nil, fmt.Errorf("could not reconstruct random beacon group signature: %w", err)
 	}
 
-	blockSigData := &hotstuff.BlockSignatureData{
+	blockSigData := buildBlockSignatureDataForV2(stakingSigners, aggregatedStakingSig, reconstructedBeaconSig)
+
+	qc, err := buildQCWithPackerAndSigData(p.packer, p.block, blockSigData)
+	if err != nil {
+		return nil, err
+	}
+
+	return qc, nil
+}
+
+// buildBlockSignatureDataForV2 build a block sig data for V2
+// It reuses the hotstuff.BlockSignatureData type to create the sig data without filling the RandomBeaconSigners field and
+// the AggregatedRandomBeaconSig field, so that the packer can be reused by both V2 and V3 to pack QC's sig data.
+func buildBlockSignatureDataForV2(
+	stakingSigners []flow.Identifier,
+	aggregatedStakingSig []byte,
+	reconstructedBeaconSig crypto.Signature) *hotstuff.BlockSignatureData {
+	return &hotstuff.BlockSignatureData{
 		StakingSigners:               stakingSigners,
 		AggregatedStakingSig:         aggregatedStakingSig,
 		ReconstructedRandomBeaconSig: reconstructedBeaconSig,
 	}
+}
 
-	signerIDs, sigData, err := p.packer.Pack(p.block.BlockID, blockSigData)
+// buildQCWithPackerAndSigData builds the QC with the given packer and blockSigData
+func buildQCWithPackerAndSigData(
+	packer hotstuff.Packer,
+	block *model.Block,
+	blockSigData *hotstuff.BlockSignatureData) (*flow.QuorumCertificate, error) {
+	signerIDs, sigData, err := packer.Pack(block.BlockID, blockSigData)
 	if err != nil {
 		return nil, fmt.Errorf("could not pack the block sig data: %w", err)
 	}
 
 	return &flow.QuorumCertificate{
-		View:      p.block.View,
-		BlockID:   p.block.BlockID,
+		View:      block.View,
+		BlockID:   block.BlockID,
 		SignerIDs: signerIDs,
 		SigData:   sigData,
 	}, nil

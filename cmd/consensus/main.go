@@ -40,7 +40,6 @@ import (
 	"github.com/onflow/flow-go/fvm/systemcontracts"
 	"github.com/onflow/flow-go/model/bootstrap"
 	"github.com/onflow/flow-go/model/encodable"
-	"github.com/onflow/flow-go/model/encoding"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/flow/filter"
 	"github.com/onflow/flow-go/module"
@@ -54,7 +53,6 @@ import (
 	consensusMempools "github.com/onflow/flow-go/module/mempool/consensus"
 	"github.com/onflow/flow-go/module/mempool/stdmap"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/module/signature"
 	"github.com/onflow/flow-go/module/synchronization"
 	"github.com/onflow/flow-go/module/validation"
 	"github.com/onflow/flow-go/state/protocol"
@@ -207,10 +205,7 @@ func main() {
 				node.Storage.Headers,
 				node.Storage.Index,
 				node.Storage.Results,
-				node.Storage.Seals,
-				signature.NewAggregationVerifier(encoding.ExecutionReceiptTag))
-
-			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
+				node.Storage.Seals)
 
 			sealValidator, err := validation.NewSealValidator(
 				node.State,
@@ -219,7 +214,6 @@ func main() {
 				node.Storage.Results,
 				node.Storage.Seals,
 				chunkAssigner,
-				resultApprovalSigVerifier,
 				requiredApprovalsForSealConstruction,
 				requiredApprovalsForSealVerification,
 				conMetrics)
@@ -407,7 +401,6 @@ func main() {
 		}).
 		Component("sealing engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 
-			resultApprovalSigVerifier := signature.NewAggregationVerifier(encoding.ResultApprovalTag)
 			sealingTracker := tracker.NewSealingTracker(node.Logger, node.Storage.Headers, node.Storage.Receipts, seals)
 
 			config := sealing.DefaultConfig()
@@ -430,7 +423,6 @@ func main() {
 				node.State,
 				node.Storage.Seals,
 				chunkAssigner,
-				resultApprovalSigVerifier,
 				seals,
 				config,
 			)
@@ -614,36 +606,6 @@ func main() {
 
 			return aggregator, nil
 		}).
-		Module("compliance engine", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			// initialize the entity database accessors
-			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
-
-			// initialize the pending blocks cache
-			proposals := buffer.NewPendingBlocks()
-
-			core, err := compliance.NewCore(node.Logger,
-				node.Metrics.Engine,
-				node.Tracer,
-				node.Metrics.Mempool,
-				node.Metrics.Compliance,
-				cleaner,
-				node.Storage.Headers,
-				node.Storage.Payloads,
-				mutableState,
-				proposals,
-				syncCore,
-				hotstuffModules.Aggregator)
-			if err != nil {
-				return fmt.Errorf("could not initialize compliance core: %w", err)
-			}
-
-			// initialize the compliance engine
-			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, core)
-			if err != nil {
-				return fmt.Errorf("could not initialize compliance engine: %w", err)
-			}
-			return nil
-		}).
 		Component("hotstuff participant", func(_ cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			// initialize the block builder
 			var build module.Builder
@@ -687,6 +649,34 @@ func main() {
 			finalizedBlock, pending, err := recovery.FindLatest(node.State, node.Storage.Headers)
 			if err != nil {
 				return nil, err
+			}
+
+			// initialize the entity database accessors
+			cleaner := bstorage.NewCleaner(node.Logger, node.DB, node.Metrics.CleanCollector, flow.DefaultValueLogGCFrequency)
+
+			// initialize the pending blocks cache
+			proposals := buffer.NewPendingBlocks()
+
+			complianceCore, err := compliance.NewCore(node.Logger,
+				node.Metrics.Engine,
+				node.Tracer,
+				node.Metrics.Mempool,
+				node.Metrics.Compliance,
+				cleaner,
+				node.Storage.Headers,
+				node.Storage.Payloads,
+				mutableState,
+				proposals,
+				syncCore,
+				hotstuffModules.Aggregator)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize compliance core: %w", err)
+			}
+
+			// initialize the compliance engine
+			comp, err = compliance.NewEngine(node.Logger, node.Network, node.Me, prov, complianceCore)
+			if err != nil {
+				return nil, fmt.Errorf("could not initialize compliance engine: %w", err)
 			}
 
 			// initialize hotstuff consensus algorithm

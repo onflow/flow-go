@@ -4,26 +4,21 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/crypto/hash"
 )
 
-// FromParentSignature reads the raw random seed from a combined signature.
-// the combinedSig must be from a QuorumCertificate. The indices can be used to
-// generate task-specific seeds from the same signature.
-func FromParentSignature(indices []uint32, combinedSig crypto.Signature) ([]byte, error) {
-	// split the parent voter sig into staking & beacon parts
+// FromParentSignature reads the raw random seed from a main consensus QC sigData.
+// The sigData is an RLP encoded structure that is part of QuorumCertificate.
+// The indices can be used to generate task-specific seeds from the same signature.
+func FromParentSignature(indices []uint32, sigData []byte) ([]byte, error) {
+	// unpack sig data to extract random beacon sig
+	randomBeaconSig, err := packer.UnpackRandomBeaconSig(sigData)
+	if err != nil {
+		return nil, fmt.Errorf("could not unpack block signature: %w", err)
+	}
 
-	// Temporary breaking point
-	panic("implementation OUTDATED: our packing of signature data within the QC has now changed")
-	// TODO: our packing of signature data within the QC has now changed. We need to update the following logic
-	//combiner := signature.NewCombiner(encodable.ConsensusVoteSigLen, encodable.RandomBeaconSigLen)
-	//_, randomBeaconSig, err := combiner.Split(combinedSig)
-	//if err != nil {
-	//	return nil, fmt.Errorf("could not split block signature: %w", err)
-	//}
-	//
-	//return FromRandomSource(indices, randomBeaconSig)
+	return FromRandomSource(indices, randomBeaconSig)
 }
 
 // FromRandomSource generates a task-specific seed (task is determined by indices).

@@ -14,6 +14,7 @@ import (
 
 	hotstuffroot "github.com/onflow/flow-go/consensus/hotstuff"
 	hotstuff "github.com/onflow/flow-go/consensus/hotstuff/model"
+	hotstuffPacker "github.com/onflow/flow-go/consensus/hotstuff/packer"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/crypto/hash"
 	"github.com/onflow/flow-go/engine/execution/state/delta"
@@ -395,7 +396,7 @@ func BlockHeaderWithParentFixture(parent *flow.Header) flow.Header {
 		Timestamp:          time.Now().UTC(),
 		View:               view,
 		ParentVoterIDs:     IdentifierListFixture(4),
-		ParentVoterSigData: CombinedSignatureFixture(),
+		ParentVoterSigData: QCSigDataFixture(),
 		ProposerID:         IdentifierFixture(),
 		ProposerSigData:    SignatureFixture(),
 	}
@@ -1082,14 +1083,24 @@ func ChunkStatusListFixture(t *testing.T, blockHeight uint64, result *flow.Execu
 	return statuses
 }
 
-func SignatureFixture() crypto.Signature {
-	sig := make([]byte, 48)
-	_, _ = crand.Read(sig)
-	return sig
+func QCSigDataFixture() []byte {
+	packer := hotstuffPacker.SigDataPacker{}
+	sigType := RandomBytes(5)
+	for i := range sigType {
+		sigType[i] = sigType[i] % 2
+	}
+	sigData := hotstuffPacker.SignatureData{
+		SigType:                      sigType,
+		AggregatedStakingSig:         SignatureFixture(),
+		AggregatedRandomBeaconSig:    SignatureFixture(),
+		ReconstructedRandomBeaconSig: SignatureFixture(),
+	}
+	encoded, _ := packer.Encode(&sigData)
+	return encoded
 }
 
-func CombinedSignatureFixture() crypto.Signature {
-	sig := make([]byte, 48*2)
+func SignatureFixture() crypto.Signature {
+	sig := make([]byte, 48)
 	_, _ = crand.Read(sig)
 	return sig
 }
@@ -1477,7 +1488,7 @@ func QuorumCertificateFixture(opts ...func(*flow.QuorumCertificate)) *flow.Quoru
 		View:      uint64(rand.Uint32()),
 		BlockID:   IdentifierFixture(),
 		SignerIDs: IdentifierListFixture(3),
-		SigData:   RandomBytes(128),
+		SigData:   QCSigDataFixture(),
 	}
 	for _, apply := range opts {
 		apply(&qc)
