@@ -11,6 +11,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/onflow/cadence"
@@ -37,48 +38,99 @@ import (
 
 var filenameFlag string
 var blocksFlag int
+var workersFlag int
 
 func init() {
-	flag.StringVar(&filenameFlag, "file", "data.csv", "help message for flagname")
-	flag.IntVar(&blocksFlag, "blocks", 1000, "help message for flagname")
+	flag.StringVar(&filenameFlag, "file", "data.csv", "output data file")
+	flag.IntVar(&blocksFlag, "blocks", 1000, "Total blocks to go through")
+	flag.IntVar(&workersFlag, "workers", 2, "Number of concurrent threads")
 }
 
 func main() {
 	flag.Parse()
 
-	data := runTransactionsAndGetData(blocksFlag)
+	numWorkers := workersFlag
+	workersWG := &sync.WaitGroup{}
+	collectorsWG := &sync.WaitGroup{}
+	dataChannel := make(chan *transactionDataCollector, numWorkers)
+	rootDataCollector := newTransactionDataCollector()
+
+	runsPerWorker := blocksFlag / (100 * numWorkers)
+	run := 0
+	blocksPerRun := 100
+	collectorsWG.Add(1)
+	go func() {
+		for dc := range dataChannel {
+			rootDataCollector.Merge(dc)
+
+			run++
+			fmt.Println("progress: ", run, "/", runsPerWorker*numWorkers)
+			if run%numWorkers == 0 {
+				for _, tt := range Pool.Pool {
+					if stt, ok := tt.(*SimpleTxType); ok {
+						fmt.Println(stt.name, stt.slope)
+					}
+				}
+			}
+		}
+		collectorsWG.Done()
+	}()
+
+	for i := 0; i < numWorkers; i++ {
+		workersWG.Add(1)
+		go func() {
+			for j := 0; j < runsPerWorker; j++ {
+				dataChannel <- runTransactionsAndGetData(blocksPerRun)
+			}
+			workersWG.Done()
+		}()
+	}
+
+	workersWG.Wait()
+	close(dataChannel)
+	collectorsWG.Wait()
+
+	// output collected data to file
+	var data [][]string
+	columns := []string{"tx"}
+	for s := range rootDataCollector.Columns {
+		columns = append(columns, s)
+	}
+	columns = append(columns, "ms")
+
+	data = append(data, columns)
+
+	for s, u := range rootDataCollector.TimeSpent {
+		cdata := make([]string, len(columns))
+		cdata[0] = rootDataCollector.TransactionNames[s]
+		for i := 1; i < len(columns)-1; i++ {
+			cdata[i] = strconv.FormatUint(rootDataCollector.Weights[s][columns[i]], 10)
+		}
+		cdata[len(columns)-1] = strconv.FormatUint(u, 10)
+		data = append(data, cdata)
+	}
 
 	f, err := os.Create(filenameFlag)
 	defer f.Close()
-
 	if err != nil {
-
 		panic("")
 	}
-
 	w := csv.NewWriter(f)
 	err = w.WriteAll(data)
-
 	if err != nil {
 		panic("")
 	}
 }
 
-func runTransactionsAndGetData(blocks int) [][]string {
+func runTransactionsAndGetData(blocks int) *transactionDataCollector {
 	rand.Seed(time.Now().UnixNano())
 
 	longString := strings.Repeat("0", 100)
 	chain := flow.Testnet.Chain()
 
-	logE := &logExtractor{
-		TimeSpent:        map[string]uint64{},
-		Weights:          map[string]map[string]uint64{},
-		Columns:          map[string]struct{}{},
-		InteractionUsed:  map[string]uint64{},
-		TransactionNames: map[string]string{},
-	}
+	dc := newTransactionDataCollector()
 
-	logger := zerolog.New(logE).Level(zerolog.InfoLevel)
+	logger := zerolog.New(dc).Level(zerolog.InfoLevel)
 
 	blockExecutor, err := NewBasicBlockExecutor(chain, logger)
 	if err != nil {
@@ -126,9 +178,6 @@ func runTransactionsAndGetData(blocks int) [][]string {
 	transactionsPerBlock := rand.Intn(50) + 1
 
 	for i := 0; i < blocks; i++ {
-		if i%100 == 0 {
-			fmt.Println("progress", i)
-		}
 		transactions := make([]*flow.TransactionBody, transactionsPerBlock)
 		generatedTransactions := make([]GeneratedTransaction, transactionsPerBlock)
 		for j := 0; j < transactionsPerBlock; j++ {
@@ -146,7 +195,7 @@ func runTransactionsAndGetData(blocks int) [][]string {
 			}
 
 			transactions[j] = txBody
-			logE.TransactionNames[txBody.ID().String()] = txType.Name()
+			dc.TransactionNames[txBody.ID().String()] = txType.Name()
 		}
 
 		computationResult, err := blockExecutor.ExecuteCollections([][]*flow.TransactionBody{transactions})
@@ -160,31 +209,13 @@ func runTransactionsAndGetData(blocks int) [][]string {
 				fmt.Println(generatedTransactions[j].Type.Name())
 				panic(computationResult.TransactionResults[j].ErrorMessage)
 			}
-			generatedTransactions[j].AdjustParameterRange(logE.TimeSpent[computationResult.TransactionResults[j].ID().String()])
-			totalInteractionUsed += logE.InteractionUsed[computationResult.TransactionResults[j].ID().String()]
+			generatedTransactions[j].AdjustParameterRange(dc.TimeSpent[computationResult.TransactionResults[j].ID().String()])
+			totalInteractionUsed += dc.InteractionUsed[computationResult.TransactionResults[j].ID().String()]
 			totalComputationUsed += computationResult.TransactionResults[j].ComputationUsed
 		}
 	}
 
-	var data [][]string
-	columns := []string{"tx"}
-	for s := range logE.Columns {
-		columns = append(columns, s)
-	}
-	columns = append(columns, "ms")
-
-	data = append(data, columns)
-
-	for s, u := range logE.TimeSpent {
-		cdata := make([]string, len(columns))
-		cdata[0] = logE.TransactionNames[s]
-		for i := 1; i < len(columns)-1; i++ {
-			cdata[i] = strconv.FormatUint(logE.Weights[s][columns[i]], 10)
-		}
-		cdata[len(columns)-1] = strconv.FormatUint(u, 10)
-		data = append(data, cdata)
-	}
-	return data
+	return dc
 }
 
 type TestBenchBlockExecutor interface {
@@ -303,7 +334,7 @@ func NewBasicBlockExecutor(chain flow.Chain, logger zerolog.Logger) (*BasicBlock
 	opts := []fvm.Option{
 		fvm.WithTransactionFeesEnabled(true),
 		fvm.WithAccountStorageLimit(true),
-		fvm.WithMaxStateInteractionSize(200_000_000),
+		fvm.WithMaxStateInteractionSize(2_000_000_000),
 		fvm.WithComputationLimit(20_000_000),
 		fvm.WithChain(chain),
 	}
@@ -451,7 +482,8 @@ func (b *BasicBlockExecutor) SetupAccounts(privateKeys []flow.AccountPrivateKey)
 	return accounts, nil
 }
 
-type logExtractor struct {
+// transactionDataCollector collects data from a transaction execution logs.
+type transactionDataCollector struct {
 	TimeSpent        map[string]uint64
 	Weights          map[string]map[string]uint64
 	Columns          map[string]struct{}
@@ -470,7 +502,17 @@ type txSuccessfulLog struct {
 	LedgerInteractionUsed uint64 `json:"ledgerInteractionUsed"`
 }
 
-func (l *logExtractor) Write(p []byte) (n int, err error) {
+func newTransactionDataCollector() *transactionDataCollector {
+	return &transactionDataCollector{
+		TimeSpent:        map[string]uint64{},
+		Weights:          map[string]map[string]uint64{},
+		Columns:          map[string]struct{}{},
+		InteractionUsed:  map[string]uint64{},
+		TransactionNames: map[string]string{},
+	}
+}
+
+func (l *transactionDataCollector) Write(p []byte) (n int, err error) {
 	if strings.Contains(string(p), "weights") {
 		w := txWeights{}
 		err := json.Unmarshal(p, &w)
@@ -501,4 +543,23 @@ func (l *logExtractor) Write(p []byte) (n int, err error) {
 
 }
 
-var _ io.Writer = &logExtractor{}
+// Merge merges the data from the other collector into this one.
+func (l *transactionDataCollector) Merge(l2 *transactionDataCollector) {
+	for k, v := range l2.TimeSpent {
+		l.TimeSpent[k] = v
+	}
+	for k, v := range l2.Weights {
+		l.Weights[k] = v
+	}
+	for k, v := range l2.Columns {
+		l.Columns[k] = v
+	}
+	for k, v := range l2.InteractionUsed {
+		l.InteractionUsed[k] = v
+	}
+	for k, v := range l2.TransactionNames {
+		l.TransactionNames[k] = v
+	}
+}
+
+var _ io.Writer = &transactionDataCollector{}

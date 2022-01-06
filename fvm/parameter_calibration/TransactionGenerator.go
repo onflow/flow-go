@@ -5,6 +5,7 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"math/rand"
 	"strings"
+	"sync"
 )
 
 // get a random transaction type from a pool of transaction types
@@ -64,15 +65,25 @@ func templateTx(rep uint64, body string) string {
 }
 
 type SimpleTxType struct {
-	paramMin uint64
 	paramMax uint64
 	body     string
 	name     string
+
+	mu          sync.Mutex
+	slopePoints uint64
+	slope       float64
 }
 
+const desiredMaxTime float64 = 500 // in milliseconds
+
 func (s *SimpleTxType) GenerateTransaction(context TransactionTypeContext) (GeneratedTransaction, error) {
-	parameter := rand.Uint64() % (s.paramMax - s.paramMin)
-	parameter += s.paramMin
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	parameter := rand.Uint64()%s.paramMax + 1
+	if s.slopePoints == 0 {
+		parameter = s.paramMax + 1
+	}
 	script := templateTx(parameter, s.body)
 	script = context.ReplaceAddresses(script)
 	tx := flow.NewTransactionBody().SetGasLimit(1_000_000).SetScript([]byte(script))
@@ -88,23 +99,30 @@ func (s *SimpleTxType) Name() string {
 	return s.name
 }
 
+// AdjustParameterRange adjusts the parameter range of the transaction type so that the generated transactions take up to desiredMaxTime
 func (s *SimpleTxType) AdjustParameterRange(parameter uint64, executionTime uint64) {
-	if executionTime < 10 {
-		s.paramMin *= 2
-		s.paramMax *= 2
-		fmt.Println("Adjusting parameter range for", s.name, "to", s.paramMin, "to", s.paramMax)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	prevParamMax := s.paramMax
+
+	s.slope = (float64(s.slopePoints)*s.slope + (float64(executionTime) / float64(parameter))) / float64(s.slopePoints+1)
+	s.slopePoints++
+
+	s.paramMax = uint64(desiredMaxTime / s.slope)
+	if s.paramMax < 1 {
+		s.paramMax = 1
 	}
-	if executionTime > 1000 {
-		s.paramMin /= 2
-		if s.paramMin < 1 {
-			s.paramMin = 1
-		}
-		s.paramMax /= 2
-		if s.paramMax < 1 {
-			s.paramMax = 1
-		}
-		fmt.Println("Adjusting parameter range for", s.name, "to", s.paramMin, "to", s.paramMax)
+	if (float64(s.paramMax)-float64(prevParamMax))/float64(prevParamMax) > 2.0 {
+		s.paramMax = prevParamMax * 2
 	}
+}
+
+func (s *SimpleTxType) GetSlope() float64 {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	return s.slope
 }
 
 var _ TransactionType = &SimpleTxType{}
@@ -112,93 +130,78 @@ var _ TransactionType = &SimpleTxType{}
 var Pool = TransactionTypePool{
 	Pool: []TransactionType{
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     "",
 			name:     "reference tx",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     "i.toString()",
 			name:     "convert int to string",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     `"x".concat(i.toString())`,
 			name:     "convert int to string and concatenate it",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     `signer.address`,
 			name:     "get signer address",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     `getAccount(signer.address)`,
 			name:     "get public account",
 		},
 		&SimpleTxType{
-			paramMin: 25,
 			paramMax: 500,
 			body:     `getAccount(signer.address).balance`,
 			name:     "get account and get balance",
 		},
 		&SimpleTxType{
-			paramMin: 25,
 			paramMax: 500,
 			body:     `getAccount(signer.address).availableBalance`,
 			name:     "get account and get available balance",
 		},
 		&SimpleTxType{
-			paramMin: 100,
 			paramMax: 2000,
 			body:     `getAccount(signer.address).storageUsed`,
 			name:     "get account and get storage used",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     `getAccount(signer.address).storageCapacity`,
 			name:     "get account and get storage capacity",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     `getAccount(signer.address).storageCapacity`,
 			name:     "get account and get storage capacity",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     `getAccount(signer.address).storageCapacity`,
 			name:     "get account and get storage capacity",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     `getAccount(signer.address).storageCapacity`,
 			name:     "get account and get storage capacity",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     `let vaultRef = signer.borrow<&FlowToken.Vault>(from: /storage/flowTokenVault)!`,
 			name:     "get signer vault",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
-			body: `let receiverRef =  getAccount(signer.address)
+			body: `let receiverRef = getAccount(signer.address)
 				.getCapability(/public/flowTokenReceiver)
 				.borrow<&{FungibleToken.Receiver}>()!`,
 			name: "get signer receiver",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body: `let receiverRef =  getAccount(signer.address)
 				.getCapability(/public/flowTokenReceiver)
@@ -208,47 +211,33 @@ var Pool = TransactionTypePool{
 			name: "transfer tokens",
 		},
 		&SimpleTxType{
-			paramMin: 50,
-			paramMax: 1000,
-			body: `let receiverRef =  getAccount(signer.address)
-				.getCapability(/public/flowTokenReceiver)
-				.borrow<&{FungibleToken.Receiver}>()!`,
-			name: "get signer receiver",
-		},
-		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body: `signer.load<String>(from: /storage/testpath)
 				signer.save("", to: /storage/testpath)`,
 			name: "load and save empty string on signers address",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body: `signer.load<String>(from: /storage/testpath)
 				signer.save("%s", to: /storage/testpath)`,
 			name: "load and save long string on signers address",
 		},
 		&SimpleTxType{
-			paramMin: 5,
 			paramMax: 100,
 			body:     `let acct = AuthAccount(payer: signer)`,
 			name:     "create new account",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     `TestContract.empty()`,
 			name:     "call empty contract function",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     `TestContract.emit()`,
 			name:     "emit event",
 		},
 		&SimpleTxType{
-			paramMin: 500,
 			paramMax: 10000,
 			body: `let strings = signer.borrow<&[String]>(from: /storage/test)!
 				var j = 0
@@ -257,10 +246,9 @@ var Pool = TransactionTypePool{
 				  	lenSum = lenSum + strings[j].length
 					j = j + 1
 				}`,
-			name: "call empty contract function",
+			name: "borrow array from storage",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body: `let strings = signer.copy<[String]>(from: /storage/test)!
 				var j = 0
@@ -272,13 +260,11 @@ var Pool = TransactionTypePool{
 			name: "copy array from storage",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body:     `signer.addPublicKey("f847b84000fb479cb398ab7e31d6f048c12ec5b5b679052589280cacde421af823f93fe927dfc3d1e371b172f97ceeac1bc235f60654184c83f4ea70dd3b7785ffb3c73802038203e8".decodeHex())`,
 			name:     "add key to account",
 		},
 		&SimpleTxType{
-			paramMin: 50,
 			paramMax: 1000,
 			body: `
 				signer.addPublicKey("f847b84000fb479cb398ab7e31d6f048c12ec5b5b679052589280cacde421af823f93fe927dfc3d1e371b172f97ceeac1bc235f60654184c83f4ea70dd3b7785ffb3c73802038203e8".decodeHex())
