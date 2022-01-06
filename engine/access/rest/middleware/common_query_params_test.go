@@ -14,6 +14,7 @@ import (
 func TestCommonQueryParamMiddlewares(t *testing.T) {
 
 	testFunc := func(expandList, selectList []string) {
+
 		th := &testHandler{
 			t:                  t,
 			expectedExpandList: expandList,
@@ -22,17 +23,16 @@ func TestCommonQueryParamMiddlewares(t *testing.T) {
 
 		// setup the router to use the test handler and the QueryExpandable and QuerySelect
 		r := mux.NewRouter()
-		r.Handle("/", th.getHandler())
+		r.Handle("/", th.getTestHandler())
 		r.Use(QueryExpandable())
 		r.Use(QuerySelect())
 
 		// create request
-		req, err := http.NewRequest("GET", "/", nil)
-		require.NoError(t, err)
+		req := httptest.NewRequest("GET", "/", nil)
 		query := req.URL.Query()
 		// add query params as per test case
 		if len(expandList) > 0 {
-			query.Add(expandQueryParam, strings.Join(expandList, ","))
+			query.Add(ExpandQueryParam, strings.Join(expandList, ","))
 		}
 		if len(selectList) > 0 {
 			query.Add(selectQueryParam, strings.Join(selectList, ","))
@@ -95,15 +95,16 @@ type testHandler struct {
 	t                  *testing.T
 }
 
-func (th *testHandler) getHandler() http.Handler {
+func (th *testHandler) getTestHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
 		actualExpandList, expandListPopulated := GetFieldsToExpand(r)
-		require.Equal(th.t, len(th.expectedExpandList), len(actualExpandList))
 		require.Equal(th.t, len(th.expectedExpandList) != 0, expandListPopulated)
+		require.ElementsMatch(th.t, th.expectedExpandList, actualExpandList)
 
 		actualSelectList, selectListPopulated := GetFieldsToSelect(r)
-		require.Equal(th.t, len(th.expectedSelectList), len(actualSelectList))
 		require.Equal(th.t, len(th.expectedSelectList) != 0, selectListPopulated)
+		require.ElementsMatch(th.t, th.expectedSelectList, actualSelectList)
 
 		w.WriteHeader(http.StatusOK)
 	})

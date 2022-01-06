@@ -57,6 +57,10 @@ func (proc *TransactionProcedure) Run(vm *VirtualMachine, ctx Context, st *state
 		}
 	}()
 
+	if proc.Transaction.Payer == ctx.Chain.ServiceAddress() {
+		st.SetPayerIsServiceAccount()
+	}
+
 	for _, p := range ctx.TransactionProcessors {
 		err := p.Process(vm, &ctx, proc, st, programs)
 		txErr, failure := errors.SplitErrorTypes(err)

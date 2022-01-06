@@ -127,6 +127,25 @@ func AccountKeyFixture(
 	}, nil
 }
 
+// AccountFixture returns a randomly generated account.
+func AccountFixture() (*flow.Account, error) {
+	key, err := AccountKeyFixture(128, crypto.ECDSAP256, hash.SHA3_256)
+	if err != nil {
+		return nil, err
+	}
+
+	contracts := make(map[string][]byte, 2)
+	contracts["contract1"] = []byte("contract1")
+	contracts["contract2"] = []byte("contract2")
+
+	return &flow.Account{
+		Address:   RandomAddressFixture(),
+		Balance:   100,
+		Keys:      []flow.AccountPublicKey{key.PublicKey(1000)},
+		Contracts: contracts,
+	}, nil
+}
+
 func BlockFixture() flow.Block {
 	header := BlockHeaderFixture()
 	return *BlockWithParentFixture(&header)
@@ -347,6 +366,12 @@ func GenesisFixture() *flow.Block {
 func WithHeaderHeight(height uint64) func(header *flow.Header) {
 	return func(header *flow.Header) {
 		header.Height = height
+	}
+}
+
+func HeaderWithView(view uint64) func(*flow.Header) {
+	return func(header *flow.Header) {
+		header.View = view
 	}
 }
 
@@ -683,7 +708,7 @@ func WithExecutionResultBlockID(blockID flow.Identifier) func(*flow.ExecutionRes
 	}
 }
 
-func WIthServiceEvents(n int) func(result *flow.ExecutionResult) {
+func WithServiceEvents(n int) func(result *flow.ExecutionResult) {
 	return func(result *flow.ExecutionResult) {
 		result.ServiceEvents = ServiceEventsFixture(n)
 	}
@@ -746,12 +771,6 @@ func WithBlockID(id flow.Identifier) func(*flow.ResultApproval) {
 func WithChunk(chunkIdx uint64) func(*flow.ResultApproval) {
 	return func(approval *flow.ResultApproval) {
 		approval.Body.ChunkIndex = chunkIdx
-	}
-}
-
-func WithServiveEvents(events ...flow.ServiceEvent) func(*flow.ExecutionResult) {
-	return func(result *flow.ExecutionResult) {
-		result.ServiceEvents = events
 	}
 }
 
@@ -885,11 +904,13 @@ func PrivateNodeInfosFixture(n int, opts ...func(*flow.Identity)) []bootstrap.No
 // IdentityFixture returns a node identity.
 func IdentityFixture(opts ...func(*flow.Identity)) *flow.Identity {
 	nodeID := IdentifierFixture()
+	stakingKey := StakingPrivKeyByIdentifier(nodeID)
 	identity := flow.Identity{
-		NodeID:  nodeID,
-		Address: fmt.Sprintf("address-%v", nodeID[0:7]),
-		Role:    flow.RoleConsensus,
-		Stake:   1000,
+		NodeID:        nodeID,
+		Address:       fmt.Sprintf("address-%v", nodeID[0:7]),
+		Role:          flow.RoleConsensus,
+		Stake:         1000,
+		StakingPubKey: stakingKey.PublicKey(),
 	}
 	for _, apply := range opts {
 		apply(&identity)
@@ -1773,6 +1794,21 @@ func PrivateKeyFixture(algo crypto.SigningAlgorithm, seedLength int) crypto.Priv
 		panic(err)
 	}
 	return sk
+}
+
+// PrivateKeyFixtureByIdentifier returns a private key for a given node.
+// given the same identifier, it will always return the same private key
+func PrivateKeyFixtureByIdentifier(algo crypto.SigningAlgorithm, seedLength int, id flow.Identifier) crypto.PrivateKey {
+	seed := append(id[:], id[:]...)
+	sk, err := crypto.GeneratePrivateKey(algo, seed[:seedLength])
+	if err != nil {
+		panic(err)
+	}
+	return sk
+}
+
+func StakingPrivKeyByIdentifier(id flow.Identifier) crypto.PrivateKey {
+	return PrivateKeyFixtureByIdentifier(crypto.BLSBLS12381, crypto.KeyGenSeedMinLenBLSBLS12381, id)
 }
 
 // NetworkingPrivKeyFixture returns random ECDSAP256 private key

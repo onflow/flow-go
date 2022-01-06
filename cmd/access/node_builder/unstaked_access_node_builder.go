@@ -245,7 +245,7 @@ func (anb *UnstakedAccessNodeBuilder) initUnstakedLocal() func(builder cmd.NodeB
 			Address:       anb.BindAddr,
 		}
 
-		me, err := local.New(self, nil)
+		me, err := local.NewNoKey(self)
 		anb.MustNot(err).Msg("could not initialize local")
 		node.Me = me
 	}
@@ -339,9 +339,9 @@ func (anb *UnstakedAccessNodeBuilder) initMiddleware(nodeID flow.Identifier,
 		networkMetrics,
 		anb.SporkID,
 		p2p.DefaultUnicastTimeout,
-		false, // no connection gating for the unstaked nodes
 		anb.IDTranslator,
 		p2p.WithMessageValidators(validators...),
+		p2p.WithConnectionGating(false),
 		// no peer manager
 		// use default identifier provider
 	)

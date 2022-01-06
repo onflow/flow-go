@@ -3,6 +3,10 @@ package testnet
 import (
 	"context"
 	"fmt"
+	"github.com/onflow/flow-go/cmd/bootstrap/utils"
+	"github.com/onflow/flow-go/crypto"
+	"github.com/onflow/flow-go/model/encodable"
+	"github.com/onflow/flow-go/model/flow"
 	"os"
 	"path/filepath"
 	"time"
@@ -44,6 +48,65 @@ type ContainerConfig struct {
 	AdditionalFlags       []string
 	Debug                 bool
 	SupportsUnstakedNodes bool
+}
+
+func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID, machineAccountAddr flow.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
+	// write staking and machine account private key files
+	writeJSONFile := func(relativePath string, val interface{}) error {
+		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
+	}
+
+	writeFile := func(relativePath string, data []byte) error {
+		return WriteFile(filepath.Join(bootstrapDir, relativePath), data)
+	}
+
+	nodeInfos := []bootstrap.NodeInfo{c.NodeInfo}
+	err := utils.WriteStakingNetworkingKeyFiles(nodeInfos, writeJSONFile)
+	if err != nil {
+		return fmt.Errorf("failed to write private key file: %w", err)
+	}
+
+	err = utils.WriteSecretsDBEncryptionKeyFiles(nodeInfos, writeFile)
+	if err != nil {
+		return fmt.Errorf("failed to write secrets db key file: %w", err)
+	}
+
+	if role == flow.RoleConsensus || role == flow.RoleCollection {
+		err = utils.WriteMachineAccountFile(chainID, c.NodeID, machineAccountAddr, machineAccountKey, writeJSONFile)
+		if err != nil {
+			return fmt.Errorf("failed to write machine account file: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// GetPrivateNodeInfoAddress returns the node's address <name>:<port>
+func GetPrivateNodeInfoAddress(nodeName string) string {
+	return fmt.Sprintf("%s:%d", nodeName, DefaultFlowPort)
+}
+
+func NewContainerConfig(nodeName string, conf NodeConfig, networkKey, stakingKey crypto.PrivateKey) ContainerConfig {
+	info := bootstrap.NewPrivateNodeInfo(
+		conf.Identifier,
+		conf.Role,
+		GetPrivateNodeInfoAddress(nodeName),
+		conf.Stake,
+		networkKey,
+		stakingKey,
+	)
+
+	containerConf := ContainerConfig{
+		NodeInfo:              info,
+		ContainerName:         nodeName,
+		LogLevel:              conf.LogLevel,
+		Ghost:                 conf.Ghost,
+		AdditionalFlags:       conf.AdditionalFlags,
+		Debug:                 conf.Debug,
+		SupportsUnstakedNodes: conf.SupportsUnstakedNodes,
+	}
+
+	return containerConf
 }
 
 // ImageName returns the Docker image name for the given config.

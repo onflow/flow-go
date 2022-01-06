@@ -7,16 +7,18 @@ import (
 	sdk "github.com/onflow/flow-go-sdk"
 
 	"github.com/stretchr/testify/require"
+	tsuite "github.com/stretchr/testify/suite"
 
 	"github.com/onflow/flow-go/engine"
 	"github.com/onflow/flow-go/integration/tests/common"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/model/messages"
+	"github.com/onflow/flow-go/utils/unittest"
 )
 
 func TestExecutionStateSync(t *testing.T) {
-	// TODO: We've removed state sync, so tests are not currently maintained, and flakey
-	// suite.Run(t, new(StateSyncSuite))
+	unittest.SkipUnless(t, unittest.TEST_DEPRECATED, "state sync disabled")
+	tsuite.Run(t, new(StateSyncSuite))
 }
 
 type StateSyncSuite struct {
@@ -24,8 +26,6 @@ type StateSyncSuite struct {
 }
 
 func (s *StateSyncSuite) TestStateSyncAfterNetworkPartition() {
-	s.T().Skip("disable state sync")
-
 	// wait for next height finalized (potentially first height), called blockA
 	blockA := s.BlockState.WaitForHighestFinalizedProgress(s.T())
 	s.T().Logf("got blockA height %v ID %v", blockA.Header.Height, blockA.Header.ID())

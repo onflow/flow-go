@@ -57,7 +57,6 @@ func (suite *Suite) SetupTest() {
 	suite.log = zerolog.New(zerolog.NewConsoleWriter())
 	suite.state = new(protocol.State)
 	suite.snapshot = new(protocol.Snapshot)
-	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	header := unittest.BlockHeaderFixture()
 	params := new(protocol.Params)
 	params.On("Root").Return(&header, nil)
@@ -106,7 +105,7 @@ func (suite *Suite) TestPing() {
 func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 	// setup the mocks
 	block := unittest.BlockHeaderFixture()
-
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Head").Return(&block, nil).Once()
 
 	backend := New(
@@ -138,7 +137,7 @@ func (suite *Suite) TestGetLatestFinalizedBlockHeader() {
 func (suite *Suite) TestGetLatestProtocolStateSnapshot() {
 	// setup the snapshot mock
 	snap := unittest.RootSnapshotFixture(unittest.CompleteIdentitySet())
-	suite.state.On("Sealed").Return(snap).Once()
+	suite.state.On("Final").Return(snap).Once()
 
 	backend := New(
 		suite.state,
@@ -303,6 +302,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 	txID := transactionBody.ID()
 	blockID := block.ID()
 	_, fixedENIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 	suite.snapshot.On("Identities", mock.Anything).Return(fixedENIDs, nil)
 
 	// create a mock connection factory
@@ -394,6 +394,7 @@ func (suite *Suite) TestTransactionStatusTransition() {
 // of transaction changes from Pending to Expired when enough blocks pass
 func (suite *Suite) TestTransactionExpiredStatusTransition() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	ctx := context.Background()
 	collection := unittest.CollectionFixture(1)
@@ -534,6 +535,8 @@ func (suite *Suite) TestTransactionPendingToFinalizedStatusTransition() {
 	snapshotAtBlock.On("Head").Return(refBlock.Header, nil)
 
 	_, enIDs := suite.setupReceipts(&block)
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
+
 	suite.snapshot.On("Identities", mock.Anything).Return(enIDs, nil)
 
 	suite.state.
@@ -676,6 +679,7 @@ func (suite *Suite) TestTransactionResultUnknown() {
 
 func (suite *Suite) TestGetLatestFinalizedBlock() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	// setup the mocks
 	expected := unittest.BlockFixture()
@@ -722,6 +726,7 @@ func (mc *mockCloser) Close() error { return nil }
 
 func (suite *Suite) TestGetEventsForBlockIDs() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	events := getEvents(10)
 	validExecutorIdentities := flow.IdentityList{}
@@ -864,6 +869,88 @@ func (suite *Suite) TestGetEventsForBlockIDs() {
 
 	suite.assertAllExpectations()
 }
+
+func (suite *Suite) TestGetExecutionResultByID() {
+	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+
+	validExecutorIdentities := flow.IdentityList{}
+	validENIDs := flow.IdentifierList(validExecutorIdentities.NodeIDs())
+
+	// create a mock connection factory
+	connFactory := new(backendmock.ConnectionFactory)
+
+	nonexistingID := unittest.IdentifierFixture()
+	blockID := unittest.IdentifierFixture()
+	executionResult := unittest.ExecutionResultFixture(
+		unittest.WithExecutionResultBlockID(blockID))
+
+	ctx := context.Background()
+
+	results := new(storagemock.ExecutionResults)
+	results.
+		On("ByID", nonexistingID).
+		Return(nil, storage.ErrNotFound)
+
+	results.
+		On("ByID", executionResult.ID()).
+		Return(executionResult, nil)
+
+	suite.Run("nonexisting execution result for id", func() {
+
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, nil,
+			nil,
+			suite.headers, nil, nil,
+			suite.receipts,
+			results,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			validENIDs.Strings(), // set the fixed EN Identifiers to the generated execution IDs
+			suite.log,
+		)
+
+		// execute request
+		_, err := backend.GetExecutionResultByID(ctx, nonexistingID)
+
+		assert.Error(suite.T(), err)
+	})
+
+	suite.Run("existing execution result id", func() {
+		// create the handler
+		backend := New(
+			suite.state,
+			nil, nil,
+			nil,
+			suite.headers, nil, nil,
+			nil,
+			results,
+			suite.chainID,
+			metrics.NewNoopCollector(),
+			connFactory, // the connection factory should be used to get the execution node client
+			false,
+			DefaultMaxHeightRange,
+			nil,
+			validENIDs.Strings(),
+			suite.log,
+		)
+
+		// execute request
+		er, err := backend.GetExecutionResultByID(ctx, executionResult.ID())
+		suite.checkResponse(er, err)
+
+		require.Equal(suite.T(), executionResult, er)
+	})
+
+	results.AssertExpectations(suite.T())
+	suite.assertAllExpectations()
+}
+
 func (suite *Suite) TestGetExecutionResultByBlockID() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
 
@@ -876,7 +963,7 @@ func (suite *Suite) TestGetExecutionResultByBlockID() {
 	blockID := unittest.IdentifierFixture()
 	executionResult := unittest.ExecutionResultFixture(
 		unittest.WithExecutionResultBlockID(blockID),
-		unittest.WIthServiceEvents(2))
+		unittest.WithServiceEvents(2))
 
 	ctx := context.Background()
 
@@ -1223,6 +1310,7 @@ func (suite *Suite) TestGetEventsForHeightRange() {
 
 func (suite *Suite) TestGetAccount() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	address, err := suite.chainID.Chain().NewAddressGenerator().NextAddress()
 	suite.Require().NoError(err)
@@ -1300,6 +1388,7 @@ func (suite *Suite) TestGetAccount() {
 
 func (suite *Suite) TestGetAccountAtBlockHeight() {
 	suite.state.On("Sealed").Return(suite.snapshot, nil).Maybe()
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	height := uint64(5)
 	address := unittest.AddressFixture()
@@ -1447,8 +1536,10 @@ func (suite *Suite) TestExecutionNodesForBlockID() {
 			return allExecutionNodes.Filter(filter)
 		},
 		func(flow.IdentityFilter) error { return nil })
+	suite.state.On("Final").Return(suite.snapshot, nil).Maybe()
 
 	testExecutionNodesForBlockID := func(preferredENs, fixedENs, expectedENs flow.IdentityList) {
+
 		if preferredENs != nil {
 			preferredENIdentifiers = preferredENs.NodeIDs()
 		}

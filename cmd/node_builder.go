@@ -17,7 +17,6 @@ import (
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module"
 	"github.com/onflow/flow-go/module/id"
-	"github.com/onflow/flow-go/module/local"
 	"github.com/onflow/flow-go/network"
 	"github.com/onflow/flow-go/network/p2p"
 	"github.com/onflow/flow-go/state/protocol"
@@ -141,7 +140,7 @@ type NodeConfig struct {
 	BaseConfig
 	Logger            zerolog.Logger
 	NodeID            flow.Identifier
-	Me                *local.Local
+	Me                module.Local
 	Tracer            module.Tracer
 	MetricsRegisterer prometheus.Registerer
 	Metrics           Metrics

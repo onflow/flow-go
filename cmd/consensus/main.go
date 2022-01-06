@@ -115,7 +115,8 @@ func main() {
 		dkgBrokerTunnel         *dkgmodule.BrokerTunnel
 		blockTimer              protocol.BlockTimer
 		finalizedHeader         *synceng.FinalizedHeaderCache
-		dkgKeyStore             *bstorage.BeaconPrivateKeys
+		dkgState                *bstorage.DKGState
+		safeBeaconKeys          *bstorage.SafeBeaconPrivateKeys
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleConsensus.String())
@@ -169,8 +170,12 @@ func main() {
 			conMetrics = metrics.NewConsensusCollector(node.Tracer, node.MetricsRegisterer)
 			return nil
 		}).
-		Module("dkg key storage", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
-			dkgKeyStore, err = bstorage.NewBeaconPrivateKeys(node.Metrics.Cache, node.SecretsDB)
+		Module("dkg state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			dkgState, err = bstorage.NewDKGState(node.Metrics.Cache, node.SecretsDB)
+			return err
+		}).
+		Module("beacon keys", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			safeBeaconKeys = bstorage.NewSafeBeaconPrivateKeys(dkgState)
 			return err
 		}).
 		Module("mutable follower state", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
@@ -249,8 +254,8 @@ func main() {
 
 			// if the node is not part of the current epoch identities, we do
 			// not need to load the key
-			epoch := node.State.AtBlockID(node.RootBlock.ID()).Epochs().Current()
-			initialIdentities, err := epoch.InitialIdentities()
+			rootEpoch := node.State.AtBlockID(node.RootBlock.ID()).Epochs().Current()
+			initialIdentities, err := rootEpoch.InitialIdentities()
 			if err != nil {
 				return err
 			}
@@ -265,11 +270,16 @@ func main() {
 			if err != nil {
 				return err
 			}
-			epochCounter, err := epoch.Counter()
+			epochCounter, err := rootEpoch.Counter()
 			if err != nil {
 				return err
 			}
-			err = dkgKeyStore.InsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey)
+			err = dkgState.InsertMyBeaconPrivateKey(epochCounter, beaconPrivateKey.PrivateKey)
+			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
+				return err
+			}
+			// mark the root DKG as successful, so it is considered safe
+			err = dkgState.SetDKGEndState(epochCounter, flow.DKGEndStateSuccess)
 			if err != nil && !errors.Is(err, storage.ErrAlreadyExists) {
 				return err
 			}
@@ -278,16 +288,16 @@ func main() {
 			// participant in the epoch and we don't have the corresponding DKG
 			// key in the database.
 			checkEpochKey := func(protocol.Epoch) error {
-				identities, err := epoch.InitialIdentities()
+				identities, err := rootEpoch.InitialIdentities()
 				if err != nil {
 					return err
 				}
 				if _, ok := identities.ByNodeID(node.NodeID); ok {
-					counter, err := epoch.Counter()
+					counter, err := rootEpoch.Counter()
 					if err != nil {
 						return err
 					}
-					_, err = dkgKeyStore.RetrieveMyBeaconPrivateKey(counter)
+					_, err = dkgState.RetrieveMyBeaconPrivateKey(counter)
 					if err != nil {
 						return err
 					}
@@ -604,7 +614,7 @@ func main() {
 
 			epochLookup := epochs.NewEpochLookup(node.State)
 
-			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, dkgKeyStore)
+			thresholdSignerStore := signature.NewEpochAwareSignerStore(epochLookup, safeBeaconKeys)
 
 			// initialize the combined signer for hotstuff
 			var signer hotstuff.SignerVerifier
@@ -743,7 +753,7 @@ func main() {
 				node.Logger,
 				node.Me,
 				node.State,
-				dkgKeyStore,
+				dkgState,
 				dkgmodule.NewControllerFactory(
 					node.Logger,
 					node.Me,

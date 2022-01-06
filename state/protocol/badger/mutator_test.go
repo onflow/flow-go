@@ -306,11 +306,11 @@ func TestExtendInvalidChainID(t *testing.T) {
 }
 
 func TestExtendReceiptsNotSorted(t *testing.T) {
-	// Todo: this test needs to be updated:
+	// TODO: this test needs to be updated:
 	// We don't require the receipts to be sorted by height anymore
 	// We could require an "parent first" ordering, which is less strict than
 	// a full ordering by height
-	t.Skip()
+	unittest.SkipUnless(t, unittest.TEST_WIP, "needs update")
 
 	rootSnapshot := unittest.RootSnapshotFixture(participants)
 	head, err := rootSnapshot.Head()

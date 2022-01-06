@@ -2,6 +2,11 @@
 
 package crypto
 
+import (
+	"errors"
+	"fmt"
+)
+
 // DKG stands for distributed key generation. In this library, DKG
 // refers to discrete-log based protocols that generate keys for a BLS-based
 // threshold signature scheme.
@@ -51,6 +56,29 @@ type DKGState interface {
 	// The caller should make sure all honest nodes call this function,
 	// otherwise, the protocol can be broken.
 	ForceDisqualify(node int) error
+}
+
+// dkgFailureError is an error returned when a participant
+// detects a failure in the protocol and is not able to compute output keys.
+// Such a failure can be local and only depends on the participant's view of what
+// happened in the protocol. The error can only be returned using the End() function.
+type dkgFailureError struct {
+	error
+}
+
+// dkgFailureErrorf constructs a new dkgFailureError
+func dkgFailureErrorf(msg string, args ...interface{}) error {
+	return &dkgFailureError{
+		error: fmt.Errorf(msg, args...),
+	}
+}
+
+// IsDKGFailureError checks if the input error is of a dkgFailureError type.
+// dkgFailureError is an error returned when a participant
+// detects a failure in the protocol and is not able to compute output keys.
+func IsDKGFailureError(err error) bool {
+	var target *dkgFailureError
+	return errors.As(err, &target)
 }
 
 // index is the node index type used as participants ID
