@@ -19,3 +19,13 @@ func (b *backendExecutionResults) GetExecutionResultForBlockID(ctx context.Conte
 
 	return er, nil
 }
+
+// GetExecutionResultByID gets an execution result by its ID.
+func (b *backendExecutionResults) GetExecutionResultByID(ctx context.Context, id flow.Identifier) (*flow.ExecutionResult, error) {
+	result, err := b.executionResults.ByID(id)
+	if err != nil {
+		return nil, convertStorageError(err)
+	}
+
+	return result, nil
+}

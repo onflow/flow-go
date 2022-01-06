@@ -5,7 +5,7 @@ import (
 	"sync"
 )
 
-// State captures the state of a DKG engine
+// State captures the state of an in-progress DKG.
 type State uint32
 
 const (
