@@ -112,7 +112,7 @@ func ComputeLeaderSelectionFromSeed(firstView uint64, seed []byte, count int, id
 	}, nil
 }
 
-// WeightedRandomSelection - given a seed and a given count, pre-generate the indexs of leader.
+// WeightedRandomSelection - given a seed and a given count, pre-generate the indices of leader.
 // The chance to be selected as leader is proportional to its weight.
 // If an identity has 0 stake (weight is 0), it won't be selected as leader.
 // This algorithm is essentially Fitness proportionate selection:
@@ -137,7 +137,7 @@ func WeightedRandomSelection(seed []byte, count int, weights []uint64) ([]uint16
 	weightSums := make([]uint64, 0, len(weights))
 
 	// cumulative sum of weights
-	// after cumulating the weights, the sum is the total weight
+	// after cumulating the weights, the sum is the total weight;
 	// total weight is used to specify the range of the random number.
 	var cumsum uint64
 	for _, weight := range weights {
@@ -184,6 +184,6 @@ func binarySearch(value uint64, arr []uint64) int {
 			return left
 		}
 
-		mid = int(uint(left+right) >> 1)
+		mid = int(left+right) >> 1
 	}
 }
