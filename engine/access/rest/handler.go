@@ -14,6 +14,11 @@ import (
 	"github.com/onflow/flow-go/engine/access/rest/generated"
 )
 
+// Validator provides validation for http requests
+type Validator interface {
+	Validate(r *http.Request) error
+}
+
 // ApiHandlerFunc is a function that contains endpoint handling logic,
 // it fetches necessary resources and returns an error or response model.
 type ApiHandlerFunc func(
@@ -32,21 +37,36 @@ type Handler struct {
 	backend        access.API
 	linkGenerator  LinkGenerator
 	apiHandlerFunc ApiHandlerFunc
+	validator      Validator
 }
 
-func NewHandler(logger zerolog.Logger, backend access.API, handlerFunc ApiHandlerFunc, generator LinkGenerator) *Handler {
+func NewHandler(
+	logger zerolog.Logger,
+	backend access.API,
+	handlerFunc ApiHandlerFunc,
+	generator LinkGenerator,
+	validator Validator,
+) *Handler {
 	return &Handler{
 		logger:         logger,
 		backend:        backend,
 		apiHandlerFunc: handlerFunc,
 		linkGenerator:  generator,
+		validator:      validator,
 	}
 }
 
 // ServerHTTP function acts as a wrapper to each request providing common handling functionality
 // such as logging, error handling, request decorators
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	errorLogger := h.logger.With().Str("request_url", r.URL.String()).Logger()
+	// create a logger
+	errLog := h.logger.With().Str("request_url", r.URL.String()).Logger()
+
+	err := h.validator.Validate(r)
+	if err != nil {
+		h.errorResponse(w, http.StatusBadRequest, err.Error(), errLog) // todo(sideninja) limit message
+		return
+	}
 
 	// create request decorator with parsed values
 	decoratedRequest := request.Decorate(r)
@@ -73,18 +93,18 @@ func (h *Handler) errorHandler(w http.ResponseWriter, err error, errorLogger zer
 	// rest status type error should be returned with status and user message provided
 	var statusErr StatusError
 	if errors.As(err, &statusErr) {
-		h.errorResponse(w, statusErr.Status(), statusErr.UserMessage(), errorLogger)
+		h.errorResponse(w, statusErr.Status(), statusErr.UserMessage(), errLog)
 		return
 	}
 
 	// handle grpc status error returned from the backend calls, we are forwarding the message to the client
 	if se, ok := status.FromError(err); ok {
 		if se.Code() == codes.NotFound {
-			h.errorResponse(w, http.StatusNotFound, se.Message(), errorLogger)
+			h.errorResponse(w, http.StatusNotFound, se.Message(), errLog)
 			return
 		}
 		if se.Code() == codes.InvalidArgument {
-			h.errorResponse(w, http.StatusBadRequest, se.Message(), errorLogger)
+			h.errorResponse(w, http.StatusBadRequest, se.Message(), errLog)
 			return
 		}
 	}

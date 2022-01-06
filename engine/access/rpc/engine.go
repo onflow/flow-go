@@ -332,7 +332,12 @@ func (e *Engine) serveREST() {
 
 	e.log.Info().Str("rest_api_address", e.config.RESTListenAddr).Msg("starting REST server on address")
 
-	e.restServer = rest.NewServer(e.backend, e.config.RESTListenAddr, e.log)
+	r, err := rest.NewServer(e.backend, e.config.RESTListenAddr, e.log)
+	if err != nil {
+		e.log.Err(err).Msg("failed to initialize the REST server")
+		return
+	}
+	e.restServer = r
 
 	l, err := net.Listen("tcp", e.config.RESTListenAddr)
 	if err != nil {
