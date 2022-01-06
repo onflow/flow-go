@@ -256,13 +256,13 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 	return container
 }
 
-func (net *FlowNetwork) MetricsPorts() string {
+func (net *FlowNetwork) PrintMetricsPorts() {
 	var builder strings.Builder
 	builder.WriteString("metrics endpoints by container name:\n")
 	for containerName, metricsPort := range net.MetricsPortsByContainerName {
 		builder.WriteString(fmt.Sprintf("\t%s: 0.0.0.0:%s/metrics\n", containerName, metricsPort))
 	}
-	return builder.String()
+	fmt.Print(builder.String())
 }
 
 type ConsensusFollowerConfig struct {
@@ -556,8 +556,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			// ghost containers don't participate in the network skip any SN/LN ghost containers
 			if !nodeConf.Ghost {
 				nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
-				nodeContainer.AddFlag("insecure-access-api", "false")
-				nodeContainer.AddFlag("access-node-ids", "*")
+				nodeContainer.addFlag("insecure-access-api", "false")
+				nodeContainer.addFlag("access-node-ids", "*")
 			}
 		}
 	}
@@ -569,7 +569,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
 
-	fmt.Print(flowNetwork.MetricsPorts())
+	flowNetwork.PrintMetricsPorts()
 
 	return flowNetwork
 }
@@ -714,10 +714,10 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			net.AccessPorts[ColNodeMetricsPort] = hostMetricsPort
 			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 			// set a low timeout so that all nodes agree on the current view more quickly
-			nodeContainer.AddFlag("hotstuff-timeout", time.Second.String())
-			nodeContainer.AddFlag("hotstuff-min-timeout", time.Second.String())
+			nodeContainer.addFlag("hotstuff-timeout", time.Second.String())
+			nodeContainer.addFlag("hotstuff-min-timeout", time.Second.String())
 
-			nodeContainer.AddFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.addFlag("ingress-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 			nodeContainer.Ports[ColNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostPort))
 			net.AccessPorts[ColNodeAPIPort] = hostPort
@@ -735,7 +735,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
 			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
-			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 
 			nodeContainer.Ports[ExeNodeAPIPort] = hostPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckExecutionGRPC(hostPort))
@@ -754,7 +754,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				fmt.Sprintf("%s:%s:rw", tmpLedgerDir, DefaultExecutionRootDir),
 			)
 
-			nodeContainer.AddFlag("triedir", DefaultExecutionRootDir)
+			nodeContainer.addFlag("triedir", DefaultExecutionRootDir)
 
 		case flow.RoleAccess:
 			hostGRPCPort := testingdock.RandomPort(t)
@@ -766,11 +766,11 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			nodeContainer.bindPort(hostGRPCPort, containerGRPCPort)
 			nodeContainer.bindPort(hostHTTPProxyPort, containerHTTPProxyPort)
 			nodeContainer.bindPort(hostSecureGRPCPort, containerSecureGRPCPort)
-			nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
-			nodeContainer.AddFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
+			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+			nodeContainer.addFlag("http-addr", fmt.Sprintf("%s:8000", nodeContainer.Name()))
 			// uncomment line below to point the access node exclusively to a single collection node
-			// nodeContainer.AddFlag("static-collection-ingress-addr", "collection_1:9000")
-			nodeContainer.AddFlag("collection-ingress-port", "9000")
+			// nodeContainer.addFlag("static-collection-ingress-addr", "collection_1:9000")
+			nodeContainer.addFlag("collection-ingress-port", "9000")
 			net.AccessPorts[AccessNodeAPISecurePort] = hostSecureGRPCPort
 			nodeContainer.opts.HealthCheck = testingdock.HealthCheckCustom(healthcheckAccessGRPC(hostGRPCPort))
 			nodeContainer.Ports[AccessNodeAPIPort] = hostGRPCPort
@@ -783,7 +783,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				hostExternalNetworkPort := testingdock.RandomPort(t)
 				nodeContainer.bindPort(hostExternalNetworkPort, fmt.Sprintf("%s/tcp", strconv.Itoa(DefaultFlowPort)))
 				net.AccessPorts[AccessNodeExternalNetworkPort] = hostExternalNetworkPort
-				nodeContainer.AddFlag("supports-unstaked-node", "true")
+				nodeContainer.addFlag("supports-unstaked-node", "true")
 			}
 
 			hostMetricsPort := testingdock.RandomPort(t)
@@ -797,7 +797,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		case flow.RoleConsensus:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
-			nodeContainer.AddFlag("chunk-alpha", "1")
+			nodeContainer.addFlag("chunk-alpha", "1")
 			hostMetricsPort := testingdock.RandomPort(t)
 			containerMetricsPort := "8080/tcp"
 
@@ -808,7 +808,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		case flow.RoleVerification:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
-			nodeContainer.AddFlag("chunk-alpha", "1")
+			nodeContainer.addFlag("chunk-alpha", "1")
 			hostMetricsPort := testingdock.RandomPort(t)
 			containerMetricsPort := "8080/tcp"
 
@@ -821,7 +821,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 		hostPort := testingdock.RandomPort(t)
 		containerPort := "9000/tcp"
 
-		nodeContainer.AddFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
+		nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 		nodeContainer.bindPort(hostPort, containerPort)
 		nodeContainer.Ports[GhostNodeAPIPort] = hostPort
 

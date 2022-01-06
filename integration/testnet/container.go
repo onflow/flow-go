@@ -179,8 +179,8 @@ func (c *Container) bindPort(hostPort, containerPort string) {
 
 }
 
-// AddFlag adds a command line flag to the container's startup command.
-func (c *Container) AddFlag(flag, val string) {
+// addFlag adds a command line flag to the container's startup command.
+func (c *Container) addFlag(flag, val string) {
 	c.opts.Config.Cmd = append(
 		c.opts.Config.Cmd,
 		fmt.Sprintf("--%s=%s", flag, val),
