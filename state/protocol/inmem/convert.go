@@ -264,7 +264,9 @@ func SnapshotFromBootstrapStateWithProtocolVersion(
 		LatestResult: result,
 		SealingSegment: &flow.SealingSegment{
 			Blocks:           []*flow.Block{root},
-			ExecutionResults: make(flow.ExecutionResultList, 0),
+			ExecutionResults: flow.ExecutionResultList{result},
+			LatestSeals:      map[flow.Identifier]flow.Identifier{root.ID(): seal.ID()},
+			FirstSeal:        seal,
 		},
 		QuorumCertificate: qc,
 		Phase:             flow.EpochPhaseStaking,

@@ -94,19 +94,13 @@ func Bootstrap(
 		highest := segment.Highest() // reference block of the snapshot
 		lowest := segment.Lowest()   // last sealed block
 
-		// bootstrap the sealing segment
+		// 1) bootstrap the sealing segment
 		err = state.bootstrapSealingSegment(segment, highest)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap sealing chain segment blocks: %w", err)
 		}
 
-		// 2) insert the root execution result and seal into the database and index it
-		err = transaction.WithTx(state.bootstrapSealedResult(root))(tx)
-		if err != nil {
-			return fmt.Errorf("could not bootstrap sealed result: %w", err)
-		}
-
-		// 3) insert the root quorum certificate into the database
+		// 2) insert the root quorum certificate into the database
 		qc, err := root.QuorumCertificate()
 		if err != nil {
 			return fmt.Errorf("could not get root qc: %w", err)
@@ -116,25 +110,25 @@ func Bootstrap(
 			return fmt.Errorf("could not insert root qc: %w", err)
 		}
 
-		// 4) initialize the current protocol state height/view pointers
+		// 3) initialize the current protocol state height/view pointers
 		err = transaction.WithTx(state.bootstrapStatePointers(root))(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap height/view pointers: %w", err)
 		}
 
-		// 5) initialize values related to the epoch logic
+		// 4) initialize values related to the epoch logic
 		err = state.bootstrapEpoch(root, !config.SkipNetworkAddressValidation)(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap epoch values: %w", err)
 		}
 
-		// 6) initialize spork params
+		// 5) initialize spork params
 		err = transaction.WithTx(state.bootstrapSporkInfo(root))(tx)
 		if err != nil {
 			return fmt.Errorf("could not bootstrap spork info: %w", err)
 		}
 
-		// 7) set metric values
+		// 6) set metric values
 		err = state.updateEpochMetrics(root)
 		if err != nil {
 			return fmt.Errorf("could not update epoch metrics: %w", err)
@@ -171,6 +165,14 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 			}
 		}
 
+		// insert the first seal (in case the segment's first block contains no seal)
+		if segment.FirstSeal != nil {
+			err := transaction.WithTx(operation.InsertSeal(segment.FirstSeal.ID(), segment.FirstSeal))(tx)
+			if err != nil {
+				return fmt.Errorf("could not insert first seal: %w", err)
+			}
+		}
+
 		for i, block := range segment.Blocks {
 			blockID := block.ID()
 			height := block.Header.Height
@@ -188,6 +190,22 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 				return fmt.Errorf("could not index root block segment (id=%x): %w", blockID, err)
 			}
 
+			// index the latest seal as of this block
+			latestSealID, ok := segment.LatestSeals[blockID]
+			if !ok {
+				return fmt.Errorf("missing latest seal for sealing segment block (id=%s)", blockID)
+			}
+			// sanity check: make sure the seal exists
+			var latestSeal flow.Seal
+			err = transaction.WithTx(operation.RetrieveSeal(latestSealID, &latestSeal))(tx)
+			if err != nil {
+				return fmt.Errorf("could not verify latest seal for block (id=%x) exists: %w", blockID, err)
+			}
+			err = transaction.WithTx(operation.IndexBlockSeal(blockID, latestSealID))(tx)
+			if err != nil {
+				return fmt.Errorf("could not index block seal: %w", err)
+			}
+
 			// for all but the first block in the segment, index the parent->child relationship
 			if i > 0 {
 				err = transaction.WithTx(operation.InsertBlockChildren(block.Header.ParentID, []flow.Identifier{blockID}))(tx)
@@ -201,39 +219,6 @@ func (state *State) bootstrapSealingSegment(segment *flow.SealingSegment, head *
 		err := transaction.WithTx(operation.InsertBlockChildren(head.ID(), nil))(tx)
 		if err != nil {
 			return fmt.Errorf("could not insert child index for head block (id=%x): %w", head.ID(), err)
-		}
-
-		return nil
-	}
-}
-
-func (state *State) bootstrapSealedResult(root protocol.Snapshot) func(*badger.Txn) error {
-	return func(tx *badger.Txn) error {
-		head, err := root.Head()
-		if err != nil {
-			return fmt.Errorf("could not get head from root snapshot: %w", err)
-		}
-		result, seal, err := root.SealedResult()
-		if err != nil {
-			return fmt.Errorf("could not get sealed result from root snapshot: %w", err)
-		}
-
-		err = operation.SkipDuplicates(operation.InsertExecutionResult(result))(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert root result: %w", err)
-		}
-		err = operation.IndexExecutionResult(result.BlockID, result.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index root result: %w", err)
-		}
-
-		err = operation.SkipDuplicates(operation.InsertSeal(seal.ID(), seal))(tx)
-		if err != nil {
-			return fmt.Errorf("could not insert root seal: %w", err)
-		}
-		err = operation.IndexBlockSeal(head.ID(), seal.ID())(tx)
-		if err != nil {
-			return fmt.Errorf("could not index root block seal: %w", err)
 		}
 
 		return nil
