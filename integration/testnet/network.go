@@ -23,6 +23,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/onflow/flow-go-sdk/crypto"
+
 	"github.com/onflow/flow-go/cmd/bootstrap/run"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	consensus_follower "github.com/onflow/flow-go/follower"
@@ -487,7 +488,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		Name: networkConf.Name,
 	})
 
-	// create a temporary directory to store all bootstrapping files 
+	// create a temporary directory to store all bootstrapping files
 	bootstrapDir, err := integrationBootstrapDir()
 	require.Nil(t, err)
 
@@ -510,7 +511,7 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 		seal:                       seal,
 		result:                     result,
 		BootstrapDir:               bootstrapDir,
-		BootstrapSnapshot: 			bootstrapSnapshot,
+		BootstrapSnapshot:          bootstrapSnapshot,
 	}
 
 	// check that at-least 2 full access nodes must be configure in your test suite

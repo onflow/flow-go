@@ -84,7 +84,7 @@ func withDHTNodeEnabled(asServer bool) nodeFixtureParameterOption {
 // nodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
 // It returns the node and its identity.
 func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
-	logger := unittest.Logger().Level(zerolog.ErrorLevel)
+	logger := unittest.Logger().Level(zerolog.DebugLevel)
 
 	// default parameters
 	parameters := &nodeFixtureParameters{

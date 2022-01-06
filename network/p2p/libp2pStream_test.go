@@ -349,16 +349,17 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 func TestOneToOneComm(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-
+	msg := "hello\n"
 	count := 2
 	ch := make(chan string, count)
 
 	// Create the handler function
 	streamHandler := func(s network.Stream) {
-		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-		str, err := rw.ReadString('\n')
-		assert.NoError(t, err)
-		ch <- str
+		r := bufio.NewReader(s)
+		b := make([]byte, len(msg))
+		_, err := r.Read(b)
+		require.NoError(t, err)
+		ch <- string(b)
 	}
 
 	// Creates nodes
@@ -366,7 +367,8 @@ func TestOneToOneComm(t *testing.T) {
 		ctx,
 		unittest.IdentifierFixture(),
 		count,
-		withDefaultStreamHandler(streamHandler))
+		withDefaultStreamHandler(streamHandler),
+		withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, count)
 
@@ -380,44 +382,43 @@ func TestOneToOneComm(t *testing.T) {
 	// Create stream from node 1 to node 2
 	nodes[0].host.Peerstore().AddAddrs(pInfo2.ID, pInfo2.Addrs, peerstore.AddressTTL)
 	s1, err := nodes[0].CreateStream(ctx, pInfo2.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	rw := bufio.NewReadWriter(bufio.NewReader(s1), bufio.NewWriter(s1))
 
 	// Send message from node 1 to 2
-	msg := "hello\n"
 	_, err = rw.WriteString(msg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Flush the stream
-	assert.NoError(t, rw.Flush())
+	require.NoError(t, rw.Flush())
 
 	// Wait for the message to be received
 	select {
 	case rcv := <-ch:
 		require.Equal(t, msg, rcv)
-	case <-time.After(1 * time.Second):
-		assert.Fail(t, "message not received")
+		//case <-time.After(1 * time.Second):
+		//	require.Fail(t, "message not received")
 	}
 
 	// Create stream from node 2 to node 1
 	nodes[1].host.Peerstore().AddAddrs(pInfo1.ID, pInfo1.Addrs, peerstore.AddressTTL)
 	s2, err := nodes[1].CreateStream(ctx, pInfo1.ID)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	rw = bufio.NewReadWriter(bufio.NewReader(s2), bufio.NewWriter(s2))
 
 	// Send message from node 2 to 1
 	msg = "hey\n"
 	_, err = rw.WriteString(msg)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	// Flush the stream
-	assert.NoError(t, rw.Flush())
+	require.NoError(t, rw.Flush())
 
 	select {
 	case rcv := <-ch:
 		require.Equal(t, msg, rcv)
 	case <-time.After(3 * time.Second):
-		assert.Fail(t, "message not received")
+		require.Fail(t, "message not received")
 	}
 }
 

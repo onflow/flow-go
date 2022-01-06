@@ -85,7 +85,7 @@ func (s *Suite) SetupSuite() {
 	s.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification,
 		testnet.WithID(s.verID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		// only verification and execution nodes run with preferred unicast protocols
 		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.preferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, verConfig)
@@ -94,7 +94,7 @@ func (s *Suite) SetupSuite() {
 	s.exe1ID = unittest.IdentifierFixture()
 	exe1Config := testnet.NewNodeConfig(flow.RoleExecution,
 		testnet.WithID(s.exe1ID),
-		testnet.WithLogLevel(zerolog.InfoLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 		// only verification and execution nodes run with preferred unicast protocols
 		testnet.WithAdditionalFlag(fmt.Sprintf("--preferred-unicast-protocols=%s", s.preferredUnicasts)))
 	s.nodeConfigs = append(s.nodeConfigs, exe1Config)
