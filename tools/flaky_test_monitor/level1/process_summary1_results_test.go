@@ -10,7 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/onflow/flow-go/tools/flaky-test-monitor/common"
+	"flow-go/tools/flaky-test-monitor/common"
+
 	"github.com/stretchr/testify/require"
 )
 
