@@ -185,9 +185,11 @@ func (anb *StakedAccessNodeBuilder) Build() AccessNodeBuilder {
 			pingService,
 			anb.nodeInfoFile,
 		)
+
 		if err != nil {
 			return nil, fmt.Errorf("could not create ping engine: %w", err)
 		}
+
 		return ping, nil
 	})
 

@@ -28,6 +28,7 @@ func NewConnGater(log zerolog.Logger, peerFilter PeerFilter) *ConnGater {
 		log:        log,
 		peerFilter: peerFilter,
 	}
+
 	return cg
 }
 

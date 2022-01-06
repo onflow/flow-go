@@ -10,6 +10,7 @@ import (
 	addrutil "github.com/libp2p/go-addr-util"
 	"github.com/libp2p/go-libp2p-core/host"
 	"github.com/libp2p/go-libp2p-core/network"
+	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
@@ -40,6 +41,8 @@ type nodeFixtureParameters struct {
 	address     string
 	dhtEnabled  bool
 	dhtServer   bool
+	dhtPrefix   string
+	peerFilter  PeerFilter
 }
 
 type nodeFixtureParameterOption func(*nodeFixtureParameters)
@@ -68,10 +71,17 @@ func withNetworkingAddress(address string) nodeFixtureParameterOption {
 	}
 }
 
-func withDHTNodeEnabled(asServer bool) nodeFixtureParameterOption {
+func withDHTNodeEnabled(prefix string, asServer bool) nodeFixtureParameterOption {
 	return func(p *nodeFixtureParameters) {
 		p.dhtEnabled = true
 		p.dhtServer = asServer
+		p.dhtPrefix = prefix
+	}
+}
+
+func withPeerFilter(filter PeerFilter) nodeFixtureParameterOption {
+	return func(p *nodeFixtureParameters) {
+		p.peerFilter = filter
 	}
 }
 
@@ -106,7 +116,7 @@ func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opt
 
 	if parameters.dhtEnabled {
 		builder.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return NewDHT(c, h, unicast.FlowDHTProtocolIDPrefix+"test", AsServer(parameters.dhtServer))
+			return NewDHT(c, h, protocol.ID(unicast.FlowDHTProtocolIDPrefix+parameters.dhtPrefix), AsServer(parameters.dhtServer))
 		})
 	}
 
@@ -224,5 +234,6 @@ func nodesFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, co
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}
+
 	return nodes, identities
 }

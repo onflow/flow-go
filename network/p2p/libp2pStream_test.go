@@ -515,20 +515,22 @@ func TestConnectionGating(t *testing.T) {
 	defer cancel()
 
 	// create 2 nodes
-	nodes, identities := nodesFixture(t,
-		ctx,
-		unittest.IdentifierFixture(),
-		2,
-		withAllowListEnabled())
+	node1Peers := make(map[peer.ID]struct{})
+	node1, node1Id := nodeFixture(t, ctx, unittest.IdentifierFixture(), withPeerFilter(func(p peer.ID) bool {
+		_, ok := node1Peers[p]
+		return ok
+	}))
 
-	node1 := nodes[0]
-	node1Id := *identities[0]
+	node2Peers := make(map[peer.ID]struct{})
+	node2, node2Id := nodeFixture(t, ctx, unittest.IdentifierFixture(), withPeerFilter(func(p peer.ID) bool {
+		_, ok := node2Peers[p]
+		return ok
+	}))
+
 	defer stopNode(t, node1)
 	node1Info, err := PeerAddressInfo(node1Id)
 	assert.NoError(t, err)
 
-	node2 := nodes[1]
-	node2Id := *identities[1]
 	defer stopNode(t, node2)
 	node2Info, err := PeerAddressInfo(node2Id)
 	assert.NoError(t, err)
@@ -551,7 +553,7 @@ func TestConnectionGating(t *testing.T) {
 	t.Run("inbound connection from an allowed node is rejected", func(t *testing.T) {
 
 		// node1 allowlists node2 but node2 does not allowlists node1
-		node1.UpdateAllowList(peer.IDSlice{node2Info.ID})
+		node1Peers[node2Info.ID] = struct{}{}
 
 		// node1 attempts to connect to node2
 		// node2 should reject the inbound connection
@@ -563,9 +565,9 @@ func TestConnectionGating(t *testing.T) {
 	t.Run("outbound connection to an approved node is allowed", func(t *testing.T) {
 
 		// node1 allowlists node2
-		node1.UpdateAllowList(peer.IDSlice{node2Info.ID})
+		node1Peers[node2Info.ID] = struct{}{}
 		// node2 allowlists node1
-		node2.UpdateAllowList(peer.IDSlice{node1Info.ID})
+		node2Peers[node1Info.ID] = struct{}{}
 
 		// node1 should be allowed to connect to node2
 		node1.host.Peerstore().AddAddrs(node2Info.ID, node2Info.Addrs, peerstore.AddressTTL)
