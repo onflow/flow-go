@@ -90,11 +90,16 @@ func (rd *Request) Selects() []string {
 
 func (rd *Request) GetVar(name string) string {
 	vars := mux.Vars(rd.Request)
-	return vars[name] // todo(sideninja) consider returning err if non-existing
+	return vars[name]
+}
+
+func (rd *Request) GetVars(name string) []string {
+	vars := mux.Vars(rd.Request)
+	return toStringArray(vars[name])
 }
 
 func (rd *Request) GetQueryParam(name string) string {
-	return rd.Request.URL.Query().Get(name) // todo(sideninja) consider returning err if non-existing
+	return rd.Request.URL.Query().Get(name)
 }
 
 func (rd *Request) GetQueryParams(name string) []string {
@@ -138,4 +143,22 @@ func sliceToMap(values []string) map[string]bool {
 		valueMap[v] = true
 	}
 	return valueMap
+}
+
+func toStringArray(in string) []string {
+	in = strings.TrimSuffix(in, "]")
+	in = strings.TrimPrefix(in, "[")
+	var out []string
+
+	if len(in) == 0 {
+		return []string{}
+	}
+
+	if strings.Contains(in, ",") {
+		out = strings.Split(in, ",")
+	} else {
+		out = strings.Fields(in)
+	}
+
+	return out
 }

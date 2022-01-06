@@ -13,6 +13,7 @@ type ID flow.Identifier
 
 func (i *ID) Parse(raw string) error {
 	if raw == "" { // allow empty
+		*i = ID(flow.ZeroID)
 		return nil
 	}
 
@@ -41,15 +42,15 @@ func (i *IDs) Parse(raw []string) error {
 		return fmt.Errorf("at most %d IDs can be requested at a time", maxIDsLength)
 	}
 
-	id := make([]ID, len(raw))
+	ids := make([]ID, len(raw))
 	for j, r := range raw {
-		err := id[j].Parse(r)
+		err := ids[j].Parse(r)
 		if err != nil {
 			return err
 		}
 	}
 
-	*i = id
+	*i = ids
 	return nil
 }
 

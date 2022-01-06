@@ -9,7 +9,7 @@ const heightQuery = "height"
 const startHeightQuery = "start_height"
 const endHeightQuery = "end_height"
 const maxAllowedHeights = 50
-const idsQuery = "ids"
+const idParam = "id"
 
 const mustProvideHeightOrRangeErr = "must provide either heights or start and end height range"
 const onlyProvideHeightOrRangeErr = "can only provide either heights or start and end height range"
@@ -97,7 +97,7 @@ type GetBlockByIDs struct {
 
 func (g *GetBlockByIDs) Build(r *Request) error {
 	return g.Parse(
-		r.GetQueryParams(idsQuery),
+		r.GetVars(idParam),
 	)
 }
 
