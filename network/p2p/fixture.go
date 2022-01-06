@@ -21,7 +21,6 @@ import (
 	fcrypto "github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/flow"
 	"github.com/onflow/flow-go/module/metrics"
-	"github.com/onflow/flow-go/network/mocknetwork"
 	"github.com/onflow/flow-go/network/p2p/unicast"
 	"github.com/onflow/flow-go/utils/unittest"
 )
@@ -116,7 +115,7 @@ func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opt
 
 	if parameters.dhtEnabled {
 		builder.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return NewDHT(c, h, protocol.ID(unicast.FlowDHTProtocolIDPrefix+parameters.dhtPrefix), AsServer(parameters.dhtServer))
+			return NewDHT(c, h, protocol.ID(unicast.FlowDHTProtocolIDPrefix+parameters.dhtPrefix+"/"), AsServer(parameters.dhtServer))
 		})
 	}
 
@@ -137,17 +136,6 @@ func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opt
 	identity.Address = ip + ":" + port
 
 	return n, *identity
-}
-
-func mockPingInfoProvider() (*mocknetwork.PingInfoProvider, string, uint64, uint64) {
-	version := "version_1"
-	height := uint64(5000)
-	view := uint64(10)
-	pingInfoProvider := new(mocknetwork.PingInfoProvider)
-	pingInfoProvider.On("SoftwareVersion").Return(version)
-	pingInfoProvider.On("SealedBlockHeight").Return(height)
-	pingInfoProvider.On("HotstuffView").Return(view)
-	return pingInfoProvider, version, height, view
 }
 
 // stopNodes stop all nodes in the input slice
