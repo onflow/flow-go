@@ -172,7 +172,7 @@ func binarySearch(value uint64, arr []uint64) int {
 	left := 0
 	arrayLen := len(arr)
 	right := arrayLen - 1
-	mid := int(uint(arrayLen) >> 1)
+	mid := arrayLen >> 1
 	for {
 		if arr[mid] <= value {
 			left = mid + 1
