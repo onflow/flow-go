@@ -78,6 +78,8 @@ func (ss *SealingSuite) SetupTest() {
 	exeConfig := testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.exeID), testnet.AsGhost())
 	nodeConfigs = append(nodeConfigs, exeConfig)
 
+	nodeConfigs = append(nodeConfigs, testnet.NewNodeConfig(flow.RoleExecution, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(unittest.IdentifierFixture())))
+
 	// need one controllable verification node (used ghost)
 	ss.verID = unittest.IdentifierFixture()
 	verConfig := testnet.NewNodeConfig(flow.RoleVerification, testnet.WithLogLevel(zerolog.FatalLevel), testnet.WithID(ss.verID), testnet.AsGhost())
