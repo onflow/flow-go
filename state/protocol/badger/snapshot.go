@@ -267,9 +267,22 @@ func (s *Snapshot) SealedResult() (*flow.ExecutionResult, *flow.Seal, error) {
 
 // SealingSegment will walk through the chain backward until we reach the block referenced
 // by the latest seal and build a SealingSegment. As we visit each block we check each execution
-// receipt in the blocks payload to make sure we have a corresponding execution result, any execution
+// receipt in the block's payload to make sure we have a corresponding execution result, any execution
 // results missing from blocks are stored in the SealingSegment.ExecutionResults field.
 func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
+	var rootHeight uint64
+	err := s.state.db.View(operation.RetrieveRootHeight(&rootHeight))
+	if err != nil {
+		return nil, fmt.Errorf("could not get root height: %w", err)
+	}
+	head, err := s.Head()
+	if err != nil {
+		return nil, fmt.Errorf("could not get snapshot reference block: %w", err)
+	}
+	if head.Height < rootHeight {
+		return nil, protocol.ErrSealingSegmentBelowRootBlock
+	}
+
 	seal, err := s.state.seals.ByBlockID(s.blockID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get seal for sealing segment: %w", err)
@@ -277,7 +290,7 @@ func (s *Snapshot) SealingSegment() (*flow.SealingSegment, error) {
 
 	// walk through the chain backward until we reach the block referenced by
 	// the latest seal - the returned segment includes this block
-	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID)
+	builder := flow.NewSealingSegmentBuilder(s.state.results.ByID, s.state.seals.ByBlockID)
 	scraper := func(header *flow.Header) error {
 		blockID := header.ID()
 		block, err := s.state.blocks.ByID(blockID)
