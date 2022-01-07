@@ -613,7 +613,7 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 			for _, an := range s.net.ContainersByRole(flow.RoleAccess) {
 				if !an.Config.Ghost {
 					port := s.net.AccessPortsByContainerName[an.Name()]
-					nodeContainer.AddFlag("access-node-addresses", fmt.Sprintf("[%s:%s]", an.Name(), port))
+					nodeContainer.AddFlag("access-node-addresses", fmt.Sprintf("0.0.0.0:%s", port))
 					break
 				}
 			}

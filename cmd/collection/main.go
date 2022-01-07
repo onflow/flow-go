@@ -87,11 +87,11 @@ func main() {
 		err               error
 
 		// epoch qc contract client
-		machineAccountInfo *bootstrap.NodeMachineAccountInfo
-		flowClientConfigs  []*common.FlowClientConfig
-		insecureAccessAPI  bool
-		accessNodeIDS      []string
-		accessNodeAddresses     []string
+		machineAccountInfo  *bootstrap.NodeMachineAccountInfo
+		flowClientConfigs   []*common.FlowClientConfig
+		insecureAccessAPI   bool
+		accessNodeIDS       []string
+		accessNodeAddresses []string
 	)
 
 	nodeBuilder := cmd.FlowNode(flow.RoleCollection.String())
