@@ -222,20 +222,21 @@ func main() {
 				return nil
 			}
 
-			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
-			if err != nil {
-				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
-			}
-
-			flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
-			if err != nil {
-				return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
-			}
+			//anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
+			//if err != nil {
+			//	return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
+			//}
+			//
+			//flowClientConfigs, err = common.FlowClientConfigs(anIDS, insecureAccessAPI, node.State.Sealed())
+			//if err != nil {
+			//	return fmt.Errorf("failed to prepare flow client connection configs for each access node id %w", err)
+			//}
 
 			return nil
 		}).
 		Component("machine account config validator", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) (module.ReadyDoneAware, error) {
 			//@TODO use fallback logic for flowClient similar to DKG/QC contract clients
+			node.Logger.Warn().Interface("client-config", flowClientConfigs[0]).Msg("client config")
 			flowClient, err := common.FlowClient(flowClientConfigs[0])
 			if err != nil {
 				return nil, fmt.Errorf("failed to get flow client connection option for access node (0): %s %w", flowClientConfigs[0].AccessAddress, err)

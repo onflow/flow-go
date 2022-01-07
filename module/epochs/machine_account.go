@@ -144,7 +144,7 @@ func (validator *MachineAccountConfigValidator) validateMachineAccountConfig(ctx
 		return
 	}
 
-	log.Info().Msg("confirmed valid machine account configuration")
+	log.Warn().Msg("confirmed valid machine account configuration")
 }
 
 // CheckMachineAccountInfo checks a node machine account config, logging

@@ -556,8 +556,13 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 			// ghost containers don't participate in the network skip any SN/LN ghost containers
 			if !nodeConf.Ghost {
 				nodeContainer := flowNetwork.Containers[nodeConf.ContainerName]
-				nodeContainer.AddFlag("insecure-access-api", "false")
-				nodeContainer.AddFlag("access-node-ids", "*")
+				for _, an := range flowNetwork.ContainersByRole(flow.RoleAccess) {
+					if !an.Config.Ghost {
+						port := flowNetwork.AccessPortsByContainerName[an.Name()]
+						nodeContainer.AddFlag("access-node-addresses", fmt.Sprintf("%s:%s", an.Name(), port))
+						break
+					}
+				}
 			}
 		}
 	}

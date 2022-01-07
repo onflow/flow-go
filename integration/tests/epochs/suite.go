@@ -52,7 +52,7 @@ func (s *Suite) SetupTest() {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.WarnLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
@@ -589,7 +589,7 @@ func (s *Suite) assertNodeNotApprovedOrProposed(ctx context.Context, env templat
 // newTestContainerOnNetwork configures a new container on the suites network
 func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperationInfo) *testnet.Container {
 	containerConfigs := []func(config *testnet.NodeConfig){
-		testnet.WithLogLevel(zerolog.DebugLevel),
+		testnet.WithLogLevel(zerolog.WarnLevel),
 		testnet.WithID(info.NodeID),
 	}
 
@@ -613,7 +613,7 @@ func (s *Suite) newTestContainerOnNetwork(role flow.Role, info *StakedNodeOperat
 			for _, an := range s.net.ContainersByRole(flow.RoleAccess) {
 				if !an.Config.Ghost {
 					port := s.net.AccessPortsByContainerName[an.Name()]
-					nodeContainer.AddFlag("access-node-addresses", fmt.Sprintf("0.0.0.0:%s", port))
+					nodeContainer.AddFlag("access-node-addresses", fmt.Sprintf("%s:%s", an.Name(), port))
 					break
 				}
 			}

@@ -95,7 +95,7 @@ func main() {
 		flowClientConfigs  []*common.FlowClientConfig
 		insecureAccessAPI  bool
 		accessNodeIDS      []string
-
+		accessNodeAddresses []string
 		err                     error
 		mutableState            protocol.MutableState
 		beaconPrivateKey        *encodable.RandomBeaconPrivKey
@@ -143,6 +143,8 @@ func main() {
 		flags.BoolVar(&emergencySealing, "emergency-sealing-active", sealing.DefaultEmergencySealingActive, "(de)activation of emergency sealing")
 		flags.BoolVar(&insecureAccessAPI, "insecure-access-api", false, "required if insecure GRPC connection should be used")
 		flags.StringSliceVar(&accessNodeIDS, "access-node-ids", []string{}, fmt.Sprintf("array of access node IDs sorted in priority order where the first ID in this array will get the first connection attempt and each subsequent ID after serves as a fallback. Minimum length %d. Use '*' for all IDs in protocol state.", common.DefaultAccessNodeIDSMinimum))
+		flags.StringSliceVar(&accessNodeAddresses, "access-node-addresses", []string{}, fmt.Sprintf("custom list of access node full addresses. Minimum length %d. This flag can only be used on non-mainnet networks.", common.DefaultAccessNodeIDSMinimum))
+
 		flags.DurationVar(&dkgControllerConfig.BaseStartDelay, "dkg-controller-base-start-delay", dkgmodule.DefaultBaseStartDelay, "used to define the range for jitter prior to DKG start (eg. 500µs) - the base value is scaled quadratically with the # of DKG participants")
 		flags.DurationVar(&dkgControllerConfig.BaseHandleFirstBroadcastDelay, "dkg-controller-base-handle-first-broadcast-delay", dkgmodule.DefaultBaseHandleFirstBroadcastDelay, "used to define the range for jitter prior to DKG handling the first broadcast messages (eg. 50ms) - the base value is scaled quadratically with the # of DKG participants")
 		flags.DurationVar(&dkgControllerConfig.HandleSubsequentBroadcastDelay, "dkg-controller-handle-subsequent-broadcast-delay", dkgmodule.DefaultHandleSubsequentBroadcastDelay, "used to define the constant delay introduced prior to DKG handling subsequent broadcast messages (eg. 2s)")
@@ -364,6 +366,24 @@ func main() {
 			return err
 		}).
 		Module("sdk client connection options", func(builder cmd.NodeBuilder, node *cmd.NodeConfig) error {
+			// access node addresses can be set explicitly for testing networks
+			node.Logger.Warn().Str("addresses", accessNodeAddresses[0]).Msg("access addresses")
+			if len(accessNodeAddresses) > 0 {
+				if node.RootChainID == flow.Mainnet {
+					return fmt.Errorf("invalid flag usage --access-node-addresses flag is not allowed on chain with root ID %s", flow.Mainnet)
+				}
+
+				for _, address := range accessNodeAddresses {
+					config, err := common.NewFlowClientConfig(address, "", true)
+					if err != nil {
+						return fmt.Errorf("failed create flow client configs using flag --access-node-addresses: %w", err)
+					}
+					flowClientConfigs = append(flowClientConfigs, config)
+				}
+
+				return nil
+			}
+
 			anIDS, err := common.ValidateAccessNodeIDSFlag(accessNodeIDS, node.RootChainID, node.State.Sealed())
 			if err != nil {
 				return fmt.Errorf("failed to validate flag --access-node-ids %w", err)
