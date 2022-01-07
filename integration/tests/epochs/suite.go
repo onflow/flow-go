@@ -52,7 +52,7 @@ func (s *Suite) SetupTest() {
 	collectionConfigs := []func(*testnet.NodeConfig){
 		testnet.WithAdditionalFlag("--hotstuff-timeout=12s"),
 		testnet.WithAdditionalFlag("--block-rate-delay=100ms"),
-		testnet.WithLogLevel(zerolog.FatalLevel),
+		testnet.WithLogLevel(zerolog.DebugLevel),
 	}
 
 	consensusConfigs := []func(config *testnet.NodeConfig){
