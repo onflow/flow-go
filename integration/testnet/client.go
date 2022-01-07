@@ -237,15 +237,26 @@ func (c *Client) GetLatestProtocolSnapshot(ctx context.Context) (*inmem.Snapshot
 	return snapshot, nil
 }
 
+// GetLatestBlockID returns block ID of the latest sealed block
 func (c *Client) GetLatestBlockID(ctx context.Context) (flow.Identifier, error) {
 	header, err := c.client.GetLatestBlockHeader(ctx, true)
 	if err != nil {
-		return flow.ZeroID, fmt.Errorf("could not get latest block header: %w", err)
+		return flow.ZeroID, fmt.Errorf("could not get latest sealed block header: %w", err)
 	}
 
 	var id flow.Identifier
 	copy(id[:], header.ID[:])
 	return id, nil
+}
+
+// GetLatestSealedBlockHeader returns full block header for the latest sealed block
+func (c *Client) GetLatestSealedBlockHeader(ctx context.Context) (*sdk.BlockHeader, error) {
+	header, err := c.client.GetLatestBlockHeader(ctx, true)
+	if err != nil {
+		return nil, fmt.Errorf("could not get latest sealed block header: %w", err)
+	}
+
+	return header, nil
 }
 
 func (c *Client) UserAddress(txResp *sdk.TransactionResult) (sdk.Address, bool) {
