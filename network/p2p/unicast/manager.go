@@ -107,7 +107,7 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 //
 // It makes at most `maxAttempts` to create a stream with the peer.
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
-// remote nodes and once in a while UpgradeRawStream returns an error 'both yamux endpoints are clients'.
+// remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'.
 //
 // Note that in case an existing TCP connection underneath to `peerID` exists, that connection is utilized for creating a new stream.
 // The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
