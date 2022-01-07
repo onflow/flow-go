@@ -29,7 +29,7 @@ const (
 	LedgerHeavyLoadType   LoadType = "ledger-heavy"
 )
 
-const accountCreationBatchSize = 100
+var accountCreationBatchSize int = 100
 const tokensPerTransfer = 0.01 // flow testnets only have 10e6 total supply, so we choose a small amount here
 
 // ContLoadGenerator creates a continuous load of transactions to the network
@@ -48,8 +48,8 @@ type ContLoadGenerator struct {
 	fungibleTokenAddress *flowsdk.Address
 	favContractAddress   *flowsdk.Address
 	accounts             []*flowAccount
-	availableAccounts    chan         *flowAccount          // queue with accounts available for   workers
-	happeningAccounts    chan func() (*flowAccount, string) // queue with accounts happening after worker processing
+	availableAccounts    chan         *flowAccount                     // queue with accounts available for   workers
+	happeningAccounts    chan func() (*flowAccount, string, time.Time) // queue with accounts happening after worker processing
 	txTracker            *TxTracker
 	txStatsTracker       *TxStatsTracker
 	workerStatsTracker   *WorkerStatsTracker
@@ -58,6 +58,7 @@ type ContLoadGenerator struct {
 	stopped              bool
 	loadType             LoadType
 	feedbackEnabled      bool
+	availableAccountsLo  int
 }
 
 // NewContLoadGenerator returns a new ContLoadGenerator
@@ -76,7 +77,12 @@ func NewContLoadGenerator(
 	feedbackEnabled bool,
 ) (*ContLoadGenerator, error) {
 
-	numberOfAccounts := tps * 10 // 1 second per block, factor 10 for delays to prevent sequence number collisions
+	multiplier := 10
+	if feedbackEnabled {
+		multiplier = 20 // bigger if feedbackEnabled otherwise we can run out of accounts for sending transactions
+		accountCreationBatchSize = 250 // due to the bigger multiplier we enlarge accountCreationBatchSize to create the accounts faster
+	}
+	numberOfAccounts := tps * multiplier // 1 second per block, factor 10 for delays to prevent sequence number collisions
 
 	servAcc, err := loadServiceAccount(flowClient, serviceAccountAddress, servAccPrivKeyHex)
 	if err != nil {
@@ -103,14 +109,15 @@ func NewContLoadGenerator(
 		fungibleTokenAddress: fungibleTokenAddress,
 		flowTokenAddress:     flowTokenAddress,
 		accounts:             make([]*flowAccount, 0),
-		availableAccounts:    make(chan         *flowAccount         , numberOfAccounts),
-		happeningAccounts:    make(chan func() (*flowAccount, string), numberOfAccounts),
+		availableAccounts:    make(chan         *flowAccount                    , numberOfAccounts),
+		happeningAccounts:    make(chan func() (*flowAccount, string, time.Time), numberOfAccounts),
 		txTracker:            txTracker,
 		txStatsTracker:       txStatsTracker,
 		workerStatsTracker:   NewWorkerStatsTracker(),
 		blockRef:             NewBlockRef(supervisorClient),
 		loadType:             loadType,
 		feedbackEnabled:      feedbackEnabled,
+		availableAccountsLo:  numberOfAccounts,
 	}
 
 	return lGen, nil
@@ -313,7 +320,7 @@ func (lg *ContLoadGenerator) createAccounts(num int) error {
 					accountCreatedEvent := flowsdk.AccountCreatedEvent(event)
 					accountAddress := accountCreatedEvent.Address()
 
-					lg.log.Debug().
+					lg.log.Trace().
 						Hex("address", accountAddress.Bytes()).
 						Msg("new account created")
 
@@ -415,22 +422,29 @@ func (lg *ContLoadGenerator) sendAddKeyTx(workerID int) {
 	lg.sendTx(workerID, addKeysTx)
 }
 
-func (lg *ContLoadGenerator) pushAccountsHappening(workerID int, acc *flowAccount, tx_id string) {
+func (lg *ContLoadGenerator) pushAccountsHappening(workerID int, acc *flowAccount, tx_id string, timeNow time.Time) {
 	lg.log.Trace().Msgf("workerID=%d pushing happening address", workerID)
-	lg.happeningAccounts <- (func() (*flowAccount, string) { return acc, tx_id })
+	lg.happeningAccounts <- (func() (*flowAccount, string, time.Time) { return acc, tx_id, timeNow })
 }
 
 func (lg *ContLoadGenerator) probeAccountsHappening(workerID int) {
-
 	channelElements := len(lg.happeningAccounts)
 	lg.log.Trace().Msgf("workerID=%d probing happening address from channel with %d elements", workerID, channelElements)
 	for i := 0; i < channelElements; i++ {
-		acc, tx_id := (<-lg.happeningAccounts)()
+		acc, tx_id, timeAtSendTx := (<-lg.happeningAccounts)()
 		txIdFile := fmt.Sprintf("/dev/shm/flow-transaction-feedback/%s/%s/%s.txt", tx_id[0:2], tx_id[2:4], tx_id[4:]) // e.g. /dev/shm/flow-transaction-feedback/70/b9/4146a01bc7843dc9547837e19ba0da6899fdd83ae61e2cf2e3fb4555da6a.txt
 		lg.log.Trace().Msgf("workerID=%d probing happening address %x account %d tx_id %s AKA %s", workerID, acc.address.Bytes(), acc.i, tx_id, txIdFile)
 		if _, err:= os.Stat(txIdFile); errors.Is(err, fs.ErrNotExist) {
 			// come here if file does not exist; means account is still happening...
-			lg.pushAccountsHappening(workerID, acc, tx_id)
+			lg.pushAccountsHappening(workerID, acc, tx_id, timeAtSendTx)
+
+			elapsed := time.Since(timeAtSendTx).Seconds()
+			elapsedSuspicious := 30.0
+			if (elapsed >= elapsedSuspicious) && (elapsed < (1+elapsedSuspicious)) {
+				// come here to capture transactions which mysteriously have had no feedback after 30 seconds
+				// note: this should only be output once as its age reaches and passes through a certain amount of seconds...
+				lg.log.Warn().Msgf("workerID=%d address %x account %d tx_id=%s has been happening for %f seconds and counting", workerID, acc.address.Bytes(), acc.i, tx_id, elapsed)
+			}
 		} else {
 			// come here if file exists; means account is good to be used again
 			lg.availableAccounts <- acc
@@ -455,6 +469,12 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 		if lg.feedbackEnabled {
 			// come here if feedbackEnabled so that worker with workerID 0 can probe to see if accounts are no longer happening
 			defer lg.probeAccountsHappening(workerID)
+
+			// come here to have workerID 0 keep track of lowest number of available accounts in channel
+			if len(lg.availableAccounts) < lg.availableAccountsLo {
+				lg.availableAccountsLo = len(lg.availableAccounts)
+				lg.log.Debug().Msgf("workerID=%d discovered new availableAccountsLo=%d of numberOfAccounts=%d", workerID, lg.availableAccountsLo, lg.numberOfAccounts)
+			}
 		}
 	}
 
@@ -466,15 +486,15 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 			if ok {
 				// come here if read from next available account channel
 			} else {
-				lg.log.Trace().Msgf("workerID=%d next available account channel closed; skipping send", workerID)
+				// come here if next available account channel closed; in theory this should never happen
+				lg.log.Error().Msgf("workerID=%d ERROR: next available account channel closed; skipping send", workerID)
 				return
 			}
 		default:
-			// come here if nothing to read from non-closed channel
-			lg.log.Trace().Msgf("workerID=%d no next available account in channel; skipping send", workerID)
+			// come here if nothing to read from next available account channel; in theory this should never happen
+			lg.log.Error().Msgf("workerID=%d ERROR: next available account channel empty; skipping send // channels availableAccounts[%d] happeningAccounts[%d]", workerID, len(lg.availableAccounts), len(lg.happeningAccounts))
 			return
 	}
-	//fixme acc := <-lg.availableAccounts
 	if !lg.feedbackEnabled {
 		// come here if feedback disabled and happening accounts get recycled by time... which can result in transaction execution sequence mismatch errors
 		defer func() { lg.availableAccounts <- acc }()
@@ -513,7 +533,7 @@ func (lg *ContLoadGenerator) sendTokenTransferTx(workerID int) {
 
 	if lg.feedbackEnabled {
 		// come here if feedback enable and happening accounts get recycled after checking they make it into a block
-		lg.pushAccountsHappening(workerID, acc, transferTx.ID().String())
+		lg.pushAccountsHappening(workerID, acc, transferTx.ID().String(), time.Now())
 	}
 }
 
