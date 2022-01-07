@@ -41,15 +41,30 @@ func processSummary3TestRun(level2FilePath string, propertyFileDirectory string)
 	// most failures, no-results, longest running
 	for _, trs := range testSummary2.TestResults {
 		if trs.NoResult > 0 {
-			noResultsTRS = insertSortedByNoResult(noResultsTRS, *trs)
+			noResultsTRS = append(noResultsTRS, *trs)
 		}
 		if trs.Failed > 0 && trs.FailureRate >= config.FailureThresholdPercent {
-			failuresTRS = insertSortedByFailureRate(failuresTRS, *trs)
+			failuresTRS = append(failuresTRS, *trs)
 		}
 		if trs.AverageDuration > 0 && trs.AverageDuration >= config.DurationThresholdSeconds {
-			durationTRS = insertSortedByDuration(durationTRS, *trs)
+			durationTRS = append(durationTRS, *trs)
 		}
 	}
+
+	// sort no result slice from most no results to least - that's why less function compares in reverse order
+	sort.Slice(noResultsTRS, func(i, j int) bool {
+		return (noResultsTRS[i].NoResult > noResultsTRS[j].NoResult)
+	})
+
+	// sort failures slice from most failures to least - that's why less function compares in reverse order
+	sort.Slice(failuresTRS, func(i, j int) bool {
+		return failuresTRS[i].FailureRate > failuresTRS[j].FailureRate
+	})
+
+	// sort duration slice from longest duration to shortest - that's why less function compares in reverse order
+	sort.Slice(durationTRS, func(i, j int) bool {
+		return durationTRS[i].AverageDuration > durationTRS[j].AverageDuration
+	})
 
 	var testSummary3 common.TestSummary3
 	testSummary3.NoResults = noResultsTRS
@@ -75,49 +90,6 @@ func processSummary3TestRun(level2FilePath string, propertyFileDirectory string)
 	testSummary3.LongestRunning = durationTRS
 
 	return testSummary3
-}
-
-func insertSortedByNoResult(testResultSummaries []common.TestResultSummary, testResultSummaryToInsert common.TestResultSummary) []common.TestResultSummary {
-	indexToInsertAt := sort.Search(len(testResultSummaries), func(i int) bool {
-		return float32(testResultSummaries[i].NoResult) < float32(testResultSummaryToInsert.NoResult)
-	})
-	return insertAt(testResultSummaries, indexToInsertAt, testResultSummaryToInsert)
-}
-
-func insertSortedByDuration(testResultSummaries []common.TestResultSummary, testResultSummaryToInsert common.TestResultSummary) []common.TestResultSummary {
-	indexToInsertAt := sort.Search(len(testResultSummaries), func(i int) bool {
-		return testResultSummaries[i].AverageDuration < testResultSummaryToInsert.AverageDuration
-	})
-	return insertAt(testResultSummaries, indexToInsertAt, testResultSummaryToInsert)
-}
-
-// from https://stackoverflow.com/a/67216833/5719544
-func insertSortedByFailureRate(testResultSummaries []common.TestResultSummary, testResultSummaryToInsert common.TestResultSummary) []common.TestResultSummary {
-	indexToInsertAt := sort.Search(len(testResultSummaries), func(i int) bool {
-		return testResultSummaries[i].FailureRate < testResultSummaryToInsert.FailureRate
-	})
-	return insertAt(testResultSummaries, indexToInsertAt, testResultSummaryToInsert)
-}
-
-// insertAt inserts v into s at index i and returns the new slice.
-// from https://stackoverflow.com/a/67216833/5719544
-func insertAt(data []common.TestResultSummary, i int, v common.TestResultSummary) []common.TestResultSummary {
-	if i == len(data) {
-		// Insert at end is the easy case.
-		return append(data, v)
-	}
-
-	// Make space for the inserted element by shifting
-	// values at the insertion index up one index. The call
-	// to append does not allocate memory when cap(data) is
-	// greater ​than len(data).
-	data = append(data[:i+1], data[i:]...)
-
-	// Insert the new element.
-	data[i] = v
-
-	// Return the updated slice.
-	return data
 }
 
 func main() {
