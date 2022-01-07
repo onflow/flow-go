@@ -82,13 +82,13 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 	var errs error
 
 	for i := len(m.unicasts) - 1; i >= 0; i-- {
-		s, addrs, err := m.createStreamWithProtocol(ctx, m.unicasts[i].ProtocolId(), peerID, maxAttempts)
+		s, addrs, err := m.rawStreamWithProtocol(ctx, m.unicasts[i].ProtocolId(), peerID, maxAttempts)
 		if err != nil {
 			errs = multierror.Append(errs, err)
 			continue
 		}
 
-		s, err = m.unicasts[i].NewStream(s)
+		s, err = m.unicasts[i].UpgradeRawStream(s)
 		if err != nil {
 			errs = multierror.Append(errs, fmt.Errorf("could not upgrade stream: %w", err))
 			continue
@@ -101,14 +101,17 @@ func (m *Manager) CreateStream(ctx context.Context, peerID peer.ID, maxAttempts 
 	return nil, nil, fmt.Errorf("could not create stream on any available unicast protocol: %w", errs)
 }
 
-// createStreamWithProtocol creates a stream on specified protocol.
+// rawStreamWithProtocol creates a stream raw libp2p stream on specified protocol.
+//
+// Note: a raw stream must be upgraded by the given unicast protocol id.
+//
 // It makes at most `maxAttempts` to create a stream with the peer.
 // This was put in as a fix for #2416. PubSub and 1-1 communication compete with each other when trying to connect to
-// remote nodes and once in a while NewStream returns an error 'both yamux endpoints are clients'.
+// remote nodes and once in a while UpgradeRawStream returns an error 'both yamux endpoints are clients'.
 //
 // Note that in case an existing TCP connection underneath to `peerID` exists, that connection is utilized for creating a new stream.
 // The multiaddr.Multiaddr return value represents the addresses of `peerID` we dial while trying to create a stream to it.
-func (m *Manager) createStreamWithProtocol(ctx context.Context,
+func (m *Manager) rawStreamWithProtocol(ctx context.Context,
 	protocolID protocol.ID,
 	peerID peer.ID,
 	maxAttempts int) (libp2pnet.Stream, []multiaddr.Multiaddr, error) {

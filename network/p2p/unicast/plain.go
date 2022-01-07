@@ -11,7 +11,7 @@ type PlainStream struct {
 	protocolId protocol.ID
 }
 
-func (p PlainStream) NewStream(s libp2pnet.Stream) (libp2pnet.Stream, error) {
+func (p PlainStream) UpgradeRawStream(s libp2pnet.Stream) (libp2pnet.Stream, error) {
 	return s, nil
 }
 

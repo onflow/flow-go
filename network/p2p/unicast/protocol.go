@@ -66,7 +66,7 @@ func ToProtocolFactory(name ProtocolName) (ProtocolFactory, error) {
 
 // Protocol represents a unicast protocol.
 type Protocol interface {
-	NewStream(s libp2pnet.Stream) (libp2pnet.Stream, error)
+	UpgradeRawStream(s libp2pnet.Stream) (libp2pnet.Stream, error)
 	Handler(stream libp2pnet.Stream)
 	ProtocolId() protocol.ID
 }
