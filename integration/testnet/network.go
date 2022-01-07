@@ -80,6 +80,18 @@ const (
 	// ExeNodeMetricsPort is the name used for the execution node metrics server port
 	ExeNodeMetricsPort = "exe-metrics-port"
 
+	// ColNodeMetricsPort is the name used for the collection node metrics server port
+	ColNodeMetricsPort = "col-metrics-port"
+
+	// AccessNodeMetricsPort is the name used for the access node metrics server port
+	AccessNodeMetricsPort = "access-metrics-port"
+
+	// VerNodeMetricsPort is the name used for the verification node metrics server port
+	VerNodeMetricsPort = "verification-metrics-port"
+
+	// ConNodeMetricsPort is the name used for the consensus node metrics server port
+	ConNodeMetricsPort = "con-metrics-port"
+
 	// DefaultFlowPort default gossip network port
 	DefaultFlowPort = 2137
 	// DefaultSecureGRPCPort is the port used to access secure GRPC server running on ANs
@@ -101,20 +113,21 @@ func init() {
 
 // FlowNetwork represents a test network of Flow nodes running in Docker containers.
 type FlowNetwork struct {
-	t                          *testing.T
-	suite                      *testingdock.Suite
-	config                     NetworkConfig
-	cli                        *dockerclient.Client
-	network                    *testingdock.Network
-	Containers                 map[string]*Container
-	ConsensusFollowers         map[flow.Identifier]consensus_follower.ConsensusFollower
-	AccessPorts                map[string]string
-	AccessPortsByContainerName map[string]string
-	root                       *flow.Block
-	result                     *flow.ExecutionResult
-	seal                       *flow.Seal
-	BootstrapDir               string
-	BootstrapSnapshot          *inmem.Snapshot
+	t                           *testing.T
+	suite                       *testingdock.Suite
+	config                      NetworkConfig
+	cli                         *dockerclient.Client
+	network                     *testingdock.Network
+	Containers                  map[string]*Container
+	ConsensusFollowers          map[flow.Identifier]consensus_follower.ConsensusFollower
+	AccessPorts                 map[string]string
+	AccessPortsByContainerName  map[string]string
+	MetricsPortsByContainerName map[string]string
+	root                        *flow.Block
+	result                      *flow.ExecutionResult
+	seal                        *flow.Seal
+	BootstrapDir                string
+	BootstrapSnapshot           *inmem.Snapshot
 }
 
 // Identities returns a list of identities, one for each node in the network.
@@ -242,6 +255,15 @@ func (net *FlowNetwork) ContainerByName(name string) *Container {
 	container, exists := net.Containers[name]
 	require.True(net.t, exists, "container %s does not exists", name)
 	return container
+}
+
+func (net *FlowNetwork) PrintMetricsPorts() {
+	var builder strings.Builder
+	builder.WriteString("metrics endpoints by container name:\n")
+	for containerName, metricsPort := range net.MetricsPortsByContainerName {
+		builder.WriteString(fmt.Sprintf("\t%s: 0.0.0.0:%s/metrics\n", containerName, metricsPort))
+	}
+	fmt.Print(builder.String())
 }
 
 type ConsensusFollowerConfig struct {
@@ -498,20 +520,21 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	require.Nil(t, err)
 
 	flowNetwork := &FlowNetwork{
-		t:                          t,
-		cli:                        dockerClient,
-		config:                     networkConf,
-		suite:                      suite,
-		network:                    network,
-		Containers:                 make(map[string]*Container, nNodes),
-		ConsensusFollowers:         make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
-		AccessPorts:                make(map[string]string),
-		AccessPortsByContainerName: make(map[string]string),
-		root:                       root,
-		seal:                       seal,
-		result:                     result,
-		BootstrapDir:               bootstrapDir,
-		BootstrapSnapshot:          bootstrapSnapshot,
+		t:                           t,
+		cli:                         dockerClient,
+		config:                      networkConf,
+		suite:                       suite,
+		network:                     network,
+		Containers:                  make(map[string]*Container, nNodes),
+		ConsensusFollowers:          make(map[flow.Identifier]consensus_follower.ConsensusFollower, len(networkConf.ConsensusFollowers)),
+		AccessPorts:                 make(map[string]string),
+		AccessPortsByContainerName:  make(map[string]string),
+		MetricsPortsByContainerName: make(map[string]string),
+		root:                        root,
+		seal:                        seal,
+		result:                      result,
+		BootstrapDir:                bootstrapDir,
+		BootstrapSnapshot:           bootstrapSnapshot,
 	}
 
 	// check that at-least 2 full access nodes must be configure in your test suite
@@ -546,6 +569,8 @@ func PrepareFlowNetwork(t *testing.T, networkConf NetworkConfig) *FlowNetwork {
 	for _, followerConf := range networkConf.ConsensusFollowers {
 		flowNetwork.addConsensusFollower(t, rootProtocolSnapshotPath, followerConf, confs)
 	}
+
+	flowNetwork.PrintMetricsPorts()
 
 	return flowNetwork
 }
@@ -682,6 +707,13 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 
 			nodeContainer.bindPort(hostPort, containerPort)
 
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
+
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[ColNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[ColNodeMetricsPort] = hostMetricsPort
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 			// set a low timeout so that all nodes agree on the current view more quickly
 			nodeContainer.addFlag("hotstuff-timeout", time.Second.String())
 			nodeContainer.addFlag("hotstuff-min-timeout", time.Second.String())
@@ -702,6 +734,7 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 			containerMetricsPort := "8080/tcp"
 
 			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 
 			nodeContainer.addFlag("rpc-addr", fmt.Sprintf("%s:9000", nodeContainer.Name()))
 
@@ -754,16 +787,36 @@ func (net *FlowNetwork) AddNode(t *testing.T, bootstrapDir string, nodeConf Cont
 				nodeContainer.addFlag("supports-unstaked-node", "true")
 			}
 
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
+
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[AccessNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[AccessNodeMetricsPort] = hostMetricsPort
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
+
 		case flow.RoleConsensus:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
 			nodeContainer.addFlag("chunk-alpha", "1")
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
 
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[ConNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[ConNodeMetricsPort] = hostMetricsPort
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 		case flow.RoleVerification:
 			// use 1 here instead of the default 5, because the integration
 			// tests only start 1 verification node
 			nodeContainer.addFlag("chunk-alpha", "1")
+			hostMetricsPort := testingdock.RandomPort(t)
+			containerMetricsPort := "8080/tcp"
 
+			nodeContainer.bindPort(hostMetricsPort, containerMetricsPort)
+			nodeContainer.Ports[VerNodeMetricsPort] = hostMetricsPort
+			net.AccessPorts[VerNodeMetricsPort] = hostMetricsPort
+			net.MetricsPortsByContainerName[nodeContainer.Name()] = hostMetricsPort
 		}
 	} else {
 		hostPort := testingdock.RandomPort(t)
