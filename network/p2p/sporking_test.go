@@ -39,7 +39,9 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	node1, id1 := nodeFixture(t,
 		ctx,
 		sporkId,
-		withNetworkingPrivateKey(node1key))
+		"test_crosstalk_prevention_on_network_key_change",
+		withNetworkingPrivateKey(node1key),
+	)
 	defer stopNode(t, node1)
 	t.Logf(" %s node started on %s", id1.NodeID.String(), id1.Address)
 	t.Logf("libp2p ID for %s: %s", id1.NodeID.String(), node1.host.ID())
@@ -49,7 +51,9 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	node2, id2 := nodeFixture(t,
 		ctx,
 		sporkId,
-		withNetworkingPrivateKey(node2key))
+		"test_crosstalk_prevention_on_network_key_change",
+		withNetworkingPrivateKey(node2key),
+	)
 	peerInfo2, err := PeerAddressInfo(id2)
 	require.NoError(t, err)
 
@@ -67,8 +71,10 @@ func TestCrosstalkPreventionOnNetworkKeyChange(t *testing.T) {
 	node2, id2New := nodeFixture(t,
 		ctx,
 		sporkId,
+		"test_crosstalk_prevention_on_network_key_change",
 		withNetworkingPrivateKey(node2keyNew),
-		withNetworkingAddress(id2.Address))
+		withNetworkingAddress(id2.Address),
+	)
 	defer stopNode(t, node2)
 
 	// make sure the node2 indeed came up on the old ip and port
@@ -89,14 +95,14 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	sporkId1 := unittest.IdentifierFixture()
 
 	// create and start node 1 on localhost and random port
-	node1, id1 := nodeFixture(t, ctx, sporkId1)
+	node1, id1 := nodeFixture(t, ctx, sporkId1, "test_one_to_one_crosstalk_prevention")
 
 	defer stopNode(t, node1)
 	peerInfo1, err := PeerAddressInfo(id1)
 	require.NoError(t, err)
 
 	// create and start node 2 on localhost and random port
-	node2, id2 := nodeFixture(t, ctx, sporkId1)
+	node2, id2 := nodeFixture(t, ctx, sporkId1, "test_one_to_one_crosstalk_prevention")
 
 	// create stream from node 2 to node 1
 	testOneToOneMessagingSucceeds(t, node2, peerInfo1)
@@ -109,7 +115,9 @@ func TestOneToOneCrosstalkPrevention(t *testing.T) {
 	node2, id2New := nodeFixture(t,
 		ctx,
 		unittest.IdentifierFixture(), // update the flow root id for node 2. node1 is still listening on the old protocol
-		withNetworkingAddress(id2.Address))
+		"test_one_to_one_crosstalk_prevention",
+		withNetworkingAddress(id2.Address),
+	)
 
 	defer stopNode(t, node2)
 
@@ -133,14 +141,18 @@ func TestOneToKCrosstalkPrevention(t *testing.T) {
 	// create and start node 1 on localhost and random port
 	node1, _ := nodeFixture(t,
 		ctx,
-		previousSporkId)
+		previousSporkId,
+		"test_one_to_k_crosstalk_prevention",
+	)
 
 	defer stopNode(t, node1)
 
 	// create and start node 2 on localhost and random port with the same root block ID
 	node2, id2 := nodeFixture(t,
 		ctx,
-		previousSporkId)
+		previousSporkId,
+		"test_one_to_k_crosstalk_prevention",
+	)
 
 	pInfo2, err := PeerAddressInfo(id2)
 	defer stopNode(t, node2)

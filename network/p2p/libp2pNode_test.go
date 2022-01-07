@@ -50,9 +50,12 @@ func TestSingleNodeLifeCycle(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	node, _ := nodeFixture(t,
+	node, _ := nodeFixture(
+		t,
 		ctx,
-		unittest.IdentifierFixture())
+		unittest.IdentifierFixture(),
+		"test_single_node_life_cycle",
+	)
 
 	stopNode(t, node)
 }
@@ -87,7 +90,7 @@ func TestAddPeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), count)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_add_peers", count)
 	defer stopNodes(t, nodes)
 
 	// add the remaining nodes to the first node as its set of peers
@@ -108,7 +111,7 @@ func TestRemovePeers(t *testing.T) {
 	defer cancel()
 
 	// create nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), count)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_remove_peers", count)
 	peerInfos, errs := peerInfosFromIDs(identities)
 	assert.Len(t, errs, 0)
 	defer stopNodes(t, nodes)

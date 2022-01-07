@@ -121,9 +121,7 @@ func GenerateIDs(
 
 		var opts []nodeBuilderOption
 
-		if len(o.dhtOpts) > 0 {
-			opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
-		}
+		opts = append(opts, withDHT(o.dhtPrefix, o.dhtOpts...))
 
 		libP2PNodes[i], tagObservables[i] = generateLibP2PNode(t, logger, *id, key, o.connectionGating, idProvider, opts...)
 
@@ -319,13 +317,14 @@ type nodeBuilderOption func(p2p.NodeBuilder)
 func withDHT(prefix string, dhtOpts ...dht.Option) nodeBuilderOption {
 	return func(nb p2p.NodeBuilder) {
 		nb.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return p2p.NewDHT(c, h, pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix+"/"), dhtOpts...)
+			return p2p.NewDHT(c, h, pc.ID(unicast.FlowDHTProtocolIDPrefix+prefix), dhtOpts...)
 		})
 	}
 }
 
 // generateLibP2PNode generates a `LibP2PNode` on localhost using a port assigned by the OS
-func generateLibP2PNode(t *testing.T,
+func generateLibP2PNode(
+	t *testing.T,
 	logger zerolog.Logger,
 	id flow.Identity,
 	key crypto.PrivateKey,

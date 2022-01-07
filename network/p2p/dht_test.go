@@ -27,10 +27,10 @@ func TestFindPeerWithDHT(t *testing.T) {
 	golog.SetAllLoggers(golog.LevelFatal) // change this to Debug if libp2p logs are needed
 
 	sporkId := unittest.IdentifierFixture()
-	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, 2, withDHTNodeEnabled("dht_test", true))
+	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 2, withDHTOptions(AsServer(true)))
 	require.Len(t, dhtServerNodes, 2)
 
-	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, count-2, withDHTNodeEnabled("dht_test", false))
+	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-2, withDHTOptions(AsServer(false)))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	defer stopNodes(t, nodes)
@@ -108,12 +108,12 @@ func TestPubSubWithDHTDiscovery(t *testing.T) {
 
 	sporkId := unittest.IdentifierFixture()
 	// create one node running the DHT Server (mimicking the staked AN)
-	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, 1, withDHTNodeEnabled("dht_test", true))
+	dhtServerNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", 1, withDHTOptions(AsServer(true)))
 	require.Len(t, dhtServerNodes, 1)
 	dhtServerNode := dhtServerNodes[0]
 
 	// crate other nodes running the DHT Client (mimicking the unstaked ANs)
-	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, count-1, withDHTNodeEnabled("dht_test", false))
+	dhtClientNodes, _ := nodesFixture(t, ctx, sporkId, "dht_test", count-1, withDHTOptions(AsServer(false)))
 
 	nodes := append(dhtServerNodes, dhtClientNodes...)
 	defer stopNodes(t, nodes)

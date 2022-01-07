@@ -12,6 +12,8 @@ import (
 	"github.com/libp2p/go-libp2p-core/network"
 	"github.com/libp2p/go-libp2p-core/protocol"
 	"github.com/libp2p/go-libp2p-core/routing"
+	dht "github.com/libp2p/go-libp2p-kad-dht"
+	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	"github.com/multiformats/go-multiaddr"
 	manet "github.com/multiformats/go-multiaddr/net"
 	"github.com/rs/zerolog"
@@ -38,9 +40,7 @@ type nodeFixtureParameters struct {
 	unicasts    []unicast.ProtocolName
 	key         fcrypto.PrivateKey
 	address     string
-	dhtEnabled  bool
-	dhtServer   bool
-	dhtPrefix   string
+	dhtOptions  []dht.Option
 	peerFilter  PeerFilter
 }
 
@@ -70,11 +70,9 @@ func withNetworkingAddress(address string) nodeFixtureParameterOption {
 	}
 }
 
-func withDHTNodeEnabled(prefix string, asServer bool) nodeFixtureParameterOption {
+func withDHTOptions(opts ...dht.Option) nodeFixtureParameterOption {
 	return func(p *nodeFixtureParameters) {
-		p.dhtEnabled = true
-		p.dhtServer = asServer
-		p.dhtPrefix = prefix
+		p.dhtOptions = opts
 	}
 }
 
@@ -86,7 +84,13 @@ func withPeerFilter(filter PeerFilter) nodeFixtureParameterOption {
 
 // nodeFixture is a test fixture that creates a single libp2p node with the given key, spork id, and options.
 // It returns the node and its identity.
-func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opts ...nodeFixtureParameterOption) (*Node, flow.Identity) {
+func nodeFixture(
+	t *testing.T,
+	ctx context.Context,
+	sporkId flow.Identifier,
+	dhtPrefix string,
+	opts ...nodeFixtureParameterOption,
+) (*Node, flow.Identity) {
 	logger := unittest.Logger().Level(zerolog.ErrorLevel)
 
 	// default parameters
@@ -95,8 +99,6 @@ func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opt
 		unicasts:    nil,
 		key:         generateNetworkingKey(t),
 		address:     defaultAddress,
-		dhtServer:   false,
-		dhtEnabled:  false,
 	}
 
 	for _, opt := range opts {
@@ -111,13 +113,11 @@ func nodeFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, opt
 	connManager := NewConnManager(logger, noopMetrics)
 
 	builder := NewNodeBuilder(logger, parameters.address, parameters.key, sporkId).
-		SetConnectionManager(connManager)
-
-	if parameters.dhtEnabled {
-		builder.SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
-			return NewDHT(c, h, protocol.ID(unicast.FlowDHTProtocolIDPrefix+parameters.dhtPrefix+"/"), AsServer(parameters.dhtServer))
+		SetConnectionManager(connManager).
+		SetPubSub(pubsub.NewGossipSub).
+		SetRoutingSystem(func(c context.Context, h host.Host) (routing.Routing, error) {
+			return NewDHT(c, h, protocol.ID(unicast.FlowDHTProtocolIDPrefix+sporkId.String()+"/"+dhtPrefix), parameters.dhtOptions...)
 		})
-	}
 
 	n, err := builder.Build(ctx)
 	require.NoError(t, err)
@@ -200,7 +200,7 @@ func acceptAndHang(t *testing.T, l net.Listener) {
 
 // nodesFixture is a test fixture that creates a number of libp2p nodes with the given callback function for stream handling.
 // It returns the nodes and their identities.
-func nodesFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, count int, opts ...nodeFixtureParameterOption) ([]*Node,
+func nodesFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, dhtPrefix string, count int, opts ...nodeFixtureParameterOption) ([]*Node,
 	flow.IdentityList) {
 	// keeps track of errors on creating a node
 	var err error
@@ -218,7 +218,7 @@ func nodesFixture(t *testing.T, ctx context.Context, sporkId flow.Identifier, co
 	var identities flow.IdentityList
 	for i := 0; i < count; i++ {
 		// create a node on localhost with a random port assigned by the OS
-		node, identity := nodeFixture(t, ctx, sporkId, opts...)
+		node, identity := nodeFixture(t, ctx, sporkId, dhtPrefix, opts...)
 		nodes = append(nodes, node)
 		identities = append(identities, &identity)
 	}

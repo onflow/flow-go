@@ -36,6 +36,7 @@ func TestStreamClosing(t *testing.T) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
+		"test_stream_closing",
 		2,
 		withDefaultStreamHandler(handler))
 	defer stopNodes(t, nodes)
@@ -141,6 +142,7 @@ func testCreateStream(t *testing.T, sporkId flow.Identifier, unicasts []unicast.
 	nodes, identities := nodesFixture(t,
 		ctx,
 		sporkId,
+		"test_create_stream",
 		count,
 		withPreferredUnicasts(unicasts))
 	defer stopNodes(t, nodes)
@@ -198,8 +200,9 @@ func TestCreateStream_FallBack(t *testing.T) {
 	thisNode, _ := nodeFixture(t,
 		ctx,
 		sporkId,
+		"test_create_stream_fallback",
 		withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
-	otherNode, otherId := nodeFixture(t, ctx, sporkId)
+	otherNode, otherId := nodeFixture(t, ctx, sporkId, "test_create_stream_fallback")
 
 	defer stopNodes(t, []*Node{thisNode, otherNode})
 
@@ -257,7 +260,7 @@ func TestCreateStreamIsConcurrencySafe(t *testing.T) {
 	defer cancel()
 
 	// create two nodes
-	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), 2)
+	nodes, identities := nodesFixture(t, ctx, unittest.IdentifierFixture(), "test_create_stream_is_concurrency_safe", 2)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, 2)
 	nodeInfo1, err := PeerAddressInfo(*identities[1])
@@ -299,7 +302,9 @@ func TestNoBackoffWhenCreatingStream(t *testing.T) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
-		count)
+		"test_no_backoff_when_create_stream",
+		count,
+	)
 	node1 := nodes[0]
 	node2 := nodes[1]
 
@@ -365,8 +370,10 @@ func TestOneToOneComm(t *testing.T) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
+		"test_one_to_one_comm",
 		count,
-		withDefaultStreamHandler(streamHandler))
+		withDefaultStreamHandler(streamHandler),
+	)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, count)
 
@@ -431,7 +438,9 @@ func TestCreateStreamTimeoutWithUnresponsiveNode(t *testing.T) {
 	nodes, identities := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
-		1)
+		"test_create_stream_timeout_with_unresponsive_node",
+		1,
+	)
 	defer stopNodes(t, nodes)
 	require.Len(t, identities, 1)
 
@@ -469,7 +478,9 @@ func TestCreateStreamIsConcurrent(t *testing.T) {
 	goodNodes, goodNodeIds := nodesFixture(t,
 		ctx,
 		unittest.IdentifierFixture(),
-		2)
+		"test_create_stream_is_concurrent",
+		2,
+	)
 
 	defer stopNodes(t, goodNodes)
 	require.Len(t, goodNodeIds, 2)
@@ -516,13 +527,13 @@ func TestConnectionGating(t *testing.T) {
 
 	// create 2 nodes
 	node1Peers := make(map[peer.ID]struct{})
-	node1, node1Id := nodeFixture(t, ctx, unittest.IdentifierFixture(), withPeerFilter(func(p peer.ID) bool {
+	node1, node1Id := nodeFixture(t, ctx, unittest.IdentifierFixture(), "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
 		_, ok := node1Peers[p]
 		return ok
 	}))
 
 	node2Peers := make(map[peer.ID]struct{})
-	node2, node2Id := nodeFixture(t, ctx, unittest.IdentifierFixture(), withPeerFilter(func(p peer.ID) bool {
+	node2, node2Id := nodeFixture(t, ctx, unittest.IdentifierFixture(), "test_connection_gating", withPeerFilter(func(p peer.ID) bool {
 		_, ok := node2Peers[p]
 		return ok
 	}))
