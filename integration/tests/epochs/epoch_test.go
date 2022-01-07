@@ -180,7 +180,7 @@ func (s *Suite) runTestEpochJoinAndLeave(role flow.Role, checkNetworkHealth node
 
 	s.assertDKGSuccessful(ctx, env)
 	s.assertQCVotingSuccessful(ctx, env)
-	
+
 	// assert transition to second epoch happened as expected
 	// if counter is still 0, epoch emergency fallback was triggered and we can fail early
 	s.assertEpochCounter(ctx, 1)

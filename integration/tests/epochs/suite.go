@@ -126,7 +126,7 @@ type StakedNodeOperationInfo struct {
 	StakingAccountKey       sdkcrypto.PrivateKey
 	NetworkingKey           sdkcrypto.PrivateKey
 	StakingKey              sdkcrypto.PrivateKey
-	MachineAccountAddress   flow.Address
+	MachineAccountAddress   sdk.Address
 	MachineAccountKey       sdkcrypto.PrivateKey
 	MachineAccountPublicKey flow.AccountPublicKey
 	ContainerName           string
@@ -168,7 +168,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 	require.NoError(s.T(), err)
 
 	// create staking collection
-	result, err = s.createStakingCollection(ctx, env, stakingAccountKey, stakingAccount)
+	result, machineAccountAddr, err := s.createStakingCollection(ctx, env, stakingAccountKey, stakingAccount)
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
 
@@ -215,6 +215,7 @@ func (s *Suite) StakeNode(ctx context.Context, env templates.Environment, role f
 		NetworkingKey:           networkingKey,
 		MachineAccountKey:       machineAccountKey,
 		MachineAccountPublicKey: machineAccountPubKey,
+		MachineAccountAddress:   machineAccountAddr,
 		ContainerName:           containerName,
 	}
 }
@@ -307,7 +308,7 @@ func (s *Suite) createAccount(ctx context.Context,
 }
 
 // creates a staking collection for the given node
-func (s *Suite) createStakingCollection(ctx context.Context, env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account) (*sdk.TransactionResult, error) {
+func (s *Suite) createStakingCollection(ctx context.Context, env templates.Environment, accountKey sdkcrypto.PrivateKey, stakingAccount *sdk.Account) (*sdk.TransactionResult, sdk.Address, error) {
 	latestBlockID, err := s.client.GetLatestBlockID(ctx)
 	require.NoError(s.T(), err)
 
@@ -329,7 +330,16 @@ func (s *Suite) createStakingCollection(ctx context.Context, env templates.Envir
 	require.NoError(s.T(), err)
 	stakingAccount.Keys[0].SequenceNumber++
 
-	return result, nil
+	var machineAccountAddr sdk.Address
+	for _, event := range result.Events {
+		if event.Type == sdk.EventAccountCreated { // assume only one account created (safe because we control the transaction)
+			accountCreatedEvent := sdk.AccountCreatedEvent(event)
+			machineAccountAddr = accountCreatedEvent.Address()
+			break
+		}
+	}
+
+	return result, machineAccountAddr, nil
 }
 
 // SubmitStakingCollectionRegisterNodeTx submits tx that calls StakingCollection.registerNode
@@ -410,8 +420,7 @@ func (s *Suite) SubmitStakingCollectionCloseStakeTx(
 	return result, nil
 }
 
-
-func (s *Suite) removeNodeFromProtocol(ctx context.Context, env templates.Environment, nodeID flow.Identifier)  {
+func (s *Suite) removeNodeFromProtocol(ctx context.Context, env templates.Environment, nodeID flow.Identifier) {
 	result, err := s.submitAdminRemoveNodeTx(ctx, env, nodeID)
 	require.NoError(s.T(), err)
 	require.NoError(s.T(), result.Error)
@@ -562,7 +571,7 @@ func (s *Suite) assertQCVotingSuccessful(ctx context.Context, env templates.Envi
 	//.ToGoValue().(bool)
 }
 
-func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environment)  {
+func (s *Suite) assertDKGSuccessful(ctx context.Context, env templates.Environment) {
 	v, err := s.client.ExecuteScriptBytes(ctx, templates.GenerateGetDKGCompletedScript(env), []cadence.Value{})
 	require.NoError(s.T(), err)
 	require.Truef(s.T(), bool(v.(cadence.Bool)), "expected dkg to have completed successfully")
@@ -606,7 +615,7 @@ func (s *Suite) assertInPhase(ctx context.Context, expectedPhase flow.EpochPhase
 }
 
 // assertEpochCounter requires actual epoch counter is equal to counter provided
-func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64)  {
+func (s *Suite) assertEpochCounter(ctx context.Context, expectedCounter uint64) {
 	snapshot, err := s.client.GetLatestProtocolSnapshot(ctx)
 	require.NoError(s.T(), err)
 	actualCounter, err := snapshot.Epochs().Current().Counter()
@@ -648,7 +657,7 @@ func (s *Suite) assertNetworkHealthyAfterANChange(ctx context.Context, env templ
 // assertNetworkHealthyAfterVNChange after an verification node is removed or added to the network
 // this func can be used to perform sanity.
 // 1. Ensure sealing continues by comparing latest sealed block from the root snapshot to the current latest sealed block
-func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo)  {
+func (s *Suite) assertNetworkHealthyAfterVNChange(ctx context.Context, _ templates.Environment, rootSnapshot *inmem.Snapshot, _ *StakedNodeOperationInfo) {
 	bootstrapHead, err := rootSnapshot.Head()
 	require.NoError(s.T(), err)
 
