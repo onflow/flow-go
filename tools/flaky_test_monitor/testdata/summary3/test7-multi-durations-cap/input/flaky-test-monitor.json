@@ -1,0 +1,12 @@
+{
+  "comment1": "property file for Flaky Test Monitor - Level 3",
+  "comment1.1": "check main flaky-test-monitor.json under level3 directory for explanation of each property",
+
+
+  "failures_threshold_percent": 0,
+  "failures_slice_max": 10,
+
+  "comment2": "return top 5 longest tests with duration of at least 0.25 seconds",
+  "duration_threshold_seconds":0.25,
+  "duration_slice_max":5
+}
