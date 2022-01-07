@@ -31,6 +31,7 @@ func NewGzipCompressedUnicast(logger zerolog.Logger, sporkId flow.Identifier, de
 	}
 }
 
+// UpgradeRawStream wraps gzip compression and decompression around the plain libp2p stream.
 func (g GzipStream) UpgradeRawStream(s libp2pnet.Stream) (libp2pnet.Stream, error) {
 	return compressed.NewCompressedStream(s, compressor.GzipStreamCompressor{})
 }

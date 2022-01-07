@@ -11,6 +11,7 @@ type PlainStream struct {
 	protocolId protocol.ID
 }
 
+// UpgradeRawStream implements protocol interface and returns the input stream without any modification.
 func (p PlainStream) UpgradeRawStream(s libp2pnet.Stream) (libp2pnet.Stream, error) {
 	return s, nil
 }
