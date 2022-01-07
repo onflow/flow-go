@@ -28,7 +28,7 @@ type Suite struct {
 	exe1ID                     flow.Identifier
 	exe2ID                     flow.Identifier
 	verID                      flow.Identifier // represents id of verification node
-	preferredUnicasts          string
+	preferredUnicasts          string          // preferred unicast protocols between execution and verification nodes.
 }
 
 // Ghost returns a client to interact with the Ghost node on testnet.
