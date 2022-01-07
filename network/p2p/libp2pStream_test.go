@@ -383,7 +383,7 @@ func testUnicastOverStream(t *testing.T, opts ...nodeFixtureParameterOption) {
 	testUnicastOverStreamRoundTrip(t, ctx, *identities[0], nodes[0], *identities[1], nodes[1], ch)
 }
 
-// TestUnicastOverStream_Fallback checks two nodes with asymmetric set of preferred unicast protocols can create streams and
+// TestUnicastOverStream_Fallback checks two nodes with asymmetric sets of preferred unicast protocols can create streams and
 // send and receive unicasts. Despite the asymmetry, the nodes must fall back to the libp2p plain stream during negotiation.
 func TestUnicastOverStream_Fallback(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
@@ -416,7 +416,7 @@ func TestUnicastOverStream_Fallback(t *testing.T) {
 	testUnicastOverStreamRoundTrip(t, ctx, id1, node1, id2, node2, ch)
 }
 
-// testUnicastOverStreamRoundTrip creates checks node1 and node2 can create stream between each other and push unicast messages
+// testUnicastOverStreamRoundTrip checks node1 and node2 can create stream between each other and push unicast messages
 // to each other over the streams.
 //
 // The channel argument keeps the individual messages received at both ends.
