@@ -3,6 +3,7 @@ package testnet
 import (
 	"context"
 	"fmt"
+	sdk "github.com/onflow/flow-go-sdk"
 	"github.com/onflow/flow-go/cmd/bootstrap/utils"
 	"github.com/onflow/flow-go/crypto"
 	"github.com/onflow/flow-go/model/encodable"
@@ -50,7 +51,7 @@ type ContainerConfig struct {
 	SupportsUnstakedNodes bool
 }
 
-func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID, machineAccountAddr flow.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
+func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID, machineAccountAddr sdk.Address, machineAccountKey encodable.MachineAccountPrivKey, role flow.Role) error {
 	// write staking and machine account private key files
 	writeJSONFile := func(relativePath string, val interface{}) error {
 		return WriteJSON(filepath.Join(bootstrapDir, relativePath), val)
@@ -72,7 +73,7 @@ func (c ContainerConfig) WriteKeyFiles(bootstrapDir string, chainID flow.ChainID
 	}
 
 	if role == flow.RoleConsensus || role == flow.RoleCollection {
-		err = utils.WriteMachineAccountFile(chainID, c.NodeID, machineAccountAddr, machineAccountKey, writeJSONFile)
+		err = utils.WriteMachineAccountFile(c.NodeID, machineAccountAddr, machineAccountKey, writeJSONFile)
 		if err != nil {
 			return fmt.Errorf("failed to write machine account file: %w", err)
 		}
