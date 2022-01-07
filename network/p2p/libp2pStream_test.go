@@ -361,7 +361,7 @@ func testUnicastOverStream(t *testing.T, opts ...nodeFixtureParameterOption) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	count := 2
-	ch := make(chan string, count)
+	ch := make(chan string, count) // we expect two messages during test, one from node1->node2 and vice versa.
 
 	// Create the handler function
 	streamHandler := func(s network.Stream) {
@@ -381,6 +381,39 @@ func testUnicastOverStream(t *testing.T, opts ...nodeFixtureParameterOption) {
 	require.Len(t, identities, count)
 
 	testUnicastOverStreamRoundTrip(t, ctx, *identities[0], nodes[0], *identities[1], nodes[1], ch)
+}
+
+// TestUnicastOverStream_Fallback checks two nodes with asymmetric set of preferred unicast protocols can create streams and
+// send and receive unicasts. Despite the asymmetry, the nodes must fall back to the libp2p plain stream during negotiation.
+func TestUnicastOverStream_Fallback(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	ch := make(chan string, 2) // we expect two messages during test, one from node1->node2 and vice versa.
+
+	// Create the handler function
+	streamHandler := func(s network.Stream) {
+		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
+		str, err := rw.ReadString('\n')
+		require.NoError(t, err)
+		ch <- str
+	}
+
+	// Creates nodes
+	// node1: supports only plain unicast protocol
+	// node2: supports plain and gzip
+	sporkId := unittest.IdentifierFixture()
+	node1, id1 := nodeFixture(t,
+		ctx,
+		sporkId,
+		withDefaultStreamHandler(streamHandler))
+	node2, id2 := nodeFixture(t,
+		ctx,
+		sporkId,
+		withDefaultStreamHandler(streamHandler),
+		withPreferredUnicasts([]unicast.ProtocolName{unicast.GzipCompressionUnicast}))
+	defer stopNodes(t, []*Node{node1, node2})
+
+	testUnicastOverStreamRoundTrip(t, ctx, id1, node1, id2, node2, ch)
 }
 
 // testUnicastOverStreamRoundTrip creates checks node1 and node2 can create stream between each other and push unicast messages

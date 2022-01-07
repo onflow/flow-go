@@ -6,9 +6,11 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+// TestVerificationStreamNegotiationSuite enables gzip stream compression only between execution and verification nodes, while the
+// rest of network runs on plain libp2p streams. It evaluates that network operates on its happy path concerning verification functionality.
 func TestVerificationStreamNegotiationSuite(t *testing.T) {
 	s := new(VerificationStreamNegotiationSuite)
-	s.preferredUnicasts = "gzip-compression"
+	s.preferredUnicasts = "gzip-compression" // enables gzip stream compression between execution and verification node
 	suite.Run(t, s)
 }
 
@@ -18,16 +20,7 @@ type VerificationStreamNegotiationSuite struct {
 
 // TestVerificationNodeHappyPath verifies the integration of verification and execution nodes over the
 // happy path of successfully issuing a result approval for the first chunk of the first block of the testnet.
+// Note that gzip stream compression is enabled between verification and execution nodes.
 func (suite *VerificationStreamNegotiationSuite) TestVerificationNodeHappyPath() {
-	// wait for next height finalized (potentially first height), called blockA
-	blockA := suite.BlockState.WaitForHighestFinalizedProgress(suite.T())
-	suite.T().Logf("blockA generated, height: %v ID: %v\n", blockA.Header.Height, blockA.Header.ID())
-
-	// waits for execution receipt for blockA from execution node, called receiptA
-	receiptA := suite.ReceiptState.WaitForReceiptFrom(suite.T(), blockA.Header.ID(), suite.exe1ID)
-	resultID := receiptA.ExecutionResult.ID()
-	suite.T().Logf("receipt for blockA generated: result ID: %x\n", resultID)
-
-	// wait for a result approval from verification node
-	suite.ApprovalState.WaitForResultApproval(suite.T(), suite.verID, resultID, uint64(0))
+	testVerificationNodeHappyPath(suite.T(), suite.exe1ID, suite.verID, suite.BlockState, suite.ReceiptState, suite.ApprovalState)
 }
