@@ -103,3 +103,7 @@ func SaveToFile(fileName string, testSummary interface{}) {
 	_, err = file.Write(testSummaryBytes)
 	AssertNoError(err, "error saving test summary to file")
 }
+
+func ProcessRawTestStep(testStep *RawTestStep) {
+
+}

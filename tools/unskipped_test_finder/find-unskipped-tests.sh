@@ -1,0 +1,4 @@
+# run tests
+
+make test
+

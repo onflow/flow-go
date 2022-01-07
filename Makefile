@@ -76,6 +76,9 @@ unittest: unittest-main
 	$(MAKE) -C crypto test
 	$(MAKE) -C integration test
 
+.PHONY: find-unskipped-tests
+find-unskipped-tests: TODO
+
 .PHONY: test
 test: generate-mocks unittest
 
